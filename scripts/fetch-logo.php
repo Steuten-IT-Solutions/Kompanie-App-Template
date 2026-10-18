@@ -53,8 +53,9 @@ for ($hop = 0; $hop < 4; $hop++) {
         $fail('Das Logo ließ sich nicht laden: ' . curl_error($ch));
     }
     if ($status >= 300 && $status < 400 && $next !== '') {
-        if (!$allowed($next)) {
-            $fail('Das Logo leitet auf eine fremde Adresse weiter.');
+        // Anhänge öffentlicher Repos leitet GitHub auf seinen S3-Speicher weiter (signierte, kurzlebige Adresse).
+        if (!$allowed($next) && !preg_match('~^https://github-production-user-asset-[0-9a-f]+\.s3\.amazonaws\.com/~', $next)) {
+            $fail('Das Logo leitet auf eine fremde Adresse weiter (' . preg_replace('~[^A-Za-z0-9.-]~', '', (string) parse_url($next, PHP_URL_HOST)) . ').');
         }
         $url = $next;
         continue;

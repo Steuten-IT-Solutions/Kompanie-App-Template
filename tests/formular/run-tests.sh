@@ -42,7 +42,8 @@ awk '{print} /^Herzlich willkommen!$/ {print "### Name des Repos"; print ""; pri
 if php scripts/issue-to-kompanie.php --mode=neu --body="$T/doppelt.md" --out="$T/d" 2> /dev/null; then fail "Doppeltes Feld angenommen"; fi
 grep -q "doppelt" "$T/d/fehler.txt" && ok "Doppeltes Feld (Überschrift im Text) wird abgelehnt" || fail "Doppelt: $(cat "$T/d/fehler.txt")"
 
-for url in "https://example.org/logo.png" "http://github.com/user-attachments/assets/x" "https://github.com.example.org/user-attachments/x"; do
+for url in "https://example.org/logo.png" "http://github.com/user-attachments/assets/x" "https://github.com.example.org/user-attachments/x" \
+  "https://github-production-user-asset-6210df.s3.amazonaws.com/x.png"; do   # S3 nur als Weiterleitungsziel von GitHub
   if php scripts/fetch-logo.php --url="$url" --out="$T/logo" 2> /dev/null; then fail "Logo von $url geladen"; fi
 done
 ok "Logo nur von GitHub-Anhängen (https)"
