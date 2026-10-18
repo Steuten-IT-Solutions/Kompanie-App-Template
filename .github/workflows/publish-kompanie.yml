@@ -15,12 +15,18 @@ on:
         description: Kompanie-Repo (Steuten-IT-Solutions/Name, genaue Schreibweise)
         type: string
         required: true
-  # Nur für kompanien-abgleichen.yml in diesem Repo. (Aus einem fremden Repo aufgerufen liefe der
-  # Workflow mit dessen Rechten und Geheimnissen, nicht mit unseren.)
+  # Nur für kompanien-abgleichen.yml und kompanie-formular.yml in diesem Repo. (Aus einem fremden Repo
+  # aufgerufen liefe der Workflow mit dessen Rechten und Geheimnissen, nicht mit unseren.)
+  # Die Aufrufer müssen die Secrets weitergeben, auch die der Environment: sonst kommen sie leer an.
   workflow_call:
     inputs:
       repo:
         type: string
+        required: true
+    secrets:
+      KOMPANIE_APP_KEY:
+        required: true
+      KOMPANIE_SIGNING_KEY:
         required: true
 
 permissions:

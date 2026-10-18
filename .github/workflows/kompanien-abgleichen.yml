@@ -62,3 +62,7 @@ jobs:
     uses: ./.github/workflows/publish-kompanie.yml
     with:
       repo: ${{ matrix.repo }}
+    # Nur diese beiden (nicht secrets: inherit); sie gelten erst im Job mit der Environment „veroeffentlichen“.
+    secrets:
+      KOMPANIE_APP_KEY: ${{ secrets.KOMPANIE_APP_KEY }}
+      KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
