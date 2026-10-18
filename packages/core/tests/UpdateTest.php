@@ -82,7 +82,7 @@ final class UpdateTest extends TestCase
         $this->assertSame('1.0.0.2', $list->channel('early'));
         $this->assertTrue($list->isWithdrawn('1.1.0.3'));
         $this->assertNotContains('1.1.0.3', array_column($list->available(), 'version'));
-        $this->assertSame('early', $list->channelFor(['coreVersion' => '1.1.0'], '1.1.0'), 'Kern mit zurückgezogenem Release: nie mehr direkt stable');
+        $this->assertSame('early', $list->channelFor(['coreVersion' => '1.1.0', 'coreCode' => 'c11'], '1.1.0 c11'), 'Kern mit zurückgezogenem Release: nie mehr direkt stable');
         $this->assertThrows(fn () => $list->promote('1.1.0.3'), 'zurückgezogen');
         $this->assertThrows(fn () => $list->addRelease($this->release('1.1.0.3'), $base('x')), 'nie ersetzt');
         $this->assertThrows(fn () => $list->addRelease($this->release('1.0.0.9'), $base('x')), 'älter als');
@@ -99,14 +99,23 @@ final class UpdateTest extends TestCase
         $list->withdraw('2.0.0.5');
         $this->assertNull($list->channel('stable'));
 
-        // Nur das Aussehen geändert (gleicher Kern und Commit wie stable): direkt stable.
+        // Nur das Aussehen geändert (gleicher Kern und Programmcode wie stable): direkt stable.
         $list2 = UpdateList::create('org/k', 'K');
-        $list2->addRelease(['kompanie' => 'org/k', 'coreCommit' => 'abc'] + $this->release('1.0.0.1'), $base('1.0.0.1'), 'stable');
-        $this->assertSame('stable', $list2->channelFor(['coreVersion' => '1.0.0', 'coreCommit' => 'abc']));
-        $this->assertSame('early', $list2->channelFor(['coreVersion' => '1.0.0', 'coreCommit' => 'def']), 'v1 still verschoben: neuer Code');
-        $this->assertSame('early', $list2->channelFor(['coreVersion' => '1.1.0']), 'neuer Kern erst auf der Demo');
-        $this->assertSame('early', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0']), 'erste Version');
-        $this->assertSame('stable', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0'], '1.0.0'), 'erste Version mit geprüftem Kern');
+        $list2->addRelease(['kompanie' => 'org/k', 'coreCommit' => 'abc', 'coreCode' => 'c1'] + $this->release('1.0.0.1'), $base('1.0.0.1'), 'stable');
+        $this->assertSame('stable', $list2->channelFor(['coreVersion' => '1.0.0', 'coreCommit' => 'xyz', 'coreCode' => 'c1']), 'anderer Commit, gleicher Code (z. B. nur Doku geändert)');
+        $this->assertSame('early', $list2->channelFor(['coreVersion' => '1.0.0', 'coreCommit' => 'abc', 'coreCode' => 'c2']), 'gleiche Kern-Version, aber geänderter Code');
+        $this->assertSame('early', $list2->channelFor(['coreVersion' => '1.1.0', 'coreCode' => 'c1']), 'neuer Kern erst auf der Demo');
+        $this->assertSame('early', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0', 'coreCode' => 'c1']), 'erste Version');
+        $this->assertSame('stable', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0', 'coreCode' => 'c1'], '1.0.0 c1'), 'erste Version mit geprüftem Kern');
+        $this->assertSame('early', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0', 'coreCode' => 'c9'], '1.0.0 c1'), 'Kern-Version geprüft, aber Code seitdem geändert');
+        $this->assertSame('early', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0', 'coreCode' => 'c1'], '1.0.0'), 'STABLE_CORE ohne Prüfsumme gilt nicht');
+        $this->assertSame('early', $list2->channelFor(['coreVersion' => '1.0.0']), 'ohne Code und Commit nie direkt stable');
+
+        // Versionsnummern: fortlaufend je Kern-Version; Serien-Nummer mindestens die aktuelle Zeit
+        $this->assertSame('1.0.0.2', $list2->nextVersion('1.0.0'));
+        $this->assertSame('1.1.0.1', $list2->nextVersion('1.1.0'));
+        $this->assertThrows(fn () => $list2->nextVersion('0.9.0'), 'älter als');
+        $this->assertGreaterThanOrEqual(time() - 5, $list2->serial());
 
         // Kürzung: stable bleibt in der Liste, auch nach vielen early-Versionen
         $list3 = UpdateList::create('org/kompanie-test', 'K');

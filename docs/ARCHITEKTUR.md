@@ -249,11 +249,11 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 - Kern: SemVer, Tag `v1.2.3`, beweglicher Tag `v1`.
 - Kompanie: Kern-Version plus laufende Build-Nummer, z. B. `1.4.0.3`. Auch eine Logo-Änderung wird so als Update ausgeliefert.
 - Jedes Release enthält `release.json`: Version, Mindest-PHP-Version, nötige Erweiterungen, ob Migrationen dabei sind, Signatur.
-- Ein Kern-Release startet **„Alle Kompanien neu bauen“** (über das Topic `kompanie-app`, mit einer GitHub App der Organisation).
+- Jede Änderung am Programmcode auf `main` baut über **„Kompanien abgleichen“** (alle 30 Minuten, findet die Repos über das Topic `kompanie-app`) neue Versionen für alle Kompanien, zuerst im Kanal `early`.
 
 ### Signatur
 
-Jedes Paket wird mit **Ed25519** signiert (privater Schlüssel als Organisations-Secret, öffentliche Schlüssel im Kern). Installer und Updater prüfen mit `sodium` vor dem Entpacken. Schlüsselwechsel über eine Liste erlaubter Schlüssel.
+`release.json` (mit SHA-256 und Größe jedes Pakets und von `install.php`) und die Update-Liste werden mit **Ed25519** signiert (privater Schlüssel nur als Secret der Environment `veroeffentlichen` im Kern-Repo, öffentliche Schlüssel im Kern, `TrustedKeys`). Installer und Updater prüfen mit `sodium` die Signatur und vor dem Entpacken die Prüfsumme des Pakets. Schlüsselwechsel über die Liste erlaubter Schlüssel. Ablauf und Schutz der Signierung: [RELEASE.md](RELEASE.md).
 
 ### Ein Update in jedem Fall einspielen
 
@@ -377,7 +377,7 @@ Festgehalten für die Planung:
 | 3 | **Eigenständige Version:** Benutzer, Sitzung, Einstellungen, SQLite und MySQL über PDO, Export/Import | eigenständige Version |
 | 4 | **Branding und Build:** Farben, Icons, Signatur, Screenshots, `Kompanie-App-Vorlage`, Download-Seite | Kompanie-Repo baut signierte Pakete |
 | 5 | **Installer, Assistent, Updates:** automatische Updates, Ein-Klick-Update, Zurückrollen, Sicherung, Statusseite | Installation und Pflege ohne Handarbeit |
-| 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, „Alle Kompanien neu bauen“, Statusübersicht | neue Kompanie nur durch Eintragen |
+| 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, Statusübersicht („Kompanien abgleichen“ ist schon da) | neue Kompanie nur durch Eintragen |
 | später | Hoster-Anleitungen erweitern, `/embed/termine`, Multisite | |
 | – | Umstellung Lank | eigener Plan |
 

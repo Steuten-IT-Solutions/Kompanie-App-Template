@@ -1,5 +1,6 @@
 # Eine Version einer Kompanie für alle freigeben (promote) oder zurückziehen (withdraw).
-# Nur im Kern-Repo, hinter der Environment „veroeffentlichen“. Zurückgezogene Versionen spielen
+# Nur im Kern-Repo, hinter der Environment „veroeffentlichen“; starten dürfen nur Personen mit
+# Schreibrecht auf das Kern-Repo. Zurückgezogene Versionen spielen
 # die Installationen automatisch auf die zuletzt freigegebene Version zurück.
 name: Versionen steuern
 
@@ -18,23 +19,14 @@ on:
         description: Version, z. B. 1.4.0.3
         type: string
         required: true
-  workflow_call:
-    inputs:
-      repo:
-        type: string
-        required: true
-      action:
-        type: string
-        required: true
-      version:
-        type: string
-        required: true
 
 permissions:
   contents: read
 
+# Je Kompanie, Aktion und Version eine eigene Gruppe: So verdrängt kein späterer Lauf einen wartenden
+# (z. B. ein Zurückziehen). Gleichzeitige Änderungen der Liste fängt control-release.sh ab.
 concurrency:
-  group: kompanie-control-${{ inputs.repo }}
+  group: kompanie-control-${{ inputs.repo }}-${{ inputs.action }}-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:

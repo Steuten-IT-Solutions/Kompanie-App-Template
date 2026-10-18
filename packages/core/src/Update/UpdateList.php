@@ -8,7 +8,8 @@ namespace KompanieApp\Core\Update;
  * Die Update-Liste einer Kompanie (updates.json, signiert, auf GitHub Pages).
  *
  * - type/kompanie: wofür die Liste gilt; Installationen nehmen nur die Liste ihrer Kompanie an
- * - serial: steigt mit jeder Änderung; Installationen nehmen nie eine ältere Liste an
+ * - serial: steigt mit jeder Änderung (mindestens auf die aktuelle Unix-Zeit, damit auch eine neu
+ *   angelegte Liste höher liegt); Installationen nehmen nie eine ältere Liste an
  *   (Schutz vor dem Wiedereinspielen einer alten, ebenfalls signierten Liste)
  * - versions: alle veröffentlichten Versionen, neueste zuerst, mit Adresse und SHA-256 der Pakete
  * - channels: early (nur unsere Demo-Installation) und stable (alle Kompanien)
@@ -121,6 +122,8 @@ final class UpdateList
             'major' => Version::major($v),
             'coreVersion' => (string) ($release['coreVersion'] ?? ''),
             'coreCommit' => (string) ($release['coreCommit'] ?? ''),
+            'coreCode' => (string) ($release['coreCode'] ?? ''),
+            'kompanieCommit' => (string) ($release['kompanieCommit'] ?? ''),
             'minPhp' => (string) ($release['minPhp'] ?? '8.1'),
             'minWordPress' => (string) ($release['minWordPress'] ?? '6.2'),
             'extensions' => array_values((array) ($release['extensions'] ?? [])),
@@ -138,8 +141,9 @@ final class UpdateList
 
     /**
      * Kanal für ein neues Release. Direkt stable, wenn der Programmcode schon geprüft ist:
-     * - die Kern-Version hat den Test der Demo-Installation bestanden ($stableCore, Datei STABLE_CORE), oder
-     * - es ändert sich nur das Aussehen (gleicher Kern-Commit bzw. gleiche Kern-Version wie die Version in stable).
+     * - er ist derselbe wie der auf der Demo-Installation geprüfte ($stableCore = Inhalt der Datei
+     *   STABLE_CORE: „Kern-Version Code-Prüfsumme“, beides aus der release.json der geprüften Version), oder
+     * - es ändert sich nur das Aussehen (gleicher Programmcode wie die Version in stable).
      * Nie für Kern-Versionen, von denen ein Release zurückgezogen wurde. Sonst early.
      *
      * @param array<string, mixed> $release
@@ -147,10 +151,12 @@ final class UpdateList
     public function channelFor(array $release, string $stableCore = ''): string
     {
         $core = (string) ($release['coreVersion'] ?? '');
+        $code = (string) ($release['coreCode'] ?? '');
         if ($core === '' || in_array($core, $this->data['blockedCores'], true)) {
             return 'early';
         }
-        if ($stableCore !== '' && $core === $stableCore) {
+        $checked = preg_split('/\s+/', trim($stableCore)) ?: [];
+        if (count($checked) === 2 && $checked[0] === $core && $code !== '' && hash_equals($checked[1], $code)) {
             return 'stable';
         }
         $stable = $this->channel('stable');
@@ -158,9 +164,36 @@ final class UpdateList
         if ($entry === null || ($entry['coreVersion'] ?? null) !== $core) {
             return 'early';
         }
-        // Gleiche Kern-Version: Ist der Commit bekannt, muss auch er gleich sein (kein still verschobenes v1).
+        // Gleiche Kern-Version: Auch der Programmcode muss gleich sein (kein still geänderter Kern).
+        if ($code !== '' && ($entry['coreCode'] ?? '') !== '') {
+            return hash_equals((string) $entry['coreCode'], $code) ? 'stable' : 'early';
+        }
         $commit = (string) ($release['coreCommit'] ?? '');
-        return $commit === '' || ($entry['coreCommit'] ?? '') === '' || $entry['coreCommit'] === $commit ? 'stable' : 'early';
+        return $commit !== '' && ($entry['coreCommit'] ?? '') === $commit ? 'stable' : 'early';
+    }
+
+    /**
+     * Nächste Versionsnummer für eine Kern-Version: Kern-Version plus fortlaufende Build-Nummer
+     * (eins mehr als die höchste schon vergebene, auch zurückgezogene).
+     */
+    public function nextVersion(string $coreVersion): string
+    {
+        if (!preg_match('/^\d{1,4}\.\d{1,4}\.\d{1,4}$/', $coreVersion)) {
+            throw new \RuntimeException("Ungültige Kern-Version: $coreVersion");
+        }
+        $build = 0;
+        foreach (array_merge(array_column($this->data['versions'], 'version'), $this->data['withdrawn']) as $v) {
+            if (is_string($v) && str_starts_with($v, $coreVersion . '.')) {
+                $build = max($build, (int) substr($v, strlen($coreVersion) + 1));
+            }
+        }
+        $next = $coreVersion . '.' . ($build + 1);
+        foreach ($this->data['versions'] as $e) {
+            if (Version::compare($e['version'], $next) > 0) {
+                throw new \RuntimeException("Kern-Version $coreVersion ist älter als die schon veröffentlichte {$e['version']}.");
+            }
+        }
+        return $next;
     }
 
     /** Befördert eine Version nach stable (nach erfolgreichem Test der Demo-Installation). */
@@ -293,7 +326,7 @@ final class UpdateList
 
     private function touch(): void
     {
-        $this->data['serial'] = $this->serial() + 1;
+        $this->data['serial'] = max($this->serial() + 1, time());
         $this->data['generated'] = gmdate('c');
     }
 }

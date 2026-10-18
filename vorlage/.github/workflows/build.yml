@@ -1,8 +1,8 @@
-# Baut eine Vorschau der App dieser Kompanie (Bildschirmfotos, Pakete zum Ansehen) und stößt nach
-# einer Änderung auf main die Veröffentlichung im Kern-Repo an. Nichts hier muss angepasst werden.
+# Baut eine Vorschau der App dieser Kompanie (Bildschirmfotos, Pakete zum Ansehen), z. B. für Pull
+# Requests. Nichts hier muss angepasst werden.
 #
-# Dieses Repo hat bewusst keinen Zugriff auf den Signaturschlüssel: Signiert und veröffentlicht wird
-# nur im Kern-Repo. Das Secret KOMPANIE_DISPATCH_TOKEN darf dort nur Workflows starten.
+# Veröffentlicht wird nicht von hier: Das Kern-Repo prüft alle 30 Minuten, ob sich main geändert hat,
+# und baut, signiert und veröffentlicht dann selbst. Dieses Repo braucht dafür keine Geheimnisse.
 name: App bauen
 
 on:
@@ -19,13 +19,3 @@ permissions:
 jobs:
   vorschau:
     uses: Steuten-IT-Solutions/Kompanie-App-Template/.github/workflows/preview-kompanie.yml@v1
-
-  veroeffentlichen:
-    needs: vorschau
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Veröffentlichung im Kern-Repo anstoßen
-        env:
-          GH_TOKEN: ${{ secrets.KOMPANIE_DISPATCH_TOKEN }}
-        run: gh workflow run publish-kompanie.yml --repo Steuten-IT-Solutions/Kompanie-App-Template --ref main -f repo="$GITHUB_REPOSITORY"

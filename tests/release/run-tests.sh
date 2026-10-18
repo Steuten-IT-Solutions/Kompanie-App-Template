@@ -68,18 +68,27 @@ WP_LIST="$(unzip -l "$T/r1/kompanie-app-wordpress.zip")"
 grep -qE 'tests/|e2e/|node_modules' <<< "$SA_LIST" && fail "Paket enthält Entwicklungsdateien" || ok "Paket ohne Entwicklungsdateien"
 grep -q 'kompanie-app/core/App.php' <<< "$WP_LIST" && ok "Plugin enthält den Kern" || fail "Kern fehlt im Plugin"
 
-# Veröffentlichen wie im Workflow: unsigniert bauen, getrennt signieren, Release + gh-pages
-# (mit einem Bare-Repo statt GitHub und einer Attrappe der GitHub-CLI).
-KOMPANIE_SIGNING_KEY= php scripts/package.php --config=config/kompanie.example.json --version="$CORE.7" --out="$T/p7/release" --kompanie=org/kompanie-test > /dev/null 2>&1
-grep -q '"type": "release"' "$T/p7/release/release.json" && ! grep -q kompanie-app-signed "$T/p7/release/release.json" && ok "Build-Job erzeugt unsignierte release.json" || fail "release.json im Build-Job"
-cp "$T/p7/release/kompanie-app-standalone.zip" "$T/orig.zip"
-echo "manipuliert" >> "$T/p7/release/kompanie-app-standalone.zip"
-if php scripts/sign-release.php --dir="$T/p7/release" --trust-signing-key > /dev/null 2>&1; then fail "Manipuliertes Paket signiert"; else ok "Signier-Schritt prüft die Pakete gegen release.json"; fi
-cp "$T/orig.zip" "$T/p7/release/kompanie-app-standalone.zip"
-if php scripts/sign-release.php --dir="$T/p7/release" > /dev/null 2>&1; then fail "Schlüssel außerhalb von TrustedKeys akzeptiert"; else ok "Nur Schlüssel aus TrustedKeys signieren"; fi
-php scripts/sign-release.php --dir="$T/p7/release" --trust-signing-key > /dev/null && ok "Signiert" || fail "Signieren"
-mkdir -p "$T/p7/screenshots" "$T/p7/brand"
-cp packages/frontend/src/generated/{brand.json,theme.css,logo.png} "$T/p7/brand/" && cp packages/frontend/public/icons/favicon-32.png "$T/p7/brand/favicon.png"
+# Veröffentlichen wie im Workflow: Build-Ergebnis gefiltert übernehmen, im Veröffentlichungs-Job selbst
+# paketieren und signieren, Release + gh-pages (mit einem Bare-Repo statt GitHub und einer Attrappe der GitHub-CLI).
+mkdir -p "$T/untrusted/brand" "$T/untrusted/screenshots"
+cp -r packages/frontend/dist "$T/untrusted/dist"
+cp packages/frontend/src/generated/{brand.json,theme.css,logo.png} "$T/untrusted/brand/" && cp packages/frontend/public/icons/favicon-32.png "$T/untrusted/brand/favicon.png"
+cp packages/frontend/public/icons/favicon-32.png "$T/untrusted/screenshots/1-termine.png"
+TYPES=js,css,html,png,jpg,jpeg,webp,svg,ico,json,webmanifest,woff2,txt
+for bad in "x.php" "bild.php.png" ".htaccess" "assets/.user.ini"; do
+  mkdir -p "$(dirname "$T/untrusted/dist/$bad")" && echo "<?php" > "$T/untrusted/dist/$bad"
+  if php scripts/import-build.php --from="$T/untrusted/dist" --to="$T/checked/dist" --types="$TYPES" > /dev/null 2>&1; then fail "Build-Ergebnis mit $bad übernommen"; fi
+  rm "$T/untrusted/dist/$bad"
+done
+ok "Build-Ergebnis mit PHP-, .htaccess- oder Punktdateien wird abgelehnt"
+ln -s /etc/passwd "$T/untrusted/dist/link.txt"
+if php scripts/import-build.php --from="$T/untrusted/dist" --to="$T/checked/dist" --types="$TYPES" > /dev/null 2>&1; then fail "Symbolischer Link übernommen"; else ok "Symbolische Links werden abgelehnt"; fi
+rm "$T/untrusted/dist/link.txt"
+php scripts/import-build.php --from="$T/untrusted/dist" --to="$T/checked/dist" --types="$TYPES" > /dev/null
+php scripts/import-build.php --from="$T/untrusted/brand" --to="$T/checked/brand" --types=json,css,png > /dev/null
+php scripts/import-build.php --from="$T/untrusted/screenshots" --to="$T/checked/screenshots" --types=png > /dev/null
+ok "Gebaute Oberfläche übernommen"
+
 git init --quiet --bare "$T/remote.git"
 cat > "$T/gh" <<'GH'
 #!/usr/bin/env bash
@@ -87,20 +96,58 @@ cat > "$T/gh" <<'GH'
 D="$(dirname "$0")/releases"; mkdir -p "$D"
 case "$1 $2" in
   "release view") [ -d "$D/$3" ] ;;
-  "release delete") rm -rf "${D:?}/$3" ;;
-  "release create") TAG="$3"; shift 3; mkdir -p "$D/$TAG"; for a in "$@"; do [ -f "$a" ] && cp "$a" "$D/$TAG/"; [ "$a" = --prerelease ] && touch "$D/$TAG/PRERELEASE"; done; true ;;
+  "release delete") echo "gelöscht" > "$D/$3.GELOESCHT" ;;
+  "release create"|"release upload") TAG="$3"; shift 3; mkdir -p "$D/$TAG"; for a in "$@"; do [ -f "$a" ] && cp "$a" "$D/$TAG/"; [ "$a" = --prerelease ] && touch "$D/$TAG/PRERELEASE"; done; true ;;
+  "release edit") case "$*" in *--prerelease=true*) touch "$D/$3/PRERELEASE" ;; *--prerelease=false*) rm -f "$D/$3/PRERELEASE" ;; esac ;;
 esac
 GH
 chmod +x "$T/gh"
-PUB=(env REPO=org/kompanie-test VERSION="$CORE.7" KOMPANIE_SHA=abc OUT="$T/p7" STABLE_CORE= GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x)
-"${PUB[@]}" scripts/publish-release.sh > /dev/null && [ -f "$T/releases/v$CORE.7/install.php" ] && [ -f "$T/releases/v$CORE.7/PRERELEASE" ] && ok "Erstes Veröffentlichen legt gh-pages an; neuer Kern als Vorab-Release" || fail "Veröffentlichen"
-git clone --quiet --branch gh-pages "file://$T/remote.git" "$T/pages1"
-[ -f "$T/pages1/updates.json" ] && [ -f "$T/pages1/index.html" ] && [ -f "$T/pages1/brand/theme.css" ] && ok "gh-pages: Update-Liste, Download-Seite, Branding" || fail "gh-pages-Inhalt"
-OUT2="$("${PUB[@]}" scripts/publish-release.sh)"
-grep -q "schon in der Liste" <<< "$OUT2" && ok "Re-run veröffentlicht nichts doppelt" || fail "Re-run"
-env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.7" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null && ok "Freigeben über control-release.sh" || fail "Freigeben"
-git clone --quiet --branch gh-pages "file://$T/remote.git" "$T/pages2"
-grep -q "releases/download/v$CORE.7/kompanie-app-wordpress.zip" "$T/pages2/index.html" && ok "Download-Seite nach der Freigabe" || fail "Download-Seite nach Freigabe"
-if env REPO=org/kompanie-test ACTION=boese VERSION="$CORE.7" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null 2>&1; then fail "Unbekannte Aktion angenommen"; else ok "Unbekannte Aktion abgelehnt"; fi
+SHA1=1111111111111111111111111111111111111111
+SHA2=2222222222222222222222222222222222222222
+SHA3=3333333333333333333333333333333333333333
+pub() { env REPO=org/kompanie-test KOMPANIE_SHA="$1" CONFIG=config/kompanie.example.json DIST="$T/checked/dist" BRAND="$T/checked/brand" \
+  SCREENSHOTS="$T/checked/screenshots" STABLE_CORE="${2:-}" TRUST_SIGNING_KEY=1 GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/publish-release.sh; }
+pages() { rm -rf "$T/pages" && git clone --quiet --branch gh-pages "file://$T/remote.git" "$T/pages"; }
+list() { php scripts/updates.php --list="$T/pages/updates.json" --show; }
+
+pub "$SHA1" > /dev/null
+R="$T/releases/v$CORE.1"
+[ "$(ls "$R" | sort | tr '\n' ' ')" = "PRERELEASE install.php kompanie-app-standalone.zip kompanie-app-wordpress.zip release.json " ] \
+  && ok "Erstes Veröffentlichen: Version $CORE.1 mit genau vier Dateien, neuer Kern als Vorab-Release" || fail "Release-Dateien: $(ls "$R")"
+pages
+[ -f "$T/pages/updates.json" ] && [ -f "$T/pages/index.html" ] && [ -f "$T/pages/brand/theme.css" ] && ok "gh-pages: Update-Liste, Download-Seite, Branding" || fail "gh-pages-Inhalt"
+INFO="$(php -r '$e = json_decode(file_get_contents($argv[1]), true); $r = json_decode(base64_decode($e["payload"]), true);
+  echo $r["kompanie"], " ", $r["kompanieCommit"], " ", $r["installer"]["sha256"] === hash_file("sha256", $argv[2]) ? "ok" : "falsch", " ", strlen($r["coreCode"]);' "$R/release.json" "$R/install.php")"
+[ "$INFO" = "org/kompanie-test $SHA1 ok 64" ] && ok "release.json: Kompanie, Commit, Prüfsumme von install.php, Code-Prüfsumme" || fail "release.json: $INFO"
+grep -q "\"kompanieCommit\": \"$SHA1\"" <<< "$(list)" && ok "Update-Liste kennt den Stand des Kompanie-Repos" || fail "kompanieCommit fehlt in der Liste"
+
+OUT2="$(pub "$SHA1")"
+grep -q "schon als Version $CORE.1 veröffentlicht" <<< "$OUT2" && [ ! -d "$T/releases/v$CORE.2" ] && ok "Gleicher Stand: nichts doppelt" || fail "Re-run: $OUT2"
+
+# Abbruch nach dem Anlegen des Releases (Liste nicht aktualisiert): dieselbe Nummer wird fertig veröffentlicht, nichts gelöscht
+mkdir -p "$T/releases/v$CORE.2" && echo alt > "$T/releases/v$CORE.2/release.json"
+pub "$SHA2" > /dev/null
+pages
+grep -q kompanie-app-signed "$T/releases/v$CORE.2/release.json" && ! ls "$T/releases/"*.GELOESCHT > /dev/null 2>&1 && grep -q "\"$CORE.2\"" <<< "$(list)" \
+  && ok "Halbfertiges Release wird ergänzt statt gelöscht" || fail "Halbfertiges Release"
+
+env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null && ok "Freigeben über control-release.sh" || fail "Freigeben"
+pages
+grep -q "releases/download/v$CORE.2/kompanie-app-wordpress.zip" "$T/pages/index.html" && ok "Download-Seite nach der Freigabe" || fail "Download-Seite nach Freigabe"
+if env REPO=org/kompanie-test ACTION=boese VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null 2>&1; then fail "Unbekannte Aktion angenommen"; else ok "Unbekannte Aktion abgelehnt"; fi
+
+# Neuer Stand der Kompanie bei gleichem Programmcode wie stable: direkt stable, kein Vorab-Release
+pub "$SHA3" > /dev/null
+[ -d "$T/releases/v$CORE.3" ] && [ ! -f "$T/releases/v$CORE.3/PRERELEASE" ] && ok "Nur Aussehen geändert: direkt stable" || fail "Kanal bei gleichem Code"
+
+# Nach dem Zurückziehen ist die Kern-Version gesperrt: auch mit passendem STABLE_CORE nur early
+# (dass STABLE_CORE nur mit passender Code-Prüfsumme gilt, prüft UpdateTest)
+CODE="$(php scripts/package.php --code-hash)"
+SHA4=4444444444444444444444444444444444444444
+env REPO=org/kompanie-test ACTION=withdraw VERSION="$CORE.3" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null
+pub "$SHA4" "$CORE $CODE" > /dev/null
+[ -f "$T/releases/v$CORE.4/PRERELEASE" ] && ok "Nach dem Zurückziehen: Kern gesperrt, nur noch early" || fail "Gesperrter Kern"
+pages
+grep -q '"serial": 1[0-9]\{9\}' <<< "$(list)" && ok "Serien-Nummer mindestens die aktuelle Zeit" || fail "Serien-Nummer"
 
 echo; echo "$pass bestanden, 0 fehlgeschlagen"

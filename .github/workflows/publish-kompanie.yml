@@ -1,18 +1,22 @@
-# Baut, signiert und veröffentlicht die App einer Kompanie. Läuft nur im Kern-Repo:
-# - Job „bauen“ ohne Geheimnisse (npm, Playwright, Branding),
-# - Job „veröffentlichen“ hinter der Environment „veroeffentlichen“ (Secrets KOMPANIE_SIGNING_KEY
-#   und KOMPANIE_APP_KEY, Variable KOMPANIE_APP_ID; nur Branch main): ohne npm, prüft die Pakete
-#   gegen release.json, signiert, legt das Release im Kompanie-Repo an und aktualisiert gh-pages.
-# Angestoßen vom Kompanie-Repo nach einer Änderung (vorlage/.github/workflows/build.yml) oder von Hand.
+# Baut, signiert und veröffentlicht die App einer Kompanie. Läuft nur im Kern-Repo, von Hand oder aus
+# „Kompanien abgleichen“ (kompanien-abgleichen.yml, z. B. nach einer Änderung im Kompanie-Repo):
+# - Job „build“ ohne Geheimnisse: npm, Branding aus kompanie.json und Logo, Bildschirmfotos.
+#   Sein Ergebnis gilt als nicht vertrauenswürdig (hier laufen fremde Pakete und Daten der Kompanie).
+# - Job „publish“ hinter der Environment „veroeffentlichen“ (Secrets KOMPANIE_SIGNING_KEY und
+#   KOMPANIE_APP_KEY, Variable KOMPANIE_APP_ID; nur Branch main), ohne npm: übernimmt aus „build“ nur
+#   die gebaute Oberfläche und Bilder (erlaubte Dateitypen), baut Pakete, install.php und release.json
+#   selbst aus dem eigenen Checkout, signiert und veröffentlicht (scripts/publish-release.sh).
 name: Kompanie veröffentlichen
 
 on:
   workflow_dispatch:
     inputs:
       repo:
-        description: Kompanie-Repo (Steuten-IT-Solutions/Name)
+        description: Kompanie-Repo (Steuten-IT-Solutions/Name, genaue Schreibweise)
         type: string
         required: true
+  # Nur für kompanien-abgleichen.yml in diesem Repo. (Aus einem fremden Repo aufgerufen liefe der
+  # Workflow mit dessen Rechten und Geheimnissen, nicht mit unseren.)
   workflow_call:
     inputs:
       repo:
@@ -30,15 +34,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      kompanie-sha: ${{ steps.version.outputs.kompanie-sha }}
-      stable-core: ${{ steps.version.outputs.stable-core }}
+      kompanie-sha: ${{ steps.kompanie.outputs.sha }}
     steps:
-      - name: Eingabe prüfen
+      - name: Kompanie-Repo prüfen (Schreibweise, Topic kompanie-app)
         env:
           REPO: ${{ inputs.repo }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           [[ "$REPO" =~ ^Steuten-IT-Solutions/[A-Za-z0-9._-]+$ ]] || { echo "::error::Ungültiges Kompanie-Repo: $REPO"; exit 1; }
+          [[ "$REPO" != "$GITHUB_REPOSITORY" ]] || { echo "::error::Das Kern-Repo ist keine Kompanie."; exit 1; }
+          INFO="$(gh api "repos/$REPO" --jq '[.full_name, (.topics | index("kompanie-app") != null), .private] | @tsv')"
+          IFS=$'\t' read -r NAME TOPIC PRIVATE <<< "$INFO"
+          [[ "$NAME" == "$REPO" ]] || { echo "::error::Bitte genau so schreiben: $NAME"; exit 1; }
+          [[ "$TOPIC" == true ]] || { echo "::error::$REPO hat nicht das Topic kompanie-app."; exit 1; }
+          [[ "$PRIVATE" == false ]] || { echo "::error::$REPO muss öffentlich sein."; exit 1; }
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -51,6 +60,10 @@ jobs:
           ref: main
           path: kompanie
           persist-credentials: false
+
+      - name: Stand des Kompanie-Repos
+        id: kompanie
+        run: echo "sha=$(git -C kompanie rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
@@ -71,36 +84,28 @@ jobs:
           KOMPANIE_ASSETS: ${{ github.workspace }}/kompanie/assets
         run: scripts/build-frontend.sh
 
-      - name: Version bestimmen
-        id: version
-        working-directory: core
-        run: |
-          echo "version=$(tr -d '[:space:]' < VERSION).${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          echo "kompanie-sha=$(git -C ../kompanie rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "stable-core=$(tr -d '[:space:]' < STABLE_CORE 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
-
       - name: Bildschirmfotos
         working-directory: core
         env:
           KOMPANIE_CONFIG: ${{ github.workspace }}/kompanie/kompanie.json
+          OUT: ${{ github.workspace }}/out
         run: |
           npx playwright install --with-deps chromium
-          scripts/screenshots.sh "${{ github.workspace }}/out/screenshots"
+          scripts/screenshots.sh "$OUT/screenshots"
 
-      - name: Pakete bauen (noch unsigniert)
+      - name: Ergebnis zusammenstellen
         working-directory: core
         env:
-          KOMPANIE_CORE_COMMIT: ${{ github.sha }}
+          OUT: ${{ github.workspace }}/out
         run: |
-          php scripts/package.php --config="${{ github.workspace }}/kompanie/kompanie.json" \
-            --version="${{ steps.version.outputs.version }}" --out="${{ github.workspace }}/out/release" --kompanie="${{ inputs.repo }}"
-          mkdir -p "${{ github.workspace }}/out/brand"
-          cp packages/frontend/src/generated/brand.json packages/frontend/src/generated/theme.css packages/frontend/src/generated/logo.png "${{ github.workspace }}/out/brand/"
-          cp packages/frontend/public/icons/favicon-32.png "${{ github.workspace }}/out/brand/favicon.png"
+          cp -r packages/frontend/dist "$OUT/dist"
+          mkdir -p "$OUT/brand"
+          cp packages/frontend/src/generated/brand.json packages/frontend/src/generated/theme.css packages/frontend/src/generated/logo.png "$OUT/brand/"
+          cp packages/frontend/public/icons/favicon-32.png "$OUT/brand/favicon.png"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: release
+          name: build
           path: out
           retention-days: 7
 
@@ -115,6 +120,19 @@ jobs:
           path: core
           persist-credentials: false
 
+      - name: Stand des Kompanie-Repos prüfen
+        env:
+          SHA: ${{ needs.build.outputs.kompanie-sha }}
+        run: '[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Ungültiger Commit: $SHA"; exit 1; }'
+
+      # Derselbe Stand wie im Build-Job, hier selbst geholt (kompanie.json kommt nicht aus dem Build-Ergebnis).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ needs.build.outputs.kompanie-sha }}
+          path: kompanie
+          persist-credentials: false
+
       - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
           php-version: '8.2'
@@ -123,8 +141,17 @@ jobs:
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: release
-          path: out
+          name: build
+          path: ${{ runner.temp }}/untrusted
+
+      - name: Build-Ergebnis prüfen und übernehmen (nur erlaubte Dateitypen)
+        env:
+          IN: ${{ runner.temp }}/untrusted
+          OUT: ${{ runner.temp }}/checked
+        run: |
+          php core/scripts/import-build.php --from="$IN/dist" --to="$OUT/dist" --types=js,css,html,png,jpg,jpeg,webp,svg,ico,json,webmanifest,woff2,txt
+          php core/scripts/import-build.php --from="$IN/brand" --to="$OUT/brand" --types=json,css,png --max-mb=2
+          if [ -d "$IN/screenshots" ]; then php core/scripts/import-build.php --from="$IN/screenshots" --to="$OUT/screenshots" --types=png --max-mb=5; fi
 
       - name: Name des Kompanie-Repos
         id: name
@@ -141,18 +168,15 @@ jobs:
           owner: Steuten-IT-Solutions
           repositories: ${{ steps.name.outputs.name }}
 
-      - name: Signieren
+      - name: Pakete bauen, signieren, Release, Update-Liste und Download-Seite
         env:
           KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
-        run: php core/scripts/sign-release.php --dir=out/release
-
-      - name: Release, Update-Liste und Download-Seite
-        env:
-          KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
+          KOMPANIE_CORE_COMMIT: ${{ github.sha }}
           GH_TOKEN: ${{ steps.app.outputs.token }}
           REPO: ${{ inputs.repo }}
-          VERSION: ${{ needs.build.outputs.version }}
           KOMPANIE_SHA: ${{ needs.build.outputs.kompanie-sha }}
-          STABLE_CORE: ${{ needs.build.outputs.stable-core }}
-          OUT: ${{ github.workspace }}/out
+          CONFIG: ${{ github.workspace }}/kompanie/kompanie.json
+          DIST: ${{ runner.temp }}/checked/dist
+          BRAND: ${{ runner.temp }}/checked/brand
+          SCREENSHOTS: ${{ runner.temp }}/checked/screenshots
         run: core/scripts/publish-release.sh

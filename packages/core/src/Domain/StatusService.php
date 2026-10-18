@@ -48,6 +48,9 @@ final class StatusService
         }
         $s = $u->status();
         $last = is_array($s['last']) ? $s['last'] : null;
+        if ($s['withdrawn'] && $s['fallback'] === null) {
+            return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen, aber es gibt noch keine geprüfte Version, auf die die Installation wechseln kann. Bitte bei den Betreuern der App melden.");
+        }
         if ($s['withdrawn']) {
             return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen. Die Installation wechselt beim nächsten Abgleich automatisch zurück; das geht auch sofort unter Einstellungen → Updates.");
         }

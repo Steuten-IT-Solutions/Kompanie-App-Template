@@ -120,6 +120,7 @@ final class UpdateService
             'available' => false,
             'major' => false,
             'withdrawn' => false,
+            'fallback' => null,
             'problems' => [],
             'versions' => [],
             'last' => $this->settings->get(self::LAST),
@@ -131,6 +132,10 @@ final class UpdateService
         $out['withdrawn'] = $list->isWithdrawn($this->currentVersion);
         // Updates innerhalb der eigenen Hauptversion, auch wenn der Kanal schon auf eine neuere zeigt.
         $latest = $list->latestFor(Version::major($this->currentVersion), $this->channel());
+        if ($out['withdrawn'] && $latest !== null && $latest !== $this->currentVersion) {
+            // Ziel des automatischen Wechsels (kann älter sein); null = keine geprüfte Version da.
+            $out['fallback'] = $latest;
+        }
         if ($latest !== null && Version::compare($latest, $this->currentVersion) > 0) {
             $out['latest'] = $latest;
             $out['available'] = true;
@@ -291,7 +296,8 @@ final class UpdateService
         if (!$changes) {
             return;
         }
-        $name = 'sicherungen/vor-update-' . $this->currentVersion . '-' . gmdate('Ymd-His', $this->time->timestamp()) . '.json';
+        // Zufälliger Teil im Namen: Unter WordPress auf nginx greift der .htaccess-Schutz des Ordners nicht.
+        $name = 'sicherungen/vor-update-' . $this->currentVersion . '-' . gmdate('Ymd-His', $this->time->timestamp()) . '-' . bin2hex(random_bytes(16)) . '.json';
         $path = $this->files->path($name, false);
         if (file_put_contents($path, (string) json_encode($this->backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) === false) {
             throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');

@@ -156,7 +156,13 @@ function ki_stable_entry()
         throw new RuntimeException('Die Signatur der Liste ist ungültig. Bitte später erneut versuchen und sonst bei uns melden.');
     }
     $list = json_decode($bytes, true);
+    if (!is_array($list) || !isset($list['type']) || $list['type'] !== 'updates' || !isset($list['kompanie']) || $list['kompanie'] !== $KONFIG['kompanie']) {
+        throw new RuntimeException('Die Liste der Versionen gehört nicht zu dieser Kompanie. Bitte den Installer neu von der Download-Seite laden.');
+    }
     $stable = isset($list['channels']['stable']) ? $list['channels']['stable'] : null;
+    if ($stable !== null && isset($list['withdrawn']) && in_array($stable, (array) $list['withdrawn'], true)) {
+        $stable = null;
+    }
     foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
         if ($stable !== null && $e['version'] === $stable && isset($e['files']['standalone']['url'], $e['files']['standalone']['sha256'])) {
             return $e;

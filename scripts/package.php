@@ -3,9 +3,12 @@
  * Packt die gebaute App einer Kompanie in die beiden Pakete und schreibt release.json.
  *
  *   php scripts/package.php --config=pfad/kompanie.json --version=0.1.0.3 --out=dist/release [--kompanie=org/repo]
- *       [--updates-url=…] [--status-url=https://…] [--support="Text"] [--trust-signing-key]
+ *       [--kompanie-commit=sha] [--dist=ordner --brand=brand.json] [--updates-url=…] [--status-url=https://…]
+ *       [--support="Text"] [--trust-signing-key]
+ *       php scripts/package.php --code-hash     nur die Prüfsumme des Programmcodes ausgeben (für STABLE_CORE)
  *
- * Vorher: scripts/build-frontend.sh mit KOMPANIE_CONFIG/KOMPANIE_ASSETS derselben Kompanie.
+ * Vorher: scripts/build-frontend.sh mit KOMPANIE_CONFIG/KOMPANIE_ASSETS derselben Kompanie
+ * (oder die gebaute App mit --dist und deren brand.json mit --brand angeben).
  * Signiert wird mit dem Schlüssel aus der Umgebungsvariablen KOMPANIE_SIGNING_KEY (Base64);
  * ohne Schlüssel entsteht release.json unsigniert (nur für Tests; Installer und Updater lehnen sie ab).
  *
@@ -19,7 +22,10 @@
  * https://org.github.io/repo/updates.json), vertrauenswürdige Schlüssel (TrustedKeys; mit
  * --trust-signing-key zusätzlich der Signaturschlüssel – nur für Tests), Statusmeldungen, Hilfe.
  * Mit --require-signature muss der Signaturschlüssel in TrustedKeys stehen, sonst könnten die
- * Installationen keine Updates prüfen.
+ * Installationen keine Updates prüfen, und --kompanie ist Pflicht.
+ *
+ * release.json enthält coreCode: SHA-256 über alle Programmdateien (Kern, Adapter, Installer) ohne
+ * die gebaute Oberfläche. Gleicher Wert = gleicher Programmcode, unabhängig vom Commit.
  */
 
 declare(strict_types=1);
@@ -33,7 +39,7 @@ use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\Version;
 use KompanieApp\Standalone\Migrations as StandaloneMigrations;
 
-$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'require-signature', 'updates-url::', 'status-url::', 'support::', 'trust-signing-key']);
+$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'kompanie-commit::', 'dist::', 'brand::', 'require-signature', 'updates-url::', 'status-url::', 'support::', 'trust-signing-key', 'code-hash']);
 $config = (string) ($opt['config'] ?? '');
 $version = (string) ($opt['version'] ?? '');
 $out = rtrim((string) ($opt['out'] ?? ''), '/');
@@ -41,25 +47,29 @@ $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
 };
-if (!is_file($config) || $out === '' || !Version::valid($version)) {
+if (isset($opt['code-hash'])) {
+    $codeHashOnly = true;
+} elseif (!is_file($config) || $out === '' || !Version::valid($version)) {
     $fail('Aufruf: php scripts/package.php --config=kompanie.json --version=1.2.3.4 --out=ordner');
 }
-if (!class_exists(ZipArchive::class)) {
+if (!isset($codeHashOnly) && !class_exists(ZipArchive::class)) {
     $fail('PHP-Erweiterung zip fehlt.');
 }
-$kompanie = json_decode((string) file_get_contents($config), true);
-if (!is_array($kompanie) || !is_string($kompanie['name'] ?? null)) {
-    $fail('kompanie.json ist nicht lesbar.');
+if (!isset($codeHashOnly)) {
+    $kompanie = json_decode((string) file_get_contents($config), true);
+    if (!is_array($kompanie) || !is_string($kompanie['name'] ?? null)) {
+        $fail('kompanie.json ist nicht lesbar.');
+    }
+    $dist = rtrim((string) ($opt['dist'] ?? $root . '/packages/frontend/dist'), '/');
+    if (!is_file($dist . '/index.html') || !is_file($dist . '/sw.js')) {
+        $fail("Die App ist nicht gebaut ($dist). Erst scripts/build-frontend.sh ausführen.");
+    }
+    $brand = json_decode((string) @file_get_contents((string) ($opt['brand'] ?? $root . '/packages/frontend/src/generated/brand.json')), true);
+    if (($brand['name'] ?? null) !== trim($kompanie['name'])) {
+        $fail('Die gebaute App gehört zu einer anderen Kompanie („' . ($brand['name'] ?? '?') . '“). Bitte mit KOMPANIE_CONFIG=' . $config . ' neu bauen.');
+    }
+    @mkdir($out, 0775, true);
 }
-$dist = $root . '/packages/frontend/dist';
-if (!is_file($dist . '/index.html') || !is_file($dist . '/sw.js')) {
-    $fail('Die App ist nicht gebaut (packages/frontend/dist). Erst scripts/build-frontend.sh ausführen.');
-}
-$brand = json_decode((string) @file_get_contents($root . '/packages/frontend/src/generated/brand.json'), true);
-if (($brand['name'] ?? null) !== trim($kompanie['name'])) {
-    $fail('Die gebaute App gehört zu einer anderen Kompanie („' . ($brand['name'] ?? '?') . '“). Bitte mit KOMPANIE_CONFIG=' . $config . ' neu bauen.');
-}
-@mkdir($out, 0775, true);
 
 /**
  * Alle Dateien unter $dir (relativ), sortiert; ohne Ausnahmen. In einem Git-Arbeitsbaum nur
@@ -120,6 +130,29 @@ function kompanie_zip(string $file, array $entries): void
     $zip->close();
 }
 
+/** Prüfsumme des Programmcodes: Pfad und SHA-256 jeder Datei aus Kern, Adaptern und Installer. */
+function kompanie_code_hash(string $root): string
+{
+    $parts = [
+        'core' => kompanie_files($root . '/packages/core/src'),
+        'wordpress' => kompanie_files($root . '/adapters/wordpress', ['#^app/#', '#^kompanie\.json$#']),
+        'standalone' => kompanie_files($root . '/adapters/standalone', ['#^(app|data|media)/#', '#^(sw\.js|kompanie\.json|VERSION|data-dir\.php)$#']),
+        'installer' => ['install.php' => $root . '/installer/install.php'],
+    ];
+    $lines = [];
+    foreach ($parts as $part => $files) {
+        foreach ($files as $rel => $src) {
+            $lines[] = "$part/$rel\t" . hash_file('sha256', $src);
+        }
+    }
+    return hash('sha256', implode("\n", $lines));
+}
+
+if (isset($codeHashOnly)) {
+    echo kompanie_code_hash($root), "\n";
+    exit(0);
+}
+
 // Signaturschlüssel und Update-Konfiguration
 $key = getenv('KOMPANIE_SIGNING_KEY');
 $signing = null;
@@ -136,6 +169,9 @@ if ($signing !== null && isset($opt['require-signature']) && !isset($trusted[Sig
     $fail('Der Signaturschlüssel steht nicht in packages/core/src/Update/TrustedKeys.php. Ohne diesen Eintrag könnten die Installationen keine Updates prüfen (siehe docs/RELEASE.md).');
 }
 $repo = (string) ($opt['kompanie'] ?? '');
+if (isset($opt['require-signature']) && !preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repo)) {
+    $fail('--kompanie=Organisation/Repo fehlt; ohne sie würden die Installationen jede Liste annehmen.');
+}
 $updatesUrl = (string) ($opt['updates-url'] ?? '');
 if ($updatesUrl === '' && preg_match('#^([^/]+)/([^/]+)$#', $repo, $m)) {
     $updatesUrl = 'https://' . strtolower($m[1]) . '.github.io/' . $m[2] . '/updates.json';
@@ -206,6 +242,8 @@ $release = [
     'type' => 'release',
     'kompanie' => (string) ($opt['kompanie'] ?? ''),
     'coreCommit' => (string) (getenv('KOMPANIE_CORE_COMMIT') ?: ($sha[0] ?? '')),
+    'coreCode' => kompanie_code_hash($root),
+    'kompanieCommit' => (string) ($opt['kompanie-commit'] ?? ''),
     'name' => trim($kompanie['name']),
     'version' => $version,
     'major' => Version::major($version),
@@ -234,6 +272,7 @@ if ($n !== 1) {
     $fail('Platzhalter im Installer nicht gefunden.');
 }
 file_put_contents("$out/install.php", $installer);
+$release['installer'] = ['name' => 'install.php', 'sha256' => hash('sha256', $installer), 'size' => strlen($installer)];
 
 if ($signing !== null) {
     [$secret, $public] = $signing;

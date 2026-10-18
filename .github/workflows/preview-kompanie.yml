@@ -8,9 +8,9 @@ on:
   workflow_call:
     inputs:
       core-ref:
-        description: Version des Kerns (Tag, z. B. v1)
+        description: Stand des Kerns (Standard main, wie bei der Veröffentlichung)
         type: string
-        default: v1
+        default: main
 
 permissions:
   contents: read

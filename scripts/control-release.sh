@@ -19,6 +19,10 @@ for attempt in 1 2 3 4 5; do
   php "$ROOT/scripts/updates.php" --list="$WORK/site/updates.json" --"$ACTION"="$VERSION"
   php "$ROOT/scripts/download-page.php" --updates="$WORK/site/updates.json" --out="$WORK/site"
   git -C "$WORK/site" add -A
+  if git -C "$WORK/site" diff --cached --quiet; then
+    echo "Keine Änderung nötig."
+    exit 0
+  fi
   git -C "$WORK/site" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
     commit --quiet -m "$ACTION $VERSION"
   if git -C "$WORK/site" push --quiet origin HEAD:refs/heads/gh-pages; then

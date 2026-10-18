@@ -106,7 +106,22 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             Installiert: <strong>{u.current}</strong>
             {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)}
           </p>
-          {u.withdrawn && <p className="form-error small">Diese Version wurde zurückgezogen. Die vorige wird automatisch wieder eingespielt.</p>}
+          {u.withdrawn &&
+            (u.fallback ? (
+              <>
+                <p className="form-error small">
+                  Diese Version wurde zurückgezogen. Version {u.fallback} wird beim nächsten Abgleich automatisch eingespielt.
+                </p>
+                <button type="button" className="btn btn-block" disabled={!!busy} onClick={() => install(u.fallback!)}>
+                  {busy === 'install' ? 'Wird eingespielt …' : `Jetzt auf ${u.fallback} wechseln`}
+                </button>
+              </>
+            ) : (
+              <p className="form-error small">
+                Diese Version wurde zurückgezogen, aber es gibt noch keine geprüfte Version zum Wechseln. Bitte bei den Betreuern der
+                App melden.
+              </p>
+            ))}
           {u.error && <p className="form-error small">Letzte Prüfung: {u.error}</p>}
           {u.last && !u.last.ok && <p className="form-error small">Letztes Update auf {u.last.to} hat nicht geklappt: {u.last.error}</p>}
           {u.available && u.latest ? (

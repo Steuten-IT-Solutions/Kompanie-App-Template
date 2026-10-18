@@ -6,9 +6,13 @@
  *   php scripts/updates.php --list=updates.json --promote=1.2.3.4
  *   php scripts/updates.php --list=updates.json --withdraw=1.2.3.4
  *   php scripts/updates.php --list=updates.json --show
+ *   php scripts/updates.php --list=updates.json --next-version=1.2.3      nächste freie Versionsnummer
+ *   php scripts/updates.php --list=updates.json --find=<Commit des Kompanie-Repos> --core-code=<Prüfsumme>
+ *       gibt die Version aus, die genau diesen Stand schon enthält (sonst nichts)
  *
  * --channel=auto (Standard): stable, wenn der Kern schon auf der Demo geprüft ist (--stable-core=Inhalt
- * von STABLE_CORE) oder sich nur das Aussehen ändert; sonst early.
+ * von STABLE_CORE: „Kern-Version Code-Prüfsumme“) oder sich nur das Aussehen ändert; sonst early.
+ * --kompanie legt fest, zu welcher Kompanie eine neue Liste gehört (sonst aus der release.json).
  * --list wird gelesen (fehlt die Datei, entsteht eine neue Liste) und überschrieben.
  * Signiert und geprüft wird mit KOMPANIE_SIGNING_KEY; vorhandene Listen und Releases müssen mit
  * diesem Schlüssel oder einem aus TrustedKeys signiert sein.
@@ -22,7 +26,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run']);
+$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:']);
 $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
@@ -42,6 +46,11 @@ try {
 
     if (is_file($file)) {
         $list = UpdateList::fromPayload(SignedEnvelope::open((string) file_get_contents($file), $trusted));
+        if (isset($opt['kompanie']) && $list->kompanie() !== (string) $opt['kompanie']) {
+            $fail("Die Liste gehört zu {$list->kompanie()}, nicht zu {$opt['kompanie']}.");
+        }
+    } elseif (isset($opt['next-version']) || isset($opt['find'])) {
+        $list = UpdateList::create((string) ($opt['kompanie'] ?? ''), '');
     } elseif (isset($opt['add'])) {
         $release = SignedEnvelope::open((string) file_get_contents((string) $opt['add']), $trusted);
         $list = UpdateList::create((string) ($opt['kompanie'] ?? $release['kompanie'] ?? ''), (string) ($release['name'] ?? ''));
@@ -49,6 +58,21 @@ try {
         $fail("$file gibt es nicht.");
     }
 
+    if (isset($opt['next-version'])) {
+        echo $list->nextVersion((string) $opt['next-version']), "\n";
+        exit(0);
+    }
+    if (isset($opt['find'])) {
+        $code = (string) ($opt['core-code'] ?? '');
+        // Auch zurückgezogene: Ein zurückgezogener Stand wird nicht still neu veröffentlicht.
+        foreach ($list->toArray()['versions'] as $e) {
+            if ($opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code) {
+                echo $e['version'], "\n";
+                break;
+            }
+        }
+        exit(0);
+    }
     if (isset($opt['add'])) {
         $release = SignedEnvelope::open((string) file_get_contents((string) $opt['add']), $trusted);
         $base = (string) ($opt['base-url'] ?? '');

@@ -54,7 +54,7 @@ Fragt jeder Server direkt die GitHub-API nach neuen Releases, gilt ohne Anmeldun
 
 Ablauf:
 
-1. Kern-Release → „Alle Kompanien neu bauen“ baut **alle** Kompanie-Repos sofort und trägt die Version in `updates.json` unter `early` ein.
+1. Kern-Release → „Kompanien abgleichen“ baut **alle** Kompanie-Repos (spätestens nach 30 Minuten) und trägt die Version in `updates.json` unter `early` ein.
 2. Die **Demo-Installation** (Standalone mit SQLite **und** WordPress-Plugin, mit Beispieldaten) aktualisiert sich sofort.
 3. Ein Workflow testet sie automatisch (Playwright): Anmeldung, Termine, Punkte, Strafen, Galerie, Update, Zurückrollen.
 4. Ist der Test grün und kein Issue mit dem Label `release-stopp` offen, **befördert** der Workflow die Version nach `stable`. Ab dann holen sie sich alle Kompanien.
