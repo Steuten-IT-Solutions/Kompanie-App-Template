@@ -2,7 +2,8 @@
 /**
  * Erzeugt ein Ed25519-Schlüsselpaar zum Signieren der Pakete:
  *   php scripts/keygen.php
- * Den geheimen Schlüssel als Organisations-Secret KOMPANIE_SIGNING_KEY speichern (nie ins Repo),
+ * Den geheimen Schlüssel als Secret KOMPANIE_SIGNING_KEY der Environment „veroeffentlichen“ im Kern-Repo
+ * speichern (nie ins Repo),
  * den öffentlichen in packages/core/src/Update/TrustedKeys.php eintragen. Siehe docs/RELEASE.md.
  */
 
