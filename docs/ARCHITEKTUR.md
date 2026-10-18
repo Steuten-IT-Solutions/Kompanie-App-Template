@@ -2,7 +2,7 @@
 
 Dieses Repo ist der **gemeinsame Kern** der Kompanie-App. Jede Kompanie bekommt in unserer GitHub-Organisation ein eigenes, kleines Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Alles andere passiert automatisch: Build, Icons, Prüfungen, Releases und Updates auf den Servern der Kompanien.
 
-Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompanie-Lank-App`). Ihre Funktionen werden hier herausgelöst, **neutral gestaltet** und von WordPress getrennt. Die Umstellung dieser Kompanie wird getrennt geplant (siehe [Abschnitt 14](#14-umstellung-der-ersten-kompanie-lank)).
+Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompanie-Lank-App`). Ihre Funktionen werden hier herausgelöst, **neutral gestaltet** und von WordPress getrennt. Die Umstellung dieser Kompanie wird getrennt geplant (siehe [Abschnitt 15](#15-umstellung-der-ersten-kompanie-lank)).
 
 ## 1. Leitlinien
 
@@ -55,7 +55,7 @@ Die Download-Seite der Kompanie zeigt zwei große Knöpfe mit bebilderter Anleit
 
 Danach führt der **Einrichtungsassistent** durch das, was nur die Kompanie wissen kann: erster Admin (nur ohne WordPress), Kalender-Link, Galerie. Jeder Schritt wird sofort geprüft. **Eine Datenbank muss die Kompanie nicht anlegen**: Der Installer wählt den Datenspeicher selbst.
 
-Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt ohne WordPress. Dafür gibt es **Anleitungen für die gängigen Hoster** (z. B. IONOS, Strato, all-inkl, netcup, Hetzner) mit Bildern. *Offen:* Ob wir das für Kompanien übernehmen, die es nicht selbst können.
+Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt ohne WordPress. Dafür gibt es **Anleitungen für die gängigen Hoster** (z. B. IONOS, Strato, all-inkl, netcup, Hetzner) mit Bildern. *Offen:* Ob wir das für Kompanien übernehmen, die es nicht selbst können (siehe [Offene Punkte, Abschnitt 2](OFFENE-PUNKTE.md#2-hilfe-beim-hochladen-von-installphp)).
 
 ### Update (niemand)
 
@@ -63,7 +63,7 @@ Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt oh
 2. Alle Kompanie-Repos bauen automatisch neu und veröffentlichen ein Release.
 3. Die Server holen sich das Update selbst, prüfen Signatur und Voraussetzungen, sichern die Daten, spielen es ein und führen die Migrationen aus.
 
-Was passiert, wenn etwas davon nicht geht, steht in [Abschnitt 10](#10-updates-und-zurückrollen).
+Was passiert, wenn etwas davon nicht geht, steht in [Abschnitt 11](#11-updates-und-zurückrollen).
 
 ## 4. Überblick
 
@@ -197,7 +197,33 @@ Der Kern enthält **eine Routentabelle**. WordPress registriert sie unter `/wp-j
 
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 
-## 9. Kompanie-Konfiguration und automatisches Branding
+## 9. Google: Galerie und Kalender
+
+### Kalender
+
+Standard ist die **geheime iCal-Adresse** des Google Kalenders. Das ist ein Link zum Einfügen, ohne Google Cloud. Google-Kalender-ID mit API-Key bleibt als Option.
+
+### Galerie
+
+Gesucht ist ein Weg, bei dem die Kompanie kein Google-Cloud-Projekt braucht. Zwei Varianten, die Entscheidung fällt nach einem **Test-Prototyp** (Testfälle: [Offene Punkte, Abschnitt 5](OFFENE-PUNKTE.md#5-galerie-test-mit-google-verbinden)):
+
+**Ziel: „Mit Google verbinden“** (OAuth, Berechtigung `drive.file`, Ordnerauswahl über den Google Picker)
+
+- `drive.file` gilt bei Google als nicht sensibel. Die App braucht nur die vereinfachte Prüfung, keine Sicherheitsbewertung. Die App sieht nur den gewählten Ordner, nicht das ganze Drive.
+- Ein gemeinsamer OAuth-Client in unserem Google-Cloud-Projekt. Die Anmeldung läuft über eine **feste Rücksprungseite** (statisch, z. B. GitHub Pages) mit signiertem `state`, die an den Server der Kompanie weiterleitet. Dadurch muss nicht jede Kompanie-Domain bei Google eingetragen werden.
+- **Offen, Gegenstand des Tests:** Ob die App mit `drive.file` an Dateien **in** einem gewählten Ordner kommt, in Unterordnern (Jahr → Album → `intern`) und vor allem an **später hochgeladene Bilder**. Die Berichte dazu widersprechen sich, eine offizielle Aussage von Google fehlt.
+- Verworfen: `drive.readonly`. Diese Berechtigung ist „restricted“ und braucht eine Sicherheitsbewertung; ohne Prüfung gibt es einen Warnbildschirm und eine Grenze von 100 Nutzern.
+
+**Ersatz: Ordner freigeben** (falls der Test scheitert)
+
+- Ein Workflow legt pro Kompanie ein Dienstkonto in unserem Google-Cloud-Projekt an.
+- Der Server der Kompanie erzeugt sein Schlüsselpaar selbst. Nur der **öffentliche** Schlüssel wird beim Dienstkonto hinterlegt. Der private Schlüssel verlässt den Server nie.
+- Die Kompanie gibt ihren Galerie-Ordner für die angezeigte E-Mail-Adresse frei. Der Assistent prüft live, ob die Freigabe da ist.
+- *Zu prüfen:* Neuere Google-Cloud-Organisationen sperren das Hochladen von Schlüsseln teilweise per Voreinstellung. Ein Administrator kann diese Sperre aufheben.
+
+Verworfen: ein **gemeinsames Dienstkonto für alle** (ein kompromittierter Server könnte die Ordner aller Kompanien lesen) und ein **zentraler Galerie-Dienst** bei uns (wir würden die internen Fotos aller Kompanien verarbeiten; das bedeutet Auftragsverarbeitung und eigenen Betrieb).
+
+## 10. Kompanie-Konfiguration und automatisches Branding
 
 `kompanie.json` (Schema: [`config/kompanie.schema.json`](../config/kompanie.schema.json), Beispiel: [`config/kompanie.example.json`](../config/kompanie.example.json)). **Pflicht sind nur `name` und `colors.primary`**, dazu ein Logo. Alles andere hat Standardwerte.
 
@@ -212,11 +238,11 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 
 **Zugangsdaten** gehören nie in `kompanie.json` oder ins Repo; die Kompanie-Repos sind öffentlich.
 
-**Rechtstexte:** Felder `legal.imprintUrl`/`legal.privacyUrl` oder Dateien `legal/impressum.md`/`legal/datenschutz.md`. *Ob die App ein eigenes Impressum braucht und was in die Datenschutzerklärung gehört, sollte rechtlich geprüft werden.* *Vorschlag:* eine rechtlich geprüfte Vorlage für alle Kompanien bereitstellen.
+**Rechtstexte:** Felder `legal.imprintUrl`/`legal.privacyUrl` oder Dateien `legal/impressum.md`/`legal/datenschutz.md`. *Ob die App ein eigenes Impressum braucht und was in die Datenschutzerklärung gehört, muss rechtlich geprüft werden.* Danach liegen Vorlagen im Kern, die die App mit ihren Daten füllt (siehe [Offene Punkte, Abschnitt 3](OFFENE-PUNKTE.md#3-rechtstexte-und-datenschutz)).
 
 **Vorschau:** Die CI jedes Kompanie-Repos startet die App mit Beispieldaten und hängt Screenshots (hell/dunkel) an Pull Requests und Releases.
 
-## 10. Updates und Zurückrollen
+## 11. Updates und Zurückrollen
 
 ### Versionen
 
@@ -258,11 +284,15 @@ Jede Kompanie kann in der App unter *Einstellungen → Updates* auf eine **älte
 - Admins können jederzeit **„Datensicherung herunterladen“** und eine Sicherung wieder einspielen.
 - Die App erinnert Admins regelmäßig an eine Sicherung, wenn länger keine heruntergeladen wurde.
 
-### Offen
+### Update-Liste und gestaffelte Verteilung
 
-**Gestaffelte Verteilung:** Ein fehlerhaftes Release erreicht ohne Staffelung alle Kompanien gleichzeitig. Zurückrollen hilft dann, setzt aber voraus, dass die Kompanie den Fehler bemerkt. Vorschlag: Releases gehen zuerst an eine Demo-Installation und Testkompanien und einige Tage später an alle. Sicherheitskorrekturen gehen sofort an alle.
+- Die Server fragen **nicht die GitHub-API** (Limit von 60 Anfragen pro Stunde je IP-Adresse; auf Webspace teilen sich viele Seiten eine Adresse). Stattdessen liest jeder Server einmal täglich die **signierte Update-Liste** `updates.json` seiner Kompanie von GitHub Pages.
+- **Zwei Ringe:** `early` (Demo-Installation, Testkompanien) bekommt ein Release sofort, `stable` nach einer Haltezeit, wenn nichts gestoppt wurde. Sicherheitskorrekturen gehen sofort an alle.
+- Eine **zurückgezogene Version** rollen die Server automatisch zurück.
 
-## 11. Installation und Einrichtung
+Einzelheiten: [Offene Punkte, Abschnitt 1](OFFENE-PUNKTE.md#1-update-verteilung-und-gestaffelte-releases).
+
+## 12. Installation und Einrichtung
 
 ### Web-Installer (`installer/install.php`)
 
@@ -281,18 +311,18 @@ Eine einzelne Datei, auf die Kompanie zugeschnitten (Repo-Name und Signaturschl�
 2. Kalender: geheime iCal-Adresse einfügen (mit bebilderter Anleitung, wo man sie in Google findet), Testabruf
 3. Galerie: „Mit Google verbinden“ bzw. Ordnerfreigabe, Live-Prüfung
 4. News (nur Standalone): Adresse einer vorhandenen Webseite oder überspringen
-5. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 12)
+5. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
 
 Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachholen.
 
-## 12. Pflege ohne technisches Wissen
+## 13. Pflege ohne technisches Wissen
 
 - **Statusseite für Admins** mit Ampel in Alltagssprache: Updates, Galerie-Abgleich, Kalender, letzte Sicherung, Server. Bei Gelb/Rot steht dabei, was zu tun ist, oder „Bitte melde dich bei …“ mit unseren Kontaktdaten.
 - **Hinweise direkt in der App** für Admins, statt E-Mails (E-Mail-Versand ist auf Webspace oft unzuverlässig).
-- **Statusmeldungen an uns, nur mit Zustimmung:** Version, PHP-Version, Ergebnis des letzten Updates und Abgleichs, Fehlermeldungen. Keine Mitgliederdaten. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar.
+- **Statusmeldungen an uns, nur mit Zustimmung:** Version, PHP-Version, Ergebnis des letzten Updates und Abgleichs, Fehlercodes. Keine Mitgliederdaten. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
 - **Hilfe-Texte** an jeder Einstellung; Fachbegriffe nur mit Erklärung.
 
-## 13. Die beiden Adapter
+## 14. Die beiden Adapter
 
 ### WordPress-Plugin (`adapters/wordpress`)
 
@@ -312,7 +342,7 @@ Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachho
 - **Läuft auf** Apache, nginx und LiteSpeed, im Hauptverzeichnis oder Unterordner, mit oder ohne URL-Umschreibung.
 - **Termine auf fremden Webseiten:** einbettbarer Ausschnitt `/embed/termine`. *Später.*
 
-## 14. Umstellung der ersten Kompanie (Lank)
+## 15. Umstellung der ersten Kompanie (Lank)
 
 Wird **getrennt geplant**. Bis dahin gilt: **Neue Funktionen werden im Kern gebaut**; im Lank-Repo nur noch Fehlerkorrekturen, die auch in den Kern übernommen werden.
 
@@ -322,7 +352,7 @@ Festgehalten für die Planung:
 - MySQL-Konnektor mit einstellbarem Tabellenpräfix, erste Migration = Schema Version 3: Tabellen `wp_mkl_*` und Galerie-Dateien bleiben.
 - Offene Punkte: API-Namensraum und installierte PWAs mit altem Service Worker, bisherige Rollen und Optionen, Shortcodes `[mkl_termine]`/`[mkl_galerie]` als Alias, Kalender über das Plugin „Private Google Calendars“, bestehende Anmeldungen sollen erhalten bleiben.
 
-## 15. Tests
+## 16. Tests
 
 - **Unit-Tests** für den Kern (PHPUnit), mit Test-Umsetzungen der Ports.
 - **Repository-Contract-Tests** gegen MySQL/MariaDB und SQLite.
@@ -333,7 +363,7 @@ Festgehalten für die Planung:
 - **Branding:** Kontrastprüfung, Icon-Erzeugung, Screenshots.
 - **Grenz- und Neutralitätsprüfung** in der CI.
 
-## 16. Fahrplan
+## 17. Fahrplan
 
 | Phase | Inhalt | Ergebnis |
 |---|---|---|
@@ -354,4 +384,6 @@ Festgehalten für die Planung:
 - einen **Ed25519-Signaturschlüssel** als Organisations-Secret
 - ein **Google-Cloud-Projekt** mit OAuth-Client (Galerie-Test)
 - ein leeres Repo **`Kompanie-App-Vorlage`**
-- eine kleine Stelle, die **Statusmeldungen** annimmt (nur für Kompanien, die zustimmen). *Offen:* wo; sie sollte ohne eigenen Server auskommen, z. B. als einfacher Endpunkt auf unserem Webspace
+- eine Subdomain auf unserem Webspace für den Empfang der **Statusmeldungen** (nur von Kompanien, die zustimmen)
+
+Die Planung der offenen Punkte steht in [OFFENE-PUNKTE.md](OFFENE-PUNKTE.md).

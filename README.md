@@ -19,6 +19,7 @@ Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin
 ## Dokumentation
 
 - [Architektur, Abläufe und Fahrplan](docs/ARCHITEKTUR.md)
+- [Planung der offenen Punkte](docs/OFFENE-PUNKTE.md)
 - [API-Spezifikation](api/openapi.yaml)
 - [Kompanie-Konfiguration: Schema](config/kompanie.schema.json) und [Beispiel](config/kompanie.example.json)
 
