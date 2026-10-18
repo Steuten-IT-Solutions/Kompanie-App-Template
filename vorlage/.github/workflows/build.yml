@@ -1,23 +1,31 @@
-# Baut die App dieser Kompanie, sobald sich kompanie.json oder das Logo ändert, und wenn ein
-# neuer Kern erscheint („Alle Kompanien neu bauen“). Nichts hier muss angepasst werden.
+# Baut eine Vorschau der App dieser Kompanie (Bildschirmfotos, Pakete zum Ansehen) und stößt nach
+# einer Änderung auf main die Veröffentlichung im Kern-Repo an. Nichts hier muss angepasst werden.
+#
+# Dieses Repo hat bewusst keinen Zugriff auf den Signaturschlüssel: Signiert und veröffentlicht wird
+# nur im Kern-Repo. Das Secret KOMPANIE_DISPATCH_TOKEN darf dort nur Workflows starten.
 name: App bauen
 
 on:
   push:
     branches: [main]
-    paths: ['kompanie.json', 'assets/**', 'legal/**']
+    paths: ['kompanie.json', 'assets/**']
   pull_request:
-    paths: ['kompanie.json', 'assets/**', 'legal/**']
-  repository_dispatch:
-    types: [kern-release]
+    paths: ['kompanie.json', 'assets/**']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
-    uses: Steuten-IT-Solutions/Kompanie-App-Template/.github/workflows/build-kompanie.yml@v1
-    with:
-      publish: ${{ github.event_name != 'pull_request' }}
-    secrets: inherit
+  vorschau:
+    uses: Steuten-IT-Solutions/Kompanie-App-Template/.github/workflows/preview-kompanie.yml@v1
+
+  veroeffentlichen:
+    needs: vorschau
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Veröffentlichung im Kern-Repo anstoßen
+        env:
+          GH_TOKEN: ${{ secrets.KOMPANIE_DISPATCH_TOKEN }}
+        run: gh workflow run publish-kompanie.yml --repo Steuten-IT-Solutions/Kompanie-App-Template --ref main -f repo="$GITHUB_REPOSITORY"

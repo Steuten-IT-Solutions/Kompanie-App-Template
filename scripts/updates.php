@@ -22,7 +22,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:']);
+$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run']);
 $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
@@ -57,11 +57,22 @@ try {
         }
         $channel = (string) ($opt['channel'] ?? 'auto');
         $channel = $channel === 'auto' ? $list->channelFor($release, trim((string) ($opt['stable-core'] ?? ''))) : $channel;
+        if ($list->entry((string) $release['version']) !== null) {
+            echo "Version {$release['version']} ist schon in der Liste.\n";
+            if (getenv('GITHUB_OUTPUT')) {
+                file_put_contents((string) getenv('GITHUB_OUTPUT'), "channel=$channel\nknown=1\n", FILE_APPEND);
+            }
+            exit(0);
+        }
+        if (isset($opt['dry-run'])) {
+            echo "Kanal: $channel\n";
+            if (getenv('GITHUB_OUTPUT')) {
+                file_put_contents((string) getenv('GITHUB_OUTPUT'), "channel=$channel\nknown=0\n", FILE_APPEND);
+            }
+            exit(0);
+        }
         $list->addRelease($release, rtrim($base, '/') . '/', $channel);
         echo "Version {$release['version']} aufgenommen (Kanal $channel).\n";
-        if (getenv('GITHUB_OUTPUT')) {
-            file_put_contents((string) getenv('GITHUB_OUTPUT'), "channel=$channel\n", FILE_APPEND);
-        }
     }
     if (isset($opt['promote'])) {
         $list->promote((string) $opt['promote']);

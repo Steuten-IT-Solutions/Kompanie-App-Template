@@ -1,83 +1,81 @@
-# Steuert die Update-Liste einer Kompanie: Version für alle freigeben (stable) oder zurückziehen.
-# Wird aus jedem Kompanie-Repo aufgerufen (Vorlage: vorlage/.github/workflows/versionen.yml) und
-# später automatisch nach dem Test der Demo-Installation.
+# Eine Version einer Kompanie für alle freigeben (promote) oder zurückziehen (withdraw).
+# Nur im Kern-Repo, hinter der Environment „veroeffentlichen“. Zurückgezogene Versionen spielen
+# die Installationen automatisch auf die zuletzt freigegebene Version zurück.
 name: Versionen steuern
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      action:
-        description: promote (für alle freigeben) oder withdraw (zurückziehen)
+      repo:
+        description: Kompanie-Repo (Steuten-IT-Solutions/Name)
         type: string
         required: true
+      action:
+        description: Was soll passieren?
+        type: choice
+        options: [promote, withdraw]
       version:
         description: Version, z. B. 1.4.0.3
         type: string
         required: true
-      core-ref:
+  workflow_call:
+    inputs:
+      repo:
         type: string
-        default: v1
-    secrets:
-      KOMPANIE_SIGNING_KEY:
+        required: true
+      action:
+        type: string
+        required: true
+      version:
+        type: string
         required: true
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: kompanie-build-${{ github.repository }}
+  group: kompanie-control-${{ inputs.repo }}
   cancel-in-progress: false
 
 jobs:
   control:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: veroeffentlichen
     steps:
       - name: Eingaben prüfen
+        id: name
         env:
-          ACTION: ${{ inputs.action }}
-          VERSION: ${{ inputs.version }}
+          REPO: ${{ inputs.repo }}
         run: |
-          [[ "$ACTION" == "promote" || "$ACTION" == "withdraw" ]] || { echo "::error::Unbekannte Aktion: $ACTION"; exit 1; }
-          [[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(\.[0-9]{1,6})?$ ]] || { echo "::error::Ungültige Version: $VERSION"; exit 1; }
+          [[ "$REPO" =~ ^Steuten-IT-Solutions/[A-Za-z0-9._-]+$ ]] || { echo "::error::Ungültiges Kompanie-Repo: $REPO"; exit 1; }
+          echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          path: kompanie
-
-      - uses: actions/checkout@v4
-        with:
-          repository: Steuten-IT-Solutions/Kompanie-App-Template
-          ref: ${{ inputs.core-ref }}
           path: core
+          persist-credentials: false
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
           php-version: '8.2'
-          extensions: sodium
+          extensions: sodium, mbstring
           tools: none
 
-      - uses: actions/setup-node@v4
+      - name: Zugang zum Kompanie-Repo (GitHub App)
+        id: app
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: core/package-lock.json
+          app-id: ${{ vars.KOMPANIE_APP_ID }}
+          private-key: ${{ secrets.KOMPANIE_APP_KEY }}
+          owner: Steuten-IT-Solutions
+          repositories: ${{ steps.name.outputs.name }}
 
       - name: Update-Liste ändern und Download-Seite neu erzeugen
         env:
           KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ inputs.repo }}
           ACTION: ${{ inputs.action }}
           VERSION: ${{ inputs.version }}
-        run: |
-          SITE="$GITHUB_WORKSPACE/site"
-          git -C kompanie fetch --depth=1 origin gh-pages
-          git -C kompanie worktree add "$SITE" origin/gh-pages --detach
-          cd core
-          npm ci --no-audit --no-fund
-          (cd packages/frontend && KOMPANIE_CONFIG="$GITHUB_WORKSPACE/kompanie/kompanie.json" KOMPANIE_ASSETS="$GITHUB_WORKSPACE/kompanie/assets" npm run brand)
-          php scripts/updates.php --list="$SITE/updates.json" --"$ACTION"="$VERSION"
-          php scripts/download-page.php --updates="$SITE/updates.json" --out="$SITE"
-          cd "$SITE"
-          git add -A
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit --quiet -m "$ACTION $VERSION"
-          git push --quiet origin HEAD:refs/heads/gh-pages
+        run: core/scripts/control-release.sh

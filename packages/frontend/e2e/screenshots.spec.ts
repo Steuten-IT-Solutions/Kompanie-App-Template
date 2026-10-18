@@ -28,27 +28,34 @@ test.beforeEach(async ({ page }) => {
 
 test('Bildschirmfotos', async ({ page }) => {
   await page.goto('/app/');
-  await expect(page.locator('li.event, .empty').first()).toBeVisible();
+  // Nur Bereiche zeigen, die diese Kompanie eingeschaltet hat.
+  const f = await page.evaluate(() => window.KOMPANIE_CONFIG!.features);
+  await expect(page.locator('.topbar')).toBeVisible();
   await shot(page, '0-start-gast');
 
   await login(page);
-  await page.goto('/app/#/termine');
-  await expect(page.locator('li.event').first()).toBeVisible();
-  await shot(page, '1-termine');
-  await shot(page, '1-termine-dunkel', true);
-
-  await page.goto('/app/#/meins');
-  await expect(page.locator('.stat').first()).toBeVisible();
-  await shot(page, '2-punkte');
-
-  await page.goto('/app/#/news');
-  await expect(page.locator('.news-card').first()).toBeVisible();
-  await page.locator('.news-card').first().click();
-  await expect(page.locator('.news-article')).toBeVisible();
-  await shot(page, '12-gast-news');
-
-  await page.goto('/app/#/galerie');
-  await expect(page.locator('.album-card').first()).toBeVisible();
-  await page.waitForLoadState('networkidle');
-  await shot(page, '16-galerie-alben');
+  if (f.events || f.calendar) {
+    await page.goto('/app/#/termine');
+    await expect(page.locator('li.event').first()).toBeVisible();
+    await shot(page, '1-termine');
+    await shot(page, '1-termine-dunkel', true);
+  }
+  if (f.points || f.penalties) {
+    await page.goto('/app/#/meins');
+    await expect(page.locator('.stat').first()).toBeVisible();
+    await shot(page, '2-punkte');
+  }
+  if (f.news) {
+    await page.goto('/app/#/news');
+    await expect(page.locator('.news-card').first()).toBeVisible();
+    await page.locator('.news-card').first().click();
+    await expect(page.locator('.news-article')).toBeVisible();
+    await shot(page, '3-news');
+  }
+  if (f.gallery) {
+    await page.goto('/app/#/galerie');
+    await expect(page.locator('.album-card').first()).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await shot(page, '4-galerie');
+  }
 });

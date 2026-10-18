@@ -138,12 +138,16 @@ final class Kernel
         return new PdoUsers($this->db(), $this->sessions());
     }
 
-    /** kompanie.json der Installation; während der Entwicklung das Beispiel aus dem Repo. */
+    /**
+     * kompanie.json der Installation. Während der Entwicklung (kein Paket): die Datei aus
+     * KOMPANIE_CONFIG wie beim Bauen (z. B. für Bildschirmfotos einer Kompanie), sonst das Beispiel.
+     */
     public function kompanieConfig(): KompanieConfig
     {
         $file = $this->root . '/kompanie.json';
+        $env = getenv('KOMPANIE_CONFIG');
         if (!is_file($file)) {
-            $file = dirname($this->root, 2) . '/config/kompanie.example.json';
+            $file = is_string($env) && is_file($env) ? $env : dirname($this->root, 2) . '/config/kompanie.example.json';
         }
         return KompanieConfig::fromFile($file);
     }

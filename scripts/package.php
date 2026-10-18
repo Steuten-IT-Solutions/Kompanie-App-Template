@@ -61,10 +61,32 @@ if (($brand['name'] ?? null) !== trim($kompanie['name'])) {
 }
 @mkdir($out, 0775, true);
 
-/** Alle Dateien unter $dir (relativ), sortiert; ohne Ausnahmen. */
-function kompanie_files(string $dir, array $exclude = []): array
+/**
+ * Alle Dateien unter $dir (relativ), sortiert; ohne Ausnahmen. In einem Git-Arbeitsbaum nur
+ * versionierte Dateien (keine zufällig herumliegenden lokalen Dateien im Paket).
+ */
+function kompanie_files(string $dir, array $exclude = [], bool $tracked = true): array
 {
     $files = [];
+    $list = null;
+    if ($tracked) {
+        exec('git -C ' . escapeshellarg($dir) . ' ls-files -z . 2>/dev/null', $out, $code);
+        $list = $code === 0 && $out !== [] ? array_filter(explode("\0", implode("\n", $out))) : null;
+    }
+    if ($list !== null) {
+        foreach ($list as $rel) {
+            foreach ($exclude as $pattern) {
+                if (preg_match($pattern, $rel)) {
+                    continue 2;
+                }
+            }
+            if (is_file("$dir/$rel")) {
+                $files[$rel] = "$dir/$rel";
+            }
+        }
+        ksort($files);
+        return $files;
+    }
     $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
     foreach ($it as $f) {
         $rel = substr($f->getPathname(), strlen($dir) + 1);
@@ -90,8 +112,10 @@ function kompanie_zip(string $file, array $entries): void
     ksort($entries);
     foreach ($entries as $name => $src) {
         is_array($src) ? $zip->addFromString($name, $src['content']) : $zip->addFile($src, $name);
-        // Feste Zeit: gleiche Eingaben ergeben gleiche Pakete.
+        // Feste Zeit und feste Rechte (rw-r--r--): gleiche Eingaben ergeben gleiche Pakete, und
+        // entpackte Dateien sind nie für alle beschreibbar.
         $zip->setMtimeName($name, 946684800);
+        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0100644 << 16);
     }
     $zip->close();
 }
@@ -128,7 +152,7 @@ $updateJson = [
 $updateEntry = ['content' => json_encode($updateJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"];
 
 $core = kompanie_files($root . '/packages/core/src');
-$app = kompanie_files($dist);
+$app = kompanie_files($dist, [], false);
 $kompanieJson = ['content' => (string) file_get_contents($config)];
 
 // WordPress-Plugin
@@ -177,8 +201,11 @@ foreach ($packages as $variant => $entries) {
     $files[$variant] = ['name' => $name, 'sha256' => hash_file('sha256', "$out/$name"), 'size' => filesize("$out/$name")];
 }
 
+exec('git -C ' . escapeshellarg($root) . ' rev-parse HEAD 2>/dev/null', $sha);
 $release = [
+    'type' => 'release',
     'kompanie' => (string) ($opt['kompanie'] ?? ''),
+    'coreCommit' => (string) (getenv('KOMPANIE_CORE_COMMIT') ?: ($sha[0] ?? '')),
     'name' => trim($kompanie['name']),
     'version' => $version,
     'major' => Version::major($version),

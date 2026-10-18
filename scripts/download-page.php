@@ -1,9 +1,12 @@
 <?php
 /**
  * Erzeugt die Download-Seite einer Kompanie (statisch, für GitHub Pages):
- *   php scripts/download-page.php --updates=updates.json --out=site [--screenshots=ordner]
+ *   php scripts/download-page.php --updates=updates.json --out=site [--screenshots=ordner] [--brand=ordner]
  *
- * Nutzt das zuletzt gebaute Branding (packages/frontend/src/generated: brand.json, theme.css, logo.png).
+ * Branding (brand.json, theme.css, logo.png, favicon.png) aus --brand, sonst aus dem zuletzt
+ * gebauten Stand (packages/frontend/src/generated) bzw. aus site/brand/ einer früheren Seite.
+ * Die Dateien werden unter site/brand/ abgelegt, damit spätere Änderungen (Freigeben,
+ * Zurückziehen) die Seite ohne neuen Build erzeugen können.
  * Verlinkt die Pakete der Version im Kanal stable. updates.json wird mit TrustedKeys bzw. dem
  * Schlüssel aus KOMPANIE_SIGNING_KEY geprüft. Ohne --updates entsteht eine Vorschau ohne Download.
  */
@@ -17,18 +20,35 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['updates::', 'out:', 'screenshots::']);
+$opt = getopt('', ['updates::', 'out:', 'screenshots::', 'brand::']);
 $out = rtrim((string) ($opt['out'] ?? ''), '/');
 if ($out === '') {
     fwrite(STDERR, "Aufruf: php scripts/download-page.php --updates=updates.json --out=ordner\n");
     exit(1);
 }
-$gen = $root . '/packages/frontend/src/generated';
-$brand = json_decode((string) file_get_contents($gen . '/brand.json'), true);
-$theme = (string) file_get_contents($gen . '/theme.css');
+$brandDir = (string) ($opt['brand'] ?? '');
+if ($brandDir === '') {
+    $brandDir = is_file($out . '/brand/brand.json') ? $out . '/brand' : '';
+}
+if ($brandDir === '') {
+    $gen = $root . '/packages/frontend/src/generated';
+    $brandDir = sys_get_temp_dir() . '/kompanie-brand-' . bin2hex(random_bytes(4));
+    @mkdir($brandDir, 0775, true);
+    foreach (['brand.json' => "$gen/brand.json", 'theme.css' => "$gen/theme.css", 'logo.png' => "$gen/logo.png", 'favicon.png' => "$root/packages/frontend/public/icons/favicon-32.png"] as $n => $src) {
+        copy($src, "$brandDir/$n");
+    }
+}
+$brand = json_decode((string) file_get_contents($brandDir . '/brand.json'), true);
+$theme = (string) file_get_contents($brandDir . '/theme.css');
 @mkdir($out . '/screenshots', 0775, true);
-copy($gen . '/logo.png', $out . '/logo.png');
-copy($root . '/packages/frontend/public/icons/favicon-32.png', $out . '/favicon.png');
+@mkdir($out . '/brand', 0775, true);
+foreach (['brand.json', 'theme.css', 'logo.png', 'favicon.png'] as $n) {
+    if (realpath("$brandDir/$n") !== realpath("$out/brand/$n")) {
+        copy("$brandDir/$n", "$out/brand/$n");
+    }
+}
+copy($brandDir . '/logo.png', $out . '/logo.png');
+copy($brandDir . '/favicon.png', $out . '/favicon.png');
 
 $stable = null;
 if (!empty($opt['updates'])) {
@@ -44,7 +64,7 @@ if (!empty($opt['updates'])) {
 
 // Bildschirmfotos: neue aus --screenshots, sonst die schon auf der Seite vorhandenen.
 $shots = [];
-foreach (['0-start-gast', '1-termine', '1-termine-dunkel', '12-gast-news', '16-galerie-alben', '2-punkte'] as $name) {
+foreach (['0-start-gast', '1-termine', '1-termine-dunkel', '3-news', '4-galerie', '2-punkte'] as $name) {
     $src = empty($opt['screenshots']) ? '' : $opt['screenshots'] . "/$name.png";
     if ($src !== '' && is_file($src)) {
         copy($src, "$out/screenshots/$name.png");

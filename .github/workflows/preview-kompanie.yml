@@ -1,0 +1,71 @@
+# Vorschau einer Kompanie: App bauen, Bildschirmfotos, Pakete (unsigniert) als Ergebnis zum Ansehen.
+# Wird aus jedem Kompanie-Repo aufgerufen (vorlage/.github/workflows/build.yml), auch für Pull Requests.
+# Bekommt bewusst keine Geheimnisse: Signiert und veröffentlicht wird nur im Kern-Repo
+# (publish-kompanie.yml).
+name: Kompanie-Vorschau
+
+on:
+  workflow_call:
+    inputs:
+      core-ref:
+        description: Version des Kerns (Tag, z. B. v1)
+        type: string
+        default: v1
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kompanie-Repo holen
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: kompanie
+          persist-credentials: false
+
+      - name: Kern holen
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: Steuten-IT-Solutions/Kompanie-App-Template
+          ref: ${{ inputs.core-ref }}
+          path: core
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, gd, sodium, zip, mbstring, curl, openssl, simplexml, intl
+          tools: none
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: core/package-lock.json
+
+      - name: App bauen (Branding aus kompanie.json und Logo)
+        working-directory: core
+        env:
+          KOMPANIE_CONFIG: ${{ github.workspace }}/kompanie/kompanie.json
+          KOMPANIE_ASSETS: ${{ github.workspace }}/kompanie/assets
+        run: scripts/build-frontend.sh
+
+      - name: Bildschirmfotos (hell und dunkel)
+        working-directory: core
+        env:
+          KOMPANIE_CONFIG: ${{ github.workspace }}/kompanie/kompanie.json
+        run: |
+          npx playwright install --with-deps chromium
+          scripts/screenshots.sh "${{ github.workspace }}/out/screenshots"
+
+      - name: Pakete bauen (unsigniert, nur zum Ansehen)
+        working-directory: core
+        run: php scripts/package.php --config="${{ github.workspace }}/kompanie/kompanie.json" --version="$(tr -d '[:space:]' < VERSION).0" --out="${{ github.workspace }}/out/release" --kompanie="${{ github.repository }}"
+
+      - name: Ergebnis zum Ansehen
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vorschau
+          path: out

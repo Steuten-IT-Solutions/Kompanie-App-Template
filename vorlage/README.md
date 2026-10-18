@@ -20,18 +20,24 @@ Hier wird nur eingetragen, was die Kompanie ausmacht.
 ## Ändern
 
 Am einfachsten über das Formular **„Kompanie ändern“** im Kern-Repo. Wer es direkt hier ändert:
-Eine Änderung an `kompanie.json` oder am Logo startet den Build. Im Pull Request hängen die Bildschirmfotos
-als Ergebnis an; nach dem Zusammenführen erscheint eine neue Version, die die Installationen selbst holen.
+Eine Änderung an `kompanie.json` oder am Logo startet im Pull Request eine Vorschau: Bildschirmfotos und
+Pakete liegen als Ergebnis „vorschau“ am Workflow-Lauf (*Checks → App bauen → Summary*). Nach dem Zusammenführen
+veröffentlicht das Kern-Repo eine neue Version, die die Installationen selbst holen.
 
 ## Versionen
 
 - Neue Versionen des Kerns laufen zuerst auf unserer Demo-Installation (Kanal `early`) und gehen danach an alle (`stable`).
 - Ändert sich nur das Aussehen, geht die neue Version direkt an alle.
-- **Zurückziehen:** *Actions → Versionen steuern → Run workflow* mit `withdraw` und der Version.
-  Installationen auf dieser Version spielen automatisch die vorige ein.
+- Freigeben und Zurückziehen geschieht zentral im Kern-Repo (*Actions → Versionen steuern*).
+  Installationen auf einer zurückgezogenen Version spielen automatisch die vorige ein.
+
+## Sicherheit
+
+Dieses Repo enthält keine Geheimnisse und hat keinen Zugriff auf den Signaturschlüssel. Nach einer
+Änderung auf `main` stößt es nur die Veröffentlichung im Kern-Repo an; dort wird gebaut, geprüft und signiert.
 
 ## Einmalig einrichten (macht der Workflow „Neue Kompanie“)
 
-- *Settings → Pages:* Quelle „Deploy from a branch“, Branch `gh-pages`.
+- *Settings → Pages:* Quelle „Deploy from a branch“, Branch `gh-pages` (nach der ersten Veröffentlichung).
 - Topic `kompanie-app` setzen (damit „Alle Kompanien neu bauen“ das Repo findet).
-- Das Secret `KOMPANIE_SIGNING_KEY` kommt aus der Organisation.
+- Das Secret `KOMPANIE_DISPATCH_TOKEN` kommt aus der Organisation.
