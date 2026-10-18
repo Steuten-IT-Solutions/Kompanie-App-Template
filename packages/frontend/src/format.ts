@@ -1,0 +1,67 @@
+const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+const dateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const weekdayFmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+const timeFmt = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
+const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
+
+export const formatEuro = (cents: number) => euro.format(cents / 100);
+
+/** 'YYYY-MM-DD' als lokales Datum (ohne UTC-Verschiebung). */
+export function parseLocalDate(ymd: string): Date {
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
+
+export function todayYmd(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function formatPoints(points: number): string {
+  return (points > 0 ? '+' : '') + points.toLocaleString('de-DE');
+}
+
+/** "2,50" / "2.50" / "2" → 250 Cent; null bei ungültiger Eingabe. */
+export function parseEuroToCents(input: string): number | null {
+  const s = input.trim().replace(/\s|€/g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
+  return Math.round(parseFloat(s) * 100);
+}
+
+/* Termine */
+
+export function eventStart(ev: { start: string; all_day: boolean }): Date {
+  return ev.all_day ? parseLocalDate(ev.start) : new Date(ev.start);
+}
+
+/** Ende inklusiv für ganztägige Termine (Google/iCal liefern exklusives Ende). */
+export function eventEnd(ev: { end: string; start: string; all_day: boolean }): Date {
+  if (!ev.all_day) return new Date(ev.end || ev.start);
+  const d = parseLocalDate(ev.end || ev.start);
+  if (ev.end && ev.end > ev.start) d.setDate(d.getDate() - 1);
+  return d;
+}
+
+export function formatEventWhen(ev: { start: string; end: string; all_day: boolean }): string {
+  const s = eventStart(ev);
+  const e = eventEnd(ev);
+  const sameDay = s.toDateString() === e.toDateString();
+  if (ev.all_day) {
+    return sameDay ? `${weekdayFmt.format(s)} · ganztägig` : `${weekdayFmt.format(s)} – ${weekdayFmt.format(e)}`;
+  }
+  if (e.getTime() <= s.getTime()) return `${weekdayFmt.format(s)} · ${timeFmt.format(s)} Uhr`;
+  return sameDay
+    ? `${weekdayFmt.format(s)} · ${timeFmt.format(s)}–${timeFmt.format(e)} Uhr`
+    : `${weekdayFmt.format(s)}, ${timeFmt.format(s)} – ${weekdayFmt.format(e)}, ${timeFmt.format(e)} Uhr`;
+}
+
+export const formatMonth = (d: Date) => monthFmt.format(d);
+
+/**
+ * Für Texte, die per CSS in Großbuchstaben erscheinen (text-transform: uppercase):
+ * Browser machen daraus sonst „SS“ (Spieß → SPIESS). Mit dem großen ẞ bleibt es „SPIEẞ“.
+ */
+export const caps = (s: string) => s.replace(/ß/g, 'ẞ');

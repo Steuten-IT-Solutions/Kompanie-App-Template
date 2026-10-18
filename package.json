@@ -1,0 +1,17 @@
+{
+  "name": "kompanie-app",
+  "private": true,
+  "workspaces": [
+    "packages/branding",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "branding": "npm run -w packages/branding brand --",
+    "build": "npm run -w packages/frontend build",
+    "typecheck": "npm run -w packages/frontend typecheck",
+    "test:branding": "npm run -w packages/branding test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

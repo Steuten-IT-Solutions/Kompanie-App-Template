@@ -4,3 +4,9 @@ dist/
 .DS_Store
 .phpunit.cache/
 .wp-test/
+packages/frontend/src/generated/
+packages/frontend/public/icons/
+packages/frontend/test-results/
+packages/frontend/playwright-report/
+adapters/wordpress/app/
+adapters/wordpress/kompanie.json

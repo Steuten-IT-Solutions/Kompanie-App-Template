@@ -75,6 +75,25 @@ jobs:
           KOMPANIE_TEST_MYSQL: 127.0.0.1;kompanie_test;kompanie;kompanie
         run: vendor/bin/phpunit
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten
+        run: npm ci --no-audit --no-fund
+
+      - name: Branding-Tests (Farben, Kontrast, Icons, Konfiguration)
+        run: npm run test:branding
+
+      - name: Frontend bauen (inkl. TypeScript-Prüfung)
+        run: npm run build
+
   wordpress:
     runs-on: ubuntu-latest
     services:
@@ -106,3 +125,29 @@ jobs:
 
       - name: WordPress-Tests (API-Szenario und Plugin)
         run: php .wp-test/wp-cli.phar --allow-root --path=.wp-test/wp eval-file tests/wordpress/run-tests.php
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Frontend bauen und ins Plugin legen
+        run: scripts/build-frontend.sh
+
+      - name: E2E-Tests (Playwright)
+        env:
+          KOMPANIE_WP_CLI: php .wp-test/wp-cli.phar --allow-root --path=.wp-test/wp
+          KOMPANIE_SCREENSHOT_DIR: ${{ github.workspace }}/screenshots
+        run: |
+          mkdir -p screenshots
+          npx playwright install --with-deps chromium
+          (PHP_CLI_SERVER_WORKERS=4 php -S localhost:8888 -t .wp-test/wp .wp-test/router.php > /tmp/php-server.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://localhost:8888/wp-login.php && break; sleep 1; done
+          cd packages/frontend && npx playwright test --reporter=line
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: ignore
