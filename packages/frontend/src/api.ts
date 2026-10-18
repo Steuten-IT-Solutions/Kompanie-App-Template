@@ -279,7 +279,8 @@ export const api = {
 
   login: (username: string, password: string, remember: boolean) =>
     request<AppConfig>('POST', '/auth/login', { username, password, remember }),
-  logout: () => request<{ logged_out: boolean }>('POST', '/auth/logout'),
+  // Mit leerem JSON-Inhalt: Die eigenständige Version verlangt ihn bei Anfragen ohne Sitzung.
+  logout: () => request<{ logged_out: boolean }>('POST', '/auth/logout', {}),
 
   events: () => request<PublicEvent[]>('GET', '/events'),
   createEvent: (data: EventInput) => request<PublicEvent>('POST', '/events', data),
@@ -325,7 +326,7 @@ export const api = {
   testCalendar: () => request<{ count: number; sample: { start: string; title: string }[] }>('POST', '/admin/calendar/test'),
   testNews: () => request<{ count: number }>('POST', '/admin/news/test'),
   syncGallery: (onlyProcess = false) =>
-    request<{ albums: number; photos: number; processed: number; pending: number }>('POST', '/admin/gallery/sync', { only_process: onlyProcess }),
+    request<{ albums: number; photos: number; processed: number; pending: number; failed: number; error: string }>('POST', '/admin/gallery/sync', { only_process: onlyProcess }),
 };
 
 export type NewsSourceType = 'none' | 'wordpress' | 'rss';

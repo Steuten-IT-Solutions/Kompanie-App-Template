@@ -57,7 +57,8 @@ final class Kernel
     public static function basePath(array $server): string
     {
         $script = str_replace('\\', '/', (string) ($server['SCRIPT_NAME'] ?? '/index.php'));
-        $dir = rtrim(dirname($script), '/');
+        // dirname() liefert unter Windows für „/index.php“ einen Backslash.
+        $dir = rtrim(str_replace('\\', '/', dirname($script)), '/');
         return $dir . '/';
     }
 
@@ -199,7 +200,7 @@ final class Kernel
 
     public function cronKey(): string
     {
-        return substr(hash_hmac('sha256', 'cron', $this->config()->secret()), 0, 32);
+        return substr(hash_hmac('sha256', 'cron|key', $this->config()->secret()), 0, 32);
     }
 
     /** Adresse für einen Cronjob beim Hoster (Alternative zu bin/kompanie.php cron). */
@@ -215,15 +216,35 @@ final class Kernel
     public function handleHttp(): void
     {
         $path = $this->requestPath();
+        try {
+            $this->route($path);
+        } catch (\Throwable $e) {
+            // Nie Einzelheiten (Pfade, SQL) an Besucher; sie stehen im Fehlerprotokoll des Servers.
+            error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            if (!headers_sent()) {
+                $this->sendError($path, 500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.');
+            }
+        }
+    }
+
+    private function route(string $path): void
+    {
         if (!$this->installed()) {
             $this->sendNotInstalled($path);
+            return;
+        }
+        try {
+            $this->config()->secret();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: config.php: ' . $e->getMessage());
+            $this->sendError($path, 503, 'config_invalid', 'Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.');
             return;
         }
         try {
             $this->upgrade();
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Datenbank nicht erreichbar: ' . $e->getMessage());
-            $this->sendPlain(503, 'Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.');
+            $this->sendError($path, 503, 'database_unavailable', 'Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.');
             return;
         }
 
@@ -250,11 +271,11 @@ final class Kernel
         if (isset($_GET['r']) && is_string($_GET['r'])) {
             $path = $_GET['r'];
         } else {
-            $uri = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+            // Erst dekodieren, dann vergleichen: SCRIPT_NAME ist dekodiert (z. B. „/mein verein/“).
+            $uri = rawurldecode((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH));
             $base = $this->http->basePath;
             $path = str_starts_with($uri, $base) ? substr($uri, strlen($base)) : $uri;
             $path = (string) preg_replace('#^index\.php#', '', $path);
-            $path = rawurldecode($path);
         }
         $path = '/' . ltrim($path, '/');
         return $path === '/' ? '/' : rtrim($path, '/');
@@ -300,7 +321,8 @@ final class Kernel
         $c = $app->config;
         $icons = $app->env->appUrl() . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
-        header('Cache-Control: public, max-age=3600');
+        // Adressen hängen ohne fest eingetragene base_url von der Anfrage ab: nicht in fremden Caches speichern.
+        header('Cache-Control: private, max-age=3600');
         $this->securityHeaders();
         echo json_encode([
             'name' => $c->name(),
@@ -354,7 +376,8 @@ final class Kernel
 
     private function sendCron(): void
     {
-        $key = is_string($_GET['key'] ?? null) ? $_GET['key'] : '';
+        // Schlüssel im Header (Selbstaufruf) oder als Parameter (Cronjob des Hosters).
+        $key = (string) ($this->http->header('X-Kompanie-Cron') ?? (is_string($_GET['key'] ?? null) ? $_GET['key'] : ''));
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
             $this->sendPlain(403, 'Falscher Schlüssel.');
@@ -372,6 +395,14 @@ final class Kernel
     private function sendApp(): void
     {
         header('Cache-Control: no-store');
+        // Mit fest eingetragener Adresse: andere Schreibweisen (z. B. mit/ohne www) dorthin umleiten,
+        // sonst lehnt die Herkunftsprüfung die Anmeldung als „fremde Seite“ ab.
+        $base = $this->config()->baseUrl();
+        if ($base !== '' && strcasecmp((string) parse_url($base, PHP_URL_HOST), (string) parse_url($this->http->baseUrl(), PHP_URL_HOST)) !== 0
+            && $this->http->method() === 'GET') {
+            header('Location: ' . $base, true, 301);
+            return;
+        }
         $file = $this->appDir() . '/index.html';
         if (!is_readable($file)) {
             $this->sendPlain(500, 'Die App wurde noch nicht gebaut (app/index.html fehlt).');
@@ -413,6 +444,20 @@ final class Kernel
             return;
         }
         $this->sendPlain(503, $msg);
+    }
+
+    /** Fehler als JSON (API) oder als Text (alles andere). */
+    private function sendError(string $path, int $status, string $code, string $message): void
+    {
+        if (str_starts_with($path, '/api/')) {
+            http_response_code($status);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Cache-Control: no-store');
+            $this->securityHeaders();
+            echo json_encode(['code' => $code, 'message' => $message], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $this->sendPlain($status, $message);
     }
 
     private function sendPlain(int $status, string $text): void
@@ -470,16 +515,30 @@ final class Kernel
         return false;
     }
 
+    /**
+     * Ruft die eigene Cron-Adresse im Hintergrund auf. Nur mit fest eingetragener Adresse
+     * (base_url aus config.php), nie mit der Adresse aus der Anfrage (Host-Header), und höchstens
+     * einmal pro Minute. Der Schlüssel geht im Header, nicht in der Adresse.
+     */
     private function spawnCron(): void
     {
-        if (!function_exists('curl_init')) {
+        $base = $this->config()->baseUrl();
+        if ($base === '' || !function_exists('curl_init')) {
             return;
         }
-        $ch = curl_init($this->cronUrl());
+        $cache = $this->app()->cache;
+        if ($cache->get('cron_spawned') !== null) {
+            return;
+        }
+        $cache->set('cron_spawned', 1, 60);
+        $url = $this->config()->urlMode() === 'rewrite' ? $base . 'cron' : $base . 'index.php?r=/cron';
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT_MS => 300,
             CURLOPT_NOSIGNAL => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_HTTPHEADER => ['X-Kompanie-Cron: ' . $this->cronKey()],
         ]);
         curl_exec($ch);
         curl_close($ch);

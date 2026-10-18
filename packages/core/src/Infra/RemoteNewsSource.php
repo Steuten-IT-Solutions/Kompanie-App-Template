@@ -13,16 +13,21 @@ use KompanieApp\Core\Port\Settings;
 
 /**
  * Neuigkeiten von einer vorhandenen Webseite der Kompanie:
- * - 'wordpress': Beiträge einer WordPress-Seite über /wp-json/wp/v2/posts,
- * - 'rss': ein RSS- oder Atom-Feed.
- * Eingestellt über news_source und news_url. Antworten werden 10 Minuten zwischengespeichert.
- * Den HTML-Inhalt bereinigt zusätzlich die App (DOMPurify).
+ * - 'wordpress': Beiträge einer WordPress-Seite über die REST-API (?rest_route=/wp/v2/posts,
+ *   funktioniert mit und ohne schöne Permalinks),
+ * - 'rss': ein Feed im Format RSS 2.0, RSS 1.0 (RDF) oder Atom.
+ * Eingestellt über news_source und news_url. Antworten werden 10 Minuten zwischengespeichert,
+ * Fehler 1 Minute (damit eine ausgefallene Seite nicht jeden Aufruf aufhält).
+ * Öffentliche Fehlermeldungen sind allgemein gehalten; Einzelheiten nur im Test für Admins.
+ * Den HTML-Inhalt bereinigt die App vor dem Anzeigen (DOMPurify).
  */
 final class RemoteNewsSource implements NewsSource
 {
     public const SOURCES = ['none', 'wordpress', 'rss'];
     private const CACHE_SECONDS = 600;
     private const MAX_FEED_ITEMS = 100;
+    private const ERROR_SECONDS = 60;
+    private const PUBLIC_ERROR = 'Die Neuigkeiten sind gerade nicht erreichbar. Bitte später erneut versuchen.';
 
     private bool $bypassCache = false;
 
@@ -112,12 +117,28 @@ final class RemoteNewsSource implements NewsSource
         }
     }
 
-    /** @param array<string, int|string> $query */
+    /** Fehler: im Test für Admins mit Einzelheiten, sonst allgemein (keine Details zu internen Adressen). */
+    private function upstream(string $detail): ApiError
+    {
+        return ApiError::upstream($this->bypassCache ? $detail : self::PUBLIC_ERROR);
+    }
+
+    /**
+     * Adresse der REST-API. Akzeptiert die Startseite (auch mit Unterordner oder Parametern wie
+     * ?lang=de) und Adressen, die schon auf /wp-json zeigen.
+     *
+     * @param array<string, int|string> $query
+     */
     private function wpUrl(string $route, array $query): string
     {
-        $base = rtrim($this->url(), '/');
-        // Mit und ohne URL-Umschreibung erreichbar: ?rest_route= funktioniert immer.
-        return $base . '/?rest_route=' . rawurlencode('/wp/v2/' . $route) . '&' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        $parts = parse_url($this->url());
+        $path = rtrim((string) ($parts['path'] ?? ''), '/');
+        $path = (string) preg_replace('#/wp-json(/.*)?$#', '', $path);
+        parse_str((string) ($parts['query'] ?? ''), $params);
+        unset($params['rest_route']);
+        $params = ['rest_route' => '/wp/v2/' . $route] + $params + $query;
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        return ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '') . $port . $path . '/?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
     }
 
     /** @return array{status: int, headers: array<string, string>, body: string} */
@@ -125,18 +146,22 @@ final class RemoteNewsSource implements NewsSource
     {
         $key = $this->cacheKey($url);
         $cached = $this->bypassCache ? null : $this->cache->get($key);
+        if (is_array($cached) && isset($cached['error'])) {
+            throw $this->upstream((string) $cached['error']);
+        }
         if (is_array($cached)) {
             return $cached;
         }
         try {
             $res = $this->http->request('GET', $url, ['Accept' => 'application/json, application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5'], null, 10);
         } catch (\RuntimeException $e) {
-            throw ApiError::upstream('Die Webseite mit den Neuigkeiten ist gerade nicht erreichbar: ' . $e->getMessage());
+            $detail = 'Die Webseite mit den Neuigkeiten ist nicht erreichbar: ' . $e->getMessage();
+            $this->cache->set($key, ['error' => $detail], self::ERROR_SECONDS);
+            throw $this->upstream($detail);
         }
         $res['headers'] = array_change_key_case($res['headers']);
-        if ($res['status'] === 200 || $res['status'] === 400 || $res['status'] === 404) {
-            $this->cache->set($key, $res, self::CACHE_SECONDS);
-        }
+        $ok = $res['status'] === 200 || $res['status'] === 400 || $res['status'] === 404;
+        $this->cache->set($key, $res, $ok ? self::CACHE_SECONDS : self::ERROR_SECONDS);
         return $res;
     }
 
@@ -150,7 +175,7 @@ final class RemoteNewsSource implements NewsSource
     {
         $data = json_decode($res['body'], true);
         if ($res['status'] !== 200 || !is_array($data)) {
-            throw ApiError::upstream('Die Webseite lieferte keine Beiträge (HTTP ' . $res['status'] . '). Ist die Adresse richtig und die REST-API erreichbar?');
+            throw $this->upstream('Die Webseite lieferte keine Beiträge (HTTP ' . $res['status'] . '). Ist die Adresse richtig und die REST-API erreichbar?');
         }
         return $data;
     }
@@ -170,46 +195,83 @@ final class RemoteNewsSource implements NewsSource
         ];
     }
 
+    private const NS_ATOM = 'http://www.w3.org/2005/Atom';
+    private const NS_RSS1 = 'http://purl.org/rss/1.0/';
+    private const NS_CONTENT = 'http://purl.org/rss/1.0/modules/content/';
+    private const NS_DC = 'http://purl.org/dc/elements/1.1/';
+
     /** @return array<int, array<string, mixed>> */
     private function feed(): array
     {
         $res = $this->fetch($this->url());
         if ($res['status'] !== 200) {
-            throw ApiError::upstream('Der Feed lieferte HTTP ' . $res['status'] . '.');
+            throw $this->upstream('Der Feed lieferte HTTP ' . $res['status'] . '.');
         }
         $previous = libxml_use_internal_errors(true);
-        // Ohne externe Entitäten und Netzwerkzugriff (XXE).
-        $xml = simplexml_load_string($res['body'], \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOCDATA);
+        // Ohne externe Entitäten und Netzwerkzugriff (XXE). Leerraum vor <?xml kommt bei
+        // manchen WordPress-Plugins vor und wäre sonst ein Fehler.
+        $xml = simplexml_load_string(ltrim($res['body']), \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOCDATA);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
         if ($xml === false) {
-            throw ApiError::upstream('Unter der Adresse liegt kein gültiger RSS- oder Atom-Feed.');
+            throw $this->upstream('Unter der Adresse liegt kein gültiger RSS- oder Atom-Feed.');
         }
+        $root = $xml->getName();
         $items = [];
-        if (isset($xml->channel)) { // RSS 2.0
-            foreach ($xml->channel->item as $it) {
-                $content = $it->children('http://purl.org/rss/1.0/modules/content/');
+        if ($root === 'rss') { // RSS 2.0 (und 0.9x)
+            foreach ($xml->channel->item ?? [] as $it) {
+                $content = $it->children(self::NS_CONTENT);
+                $dc = $it->children(self::NS_DC);
                 $html = (string) ($content->encoded ?? '') ?: (string) $it->description;
-                $items[] = $this->feedItem((string) $it->link, (string) $it->title, (string) $it->pubDate, (string) $it->description, $html, self::rssImage($it));
+                $date = (string) $it->pubDate ?: (string) ($dc->date ?? '');
+                $items[] = $this->feedItem((string) $it->link, (string) $it->title, $date, (string) $it->description, $html, self::rssImage($it));
             }
-        } else { // Atom
-            $xml->registerXPathNamespace('a', 'http://www.w3.org/2005/Atom');
-            foreach ($xml->xpath('//a:entry') ?: [] as $e) {
-                $e->registerXPathNamespace('a', 'http://www.w3.org/2005/Atom');
+        } elseif ($root === 'RDF') { // RSS 1.0
+            foreach ($xml->children(self::NS_RSS1)->item ?? [] as $it) {
+                $dc = $it->children(self::NS_DC);
+                $content = $it->children(self::NS_CONTENT);
+                $html = (string) ($content->encoded ?? '') ?: (string) $it->description;
+                $items[] = $this->feedItem((string) $it->link, (string) $it->title, (string) ($dc->date ?? ''), (string) $it->description, $html, null);
+            }
+        } elseif ($root === 'feed' && in_array(self::NS_ATOM, $xml->getNamespaces(), true)) { // Atom, auch mit Präfix
+            foreach ($xml->children(self::NS_ATOM)->entry ?? [] as $e) {
+                $a = $e->children(self::NS_ATOM);
                 $link = '';
-                foreach ($e->link as $l) {
-                    if ((string) $l['rel'] === '' || (string) $l['rel'] === 'alternate') {
-                        $link = (string) $l['href'];
+                foreach ($a->link as $l) {
+                    $rel = (string) $l->attributes()['rel'];
+                    if ($rel === '' || $rel === 'alternate') {
+                        $link = (string) $l->attributes()['href'];
                         break;
                     }
                 }
-                $html = (string) $e->content ?: (string) $e->summary;
-                $items[] = $this->feedItem($link, (string) $e->title, (string) ($e->published ?: $e->updated), (string) $e->summary, $html, null);
+                $html = self::atomText($a->content) ?: self::atomText($a->summary);
+                $items[] = $this->feedItem($link, (string) $a->title, (string) ($a->published ?: $a->updated), self::atomText($a->summary), $html, null);
             }
+        } else {
+            throw $this->upstream('Unter der Adresse liegt kein RSS- oder Atom-Feed.');
         }
         $items = array_values(array_filter($items, static fn (array $i): bool => $i['link'] !== '' || $i['title'] !== ''));
+        // Neueste zuerst; Beiträge ohne Datum ans Ende.
         usort($items, static fn (array $a, array $b): int => strcmp($b['date'], $a['date']));
         return array_slice($items, 0, self::MAX_FEED_ITEMS);
+    }
+
+    /** Text- oder HTML-Inhalt eines Atom-Elements; type="xhtml" steckt in einem div. */
+    private static function atomText(?\SimpleXMLElement $el): string
+    {
+        if ($el === null || $el->getName() === '') {
+            return '';
+        }
+        if ((string) $el->attributes()['type'] === 'xhtml') {
+            $html = '';
+            foreach ($el->children('http://www.w3.org/1999/xhtml') as $div) {
+                foreach ($div->children('http://www.w3.org/1999/xhtml') as $child) {
+                    $html .= (string) $child->asXML();
+                }
+            }
+            return $html;
+        }
+        return (string) $el;
     }
 
     /** @return array<string, mixed> */
@@ -250,6 +312,7 @@ final class RemoteNewsSource implements NewsSource
         return mb_strlen($text) > 280 ? rtrim(mb_substr($text, 0, 277)) . ' …' : $text;
     }
 
+    /** Datum als ISO 8601 in UTC (vergleichbar und sortierbar); null, wenn nicht lesbar. */
     private static function isoDate(string $value, bool $utc): ?string
     {
         if (trim($value) === '') {
@@ -257,7 +320,7 @@ final class RemoteNewsSource implements NewsSource
         }
         try {
             $dt = $utc ? new \DateTimeImmutable($value, new \DateTimeZone('UTC')) : new \DateTimeImmutable($value);
-            return $dt->format('c');
+            return $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
         } catch (\Exception) {
             return null;
         }

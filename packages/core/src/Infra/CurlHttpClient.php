@@ -9,7 +9,8 @@ use KompanieApp\Core\Port\HttpClient;
 /** Ausgehende Anfragen über cURL oder, falls nicht vorhanden, über PHP-Streams. */
 final class CurlHttpClient implements HttpClient
 {
-    public function __construct(private readonly string $userAgent = 'Kompanie-App')
+    /** @param int $maxBytes größte angenommene Antwort (Schutz des Arbeitsspeichers), Standard 64 MB */
+    public function __construct(private readonly string $userAgent = 'Kompanie-App', private readonly int $maxBytes = 64 * 1024 * 1024)
     {
     }
 
@@ -31,9 +32,20 @@ final class CurlHttpClient implements HttpClient
     {
         $ch = curl_init($url);
         $responseHeaders = [];
+        $data = '';
+        $tooLarge = false;
+        $max = $this->maxBytes;
         curl_setopt_array($ch, [
             CURLOPT_CUSTOMREQUEST => strtoupper($method),
-            CURLOPT_RETURNTRANSFER => true,
+            // Stückweise lesen und abbrechen, sobald die Antwort zu groß wird.
+            CURLOPT_WRITEFUNCTION => static function ($ch, string $chunk) use (&$data, &$tooLarge, $max): int {
+                if (strlen($data) + strlen($chunk) > $max) {
+                    $tooLarge = true;
+                    return 0;
+                }
+                $data .= $chunk;
+                return strlen($chunk);
+            },
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
@@ -54,6 +66,10 @@ final class CurlHttpClient implements HttpClient
             curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
         }
         $result = curl_exec($ch);
+        if ($tooLarge) {
+            curl_close($ch);
+            throw new \RuntimeException(sprintf('Die Antwort ist zu groß (mehr als %d MB).', max(1, intdiv($max, 1024 * 1024))));
+        }
         if ($result === false) {
             $error = curl_error($ch);
             curl_close($ch);
@@ -61,7 +77,7 @@ final class CurlHttpClient implements HttpClient
         }
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
-        return ['status' => $status, 'headers' => $responseHeaders, 'body' => (string) $result];
+        return ['status' => $status, 'headers' => $responseHeaders, 'body' => $data];
     }
 
     private function stream(string $method, string $url, array $lines, ?string $body, int $timeout): array
@@ -75,9 +91,12 @@ final class CurlHttpClient implements HttpClient
             'follow_location' => 1,
             'max_redirects' => 5,
         ]]);
-        $result = @file_get_contents($url, false, $context);
+        $result = @file_get_contents($url, false, $context, 0, $this->maxBytes + 1);
         if ($result === false) {
             throw new \RuntimeException('Keine Verbindung.');
+        }
+        if (strlen($result) > $this->maxBytes) {
+            throw new \RuntimeException(sprintf('Die Antwort ist zu groß (mehr als %d MB).', max(1, intdiv($this->maxBytes, 1024 * 1024))));
         }
         $status = 0;
         $headers = [];

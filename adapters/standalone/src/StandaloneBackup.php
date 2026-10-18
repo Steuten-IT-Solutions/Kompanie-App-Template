@@ -53,8 +53,8 @@ final class StandaloneBackup
     public function import(string $json): void
     {
         $data = Backup::parse($json);
-        if (($data['variant'] ?? '') !== 'standalone' && !empty($data['tables']['users'])) {
-            throw new \RuntimeException('Benutzer aus einer WordPress-Sicherung lassen sich nicht übernehmen.');
+        if (($data['variant'] ?? '') !== 'standalone') {
+            throw new \RuntimeException('Sicherungen aus dem WordPress-Plugin lassen sich (noch) nicht in die eigenständige Version übernehmen: Die Benutzer sind dort WordPress-Konten.');
         }
         if (empty($data['tables']['users']) || !in_array('admin', array_column($data['tables']['users'], 'level'), true)) {
             throw new \RuntimeException('Die Sicherung enthält keinen Admin; danach könnte sich niemand mehr anmelden.');

@@ -13,6 +13,9 @@ if (PHP_VERSION_ID < 80100) {
     exit;
 }
 
+// Fehlermeldungen nie im Browser zeigen (auf manchem Webspace standardmäßig an); sie gehen ins Protokoll.
+ini_set('display_errors', '0');
+
 require __DIR__ . '/autoload.php';
 
 (new KompanieApp\Standalone\Kernel(__DIR__))->handleHttp();

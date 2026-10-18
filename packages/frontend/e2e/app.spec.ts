@@ -414,14 +414,14 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein (nur eigens
   }
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
-  await expect(page.getByText('✓ Ein Kalender ist eingerichtet.')).toBeVisible();
+  await expect(page.getByText('✓ Eingerichtet über die geheime iCal-Adresse.')).toBeVisible();
   await expect(page.getByText('https://kalender.test')).toHaveCount(0); // geheime Adresse wird nicht angezeigt
 
   await page.getByRole('button', { name: 'Kalender testen' }).click();
   await expect(page.getByText(/3 Termine gefunden/)).toBeVisible();
 
   const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
-  await cal.getByLabel('Neue iCal-Adresse (ersetzt die bisherige)').fill('ftp://falsch');
+  await cal.getByLabel('Neue iCal-Adresse (ersetzt die bisherige Einrichtung)').fill('ftp://falsch');
   await cal.getByRole('button', { name: 'Speichern' }).click();
   await expect(cal.locator('.form-error')).toBeVisible();
 

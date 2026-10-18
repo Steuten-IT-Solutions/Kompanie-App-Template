@@ -13,5 +13,11 @@ php -S "localhost:$PORT" -t "$WORK/www" "$ROOT/tests/standalone/e2e-router.php" 
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true; rm -rf "$WORK"' EXIT
 for _ in $(seq 1 30); do curl -s -o /dev/null "http://localhost:$PORT/" && break; sleep 0.5; done
+# Läuft wirklich unser Server (und nicht etwas anderes auf dem Port)?
+if ! kill -0 "$SERVER" 2>/dev/null || ! curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/app/" | grep -qE '^(200|503)$'; then
+  echo "Der Testserver auf Port $PORT startet nicht (Port belegt?). Protokoll:" >&2
+  cat "$WORK/server.log" >&2
+  exit 1
+fi
 cd "$ROOT/packages/frontend"
 KOMPANIE_VARIANT=standalone KOMPANIE_BASE_URL="http://localhost:$PORT" npx playwright test "$@"

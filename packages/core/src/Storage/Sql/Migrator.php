@@ -54,7 +54,7 @@ final class Migrator
                 }
                 try {
                     $this->db->execute(str_replace('{options}', $this->db->tableOptions(), $sql));
-                } catch (\RuntimeException $e) { // PDOException oder Fehler von $wpdb
+                } catch (\RuntimeException $e) { // auch PDOException und Datenbankfehler der Adapter
                     // Zwei gleichzeitige Aufrufe direkt nach einem Update: Der andere war schneller.
                     if (!isset($m[2]) || !preg_match('/duplicate column/i', $e->getMessage())) {
                         throw $e;

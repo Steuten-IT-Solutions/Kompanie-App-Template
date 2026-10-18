@@ -3,8 +3,9 @@ import { api, type AdminSettings, type NewsSourceType } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 /**
- * Einstellungen der eigenständigen Version (bei WordPress im WP-Admin):
+ * Einstellungen der eigenständigen Version (bei WordPress zeigt die App sie nicht; dort im WP-Admin):
  * Kalender, Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
+ * (Die Endpunkte /admin/* gibt es auch im WordPress-Plugin; dort pflegt man sie aber im WP-Admin.)
  */
 export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
@@ -65,6 +66,7 @@ function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
   const c = settings.calendar;
+  const status = { ics: '✓ Eingerichtet über die geheime iCal-Adresse.', google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).', none: 'Noch kein Kalender eingerichtet.' }[c.source];
 
   async function test() {
     setTesting(true);
@@ -87,16 +89,17 @@ function Calendar({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        if (url.trim()) save({ calendar_ics_url: url.trim() }, () => setUrl(''));
+        if (!url.trim()) return setError('Bitte zuerst die iCal-Adresse einfügen.');
+        save({ calendar_ics_url: url.trim() }, () => setUrl(''));
       }}
     >
       <p className="muted small">
         In Google Kalender unter <em>Einstellungen → Kalender auswählen → Kalender integrieren</em> die{' '}
         <strong>geheime Adresse im iCal-Format</strong> kopieren und hier einfügen. Sie wird nicht wieder angezeigt.
       </p>
-      <p className="small">{c.ics_url_set || c.source === 'google' ? '✓ Ein Kalender ist eingerichtet.' : 'Noch kein Kalender eingerichtet.'}</p>
+      <p className="small">{status}</p>
       <label className="field">
-        <span>{c.ics_url_set ? 'Neue iCal-Adresse (ersetzt die bisherige)' : 'Geheime iCal-Adresse'}</span>
+        <span>{c.source === 'none' ? 'Geheime iCal-Adresse' : 'Neue iCal-Adresse (ersetzt die bisherige Einrichtung)'}</span>
         <input type="url" inputMode="url" autoComplete="off" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" value={url} onChange={(e) => setUrl(e.target.value)} />
       </label>
       {c.source !== 'none' && (
@@ -104,14 +107,20 @@ function Calendar({ settings, onSaved, onToast }: SectionProps) {
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
             {testing ? 'Prüft …' : 'Kalender testen'}
           </button>
-          {c.ics_url_set && (
-            <button type="button" className="btn btn-link" onClick={() => window.confirm('Kalender wirklich entfernen?') && save({ calendar_ics_url: '' })}>
-              Entfernen
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-link"
+            onClick={() => window.confirm('Kalender wirklich entfernen?') && save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' })}
+          >
+            Entfernen
+          </button>
         </div>
       )}
-      {result && <p className="small" role="status">{result}</p>}
+      {result && (
+        <p className="small" role="status">
+          {result}
+        </p>
+      )}
     </Section>
   );
 }
@@ -120,9 +129,11 @@ function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
   const [key, setKey] = useState('');
+  const [replaceKey, setReplaceKey] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
+  const showKeyField = !g.service_account_email || replaceKey;
 
   async function sync() {
     setSyncing(true);
@@ -135,7 +146,11 @@ function Gallery({ settings, onSaved, onToast }: SectionProps) {
         r = await api.syncGallery(true);
         setProgress(`${r.albums} Alben, ${r.photos} Bilder – noch ${r.pending} Bilder …`);
       }
-      setProgress(r.pending > 0 ? `${r.pending} Bilder konnten noch nicht aufbereitet werden; das geschieht stündlich automatisch.` : `Fertig: ${r.albums} Alben, ${r.photos} Bilder.`);
+      const parts = [`${r.albums} Alben, ${r.photos} Bilder.`];
+      if (r.pending > 0) parts.push(`${r.pending} Bilder werden stündlich automatisch weiter aufbereitet.`);
+      if (r.failed > 0) parts.push(`${r.failed} Bilder ließen sich nicht laden; sie werden beim nächsten Abgleich erneut versucht.`);
+      setProgress((r.pending > 0 || r.failed > 0 ? 'Abgeglichen: ' : 'Fertig: ') + parts.join(' '));
+      onSaved(await api.settings()); // Stand des Abgleichs (z. B. alte Fehlermeldung) aktualisieren
     } catch (err) {
       setError((err as Error).message);
       setProgress(null);
@@ -151,20 +166,32 @@ function Gallery({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        save({ gallery_root: root.trim(), ...(key.trim() ? { drive_service_account: key.trim() } : {}) }, () => setKey(''));
+        save({ gallery_root: root.trim(), ...(key.trim() ? { drive_service_account: key.trim() } : {}) }, () => {
+          setKey('');
+          setReplaceKey(false);
+        });
       }}
     >
       <p className="muted small">
         Den Galerie-Ordner in Google Drive für das Dienstkonto freigeben (Betrachter) und hier den Link zum Ordner eintragen.
         Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im Unterordner <em>intern</em> sehen nur Mitglieder.
       </p>
-      {g.service_account_email ? (
-        <p className="small">
+      {g.service_account_email && (
+        <div className="small">
           Dienstkonto: <code>{g.service_account_email}</code>
-        </p>
-      ) : (
+          <div className="button-row">
+            <button type="button" className="btn btn-link" onClick={() => setReplaceKey(!replaceKey)}>
+              {replaceKey ? 'Schlüssel behalten' : 'Schlüssel ersetzen'}
+            </button>
+            <button type="button" className="btn btn-link" onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}>
+              Schlüssel entfernen
+            </button>
+          </div>
+        </div>
+      )}
+      {showKeyField && (
         <label className="field">
-          <span>Schlüssel des Dienstkontos (JSON)</span>
+          <span>{g.service_account_email ? 'Neuer Schlüssel des Dienstkontos (JSON)' : 'Schlüssel des Dienstkontos (JSON)'}</span>
           <textarea rows={4} spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder='{"type": "service_account", …}' />
         </label>
       )}
@@ -174,18 +201,15 @@ function Gallery({ settings, onSaved, onToast }: SectionProps) {
       </label>
       {g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
       {g.configured && (
-        <div className="button-row">
-          <button type="button" className="btn btn-secondary" onClick={sync} disabled={syncing}>
-            {syncing ? 'Gleicht ab …' : 'Jetzt abgleichen'}
-          </button>
-          {g.service_account_email && (
-            <button type="button" className="btn btn-link" onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}>
-              Schlüssel entfernen
-            </button>
-          )}
-        </div>
+        <button type="button" className="btn btn-secondary" onClick={sync} disabled={syncing}>
+          {syncing ? 'Gleicht ab …' : 'Jetzt abgleichen'}
+        </button>
       )}
-      {progress && <p className="small" role="status">{progress}</p>}
+      {progress && (
+        <p className="small" role="status">
+          {progress}
+        </p>
+      )}
     </Section>
   );
 }
@@ -195,9 +219,12 @@ function News({ settings, onSaved, onToast }: SectionProps) {
   const [source, setSource] = useState<NewsSourceType>(n.source);
   const [url, setUrl] = useState(n.url);
   const [result, setResult] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
+  const unsaved = source !== n.source || (source !== 'none' && url.trim() !== n.url);
 
   async function test() {
+    setTesting(true);
     setResult(null);
     setError(null);
     try {
@@ -205,6 +232,8 @@ function News({ settings, onSaved, onToast }: SectionProps) {
       setResult(`${r.count} Beiträge gefunden.`);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -215,6 +244,7 @@ function News({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
+        if (source !== 'none' && !url.trim()) return setError('Bitte die Adresse angeben.');
         save({ news_source: source, news_url: source === 'none' ? '' : url.trim() });
       }}
     >
@@ -230,15 +260,22 @@ function News({ settings, onSaved, onToast }: SectionProps) {
       {source !== 'none' && (
         <label className="field">
           <span>{source === 'wordpress' ? 'Adresse der Webseite' : 'Adresse des Feeds'}</span>
-          <input type="url" inputMode="url" placeholder={source === 'wordpress' ? 'https://www.beispiel.de' : 'https://www.beispiel.de/feed'} value={url} onChange={(e) => setUrl(e.target.value)} />
+          <input type="url" inputMode="url" required placeholder={source === 'wordpress' ? 'https://www.beispiel.de' : 'https://www.beispiel.de/feed'} value={url} onChange={(e) => setUrl(e.target.value)} />
         </label>
       )}
-      {n.source !== 'none' && (
-        <button type="button" className="btn btn-secondary" onClick={test}>
-          Neuigkeiten testen
-        </button>
+      {n.source !== 'none' &&
+        (unsaved ? (
+          <p className="muted small">Erst speichern, dann testen.</p>
+        ) : (
+          <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
+            {testing ? 'Prüft …' : 'Neuigkeiten testen'}
+          </button>
+        ))}
+      {result && (
+        <p className="small" role="status">
+          {result}
+        </p>
       )}
-      {result && <p className="small" role="status">{result}</p>}
     </Section>
   );
 }

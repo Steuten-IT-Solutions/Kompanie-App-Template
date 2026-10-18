@@ -40,7 +40,8 @@ final class LocalFileStorage implements FileStorage
 
     public function delete(string $relative, bool $public): void
     {
-        $file = rtrim($public ? $this->publicDir : $this->privateDir, '/') . '/' . ltrim($relative, '/');
+        $relative = ltrim(str_replace(['\\', '..'], ['/', ''], $relative), '/');
+        $file = rtrim($public ? $this->publicDir : $this->privateDir, '/') . '/' . $relative;
         if (is_file($file)) {
             @unlink($file);
         }

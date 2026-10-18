@@ -48,18 +48,36 @@ final class DriveClient
         return $this->serviceAccount()['client_email'] ?? '';
     }
 
-    /** Prüft und speichert den JSON-Schlüssel eines Dienstkontos. */
-    public function saveServiceAccount(string $json): void
+    /**
+     * Prüft den JSON-Schlüssel eines Dienstkontos und gibt die benötigten Felder zurück.
+     *
+     * @return array<string, mixed>
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public static function parseServiceAccount(string $json): array
     {
         $data = json_decode($json, true);
-        if (!is_array($data) || empty($data['client_email']) || empty($data['private_key'])) {
+        if (!is_array($data) || !is_string($data['client_email'] ?? null) || !is_string($data['private_key'] ?? null)
+            || $data['client_email'] === '' || $data['private_key'] === '') {
             throw new \RuntimeException('Das ist kein gültiger Schlüssel eines Dienstkontos (client_email oder private_key fehlt).');
         }
         if (!openssl_pkey_get_private($data['private_key'])) {
             throw new \RuntimeException('Der private Schlüssel kann nicht gelesen werden.');
         }
-        $keep = array_intersect_key($data, array_flip(['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id', 'token_uri']));
-        $this->settings->set(self::SETTING, json_encode($keep));
+        return array_intersect_key($data, array_flip(['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id', 'token_uri']));
+    }
+
+    /** Prüft und speichert den JSON-Schlüssel eines Dienstkontos. */
+    public function saveServiceAccount(string $json): void
+    {
+        $this->settings->set(self::SETTING, json_encode(self::parseServiceAccount($json)));
+        $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    /** Entfernt den Schlüssel. */
+    public function removeServiceAccount(): void
+    {
+        $this->settings->delete(self::SETTING);
         $this->cache->delete(self::TOKEN_CACHE);
     }
 

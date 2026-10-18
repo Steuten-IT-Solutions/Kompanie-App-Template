@@ -130,7 +130,7 @@ final class App
 
     public function members(): MemberService
     {
-        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator));
+        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache));
     }
 
     public function calendar(): CalendarService

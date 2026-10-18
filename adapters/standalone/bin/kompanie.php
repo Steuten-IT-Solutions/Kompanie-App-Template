@@ -2,8 +2,8 @@
 /**
  * Kommandozeile der eigenständigen Version (für Hoster mit SSH oder Cronjob).
  *
- *   php bin/kompanie.php install [--mysql --db-host=… --db-name=… --db-user=… --db-pass=… --db-prefix=…]
- *                                [--url=https://example.org/app/] [--rewrite]
+ *   php bin/kompanie.php install --url=https://example.org/app/ [--rewrite]
+ *                                [--mysql --db-host=… --db-name=… --db-user=… --db-pass=… --db-prefix=…]
  *   php bin/kompanie.php create-admin --name="Vorname Nachname" --login=name [--email=…] [--password=…]
  *   php bin/kompanie.php reset-password --login=name
  *   php bin/kompanie.php cron           fällige Aufgaben ausführen (z. B. stündlich als Cronjob)
@@ -105,7 +105,13 @@ try {
                 throw new RuntimeException('Bitte die Datei der Sicherung angeben.');
             }
             $kernel->upgrade();
-            (new StandaloneBackup($kernel))->import((string) file_get_contents($file));
+            $backup = new StandaloneBackup($kernel);
+            // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
+            $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '.json';
+            file_put_contents($before, json_encode($backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            @chmod($before, 0600);
+            echo "Bisheriger Stand gesichert: $before\n";
+            $backup->import((string) file_get_contents($file));
             echo "Sicherung wiederhergestellt. Alle Geräte müssen sich neu anmelden; die Galeriebilder werden neu aufbereitet.\n";
             break;
 

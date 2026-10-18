@@ -8,6 +8,7 @@ use KompanieApp\Core\Auth\Level;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\Authenticator;
+use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\UserDirectory;
 
 /** Mitglieder, Rollen und Passwörter. */
@@ -17,8 +18,12 @@ final class MemberService
         private readonly UserDirectory $users,
         private readonly ScoreService $scores,
         private readonly Authenticator $auth,
+        private readonly ?Cache $cache = null,
     ) {
     }
+
+    /** Falsche „aktuelle Passwörter“ beim Passwortwechsel: höchstens so viele in 15 Minuten. */
+    public const PASSWORD_ATTEMPTS = 5;
 
     /** @return array<string, mixed> */
     public function me(User $user): array
@@ -178,7 +183,15 @@ final class MemberService
     {
         $current = is_string($current) ? $current : '';
         $new = is_string($new) ? $new : '';
+        // Wer nur eine fremde Sitzung hat (z. B. ein nicht abgemeldetes Gerät), soll das Passwort
+        // nicht unbegrenzt raten und so das Konto übernehmen können.
+        $key = 'pwfail_' . $user->id;
+        $fails = (int) ($this->cache?->get($key) ?? 0);
+        if ($fails >= self::PASSWORD_ATTEMPTS) {
+            throw new ApiError(429, 'too_many_attempts', 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.');
+        }
         if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
+            $this->cache?->set($key, $fails + 1, 900);
             throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
         }
         if (mb_strlen($new) < Passwords::MIN_LENGTH) {
@@ -195,6 +208,7 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }
+        $this->cache?->delete($key);
         $this->auth->afterPasswordChange($user->id);
     }
 }

@@ -19,6 +19,8 @@ use KompanieApp\Core\Port\Authenticator;
 final class SessionAuth implements Authenticator, AuthContext
 {
     public const CSRF_HEADER = 'X-CSRF-Token';
+    /** Kennzeichnet Geräte, auf denen sich ein Konto schon angemeldet hat (siehe LoginThrottle). */
+    public const DEVICE_COOKIE = 'kompanie_device';
     private const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
     private User|null|false $user = false;
@@ -83,10 +85,15 @@ final class SessionAuth implements Authenticator, AuthContext
         if (in_array($this->http->method(), self::SAFE_METHODS, true)) {
             return;
         }
-        // HTML-Formulare fremder Seiten können kein application/json senden.
+        // HTML-Formulare fremder Seiten können kein application/json senden. Gäste (Anmeldung)
+        // müssen es immer angeben; angemeldete Anfragen ohne Inhalt (z. B. Abmelden) dürfen ohne.
         $type = strtolower(trim(explode(';', (string) $this->http->header('Content-Type'))[0]));
-        if ($type !== '' && $type !== 'application/json') {
+        if (($type !== '' || $this->currentUser() === null) && $type !== 'application/json') {
             throw new ApiError(415, 'unsupported_media_type', 'Bitte Daten als JSON senden.');
+        }
+        // Browser melden, ob eine Anfrage von einer fremden Seite kommt.
+        if (strtolower((string) $this->http->header('Sec-Fetch-Site')) === 'cross-site') {
+            throw new ApiError(403, 'csrf_invalid', 'Anfrage von einer fremden Seite abgelehnt.');
         }
         $origin = $this->http->header('Origin');
         if ($origin !== null && $origin !== 'null' && !$this->sameOrigin($origin)) {
@@ -110,25 +117,46 @@ final class SessionAuth implements Authenticator, AuthContext
         if ($username === '' || $password === '') {
             throw ApiError::invalid('Bitte Benutzername und Passwort eingeben.');
         }
-        if ($this->throttle->blocked($username, $ip)) {
+        $row = $this->users->findForLogin($username);
+        // Gezählt wird je Konto, gleich in welcher Schreibweise oder ob per Name oder E-Mail.
+        $id = $row ? (int) $row['id'] : 0;
+        $account = $row ? 'u' . $id : 'n' . mb_strtolower(trim($username));
+        $knownDevice = $row !== null && $this->isKnownDevice($id);
+        if (!$this->throttle->attempt($account, $ip, $knownDevice)) {
             throw new ApiError(429, 'too_many_attempts', 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.');
         }
-        $row = $this->users->findForLogin($username);
-        // Auch ohne Konto ein Passwort prüfen, damit die Antwortzeit nichts verrät.
-        $hash = $row ? (string) $row['password_hash'] : '$2y$10$a7/AN8h6R.KoFYV/BQJYOOivxgi2QpQv89YGdye0Ee9MdrPEUoDJG';
+        // Auch ohne Konto einen Hash gleicher Stärke prüfen, damit die Antwortzeit nichts verrät.
+        $hash = $row ? (string) $row['password_hash'] : password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
         if (!password_verify($password, $hash) || !$row) {
-            $this->throttle->fail($username, $ip);
             throw new ApiError(400, 'login_failed', 'Benutzername oder Passwort ist falsch.');
         }
-        $id = (int) $row['id'];
-        $this->throttle->succeed($username, $ip);
+        $this->throttle->success($account, $ip, $knownDevice);
         $this->users->rehashIfNeeded($id, $password, $hash);
         $this->users->touchLogin($id);
         // Nie eine bestehende Sitzung weiterverwenden (Session Fixation).
         $this->sessions->destroy();
         $this->sessions->start($id, $remember);
+        $this->rememberDevice($id);
         $this->user = false;
         return $this->currentUser() ?? throw new \LogicException('Anmeldung fehlgeschlagen.');
+    }
+
+    private function isKnownDevice(int $userId): bool
+    {
+        $v = (string) $this->http->cookie(self::DEVICE_COOKIE);
+        $parts = explode('.', $v);
+        return count($parts) === 3 && $parts[0] === (string) $userId
+            && hash_equals(hash_hmac('sha256', 'device|' . $parts[0] . '|' . $parts[1], $this->secret), $parts[2]);
+    }
+
+    private function rememberDevice(int $userId): void
+    {
+        if ($this->isKnownDevice($userId)) {
+            return;
+        }
+        $nonce = bin2hex(random_bytes(8));
+        $value = $userId . '.' . $nonce . '.' . hash_hmac('sha256', 'device|' . $userId . '|' . $nonce, $this->secret);
+        $this->http->setCookie(self::DEVICE_COOKIE, $value, time() + Sessions::LIFETIME);
     }
 
     public function logout(): void

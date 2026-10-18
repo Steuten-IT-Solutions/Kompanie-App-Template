@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { MemberSummary } from './api';
 
 /** Lädt Daten asynchron; reload() lädt neu. */
@@ -117,4 +117,28 @@ export function MemberPicker({
       <div className="picker-count">{selected.length} ausgewählt</div>
     </div>
   );
+}
+
+/**
+ * Fängt Fehler beim Anzeigen einer Ansicht ab: Statt einer leeren Seite erscheint ein Hinweis,
+ * Kopfzeile und Navigation bleiben bedienbar. Mit key={Ansicht} setzt ein Wechsel ihn zurück.
+ */
+export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error(error);
+  }
+
+  render() {
+    return this.state.failed ? (
+      <ErrorBox message="Diese Ansicht konnte nicht angezeigt werden." onRetry={() => this.setState({ failed: false })} />
+    ) : (
+      this.props.children
+    );
+  }
 }

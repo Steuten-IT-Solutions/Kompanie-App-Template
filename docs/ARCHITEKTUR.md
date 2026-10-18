@@ -170,7 +170,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_events` | öffentliche Termine pflegen |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
 | `promote_users` | Rollen vergeben |
-| `manage_settings` | Einstellungen, Updates, Sicherung (bei WordPress im WP-Admin) |
+| `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |
 
 Rollen: `guest`, `member`, `manager`, `admin`. Die Bezeichnungen kommen aus `kompanie.json`.
 

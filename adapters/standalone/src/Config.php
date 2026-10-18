@@ -105,6 +105,9 @@ final class Config
         $db = $this->data['db'] ?? [];
         $driver = $db['driver'] ?? 'sqlite';
         if ($driver === 'mysql') {
+            if (!preg_match('/^[A-Za-z0-9_]{0,32}$/', (string) ($db['prefix'] ?? 'kompanie_'))) {
+                throw new \RuntimeException('Das Tabellen-Präfix darf nur Buchstaben, Ziffern und _ enthalten.');
+            }
             return PdoConnection::mysql(
                 (string) ($db['host'] ?? 'localhost'),
                 (string) ($db['name'] ?? ''),

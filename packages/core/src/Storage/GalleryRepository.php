@@ -87,6 +87,11 @@ final class GalleryRepository
         return $this->db->execute('UPDATE {photos} SET status = ? WHERE status = ? AND attempts < ?', [self::PENDING, self::FAILED, $max]);
     }
 
+    public function countFailed(): int
+    {
+        return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ?', [self::FAILED]);
+    }
+
     public function countPending(): int
     {
         return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ?', [self::PENDING]);

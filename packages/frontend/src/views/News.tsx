@@ -6,6 +6,29 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 const dateFmt = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
 
+/** Datum eines Beitrags; leer, wenn die Quelle keines oder ein unlesbares liefert. */
+function newsDate(iso: string): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(t) ? '' : dateFmt.format(new Date(t));
+}
+
+/**
+ * Inhalte fremder Webseiten und Feeds: ohne Skripte (Standard von DOMPurify), zusätzlich ohne
+ * Stile und Formulare, damit ein Beitrag die App nicht umgestalten oder Eingaben abfragen kann.
+ */
+function cleanHtml(html: string): string {
+  const clean = DOMPurify.sanitize(html, {
+    ADD_ATTR: ['target'],
+    FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select', 'option', 'link', 'meta', 'base'],
+    FORBID_ATTR: ['style', 'class', 'id'],
+    RETURN_DOM_FRAGMENT: true,
+  });
+  clean.querySelectorAll('a[target]').forEach((a) => a.setAttribute('rel', 'noopener noreferrer'));
+  const div = document.createElement('div');
+  div.appendChild(clean);
+  return div.innerHTML;
+}
+
 export default function News({ id }: { id?: string }) {
   return id ? <NewsDetail id={id} /> : <NewsList />;
 }
@@ -30,7 +53,7 @@ function NewsList() {
           <li key={n.id} className="card news-card clickable" onClick={() => navigate(`news/${n.id}`)}>
             {n.image && <img className="news-image" src={n.image} alt="" loading="lazy" />}
             <div className="news-body">
-              <div className="news-date">{dateFmt.format(new Date(n.date))}</div>
+              {newsDate(n.date) && <div className="news-date">{newsDate(n.date)}</div>}
               <h2 className="news-title">{n.title}</h2>
               <p className="news-excerpt">{n.excerpt}</p>
             </div>
@@ -52,8 +75,7 @@ function NewsDetail({ id }: { id: string }) {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const n = data!;
-  // Inhalt stammt von der Webseite; zusätzlich bereinigen, bevor er eingefügt wird.
-  const html = DOMPurify.sanitize(n.content ?? '', { ADD_ATTR: ['target'] });
+  const html = cleanHtml(n.content ?? '');
 
   return (
     <article className="news-article">
@@ -61,7 +83,7 @@ function NewsDetail({ id }: { id: string }) {
         ‹ Alle Neuigkeiten
       </button>
       {n.image && <img className="news-hero" src={n.image} alt="" />}
-      <div className="news-date">{dateFmt.format(new Date(n.date))}</div>
+      {newsDate(n.date) && <div className="news-date">{newsDate(n.date)}</div>}
       <h2 className="news-headline">{n.title}</h2>
       <div className="news-content" dangerouslySetInnerHTML={{ __html: html }} />
       <a className="btn btn-secondary btn-block" href={n.link} target="_blank" rel="noreferrer">

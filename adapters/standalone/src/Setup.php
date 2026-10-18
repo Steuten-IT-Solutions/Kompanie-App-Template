@@ -17,8 +17,12 @@ final class Setup
     /**
      * @param array<string, mixed> $db ['driver' => 'sqlite'] oder ['driver' => 'mysql', 'host', 'port', 'name', 'user', 'password', 'prefix']
      */
-    public static function install(Kernel $kernel, array $db, string $baseUrl = '', string $urlMode = 'query'): void
+    public static function install(Kernel $kernel, array $db, string $baseUrl, string $urlMode = 'query'): void
     {
+        // Die Adresse wird fest eingetragen: Sie darf nie aus dem Host-Header einer Anfrage kommen.
+        if (!preg_match('~^https?://[^/\s?#]+(/[^\s?#]*)?$~', $baseUrl)) {
+            throw new \RuntimeException('Bitte die Adresse der App angeben, z. B. https://beispiel.de/app/');
+        }
         $data = $kernel->dataDir();
         if (Config::exists($data)) {
             throw new \RuntimeException('Die App ist hier schon eingerichtet (config.php vorhanden).');
@@ -28,12 +32,14 @@ final class Setup
             if (!extension_loaded('pdo_sqlite')) {
                 throw new \RuntimeException('PHP kann keine SQLite-Datenbank anlegen (Erweiterung pdo_sqlite fehlt). Sie lässt sich meist im Kundenmenü des Hosters einschalten; alternativ eine MySQL-Datenbank nutzen.');
             }
-            $db = ['driver' => 'sqlite', 'path' => 'kompanie.sqlite'];
+            // Zufälliger Name: Selbst wenn der Webserver das Datenverzeichnis nicht sperrt
+            // (nginx ohne passende Regel), ist die Datei nicht zu erraten.
+            $db = ['driver' => 'sqlite', 'path' => 'kompanie-' . bin2hex(random_bytes(16)) . '.sqlite'];
         } elseif (!extension_loaded('pdo_mysql')) {
             throw new \RuntimeException('PHP kann keine MySQL-Datenbank ansprechen (Erweiterung pdo_mysql fehlt).');
         }
         $settings = Config::defaults($db);
-        $settings['base_url'] = $baseUrl === '' ? '' : rtrim($baseUrl, '/') . '/';
+        $settings['base_url'] = rtrim($baseUrl, '/') . '/';
         $settings['url_mode'] = $urlMode === 'rewrite' ? 'rewrite' : 'query';
         // Erst die Verbindung prüfen, dann config.php schreiben: Ein Tippfehler im Passwort soll
         // keine halbe Installation hinterlassen.

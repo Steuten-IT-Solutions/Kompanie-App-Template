@@ -71,7 +71,7 @@ final class NewsAndSettingsTest extends TestCase
         $this->assertSame(200, $res->status);
         $this->assertSame('2', $res->headers['X-Total-Pages']);
         $item = $res->data[0];
-        $this->assertSame(['7', 'Fest & Feier', '2026-05-01T10:00:00+00:00', 'Kurz …', 'https://verein.example/bild.jpg', ''], [$item['id'], $item['title'], $item['date'], $item['excerpt'], $item['image'], $item['link']], 'javascript:-Link verworfen');
+        $this->assertSame(['7', 'Fest & Feier', '2026-05-01T10:00:00Z', 'Kurz …', 'https://verein.example/bild.jpg', ''], [$item['id'], $item['title'], $item['date'], $item['excerpt'], $item['image'], $item['link']], 'javascript:-Link verworfen');
         $this->assertStringContainsString('rest_route=' . rawurlencode('/wp/v2/posts'), $http->calls[0]['url'], 'funktioniert auch ohne schöne Permalinks');
 
         $calls = count($http->calls);
@@ -121,7 +121,81 @@ final class NewsAndSettingsTest extends TestCase
         $app->cache->delete('news_' . md5('https://v.example/feed'));
         $res = $app->api()->handle(new Request('GET', '/news'));
         $this->assertSame(502, $res->status);
-        $this->assertStringContainsString('kein gültiger RSS', $res->data['message']);
+        $this->assertStringContainsString('gerade nicht erreichbar', $res->data['message'], 'öffentlich nur eine allgemeine Meldung');
+    }
+
+    public function testFeedVariantsDatesAndErrors(): void
+    {
+        $body = '';
+        $http = new FakeHttpClient(static function () use (&$body): array {
+            return ['status' => 200, 'body' => $body];
+        });
+        $users = new FakeUsers();
+        $app = $this->app($http, new MemorySettings(['news_source' => 'rss', 'news_url' => 'https://v.example/feed']), $users);
+        $load = function (string $xml) use (&$body, $app): array {
+            $body = $xml;
+            $app->cache->delete('news_' . md5('https://v.example/feed'));
+            $res = $app->api()->handle(new Request('GET', '/news'));
+            $this->assertSame(200, $res->status, $xml);
+            return $res->data;
+        };
+
+        // RSS 1.0 (RDF) mit dc:date, Leerraum vor <?xml
+        $rdf = "\n  <?xml version=\"1.0\"?><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\" xmlns=\"http://purl.org/rss/1.0/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">"
+            . '<item rdf:about="https://v.example/r"><title>RDF-Beitrag</title><link>https://v.example/r</link><dc:date>2026-03-01T10:00:00+01:00</dc:date></item></rdf:RDF>';
+        $this->assertSame([['RDF-Beitrag', '2026-03-01T09:00:00Z']], array_map(static fn ($i) => [$i['title'], $i['date']], $load($rdf)));
+
+        // Atom mit Präfix und xhtml-Inhalt
+        $atom = '<?xml version="1.0"?><a:feed xmlns:a="http://www.w3.org/2005/Atom"><a:entry><a:title>Präfix</a:title><a:link href="https://v.example/p"/>'
+            . '<a:updated>2026-03-02T10:00:00Z</a:updated><a:content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Hallo <b>Welt</b></p></div></a:content></a:entry></a:feed>';
+        $list = $load($atom);
+        $this->assertSame('Präfix', $list[0]['title']);
+        $this->assertSame('https://v.example/p', $list[0]['link']);
+        $this->assertStringContainsString('<b>Welt</b>', $app->api()->handle(new Request('GET', '/news/' . $list[0]['id']))->data['content']);
+
+        // Zeitzonen: sortiert nach dem echten Zeitpunkt; Beitrag ohne lesbares Datum ans Ende
+        $rss = '<rss><channel>'
+            . '<item><title>Mittag Berlin</title><link>https://v.example/1</link><pubDate>Tue, 03 Mar 2026 12:00:00 +0200</pubDate></item>'
+            . '<item><title>Halb elf UTC</title><link>https://v.example/2</link><pubDate>Tue, 03 Mar 2026 10:30:00 +0000</pubDate></item>'
+            . '<item><title>Ohne Datum</title><link>https://v.example/3</link><pubDate>Di, 03 Mär 2026</pubDate></item>'
+            . '</channel></rss>';
+        $list = $load($rss);
+        $this->assertSame(['Halb elf UTC', 'Mittag Berlin', 'Ohne Datum'], array_column($list, 'title'));
+        $this->assertSame('', $list[2]['date']);
+
+        // Unbekanntes Format: Fehler statt „0 Beiträge“, Einzelheiten nur im Test für Admins
+        $body = '<html><body>keine Neuigkeiten</body></html>';
+        $app->cache->delete('news_' . md5('https://v.example/feed'));
+        $this->assertSame(502, $app->api()->handle(new Request('GET', '/news'))->status);
+        $users->current = $users->add('a', Level::Admin);
+        $res = $app->api()->handle(new Request('POST', '/admin/news/test'));
+        $this->assertSame(502, $res->status);
+        $this->assertStringContainsString('kein RSS- oder Atom-Feed', $res->data['message']);
+
+        // Ausgefallene Seite: Fehler wird kurz gemerkt, nicht bei jedem Aufruf neu abgefragt
+        $app->settings->set('news_url', 'https://weg.example/feed');
+        $http->handler = \Closure::fromCallable(static fn () => throw new \RuntimeException('Failed to connect to 10.0.0.1 port 3306'));
+        $calls = count($http->calls);
+        $first = $app->api()->handle(new Request('GET', '/news'));
+        $app->api()->handle(new Request('GET', '/news'));
+        $this->assertSame($calls + 1, count($http->calls));
+        $this->assertStringNotContainsString('10.0.0.1', $first->data['message'], 'keine internen Adressen für Besucher');
+    }
+
+    public function testWordPressAddressVariants(): void
+    {
+        $http = new FakeHttpClient(static fn () => ['status' => 200, 'body' => '[]', 'headers' => ['X-WP-TotalPages' => '0']]);
+        foreach ([
+            'https://verein.example' => 'https://verein.example/?rest_route=%2Fwp%2Fv2%2Fposts&per_page=10',
+            'https://verein.example/blog/' => 'https://verein.example/blog/?rest_route=%2Fwp%2Fv2%2Fposts&per_page=10',
+            'https://verein.example/?lang=de' => 'https://verein.example/?rest_route=%2Fwp%2Fv2%2Fposts&lang=de&per_page=10',
+            'https://verein.example/wp-json/' => 'https://verein.example/?rest_route=%2Fwp%2Fv2%2Fposts&per_page=10',
+            'https://verein.example:8443/wp-json/wp/v2' => 'https://verein.example:8443/?rest_route=%2Fwp%2Fv2%2Fposts&per_page=10',
+        ] as $site => $expected) {
+            $app = $this->app($http, new MemorySettings(['news_source' => 'wordpress', 'news_url' => $site]), new FakeUsers());
+            $app->api()->handle(new Request('GET', '/news'));
+            $this->assertStringStartsWith($expected, end($http->calls)['url'], $site);
+        }
     }
 
     public function testSettingsEndpoints(): void
@@ -174,6 +248,19 @@ final class NewsAndSettingsTest extends TestCase
         $this->assertSame('ABC_123', $r->data['gallery']['root']);
         $this->assertFalse($r->data['gallery']['configured'], 'ohne Dienstkonto');
         $this->assertSame(503, $h('POST', '/admin/gallery/sync')->status);
+
+        // Werte, die kein Text sind, und teilweise ungültige Anfragen ändern nichts.
+        $this->assertSame(400, $h('PATCH', '/admin/settings', ['gallery_root' => null])->status);
+        $this->assertSame(400, $h('PATCH', '/admin/settings', ['drive_service_account' => ['client_email' => 'x']])->status);
+        $this->assertSame('ABC_123', $app->gallery()->root(), 'Ordner bleibt');
+        $this->assertSame(400, $h('PATCH', '/admin/settings', ['calendar_ics_url' => 'https://neu.example/x.ics', 'gallery_root' => 'https://drive.google.com/irgendwas?'])->status);
+        $this->assertSame('https://cal.example/geheim.ics', $app->settings->get('calendar_ics_url'), 'nichts teilweise gespeichert');
+        $this->assertSame(400, $h('PATCH', '/admin/settings', ['news_source' => 'wordpress', 'news_url' => ''])->status, 'Quelle ohne Adresse');
+
+        // Eine neue iCal-Adresse gilt auch dann, wenn vorher die Google-API eingerichtet war.
+        $h('PATCH', '/admin/settings', ['google_api_key' => 'KEY', 'calendar_ids' => 'a@group.calendar.google.com']);
+        $this->assertSame('google', $h('GET', '/admin/settings')->data['calendar']['source']);
+        $this->assertSame('ics', $h('PATCH', '/admin/settings', ['calendar_ics_url' => 'https://neu.example/x.ics'])->data['calendar']['source']);
 
         $r = $h('PATCH', '/admin/settings', ['calendar_ics_url' => '', 'news_source' => 'none']);
         $this->assertSame('none', $r->data['calendar']['source']);

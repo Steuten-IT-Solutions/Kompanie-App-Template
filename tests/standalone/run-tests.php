@@ -28,6 +28,7 @@ use KompanieApp\Core\Auth\Level;
 use KompanieApp\Standalone\Config;
 use KompanieApp\Standalone\HttpContext;
 use KompanieApp\Standalone\Kernel;
+use KompanieApp\Standalone\SessionAuth;
 use KompanieApp\Standalone\Sessions;
 use KompanieApp\Standalone\Setup;
 use KompanieApp\Standalone\StandaloneBackup;
@@ -39,16 +40,25 @@ $data = sys_get_temp_dir() . '/kompanie-standalone-' . bin2hex(random_bytes(4));
 putenv("KOMPANIE_DATA_DIR=$data");
 
 $server = null;
-$startServer = static function (bool $rewrite) use (&$server, $app, $port, $data, $root): void {
+// Mit PHP_CLI_SERVER_WORKERS hat der Server Kindprozesse; die müssen mit beendet werden.
+$stopServer = static function ($proc): void {
+    $pid = proc_get_status($proc)['pid'] ?? 0;
+    if ($pid > 0) {
+        exec('pkill -TERM -P ' . (int) $pid . ' 2>/dev/null');
+    }
+    proc_terminate($proc);
+    proc_close($proc);
+};
+$startServer = static function (bool $rewrite) use (&$server, $app, $port, $data, $root, $stopServer): void {
     if ($server) {
-        proc_terminate($server);
-        proc_close($server);
+        $stopServer($server);
+        usleep(300000);
     }
     $cmd = [PHP_BINARY, '-S', "127.0.0.1:$port", '-t', $app];
     if ($rewrite) {
         $cmd[] = $root . '/tests/standalone/router.php';
     }
-    $server = proc_open($cmd, [1 => ['file', '/dev/null', 'w'], 2 => ['file', $data . '-server.log', 'a']], $pipes, $app, ['KOMPANIE_DATA_DIR' => $data] + getenv());
+    $server = proc_open($cmd, [1 => ['file', '/dev/null', 'w'], 2 => ['file', $data . '-server.log', 'a']], $pipes, $app, ['KOMPANIE_DATA_DIR' => $data, 'PHP_CLI_SERVER_WORKERS' => '8'] + getenv());
     for ($i = 0; $i < 50; $i++) {
         if (@fsockopen('127.0.0.1', $port)) {
             return;
@@ -122,6 +132,9 @@ try {
     $c->ok($login('anna', 'anna-passwort', true, ['Origin' => 'https://fremd.example'])[0] === 403, 'Anmeldung mit fremder Herkunft (Origin) → 403');
     $c->ok($login('anna', 'anna-passwort', true, ['Origin' => rtrim($base, '/')])[0] === 200, 'Anmeldung von der eigenen Seite (Origin) → 200');
     $c->ok($as($token, 'POST', 'auth/logout', null, ['X-CSRF-Token' => $csrf, 'Origin' => 'null'])[0] === 403, 'Origin „null“ (z. B. Sandbox-iframe) → 403');
+    $c->ok($login('anna', 'anna-passwort', true, ['Sec-Fetch-Site' => 'cross-site'])[0] === 403, 'Sec-Fetch-Site: cross-site → 403');
+    $raw = $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', [], (string) json_encode(['username' => 'anna', 'password' => 'anna-passwort']));
+    $c->ok($raw[0] === 415, 'Anmeldung ohne Content-Type → 415');
 
     $c->section('Begrenzung fehlgeschlagener Anmeldungen');
     $fails = [];
@@ -135,6 +148,45 @@ try {
     $kernel->db()->execute('UPDATE {login_attempts} SET window_start = window_start - 901');
     $c->ok($login('max', 'max-passwort')[0] === 200, 'Nach 15 Minuten wieder möglich');
     $c->ok($kernel->db()->scalar('SELECT COUNT(*) FROM {login_attempts} WHERE name LIKE ?', ['%max%']) == 0, 'Gespeichert werden nur Hashes, keine Namen');
+
+    $kernel->db()->execute('DELETE FROM {login_attempts}');
+    for ($i = 0; $i < 5; $i++) {
+        $login('max', 'falsch');
+    }
+    $c->ok($login('MAX@example.org', 'max-passwort')[0] === 429, 'Gleiches Konto per E-Mail oder anderer Schreibweise zählt mit');
+    $kernel->db()->execute('DELETE FROM {login_attempts}');
+
+    // Gleichzeitige Fehlversuche: Jeder wird vor der Prüfung gezählt, keiner scheitert an Sperren.
+    $mh = curl_multi_init();
+    $handles = [];
+    for ($i = 0; $i < 24; $i++) {
+        $ch = curl_init($base . 'index.php?r=/api/v1/auth/login');
+        curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => json_encode(['username' => 'anna', 'password' => 'falsch' . $i])]);
+        curl_multi_add_handle($mh, $ch);
+        $handles[] = $ch;
+    }
+    do {
+        curl_multi_exec($mh, $running);
+        curl_multi_select($mh, 0.1);
+    } while ($running > 0);
+    $codes = array_map(static fn ($ch) => curl_getinfo($ch, CURLINFO_RESPONSE_CODE), $handles);
+    $count = array_count_values($codes);
+    $c->ok(!isset($count[500]) && ($count[400] ?? 0) <= 5 && ($count[429] ?? 0) >= 19, 'Gleichzeitige Fehlversuche: höchstens 5 Passwortprüfungen, keine Fehler (' . json_encode($count) . ')');
+    $kernel->db()->execute('DELETE FROM {login_attempts}');
+
+    // Bekannte Geräte: Fremde können den Besitzer nicht über das Konto-Limit aussperren.
+    $throttle = new KompanieApp\Standalone\LoginThrottle($kernel->db(), Config::load($data)->secret());
+    for ($i = 1; $i <= 50; $i++) {
+        $throttle->attempt('u99', "10.0.0.$i", false);
+    }
+    $c->ok($throttle->attempt('u99', '10.0.1.1', false) === false, 'Konto-Limit für unbekannte Geräte (verteiltes Raten)');
+    $c->ok($throttle->attempt('u99', '10.0.1.2', true) === true, 'Bekanntes Gerät des Besitzers kommt trotzdem herein');
+    $c->ok(KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:2::1') === KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:2:ffff::9')
+        && KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:3::1') !== KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:2::1'), 'IPv6: ein /64-Netz zählt wie eine Adresse');
+    $r = $login('anna', 'anna-passwort');
+    $c->ok(str_contains($r[2]['set-cookie'], SessionAuth::DEVICE_COOKIE . '='), 'Nach der Anmeldung ist das Gerät bekannt');
+    $kernel->db()->execute('DELETE FROM {login_attempts}');
 
     $c->section('Passwort ändern, Abmelden, Verlängerung');
     $m1 = $cookieOf($login('max', 'max-passwort'));
@@ -175,6 +227,32 @@ try {
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 404, 'Unbekanntes Foto → 404');
     $bad = $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $json, '{kaputt');
     $c->ok($bad[0] === 400 && $bad[1]['code'] === 'invalid', 'Ungültiges JSON → 400');
+
+    $c->section('Selbstaufruf, Fehlerseiten, Adressen');
+    $listenPort = $port + 1;
+    $listenLog = $data . '-listener.log';
+    $listener = proc_open([PHP_BINARY, '-S', "127.0.0.1:$listenPort"], [1 => ['file', '/dev/null', 'w'], 2 => ['file', $listenLog, 'a']], $lp);
+    usleep(400000);
+    $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
+    $kernel->db()->insert('tasks', ['name' => 'testaufgabe', 'interval_seconds' => 3600, 'next_run' => time() - 10]);
+    $kernel->app()->cache->delete('cron_spawned');
+    $d->send('GET', $base . 'index.php?r=/api/v1/config', ['Host' => "127.0.0.1:$listenPort"], null);
+    usleep(1500000);
+    proc_terminate($listener);
+    proc_close($listener);
+    $c->ok(!str_contains((string) @file_get_contents($listenLog), 'cron'), 'Host-Header lenkt den Selbstaufruf nicht um (Cron-Schlüssel bleibt geheim)');
+    $c->ok((int) $kernel->db()->scalar("SELECT next_run FROM {tasks} WHERE name = 'testaufgabe'") > time(), 'Fällige Aufgabe läuft über den Selbstaufruf an die eingetragene Adresse');
+    $redirect = $d->send('GET', $base, ['Host' => "localhost:$port"], null);
+    $c->ok($redirect[0] === 301 && ($redirect[2]['location'] ?? '') === $base, 'Andere Schreibweise der Adresse wird auf die eingetragene umgeleitet');
+    $c->ok((bool) preg_match('/^kompanie-[a-f0-9]{32}\.sqlite$/', (string) (Config::load($data)->toArray()['db']['path'] ?? '')) || $kernel->db()->driver() === 'mysql', 'SQLite-Datei mit zufälligem Namen');
+    $cfgFile = $data . '/config.php';
+    $saved = (string) file_get_contents($cfgFile);
+    file_put_contents($cfgFile, '<?php return [');
+    sleep(3); // OPcache des Testservers prüft Dateien nur alle 2 Sekunden auf Änderungen
+    $broken = $d->send('GET', $base . 'index.php?r=/api/v1/config', [], null);
+    file_put_contents($cfgFile, $saved);
+    sleep(3);
+    $c->ok($broken[0] === 503 && ($broken[1]['code'] ?? '') === 'config_invalid', 'Beschädigte config.php: verständliche Meldung als JSON');
 
     $c->section('Einstellungen');
     $d->actAs($anna);
@@ -230,8 +308,7 @@ try {
     $exit = 1;
 } finally {
     if ($server) {
-        proc_terminate($server);
-        proc_close($server);
+        $stopServer($server);
     }
     if ($kernel->db()->driver() === 'mysql') {
         foreach ([...StandaloneBackup::TABLES, 'sessions', 'settings', 'cache', 'login_attempts', 'tasks'] as $t) {

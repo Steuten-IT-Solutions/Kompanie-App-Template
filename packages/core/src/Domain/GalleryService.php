@@ -214,6 +214,11 @@ final class GalleryService
         return [(int) $row['id'], false];
     }
 
+    public function countFailed(): int
+    {
+        return $this->repo->countFailed();
+    }
+
     public function countPending(): int
     {
         return $this->repo->countPending();

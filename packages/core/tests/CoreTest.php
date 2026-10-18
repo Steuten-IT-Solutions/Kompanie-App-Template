@@ -156,6 +156,20 @@ final class CoreTest extends TestCase
         $this->assertSame(1, $users->passwordChanges, 'Andere Sitzungen werden beendet');
     }
 
+    public function testPasswordChangeAttemptsAreLimited(): void
+    {
+        $users = new FakeUsers();
+        $app = TestApp::create(TestApp::connection(), $users);
+        $users->current = $id = $users->add('m', Level::Member);
+        $users->setPassword($id, 'richtig-123');
+        $try = static fn (string $cur) => $app->api()->handle(new Request('POST', '/me/password', [], ['current_password' => $cur, 'new_password' => 'ganz-neu-456']))->status;
+        for ($i = 0; $i < 5; $i++) {
+            $this->assertSame(400, $try('falsch'));
+        }
+        $this->assertSame(429, $try('richtig-123'), 'nach 5 Fehlversuchen gesperrt, auch mit dem richtigen Passwort');
+        $this->assertTrue($users->verifyPassword($id, 'richtig-123'));
+    }
+
     public function testMigratorIsIdempotent(): void
     {
         $db = TestApp::connection();

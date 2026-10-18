@@ -39,23 +39,26 @@ Mit URL-Umschreibung (`url_mode = 'rewrite'` in `config.php`, Apache/LiteSpeed �
 ## Einrichtung von Hand
 
 ```sh
-php bin/kompanie.php install --url=https://beispiel.de/app/            # SQLite
+php bin/kompanie.php install --url=https://beispiel.de/app/            # SQLite (Adresse ist Pflicht)
 php bin/kompanie.php install --url=… --mysql --db-host=localhost \
     --db-name=… --db-user=… --db-pass=… [--db-prefix=kompanie_]         # oder MySQL/MariaDB
 php bin/kompanie.php create-admin --name="Vorname Nachname" --login=vorname
 ```
 
 `--rewrite` schaltet die schönen Adressen ein (nur, wenn `.htaccess` ausgewertet wird).
+SQLite muss mindestens Version 3.24 haben (seit 2018 überall vorhanden).
 Ohne `--password` erzeugt `create-admin` ein Startpasswort und zeigt es einmal an.
 
 Weitere Befehle: `status`, `cron`, `reset-password --login=…`, `export [--out=datei.json]`, `import datei.json`.
 Die Sicherung enthält alle Daten, Benutzer (mit Passwort-Hashes) und Einstellungen; Galeriebilder werden
-nach dem Wiederherstellen neu aus Google Drive erzeugt.
+nach dem Wiederherstellen neu aus Google Drive erzeugt. `import` sichert vorher den bisherigen Stand in das
+Datenverzeichnis (`vor-import-….json`).
 
 ## Wiederkehrende Aufgaben
 
 Ein Cronjob ist **nicht nötig**: Nach Seitenaufrufen erledigt der Server fällige Aufgaben selbst, nachdem
-die Antwort verschickt ist (PHP-FPM, LiteSpeed) oder über einen Aufruf im Hintergrund. Zuverlässiger wird es
+die Antwort verschickt ist (PHP-FPM, LiteSpeed) oder über einen Aufruf der eigenen, fest eingetragenen
+Adresse im Hintergrund (höchstens einmal pro Minute). Zuverlässiger wird es
 mit einem stündlichen Cronjob beim Hoster: `php /pfad/bin/kompanie.php cron` oder ein Abruf der Cron-Adresse
 (`php bin/kompanie.php status` zeigt sie an).
 
@@ -66,8 +69,16 @@ mit einem stündlichen Cronjob beim Hoster: `php /pfad/bin/kompanie.php cron` od
   des Sitzungsschlüssels. „Angemeldet bleiben“: 400 Tage, verlängert sich beim Öffnen der App.
   Eine Passwortänderung meldet alle anderen Geräte ab.
 - Änderungen nur als JSON, nicht von fremden Seiten (`Origin`) und mit CSRF-Token (HMAC über die Sitzung).
-- Fehlversuche bei der Anmeldung sind begrenzt (je Gerät 5, je IP-Adresse 20, je Benutzer 50 in 15 Minuten).
-- Sicherheits-Header und Content-Security-Policy mit Nonce für die App-Seite.
+- Fehlversuche bei der Anmeldung sind begrenzt (in 15 Minuten: je Konto und Gerät 5, je IP-Adresse bzw.
+  IPv6-/64-Netz 20, je Konto 50). Gezählt wird je Konto, gleich ob per Name oder E-Mail. Geräte, auf denen
+  sich das Konto schon angemeldet hat, zählen beim Konto-Limit nicht mit – Fremde können den Besitzer so
+  nicht aussperren. Hinter einem Proxy oder CDN sehen alle Anfragen gleich aus (eine IP-Adresse); dann
+  greift vor allem die Grenze je Konto und Gerät.
+- Falsche „aktuelle Passwörter“ beim Passwortwechsel: höchstens 5 in 15 Minuten.
+- Sicherheits-Header und Content-Security-Policy mit Nonce für die App-Seite; Fehler erscheinen nie mit
+  Einzelheiten im Browser, sondern nur im Fehlerprotokoll des Servers.
+- Die Adresse der App steht fest in `config.php` (`base_url`); Anfragen mit anderer Schreibweise (z. B. ohne
+  `www`) werden dorthin umgeleitet.
 
 ### nginx
 
@@ -75,11 +86,14 @@ nginx wertet `.htaccess` nicht aus. Das Datenverzeichnis muss dann gesperrt werd
 
 ```nginx
 location ~ ^/app/(data|src|core|bin)/ { deny all; return 404; }
+location ~ ^/app/(data-dir\.php|autoload\.php|VERSION|kompanie\.json)$ { deny all; return 404; }
 location /app/ { try_files $uri /app/index.php$is_args$args; }
 location = /app/index.php { include fastcgi_params; fastcgi_param SCRIPT_FILENAME $document_root/app/index.php; fastcgi_pass php; }
 ```
 
 Besser liegt das Datenverzeichnis ganz außerhalb des Web-Verzeichnisses (`data-dir.php`, siehe oben).
+Die SQLite-Datei hat einen zufälligen Namen (`kompanie-<32 Zeichen>.sqlite`), damit sie auch bei einer
+fehlenden Sperre nicht zu erraten ist.
 Der Installer (Phase 5) prüft, ob die Daten von außen wirklich nicht erreichbar sind.
 
 ## Tests

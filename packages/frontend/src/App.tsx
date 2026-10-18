@@ -4,6 +4,7 @@ import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo.png';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
+import { ErrorBoundary } from './ui';
 import { navigate, useRoute } from './router';
 import Anmelden from './views/Anmelden';
 import Einstellungen from './views/Einstellungen';
@@ -193,7 +194,9 @@ export default function App() {
   if (!config) {
     return (
       <main className="content">
+        <ErrorBoundary key={rawPath.join('/')}>
         <p className="error">Die App muss über ihre Adresse auf der Webseite geöffnet werden.</p>
+        </ErrorBoundary>
       </main>
     );
   }
