@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Steuten-IT-Solutions/Kompanie-App-Template/config/kompanie.schema.json",
+  "title": "Kompanie-Konfiguration",
+  "description": "Beschreibt eine Kompanie. Wird beim Build in die App eingesetzt. Enthält keine Zugangsdaten.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["coreVersion", "name", "shortName", "domain", "theme", "features"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "coreVersion": {
+      "description": "Version des Kerns, mit der gebaut wird (Git-Tag ohne „v“).",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "slug": {
+      "description": "Kurzer technischer Name, z. B. für Dateinamen der ZIPs.",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "name": { "description": "Voller Name, z. B. im Fenstertitel.", "type": "string", "minLength": 1 },
+    "shortName": {
+      "description": "Name unter dem App-Symbol auf dem Home-Bildschirm. Wird bei mehr als etwa 12 Zeichen abgeschnitten.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 30
+    },
+    "description": { "type": "string" },
+    "domain": { "description": "Domain der Webseite ohne https://, z. B. für die Installationsanleitung.", "type": "string" },
+    "appPath": { "description": "Pfad der App auf dem Server.", "type": "string", "default": "/app/" },
+    "locale": { "type": "string", "default": "de-DE" },
+    "timezone": { "type": "string", "default": "Europe/Berlin" },
+    "currency": { "description": "ISO-4217-Code für Strafen.", "type": "string", "default": "EUR" },
+    "greeting": {
+      "description": "Begrüßung in der Kopfzeile; {name} wird durch den Namen ersetzt.",
+      "type": "string",
+      "default": "Hallo, {name}"
+    },
+    "roleLabels": {
+      "description": "Anzeigenamen der Rollen.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "guest": { "type": "string", "default": "Gast" },
+        "member": { "type": "string", "default": "Mitglied" },
+        "manager": { "type": "string", "default": "Spieß" },
+        "admin": { "type": "string", "default": "Admin" }
+      }
+    },
+    "assets": {
+      "description": "Pfade relativ zum Kompanie-Repo.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logo": { "type": "string", "default": "assets/logo.png" },
+        "icon": { "description": "Quadratisches Bild, mindestens 512 × 512 px. Daraus entstehen alle App-Icons.", "type": "string", "default": "assets/icon.png" },
+        "iconMaskable": { "description": "Optional: Icon mit Sicherheitsabstand für Android.", "type": "string" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "accent"],
+      "properties": {
+        "primary": { "$ref": "#/$defs/color", "description": "Hauptfarbe (Kopfzeile, Knöpfe)." },
+        "primaryDeep": { "$ref": "#/$defs/color" },
+        "primaryInk": { "$ref": "#/$defs/color" },
+        "accent": { "$ref": "#/$defs/color", "description": "Akzentfarbe." },
+        "accentLight": { "$ref": "#/$defs/color" },
+        "accentDark": { "$ref": "#/$defs/color" },
+        "secondary": { "$ref": "#/$defs/color" },
+        "background": { "$ref": "#/$defs/color" },
+        "card": { "$ref": "#/$defs/color" },
+        "darkBackground": { "$ref": "#/$defs/color" },
+        "darkCard": { "$ref": "#/$defs/color" },
+        "fontHeading": { "description": "Schrift für Überschriften; wird lokal eingebunden, kein Google-Fonts-Abruf.", "type": "string" }
+      }
+    },
+    "features": {
+      "description": "Welche Bereiche die App hat.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "events": { "description": "Öffentliche Terminliste.", "type": "boolean", "default": true },
+        "calendar": { "description": "Google Kalender / iCal für Mitglieder.", "type": "boolean", "default": true },
+        "news": { "type": "boolean", "default": true },
+        "gallery": { "type": "boolean", "default": true },
+        "points": { "type": "boolean", "default": true },
+        "penalties": { "type": "boolean", "default": true }
+      }
+    }
+  },
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+  }
+}

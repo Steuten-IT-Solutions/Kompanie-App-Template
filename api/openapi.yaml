@@ -1,0 +1,878 @@
+openapi: 3.1.0
+info:
+  title: Kompanie-App API
+  version: 0.1.0
+  description: |
+    Vertrag zwischen der PWA und dem Server. Beide Adapter setzen ihn um:
+    - WordPress: `/wp-json/kompanie-app/v1`
+    - Standalone: `/api/v1`
+
+    Abgeleitet aus der REST-API der Lank-App (`mk-lank/v1`, Plugin 0.3.0). Neu sind
+    `/config` und `/auth/*`; sie ersetzen `window.MKL_CONFIG`, den WordPress-Nonce und
+    den festen Weg über `wp-login.php`.
+
+    **Anmeldung:** Sitzungs-Cookie. Jede Anfrage, die Daten ändert, braucht den
+    Header `X-CSRF-Token`. Ist er abgelaufen, antwortet der Server mit 403 und
+    `code: csrf_invalid`; die App holt dann über `GET /auth/csrf` einen neuen und
+    wiederholt die Anfrage einmal.
+
+    **Rechte:** Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung.
+    Mitglieder sehen nur ihre eigenen Punkte und Strafen.
+
+    **Beträge** sind immer ganze Cent. **Datumsangaben** `YYYY-MM-DD`, Uhrzeiten `HH:MM`
+    in der Zeitzone der Kompanie.
+servers:
+  - url: /wp-json/kompanie-app/v1
+    description: WordPress-Plugin
+  - url: /api/v1
+    description: Eigenständige Version
+
+tags:
+  - name: App
+  - name: Anmeldung
+  - name: Eigene Daten
+  - name: Termine
+  - name: News
+  - name: Galerie
+  - name: Verwaltung
+
+paths:
+  /config:
+    get:
+      tags: [App]
+      summary: Laufzeit-Konfiguration und angemeldeter Benutzer
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppConfig' }
+
+  /auth/csrf:
+    get:
+      tags: [Anmeldung]
+      summary: Neues CSRF-Token
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /auth/login:
+    post:
+      tags: [Anmeldung]
+      summary: Anmelden (nur bei `auth.mode = form`)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, description: Benutzername oder E-Mail-Adresse }
+                password: { type: string }
+                remember: { type: boolean, default: true, description: "„Angemeldet bleiben“: 400 Tage, verlängert sich beim Öffnen der App" }
+      responses:
+        '200':
+          description: Angemeldet; setzt das Sitzungs-Cookie.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppConfig' }
+        '400': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /auth/logout:
+    post:
+      tags: [Anmeldung]
+      summary: Abmelden (dieses Gerät)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logged_out: { type: boolean }
+
+  /me:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene Übersicht
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /me/points:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene Punkte
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PointEntry' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/penalties:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene Strafen
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Penalty' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/password:
+    post:
+      tags: [Eigene Daten]
+      summary: Eigenes Passwort ändern
+      description: Meldet alle anderen Geräte ab. Dieses Gerät bekommt eine neue Sitzung; danach ein neues CSRF-Token holen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changed: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /calendar:
+    get:
+      tags: [Termine]
+      summary: Alle Termine aus Google Kalender / iCal (nur Mitglieder)
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CalendarEvent' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+
+  /events:
+    get:
+      tags: [Termine]
+      summary: Kommende öffentliche Termine
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PublicEvent' }
+    post:
+      tags: [Termine]
+      summary: Öffentlichen Termin anlegen
+      x-capability: manage_events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /events/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Termine]
+      summary: Öffentlichen Termin ändern
+      x-capability: manage_events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Termine]
+      summary: Öffentlichen Termin löschen
+      x-capability: manage_events
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /news:
+    get:
+      tags: [News]
+      summary: Neuigkeiten, seitenweise
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Total-Pages:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/NewsItem' }
+
+  /news/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Kennung aus der News-Quelle (bei WordPress die Beitrags-ID).
+        schema: { type: string }
+    get:
+      tags: [News]
+      summary: Einzelne Neuigkeit mit Inhalt (HTML)
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsItem' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery:
+    get:
+      tags: [Galerie]
+      summary: Alben nach Jahr. Gäste sehen nur öffentliche Bilder.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [years]
+                properties:
+                  years:
+                    type: array
+                    items: { $ref: '#/components/schemas/GalleryYear' }
+
+  /gallery/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Galerie]
+      summary: Album mit Bildern. Mitglieder bekommen die Bilder aus „intern“ dazu.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAlbum' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /catalog:
+    get:
+      tags: [Verwaltung]
+      summary: Punktekatalog
+      parameters:
+        - name: all
+          in: query
+          description: Auch inaktive Einträge (nur mit Recht `manage`).
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CatalogItem' }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Katalogeintrag anlegen
+      x-capability: manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, points]
+              properties:
+                title: { type: string }
+                points: { type: integer }
+                sort: { type: integer }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CatalogItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /catalog/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Katalogeintrag ändern
+      x-capability: manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                points: { type: integer }
+                active: { type: boolean }
+                sort: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CatalogItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members:
+    get:
+      tags: [Verwaltung]
+      summary: Mitglieder mit Summen
+      x-capability: manage
+      parameters:
+        - name: all
+          in: query
+          description: Auch Gast-Konten (nur mit Recht `promote_users`).
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MemberSummary' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Verwaltung]
+      summary: Mitglied mit Punkten und Strafen
+      x-capability: manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberDetail' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/role:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Rolle in der App setzen (nicht die eigene)
+      x-capability: promote_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level]
+              properties:
+                level:
+                  type: string
+                  enum: [guest, member, manager]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/password:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Neues Startpasswort für ein Mitglied erzeugen
+      description: |
+        Neu gegenüber Lank. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
+        neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
+        werden abgemeldet.
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [password]
+                properties:
+                  password: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /users:
+    post:
+      tags: [Verwaltung]
+      summary: Mitglied anlegen
+      description: Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
+                email: { type: string, format: email }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedUser' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /points:
+    post:
+      tags: [Verwaltung]
+      summary: Punkte an ein oder mehrere Mitglieder vergeben
+      x-capability: manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids]
+              properties:
+                user_ids:
+                  type: array
+                  minItems: 1
+                  items: { type: integer }
+                points: { type: integer, description: 'Ohne Angabe: Punkte des Katalogeintrags. Nicht 0.' }
+                catalog_id: { type: integer }
+                reason: { type: string, description: 'Ohne Angabe: Titel des Katalogeintrags.' }
+                date: { type: string, format: date }
+      responses:
+        '201':
+          description: Angelegt (ein Eintrag pro Mitglied)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PointEntry' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /points/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Verwaltung]
+      summary: Punkte stornieren (wird nur ausgeblendet)
+      x-capability: manage
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /penalties:
+    post:
+      tags: [Verwaltung]
+      summary: Strafe an ein oder mehrere Mitglieder vergeben
+      x-capability: manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids, amount_cents, reason]
+              properties:
+                user_ids:
+                  type: array
+                  minItems: 1
+                  items: { type: integer }
+                amount_cents: { type: integer, minimum: 1, maximum: 100000 }
+                reason: { type: string }
+                date: { type: string, format: date }
+      responses:
+        '201':
+          description: Angelegt (eine Strafe pro Mitglied)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Penalty' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /penalties/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Strafe als bezahlt/offen markieren
+      x-capability: manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [open, paid] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Penalty' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Strafe stornieren (wird nur ausgeblendet)
+      x-capability: manage
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+security:
+  - session: []
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Name und Inhalt des Cookies hängen vom Adapter ab (WordPress-Anmelde-Cookie bzw. eigene Sitzung).
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+
+  responses:
+    Error:
+      description: Fehler
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Deleted:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              deleted: { type: boolean }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: z. B. `not_logged_in`, `forbidden`, `invalid`, `not_found`, `csrf_invalid`, `upstream_error`
+        message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
+
+    Level:
+      type: string
+      enum: [admin, manager, member, guest]
+      description: Rolle in der App. Die Anzeigenamen stehen in `kompanie.json` (`roleLabels`).
+
+    AppUser:
+      type: object
+      required: [id, name, level, capabilities]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        login: { type: string }
+        level: { $ref: '#/components/schemas/Level' }
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [member, manage, manage_events, create_users, promote_users]
+
+    AppConfig:
+      type: object
+      required: [apiBase, appUrl, auth, features, user]
+      properties:
+        apiBase: { type: string }
+        appUrl: { type: string }
+        siteUrl: { type: string, description: Startseite der Webseite, falls vorhanden }
+        csrfToken: { type: string, description: Leer für Gäste ohne Anmeldung }
+        auth:
+          type: object
+          required: [mode]
+          properties:
+            mode:
+              type: string
+              enum: [form, redirect]
+            loginUrl: { type: string, description: Nur bei `redirect` }
+            logoutUrl: { type: string, description: Nur bei `redirect` }
+        features:
+          type: object
+          description: Bereiche, die eingeschaltet **und** auf dem Server eingerichtet sind.
+          properties:
+            events: { type: boolean }
+            calendar: { type: boolean }
+            news: { type: boolean }
+            gallery: { type: boolean }
+            points: { type: boolean }
+            penalties: { type: boolean }
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AppUser'
+            - type: 'null'
+          description: null = Gast ohne Anmeldung
+
+    Me:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        level: { $ref: '#/components/schemas/Level' }
+        points: { type: integer }
+        open_cents: { type: integer }
+
+    PointEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        points: { type: integer }
+        reason: { type: string }
+        catalog_id: { type: [integer, 'null'] }
+        date: { type: string, format: date }
+        created_by_name: { type: [string, 'null'] }
+
+    Penalty:
+      type: object
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        amount_cents: { type: integer }
+        reason: { type: string }
+        date: { type: string, format: date }
+        status: { type: string, enum: [open, paid] }
+        paid_at: { type: [string, 'null'] }
+        created_by_name: { type: [string, 'null'] }
+
+    CatalogItem:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        points: { type: integer }
+        active: { type: boolean }
+        sort: { type: integer }
+
+    CalendarEvent:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        start: { type: string, description: ISO 8601 }
+        end: { type: string, description: ISO 8601 }
+        all_day: { type: boolean }
+        location: { type: string }
+        description: { type: string }
+
+    PublicEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        start: { type: string }
+        end: { type: string }
+        all_day: { type: boolean }
+        location: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        start_time: { type: [string, 'null'] }
+        end_date: { type: [string, 'null'] }
+        end_time: { type: [string, 'null'] }
+        url: { type: string }
+
+    EventInput:
+      type: object
+      required: [title, start_date]
+      properties:
+        title: { type: string }
+        start_date: { type: string, format: date }
+        start_time: { type: string, description: 'HH:MM oder leer' }
+        end_date: { type: string, description: 'YYYY-MM-DD oder leer' }
+        end_time: { type: string, description: 'HH:MM oder leer' }
+        location: { type: string }
+        description: { type: string }
+        url: { type: string }
+
+    NewsItem:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        date: { type: string }
+        excerpt: { type: string }
+        image: { type: [string, 'null'] }
+        link: { type: string }
+        content: { type: string, description: Nur bei der Einzelansicht }
+
+    GalleryAlbumSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        count: { type: integer }
+        intern_count: { type: integer }
+        cover: { type: [string, 'null'] }
+
+    GalleryYear:
+      type: object
+      properties:
+        year: { type: string }
+        albums:
+          type: array
+          items: { $ref: '#/components/schemas/GalleryAlbumSummary' }
+
+    GalleryPhoto:
+      type: object
+      properties:
+        id: { type: integer }
+        thumb: { type: string }
+        large: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        intern: { type: boolean }
+        name: { type: string }
+
+    GalleryAlbum:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        year: { type: string }
+        photos:
+          type: array
+          items: { $ref: '#/components/schemas/GalleryPhoto' }
+
+    MemberSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        level: { $ref: '#/components/schemas/Level' }
+        points: { type: integer }
+        open_cents: { type: integer }
+
+    MemberDetail:
+      allOf:
+        - $ref: '#/components/schemas/MemberSummary'
+        - type: object
+          properties:
+            point_list:
+              type: array
+              items: { $ref: '#/components/schemas/PointEntry' }
+            penalties:
+              type: array
+              items: { $ref: '#/components/schemas/Penalty' }
+
+    CreatedUser:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        username: { type: string }
+        email: { type: string }
+        password: { type: string, description: Startpasswort; steht nur in dieser Antwort }

@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: PHP-Syntax
+        run: find packages adapters -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+      - name: Kern ohne WordPress
+        run: scripts/check-core-boundary.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: OpenAPI und Konfigurationsschema
+        run: |
+          pip install --quiet openapi-spec-validator jsonschema
+          python -m openapi_spec_validator api/openapi.yaml
+          python - <<'PY'
+          import json, jsonschema
+          schema = json.load(open('config/kompanie.schema.json'))
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.Draft202012Validator(schema).validate(json.load(open('config/kompanie.example.json')))
+          print('kompanie.example.json passt zum Schema')
+          PY
