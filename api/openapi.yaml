@@ -702,10 +702,11 @@ components:
 
     AppConfig:
       type: object
-      required: [apiBase, appUrl, auth, csrf, features, user, version]
+      required: [apiBase, appUrl, swUrl, auth, csrf, features, user, version]
       properties:
         apiBase: { type: string }
         appUrl: { type: string }
+        swUrl: { type: string, description: 'Adresse des Service Workers (Bereich: appUrl)' }
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }

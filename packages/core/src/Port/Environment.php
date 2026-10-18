@@ -19,6 +19,12 @@ interface Environment
     /** Adresse der App mit abschließendem / */
     public function appUrl(): string;
 
+    /**
+     * Adresse des Service Workers. Sein Bereich ist appUrl(); er muss deshalb unter dieser
+     * Adresse liegen oder mit dem Header Service-Worker-Allowed ausgeliefert werden.
+     */
+    public function serviceWorkerUrl(): string;
+
     /** Startseite der Webseite, falls es eine gibt. */
     public function siteUrl(): ?string;
 

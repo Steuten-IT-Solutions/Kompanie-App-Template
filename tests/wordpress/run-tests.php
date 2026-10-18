@@ -155,6 +155,7 @@ $structure = get_option('permalink_structure');
 update_option('permalink_structure', '');
 $env = new KompanieApp\WordPress\WpEnvironment();
 $c->ok(str_contains($env->appUrl('csrf'), 'kompanie_app=csrf') && str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto%2F3%2Fthumb') || str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto/3/thumb'), 'Einfache Permalinks: App-Adressen über Parameter');
+$c->ok(str_contains($env->serviceWorkerUrl(), 'kompanie_app=sw.js'), 'Einfache Permalinks: Service Worker über Parameter (nicht /sw.js)');
 update_option('permalink_structure', $structure);
 $c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
 // Deaktivieren entfernt die /app/-Regeln.
@@ -163,7 +164,16 @@ KompanieApp\WordPress\AppPage::addRewriteRules();
 KompanieApp\WordPress\AppPage::removeRewriteRules();
 $c->ok(!isset($wp_rewrite->extra_rules_top['^app/?$']), 'Regeln für /app/ lassen sich entfernen');
 KompanieApp\WordPress\AppPage::addRewriteRules();
-$c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'schema_version') !== false && wp_load_alloptions()[KompanieApp\WordPress\WpSettings::PREFIX . 'calendar_ics_url'] ?? false, 'Einstellungen mit Autoload');
+// Ältere Installationen: Autoload war aus; das Update stellt es einmalig um.
+$opt = KompanieApp\WordPress\WpSettings::PREFIX;
+$wpdb = $GLOBALS['wpdb'];
+$wpdb->update($wpdb->options, ['autoload' => 'no'], ['option_name' => $opt . 'schema_version']);
+delete_option($opt . 'roles_version');
+wp_cache_flush();
+KompanieApp\WordPress\Plugin::upgrade();
+$autoload = static fn (string $k): string => (string) $wpdb->get_var($wpdb->prepare("SELECT autoload FROM {$wpdb->options} WHERE option_name = %s", $opt . $k));
+$c->ok(in_array($autoload('schema_version'), ['yes', 'on', 'auto-on'], true) && in_array($autoload('roles_version'), ['yes', 'on', 'auto-on'], true), 'Einstellungen nach dem Update mit Autoload');
+$c->ok($autoload('drive_service_account') === '' || !in_array($autoload('drive_service_account'), ['yes', 'on', 'auto-on'], true), 'Großer Schlüssel ohne Autoload');
 
 foreach ([$member, $manager, $admin] as $id) {
     $d->deleteUser($id);

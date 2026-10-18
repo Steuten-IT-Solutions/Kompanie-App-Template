@@ -28,6 +28,8 @@ final class CoreTest extends TestCase
         $this->assertSame('Zu spät <10 min', Text::line('Zu spät <10 min'), 'einzelnes < bleibt');
         $this->assertSame('a<b und c', Text::line('a<b und c'));
         $this->assertSame('x y', Text::line('x <!-- k --> <b>y</b>'));
+        $this->assertSame('alert(1)', Text::line('<<b>script>alert(1)<</b>/script>'), 'verschachtelte Tags');
+        $this->assertSame('x', Text::line('<<<i>i>i>x'));
         $this->assertTrue(Input::isDate('2024-02-29'));
         $this->assertFalse(Input::isDate('2026-02-30'));
         $this->assertSame(5, Input::integer('5'));

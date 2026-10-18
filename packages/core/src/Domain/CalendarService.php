@@ -106,7 +106,7 @@ final class CalendarService
                 throw ApiError::upstream('Google Kalender: ' . $msg);
             }
             foreach ($body['items'] ?? [] as $item) {
-                if (($item['visibility'] ?? '') === 'private' || ($item['status'] ?? '') === 'cancelled') {
+                if (in_array($item['visibility'] ?? '', ['private', 'confidential'], true) || ($item['status'] ?? '') === 'cancelled') {
                     continue;
                 }
                 $allDay = !empty($item['start']['date']);
@@ -160,34 +160,41 @@ final class CalendarService
     }
 
     /**
-     * Einfacher ICS-Parser für VEVENTs. Wiederkehrende Termine (RRULE) erscheinen
-     * nur mit ihrem ersten Vorkommen.
+     * ICS-Parser für VEVENTs. Terminserien (RRULE) werden im Zeitraum aufgefächert,
+     * mit Ausnahmen (EXDATE) und einzeln geänderten Terminen (RECURRENCE-ID).
+     * Eingebettete Blöcke wie VALARM werden übersprungen.
      *
      * @return array<int, array<string, mixed>>
      */
     public function parseIcs(string $ics): array
     {
         $ics = (string) preg_replace("/\r\n[ \t]|\n[ \t]/", '', str_replace("\r\n", "\n", $ics));
-        [$min, $max] = $this->range();
-        $events = [];
+        $raw = [];
         $cur = null;
+        $nested = 0;
         foreach (explode("\n", $ics) as $line) {
-            $trimmed = trim($line);
-            if ($trimmed === 'BEGIN:VEVENT') {
+            $trimmed = strtoupper(trim($line));
+            if ($trimmed === 'BEGIN:VEVENT' && $cur === null) {
                 $cur = [];
+                $nested = 0;
+                continue;
+            }
+            if ($cur !== null && str_starts_with($trimmed, 'BEGIN:')) {
+                $nested++;
+                continue;
+            }
+            if ($cur !== null && str_starts_with($trimmed, 'END:') && $nested > 0) {
+                $nested--;
                 continue;
             }
             if ($trimmed === 'END:VEVENT') {
-                if ($cur && !empty($cur['DTSTART']) && !self::icsHidden($cur)) {
-                    $event = $this->icsEvent($cur);
-                    if ($event && strtotime($event['end']) >= $min && strtotime($event['start']) <= $max) {
-                        $events[] = $event;
-                    }
+                if ($cur && !empty($cur['DTSTART'])) {
+                    $raw[] = $cur;
                 }
                 $cur = null;
                 continue;
             }
-            if ($cur === null || !str_contains($line, ':')) {
+            if ($cur === null || $nested > 0 || !str_contains($line, ':')) {
                 continue;
             }
             [$key, $value] = explode(':', $line, 2);
@@ -200,9 +207,76 @@ final class CalendarService
                     $params[strtoupper($pk)] = trim($pv, '"');
                 }
             }
-            $cur[$name] = ['value' => $value, 'params' => $params];
+            if ($name === 'EXDATE') {
+                foreach (explode(',', $value) as $v) {
+                    $cur['EXDATE'][] = ['value' => $v, 'params' => $params];
+                }
+            } else {
+                $cur[$name] = ['value' => $value, 'params' => $params];
+            }
+        }
+
+        // Einzeln geänderte oder abgesagte Termine einer Serie: UID + ursprünglicher Beginn.
+        $overridden = [];
+        foreach ($raw as $e) {
+            if (isset($e['RECURRENCE-ID'], $e['UID']) && ($rid = $this->icsDate($e['RECURRENCE-ID']))) {
+                $overridden[$e['UID']['value'] . '|' . $rid[0]->getTimestamp()] = true;
+            }
+        }
+
+        [$min, $max] = $this->range();
+        $events = [];
+        foreach ($raw as $e) {
+            if (self::icsHidden($e)) {
+                continue;
+            }
+            foreach ($this->icsOccurrences($e, $overridden, $max) as $event) {
+                if (strtotime($event['end']) >= $min && strtotime($event['start']) <= $max) {
+                    $events[] = $event;
+                }
+            }
         }
         return $events;
+    }
+
+    /**
+     * @param array<string, true> $overridden
+     * @return array<int, array<string, mixed>>
+     */
+    private function icsOccurrences(array $e, array $overridden, int $max): array
+    {
+        $start = $this->icsDate($e['DTSTART']);
+        if (!$start) {
+            return [];
+        }
+        [$dt, $allDay] = $start;
+        $end = !empty($e['DTEND']) ? $this->icsDate($e['DTEND']) : null;
+        $duration = $end ? $end[0]->getTimestamp() - $dt->getTimestamp() : ($allDay ? 86400 : 0);
+        $duration = max(0, $duration);
+
+        $starts = [$dt];
+        if (!empty($e['RRULE']) && !isset($e['RECURRENCE-ID'])) {
+            $rule = new IcsRecurrence($e['RRULE']['value']);
+            if ($rule->supports()) {
+                $limit = (new \DateTimeImmutable('@' . $max))->setTimezone($dt->getTimezone());
+                $starts = $rule->occurrences($dt, $limit, $allDay);
+                $uid = $e['UID']['value'] ?? '';
+                $excluded = [];
+                foreach ($e['EXDATE'] ?? [] as $x) {
+                    if ($xd = $this->icsDate($x)) {
+                        $excluded[$allDay ? $xd[0]->format('Y-m-d') : (string) $xd[0]->getTimestamp()] = true;
+                    }
+                }
+                $starts = array_filter($starts, static fn (\DateTimeImmutable $s): bool => !isset($excluded[$allDay ? $s->format('Y-m-d') : (string) $s->getTimestamp()])
+                    && !isset($overridden[$uid . '|' . $s->getTimestamp()]));
+            }
+        }
+
+        $out = [];
+        foreach ($starts as $s) {
+            $out[] = $this->icsEvent($e, $s, $duration, $allDay);
+        }
+        return $out;
     }
 
     /**
@@ -221,44 +295,55 @@ final class CalendarService
         return str_replace(['\\n', '\\N', '\\,', '\;', '\\\\'], ["\n", "\n", ',', ';', '\\'], $v);
     }
 
-    /** @return array{0: string|null, 1: bool} */
-    private function icsTime(array $prop): array
+    /**
+     * Zeitpunkt in der Zeitzone des Termins (für Serien), ganztägig um 0 Uhr in der Zeitzone der Kompanie.
+     *
+     * @return array{0: \DateTimeImmutable, 1: bool}|null
+     */
+    private function icsDate(array $prop): ?array
     {
         $v = trim($prop['value']);
         $allDay = ($prop['params']['VALUE'] ?? '') === 'DATE' || strlen($v) === 8;
-        if ($allDay) {
-            return [substr($v, 0, 4) . '-' . substr($v, 4, 2) . '-' . substr($v, 6, 2), true];
-        }
         try {
-            if (str_ends_with($v, 'Z')) {
-                $dt = new \DateTimeImmutable(rtrim($v, 'Z'), new \DateTimeZone('UTC'));
-            } elseif (!empty($prop['params']['TZID'])) {
-                $dt = new \DateTimeImmutable($v, new \DateTimeZone($prop['params']['TZID']));
-            } else {
-                $dt = new \DateTimeImmutable($v, $this->time->timezone());
+            if ($allDay) {
+                return [new \DateTimeImmutable(substr($v, 0, 8) . 'T000000', $this->time->timezone()), true];
             }
-            return [$dt->setTimezone($this->time->timezone())->format('c'), false];
+            if (str_ends_with($v, 'Z')) {
+                return [new \DateTimeImmutable(rtrim($v, 'Z'), new \DateTimeZone('UTC')), false];
+            }
+            if (!empty($prop['params']['TZID'])) {
+                try {
+                    $tz = new \DateTimeZone($prop['params']['TZID']);
+                } catch (\Exception) {
+                    $tz = $this->time->timezone(); // z. B. Windows-Zonennamen aus Outlook
+                }
+                return [new \DateTimeImmutable($v, $tz), false];
+            }
+            return [new \DateTimeImmutable($v, $this->time->timezone()), false];
         } catch (\Exception) {
-            return [null, false];
+            return null;
         }
     }
 
-    /** @return array<string, mixed>|null */
-    private function icsEvent(array $e): ?array
+    /** @return array<string, mixed> */
+    private function icsEvent(array $e, \DateTimeImmutable $start, int $duration, bool $allDay): array
     {
-        [$start, $allDay] = $this->icsTime($e['DTSTART']);
-        if (!$start) {
-            return null;
-        }
-        $end = $start;
-        if (!empty($e['DTEND'])) {
-            $end = $this->icsTime($e['DTEND'])[0] ?? $start;
+        $end = $start->modify('+' . $duration . ' seconds');
+        if ($allDay) {
+            // Ganztägig: Datum, Ende exklusiv; Dauer in Tagen, damit die Zeitumstellung nichts verschiebt.
+            $days = max(1, (int) round($duration / 86400));
+            $startStr = $start->format('Y-m-d');
+            $endStr = $start->modify('+' . $days . ' days')->format('Y-m-d');
+        } else {
+            $tz = $this->time->timezone();
+            $startStr = $start->setTimezone($tz)->format('c');
+            $endStr = $end->setTimezone($tz)->format('c');
         }
         return [
-            'id' => md5(isset($e['UID']) ? $e['UID']['value'] . $start : $start),
+            'id' => md5(($e['UID']['value'] ?? '') . $startStr),
             'title' => isset($e['SUMMARY']) ? self::icsText($e['SUMMARY']['value']) : '(ohne Titel)',
-            'start' => $start,
-            'end' => $end,
+            'start' => $startStr,
+            'end' => $endStr,
             'all_day' => $allDay,
             'location' => isset($e['LOCATION']) ? self::icsText($e['LOCATION']['value']) : '',
             'description' => isset($e['DESCRIPTION']) ? Text::fromHtml(self::icsText($e['DESCRIPTION']['value'])) : '',

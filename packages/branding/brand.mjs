@@ -22,7 +22,7 @@ const repoRoot = resolve(here, '../..');
 
 const FONTS = {
   System: [],
-  Oswald: ['@fontsource/oswald/latin-500.css', '@fontsource/oswald/latin-600.css', '@fontsource/oswald/latin-700.css', '@fontsource/oswald/latin-ext-600.css'],
+  Oswald: ['@fontsource/oswald/latin-500.css', '@fontsource/oswald/latin-600.css', '@fontsource/oswald/latin-700.css', '@fontsource/oswald/latin-ext-500.css', '@fontsource/oswald/latin-ext-600.css', '@fontsource/oswald/latin-ext-700.css'],
   'Roboto Slab': ['@fontsource/roboto-slab/latin-500.css', '@fontsource/roboto-slab/latin-700.css', '@fontsource/roboto-slab/latin-ext-700.css'],
   'Source Sans 3': ['@fontsource/source-sans-3/latin-600.css', '@fontsource/source-sans-3/latin-700.css', '@fontsource/source-sans-3/latin-ext-700.css'],
 };
@@ -103,17 +103,29 @@ function findLogo(assetsDir) {
 
 /** Erzeugt Logo und Icons. */
 async function images(logoInput, outDir, publicDir, warnings) {
-  const base = sharp(logoInput, { density: 300 });
-  const meta = await base.metadata();
+  const probe = await sharp(logoInput).metadata();
+  // SVG so dicht rastern, dass mindestens 1024 px entstehen (auch bei width="24" oder nur viewBox).
+  let density = 72;
+  if (probe.format === 'svg') {
+    const size = Math.max(probe.width ?? 0, probe.height ?? 0) || 100;
+    density = Math.min(2400, Math.max(72, Math.ceil((72 * 1024) / size)));
+  }
+  // rotate() ohne Winkel richtet nach der EXIF-Angabe aus (Handyfotos).
+  const load = () => sharp(logoInput, { density }).rotate();
+  const meta = await sharp(await load().png().toBuffer()).metadata();
   const longest = Math.max(meta.width ?? 0, meta.height ?? 0);
-  if (meta.format !== 'svg' && longest < 192) {
+  if (probe.format !== 'svg' && longest < 192) {
     throw new BrandError(`Das Logo ist zu klein (${longest} px). Bitte ein Logo mit mindestens 512 px liefern.`);
   }
-  if (meta.format !== 'svg' && longest < 512) {
+  if (probe.format !== 'svg' && longest < 512) {
     warnings.push(`Das Logo hat nur ${longest} px; für scharfe Icons sind 512 px oder mehr besser.`);
   }
-  // Einfarbigen Rand entfernen, dann höchstens 512 px.
-  const trimmed = await sharp(logoInput, { density: 300 }).trim({ threshold: 10 }).png().toBuffer().catch(() => base.png().toBuffer());
+  // Nur durchsichtigen Rand entfernen. Eine vollflächige Hintergrundfarbe gehört zum Logo
+  // (trim() würde sonst die Farbe des Pixels oben links als Rand wegschneiden).
+  const full = await load().png().toBuffer();
+  const { data: corner } = await sharp(full).ensureAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
+  const transparentEdge = corner[3] === 0;
+  const trimmed = transparentEdge ? await sharp(full).trim({ threshold: 1 }).png().toBuffer().catch(() => full) : full;
   const logo = await sharp(trimmed).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
   writeFileSync(join(outDir, 'logo.png'), logo);
 

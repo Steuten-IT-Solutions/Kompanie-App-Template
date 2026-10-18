@@ -5,7 +5,7 @@
  * Wo API und Programmdateien liegen, steht in den Parametern ?api=…&assets=…
  * Beim Abmelden löscht die App alle Speicher.
  */
-const STATIC_CACHE = 'kompanie-static-v1';
+const STATIC_CACHE = 'kompanie-static-v2';
 const DATA_CACHE = 'kompanie-data-v1';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
@@ -23,7 +23,8 @@ self.addEventListener('activate', (event) => {
 });
 
 function isStatic(url) {
-  return ASSETS !== '' && url.href.startsWith(ASSETS) && /\.(js|css|png|svg|woff2?|webp|jpg)$/.test(url.pathname);
+  // Nur Programmdateien mit Hash im Namen; Icons (feste Namen) ändern sich mit dem Logo.
+  return ASSETS !== '' && url.href.startsWith(ASSETS + 'assets/') && /\.(js|css|png|svg|woff2?|webp|jpg)$/.test(url.pathname);
 }
 
 function isApi(url) {

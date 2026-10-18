@@ -118,6 +118,12 @@ final class GalleryTest extends TestCase
         $this->assertSame("\xFF\xD8", substr((string) file_get_contents($ok['file']), 0, 2));
         $this->assertSame(404, $gallery->photoForDelivery(99999, 'thumb', true, true)['status']);
         $this->assertSame(404, $gallery->photoForDelivery($intern['id'], 'riesig', true, true)['status']);
+        // Fehlgeschlagene Bilder lösen beim Abruf keinen neuen Download aus.
+        $this->app->db->execute("UPDATE {photos} SET status = 'error' WHERE id = ?", [$intern['id']]);
+        $downloads = $this->drive->downloads;
+        $this->assertSame(404, $gallery->photoForDelivery($intern['id'], 'large', true, true)['status']);
+        $this->assertSame($downloads, $this->drive->downloads);
+        $this->app->db->execute("UPDATE {photos} SET status = 'ready' WHERE id = ?", [$intern['id']]);
 
         // API: Gäste und Mitglieder
         $this->users->current = null;

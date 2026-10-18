@@ -166,7 +166,11 @@ final class MemberService
             throw ApiError::forbidden('Nur Admins dürfen Passwörter von Admins zurücksetzen.');
         }
         $password = Passwords::readable(12);
-        $this->users->setPassword($id, $password);
+        try {
+            $this->users->setPassword($id, $password);
+        } catch (\DomainException $e) {
+            throw ApiError::forbidden($e->getMessage());
+        }
         return ['password' => $password];
     }
 
@@ -186,7 +190,11 @@ final class MemberService
         if ($new === $current) {
             throw ApiError::invalid('Das neue Passwort muss sich vom aktuellen unterscheiden.');
         }
-        $this->users->setPassword($user->id, $new);
+        try {
+            $this->users->setPassword($user->id, $new);
+        } catch (\DomainException $e) {
+            throw ApiError::forbidden($e->getMessage());
+        }
         $this->auth->afterPasswordChange($user->id);
     }
 }

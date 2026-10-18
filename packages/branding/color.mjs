@@ -101,3 +101,31 @@ export function ensureContrast(fg, bg, min) {
   }
   return null;
 }
+
+/**
+ * Verschiebt die Helligkeit des Hintergrunds bg weg von der Schriftfarbe fg,
+ * bis der Kontrast mindestens min ist. Gibt im schlimmsten Fall Schwarz oder Weiß zurück.
+ */
+export function ensureBackground(bg, fg, min) {
+  if (contrast(fg, bg) >= min) return bg;
+  const [h, s, l] = hsl(bg);
+  const lighter = luminance(fg) < 0.5;
+  for (let step = 1; step <= 100; step++) {
+    const candidate = fromHsl(h, s, lighter ? l + step * 0.01 : l - step * 0.01);
+    if (contrast(fg, candidate) >= min) return candidate;
+  }
+  return lighter ? '#ffffff' : '#000000';
+}
+
+/**
+ * Abgeschwächte Schriftfarbe (fg zum Hintergrund hin gemischt), die auf allen
+ * Hintergründen noch mindestens min Kontrast hat. Ergebnis ist eine feste Farbe.
+ */
+export function softOn(fg, backgrounds, min, maxWeight = 0.4) {
+  const worst = backgrounds.reduce((a, b) => (contrast(fg, a) <= contrast(fg, b) ? a : b));
+  for (let w = maxWeight; w > 0; w -= 0.02) {
+    const c = mix(fg, worst, w);
+    if (backgrounds.every((b) => contrast(c, b) >= min)) return c;
+  }
+  return fg;
+}

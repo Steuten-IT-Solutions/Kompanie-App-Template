@@ -22,7 +22,11 @@ final class WpUsers implements UserDirectory, AuthContext
     public function find(int $id): ?User
     {
         $u = $id > 0 ? get_userdata($id) : false;
-        return $u ? $this->toUser($u) : null;
+        // Multisite: nur Benutzer dieser Seite (sonst wären Konten des ganzen Netzwerks erreichbar).
+        if (!$u || (is_multisite() && !is_user_member_of_blog($id))) {
+            return null;
+        }
+        return $this->toUser($u);
     }
 
     public function list(bool $includeGuests): array
@@ -62,8 +66,13 @@ final class WpUsers implements UserDirectory, AuthContext
     public function setLevel(int $id, Level $level): void
     {
         $user = get_userdata($id);
-        if (!$user) {
+        if (!$user || $this->find($id) === null) {
             throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        // Zusätzlich die Regeln von WordPress (z. B. Super-Admins, Multisite) für den, der
+        // gerade handelt. Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
+        if (get_current_user_id() !== 0 && !current_user_can('promote_user', $id)) {
+            throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }
         if ($level === Level::Admin || in_array('administrator', (array) $user->roles, true)) {
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
@@ -95,6 +104,10 @@ final class WpUsers implements UserDirectory, AuthContext
 
     public function setPassword(int $id, string $password): void
     {
+        $actor = get_current_user_id();
+        if ($actor !== 0 && $actor !== $id && (!current_user_can('edit_user', $id) || $this->find($id) === null)) {
+            throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
+        }
         wp_set_password($password, $id);
         \WP_Session_Tokens::get_instance($id)->destroy_all();
         clean_user_cache($id);
@@ -112,7 +125,7 @@ final class WpUsers implements UserDirectory, AuthContext
 
     public static function level(\WP_User $u): Level
     {
-        if (in_array('administrator', (array) $u->roles, true)) {
+        if (in_array('administrator', (array) $u->roles, true) || is_super_admin((int) $u->ID)) {
             return Level::Admin;
         }
         if (user_can($u, Roles::CAP_MANAGE)) {

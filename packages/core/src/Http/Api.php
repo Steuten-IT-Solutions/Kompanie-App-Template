@@ -106,6 +106,7 @@ final class Api
         return [
             'apiBase' => $a->env->apiBase(),
             'appUrl' => $a->env->appUrl(),
+            'swUrl' => $a->env->serviceWorkerUrl(),
             'siteUrl' => $a->env->siteUrl(),
             'variant' => $a->env->variant(),
             'version' => $a->env->version(),

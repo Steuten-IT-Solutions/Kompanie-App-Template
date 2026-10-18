@@ -39,7 +39,11 @@ final class WpDriver implements ApiDriver
         if ($level === 'admin') {
             (new \WP_User($id))->set_role('administrator');
         } else {
+            // Testaufbau, nicht Teil des Szenarios: ohne handelnden Benutzer.
+            $acting = get_current_user_id();
+            wp_set_current_user(0);
             Plugin::app()->users->setLevel($id, Level::from($level));
+            wp_set_current_user($acting);
         }
         clean_user_cache($id);
         return (int) $id;

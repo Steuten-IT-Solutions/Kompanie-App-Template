@@ -5,7 +5,6 @@
   --shadow: 0 1px 0 color-mix(in srgb, var(--primary-ink) 4%, transparent), 0 4px 14px color-mix(in srgb, var(--primary-ink) 7%, transparent);
   --tabbar-h: 66px;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --on-primary-soft: color-mix(in srgb, var(--on-primary) 82%, transparent);
   --warn-deep: color-mix(in srgb, var(--warn) 78%, black);
 }
 
@@ -73,14 +72,14 @@ button, input, select { font: inherit; color: inherit; }
   display: flex; justify-content: space-around;
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: linear-gradient(180deg, var(--primary-deep), var(--primary-ink));
+  background: linear-gradient(180deg, var(--bar-top), var(--bar-bottom));
   border-top: 3px solid var(--accent);
 }
 .tabbar button {
   position: relative; flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   background: none; border: 0; cursor: pointer;
-  color: color-mix(in srgb, var(--on-primary) 62%, transparent);
+  color: var(--on-bar-muted);
   font-family: var(--font-head); font-weight: 500; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
 }
 .tabbar button.active { color: var(--on-primary); }
@@ -156,6 +155,7 @@ button, input, select { font: inherit; color: inherit; }
   font-family: var(--font-head); font-weight: 700; font-size: 2.6rem; line-height: 1.05;
   color: var(--on-primary); font-variant-numeric: tabular-nums;
 }
+.stat-warn, .stat-warn .stat-value { color: var(--on-warn); }
 .stat-label { font-family: var(--font-head); font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.8rem; opacity: 0.9; }
 .stat-warn {
   background: linear-gradient(160deg, var(--warn) 0%, var(--warn-deep) 100%);
@@ -203,6 +203,7 @@ button, input, select { font: inherit; color: inherit; }
 .error p { margin: 0 0 8px; }
 .empty { text-align: center; color: var(--muted); padding: 28px 8px; font-style: italic; }
 
+.guest-welcome { padding: 14px 16px; margin: 0 0 14px; color: var(--ink-2); }
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px); z-index: 20;
@@ -256,7 +257,7 @@ button, input, select { font: inherit; color: inherit; }
   flex: 1; padding: 9px 4px; border: 0; border-radius: 8px; background: none; cursor: pointer; color: var(--ink-2);
   font-family: var(--font-head); font-weight: 500; font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase;
 }
-.segmented button.active { background: var(--primary); color: var(--accent-light); box-shadow: inset 0 -2px 0 var(--accent); }
+.segmented button.active { background: var(--primary); color: var(--accent-on-primary); box-shadow: inset 0 -2px 0 var(--accent); }
 .search { width: 100%; margin: 14px 0; }
 .member-name { margin: 4px 0 14px; font-family: var(--font-head); font-weight: 700; font-size: 1.6rem; letter-spacing: 0.02em; }
 .back { margin-bottom: 4px; }
@@ -384,7 +385,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .install-num {
   flex: none; width: 38px; height: 38px; border-radius: 50%;
   display: grid; place-items: center;
-  background: var(--primary); color: var(--accent-light); border: 2px solid var(--accent);
+  background: var(--primary); color: var(--accent-on-primary); border: 2px solid var(--accent);
   font-family: var(--font-head); font-weight: 700; font-size: 1.2rem;
 }
 .install-step-title { font-size: 1.15rem; line-height: 1.3; }

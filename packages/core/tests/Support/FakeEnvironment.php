@@ -28,6 +28,11 @@ final class FakeEnvironment implements Environment
         return 'https://example.org/app/';
     }
 
+    public function serviceWorkerUrl(): string
+    {
+        return 'https://example.org/app/sw.js';
+    }
+
     public function siteUrl(): ?string
     {
         return null;

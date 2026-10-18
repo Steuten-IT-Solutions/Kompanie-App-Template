@@ -42,7 +42,11 @@ final class Text
             return '';
         }
         // Nur echte Tags und Kommentare entfernen; ein einzelnes „<“ (z. B. „<10 min“) bleibt.
-        $s = (string) preg_replace(['/<!--.*?-->/su', '#</?[a-zA-Z][^>]*>#u'], '', $s);
+        // Wiederholen, bis nichts mehr passt: sonst wird aus „<<b>script>“ wieder „<script>“.
+        do {
+            $before = $s;
+            $s = (string) preg_replace(['/<!--.*?-->/su', '#</?[a-zA-Z!/][^>]*>#u'], '', $s);
+        } while ($s !== $before);
         // Steuerzeichen außer Zeilenumbruch und Tabulator entfernen.
         return (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
     }

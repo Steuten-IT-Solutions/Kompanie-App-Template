@@ -9,8 +9,9 @@ import './generated/fonts';
 import './generated/theme.css';
 import './styles.css';
 
-// Teilbarer Link /app/installieren/ → Anleitung in der App (#/installieren).
-if (/\/installieren\/?$/.test(window.location.pathname) && config) {
+// Teilbarer Link …/installieren/ (auch ?kompanie_app=installieren oder ?r=/installieren)
+// → Anleitung in der App (#/installieren).
+if (/(^|[/=])installieren\/?$/.test(decodeURIComponent(window.location.pathname + window.location.search)) && config) {
   history.replaceState(null, '', config.appUrl + '#/installieren');
 }
 // Vom Home-Bildschirm gestartet: nicht auf der Anleitung landen, sondern bei den Terminen.
@@ -30,7 +31,7 @@ if ('serviceWorker' in navigator && cfg) {
     // Der Service Worker erfährt so, wo API und Programmdateien liegen.
     const src = document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? location.href;
     const assets = src.includes('/assets/') ? src.slice(0, src.lastIndexOf('/assets/') + 1) : new URL('.', src).href;
-    const sw = new URL('sw.js', cfg.appUrl);
+    const sw = new URL(cfg.swUrl, location.href);
     sw.searchParams.set('api', new URL(cfg.apiBase, location.href).href);
     sw.searchParams.set('assets', assets);
     navigator.serviceWorker.register(sw.toString(), { scope: cfg.appUrl }).catch(() => {

@@ -83,8 +83,35 @@ final class Plugin
         $app->upgrade();
         if (get_option(WpSettings::PREFIX . 'roles_version') !== KOMPANIE_APP_VERSION) {
             Roles::install($app->config->roleLabel('member'), $app->config->roleLabel('manager'));
-            update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, false);
+            update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
+            self::autoloadOptions();
         }
+    }
+
+    /**
+     * Ältere Versionen haben die Einstellungen ohne Autoload gespeichert. update_option()
+     * ändert das nur zusammen mit dem Wert; deshalb einmal je Version direkt umstellen.
+     * Ausgenommen sind große, selten gebrauchte Werte (Galerie-Status, Zugangsschlüssel).
+     */
+    private static function autoloadOptions(): void
+    {
+        global $wpdb;
+        $names = $wpdb->get_col($wpdb->prepare(
+            "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+            $wpdb->esc_like(WpSettings::PREFIX) . '%',
+        ));
+        $names = array_diff($names, array_map(static fn (string $k): string => WpSettings::PREFIX . $k, WpSettings::NO_AUTOLOAD));
+        if ($names === []) {
+            return;
+        }
+        if (function_exists('wp_set_option_autoload_values')) {
+            wp_set_option_autoload_values(array_fill_keys($names, true));
+            return;
+        }
+        foreach ($names as $name) {
+            $wpdb->update($wpdb->options, ['autoload' => 'yes'], ['option_name' => $name]);
+        }
+        wp_cache_delete('alloptions', 'options');
     }
 
     public static function activate(): void

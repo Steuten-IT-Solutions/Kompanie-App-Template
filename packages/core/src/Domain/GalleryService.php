@@ -310,6 +310,11 @@ final class GalleryService
             return ['status' => $loggedIn ? 403 : 401];
         }
         $file = $this->path($photo, $size);
+        // Fehlgeschlagene Bilder nicht bei jedem Aufruf erneut aus Drive laden lassen
+        // (sonst könnten Besucher beliebig viele Downloads auslösen); das macht der Abgleich.
+        if ($photo['status'] === GalleryRepository::FAILED) {
+            return ['status' => 404];
+        }
         if ($photo['status'] !== GalleryRepository::READY || !is_file($file)) {
             if (!$this->generate($photo)) {
                 return ['status' => 502];

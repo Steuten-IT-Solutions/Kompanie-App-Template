@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, can, config, isMember, toLogin } from './api';
+import { api, ApiError, can, config, isMember, toLogin } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo.png';
@@ -40,7 +40,8 @@ const TAB_LABELS: Record<Tab, string> = {
 
 const TITLES: Record<View, string> = {
   ...TAB_LABELS,
-  news: 'Neuigkeiten',
+  // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
+  news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
   konto: 'Mein Konto',
   installieren: 'App installieren',
   anmelden: 'Anmelden',
@@ -116,23 +117,33 @@ async function clearCaches() {
   }
 }
 
-async function logout() {
-  try {
-    await clearCaches();
-    if (config?.auth.mode === 'form') {
-      await api.logout().catch(() => undefined);
+/**
+ * Abmelden. Im Formular-Modus erst auf dem Server: Klappt das nicht (z. B. offline),
+ * bleibt alles, wie es ist – sonst sähe die App abgemeldet aus, die Sitzung bestünde aber weiter.
+ */
+async function logout(onError: (msg: string) => void) {
+  if (config?.auth.mode === 'form') {
+    try {
+      await api.logout();
+    } catch (err) {
+      // 401: Die Sitzung ist auf dem Server schon beendet.
+      if (!(err instanceof ApiError && err.status === 401)) {
+        onError('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.');
+        return;
+      }
     }
-  } finally {
-    if (config?.auth.mode === 'redirect' && config.auth.logoutUrl) {
-      window.location.href = config.auth.logoutUrl;
-    } else {
-      window.location.href = config?.appUrl ?? './';
-    }
+  }
+  await clearCaches().catch(() => undefined);
+  if (config?.auth.mode === 'redirect' && config.auth.logoutUrl) {
+    window.location.href = config.auth.logoutUrl;
+  } else {
+    window.location.href = config?.appUrl ?? './';
   }
 }
 
 export function greeting(name: string): string {
-  return brand.greeting.replace('{name}', name);
+  // Als Funktion, damit $-Zeichen im Namen nicht als Ersetzungsmuster gelten.
+  return brand.greeting.replace('{name}', () => name);
 }
 
 export default function App() {
@@ -144,7 +155,8 @@ export default function App() {
     news: !!features?.news,
     galerie: !!features?.gallery,
     meins: isMember() && !!(features?.points || features?.penalties),
-    verwaltung: can('manage') || can('create_users') || can('promote_users'),
+    // Die Verwaltung beginnt mit der Mitgliederliste; die braucht das Recht manage.
+    verwaltung: can('manage'),
     konto: !!user,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
@@ -214,13 +226,14 @@ export default function App() {
       {tab !== 'installieren' && tab !== 'anmelden' && <InstallBanner onToast={showToast} />}
 
       <main className="content">
+        {!user && brand.guestWelcome && tab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
         {tab === 'termine' &&
-          (path[1] === 'verwalten' && can('manage_events') ? <TermineVerwalten onToast={showToast} /> : <Termine />)}
+          (path[1] === 'verwalten' && features?.events && can('manage_events') ? <TermineVerwalten onToast={showToast} /> : <Termine />)}
         {tab === 'news' && <News id={newsId} />}
         {tab === 'galerie' && <Galerie albumId={albumId} />}
         {tab === 'meins' && <Meins sub={path[1]} />}
         {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
-        {tab === 'konto' && <Konto onToast={showToast} onLogout={logout} />}
+        {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
         {tab === 'installieren' && <Installieren onToast={showToast} />}
         {tab === 'anmelden' && <Anmelden />}
       </main>

@@ -18,6 +18,7 @@ export interface AppUser {
 export interface AppConfig {
   apiBase: string;
   appUrl: string;
+  swUrl: string;
   siteUrl: string | null;
   variant: 'wordpress' | 'standalone';
   version: string;

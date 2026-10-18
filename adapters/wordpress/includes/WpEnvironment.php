@@ -42,6 +42,11 @@ final class WpEnvironment implements Environment
         return (string) get_option('permalink_structure') !== '';
     }
 
+    public function serviceWorkerUrl(): string
+    {
+        return $this->appUrl('sw.js');
+    }
+
     public function siteUrl(): ?string
     {
         return home_url('/');
