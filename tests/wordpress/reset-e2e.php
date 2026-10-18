@@ -25,4 +25,8 @@ foreach (['verwalter' => 'manager', 'mitglied1' => 'member', 'mitglied2' => 'mem
         KompanieApp\WordPress\Plugin::app()->users->setLevel($u->ID, KompanieApp\Core\Auth\Level::from($level));
     }
 }
+// Zähler (z. B. Passwortänderungen je 15 Minuten) und den Einrichtungsassistenten zurücksetzen.
+global $wpdb;
+$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like(KompanieApp\WordPress\WpSettings::PREFIX . KompanieApp\WordPress\WpCache::COUNTER) . '%'));
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'setup_done');
 echo "Testdaten zurückgesetzt.\n";

@@ -22,8 +22,10 @@ final class Plugin
             $users = new WpUsers();
             $settings = new WpSettings();
             $uploads = wp_upload_dir(null, false);
+            $db = new WpdbConnection($wpdb, $wpdb->prefix . 'kompanie_');
+            $config = self::config();
             self::$app = new App(
-                db: new WpdbConnection($wpdb, $wpdb->prefix . 'kompanie_'),
+                db: $db,
                 settings: $settings,
                 cache: new WpCache(),
                 http: new WpHttpClient(),
@@ -41,7 +43,10 @@ final class Plugin
                 authContext: $users,
                 authenticator: new WpAuthenticator($env),
                 users: $users,
-                config: self::config(),
+                config: $config,
+                updateTarget: new WpUpdateTarget(),
+                backup: new WpBackup($db, KOMPANIE_APP_VERSION, $config->name()),
+                packageConfig: self::packageConfig(),
             );
         }
         return self::$app;
@@ -55,6 +60,18 @@ final class Plugin
             $file = dirname(KOMPANIE_APP_DIR, 2) . '/config/kompanie.example.json';
         }
         return KompanieConfig::fromFile($file);
+    }
+
+    /**
+     * update.json des Pakets: Adresse der Update-Liste, vertrauenswürdige Schlüssel, Statusmeldungen.
+     * Fehlt sie (Entwicklung), gibt es keine Updates.
+     *
+     * @return array<string, mixed>
+     */
+    public static function packageConfig(): array
+    {
+        $data = json_decode((string) @file_get_contents(KOMPANIE_APP_DIR . 'update.json'), true);
+        return is_array($data) ? $data : [];
     }
 
     public static function boot(): void

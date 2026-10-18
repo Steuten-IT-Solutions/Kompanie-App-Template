@@ -413,3 +413,17 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 @media (prefers-color-scheme: dark) {
   .install-warn { background: #3a2c0c; color: #f3dca4; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Wartung: Ampel, Statusmeldung                                       */
+/* ------------------------------------------------------------------ */
+
+.status-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+.status-item { display: flex; gap: 10px; align-items: flex-start; }
+.status-dot { flex: none; width: 12px; height: 12px; margin-top: 5px; border-radius: 50%; background: var(--line-strong); }
+.status-ok .status-dot { background: var(--good); }
+.status-warn .status-dot { background: var(--accent); }
+.status-error .status-dot { background: var(--danger); }
+.payload { overflow-x: auto; background: var(--bg); padding: 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
+.settings-section details { margin: 12px 0; }
+.setup-steps { color: var(--muted); margin: 0 0 12px; }

@@ -7,6 +7,7 @@ import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './ins
 import { ErrorBoundary } from './ui';
 import { navigate, useRoute } from './router';
 import Anmelden from './views/Anmelden';
+import Einrichtung from './views/Einrichtung';
 import Einstellungen from './views/Einstellungen';
 import Galerie from './views/Galerie';
 import Installieren from './views/Installieren';
@@ -18,9 +19,9 @@ import TermineVerwalten from './views/TermineVerwalten';
 import Verwaltung from './views/Verwaltung';
 
 type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
-type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen';
+type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung';
 
-const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden', 'einstellungen'];
+const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden', 'einstellungen', 'einrichtung'];
 
 /** Ältere Links weiter unterstützen. */
 const ALIASES: Record<string, string[]> = {
@@ -48,6 +49,7 @@ const TITLES: Record<View, string> = {
   installieren: 'App installieren',
   anmelden: 'Anmelden',
   einstellungen: 'Einstellungen',
+  einrichtung: 'Einrichtung',
 };
 
 function Icon({ name }: { name: Tab }) {
@@ -163,8 +165,8 @@ export default function App() {
     konto: !!user,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
-    // Bei WordPress stehen die Einstellungen im WP-Admin.
-    einstellungen: can('manage_settings') && config?.variant === 'standalone',
+    einstellungen: can('manage_settings'),
+    einrichtung: can('manage_settings'),
   };
   const tabs = (['termine', 'news', 'galerie', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
@@ -228,10 +230,21 @@ export default function App() {
       </header>
 
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
-      {tab !== 'installieren' && tab !== 'anmelden' && tab !== 'einstellungen' && <InstallBanner onToast={showToast} />}
+      {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
       <main className="content">
         <ErrorBoundary key={rawPath.join('/')}>
+        {config.setupPending && tab !== 'einrichtung' && (
+          <div className="card setup-hint">
+            <p>
+              <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch Kalender, Fotos und Neuigkeiten verbinden – dauert ein
+              paar Minuten.
+            </p>
+            <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
+              Einrichtung starten
+            </button>
+          </div>
+        )}
         {!user && brand.guestWelcome && tab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
         {tab === 'termine' &&
           (path[1] === 'verwalten' && features?.events && can('manage_events') ? <TermineVerwalten onToast={showToast} /> : <Termine />)}
@@ -243,6 +256,7 @@ export default function App() {
         {tab === 'installieren' && <Installieren onToast={showToast} />}
         {tab === 'anmelden' && <Anmelden />}
         {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
+        {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
         </ErrorBoundary>
       </main>
 

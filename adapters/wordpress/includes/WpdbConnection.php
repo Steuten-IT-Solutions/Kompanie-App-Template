@@ -12,6 +12,9 @@ use KompanieApp\Core\Storage\Sql\Connection;
  */
 final class WpdbConnection implements Connection
 {
+    /** Verschachtelte Aufrufe laufen in der äußeren Transaktion (MySQL kennt keine verschachtelten). */
+    private int $depth = 0;
+
     public function __construct(private readonly \wpdb $wpdb, private readonly string $prefix)
     {
     }
@@ -68,7 +71,11 @@ final class WpdbConnection implements Connection
 
     public function transaction(callable $fn): mixed
     {
+        if ($this->depth > 0) {
+            return $fn();
+        }
         $this->wpdb->query('START TRANSACTION');
+        $this->depth++;
         try {
             $result = $fn();
             $this->wpdb->query('COMMIT');
@@ -76,6 +83,8 @@ final class WpdbConnection implements Connection
         } catch (\Throwable $e) {
             $this->wpdb->query('ROLLBACK');
             throw $e;
+        } finally {
+            $this->depth--;
         }
     }
 

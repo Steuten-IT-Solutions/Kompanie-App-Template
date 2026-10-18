@@ -1,27 +1,37 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, type AdminSettings, type NewsSourceType } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Wartung from './Wartung';
 
 /**
- * Einstellungen der eigenständigen Version (bei WordPress zeigt die App sie nicht; dort im WP-Admin):
- * Kalender, Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
- * (Die Endpunkte /admin/* gibt es auch im WordPress-Plugin; dort pflegt man sie aber im WP-Admin.)
+ * Einstellungen für Admins (beide Varianten): Zustand, Updates und Datensicherung, dann Kalender,
+ * Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
+ * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
  */
 export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
+  return (
+    <div className="settings">
+      <Wartung onToast={onToast} />
+      <Verbindungen onToast={onToast} />
+    </div>
+  );
+}
+
+function Verbindungen({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
   return (
-    <div className="settings">
+    <>
       <Calendar settings={s} onSaved={setData} onToast={onToast} />
       <Gallery settings={s} onSaved={setData} onToast={onToast} />
       {s.news && <News settings={s} onSaved={setData} onToast={onToast} />}
-    </div>
+    </>
   );
 }
 
-type SectionProps = { settings: AdminSettings; onSaved: (s: AdminSettings) => void; onToast: (msg: string) => void };
+export type SectionProps = { settings: AdminSettings; onSaved: (s: AdminSettings) => void; onToast: (msg: string) => void };
 
 function Section({ title, children, onSubmit, busy, error }: { title: string; children: ReactNode; onSubmit: (e: FormEvent) => void; busy: boolean; error: string | null }) {
   return (
@@ -60,7 +70,7 @@ function useSave(onSaved: (s: AdminSettings) => void, onToast: (msg: string) => 
   return { busy, error, setError, save };
 }
 
-function Calendar({ settings, onSaved, onToast }: SectionProps) {
+export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const [url, setUrl] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
@@ -125,7 +135,7 @@ function Calendar({ settings, onSaved, onToast }: SectionProps) {
   );
 }
 
-function Gallery({ settings, onSaved, onToast }: SectionProps) {
+export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
   const [key, setKey] = useState('');
@@ -214,7 +224,7 @@ function Gallery({ settings, onSaved, onToast }: SectionProps) {
   );
 }
 
-function News({ settings, onSaved, onToast }: SectionProps) {
+export function News({ settings, onSaved, onToast }: SectionProps) {
   const n = settings.news!;
   const [source, setSource] = useState<NewsSourceType>(n.source);
   const [url, setUrl] = useState(n.url);

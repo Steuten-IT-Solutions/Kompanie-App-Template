@@ -10,6 +10,12 @@
  *   php bin/kompanie.php export [--out=datei.json]
  *   php bin/kompanie.php import datei.json
  *   php bin/kompanie.php status
+ *   php bin/kompanie.php update-check   Update-Liste prüfen und anzeigen
+ *   php bin/kompanie.php update [--version=…] [--major]   neueste (oder angegebene) Version einspielen
+ *   php bin/kompanie.php rollback --version=…   auf eine ältere Version zurück
+ *
+ * Updates bitte als derselbe Benutzer ausführen, unter dem PHP auf dem Webspace läuft;
+ * sonst gehören die neuen Dateien einem anderen Benutzer.
  */
 
 declare(strict_types=1);
@@ -127,6 +133,49 @@ try {
                 }
                 echo 'Cron-Adresse: ', $kernel->cronUrl(), "\n";
             }
+            break;
+
+        case 'update-check':
+            $kernel->upgrade();
+            $updates = $kernel->app()->updates();
+            $updates->check();
+            $st = $updates->status();
+            echo 'Installiert: ', $st['current'], " (Kanal {$st['channel']}, automatisch: ", $st['auto'] ? 'ja' : 'nein', ")\n";
+            if ($st['withdrawn']) {
+                echo "Diese Version wurde zurückgezogen; beim nächsten Cron-Lauf wird die vorige eingespielt.\n";
+            }
+            echo $st['available'] ? "Neue Version: {$st['latest']}\n" : "Keine neuere Version derselben Hauptversion.\n";
+            if ($st['major']) {
+                echo "Neue Hauptversion verfügbar: {$st['majorVersion']} (nur mit: update --version={$st['majorVersion']} --major)\n";
+            }
+            foreach ($st['problems'] as $p) {
+                echo "Hinweis: $p\n";
+            }
+            if ($st['versions']) {
+                echo 'Verfügbare Versionen: ', implode(', ', array_column($st['versions'], 'version')), "\n";
+            }
+            break;
+
+        case 'update':
+        case 'rollback':
+            $kernel->upgrade();
+            $updates = $kernel->app()->updates();
+            $updates->check();
+            $version = $str('version');
+            if ($cmd === 'rollback') {
+                if ($version === '') {
+                    throw new RuntimeException('Bitte die Version angeben: rollback --version=…');
+                }
+                $updates->rollback($version);
+            } else {
+                $version = $version !== '' ? $version : (string) ($updates->status()['available'] ? $updates->status()['latest'] : '');
+                if ($version === '') {
+                    echo "Schon aktuell.\n";
+                    break;
+                }
+                $updates->install($version, 'manual', isset($opt['major']));
+            }
+            echo "Version $version eingespielt.\n";
             break;
 
         default:

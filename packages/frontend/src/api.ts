@@ -27,6 +27,8 @@ export interface AppConfig {
   features: Record<Feature, boolean>;
   /** null = Gast ohne Anmeldung. */
   user: AppUser | null;
+  /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
+  setupPending?: boolean;
 }
 
 declare global {
@@ -327,7 +329,43 @@ export const api = {
   testNews: () => request<{ count: number }>('POST', '/admin/news/test'),
   syncGallery: (onlyProcess = false) =>
     request<{ albums: number; photos: number; processed: number; pending: number; failed: number; error: string }>('POST', '/admin/gallery/sync', { only_process: onlyProcess }),
+
+  status: () => request<AdminStatus>('GET', '/admin/status'),
+  checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
+  installUpdate: (version: string, major = false) => request<{ installed: string }>('POST', '/admin/update/install', { version, major }),
+  rollback: (version: string) => request<{ installed: string }>('POST', '/admin/update/rollback', { version }),
+  updateOptions: (data: { auto?: boolean; status_reports?: boolean }) => request<UpdateStatus>('PATCH', '/admin/update', data),
+  backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
+  restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 };
+
+export type StatusLevel = 'ok' | 'warn' | 'error' | 'off';
+
+export interface UpdateStatus {
+  configured: boolean;
+  current: string;
+  channel: 'early' | 'stable';
+  auto: boolean;
+  checked_at: number | null;
+  error: string;
+  latest: string | null;
+  available: boolean;
+  major: boolean;
+  majorVersion?: string;
+  withdrawn: boolean;
+  problems: string[];
+  versions: { version: string; published: string }[];
+  last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;
+}
+
+export interface AdminStatus {
+  items: { key: string; label: string; level: StatusLevel; text: string }[];
+  support: string;
+  updates: UpdateStatus;
+  statusReports: { enabled: boolean; available: boolean; payload: Record<string, unknown> };
+  setupDone: boolean;
+}
 
 export type NewsSourceType = 'none' | 'wordpress' | 'rss';
 

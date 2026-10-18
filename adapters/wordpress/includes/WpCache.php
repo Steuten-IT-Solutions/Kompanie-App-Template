@@ -9,6 +9,9 @@ use KompanieApp\Core\Port\Cache;
 /** Zwischenspeicher als WordPress-Transients. */
 final class WpCache implements Cache
 {
+    /** Präfix (nach WpSettings::PREFIX) der Zähler von increment(). */
+    public const COUNTER = 'ctr_';
+
     public function get(string $key): mixed
     {
         $v = get_transient(WpSettings::PREFIX . $key);
@@ -34,7 +37,7 @@ final class WpCache implements Cache
         global $wpdb;
         $window = max(1, $windowSeconds);
         $expires = (intdiv(time(), $window) + 1) * $window;
-        $prefix = WpSettings::PREFIX . 'ctr_';
+        $prefix = WpSettings::PREFIX . self::COUNTER;
         $name = $prefix . sprintf('%010d', $expires) . '_' . md5($key);
         $wpdb->query($wpdb->prepare(
             "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no') ON DUPLICATE KEY UPDATE option_value = option_value + 1",

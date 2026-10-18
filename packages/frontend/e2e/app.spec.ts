@@ -404,14 +404,51 @@ test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ p
   expect(days).toBeGreaterThan(390);
 });
 
-test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein (nur eigenständige Version)', async ({ page }) => {
+test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const hint = page.locator('.setup-hint');
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Einrichtung starten' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Einrichtung');
+  await page.getByRole('button', { name: "Los geht's" }).click();
+  // Kalender, Galerie (und bei der eigenständigen Version Neuigkeiten) lassen sich überspringen.
+  while (await page.getByRole('heading', { name: 'Fast fertig' }).count() === 0) {
+    await page.getByRole('button', { name: 'Weiter', exact: true }).click();
+  }
+  await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung$/);
+  await expect(hint).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(hint).toHaveCount(0);
+});
+
+test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Konto' }).click();
-  if (!STANDALONE) {
-    // Bei WordPress stehen die Einstellungen im WP-Admin.
-    await expect(page.getByRole('button', { name: 'Einstellungen öffnen' })).toHaveCount(0);
-    return;
-  }
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
+  const status = page.locator('.settings-section', { hasText: 'Zustand der App' });
+  await expect(status.locator('.status-item').first()).toBeVisible();
+  // Die Test-Instanz ist kein Paket aus einem Release: keine Updates über die App.
+  await expect(page.getByText(/bekommt keine Updates über die App/)).toBeVisible();
+
+  const backup = page.locator('.settings-section', { hasText: 'Datensicherung' });
+  const [download] = await Promise.all([page.waitForEvent('download'), backup.getByRole('button', { name: 'Sicherung herunterladen' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^sicherung-\d{4}-\d{2}-\d{2}\.json$/);
+  const data = JSON.parse(await (await import('node:fs/promises')).readFile((await download.path())!, 'utf8'));
+  expect(data.format).toBe('kompanie-app-backup');
+  expect(data.variant).toBe(STANDALONE ? 'standalone' : 'wordpress');
+  expect(Object.keys(data.tables)).toContain('events');
+  // Nach dem Herunterladen wird die Ampel für die Sicherung grün.
+  await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
+  await shot(page, '19-wartung');
+});
+
+test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein (nur eigenständige Version)', async ({ page }) => {
+  test.skip(!STANDALONE, 'Die Test-Instanz von WordPress hat keine Attrappen für Kalender, Drive und Feed.');
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
   await expect(page.getByText('✓ Eingerichtet über die geheime iCal-Adresse.')).toBeVisible();

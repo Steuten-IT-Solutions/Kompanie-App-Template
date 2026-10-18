@@ -109,7 +109,8 @@ final class StatusService
     private function backup(): array
     {
         $last = $this->app->settings->get(self::BACKUP_SETTING);
-        $last = is_int($last) ? $last : null;
+        // WordPress liefert Zahlen aus den Options als Zeichenkette zurück.
+        $last = is_numeric($last) && (int) $last > 0 ? (int) $last : null;
         if ($this->app->backup === null) {
             return $this->item('backup', 'Datensicherung', 'off', 'In dieser Installation nicht verfügbar.');
         }
