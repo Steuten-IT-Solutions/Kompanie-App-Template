@@ -1,0 +1,58 @@
+name: Kompanie ändern
+description: Ändert Logo, Farben oder Texte einer Kompanie (nur für Mitglieder der Organisation). Leere Felder bleiben, wie sie sind.
+title: 'Kompanie ändern: '
+labels: [kompanie-aendern]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nach dem Absenden legt ein Workflow im Repo der Kompanie einen Pull Request mit der Änderung und einer Vorschau an.
+        Nach dem Zusammenführen wird die neue Version automatisch veröffentlicht.
+  - type: input
+    id: repo
+    attributes:
+      label: Name des Repos
+      description: z. B. „musterkompanie-beispielstadt“
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Name der Kompanie
+  - type: input
+    id: shortName
+    attributes:
+      label: Kurzname
+  - type: input
+    id: primary
+    attributes:
+      label: Hauptfarbe
+      description: z. B. „#2e6b3f“
+  - type: input
+    id: accent
+    attributes:
+      label: Akzentfarbe
+      description: z. B. „#d9a441“; „-“ entfernt sie.
+  - type: input
+    id: greeting
+    attributes:
+      label: Begrüßung
+      description: Muss „{name}“ enthalten.
+  - type: textarea
+    id: guestWelcome
+    attributes:
+      label: Willkommenstext für Gäste
+      description: „-“ entfernt ihn.
+  - type: input
+    id: manager
+    attributes:
+      label: Bezeichnung für Verwalter
+  - type: input
+    id: penalties
+    attributes:
+      label: Bezeichnung für Strafen
+  - type: textarea
+    id: logo
+    attributes:
+      label: Neues Logo
+      description: Bild hier hineinziehen (PNG, JPG, SVG oder WebP).

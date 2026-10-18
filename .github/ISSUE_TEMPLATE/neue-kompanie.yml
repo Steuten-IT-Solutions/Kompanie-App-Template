@@ -1,0 +1,79 @@
+name: Neue Kompanie
+description: Legt das Repo einer neuen Kompanie an und veröffentlicht ihre App (nur für Mitglieder der Organisation).
+title: 'Neue Kompanie: '
+labels: [neue-kompanie]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nach dem Absenden prüft ein Workflow die Angaben, zeigt eine Vorschau und legt das Repo an.
+        Ergebnis und Link zur Download-Seite erscheinen hier als Kommentar. Ändern: Issue bearbeiten, der Workflow läuft erneut.
+  - type: input
+    id: name
+    attributes:
+      label: Name der Kompanie
+      description: So erscheint sie in der App, z. B. „Musterkompanie Beispielstadt“ (höchstens 80 Zeichen).
+    validations:
+      required: true
+  - type: input
+    id: repo
+    attributes:
+      label: Name des Repos
+      description: Nur Kleinbuchstaben, Ziffern und Bindestriche, z. B. „musterkompanie-beispielstadt“. Wird Teil der Adresse der Download-Seite.
+    validations:
+      required: true
+  - type: input
+    id: shortName
+    attributes:
+      label: Kurzname
+      description: Unter dem App-Symbol auf dem Handy (höchstens 30 Zeichen, besser unter 12). Leer = Name.
+  - type: input
+    id: primary
+    attributes:
+      label: Hauptfarbe
+      description: Als Farbcode, z. B. „#2e6b3f“.
+    validations:
+      required: true
+  - type: input
+    id: accent
+    attributes:
+      label: Akzentfarbe
+      description: Optional, z. B. „#d9a441“. Leer = passend zur Hauptfarbe.
+  - type: input
+    id: greeting
+    attributes:
+      label: Begrüßung
+      description: Muss „{name}“ enthalten. Leer = „Hallo, {name}“.
+  - type: textarea
+    id: guestWelcome
+    attributes:
+      label: Willkommenstext für Gäste
+      description: Optional, höchstens 300 Zeichen.
+  - type: input
+    id: manager
+    attributes:
+      label: Bezeichnung für Verwalter
+      description: Optional, z. B. „Spieß“. Leer = „Verwalter“.
+  - type: input
+    id: penalties
+    attributes:
+      label: Bezeichnung für Strafen
+      description: Optional, z. B. „Kasse“. Leer = „Strafen“.
+  - type: checkboxes
+    id: off
+    attributes:
+      label: Diese Bereiche weglassen
+      options:
+        - label: Öffentliche Termine
+        - label: Kalender für Mitglieder
+        - label: News
+        - label: Galerie
+        - label: Punkte
+        - label: Strafen
+  - type: textarea
+    id: logo
+    attributes:
+      label: Logo
+      description: Bild hier hineinziehen (PNG, JPG, SVG oder WebP; beliebiges Seitenverhältnis, möglichst mindestens 512 Pixel).
+    validations:
+      required: true

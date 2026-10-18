@@ -19,7 +19,7 @@ Hier wird nur eingetragen, was die Kompanie ausmacht.
 
 ## Ändern
 
-Direkt hier im Repo (ein Formular „Kompanie ändern“ im Kern-Repo ist geplant):
+Am einfachsten über das Formular **„Kompanie ändern“** im Kern-Repo (es öffnet hier einen Pull Request). Oder direkt hier:
 Eine Änderung an `kompanie.json` oder am Logo startet im Pull Request eine Vorschau: Bildschirmfotos und
 Pakete liegen als Ergebnis „vorschau“ am Workflow-Lauf (*Checks → App bauen → Summary*). Nach dem Zusammenführen
 veröffentlicht das Kern-Repo innerhalb von 30 Minuten eine neue Version, die die Installationen selbst holen.
@@ -40,7 +40,7 @@ Das Kern-Repo prüft selbst regelmäßig, ob sich `main` hier geändert hat, und
 Das Repo muss öffentlich sein, das Topic `kompanie-app` tragen und darf nie umbenannt werden (Name und
 Adresse der Update-Liste stehen in jeder Installation). Schreibrecht nur für die Organisation.
 
-## Einmalig einrichten (später automatisch über den geplanten Workflow „Neue Kompanie“)
+## Einmalig einrichten (erledigt das Formular „Neue Kompanie“ automatisch)
 
 - *Settings → Pages:* Quelle „Deploy from a branch“, Branch `gh-pages` (nach der ersten Veröffentlichung).
 - Topic `kompanie-app` setzen (damit „Kompanien abgleichen“ im Kern-Repo das Repo findet).

@@ -1,0 +1,12 @@
+Options -Indexes
+<FilesMatch "^(config\.php|config\.example\.php|README\.md|.*\.sqlite)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>
+RedirectMatch 404 ^/data/
+# Für die HTTP-Anmeldung bei PHP als CGI/FPM
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>

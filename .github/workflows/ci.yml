@@ -97,6 +97,9 @@ jobs:
       - name: Abhängigkeiten
         run: npm ci --no-audit --no-fund
 
+      - name: Formulare „Neue Kompanie“ / „Kompanie ändern“ (Issue → kompanie.json)
+        run: tests/formular/run-tests.sh
+
       - name: Branding-Tests (Farben, Kontrast, Icons, Konfiguration)
         run: npm run test:branding
 

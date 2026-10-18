@@ -52,12 +52,33 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
      `main`). Eine Kopie gehört in den Passwort-Tresor der Organisation, sonst nirgends hin.
    - Den **öffentlichen Schlüssel** (Zeile `'…' => '…'`) in `packages/core/src/Update/TrustedKeys.php`
      eintragen. Ohne diesen Eintrag verweigert `package.php --require-signature` das Signieren.
-2. **GitHub App** der Organisation mit Schreibrecht auf *Contents* der Kompanie-Repos: App-ID als Variable
-   `KOMPANIE_APP_ID`, privaten Schlüssel als Secret `KOMPANIE_APP_KEY` derselben Environment.
+2. **GitHub App** der Organisation, installiert für alle Repos, mit den Rechten *Contents*, *Pages*,
+   *Pull requests* und *Administration* (Repos anlegen, Topics) jeweils Lesen und Schreiben: App-ID als
+   Variable `KOMPANIE_APP_ID`, privaten Schlüssel als Secret `KOMPANIE_APP_KEY` derselben Environment.
 3. **Repo `Kompanie-App-Vorlage`** mit dem Inhalt von [`vorlage/`](../vorlage) anlegen und als
    *Template repository* markieren.
 4. Nach dem ersten Zusammenführen in `main`: Tag **`v1`** setzen (die Kompanie-Repos rufen die Vorschau
    über `preview-kompanie.yml@v1` auf).
+5. Im Kern-Repo die Labels `neue-kompanie` und `kompanie-aendern` anlegen (die Formulare setzen sie).
+6. Optional als Variablen der Environment `veroeffentlichen`: `KOMPANIE_STATUS_URL` (Empfang der
+   Statusmeldungen, siehe [`tools/status-empfang`](../tools/status-empfang)) und `KOMPANIE_SUPPORT`
+   (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
+
+## Neue Kompanie, Kompanie ändern
+
+Im Kern-Repo *Issues → New issue*:
+
+- **„Neue Kompanie“**: Name, Repo-Name, Farben, Texte, Bereiche, Logo (ins Feld ziehen). Der Workflow
+  [`kompanie-formular.yml`](../.github/workflows/kompanie-formular.yml) prüft die Angaben (Schema, Kontrast,
+  Logo nur von GitHub, höchstens 5 MB, PNG/JPEG/WebP/SVG), baut eine Vorschau, legt das Repo aus der Vorlage
+  an (öffentlich, Topic `kompanie-app`) und veröffentlicht die erste Version. Ergebnis und Link zur
+  Download-Seite stehen danach als Kommentar im Issue.
+- **„Kompanie ändern“**: nur die zu ändernden Felder ausfüllen (`-` entfernt einen Wert). Der Workflow öffnet
+  im Repo der Kompanie einen Pull Request mit Vorschau; nach dem Zusammenführen wird veröffentlicht.
+  Bereiche ein- oder ausschalten geht direkt in `kompanie.json` des Repos.
+- Fehler stehen als Kommentar im Issue; nach dem Bearbeiten des Issues läuft die Prüfung erneut.
+- Nur wer Schreibrecht auf das Kern-Repo hat, kann die Formulare auslösen (geprüft wird, wer das Issue
+  angelegt oder zuletzt bearbeitet hat). Der Text des Issues wird in einem Job ohne Geheimnisse verarbeitet.
 
 ## Versionen
 

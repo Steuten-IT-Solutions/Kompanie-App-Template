@@ -194,4 +194,6 @@ jobs:
           DIST: ${{ runner.temp }}/checked/dist
           BRAND: ${{ runner.temp }}/checked/brand
           SCREENSHOTS: ${{ runner.temp }}/checked/screenshots
+          STATUS_URL: ${{ vars.KOMPANIE_STATUS_URL }}
+          SUPPORT: ${{ vars.KOMPANIE_SUPPORT }}
         run: core/scripts/publish-release.sh

@@ -384,7 +384,7 @@ Festgehalten für die Planung:
 | 3 | **Eigenständige Version:** Benutzer, Sitzung, Einstellungen, SQLite und MySQL über PDO, Export/Import | eigenständige Version |
 | 4 | **Branding und Build:** Farben, Icons, Signatur, Screenshots, `Kompanie-App-Vorlage`, Download-Seite | Kompanie-Repo baut signierte Pakete |
 | 5 | **Installer, Assistent, Updates:** automatische Updates, Ein-Klick-Update, Zurückrollen, Sicherung, Statusseite | Installation und Pflege ohne Handarbeit |
-| 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, Statusübersicht („Kompanien abgleichen“ ist schon da) | neue Kompanie nur durch Eintragen |
+| 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, „Kompanien abgleichen“, Empfang und Übersicht der Statusmeldungen (`tools/status-empfang`); offen: automatischer Demo-Test mit Befördern (braucht die Demo-Installation) | neue Kompanie nur durch Eintragen |
 | später | Hoster-Anleitungen erweitern, `/embed/termine`, Multisite | |
 | – | Umstellung Lank | eigener Plan |
 

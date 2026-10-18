@@ -1,0 +1,263 @@
+# Formulare „Neue Kompanie“ und „Kompanie ändern“ (.github/ISSUE_TEMPLATE): Angaben prüfen, Vorschau bauen,
+# dann das Repo anlegen und veröffentlichen bzw. im Repo der Kompanie einen Pull Request mit der Änderung öffnen.
+#
+# Nur für Personen mit Schreibrecht auf dieses Repo (das Repo ist öffentlich, Issues kann jeder anlegen).
+# - „pruefen“ verarbeitet den Text des Issues ohne Geheimnisse (nur Lesen + Kommentieren).
+# - „anwenden“ bekommt nur das geprüfte Ergebnis und das Token der GitHub App (Environment „veroeffentlichen“).
+name: Kompanie-Formular
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kompanie-formular-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+env:
+  ORG: Steuten-IT-Solutions
+
+jobs:
+  pruefen:
+    if: contains(github.event.issue.labels.*.name, 'neue-kompanie') || contains(github.event.issue.labels.*.name, 'kompanie-aendern')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      mode: ${{ steps.lesen.outputs.mode }}
+      repo: ${{ steps.lesen.outputs.repo }}
+    steps:
+      - name: Berechtigung prüfen (wer das Issue angelegt oder zuletzt geändert hat)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          PERM="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$SENDER/permission" --jq .permission 2> /dev/null || echo none)"
+          case "$PERM" in admin|maintain|write) ;; *) echo "::error::$SENDER hat kein Schreibrecht auf $GITHUB_REPOSITORY."; exit 1 ;; esac
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, gd, sodium, zip, mbstring, curl, openssl, simplexml, intl
+          tools: none
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Formular lesen
+        id: lesen
+        env:
+          BODY: ${{ github.event.issue.body }}
+          NEU: ${{ contains(github.event.issue.labels.*.name, 'neue-kompanie') }}
+          GH_TOKEN: ${{ github.token }}
+          OUT: ${{ runner.temp }}/formular
+        run: |
+          printf '%s' "$BODY" > "$RUNNER_TEMP/issue.md"
+          MODE=aendern; [ "$NEU" = true ] && MODE=neu
+          php scripts/issue-to-kompanie.php --mode="$MODE" --body="$RUNNER_TEMP/issue.md" --out="$OUT" --repo-only
+          REPO="$(cat "$OUT/repo.txt")"
+          mkdir -p "$OUT/kompanie"
+          if [ "$MODE" = neu ]; then
+            if gh api "repos/$ORG/$REPO" > /dev/null 2>&1; then
+              echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"
+              exit 1
+            fi
+            php scripts/issue-to-kompanie.php --mode=neu --body="$RUNNER_TEMP/issue.md" --out="$OUT"
+          else
+            if ! git clone --quiet --depth 1 "https://github.com/$ORG/$REPO.git" "$OUT/kompanie" 2> /dev/null; then
+              echo "- Das Repo $ORG/$REPO gibt es nicht." > "$OUT/fehler.txt"
+              exit 1
+            fi
+            rm -rf "$OUT/kompanie/.git"
+            php scripts/issue-to-kompanie.php --mode=aendern --body="$RUNNER_TEMP/issue.md" --out="$OUT" --current="$OUT/kompanie/kompanie.json"
+          fi
+          cp "$OUT/kompanie.json" "$OUT/kompanie/kompanie.json"
+          if [ -f "$OUT/logo-url.txt" ]; then
+            php scripts/fetch-logo.php --url="$(cat "$OUT/logo-url.txt")" --out="$OUT/kompanie/assets" 2> "$OUT/logo-fehler.txt" \
+              || { sed 's/^Fehler: /- Logo: /' "$OUT/logo-fehler.txt" > "$OUT/fehler.txt"; exit 1; }
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+
+      # Prüft kompanie.json gegen das Schema und die Farben auf Kontrast (packages/branding).
+      - name: App bauen (Prüfung)
+        env:
+          KOMPANIE_CONFIG: ${{ runner.temp }}/formular/kompanie/kompanie.json
+          KOMPANIE_ASSETS: ${{ runner.temp }}/formular/kompanie/assets
+          OUT: ${{ runner.temp }}/formular
+        run: |
+          scripts/build-frontend.sh > "$OUT/build.log" 2>&1 || {
+            { echo "- Die Angaben passen nicht:"; grep -E 'Fehler|fehler|Kontrast|muss|must' "$OUT/build.log" | head -20 | sed 's/^/  /'; } > "$OUT/fehler.txt"
+            cat "$OUT/build.log"; exit 1; }
+
+      - name: Bildschirmfotos
+        env:
+          KOMPANIE_CONFIG: ${{ runner.temp }}/formular/kompanie/kompanie.json
+          OUT: ${{ runner.temp }}/formular
+        run: |
+          npx playwright install --with-deps chromium
+          scripts/screenshots.sh "$OUT/vorschau"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kompanie
+          path: ${{ runner.temp }}/formular/kompanie
+          include-hidden-files: false
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vorschau
+          path: ${{ runner.temp }}/formular/vorschau
+
+      - name: Fehler im Issue melden
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          OUT: ${{ runner.temp }}/formular
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "**Das hat nicht geklappt.** Bitte das Issue bearbeiten; danach wird erneut geprüft."
+            echo
+            if [ -s "$OUT/fehler.txt" ]; then cat "$OUT/fehler.txt"; else echo "Einzelheiten im [Workflow-Lauf]($RUN)."; fi
+          } > "$RUNNER_TEMP/kommentar.md"
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/kommentar.md"
+
+  anwenden:
+    needs: pruefen
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: veroeffentlichen
+    outputs:
+      pr: ${{ steps.aendern.outputs.pr }}
+    steps:
+      - name: Eingaben prüfen
+        env:
+          REPO: ${{ needs.pruefen.outputs.repo }}
+          MODE: ${{ needs.pruefen.outputs.mode }}
+        run: |
+          [[ "$REPO" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "::error::Ungültiger Repo-Name"; exit 1; }
+          [[ "$MODE" == neu || "$MODE" == aendern ]] || { echo "::error::Ungültiger Modus"; exit 1; }
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: kompanie
+          path: ${{ runner.temp }}/kompanie
+
+      # Neue Repos anlegen darf die App nur mit Zugriff auf die ganze Organisation.
+      - name: Zugang (GitHub App)
+        id: app
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ vars.KOMPANIE_APP_ID }}
+          private-key: ${{ secrets.KOMPANIE_APP_KEY }}
+          owner: Steuten-IT-Solutions
+
+      - name: Repo anlegen
+        if: needs.pruefen.outputs.mode == 'neu'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ needs.pruefen.outputs.repo }}
+          SRC: ${{ runner.temp }}/kompanie
+        run: |
+          gh repo create "$ORG/$REPO" --public --template "$ORG/Kompanie-App-Vorlage" --description "App der Kompanie (Kompanie-App)"
+          # Das Anlegen aus der Vorlage läuft im Hintergrund: warten, bis main da ist.
+          for _ in $(seq 1 30); do git ls-remote --exit-code "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" refs/heads/main > /dev/null 2>&1 && break; sleep 2; done
+          git clone --quiet "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" "$RUNNER_TEMP/repo"
+          cp "$SRC/kompanie.json" "$RUNNER_TEMP/repo/kompanie.json"
+          mkdir -p "$RUNNER_TEMP/repo/assets" && rm -f "$RUNNER_TEMP/repo/assets"/logo.*
+          cp "$SRC"/assets/logo.* "$RUNNER_TEMP/repo/assets/"
+          git -C "$RUNNER_TEMP/repo" add -A
+          git -C "$RUNNER_TEMP/repo" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Kompanie eingerichtet (Formular #${{ github.event.issue.number }})"
+          git -C "$RUNNER_TEMP/repo" push --quiet origin HEAD:main
+          gh repo edit "$ORG/$REPO" --add-topic kompanie-app
+
+      - name: Pull Request mit der Änderung
+        id: aendern
+        if: needs.pruefen.outputs.mode == 'aendern'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ needs.pruefen.outputs.repo }}
+          SRC: ${{ runner.temp }}/kompanie
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          BRANCH="formular-$ISSUE"
+          git clone --quiet "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" "$RUNNER_TEMP/repo"
+          git -C "$RUNNER_TEMP/repo" checkout --quiet -B "$BRANCH"
+          cp "$SRC/kompanie.json" "$RUNNER_TEMP/repo/kompanie.json"
+          if ls "$SRC"/assets/logo.* > /dev/null 2>&1; then
+            mkdir -p "$RUNNER_TEMP/repo/assets" && rm -f "$RUNNER_TEMP/repo/assets"/logo.* && cp "$SRC"/assets/logo.* "$RUNNER_TEMP/repo/assets/"
+          fi
+          git -C "$RUNNER_TEMP/repo" add -A
+          if git -C "$RUNNER_TEMP/repo" diff --cached --quiet; then
+            echo "pr=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git -C "$RUNNER_TEMP/repo" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Änderung aus dem Formular #$ISSUE"
+          git -C "$RUNNER_TEMP/repo" push --quiet --force origin "HEAD:refs/heads/$BRANCH"
+          PR="$(gh pr view "$BRANCH" --repo "$ORG/$REPO" --json url --jq .url 2> /dev/null || true)"
+          if [ -z "$PR" ]; then
+            PR="$(gh pr create --repo "$ORG/$REPO" --head "$BRANCH" --base main --title "Änderung aus dem Formular #$ISSUE" \
+              --body "Aus dem Formular $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/issues/$ISSUE. Vorschau: Ergebnis „vorschau“ der Checks.")"
+          fi
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+
+  veroeffentlichen:
+    needs: [pruefen, anwenden]
+    if: needs.pruefen.outputs.mode == 'neu'
+    uses: ./.github/workflows/publish-kompanie.yml
+    with:
+      repo: Steuten-IT-Solutions/${{ needs.pruefen.outputs.repo }}
+
+  melden:
+    needs: [pruefen, anwenden, veroeffentlichen]
+    if: always() && needs.pruefen.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Ergebnis im Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          MODE: ${{ needs.pruefen.outputs.mode }}
+          REPO: ${{ needs.pruefen.outputs.repo }}
+          PR: ${{ needs.anwenden.outputs.pr }}
+          ANWENDEN: ${{ needs.anwenden.result }}
+          VEROEFFENTLICHEN: ${{ needs.veroeffentlichen.result }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [[ "$REPO" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || exit 1
+          PAGE="https://${ORG,,}.github.io/$REPO/"
+          {
+            if [ "$ANWENDEN" != success ] || { [ "$MODE" = neu ] && [ "$VEROEFFENTLICHEN" != success ]; }; then
+              echo "**Geprüft, aber nicht fertig geworden.** Einzelheiten im [Workflow-Lauf]($RUN)."
+            elif [ "$MODE" = neu ]; then
+              echo "**Fertig.** Repo: https://github.com/$ORG/$REPO"
+              echo
+              echo "Download-Seite (für die Kompanie): $PAGE – erscheint nach wenigen Minuten."
+              echo "Die Version liegt zuerst im Kanal \`early\` bzw. direkt in \`stable\`, wenn der Kern schon geprüft ist."
+            elif [ -n "$PR" ]; then
+              echo "**Pull Request mit der Änderung:** $PR"
+              echo
+              echo "Nach dem Zusammenführen wird die neue Version automatisch veröffentlicht (innerhalb von 30 Minuten)."
+            else
+              echo "Keine Änderung: Die Angaben entsprechen schon dem Stand im Repo."
+            fi
+            echo
+            echo "Vorschau (Bildschirmfotos): Ergebnis „vorschau“ im [Workflow-Lauf]($RUN)."
+          } > "$RUNNER_TEMP/kommentar.md"
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/kommentar.md"
