@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, config, type AdminSettings } from '../api';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
@@ -18,11 +18,17 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
   const [reports, setReports] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const stepRef = useRef<HTMLParagraphElement>(null);
+  // Beim Schrittwechsel den Fokus mitnehmen (Bildschirmleser, Tastatur).
+  useEffect(() => {
+    if (index > 0) stepRef.current?.focus();
+  }, [index]);
 
-  if ((settings.loading && !settings.data) || (status.loading && !status.data)) return <Loading />;
+  if (settings.loading && !settings.data) return <Loading />;
   if (settings.error) return <ErrorBox message={settings.error} onRetry={settings.reload} />;
-  if (status.error) return <ErrorBox message={status.error} onRetry={status.reload} />;
   const s = settings.data!;
+  // Der Zustand wird nur für die Statusmeldungen gebraucht; fehlt er, geht es ohne diese Frage weiter.
+  const reportsAvailable = !!status.data?.statusReports.available;
   const f = config?.features;
 
   const steps: Step[] = ['start'];
@@ -52,7 +58,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
 
   return (
     <div className="settings">
-      <p className="setup-steps small">
+      <p className="setup-steps small" ref={stepRef} tabIndex={-1} aria-live="polite">
         Schritt {steps.indexOf(step) + 1} von {steps.length}
       </p>
       {step === 'start' && (
@@ -72,10 +78,11 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
         <section className="card settings-section">
           <h3>Fast fertig</h3>
           <p className="small">
-            Updates kommen automatisch; vorher wird gesichert. Den Zustand der App, Updates und die Datensicherung findest du unter{' '}
+            Updates kommen automatisch; bei Datenbank-Änderungen werden die Daten vorher gesichert. Den Zustand der App, Updates und
+            die Datensicherung findest du unter{' '}
             <strong>Konto → Einstellungen</strong>.
           </p>
-          {status.data!.statusReports.available && (
+          {reportsAvailable && (
             <label className="toggle">
               <input type="checkbox" checked={reports} onChange={(e) => setReports(e.target.checked)} />
               <span>

@@ -32,12 +32,17 @@ while IFS= read -r repo; do
   # Liste als Datei (kann über 100 KB groß sein, zu groß für ein Argument)
   curl -fsSL --max-time 20 -o "$WORK/list.json" "https://raw.githubusercontent.com/$repo/gh-pages/updates.json" 2> /dev/null || echo '{}' > "$WORK/list.json"
   # Nur die neueste Version zählt (wie updates.php --find): Ein Revert ist ein neuer Stand.
-  if php -r '
+  latest="$(php -r '
     $env = json_decode((string) file_get_contents($argv[1]), true);
     $list = is_array($env) ? json_decode((string) base64_decode((string) ($env["payload"] ?? ""), true), true) : null;
     $e = $list["versions"][0] ?? null;
-    exit(is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] ? 0 : 1);
-  ' "$WORK/list.json" "$sha" "$CODE"; then
+    if (is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && preg_match("/^[0-9.]+$/", (string) $e["version"])) {
+        echo $e["version"];
+    }
+  ' "$WORK/list.json" "$sha" "$CODE")"
+  # Steht der Stand in der Liste, muss sein Release auch öffentlich sein (ein Lauf kann nach dem Eintrag in
+  # die Liste, aber vor dem Veröffentlichen des Entwurfs abgebrochen sein; der nächste Lauf holt das nach).
+  if [ -n "$latest" ] && curl -fsIL --max-time 20 -o /dev/null "https://github.com/$repo/releases/download/v$latest/release.json"; then
     echo "Aktuell: $repo" >&2
   else
     echo "Neu zu veröffentlichen: $repo" >&2

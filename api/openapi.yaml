@@ -819,7 +819,10 @@ paths:
     post:
       tags: [Wartung]
       summary: Eine Version aus der geprüften Liste einspielen
-      description: Vorher wird bei Datenbank-Änderungen automatisch gesichert. Eine neue Hauptversion nur mit `major` true.
+      description: |
+        Vorher wird bei Datenbank-Änderungen und vor einer neuen Hauptversion automatisch gesichert. Eine neue
+        Hauptversion nur mit `major` true. Im Kanal stable nur schon freigegebene Versionen. 409, wenn gerade
+        schon ein Update läuft.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -843,6 +846,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
@@ -873,6 +877,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
@@ -1075,6 +1080,8 @@ components:
         majorVersion: { type: string }
         withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
         fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
+        skipped: { type: boolean, description: 'latest wird nach dem Zurückrollen nicht automatisch eingespielt' }
+        autoAllowed: { type: boolean, description: 'Automatische Updates sind hier erlaubt (WordPress kann sie sperren)' }
         problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }
         versions:
           type: array

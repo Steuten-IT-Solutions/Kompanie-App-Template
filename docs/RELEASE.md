@@ -127,7 +127,13 @@ Version; ihre Statusseite zeigt das rot an. Dann eine korrigierte Version veröf
   zurückpushen). Eine neue Liste wird bewusst nicht angelegt, solange es Releases gibt: Sie begänne mit
   niedrigeren Nummern als die installierten Versionen.
 - **Veröffentlichtes Release ohne Listeneintrag:** von Hand prüfen (Dateien gegen eine Sicherung), dann
-  löschen; der nächste Lauf veröffentlicht unter derselben Nummer neu.
+  Release **und Tag** `v<Version>` löschen (das Tag braucht wegen des Rulesets Ausnahmerechte); der nächste
+  Lauf veröffentlicht unter derselben Nummer neu.
+- **Entwurf eines abgebrochenen Laufs:** nichts zu tun; der nächste Lauf ersetzt ihn oder veröffentlicht ihn
+  (der Abgleich erkennt auch einen Listeneintrag, dessen Release noch nicht öffentlich ist). Freigeben lässt
+  sich ein Entwurf nicht.
+- **Formel von `coreCode` geändert:** Dann entspricht kein Listeneintrag mehr dem aktuellen Stand, und jede
+  Kompanie wird einmal neu veröffentlicht (zuerst `early`). `STABLE_CORE` mit der neuen Prüfsumme eintragen.
 - **Kompanie-Repo nie umbenennen:** Name und Adresse der Update-Liste stehen in jeder Installation.
 - **Zeitplan steht still:** Bei öffentlichen Repos schaltet GitHub „Kompanien abgleichen“ nach 60 Tagen ohne
   Aktivität im Kern-Repo ab. Dann unter *Actions* wieder einschalten; spätestens bei jedem Kern-Release prüfen,

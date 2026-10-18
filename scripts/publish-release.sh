@@ -44,12 +44,35 @@ fetch_pages() {
   fi
 }
 updates() { php "$ROOT/scripts/updates.php" --list="$WORK/site/updates.json" --kompanie="$REPO" "$@"; }
-# Entwurf veröffentlichen (Prerelease, wenn noch nicht für alle freigegeben); schon öffentlich: nichts tun
+# Ist v$1 ein Entwurf? true/false; „none“ nur, wenn es das Release sicher nicht gibt. Bei anderen
+# Fehlern (Netz, API) mehrmals versuchen, sonst abbrechen.
+release_state() {
+  local out
+  for attempt in 1 2 3; do
+    if out="$($GH release view "v$1" --repo "$REPO" --json isDraft --jq .isDraft 2>&1)"; then
+      echo "$out"
+      return 0
+    fi
+    if grep -qi "not found" <<< "$out"; then
+      echo none
+      return 0
+    fi
+    sleep $((attempt * 3))
+  done
+  echo "Release v$1 nicht abfragbar: $out" >&2
+  exit 1
+}
+# Entwurf veröffentlichen (Prerelease, wenn noch nicht für alle freigegeben) und prüfen, dass er öffentlich ist
 publish_release() {
-  local draft
-  draft="$($GH release view "v$1" --repo "$REPO" --json isDraft --jq .isDraft 2> /dev/null || echo none)"
-  if [ "$draft" = true ]; then
+  local state
+  state="$(release_state "$1")"
+  if [ "$state" = true ]; then
     $GH release edit "v$1" --repo "$REPO" --draft=false --prerelease="$([ "$2" = early ] && echo true || echo false)" > /dev/null
+    state="$(release_state "$1")"
+  fi
+  if [ "$state" != false ]; then
+    echo "Release v$1 ist nicht veröffentlicht (Stand: $state)." >&2
+    exit 1
   fi
 }
 # GitHub Pages einschalten, falls noch nicht geschehen (braucht das Recht „Pages“ der App)
@@ -60,7 +83,8 @@ enable_pages() {
 }
 
 fetch_pages
-if [ ! -f "$WORK/site/updates.json" ] && [ -n "$($GH release list --repo "$REPO" --limit 1 2> /dev/null || true)" ]; then
+# (Entwürfe zählen nicht: Ein abgebrochener erster Lauf hinterlässt einen, den der nächste ersetzt.)
+if [ ! -f "$WORK/site/updates.json" ] && [ -n "$($GH release list --repo "$REPO" --exclude-drafts --limit 1)" ]; then
   # Ohne Liste begänne die Nummerierung von vorn, unter den installierten Versionen.
   echo "In $REPO gibt es Releases, aber keine Update-Liste auf gh-pages. Bitte gh-pages wiederherstellen (siehe docs/RELEASE.md)." >&2
   exit 1
@@ -78,13 +102,15 @@ BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}/"
 
 php "$ROOT/scripts/package.php" --config="$CONFIG" --dist="$DIST" --brand="$BRAND/brand.json" --version="$VERSION" \
   --out="$WORK/release" --kompanie="$REPO" --kompanie-commit="$KOMPANIE_SHA" --require-signature "${TRUST[@]}"
+# Branding vor dem Anlegen des Releases prüfen (download-page.php lehnt fremdes theme.css ab).
+php "$ROOT/scripts/download-page.php" --out="$WORK/brand-check" --brand="$BRAND" > /dev/null
 FILES=("$WORK/release/kompanie-app-wordpress.zip" "$WORK/release/kompanie-app-standalone.zip" "$WORK/release/release.json" "$WORK/release/install.php")
 
 # Release als Entwurf. Ein vorhandener Entwurf dieser Nummer stammt von einem abgebrochenen Lauf (nie
 # veröffentlicht, nie in der Liste): ersetzen. Ein veröffentlichtes Release dieser Nummer darf es nicht geben.
-EXISTING="$($GH release view "v$VERSION" --repo "$REPO" --json isDraft --jq .isDraft 2> /dev/null || echo none)"
+EXISTING="$(release_state "$VERSION")"
 if [ "$EXISTING" = true ]; then
-  $GH release delete "v$VERSION" --repo "$REPO" --yes --cleanup-tag
+  $GH release delete "v$VERSION" --repo "$REPO" --yes   # Entwürfe haben noch kein Tag
 elif [ "$EXISTING" != none ]; then
   echo "Release v$VERSION ist schon veröffentlicht, steht aber nicht in der Update-Liste. Bitte prüfen (siehe docs/RELEASE.md)." >&2
   exit 1

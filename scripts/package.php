@@ -24,8 +24,9 @@
  * Mit --require-signature muss der Signaturschlüssel in TrustedKeys stehen, sonst könnten die
  * Installationen keine Updates prüfen, und --kompanie ist Pflicht.
  *
- * release.json enthält coreCode: SHA-256 über alle Programmdateien (Kern, Adapter, Installer) ohne
- * die gebaute Oberfläche. Gleicher Wert = gleicher Programmcode, unabhängig vom Commit.
+ * release.json enthält coreCode (siehe kompanie_code_hash): Prüfsumme über alle versionierten Dateien,
+ * die in die Pakete eingehen, außer den Daten der Kompanie. Gleicher Wert = gleicher Programmcode,
+ * unabhängig vom Commit.
  */
 
 declare(strict_types=1);

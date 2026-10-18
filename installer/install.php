@@ -165,6 +165,9 @@ function ki_stable_entry()
     }
     foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
         if ($stable !== null && $e['version'] === $stable && isset($e['files']['standalone']['url'], $e['files']['standalone']['sha256'])) {
+            if (isset($e['minPhp']) && version_compare(PHP_VERSION, (string) $e['minPhp'], '<')) {
+                throw new RuntimeException('Version ' . $e['version'] . ' braucht PHP ' . $e['minPhp'] . '; hier läuft PHP ' . PHP_VERSION . '. Die PHP-Version lässt sich meist im Kundenmenü des Hosters umstellen.');
+            }
             return $e;
         }
     }
@@ -433,7 +436,7 @@ if (ki_installed()) {
         }
     }
     ki_page('Aktualisieren oder reparieren', ($err !== '' ? '<div class="error">' . ki_h($err) . '</div>' : '')
-        . '<div class="card"><h2>Die App ist hier schon installiert</h2><p>Hier lässt sich die aktuelle Version neu einspielen, z. B. wenn ein automatisches Update nicht klappt oder Dateien beschädigt sind. <strong>Die Daten bleiben erhalten.</strong></p>'
+        . '<div class="card"><h2>Die App ist hier schon installiert</h2><p>Hier lässt sich die aktuelle, für alle freigegebene Version neu einspielen, z. B. wenn ein automatisches Update nicht klappt oder Dateien beschädigt sind. <strong>Die Daten bleiben erhalten.</strong></p>'
         . '<form method="post"><input type="hidden" name="csrf" value="' . ki_h($csrf) . '"><label for="login">Benutzername eines Admins</label><input id="login" name="login" autocomplete="username" required>'
         . '<label for="password">Passwort</label><input id="password" name="password" type="password" autocomplete="current-password" required>'
         . '<button class="btn" type="submit">Aktualisieren / Reparieren</button></form></div>'

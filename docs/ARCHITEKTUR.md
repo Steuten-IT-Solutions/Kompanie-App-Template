@@ -260,7 +260,8 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 | Situation | Was passiert |
 |---|---|
 | Normalfall | automatisch, ohne Zutun |
-| automatische Updates abgeschaltet (von der Kompanie, vom Hoster oder in WordPress gesperrt) | Hinweis für Admins in der App: **„Jetzt aktualisieren“**, ein Klick |
+| automatische Updates abgeschaltet (von der Kompanie, `AUTOMATIC_UPDATER_DISABLED` oder Filter `auto_update_plugin` in WordPress) | Hinweis für Admins in der App: **„Jetzt aktualisieren“**, ein Klick |
+| Plugin-Änderungen in WordPress ganz gesperrt (`DISALLOW_FILE_MODS`) | kein Update über die App; Hinweis, das Update von Hand einspielen zu lassen |
 | WordPress verlangt FTP-Zugangsdaten zum Schreiben | Hinweis mit Erklärung; als Ausweg die Plugin-Datei über *Plugin hochladen* ersetzen |
 | Server erfüllt die Voraussetzungen der neuen Version nicht (z. B. PHP zu alt) | Update wird **nicht** eingespielt, die App läuft weiter. Admins sehen in Alltagssprache, was beim Hoster umzustellen ist (Anleitungen je Hoster: später) |
 | Update scheitert mittendrin | automatische Rückkehr zur vorigen Version (eigenständig: Dateitausch mit Rücktausch; WordPress: Upgrader mit Sicherung des Plugin-Ordners, ab WordPress 6.3), Hinweis für Admins |
@@ -276,11 +277,11 @@ Jede Kompanie kann in der App unter *Einstellungen → Updates* auf eine **älte
 - **Innerhalb einer Hauptversion ändern Migrationen nur additiv:** neue Tabellen oder Spalten, nie Umbenennen oder Löschen. Ältere `1.x`-Versionen laufen deshalb auch mit dem neueren Datenbestand. Zurückrollen heißt nur, den Programmcode zu tauschen. (Geplant: Die CI prüft das, indem die Contract-Tests der vorigen Version gegen den Datenbestand der neuen laufen.)
 - Ältere Versionen lädt der Server bei Bedarf über die signierte Update-Liste nach (sie behält die letzten 60 Versionen und die zuletzt freigegebenen).
 - Nach dem Zurückrollen **überspringt** das automatische Update diese Version, bis eine neuere erscheint.
-- **Über eine Hauptversion zurück** geht nur mit der Sicherung, die vor dem Update automatisch angelegt wurde. Die App sagt deutlich, dass Einträge seit dem Update dann verloren gehen.
+- **Über eine Hauptversion zurück** geht nicht per Klick. Vor einer neuen Hauptversion sichert die App die Daten immer; mit dieser Sicherung und dem Paket der alten Version stellen wir den Stand bei Bedarf von Hand wieder her (Einträge seit dem Update gehen dabei verloren). Ein geführter Weg in der App ist geplant.
 
 ### Sicherung
 
-- Vor jedem Update mit Migrationen: automatische Sicherung im Export-Format.
+- Vor jedem Update mit Migrationen und vor jeder neuen Hauptversion: automatische Sicherung im Export-Format (die letzten fünf, im geschützten Datenbereich).
 - Admins können jederzeit **„Datensicherung herunterladen“** und eine Sicherung wieder einspielen.
 - Die App erinnert Admins regelmäßig an eine Sicherung, wenn länger keine heruntergeladen wurde.
 

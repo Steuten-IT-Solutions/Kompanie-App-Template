@@ -304,6 +304,20 @@ try {
     } catch (RuntimeException) {
         $c->ok(true, 'Fremde Datei wird abgelehnt');
     }
+    // Über die API, wie in der App: herunterladen, Daten ändern, wiederherstellen
+    $d->forgetSessions(); // der Import oben hat alle Sitzungen beendet
+    $d->actAs($anna);
+    [$s, $dl] = $d->request('GET', '/admin/backup');
+    $c->ok($s === 200 && ($dl['format'] ?? '') === 'kompanie-app-backup' && !isset($dl['settings']['update_state']), 'GET /admin/backup liefert die Sicherung (ohne Update-Zustand)');
+    $d->request('DELETE', '/events/' . (int) $kernel->db()->scalar("SELECT id FROM {events} WHERE title = 'Sicherungstest'"));
+    $c->ok($d->request('POST', '/admin/backup', ['backup' => json_encode($dl)])[0] === 400, 'Wiederherstellen ohne Bestätigung → 400');
+    $d->actAs($max);
+    $c->ok($d->request('POST', '/admin/backup', ['backup' => json_encode($dl), 'confirm' => true])[0] === 403, 'Mitglied darf nicht wiederherstellen');
+    $d->actAs($anna);
+    [$s, $r] = $d->request('POST', '/admin/backup', ['backup' => json_encode($dl), 'confirm' => true]);
+    $c->ok($s === 200 && ($r['restored'] ?? false) === true, 'POST /admin/backup stellt wieder her');
+    $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Gelöschter Termin ist nach dem Wiederherstellen über die API wieder da');
+    $d->forgetSessions();
 
     $c->section('Schöne Adressen (URL-Umschreibung)');
     $cfg = Config::load($data)->toArray();

@@ -52,7 +52,8 @@ final class StatusService
             return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen, aber es gibt noch keine geprüfte Version, auf die die Installation wechseln kann. Bitte bei den Betreuern der App melden.");
         }
         if ($s['withdrawn']) {
-            return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen. Die Installation wechselt beim nächsten Abgleich automatisch zurück; das geht auch sofort unter Einstellungen → Updates.");
+            return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen. "
+                . ($s['autoAllowed'] ? "Die Installation wechselt beim nächsten Abgleich automatisch auf Version {$s['fallback']}; das geht auch sofort unter Einstellungen → Updates." : "Bitte unter Einstellungen → Updates auf Version {$s['fallback']} wechseln (automatische Updates sind hier gesperrt)."));
         }
         if ($last && !$last['ok'] && ($last['at'] ?? 0) >= ($s['checked_at'] ?? 0) - 86400 * 2) {
             return $this->item('updates', 'Updates', 'error', 'Das letzte Update hat nicht geklappt: ' . $last['error'] . ' Die bisherige Version läuft weiter.');
@@ -65,6 +66,12 @@ final class StatusService
         }
         if ($s['major']) {
             return $this->item('updates', 'Updates', 'warn', "Eine neue Hauptversion ({$s['latest']}) ist da. Sie wird nicht automatisch eingespielt; bitte unter Einstellungen → Updates bestätigen.");
+        }
+        if ($s['available'] && $s['skipped']) {
+            return $this->item('updates', 'Updates', 'ok', "Version {$s['current']} läuft (zurückgerollt). Version {$s['latest']} wird nicht automatisch eingespielt; von Hand geht es unter Einstellungen → Updates.");
+        }
+        if ($s['available'] && !$s['autoAllowed']) {
+            return $this->item('updates', 'Updates', 'warn', "Version {$s['latest']} ist da. Automatische Updates sind hier gesperrt (z. B. in WordPress); bitte unter Einstellungen → Updates aktualisieren.");
         }
         if ($s['available']) {
             return $this->item('updates', 'Updates', 'warn', $s['auto']

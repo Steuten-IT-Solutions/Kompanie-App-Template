@@ -79,7 +79,8 @@ final class Plugin
         // Erst auf init: Dann hat auch das Theme seine Filter (z. B. upload_dir) gesetzt.
         add_action('init', [self::class, 'upgrade'], 1);
         add_action('rest_api_init', static fn () => RestBridge::register(self::app()));
-        add_action(WpScheduler::HOOK, static fn (string $task) => self::app()->runTask($task));
+        // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
+        add_action(WpScheduler::HOOK, static fn (string $task) => WpUpdateTarget::$installed ? null : self::app()->runTask($task));
         add_action('init', static fn () => self::app()->scheduleTasks(), 20);
         Session::init();
         AppPage::init();

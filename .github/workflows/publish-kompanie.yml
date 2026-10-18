@@ -117,6 +117,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: veroeffentlichen
+    # Zusätzlich zur Gruppe des Workflows: Nie zwei Veröffentlichungen derselben Kompanie gleichzeitig
+    # (sonst könnten beide dieselbe Versionsnummer vergeben).
+    concurrency:
+      group: kompanie-publish-job-${{ inputs.repo }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:

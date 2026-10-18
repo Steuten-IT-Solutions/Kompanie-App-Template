@@ -32,7 +32,9 @@ final class UpdateServiceTest extends TestCase
     /** @var array<int, array{0: string, 1: string}> */
     public array $installed = [];
     public bool $failInstall = false;
+    public bool $autoAllowed = true;
     public array $backups = [];
+    private string $dir = '';
 
     protected function setUp(): void
     {
@@ -42,6 +44,7 @@ final class UpdateServiceTest extends TestCase
         $this->keyId = SignedEnvelope::keyId($public);
         $this->trusted = [$this->keyId => base64_encode($public)];
         $this->settings = new MemorySettings(['schema_version' => 2]);
+        $this->dir = sys_get_temp_dir() . '/kompanie-upd-' . bin2hex(random_bytes(4));
         $this->http = new FakeHttpClient(function (string $m, string $url): array {
             if (str_ends_with($url, 'updates.json')) {
                 return ['status' => 200, 'body' => $this->listJson];
@@ -92,6 +95,11 @@ final class UpdateServiceTest extends TestCase
                 return [];
             }
 
+            public function autoUpdateAllowed(): bool
+            {
+                return $this->t->autoAllowed;
+            }
+
             public function install(string $zipFile, string $version): void
             {
                 if ($this->t->failInstall) {
@@ -120,7 +128,7 @@ final class UpdateServiceTest extends TestCase
                 return true;
             }
         };
-        $dir = sys_get_temp_dir() . '/kompanie-upd-' . bin2hex(random_bytes(4));
+        $dir = $this->dir;
         return new UpdateService($this->settings, $this->http, new LocalFileStorage("$dir/p", 'https://x/', "$dir/i", ''), new Time(new FixedClock()), $current, $target, $backup,
             ['updatesUrl' => 'https://org.github.io/k/updates.json', 'trustedKeys' => $this->trusted, 'kompanie' => 'org/k']);
     }
@@ -160,7 +168,7 @@ final class UpdateServiceTest extends TestCase
         // Zurückrollen: die verlassene Version wird übersprungen, bis eine neuere kommt.
         $s->setAuto(true);
         $this->settings->set('update_channel', 'stable');
-        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.1', '1.0.0.2']);
         $s2 = $this->service('1.0.0.2');
         $s2->check();
         $s2->rollback('1.0.0.1');
@@ -231,12 +239,64 @@ final class UpdateServiceTest extends TestCase
 
     public function testBackupOnlyBeforeSchemaChanges(): void
     {
-        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.2'], [], ['1.0.0.3' => ['schema' => 3]]);
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.2', '1.0.0.3'], [], ['1.0.0.3' => ['schema' => 3]]);
         $s = $this->service('1.0.0.1');
         $s->install('1.0.0.2');
         $this->assertSame([], $this->backups, 'gleiche Datenbank: keine Sicherung nötig');
         $s->install('1.0.0.3');
         $this->assertCount(1, $this->backups, 'neue Migration: vorher sichern');
+    }
+
+    public function testBackupsKeepTheNewest(): void
+    {
+        // Versionen 1.0.0.5 … 1.0.0.12: als Text sortiert käme 1.0.0.10 vor 1.0.0.9.
+        $versions = array_map(static fn (int $i): string => "1.0.0.$i", range(5, 12));
+        $extra = [];
+        foreach ($versions as $i => $v) {
+            $extra[$v] = ['schema' => 3 + $i];
+        }
+        $this->publish($versions, $versions, [], $extra);
+        foreach (array_slice($versions, 0, -1) as $i => $from) {
+            $s = $this->service($from);
+            $this->settings->set('schema_version', 2 + $i);
+            $s->install($versions[$i + 1]); // die Testuhr steht: alle in derselben Sekunde
+        }
+        $files = glob($this->dir . '/i/sicherungen/vor-update-*.json') ?: [];
+        $this->assertCount(5, $files, 'die letzten 5');
+        $names = implode(' ', array_map('basename', $files));
+        $this->assertStringContainsString('-1.0.0.11-', $names, 'die neueste Sicherung bleibt');
+        $this->assertStringContainsString('-1.0.0.10-', $names);
+        $this->assertFileExists($this->dir . '/i/sicherungen/index.html');
+    }
+
+    public function testStableOnlyLockAndSkippedStatus(): void
+    {
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.1', '1.0.0.3']);
+        $s = $this->service('1.0.0.3');
+        $s->check();
+        $this->assertSame(['1.0.0.1'], array_column($s->status()['versions'], 'version'), 'stable: nur schon freigegebene zum Zurückrollen');
+        $this->assertThrows(fn () => $s->install('1.0.0.2'), 'noch nicht für alle freigegeben');
+
+        // Nach dem Zurückrollen zeigt der Status die übersprungene Version an
+        $s->rollback('1.0.0.1');
+        $s1 = $this->service('1.0.0.1');
+        $this->assertTrue($s1->status()['skipped']);
+
+        // Automatische Updates gesperrt (z. B. in WordPress): nichts automatisch, auch kein Rückzug
+        $this->autoAllowed = false;
+        $this->settings->delete('update_skip');
+        $n = count($this->installed);
+        $s1->runTask();
+        $this->assertCount($n, $this->installed);
+        $this->assertFalse($s1->status()['autoAllowed']);
+
+        // Ein Update zur selben Zeit: 409
+        $lock = fopen($this->dir . '/i/sicherungen/update.lock', 'c');
+        flock($lock, LOCK_EX);
+        $this->assertThrows(fn () => $s1->install('1.0.0.3'), 'schon ein Update');
+        flock($lock, LOCK_UN);
+        $s1->install('1.0.0.3');
+        $this->assertSame('1.0.0.3', end($this->installed)[0]);
     }
 
     private function assertThrows(callable $fn, string $message): void

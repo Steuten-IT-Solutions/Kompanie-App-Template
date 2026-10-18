@@ -19,7 +19,7 @@ use KompanieApp\Core\Storage\Sql\Migrator;
 final class WpBackup implements BackupProvider
 {
     /** Gehören zur Installation, nicht zu den Daten. */
-    private const SKIP_SETTINGS = [Migrator::SETTING, 'roles_version', 'update_state', 'update_last'];
+    private const SKIP_SETTINGS = [...Backup::LOCAL_SETTINGS, 'roles_version'];
 
     public function __construct(private readonly Connection $db, private readonly string $version, private readonly string $kompanie)
     {
@@ -61,17 +61,19 @@ final class WpBackup implements BackupProvider
             throw new \RuntimeException('Die Sicherung stammt von einer anderen Website. Die Daten verweisen auf deren WordPress-Benutzer und lassen sich hier nicht wiederherstellen.');
         }
         $settings = is_array($data['settings'] ?? null) ? $data['settings'] : [];
-        $this->db->transaction(function () use ($data, $settings): void {
+        $this->db->transaction(function () use ($data): void {
             (new Backup($this->db))->restore($data['tables'], Backup::CORE_TABLES);
             // Bilddateien sind nicht in der Sicherung: alle neu aufbereiten.
             $this->db->execute('UPDATE {photos} SET status = ?', [GalleryRepository::PENDING]);
-            $wp = new WpSettings();
-            foreach ($settings as $key => $value) {
-                if (is_string($key) && preg_match('/^[a-z0-9_]{1,100}$/', $key) && self::isData($key)) {
-                    $wp->set($key, $value);
-                }
-            }
         });
+        // Einstellungen erst nach der Transaktion: update_option schreibt auch in den Objekt-Cache,
+        // der ein Zurückrollen der Transaktion nicht mitbekäme.
+        $wp = new WpSettings();
+        foreach ($settings as $key => $value) {
+            if (is_string($key) && preg_match('/^[a-z0-9_]{1,100}$/', $key) && self::isData($key)) {
+                $wp->set($key, $value);
+            }
+        }
     }
 
     /** @return string[] Namen der Einstellungen ohne Präfix */

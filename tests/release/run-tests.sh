@@ -95,8 +95,8 @@ cat > "$T/gh" <<'GH'
 # Attrappe der GitHub-CLI: merkt sich Releases als Ordner (DRAFT/PRERELEASE als Markierungsdateien)
 D="$(dirname "$0")/releases"; mkdir -p "$D"
 case "$1 $2" in
-  "release view") [ -d "$D/$3" ] || exit 1; [ -f "$D/$3/DRAFT" ] && echo true || echo false ;;
-  "release list") ls "$D" | grep -v '\.FEHLER$' || true ;;
+  "release view") [ -d "$D/$3" ] || { echo "release not found" >&2; exit 1; }; [ -f "$D/$3/DRAFT" ] && echo true || echo false ;;
+  "release list") for r in "$D"/*/; do [ -d "$r" ] || continue; case "$*" in *--exclude-drafts*) [ -f "$r/DRAFT" ] && continue ;; esac; basename "$r"; done ;;
   "release delete") [ -f "$D/$3/DRAFT" ] || { echo "veröffentlicht gelöscht: $3" > "$D/$3.FEHLER"; exit 1; }; rm -rf "${D:?}/$3" ;;
   "release create") TAG="$3"; shift 3; mkdir -p "$D/$TAG"; for a in "$@"; do [ -f "$a" ] && cp "$a" "$D/$TAG/"; [ "$a" = --draft ] && touch "$D/$TAG/DRAFT"; [ "$a" = --prerelease ] && touch "$D/$TAG/PRERELEASE"; done; true ;;
   "release edit") case "$*" in *--prerelease=true*) touch "$D/$3/PRERELEASE" ;; *--prerelease=false*) rm -f "$D/$3/PRERELEASE" ;; esac
@@ -155,6 +155,10 @@ git --git-dir="$T/remote.git" fetch --quiet "$T/remote-sicherung.git" gh-pages:g
 env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > /dev/null && [ ! -f "$T/releases/v$CORE.2/PRERELEASE" ] && ok "Freigeben über control-release.sh (Release kein Vorab-Release mehr)" || fail "Freigeben"
 pages
 grep -q "releases/download/v$CORE.2/kompanie-app-wordpress.zip" "$T/pages/index.html" && ok "Download-Seite nach der Freigabe" || fail "Download-Seite nach Freigabe"
+mkdir -p "$T/releases/v$CORE.99" && touch "$T/releases/v$CORE.99/DRAFT"
+if env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.99" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > "$T/draft.log" 2>&1; then fail "Entwurf freigegeben"; fi
+grep -q "nicht veröffentlicht" "$T/draft.log" && ok "Ein Entwurf lässt sich nicht freigeben" || fail "Entwurf: $(cat "$T/draft.log")"
+rm -rf "$T/releases/v$CORE.99"
 if env REPO=org/kompanie-test ACTION=boese VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null 2>&1; then fail "Unbekannte Aktion angenommen"; else ok "Unbekannte Aktion abgelehnt"; fi
 
 # Neuer Stand der Kompanie bei gleichem Programmcode wie stable: direkt stable, kein Vorab-Release

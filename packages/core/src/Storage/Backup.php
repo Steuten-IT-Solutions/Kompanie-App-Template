@@ -21,6 +21,12 @@ final class Backup
 {
     public const FORMAT = 'kompanie-app-backup';
     public const FORMAT_VERSION = 1;
+    /**
+     * Einstellungen, die zur Installation gehören, nicht zu den Daten: Sie werden weder gesichert noch
+     * wiederhergestellt (Schema-Stand, Update-Zustand mit der laufenden Nummer der Liste, übersprungene
+     * Version, Einrichtung abgeschlossen, Zeitpunkt der letzten Sicherung).
+     */
+    public const LOCAL_SETTINGS = ['schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last'];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
     public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos'];
 

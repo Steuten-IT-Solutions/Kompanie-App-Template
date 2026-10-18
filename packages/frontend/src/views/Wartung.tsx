@@ -14,7 +14,8 @@ export default function Wartung({ onToast }: { onToast: (msg: string) => void })
   return (
     <>
       <StatusCard status={s} />
-      <Updates status={s} onChanged={reload} onToast={onToast} />
+      {/* key: nach dem Neuladen mit dem neuen Stand neu aufbauen */}
+      <Updates key={JSON.stringify([s.updates, s.statusReports.enabled])} status={s} onChanged={reload} onToast={onToast} />
       <Datensicherung onToast={onToast} onChanged={reload} />
     </>
   );
@@ -128,6 +129,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             <>
               <p className="small">
                 Neue Version: <strong>{u.latest}</strong>
+                {u.skipped && ' – wird nach dem Zurückrollen nicht automatisch eingespielt, nur mit diesem Knopf.'}
               </p>
               {u.problems.map((p) => (
                 <p key={p} className="form-error small">
@@ -145,7 +147,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             <div className="small">
               <p>
                 Neue Hauptversion <strong>{u.majorVersion}</strong> verfügbar. Sie wird nicht automatisch eingespielt; vorher bitte die
-                Hinweise zur Version lesen. Vor dem Update wird automatisch gesichert.
+                Hinweise zur Version lesen. Vor dem Update werden die Daten automatisch gesichert. Zurück auf die bisherige
+                Hauptversion geht es danach nicht per Klick, sondern nur mit unserer Hilfe.
               </p>
               <button
                 type="button"
@@ -174,6 +177,12 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             />
             <span>Updates automatisch einspielen (empfohlen)</span>
           </label>
+          {!u.autoAllowed && (
+            <p className="muted small">
+              Automatische Updates sind in dieser Installation gesperrt (z. B. in den Einstellungen von WordPress). Neue Versionen
+              bitte hier von Hand einspielen.
+            </p>
+          )}
           {olderVersions.length > 0 && (
             <details className="small">
               <summary>Auf eine ältere Version zurück</summary>
@@ -303,8 +312,9 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       <h3 id="backup-title">Datensicherung</h3>
       <p className="muted small">
         Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis und Einstellungen
-        {config?.variant === 'standalone' ? ', die Konten (Passwörter nur als nicht umkehrbare Prüfwerte)' : ''} und Zugangsschlüssel. Bitte sicher
-        aufbewahren. Vor Updates mit Datenbank-Änderungen sichert die App automatisch.
+        {config?.variant === 'standalone' ? ', die Konten (Passwörter als Prüfwerte, aus denen sich einfache Passwörter erraten lassen)' : ''} und
+        Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen sichert die App
+        automatisch.
       </p>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>

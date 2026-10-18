@@ -356,6 +356,10 @@ export interface UpdateStatus {
   withdrawn: boolean;
   /** Bei zurückgezogener Version: Ziel des automatischen Wechsels (null = keins da). */
   fallback: string | null;
+  /** Nach dem Zurückrollen: latest wird nicht automatisch eingespielt. */
+  skipped: boolean;
+  /** Automatische Updates sind hier erlaubt (WordPress kann sie sperren). */
+  autoAllowed: boolean;
   problems: string[];
   versions: { version: string; published: string }[];
   last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;

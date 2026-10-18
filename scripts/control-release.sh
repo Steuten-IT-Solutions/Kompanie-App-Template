@@ -13,6 +13,18 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REMOTE="${GIT_REMOTE:-https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+GH="${GH:-gh}"
+# Freigeben nur, was öffentlich ist (kein Entwurf eines abgebrochenen Laufs)
+if [ "$ACTION" = promote ] && [ "$($GH release view "v$VERSION" --repo "$REPO" --json isDraft --jq .isDraft)" != false ]; then
+  echo "Release v$VERSION ist nicht veröffentlicht (Entwurf?). Erst „Kompanie veröffentlichen“ erneut laufen lassen." >&2
+  exit 1
+fi
+mark_release() {
+  # Freigegeben: Das Release ist kein Vorab-Release mehr (Kennzeichnung auf GitHub; maßgeblich ist die Liste).
+  if [ "$ACTION" = promote ]; then
+    $GH release edit "v$VERSION" --repo "$REPO" --prerelease=false > /dev/null 2>&1 || echo "Hinweis: Kennzeichnung des Releases nicht geändert." >&2
+  fi
+}
 for attempt in 1 2 3 4 5; do
   rm -rf "$WORK/site"
   git clone --quiet --depth 1 --branch gh-pages "$REMOTE" "$WORK/site"
@@ -21,15 +33,13 @@ for attempt in 1 2 3 4 5; do
   git -C "$WORK/site" add -A
   if git -C "$WORK/site" diff --cached --quiet; then
     echo "Keine Änderung nötig."
+    mark_release
     exit 0
   fi
   git -C "$WORK/site" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
     commit --quiet -m "$ACTION $VERSION"
   if git -C "$WORK/site" push --quiet origin HEAD:refs/heads/gh-pages; then
-    # Freigegeben: Das Release ist kein Vorab-Release mehr (Kennzeichnung auf GitHub; maßgeblich ist die Liste).
-    if [ "$ACTION" = promote ]; then
-      ${GH:-gh} release edit "v$VERSION" --repo "$REPO" --prerelease=false > /dev/null 2>&1 || echo "Hinweis: Kennzeichnung des Releases nicht geändert." >&2
-    fi
+    mark_release
     exit 0
   fi
   sleep $((attempt * 3))

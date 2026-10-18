@@ -23,6 +23,12 @@ interface UpdateTarget
     public function problems(array $entry): array;
 
     /**
+     * Ob automatische Updates hier erlaubt sind (WordPress: z. B. AUTOMATIC_UPDATER_DISABLED oder ein
+     * Filter des Admins). Von Hand bleibt ein Update möglich, sofern problems() leer ist.
+     */
+    public function autoUpdateAllowed(): bool;
+
+    /**
      * Spielt das Paket ein. Scheitert das mittendrin, muss der vorige Stand wiederhergestellt sein.
      *
      * @throws \RuntimeException mit verständlicher Meldung

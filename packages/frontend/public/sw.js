@@ -2,11 +2,14 @@
  *
  * - Programmdateien (Hash-Dateinamen) → zuerst aus dem Speicher.
  * - App-Seite und API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version.
+ * - Verwaltung für Admins (/admin/…) und Antworten mit „Cache-Control: no-store“ (z. B. die
+ *   Datensicherung) → nie speichern.
  * Wo API und Programmdateien liegen, steht in den Parametern ?api=…&assets=…
  * Beim Abmelden löscht die App alle Speicher.
  */
 const STATIC_CACHE = 'kompanie-static-v2';
-const DATA_CACHE = 'kompanie-data-v1';
+// v2: v1 konnte Antworten von /admin/ enthalten (z. B. eine Datensicherung); beim Aktivieren gelöscht.
+const DATA_CACHE = 'kompanie-data-v2';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
@@ -31,8 +34,19 @@ function isApi(url) {
   return API !== '' && url.href.startsWith(API);
 }
 
+function isAdmin(url) {
+  // Auch in der Form index.php?r=/api/v1/admin/… (Adresse ggf. kodiert)
+  let href = url.href;
+  try {
+    href = decodeURIComponent(href);
+  } catch {
+    // unvollständig kodiert: wie angegeben prüfen
+  }
+  return href.includes('/admin/');
+}
+
 function cacheable(res) {
-  return res && res.ok && !res.redirected && res.type === 'basic';
+  return res && res.ok && !res.redirected && res.type === 'basic' && !/no-store/i.test(res.headers.get('Cache-Control') || '');
 }
 
 async function cacheFirst(request) {
@@ -71,7 +85,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === 'navigate' && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {
     event.respondWith(networkFirst(request, self.registration.scope));
-  } else if (isApi(url)) {
+  } else if (isApi(url) && !isAdmin(url)) {
     event.respondWith(networkFirst(request));
   }
 });

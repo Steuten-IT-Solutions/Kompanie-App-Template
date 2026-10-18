@@ -120,6 +120,12 @@ final class HttpDriver implements ApiDriver
         $this->as = $userId;
     }
 
+    /** Nach dem Wiederherstellen einer Sicherung gibt es keine Sitzungen mehr. */
+    public function forgetSessions(): void
+    {
+        $this->tokens = [];
+    }
+
     /** Sitzungsschlüssel eines Benutzers (legt bei Bedarf eine Sitzung an). */
     public function token(int $userId): string
     {

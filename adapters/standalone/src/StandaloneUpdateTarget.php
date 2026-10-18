@@ -30,6 +30,11 @@ final class StandaloneUpdateTarget implements UpdateTarget
         return 'standalone';
     }
 
+    public function autoUpdateAllowed(): bool
+    {
+        return true;
+    }
+
     public function problems(array $entry): array
     {
         $problems = [];

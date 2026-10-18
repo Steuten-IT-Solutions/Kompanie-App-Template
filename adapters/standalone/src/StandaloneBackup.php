@@ -18,7 +18,7 @@ final class StandaloneBackup implements BackupProvider
 {
     public const TABLES = [...Backup::CORE_TABLES, 'users'];
     /** Gehören zur Installation, nicht zu den Daten. */
-    private const SKIP_SETTINGS = [Migrator::SETTING, Migrations::SETTING];
+    private const SKIP_SETTINGS = [...Backup::LOCAL_SETTINGS, Migrations::SETTING];
 
     public function __construct(private readonly Kernel $kernel)
     {

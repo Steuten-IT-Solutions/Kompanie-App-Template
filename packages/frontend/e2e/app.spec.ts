@@ -433,6 +433,7 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   // Die Test-Instanz ist kein Paket aus einem Release: keine Updates über die App.
   await expect(page.getByText(/bekommt keine Updates über die App/)).toBeVisible();
 
+  await expect(status.locator('.status-item.status-warn', { hasText: 'Datensicherung' })).toBeVisible();
   const backup = page.locator('.settings-section', { hasText: 'Datensicherung' });
   const [download] = await Promise.all([page.waitForEvent('download'), backup.getByRole('button', { name: 'Sicherung herunterladen' }).click()]);
   expect(download.suggestedFilename()).toMatch(/^sicherung-\d{4}-\d{2}-\d{2}\.json$/);
@@ -440,17 +441,27 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   expect(data.format).toBe('kompanie-app-backup');
   expect(data.variant).toBe(STANDALONE ? 'standalone' : 'wordpress');
   expect(Object.keys(data.tables)).toContain('events');
-  // Nach dem Herunterladen wird die Ampel für die Sicherung grün.
+  // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
 });
 
-test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein (nur eigenständige Version)', async ({ page }) => {
-  test.skip(!STANDALONE, 'Die Test-Instanz von WordPress hat keine Attrappen für Kalender, Drive und Feed.');
+test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
+  if (!STANDALONE) {
+    // WordPress: Neuigkeiten kommen aus den Beiträgen (kein Abschnitt); Kalender und Galerie sind einstellbar.
+    // Die Test-Instanz hat keine Attrappen für Google, deshalb nur Speichern und Prüfen der Eingabe.
+    await expect(page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' })).toBeVisible();
+    await expect(page.locator('.settings-section h3', { hasText: /^Neuigkeiten$/ })).toHaveCount(0);
+    const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
+    await cal.locator('input[type=url]').fill('ftp://falsch');
+    await cal.getByRole('button', { name: 'Speichern' }).click();
+    await expect(cal.locator('.form-error')).toBeVisible();
+    return;
+  }
   await expect(page.getByText('✓ Eingerichtet über die geheime iCal-Adresse.')).toBeVisible();
   await expect(page.getByText('https://kalender.test')).toHaveCount(0); // geheime Adresse wird nicht angezeigt
 

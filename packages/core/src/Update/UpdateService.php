@@ -121,6 +121,8 @@ final class UpdateService
             'major' => false,
             'withdrawn' => false,
             'fallback' => null,
+            'skipped' => false,
+            'autoAllowed' => $this->target?->autoUpdateAllowed() ?? false,
             'problems' => [],
             'versions' => [],
             'last' => $this->settings->get(self::LAST),
@@ -140,6 +142,8 @@ final class UpdateService
             $out['latest'] = $latest;
             $out['available'] = true;
             $out['problems'] = $this->problems((array) $list->entry($latest));
+            // Nach dem Zurückrollen wird diese Version beim automatischen Update übersprungen.
+            $out['skipped'] = $this->skipped($latest);
         }
         $head = $list->channel($this->channel());
         if ($head !== null && Version::major($head) > Version::major($this->currentVersion)) {
@@ -148,7 +152,8 @@ final class UpdateService
             $out['majorVersion'] = $head;
         }
         foreach ($list->available() as $e) {
-            if (Version::major($e['version']) === Version::major($this->currentVersion) && $e['version'] !== $this->currentVersion) {
+            if (Version::major($e['version']) === Version::major($this->currentVersion) && $e['version'] !== $this->currentVersion
+                && ($this->channel() === 'early' || $list->wasStable($e['version']))) {
                 $out['versions'][] = ['version' => $e['version'], 'published' => $e['published'] ?? ''];
             }
         }
@@ -166,14 +171,15 @@ final class UpdateService
         if ($target === null || $target === $this->currentVersion) {
             return;
         }
+        if (!$this->target->autoUpdateAllowed()) {
+            return; // z. B. in WordPress gesperrt; die Statusseite zeigt verfügbare Versionen trotzdem an
+        }
         if ($list->isWithdrawn($this->currentVersion)) {
             // Zurückgezogen: auf die neueste geprüfte Version derselben Hauptversion, auch wenn sie älter ist.
             $this->install($target, 'withdrawn');
             return;
         }
-        $skip = (string) $this->settings->get(self::SKIP, '');
-        if (!$this->auto() || Version::compare($target, $this->currentVersion) <= 0
-            || ($skip !== '' && Version::valid($skip) && Version::compare($target, $skip) <= 0)
+        if (!$this->auto() || Version::compare($target, $this->currentVersion) <= 0 || $this->skipped($target)
             || $this->problems((array) $list->entry($target)) !== []) {
             return;
         }
@@ -199,6 +205,9 @@ final class UpdateService
         if ($entry === null || $list->isWithdrawn($version)) {
             throw ApiError::invalid("Version $version ist nicht verfügbar.");
         }
+        if ($this->channel() === 'stable' && !$list->wasStable($version)) {
+            throw ApiError::invalid("Version $version ist noch nicht für alle freigegeben.");
+        }
         if (Version::major($version) > Version::major($this->currentVersion) && !$allowMajor) {
             throw ApiError::invalid('Eine neue Hauptversion wird nur auf ausdrückliche Bestätigung eingespielt.');
         }
@@ -216,20 +225,31 @@ final class UpdateService
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
+        // Nur ein Update zur selben Zeit (täglicher Abgleich, zwei Admins, erneuter Klick nach einer
+        // Zeitüberschreitung). flock gibt die Sperre auch frei, wenn der Prozess abbricht.
+        $lock = @fopen($this->files->path('sicherungen/update.lock', false), 'c');
+        if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+            throw new ApiError(409, 'update_running', 'Gerade läuft schon ein Update. Bitte in ein paar Minuten den Zustand neu laden.');
+        }
+        // Klassen, die nach dem Austausch der Dateien noch gebraucht werden, vorher laden.
+        class_exists(ApiError::class);
+        class_exists(Version::class);
         $record = ['from' => $this->currentVersion, 'to' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'ok' => false, 'error' => ''];
         try {
             $zip = $this->download($file);
             try {
-                $this->backupBefore($entry);
+                $this->backupBefore($entry, Version::major($version) > Version::major($this->currentVersion));
                 $this->target->install($zip, $version);
             } finally {
                 @unlink($zip);
             }
         } catch (\RuntimeException $e) {
+            flock($lock, LOCK_UN);
             $record['error'] = $e->getMessage();
             $this->settings->set(self::LAST, $record);
             throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
         }
+        flock($lock, LOCK_UN);
         $record['ok'] = true;
         $this->settings->set(self::LAST, $record);
         if ($kind === 'rollback') {
@@ -284,22 +304,42 @@ final class UpdateService
         return $path;
     }
 
-    /** Vor Updates mit Datenbank-Änderungen automatisch sichern (geschützter Bereich, die letzten 5). */
-    private function backupBefore(array $entry): void
+    /**
+     * Vor Updates mit Datenbank-Änderungen und vor einer neuen Hauptversion automatisch sichern
+     * (geschützter Bereich, die letzten 5).
+     */
+    private function backupBefore(array $entry, bool $newMajor): void
     {
         if ($this->backup === null) {
             return;
         }
         $schema = (array) ($entry['schema'] ?? []);
-        $changes = (int) ($schema['core'] ?? 0) > (int) $this->settings->get('schema_version', 0)
+        $changes = $newMajor || (int) ($schema['core'] ?? 0) > (int) $this->settings->get('schema_version', 0)
             || ($this->target->variant() === 'standalone' && (int) ($schema['standalone'] ?? 0) > (int) $this->settings->get('standalone_schema_version', 0));
         if (!$changes) {
             return;
         }
-        // Zufälliger Teil im Namen: Unter WordPress auf nginx greift der .htaccess-Schutz des Ordners nicht.
-        $name = 'sicherungen/vor-update-' . $this->currentVersion . '-' . gmdate('Ymd-His', $this->time->timestamp()) . '-' . bin2hex(random_bytes(16)) . '.json';
-        $path = $this->files->path($name, false);
-        if (file_put_contents($path, (string) json_encode($this->backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) === false) {
+        // Fortlaufende Nummer vorn (sortiert richtig, auch bei Versionen wie 1.4.0.10 und 1.4.0.9 und
+        // mehreren Updates in derselben Sekunde); zufälliger Teil, weil unter WordPress auf nginx der
+        // .htaccess-Schutz des Ordners nicht greift.
+        $dir = dirname($this->files->path('sicherungen/x', false));
+        $seq = 0;
+        foreach (glob($dir . '/vor-update-*.json') ?: [] as $f) {
+            $seq = max($seq, (int) substr(basename($f), strlen('vor-update-'), 6));
+        }
+        $name = sprintf('vor-update-%06d-%s-%s-%s.json', $seq + 1, gmdate('Ymd-His', $this->time->timestamp()), $this->currentVersion, bin2hex(random_bytes(16)));
+        $path = $dir . '/' . $name;
+        if (!is_file(dirname($path) . '/index.html')) {
+            @file_put_contents(dirname($path) . '/index.html', '');
+        }
+        try {
+            $json = json_encode($this->backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht erstellen (' . $e->getMessage() . '). Das Update wurde nicht eingespielt.');
+        }
+        $written = file_put_contents($path, $json);
+        if ($written === false || $written < strlen($json)) {
+            @unlink($path);
             throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');
         }
         @chmod($path, 0600);
@@ -308,6 +348,12 @@ final class UpdateService
         foreach (array_slice($all, 0, max(0, count($all) - self::MAX_BACKUPS)) as $old) {
             @unlink($old);
         }
+    }
+
+    private function skipped(string $version): bool
+    {
+        $skip = (string) $this->settings->get(self::SKIP, '');
+        return $skip !== '' && Version::valid($skip) && Version::compare($version, $skip) <= 0;
     }
 
     private function updatesUrl(): string

@@ -142,9 +142,11 @@ try {
             $st = $updates->status();
             echo 'Installiert: ', $st['current'], " (Kanal {$st['channel']}, automatisch: ", $st['auto'] ? 'ja' : 'nein', ")\n";
             if ($st['withdrawn']) {
-                echo "Diese Version wurde zurückgezogen; beim nächsten Cron-Lauf wird die vorige eingespielt.\n";
+                echo $st['fallback'] !== null
+                    ? "Diese Version wurde zurückgezogen; Wechsel auf {$st['fallback']} mit: update (oder beim nächsten Cron-Lauf).\n"
+                    : "Diese Version wurde zurückgezogen; es gibt noch keine freigegebene Version zum Wechseln.\n";
             }
-            echo $st['available'] ? "Neue Version: {$st['latest']}\n" : "Keine neuere Version derselben Hauptversion.\n";
+            echo $st['available'] ? "Neue Version: {$st['latest']}" . ($st['skipped'] ? ' (nach dem Zurückrollen nur von Hand)' : '') . "\n" : "Keine neuere Version derselben Hauptversion.\n";
             if ($st['major']) {
                 echo "Neue Hauptversion verfügbar: {$st['majorVersion']} (nur mit: update --version={$st['majorVersion']} --major)\n";
             }
@@ -168,7 +170,8 @@ try {
                 }
                 $updates->rollback($version);
             } else {
-                $version = $version !== '' ? $version : (string) ($updates->status()['available'] ? $updates->status()['latest'] : '');
+                $st = $updates->status();
+                $version = $version !== '' ? $version : (string) ($st['available'] ? $st['latest'] : ($st['withdrawn'] ? $st['fallback'] : ''));
                 if ($version === '') {
                     echo "Schon aktuell.\n";
                     break;

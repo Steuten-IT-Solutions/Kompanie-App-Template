@@ -118,7 +118,7 @@ installer "$T/i3.html" --data-urlencode "login=admin" --data-urlencode "password
 grep -q "Version $CORE.5 ist eingespielt" "$T/i3.html" && [ "$(version)" = "$CORE.5" ] && ok "Reparaturmodus spielt $CORE.5 ein, Daten bleiben" || fail "Reparatur: $(sed 's/<[^>]*>/ /g' "$T/i3.html" | tr -s ' ' | head -c 400)"
 grep -q '"auth"' <<< "$(curl -s "${APPURL}index.php?r=/api/v1/config")" && ok "App läuft nach der Reparatur" || fail "App nach Reparatur"
 EV="$(curl -s "${APPURL}index.php?r=/api/v1/events")"; ST="$(cli status)"
-grep -q "Bleibt erhalten" <<< "$EV" && grep -q "Benutzer: 1" <<< "$ST" && ok "Termine und Konten sind nach allen Updates und der Reparatur noch da" || fail "Daten verloren: $EV / $ST"
+grep -q "Bleibt erhalten" <<< "$EV" && grep -qx "Benutzer: 1" <<< "$ST" && ok "Termine und Konten sind nach allen Updates und der Reparatur noch da" || fail "Daten verloren: $EV / $ST"
 
 # 8. Installer einer anderen Kompanie nimmt diese Liste nicht an
 release 6 org/andere

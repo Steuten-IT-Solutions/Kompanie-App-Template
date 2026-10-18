@@ -182,6 +182,54 @@ $cache = new KompanieApp\WordPress\WpCache();
 $key = 'test_' . wp_generate_password(6, false);
 $c->ok($cache->increment($key, 900) === 1 && $cache->increment($key, 900) === 2 && $cache->increment($key . 'x', 900) === 1, 'Zähler im Cache zählt atomar je Schlüssel');
 
+$c->section('Datensicherung und Update');
+$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name());
+update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'vorher');
+update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state', ['serial' => 5]);
+$app->cache->increment('backup_test', 900);
+$eventId = $app->db->insert('events', ['title' => 'Aus der Sicherung', 'start_date' => '2031-02-03', 'description' => '', 'created_by' => $admin, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00']);
+$photoStatus = $app->db->select('SELECT id, status FROM {photos}'); // Wiederherstellen setzt alle Bilder auf „aufbereiten“
+$data = $backup->export();
+$c->ok($data['variant'] === 'wordpress' && ($data['settings']['kp_test_opt'] ?? null) === 'vorher', 'Sicherung enthält Daten und Einstellungen');
+$c->ok(!array_key_exists('update_state', $data['settings']) && preg_grep('/^ctr_/', array_keys($data['settings'])) === [], 'Sicherung ohne Update-Zustand und Zähler');
+$app->db->execute('DELETE FROM {events} WHERE id = ?', [$eventId]);
+update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'nachher');
+$backup->import((string) json_encode($data));
+$c->ok((int) $app->db->scalar('SELECT COUNT(*) FROM {events} WHERE title = ?', ['Aus der Sicherung']) === 1, 'Wiederherstellen bringt die Termine zurück');
+$c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt') === 'vorher' && get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state') === ['serial' => 5], 'Einstellungen zurück, Update-Zustand bleibt');
+$fremd = $data;
+$fremd['site'] = 'andere-website.example';
+try {
+    $backup->import((string) json_encode($fremd));
+    $c->ok(false, 'Sicherung einer anderen Website wird abgelehnt');
+} catch (RuntimeException $e) {
+    $c->ok(str_contains($e->getMessage(), 'anderen Website'), 'Sicherung einer anderen Website wird abgelehnt');
+}
+$app->db->execute('DELETE FROM {events} WHERE title = ?', ['Aus der Sicherung']);
+foreach ($photoStatus as $p) {
+    $app->db->update('photos', ['status' => $p['status']], ['id' => $p['id']]);
+}
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt');
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state');
+
+// Update-Ziel: ein Paket mit falscher Version wird abgelehnt, bevor WordPress den alten Ordner anfasst.
+// (Ein erfolgreiches Einspielen wird hier nicht getestet: Das Plugin ist in der Test-Instanz ein Link aufs Repo.)
+$target = new KompanieApp\WordPress\WpUpdateTarget();
+$c->ok($target->problems(['minWordPress' => '99.0']) !== [] && $target->autoUpdateAllowed(), 'Zu alte WordPress-Version wird gemeldet; automatische Updates erlaubt');
+$zipFile = wp_tempnam('kompanie-test.zip');
+$zip = new ZipArchive();
+$zip->open($zipFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+$zip->addFromString('kompanie-app/kompanie-app.php', "<?php\n/**\n * Plugin Name: Kompanie-App\n * Version: 9.9.9.9\n */\n");
+$zip->close();
+try {
+    $target->install($zipFile, '1.0.0.1');
+    $c->ok(false, 'Paket mit anderer Version abgelehnt');
+} catch (RuntimeException $e) {
+    $c->ok(str_contains($e->getMessage(), 'andere Version'), 'Paket mit anderer Version abgelehnt, mit dem Grund in der Meldung: ' . $e->getMessage());
+}
+$c->ok(is_file(KOMPANIE_APP_FILE) && is_link(WP_PLUGIN_DIR . '/kompanie-app'), 'Plugin-Ordner unverändert');
+@unlink($zipFile);
+
 foreach ([$member, $manager, $admin] as $id) {
     $d->deleteUser($id);
 }
