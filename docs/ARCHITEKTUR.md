@@ -55,7 +55,7 @@ Die Download-Seite der Kompanie zeigt zwei große Knöpfe mit bebilderter Anleit
 
 Danach führt der **Einrichtungsassistent** durch das, was nur die Kompanie wissen kann: erster Admin (nur ohne WordPress), Kalender-Link, Galerie. Jeder Schritt wird sofort geprüft. **Eine Datenbank muss die Kompanie nicht anlegen**: Der Installer wählt den Datenspeicher selbst.
 
-Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt ohne WordPress. Dafür gibt es **Anleitungen für die gängigen Hoster** (z. B. IONOS, Strato, all-inkl, netcup, Hetzner) mit Bildern. *Offen:* Ob wir das für Kompanien übernehmen, die es nicht selbst können (siehe [Offene Punkte, Abschnitt 2](OFFENE-PUNKTE.md#2-hilfe-beim-hochladen-von-installphp)).
+Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt ohne WordPress. Dafür gibt es **Anleitungen und Kurzvideos für die gängigen Hoster** (z. B. IONOS, Strato, all-inkl, netcup, Hetzner). Eine Installation durch uns gibt es nicht (siehe [Offene Punkte, Abschnitt 2](OFFENE-PUNKTE.md#2-hilfe-beim-hochladen-von-installphp)).
 
 ### Update (niemand)
 
@@ -287,7 +287,7 @@ Jede Kompanie kann in der App unter *Einstellungen → Updates* auf eine **älte
 ### Update-Liste und gestaffelte Verteilung
 
 - Die Server fragen **nicht die GitHub-API** (Limit von 60 Anfragen pro Stunde je IP-Adresse; auf Webspace teilen sich viele Seiten eine Adresse). Stattdessen liest jeder Server einmal täglich die **signierte Update-Liste** `updates.json` seiner Kompanie von GitHub Pages.
-- **Zwei Ringe:** `early` (Demo-Installation, Testkompanien) bekommt ein Release sofort, `stable` nach einer Haltezeit, wenn nichts gestoppt wurde. Sicherheitskorrekturen gehen sofort an alle.
+- **Erst die Demo, dann alle:** Jede Version läuft zuerst auf unserer Demo-Installation und wird automatisch getestet (Kanal `early`). Ist der Test grün und nichts gestoppt, bekommen sie alle Kompanien (Kanal `stable`). Testkompanien gibt es nicht.
 - Eine **zurückgezogene Version** rollen die Server automatisch zurück.
 
 Einzelheiten: [Offene Punkte, Abschnitt 1](OFFENE-PUNKTE.md#1-update-verteilung-und-gestaffelte-releases).

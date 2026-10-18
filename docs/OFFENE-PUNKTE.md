@@ -4,12 +4,12 @@ Ergänzt die [Architektur](ARCHITEKTUR.md). Jeder Punkt hat einen Vorschlag, die
 
 | Nr. | Punkt | Wann | Braucht von uns |
 |---|---|---|---|
-| 1 | [Update-Verteilung und gestaffelte Releases](#1-update-verteilung-und-gestaffelte-releases) | Phase 4/5 | Haltezeit, Testkompanien |
-| 2 | [Hilfe beim Hochladen von `install.php`](#2-hilfe-beim-hochladen-von-installphp) | Phase 5 | Entscheidung: Installationsdienst ja/nein |
+| 1 | [Update-Verteilung und gestaffelte Releases](#1-update-verteilung-und-gestaffelte-releases) | Phase 4/5 | Demo-Installation auf unserem Webspace |
+| 2 | [Hilfe beim Hochladen von `install.php`](#2-hilfe-beim-hochladen-von-installphp) | Phase 5 | Anleitungen je Hoster |
 | 3 | [Rechtstexte und Datenschutz](#3-rechtstexte-und-datenschutz) | vor der ersten neuen Kompanie | rechtliche Prüfung beauftragen |
 | 4 | [Statusmeldungen](#4-statusmeldungen) | Phase 5/6 | Webspace/Subdomain für den Empfang |
 | 5 | [Galerie-Test](#5-galerie-test-mit-google-verbinden) | sofort, parallel zu Phase 1 | Google-Cloud-Projekt, Test-Konto |
-| 6 | [Branches und PHP-Version](#6-branches-und-php-version) | sofort | Standard-Branch umstellen, PHP-Version von Lank nachsehen |
+| 6 | [Branches und PHP-Version](#6-branches-und-php-version) | sofort | Standard-Branch auf `main` umstellen, PHP-Version von Lank nachsehen |
 
 ---
 
@@ -45,49 +45,44 @@ Fragt jeder Server direkt die GitHub-API nach neuen Releases, gilt ohne Anmeldun
 
 ### Problem 2: Ein fehlerhaftes Release trifft alle gleichzeitig
 
-**Lösung: zwei Ringe.**
+**Entscheidung: keine Testkompanien.** Jede neue Version läuft zuerst auf **unserer eigenen Demo-Installation** und wird dort automatisch getestet. Erst danach bekommen sie alle Kompanien.
 
-| Ring | Wer | Bekommt ein Release |
+| Kanal | Wer | Bekommt ein Release |
 |---|---|---|
-| `early` | Demo-Installation, Testkompanien (z. B. Lank und eine Kompanie ohne WordPress) | sofort |
-| `stable` | alle anderen | nach der **Haltezeit** (Vorschlag: 7 Tage), wenn nichts gestoppt wurde |
+| `early` | nur unsere Demo-Installation | sofort |
+| `stable` | alle Kompanien | sobald der Demo-Test grün ist und nichts gestoppt wurde |
 
 Ablauf:
 
-1. Kern-Release → „Alle Kompanien neu bauen“ baut **alle** Kompanie-Repos sofort.
-2. Jedes Kompanie-Repo trägt die neue Version in `updates.json` unter `early` ein. Kompanien im Ring `early` (Feld `rollout` in `kompanie.json`) bekommen sie sofort, alle anderen sehen sie noch nicht.
-3. Die **Demo-Installation** wird sofort aktualisiert. Ein täglicher Workflow testet sie automatisch (Playwright: Anmeldung, Termine, Punkte, Galerie, Update, Zurückrollen).
-4. Ein täglicher Workflow **befördert** Versionen nach der Haltezeit nach `stable`, wenn
-   - der Demo-Test grün ist,
-   - kein Issue mit dem Label `release-stopp` offen ist,
-   - keine Testkompanie mit Zustimmung zu Statusmeldungen (Punkt 4) Fehler nach dem Update meldet.
-5. **Sicherheitskorrekturen** (Release mit Label `security`) gehen sofort nach `stable`.
-6. **Stoppen:** Wer einen Fehler bemerkt, legt ein Issue mit `release-stopp` an. Die Beförderung hält an, bis es geschlossen ist. Ist eine Version schon in `stable`, setzt der Workflow „Version zurückziehen“ `stable` auf die vorige Version. Server, die schon aktualisiert haben, **rollen automatisch zurück**, wenn ihre Version zurückgezogen wurde. Das klappt, weil Migrationen innerhalb einer Hauptversion nur hinzufügen.
+1. Kern-Release → „Alle Kompanien neu bauen“ baut **alle** Kompanie-Repos sofort und trägt die Version in `updates.json` unter `early` ein.
+2. Die **Demo-Installation** (Standalone mit SQLite **und** WordPress-Plugin, mit Beispieldaten) aktualisiert sich sofort.
+3. Ein Workflow testet sie automatisch (Playwright): Anmeldung, Termine, Punkte, Strafen, Galerie, Update, Zurückrollen.
+4. Ist der Test grün und kein Issue mit dem Label `release-stopp` offen, **befördert** der Workflow die Version nach `stable`. Ab dann holen sie sich alle Kompanien.
+5. **Stoppen:** Wer einen Fehler bemerkt, legt ein Issue mit `release-stopp` an; die Beförderung hält an.
+6. **Zurückziehen:** Ist eine Version schon in `stable`, setzt der Workflow „Version zurückziehen“ `stable` auf die vorige Version. Server, die schon aktualisiert haben, **rollen automatisch zurück**. Das klappt, weil Migrationen innerhalb einer Hauptversion nur hinzufügen.
+
+*Einschätzung:* Der Demo-Test findet Fehler in den getesteten Abläufen, aber nicht alles, was nur bei echten Daten oder einem bestimmten Hoster auftritt. Dafür sind Zurückziehen, automatisches Zurückrollen und die Statusmeldungen (Punkt 4) da. Eine Haltezeit lässt sich später ergänzen, falls nötig.
 
 **Schritte:**
 - `updates.json` und ihre Signatur im Build-Workflow erzeugen (Phase 4)
-- Updater liest `updates.json`, Ringe, Zurückziehen (Phase 5)
-- Demo-Installation mit Beispieldaten auf unserem Webspace, täglicher Test (Phase 5)
+- Updater liest `updates.json`, Kanäle, Zurückziehen (Phase 5)
+- Demo-Installation mit Beispieldaten auf unserem Webspace, automatischer Test (Phase 5)
 - Workflows „Befördern“ und „Version zurückziehen“ (Phase 6)
 
 ---
 
 ## 2. Hilfe beim Hochladen von `install.php`
 
-Ohne WordPress bleibt ein technischer Schritt: eine Datei auf den Webspace laden.
+Ohne WordPress bleibt ein technischer Schritt: eine Datei auf den Webspace laden. **Entscheidung: Wir installieren nicht selbst, sondern stellen Anleitungen bereit.**
 
-**Immer:**
-- **Anleitungen je Hoster** mit Bildschirmfotos für den Dateimanager im Kundenmenü (kein FTP-Programm nötig). Zuerst für die Hoster der ersten Kompanien, dann nach Bedarf. Vorschlag zum Start: IONOS, Strato, all-inkl, netcup, Hetzner.
-- Dieselben Anleitungen erklären: HTTPS einschalten, PHP-Version umstellen, Subdomain oder Unterordner anlegen.
+- **Anleitungen je Hoster** mit Bildschirmfotos für den Dateimanager im Kundenmenü, damit kein FTP-Programm nötig ist. Zuerst für die Hoster der ersten Kompanien, dann nach Bedarf. Vorschlag zum Start: IONOS, Strato, all-inkl, netcup, Hetzner.
+- Dieselben Anleitungen erklären: HTTPS einschalten, PHP-Version umstellen, Unterordner anlegen.
 - **Kurzvideo** (1–2 Minuten) je Hoster, auf der Download-Seite verlinkt.
+- Eine **allgemeine Anleitung** für alle anderen Hoster („So findest du den Dateimanager“).
+- Der Installer erkennt den Hoster, wo möglich, und verlinkt die passende Anleitung direkt bei jedem Problem.
+- Die Anleitungen liegen **im Kern-Repo** und erscheinen auf allen Download-Seiten. Eine Korrektur erreicht so alle Kompanien.
 
-**Optional: Installationsdienst durch uns.**
-1. Die Kompanie legt im Kundenmenü ihres Hosters einen **eigenen, zeitlich begrenzten FTP-Zugang** für uns an (das erklärt eine Anleitung). Sie gibt nicht ihr Hauptpasswort weiter.
-2. Wir laden `install.php` hoch, rufen ihn auf und richten alles bis zum ersten Admin ein.
-3. Die Kompanie löscht den Zugang wieder. Wir bestätigen schriftlich, dass wir keine Zugangsdaten aufbewahren.
-4. Weil wir dabei Zugriff auf den Webspace und damit möglicherweise auf personenbezogene Daten haben, braucht es einen **Vertrag zur Auftragsverarbeitung** (siehe Punkt 3).
-
-*Entscheidung offen:* ob wir den Dienst anbieten und ob kostenlos oder gegen Gebühr.
+**Schritte:** Gerüst der Anleitungen und die allgemeine Anleitung in Phase 5; je Hoster, sobald eine Kompanie dort installiert.
 
 ---
 
@@ -99,7 +94,7 @@ Ohne WordPress bleibt ein technischer Schritt: eine Datei auf den Webspace laden
 
 1. **Impressum:** Die Impressumspflicht nach § 5 DDG gilt für Telemedien; Sekundärquellen zählen Apps ausdrücklich dazu und nennen für Vereine u. a. Name mit Rechtsform, Anschrift, zwei Kontaktwege und den vertretungsberechtigten Vorstand ([ARAG](https://www.arag.de/vereinsversicherung/sicheres-impressum-fuer-vereine/), [forms-legal](https://forms-legal.com/de/deutschland/business/policies/website-impressum-vollstaendig-deutschland)). Zu klären: Braucht die App ein eigenes Impressum, oder reicht ein Link auf das der Webseite? Was gilt für Kompanien ohne Webseite?
 2. **Datenschutzerklärung:** Welche Angaben braucht sie? Die App verarbeitet: Konten der Mitglieder, Punkte und Strafen, Anmelde-Cookies, Bilder aus Google Drive (Kopien auf dem Server), Kalenderdaten, Server-Logs beim Hoster.
-3. **Rollen:** Die Kompanie ist Verantwortliche. Sind wir **Auftragsverarbeiter**, wenn wir Statusmeldungen empfangen (Punkt 4) oder installieren (Punkt 2)? Dann brauchen wir einen Mustervertrag (AVV).
+3. **Rollen:** Die Kompanie ist Verantwortliche. Sind wir **Auftragsverarbeiter**, wenn wir Statusmeldungen empfangen (Punkt 4)? Dann brauchen wir einen Mustervertrag (AVV).
 4. **Strafen** sind Geldbeträge je Person. Gibt es dafür besondere Anforderungen (z. B. Löschfristen, Information der Mitglieder)?
 5. **Verzeichnis von Verarbeitungstätigkeiten:** Sollen wir den Kompanien eine Vorlage mitgeben?
 
@@ -142,7 +137,7 @@ Ohne WordPress bleibt ein technischer Schritt: eine Datei auf den Webspace laden
 - **Aufbewahrung:** 90 Tage, danach automatisch gelöscht.
 - **Signiert** mit einem Schlüssel je Installation, damit niemand Meldungen fälschen kann.
 - **Übersicht** für uns: Ampel je Kompanie, Version, Ring.
-- **Warnung per E-Mail an uns**, wenn eine Kompanie länger als 2 Tage rot ist oder ein Release in `early` Fehler häuft. Das füttert die Beförderung aus Punkt 1.
+- **Warnung per E-Mail an uns**, wenn eine Kompanie länger als 2 Tage rot ist oder sich nach einem Release Fehler häufen. Dann prüfen wir, ob die Version zurückgezogen werden muss (Punkt 1).
 - Die Zustimmung wird im Einrichtungsassistenten erfragt und mit Datum gespeichert; abschaltbar unter *Einstellungen*.
 
 **Schritte:** Meldung im Kern (Phase 5) → Empfänger und Übersicht (Phase 6). *Braucht:* Subdomain auf unserem Webspace.
@@ -204,12 +199,12 @@ Eine kleine Testseite (PHP + Picker) auf einem Testserver:
 
 Weil das Repo leer war, ist mein Arbeits-Branch zum Standard-Branch geworden. Plan:
 
-1. Branch `main` aus dem aktuellen Stand anlegen.
+1. Branch `main` aus dem aktuellen Stand anlegen. *Erledigt.*
 2. In GitHub unter *Settings → General → Default branch* auf `main` umstellen (braucht Admin-Rechte im Repo).
 3. **Regeln für `main`** (*Settings → Rules*): nur über Pull Requests, CI muss grün sein.
 4. Arbeits-Branches danach immer gegen `main`, jede Phase als eigener Pull Request.
 
-Schritt 1 kann ich übernehmen, wenn ihr zustimmt. Die Schritte 2 und 3 macht ihr in den Einstellungen.
+Die Schritte 2 und 3 macht ihr in den Einstellungen.
 
 ### PHP-Version
 

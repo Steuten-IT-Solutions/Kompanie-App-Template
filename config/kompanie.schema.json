@@ -180,15 +180,6 @@
           "pattern": "^https://"
         }
       }
-    },
-    "rollout": {
-      "description": "Update-Ring. early: bekommt Releases sofort (Testkompanien). stable: nach der Haltezeit.",
-      "type": "string",
-      "enum": [
-        "stable",
-        "early"
-      ],
-      "default": "stable"
     }
   },
   "$defs": {
