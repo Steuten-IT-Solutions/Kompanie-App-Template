@@ -58,11 +58,14 @@ jobs:
           KOMPANIE_CONFIG: ${{ github.workspace }}/kompanie/kompanie.json
         run: |
           npx playwright install --with-deps chromium
-          scripts/screenshots.sh "${{ github.workspace }}/out/screenshots"
+          scripts/screenshots.sh "$GITHUB_WORKSPACE/out/screenshots"
 
       - name: Pakete bauen (unsigniert, nur zum Ansehen)
         working-directory: core
-        run: php scripts/package.php --config="${{ github.workspace }}/kompanie/kompanie.json" --version="$(tr -d '[:space:]' < VERSION).0" --out="${{ github.workspace }}/out/release" --kompanie="${{ github.repository }}"
+        env:
+          WS: ${{ github.workspace }}
+          REPO: ${{ github.repository }}
+        run: php scripts/package.php --config="$WS/kompanie/kompanie.json" --version="$(tr -d '[:space:]' < VERSION).0" --out="$WS/out/release" --kompanie="$REPO"
 
       - name: Ergebnis zum Ansehen
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

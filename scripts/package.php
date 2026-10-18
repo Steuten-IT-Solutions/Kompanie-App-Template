@@ -75,13 +75,16 @@ if (!isset($codeHashOnly)) {
  * Alle Dateien unter $dir (relativ), sortiert; ohne Ausnahmen. In einem Git-Arbeitsbaum nur
  * versionierte Dateien (keine zufällig herumliegenden lokalen Dateien im Paket).
  */
-function kompanie_files(string $dir, array $exclude = [], bool $tracked = true): array
+function kompanie_files(string $dir, array $exclude = [], bool $tracked = true, bool $requireGit = false): array
 {
     $files = [];
     $list = null;
     if ($tracked) {
         exec('git -C ' . escapeshellarg($dir) . ' ls-files -z . 2>/dev/null', $out, $code);
         $list = $code === 0 && $out !== [] ? array_filter(explode("\0", implode("\n", $out))) : null;
+        if ($list === null && $requireGit) {
+            throw new RuntimeException("git ls-files in $dir fehlgeschlagen; die Prüfsumme braucht einen Git-Arbeitsbaum.");
+        }
     }
     if ($list !== null) {
         foreach ($list as $rel) {
@@ -130,14 +133,27 @@ function kompanie_zip(string $file, array $entries): void
     $zip->close();
 }
 
-/** Prüfsumme des Programmcodes: Pfad und SHA-256 jeder Datei aus Kern, Adaptern und Installer. */
+/**
+ * Prüfsumme des Programmcodes: Pfad und SHA-256 jeder versionierten Datei, die in die Pakete eingeht
+ * (Kern, Adapter, Installer, Oberfläche, Branding, Build- und Paket-Skripte, npm-Abhängigkeiten).
+ * Nicht enthalten: Daten der Kompanie, Tests, Doku.
+ */
 function kompanie_code_hash(string $root): string
 {
+    $f = static fn (string $dir, array $exclude = []): array => kompanie_files($root . '/' . $dir, $exclude, true, true);
     $parts = [
-        'core' => kompanie_files($root . '/packages/core/src'),
-        'wordpress' => kompanie_files($root . '/adapters/wordpress', ['#^app/#', '#^kompanie\.json$#']),
-        'standalone' => kompanie_files($root . '/adapters/standalone', ['#^(app|data|media)/#', '#^(sw\.js|kompanie\.json|VERSION|data-dir\.php)$#']),
+        'core' => $f('packages/core/src'),
+        'wordpress' => $f('adapters/wordpress', ['#^app/#', '#^kompanie\.json$#']),
+        'standalone' => $f('adapters/standalone', ['#^(app|data|media)/#', '#^(sw\.js|kompanie\.json|VERSION|data-dir\.php)$#']),
+        'frontend' => $f('packages/frontend', ['#^(e2e|test-results|dist)/#', '#^playwright\.config\.ts$#']),
+        'branding' => $f('packages/branding', ['#^test/#']),
         'installer' => ['install.php' => $root . '/installer/install.php'],
+        'build' => [
+            'package.json' => $root . '/package.json',
+            'package-lock.json' => $root . '/package-lock.json',
+            'build-frontend.sh' => $root . '/scripts/build-frontend.sh',
+            'package.php' => $root . '/scripts/package.php',
+        ],
     ];
     $lines = [];
     foreach ($parts as $part => $files) {

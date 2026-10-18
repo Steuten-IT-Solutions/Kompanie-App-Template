@@ -4,7 +4,7 @@
 # Download-Seite auf gh-pages des Kompanie-Repos.
 #
 # Umgebung: REPO, ACTION (promote|withdraw), VERSION, GH_TOKEN, KOMPANIE_SIGNING_KEY,
-#   optional GIT_REMOTE (für Tests).
+#   optional GIT_REMOTE und GH (für Tests).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${REPO:?}" "${ACTION:?}" "${VERSION:?}" "${KOMPANIE_SIGNING_KEY:?}"
@@ -16,7 +16,7 @@ trap 'rm -rf "$WORK"' EXIT
 for attempt in 1 2 3 4 5; do
   rm -rf "$WORK/site"
   git clone --quiet --depth 1 --branch gh-pages "$REMOTE" "$WORK/site"
-  php "$ROOT/scripts/updates.php" --list="$WORK/site/updates.json" --"$ACTION"="$VERSION"
+  php "$ROOT/scripts/updates.php" --list="$WORK/site/updates.json" --kompanie="$REPO" --"$ACTION"="$VERSION"
   php "$ROOT/scripts/download-page.php" --updates="$WORK/site/updates.json" --out="$WORK/site"
   git -C "$WORK/site" add -A
   if git -C "$WORK/site" diff --cached --quiet; then
@@ -26,6 +26,10 @@ for attempt in 1 2 3 4 5; do
   git -C "$WORK/site" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
     commit --quiet -m "$ACTION $VERSION"
   if git -C "$WORK/site" push --quiet origin HEAD:refs/heads/gh-pages; then
+    # Freigegeben: Das Release ist kein Vorab-Release mehr (Kennzeichnung auf GitHub; maßgeblich ist die Liste).
+    if [ "$ACTION" = promote ]; then
+      ${GH:-gh} release edit "v$VERSION" --repo "$REPO" --prerelease=false > /dev/null 2>&1 || echo "Hinweis: Kennzeichnung des Releases nicht geändert." >&2
+    fi
     exit 0
   fi
   sleep $((attempt * 3))

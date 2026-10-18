@@ -92,13 +92,16 @@ ok "Gebaute Oberfläche übernommen"
 git init --quiet --bare "$T/remote.git"
 cat > "$T/gh" <<'GH'
 #!/usr/bin/env bash
-# Attrappe der GitHub-CLI: merkt sich Releases als Ordner
+# Attrappe der GitHub-CLI: merkt sich Releases als Ordner (DRAFT/PRERELEASE als Markierungsdateien)
 D="$(dirname "$0")/releases"; mkdir -p "$D"
 case "$1 $2" in
-  "release view") [ -d "$D/$3" ] ;;
-  "release delete") echo "gelöscht" > "$D/$3.GELOESCHT" ;;
-  "release create"|"release upload") TAG="$3"; shift 3; mkdir -p "$D/$TAG"; for a in "$@"; do [ -f "$a" ] && cp "$a" "$D/$TAG/"; [ "$a" = --prerelease ] && touch "$D/$TAG/PRERELEASE"; done; true ;;
-  "release edit") case "$*" in *--prerelease=true*) touch "$D/$3/PRERELEASE" ;; *--prerelease=false*) rm -f "$D/$3/PRERELEASE" ;; esac ;;
+  "release view") [ -d "$D/$3" ] || exit 1; [ -f "$D/$3/DRAFT" ] && echo true || echo false ;;
+  "release list") ls "$D" | grep -v '\.FEHLER$' || true ;;
+  "release delete") [ -f "$D/$3/DRAFT" ] || { echo "veröffentlicht gelöscht: $3" > "$D/$3.FEHLER"; exit 1; }; rm -rf "${D:?}/$3" ;;
+  "release create") TAG="$3"; shift 3; mkdir -p "$D/$TAG"; for a in "$@"; do [ -f "$a" ] && cp "$a" "$D/$TAG/"; [ "$a" = --draft ] && touch "$D/$TAG/DRAFT"; [ "$a" = --prerelease ] && touch "$D/$TAG/PRERELEASE"; done; true ;;
+  "release edit") case "$*" in *--prerelease=true*) touch "$D/$3/PRERELEASE" ;; *--prerelease=false*) rm -f "$D/$3/PRERELEASE" ;; esac
+    case "$*" in *--draft=false*) rm -f "$D/$3/DRAFT" ;; esac ;;
+  "api "*) true ;;
 esac
 GH
 chmod +x "$T/gh"
@@ -124,14 +127,32 @@ grep -q "\"kompanieCommit\": \"$SHA1\"" <<< "$(list)" && ok "Update-Liste kennt 
 OUT2="$(pub "$SHA1")"
 grep -q "schon als Version $CORE.1 veröffentlicht" <<< "$OUT2" && [ ! -d "$T/releases/v$CORE.2" ] && ok "Gleicher Stand: nichts doppelt" || fail "Re-run: $OUT2"
 
-# Abbruch nach dem Anlegen des Releases (Liste nicht aktualisiert): dieselbe Nummer wird fertig veröffentlicht, nichts gelöscht
-mkdir -p "$T/releases/v$CORE.2" && echo alt > "$T/releases/v$CORE.2/release.json"
+# Abbruch nach dem Anlegen des Entwurfs (Liste nicht aktualisiert): Entwurf wird ersetzt, dann veröffentlicht
+mkdir -p "$T/releases/v$CORE.2" && echo alt > "$T/releases/v$CORE.2/release.json" && touch "$T/releases/v$CORE.2/DRAFT"
 pub "$SHA2" > /dev/null
 pages
-grep -q kompanie-app-signed "$T/releases/v$CORE.2/release.json" && ! ls "$T/releases/"*.GELOESCHT > /dev/null 2>&1 && grep -q "\"$CORE.2\"" <<< "$(list)" \
-  && ok "Halbfertiges Release wird ergänzt statt gelöscht" || fail "Halbfertiges Release"
+grep -q kompanie-app-signed "$T/releases/v$CORE.2/release.json" && [ ! -f "$T/releases/v$CORE.2/DRAFT" ] && grep -q "\"$CORE.2\"" <<< "$(list)" \
+  && ok "Entwurf eines abgebrochenen Laufs wird ersetzt und veröffentlicht" || fail "Abgebrochener Entwurf"
 
-env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null && ok "Freigeben über control-release.sh" || fail "Freigeben"
+# Abbruch nach dem Push, vor dem Veröffentlichen: der nächste Lauf macht den Entwurf öffentlich
+touch "$T/releases/v$CORE.2/DRAFT"
+OUT3="$(pub "$SHA2")"
+grep -q "schon als Version $CORE.2" <<< "$OUT3" && [ ! -f "$T/releases/v$CORE.2/DRAFT" ] && ok "Liegengebliebener Entwurf wird beim nächsten Lauf veröffentlicht" || fail "Entwurf nach Push"
+
+# Ein veröffentlichtes Release, das nicht in der Liste steht, wird nie angefasst
+mkdir -p "$T/releases/v$CORE.3" && echo fremd > "$T/releases/v$CORE.3/release.json"
+if pub "$SHA3" > /dev/null 2>&1; then fail "Veröffentlichtes Release überschrieben"; fi
+[ "$(cat "$T/releases/v$CORE.3/release.json")" = fremd ] && ! ls "$T/releases/"*.FEHLER > /dev/null 2>&1 && ok "Veröffentlichtes Release ohne Listeneintrag: Abbruch, nichts geändert" || fail "Release angefasst"
+rm -rf "$T/releases/v$CORE.3"
+
+# Releases vorhanden, aber gh-pages fehlt: keine neue Liste (die Nummerierung begänne von vorn)
+git clone --quiet --bare "file://$T/remote.git" "$T/remote-sicherung.git"
+git --git-dir="$T/remote.git" update-ref -d refs/heads/gh-pages
+if pub "$SHA3" > "$T/nolist.log" 2>&1; then fail "Neue Liste trotz vorhandener Releases"; fi
+grep -q "keine Update-Liste" "$T/nolist.log" && ok "Fehlende Liste bei vorhandenen Releases: Abbruch" || fail "Fehlende Liste: $(cat "$T/nolist.log")"
+git --git-dir="$T/remote.git" fetch --quiet "$T/remote-sicherung.git" gh-pages:gh-pages
+
+env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > /dev/null && [ ! -f "$T/releases/v$CORE.2/PRERELEASE" ] && ok "Freigeben über control-release.sh (Release kein Vorab-Release mehr)" || fail "Freigeben"
 pages
 grep -q "releases/download/v$CORE.2/kompanie-app-wordpress.zip" "$T/pages/index.html" && ok "Download-Seite nach der Freigabe" || fail "Download-Seite nach Freigabe"
 if env REPO=org/kompanie-test ACTION=boese VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null 2>&1; then fail "Unbekannte Aktion angenommen"; else ok "Unbekannte Aktion abgelehnt"; fi
@@ -140,13 +161,22 @@ if env REPO=org/kompanie-test ACTION=boese VERSION="$CORE.2" GIT_REMOTE="file://
 pub "$SHA3" > /dev/null
 [ -d "$T/releases/v$CORE.3" ] && [ ! -f "$T/releases/v$CORE.3/PRERELEASE" ] && ok "Nur Aussehen geändert: direkt stable" || fail "Kanal bei gleichem Code"
 
+# Revert des Kompanie-Repos auf einen früheren Stand: neuer Stand, neue Version (nicht „schon veröffentlicht“)
+pub "$SHA2" > /dev/null
+[ -d "$T/releases/v$CORE.4" ] && ok "Revert auf einen früheren Stand wird neu veröffentlicht" || fail "Revert nicht veröffentlicht"
+
+# Manipuliertes theme.css (z. B. aus einem kompromittierten Build) kommt nicht in die Download-Seite
+cp -r "$T/checked/brand" "$T/brand-boese"
+printf '</style><script>alert(1)</script>\n' >> "$T/brand-boese/theme.css"
+if php scripts/download-page.php --out="$T/site-boese" --brand="$T/brand-boese" > /dev/null 2>&1; then fail "theme.css mit Skript angenommen"; else ok "theme.css mit fremdem Inhalt abgelehnt"; fi
+
 # Nach dem Zurückziehen ist die Kern-Version gesperrt: auch mit passendem STABLE_CORE nur early
 # (dass STABLE_CORE nur mit passender Code-Prüfsumme gilt, prüft UpdateTest)
 CODE="$(php scripts/package.php --code-hash)"
 SHA4=4444444444444444444444444444444444444444
-env REPO=org/kompanie-test ACTION=withdraw VERSION="$CORE.3" GIT_REMOTE="file://$T/remote.git" GH_TOKEN=x scripts/control-release.sh > /dev/null
+env REPO=org/kompanie-test ACTION=withdraw VERSION="$CORE.4" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > /dev/null
 pub "$SHA4" "$CORE $CODE" > /dev/null
-[ -f "$T/releases/v$CORE.4/PRERELEASE" ] && ok "Nach dem Zurückziehen: Kern gesperrt, nur noch early" || fail "Gesperrter Kern"
+[ -f "$T/releases/v$CORE.5/PRERELEASE" ] && ok "Nach dem Zurückziehen: Kern gesperrt, nur noch early" || fail "Gesperrter Kern"
 pages
 grep -q '"serial": 1[0-9]\{9\}' <<< "$(list)" && ok "Serien-Nummer mindestens die aktuelle Zeit" || fail "Serien-Nummer"
 

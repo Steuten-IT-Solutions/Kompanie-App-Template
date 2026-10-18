@@ -27,7 +27,8 @@ veröffentlicht das Kern-Repo innerhalb von 30 Minuten eine neue Version, die di
 ## Versionen
 
 - Neue Versionen des Kerns laufen zuerst auf unserer Demo-Installation (Kanal `early`) und gehen danach an alle (`stable`).
-- Ändert sich nur das Aussehen, geht die neue Version direkt an alle.
+- Ändert sich nur das Aussehen, geht die neue Version direkt an alle (sofern der Kern unverändert ist; sonst
+  zuerst an die Demo).
 - Freigeben und Zurückziehen geschieht zentral im Kern-Repo (*Actions → Versionen steuern*).
   Installationen auf einer zurückgezogenen Version spielen automatisch die zuletzt freigegebene ein
   (sofern es eine gibt; sonst zeigt ihre Statusseite das an).
@@ -36,7 +37,8 @@ veröffentlicht das Kern-Repo innerhalb von 30 Minuten eine neue Version, die di
 
 Dieses Repo enthält keine Geheimnisse und hat keinen Zugriff auf das Kern-Repo oder den Signaturschlüssel.
 Das Kern-Repo prüft selbst regelmäßig, ob sich `main` hier geändert hat, und baut, prüft und signiert dann.
-Das Repo muss öffentlich sein und das Topic `kompanie-app` tragen.
+Das Repo muss öffentlich sein, das Topic `kompanie-app` tragen und darf nie umbenannt werden (Name und
+Adresse der Update-Liste stehen in jeder Installation). Schreibrecht nur für die Organisation.
 
 ## Einmalig einrichten (später automatisch über den geplanten Workflow „Neue Kompanie“)
 

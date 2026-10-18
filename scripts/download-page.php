@@ -40,6 +40,18 @@ if ($brandDir === '') {
 }
 $brand = json_decode((string) file_get_contents($brandDir . '/brand.json'), true);
 $theme = (string) file_get_contents($brandDir . '/theme.css');
+// theme.css stammt aus dem Build (dort laufen npm und die Daten der Kompanie) und landet direkt in der
+// Seite: nur genau den Aufbau zulassen, den das Branding erzeugt (Farbwerte, Schriftliste), nichts sonst.
+foreach (explode("\n", $theme) as $line) {
+    if (!preg_match('~^\s*(|/\*[^*<>]*\*/|:root \{|@media \(prefers-color-scheme: dark\) \{|\}|color-scheme: (light|dark);|--[a-z0-9-]{1,40}: (#[0-9a-fA-F]{3,8}|[A-Za-z0-9 ,\'-]{1,200});)\s*$~', $line)) {
+        fwrite(STDERR, "Fehler: theme.css enthält Unerwartetes: " . substr($line, 0, 80) . "\n");
+        exit(1);
+    }
+}
+if (!is_array($brand) || !is_string($brand['name'] ?? null)) {
+    fwrite(STDERR, "Fehler: brand.json ist ungültig.\n");
+    exit(1);
+}
 @mkdir($out . '/screenshots', 0775, true);
 @mkdir($out . '/brand', 0775, true);
 foreach (['brand.json', 'theme.css', 'logo.png', 'favicon.png'] as $n) {
@@ -97,6 +109,7 @@ $html = <<<HTML
 <html lang="de">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Die App der {$name}</title>
 <link rel="icon" type="image/png" href="favicon.png">

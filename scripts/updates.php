@@ -8,7 +8,7 @@
  *   php scripts/updates.php --list=updates.json --show
  *   php scripts/updates.php --list=updates.json --next-version=1.2.3      nächste freie Versionsnummer
  *   php scripts/updates.php --list=updates.json --find=<Commit des Kompanie-Repos> --core-code=<Prüfsumme>
- *       gibt die Version aus, die genau diesen Stand schon enthält (sonst nichts)
+ *       gibt „Version early|stable“ aus, wenn die neueste Version genau diesen Stand enthält (sonst nichts)
  *
  * --channel=auto (Standard): stable, wenn der Kern schon auf der Demo geprüft ist (--stable-core=Inhalt
  * von STABLE_CORE: „Kern-Version Code-Prüfsumme“) oder sich nur das Aussehen ändert; sonst early.
@@ -63,13 +63,12 @@ try {
         exit(0);
     }
     if (isset($opt['find'])) {
+        // Nur die neueste Version zählt (auch eine zurückgezogene): Ein Revert auf einen früheren Stand
+        // ist ein neuer Stand und wird neu veröffentlicht; ein zurückgezogener nicht still erneut.
+        $e = $list->toArray()['versions'][0] ?? null;
         $code = (string) ($opt['core-code'] ?? '');
-        // Auch zurückgezogene: Ein zurückgezogener Stand wird nicht still neu veröffentlicht.
-        foreach ($list->toArray()['versions'] as $e) {
-            if ($opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code) {
-                echo $e['version'], "\n";
-                break;
-            }
+        if (is_array($e) && $opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code) {
+            echo $e['version'], ' ', $list->wasStable($e['version']) ? 'stable' : 'early', "\n";
         }
         exit(0);
     }
@@ -84,16 +83,10 @@ try {
         $channel = $channel === 'auto' ? $list->channelFor($release, trim((string) ($opt['stable-core'] ?? ''))) : $channel;
         if ($list->entry((string) $release['version']) !== null) {
             echo "Version {$release['version']} ist schon in der Liste.\n";
-            if (getenv('GITHUB_OUTPUT')) {
-                file_put_contents((string) getenv('GITHUB_OUTPUT'), "channel=$channel\nknown=1\n", FILE_APPEND);
-            }
             exit(0);
         }
         if (isset($opt['dry-run'])) {
             echo "Kanal: $channel\n";
-            if (getenv('GITHUB_OUTPUT')) {
-                file_put_contents((string) getenv('GITHUB_OUTPUT'), "channel=$channel\nknown=0\n", FILE_APPEND);
-            }
             exit(0);
         }
         $list->addRelease($release, rtrim($base, '/') . '/', $channel);

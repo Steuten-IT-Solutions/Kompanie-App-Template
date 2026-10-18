@@ -37,6 +37,7 @@ jobs:
       kompanie-sha: ${{ steps.kompanie.outputs.sha }}
     steps:
       - name: Kompanie-Repo prüfen (Schreibweise, Topic kompanie-app)
+        id: check
         env:
           REPO: ${{ inputs.repo }}
           GH_TOKEN: ${{ github.token }}
@@ -48,6 +49,7 @@ jobs:
           [[ "$NAME" == "$REPO" ]] || { echo "::error::Bitte genau so schreiben: $NAME"; exit 1; }
           [[ "$TOPIC" == true ]] || { echo "::error::$REPO hat nicht das Topic kompanie-app."; exit 1; }
           [[ "$PRIVATE" == false ]] || { echo "::error::$REPO muss öffentlich sein."; exit 1; }
+          echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -103,9 +105,10 @@ jobs:
           cp packages/frontend/src/generated/brand.json packages/frontend/src/generated/theme.css packages/frontend/src/generated/logo.png "$OUT/brand/"
           cp packages/frontend/public/icons/favicon-32.png "$OUT/brand/favicon.png"
 
+      # Name je Kompanie: Aus „Kompanien abgleichen“ laufen mehrere Kompanien im selben Workflow-Lauf.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: build
+          name: build-${{ steps.check.outputs.name }}
           path: out
           retention-days: 7
 
@@ -131,7 +134,14 @@ jobs:
           repository: ${{ inputs.repo }}
           ref: ${{ needs.build.outputs.kompanie-sha }}
           path: kompanie
+          fetch-depth: 0
           persist-credentials: false
+
+      # Der Commit kommt aus dem Build-Job: Er muss zu main des Kompanie-Repos gehören (nicht z. B. zu einem Fork).
+      - name: Commit gehört zu main
+        env:
+          SHA: ${{ needs.build.outputs.kompanie-sha }}
+        run: git -C kompanie merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA gehört nicht zu main."; exit 1; }
 
       - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
@@ -139,9 +149,15 @@ jobs:
           extensions: sodium, zip, mbstring
           tools: none
 
+      - name: Name des Kompanie-Repos
+        id: name
+        env:
+          REPO: ${{ inputs.repo }}
+        run: echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: build
+          name: build-${{ steps.name.outputs.name }}
           path: ${{ runner.temp }}/untrusted
 
       - name: Build-Ergebnis prüfen und übernehmen (nur erlaubte Dateitypen)
@@ -152,12 +168,6 @@ jobs:
           php core/scripts/import-build.php --from="$IN/dist" --to="$OUT/dist" --types=js,css,html,png,jpg,jpeg,webp,svg,ico,json,webmanifest,woff2,txt
           php core/scripts/import-build.php --from="$IN/brand" --to="$OUT/brand" --types=json,css,png --max-mb=2
           if [ -d "$IN/screenshots" ]; then php core/scripts/import-build.php --from="$IN/screenshots" --to="$OUT/screenshots" --types=png --max-mb=5; fi
-
-      - name: Name des Kompanie-Repos
-        id: name
-        env:
-          REPO: ${{ inputs.repo }}
-        run: echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
 
       - name: Zugang zum Kompanie-Repo (GitHub App)
         id: app

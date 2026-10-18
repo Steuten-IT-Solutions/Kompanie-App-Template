@@ -16,9 +16,21 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
   `.htaccess`, keine Punktdateien, keine Links) und erzeugt **alles, was signiert wird, selbst** aus dem eigenen
   Checkout: PHP-Code, `update.json`, `install.php` (dessen SHA-256 steht in der signierten `release.json`),
   `release.json`. `kompanie.json` holt er selbst aus dem Kompanie-Repo.
+- `theme.css` aus dem Build kommt in die Download-Seite nur, wenn sie genau den Aufbau hat, den das
+  Branding erzeugt (Farbwerte, Schriftliste); die Seite hat zusätzlich eine CSP ohne Skripte.
 - **Restrisiko:** Wird der Build-Job kompromittiert (z. B. über ein npm-Paket oder einen Fehler in der
   Bildverarbeitung des Logos), kann manipuliertes JavaScript in die Oberfläche **dieser einen** Kompanie
-  gelangen. Server-Code und Schlüssel bleiben unberührt.
+  gelangen. Der Schlüssel und der PHP-Code der Pakete bleiben unberührt. **Aber:** Im WordPress-Plugin läuft
+  die Oberfläche auf derselben Adresse wie `wp-admin`; öffnet ein WordPress-Administrator die App, könnte
+  solches JavaScript in seinem Namen handeln (z. B. ein Plugin hochladen) und so doch Server-Code ausführen.
+  Der Weg dahin setzt eine Lücke in npm-Paketen oder in der Bildverarbeitung voraus, dazu ein präpariertes Logo
+  von jemandem mit Schreibrecht. Abhilfe für später: die allgemeine Oberfläche in einem vertrauenswürdigen Job
+  bauen und das Branding nur als geprüfte Daten anwenden.
+- **Schreibrecht auf ein Kompanie-Repo** heißt: bestimmen, was neue Installationen dieser Kompanie laden.
+  Die Download-Seite (`gh-pages`) und die Release-Dateien liegen dort; beim ersten Herunterladen prüft niemand
+  das Plugin-ZIP oder `install.php` (erst danach prüfen die Installationen alles selbst). Deshalb Schreibrecht
+  nur für die Organisation und die GitHub App vergeben und per Ruleset `gh-pages` sowie Tags `v*` nur für die
+  App freigeben.
 - Die **Kompanie-Repos haben keine Geheimnisse** und keinen Zugriff auf das Kern-Repo. Sie bauen nur
   Vorschauen; das Kern-Repo prüft alle 30 Minuten selbst, ob es etwas zu veröffentlichen gibt
   (`kompanien-abgleichen.yml`).
@@ -55,9 +67,11 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
 | Kompanie | `1.4.0.27` | Kern-Version plus fortlaufende Nummer je Kompanie (aus deren Update-Liste) |
 | geprüfter Kern | `1.4.0 3f2a…` | Datei [`STABLE_CORE`](../STABLE_CORE): Kern-Version und `coreCode` aus der `release.json` der auf der Demo geprüften Version |
 
-`coreCode` ist eine Prüfsumme über alle Programmdateien (Kern, Adapter, Installer), ohne Oberfläche und
-Doku (`php scripts/package.php --code-hash`). `STABLE_CORE` gilt nur, wenn beides passt: Ein Commit nach
-dem Test, der den Code ändert, landet also wieder zuerst in `early`.
+`coreCode` ist eine Prüfsumme über alle versionierten Dateien, die in die Pakete eingehen: Kern, Adapter,
+Installer, Oberfläche, Branding, Build- und Paket-Skripte, `package.json`/`package-lock.json`; ohne Daten der
+Kompanie, Tests und Doku (`php scripts/package.php --code-hash`, braucht einen Git-Arbeitsbaum).
+`STABLE_CORE` gilt nur, wenn beides passt: Ein Commit nach dem Test, der den Code ändert, landet also
+wieder zuerst in `early`.
 
 Innerhalb einer Hauptversion (`1.x`) ändern Migrationen nur additiv, damit Zurückrollen ohne Datenverlust geht.
 Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle bisherigen.
@@ -75,8 +89,9 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
 ## Was beim Veröffentlichen passiert
 
 [`kompanien-abgleichen.yml`](../.github/workflows/kompanien-abgleichen.yml) findet alle öffentlichen Repos
-der Organisation mit dem Topic `kompanie-app`, deren Stand (Commit auf `main` und `coreCode`) noch nicht in
-ihrer Update-Liste steht (`scripts/find-pending.sh`), und ruft für jedes
+der Organisation mit dem Topic `kompanie-app` (nicht archiviert), deren Stand (Commit auf `main` und
+`coreCode`) nicht der neuesten Version ihrer Update-Liste entspricht (`scripts/find-pending.sh`; ein Revert
+auf einen früheren Stand ist also ein neuer Stand), und ruft für jedes
 [`publish-kompanie.yml`](../.github/workflows/publish-kompanie.yml) auf (auch einzeln von Hand startbar):
 
 1. **build** (ohne Geheimnisse): Branding aus `kompanie.json` und Logo, App, Bildschirmfotos mit
@@ -90,8 +105,10 @@ ihrer Update-Liste steht (`scripts/find-pending.sh`), und ruft für jedes
 Kanal: `stable`, wenn der Programmcode schon geprüft ist (`STABLE_CORE`) oder sich nur das Aussehen ändert
 (gleiche Kern-Version und gleicher `coreCode` wie die freigegebene Version); sonst `early`, als Vorab-Release.
 Kern-Versionen mit einem zurückgezogenen Release gehen nie mehr direkt nach `stable`.
-Ein erneuter Lauf veröffentlicht nichts doppelt; bricht ein Lauf nach dem Anlegen des Releases ab, ergänzt
-der nächste dessen Dateien unter derselben Nummer (gelöscht wird nie).
+Das Release entsteht als **Entwurf** und wird erst öffentlich, wenn die Update-Liste es enthält. Ein erneuter
+Lauf veröffentlicht nichts doppelt; bricht ein Lauf ab, ersetzt der nächste den Entwurf oder macht ihn
+öffentlich. Veröffentlichte Releases werden nie geändert oder gelöscht: Gibt es eines, das nicht in der Liste
+steht, oder fehlt die Liste, obwohl es Releases gibt, bricht der Lauf ab (siehe „Störungen“).
 
 Pull Requests in einem Kompanie-Repo bauen nur eine Vorschau (`preview-kompanie.yml`): Pakete
 (unsigniert) und Bildschirmfotos hängen als Ergebnis am Lauf.
@@ -103,6 +120,18 @@ Im Kern-Repo *Actions → Versionen steuern → Run workflow*: Kompanie-Repo, Ak
 Installationen auf der zurückgezogenen Version spielen sie automatisch ein. **Gibt es keine solche Version**
 (z. B. die erste Version einer neuen Hauptversion), bleiben die Installationen auf der zurückgezogenen
 Version; ihre Statusseite zeigt das rot an. Dann eine korrigierte Version veröffentlichen und freigeben.
+
+## Störungen
+
+- **`gh-pages` oder `updates.json` gelöscht:** Aus dem Git-Verlauf wiederherstellen (z. B. eine lokale Kopie
+  zurückpushen). Eine neue Liste wird bewusst nicht angelegt, solange es Releases gibt: Sie begänne mit
+  niedrigeren Nummern als die installierten Versionen.
+- **Veröffentlichtes Release ohne Listeneintrag:** von Hand prüfen (Dateien gegen eine Sicherung), dann
+  löschen; der nächste Lauf veröffentlicht unter derselben Nummer neu.
+- **Kompanie-Repo nie umbenennen:** Name und Adresse der Update-Liste stehen in jeder Installation.
+- **Zeitplan steht still:** Bei öffentlichen Repos schaltet GitHub „Kompanien abgleichen“ nach 60 Tagen ohne
+  Aktivität im Kern-Repo ab. Dann unter *Actions* wieder einschalten; spätestens bei jedem Kern-Release prüfen,
+  ob der letzte Lauf aktuell ist.
 
 ## Schlüsselwechsel
 

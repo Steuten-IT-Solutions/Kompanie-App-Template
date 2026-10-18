@@ -1,8 +1,10 @@
 # Veröffentlicht neue Versionen für alle Kompanien (Repos der Organisation mit dem Topic kompanie-app),
 # deren Stand noch nicht veröffentlicht ist: nach einer Änderung im Kompanie-Repo (kompanie.json, Logo)
 # und nach einer Änderung am Programmcode des Kerns (dann für alle Kompanien, zuerst im Kanal early).
-# Läuft alle 30 Minuten und von Hand („Alle Kompanien neu bauen“). Die Kompanie-Repos brauchen dafür
-# keine Geheimnisse und keinen Zugriff auf dieses Repo.
+# Läuft alle 30 Minuten und von Hand. Veröffentlicht wird nur, was sich geändert hat (kein erzwungener
+# Neubau). Die Kompanie-Repos brauchen dafür keine Geheimnisse und keinen Zugriff auf dieses Repo.
+# Hinweis: Bei öffentlichen Repos schaltet GitHub zeitgesteuerte Workflows nach 60 Tagen ohne Aktivität
+# im Repo ab (siehe docs/RELEASE.md).
 name: Kompanien abgleichen
 
 on:
@@ -56,4 +58,3 @@ jobs:
     uses: ./.github/workflows/publish-kompanie.yml
     with:
       repo: ${{ matrix.repo }}
-    secrets: inherit
