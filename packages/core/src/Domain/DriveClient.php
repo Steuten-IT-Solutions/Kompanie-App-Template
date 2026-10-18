@@ -1,0 +1,201 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Core\Domain;
+
+use KompanieApp\Core\Port\Cache;
+use KompanieApp\Core\Port\FileStorage;
+use KompanieApp\Core\Port\HttpClient;
+use KompanieApp\Core\Port\Settings;
+
+/**
+ * Lesender Zugriff auf Google Drive über ein Dienstkonto.
+ *
+ * Der Schlüssel des Dienstkontos liegt nur auf dem Server. Der Galerie-Ordner
+ * muss in Google Drive für die E-Mail-Adresse des Dienstkontos freigegeben sein.
+ * Ohne Bibliothek: Das Zugriffstoken wird per signiertem JWT (RS256) geholt.
+ *
+ * Fehler werden als \RuntimeException mit verständlicher Meldung geworfen.
+ */
+final class DriveClient
+{
+    public const SETTING = 'drive_service_account';
+    public const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+    public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
+    public const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+    public const FOLDER_MIME = 'application/vnd.google-apps.folder';
+    private const TOKEN_CACHE = 'drive_token';
+
+    public function __construct(
+        private readonly Settings $settings,
+        private readonly HttpClient $http,
+        private readonly Cache $cache,
+        private readonly FileStorage $files,
+        private readonly Time $time,
+    ) {
+    }
+
+    /** @return array{client_email: string, private_key: string, token_uri?: string}|null */
+    public function serviceAccount(): ?array
+    {
+        $data = json_decode((string) $this->settings->get(self::SETTING, ''), true);
+        return is_array($data) && !empty($data['client_email']) && !empty($data['private_key']) ? $data : null;
+    }
+
+    public function clientEmail(): string
+    {
+        return $this->serviceAccount()['client_email'] ?? '';
+    }
+
+    /** Prüft und speichert den JSON-Schlüssel eines Dienstkontos. */
+    public function saveServiceAccount(string $json): void
+    {
+        $data = json_decode($json, true);
+        if (!is_array($data) || empty($data['client_email']) || empty($data['private_key'])) {
+            throw new \RuntimeException('Das ist kein gültiger Schlüssel eines Dienstkontos (client_email oder private_key fehlt).');
+        }
+        if (!openssl_pkey_get_private($data['private_key'])) {
+            throw new \RuntimeException('Der private Schlüssel kann nicht gelesen werden.');
+        }
+        $keep = array_intersect_key($data, array_flip(['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id', 'token_uri']));
+        $this->settings->set(self::SETTING, json_encode($keep));
+        $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    private static function b64url(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    /** Signiertes JWT für den Token-Austausch (RFC 7523). */
+    public function buildJwt(array $sa): string
+    {
+        $now = $this->time->timestamp();
+        $header = ['alg' => 'RS256', 'typ' => 'JWT'];
+        $claims = [
+            'iss' => $sa['client_email'],
+            'scope' => self::SCOPE,
+            'aud' => $sa['token_uri'] ?? self::TOKEN_URI,
+            'iat' => $now,
+            'exp' => $now + 3600,
+        ];
+        $input = self::b64url((string) json_encode($header)) . '.' . self::b64url((string) json_encode($claims, JSON_UNESCAPED_SLASHES));
+        $sig = '';
+        if (!openssl_sign($input, $sig, $sa['private_key'], OPENSSL_ALGO_SHA256)) {
+            throw new \RuntimeException('Die Anmeldung bei Google konnte nicht signiert werden.');
+        }
+        return $input . '.' . self::b64url($sig);
+    }
+
+    public function accessToken(): string
+    {
+        $sa = $this->serviceAccount();
+        if (!$sa) {
+            throw new \RuntimeException('Es ist noch kein Google-Zugang hinterlegt.');
+        }
+        $cached = $this->cache->get(self::TOKEN_CACHE);
+        if (is_array($cached) && ($cached['email'] ?? '') === $sa['client_email']) {
+            return (string) $cached['token'];
+        }
+        $res = $this->http->request(
+            'POST',
+            $sa['token_uri'] ?? self::TOKEN_URI,
+            ['Content-Type' => 'application/x-www-form-urlencoded'],
+            http_build_query(['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $this->buildJwt($sa)]),
+            20,
+        );
+        $body = json_decode($res['body'], true);
+        if ($res['status'] !== 200 || empty($body['access_token'])) {
+            throw new \RuntimeException('Die Anmeldung bei Google ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));
+        }
+        $ttl = max(60, (int) ($body['expires_in'] ?? 3600) - 300);
+        $this->cache->set(self::TOKEN_CACHE, ['email' => $sa['client_email'], 'token' => $body['access_token']], $ttl);
+        return (string) $body['access_token'];
+    }
+
+    /** @return array<int, array<string, mixed>> alle Einträge eines Ordners (mit Paging) */
+    public function listChildren(string $folderId): array
+    {
+        $token = $this->accessToken();
+        $files = [];
+        $pageToken = null;
+        do {
+            $params = [
+                'q' => sprintf("'%s' in parents and trashed = false", str_replace("'", "\\'", $folderId)),
+                'fields' => 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,imageMediaMetadata(width,height,time))',
+                'pageSize' => 1000,
+                'orderBy' => 'name',
+                'supportsAllDrives' => 'true',
+                'includeItemsFromAllDrives' => 'true',
+            ];
+            if ($pageToken) {
+                $params['pageToken'] = $pageToken;
+            }
+            $res = $this->http->request('GET', self::FILES_URL . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986), ['Authorization' => 'Bearer ' . $token], null, 30);
+            $body = json_decode($res['body'], true);
+            if ($res['status'] !== 200 || !is_array($body)) {
+                throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+            }
+            foreach ($body['files'] ?? [] as $f) {
+                $files[] = $f;
+            }
+            $pageToken = $body['nextPageToken'] ?? null;
+        } while ($pageToken);
+        return $files;
+    }
+
+    /** Lädt eine Datei in eine temporäre Datei; der Aufrufer löscht sie. */
+    public function download(string $fileId): string
+    {
+        $token = $this->accessToken();
+        $res = $this->http->request('GET', self::FILES_URL . '/' . rawurlencode($fileId) . '?alt=media&supportsAllDrives=true', ['Authorization' => 'Bearer ' . $token], null, 90);
+        if ($res['status'] !== 200) {
+            throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $res['status']);
+        }
+        $tmp = $this->files->tempFile();
+        file_put_contents($tmp, $res['body']);
+        return $tmp;
+    }
+
+    /** Fehlermeldung aus einer Google-Antwort ({error: {message}} oder {error, error_description}). */
+    private static function errorMessage(mixed $body, int $status): string
+    {
+        if (is_array($body)) {
+            $error = $body['error'] ?? null;
+            if (is_array($error) && is_string($error['message'] ?? null)) {
+                return $error['message'];
+            }
+            if (is_string($body['error_description'] ?? null)) {
+                return $body['error_description'];
+            }
+            if (is_string($error)) {
+                return $error;
+            }
+        }
+        return 'HTTP ' . $status;
+    }
+
+    public static function isFolder(array $f): bool
+    {
+        return ($f['mimeType'] ?? '') === self::FOLDER_MIME;
+    }
+
+    public static function isImage(array $f): bool
+    {
+        return str_starts_with((string) ($f['mimeType'] ?? ''), 'image/');
+    }
+
+    /** Ordner-ID aus einem Drive-Link oder direkt. */
+    public static function parseFolderId(string $input): string
+    {
+        $input = trim($input);
+        if (preg_match('#/folders/([A-Za-z0-9_-]+)#', $input, $m)) {
+            return $m[1];
+        }
+        if (preg_match('#[?&]id=([A-Za-z0-9_-]+)#', $input, $m)) {
+            return $m[1];
+        }
+        return preg_match('/^[A-Za-z0-9_-]+$/', $input) ? $input : '';
+    }
+}

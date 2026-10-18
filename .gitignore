@@ -2,3 +2,5 @@ node_modules/
 vendor/
 dist/
 .DS_Store
+.phpunit.cache/
+.wp-test/

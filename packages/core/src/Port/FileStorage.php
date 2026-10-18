@@ -8,22 +8,19 @@ namespace KompanieApp\Core\Port;
  * Dateiablage der Galerie.
  *
  * Öffentliche Dateien liefert der Webserver direkt aus. Geschützte Dateien
- * (Bilder aus „intern“) liegen außerhalb des direkten Zugriffs und werden
- * nur nach Prüfung der Anmeldung ausgeliefert.
+ * (Bilder aus „intern“) liegen außerhalb des direkten Zugriffs und werden nur
+ * nach Prüfung der Anmeldung über Environment::photoUrl() ausgeliefert.
+ * Pfade sind relativ, z. B. „12/ab34…-thumb.jpg“.
  */
 interface FileStorage
 {
-    public function put(string $path, string $sourceFile, bool $public): void;
+    /** Absoluter Pfad im Dateisystem; legt fehlende Verzeichnisse an. */
+    public function path(string $relative, bool $public): string;
 
-    public function delete(string $path, bool $public): void;
+    /** Adresse einer öffentlichen Datei für den Browser. */
+    public function publicUrl(string $relative): string;
 
-    public function exists(string $path, bool $public): bool;
-
-    /** Adresse für den Browser. Bei geschützten Dateien die Auslieferung über die App. */
-    public function url(string $path, bool $public): string;
-
-    /** Absoluter Pfad, z. B. zum Ausliefern geschützter Dateien. */
-    public function localPath(string $path, bool $public): string;
+    public function delete(string $relative, bool $public): void;
 
     /** Temporäre Datei, die der Aufrufer selbst löscht. */
     public function tempFile(): string;

@@ -10,14 +10,16 @@ use KompanieApp\Core\Auth\User;
 /**
  * Benutzerkonten. WordPress: WP-Benutzer und -Rollen. Standalone: eigene Tabelle.
  *
- * Fehler (z. B. vergebener Benutzername) werden als \DomainException mit einer
- * für Menschen lesbaren Meldung geworfen.
+ * Fehler, die die App anzeigen soll (z. B. Admin in WordPress nicht änderbar),
+ * werden als \DomainException mit einer für Menschen lesbaren Meldung geworfen.
  */
 interface UserDirectory
 {
     public function find(int $id): ?User;
 
     /**
+     * Nach Anzeigename sortiert.
+     *
      * @param bool $includeGuests auch Konten ohne Rolle in der App
      * @return User[]
      */
@@ -26,7 +28,13 @@ interface UserDirectory
     /** Legt ein Konto mit der Rolle Mitglied an und gibt seine ID zurück. */
     public function create(string $name, string $login, string $email, string $password): int;
 
+    /** Ob in dieser Umgebung Admins in der App ernannt werden können (nur Standalone). */
+    public function canAssignAdmin(): bool;
+
+    /** @throws \DomainException wenn die Rolle so nicht gesetzt werden kann */
     public function setLevel(int $id, Level $level): void;
+
+    public function countAdmins(): int;
 
     public function verifyPassword(int $id, string $password): bool;
 

@@ -21,4 +21,21 @@ final class User
     {
         return in_array($capability, $this->capabilities, true);
     }
+
+    public function isMember(): bool
+    {
+        return $this->can(Capability::Member);
+    }
+
+    /** @return array{id: int, name: string, login: string, level: string, capabilities: string[]} */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'login' => $this->login,
+            'level' => $this->level->value,
+            'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->capabilities),
+        ];
+    }
 }

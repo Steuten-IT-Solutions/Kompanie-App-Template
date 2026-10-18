@@ -28,7 +28,11 @@ interface Connection
     /** INSERT, UPDATE, DELETE; gibt die Zahl der betroffenen Zeilen zurück. */
     public function execute(string $sql, array $params = []): int;
 
-    /** Fügt eine Zeile ein und gibt die neue ID zurück. */
+    /**
+     * Fügt eine Zeile ein und gibt die neue ID zurück.
+     *
+     * @param array<string, mixed> $row
+     */
     public function insert(string $table, array $row): int;
 
     public function table(string $name): string;
@@ -40,6 +44,17 @@ interface Connection
      */
     public function transaction(callable $fn): mixed;
 
-    /** 'mysql' oder 'sqlite'; bestimmt den Dialekt (Tabellenanlage, Upsert, Datumsfunktionen). */
+    /** 'mysql' oder 'sqlite'; bestimmt den Dialekt (Tabellenanlage). */
     public function driver(): string;
+
+    /** Zusatz für CREATE TABLE, z. B. Zeichensatz bei MySQL; leer bei SQLite. */
+    public function tableOptions(): string;
+
+    /**
+     * Ändert Zeilen; gibt die Zahl der betroffenen Zeilen zurück.
+     *
+     * @param array<string, mixed> $values
+     * @param array<string, mixed> $where Gleichheitsbedingungen, mit AND verknüpft
+     */
+    public function update(string $table, array $values, array $where): int;
 }

@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Core\Port;
+
+/** Adressen und Eckdaten der Installation. */
+interface Environment
+{
+    /** 'wordpress' oder 'standalone' */
+    public function variant(): string;
+
+    /** Version der Installation, z. B. 1.4.0.3 */
+    public function version(): string;
+
+    /** Basisadresse der API mit abschließendem /, z. B. https://example.org/wp-json/kompanie-app/v1/ */
+    public function apiBase(): string;
+
+    /** Adresse der App mit abschließendem / */
+    public function appUrl(): string;
+
+    /** Startseite der Webseite, falls es eine gibt. */
+    public function siteUrl(): ?string;
+
+    /** Adresse, über die ein geschütztes oder noch nicht erzeugtes Galeriebild ausgeliefert wird. */
+    public function photoUrl(int $id, string $size): string;
+}

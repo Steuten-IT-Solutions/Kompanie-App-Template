@@ -15,7 +15,8 @@ info:
     CSRF-Token in dem Header, den `/config` unter `csrf.header` nennt (WordPress:
     `X-WP-Nonce`, Standalone: `X-CSRF-Token`). Ist es abgelaufen, antwortet der
     Server mit 403 und `code: csrf_invalid` (WordPress: `rest_cookie_invalid_nonce`);
-    die App holt dann über `GET /auth/csrf` ein neues und wiederholt die Anfrage einmal.
+    die App holt dann über `csrf.refreshUrl` aus `/config` ein neues und wiederholt die
+    Anfrage einmal.
 
     **Rechte:** Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung.
     Mitglieder sehen nur ihre eigenen Punkte und Strafen.
@@ -192,6 +193,11 @@ paths:
                 items: { $ref: '#/components/schemas/CalendarEvent' }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
+        '503':
+          description: Kalender noch nicht eingerichtet (code not_configured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /events:
     get:
@@ -667,7 +673,10 @@ components:
       properties:
         code:
           type: string
-          description: z. B. `not_logged_in`, `forbidden`, `invalid`, `not_found`, `csrf_invalid`, `upstream_error`
+          description: |
+            z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
+            `feature_disabled` (404, Bereich in kompanie.json ausgeschaltet), `method_not_allowed` (405),
+            `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500)
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
 
     Level:
@@ -696,13 +705,19 @@ components:
         apiBase: { type: string }
         appUrl: { type: string }
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
+        variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: string, description: Startseite der Webseite, falls vorhanden }
         csrf:
           type: object
-          required: [header, token]
+          required: [header, token, refreshUrl]
           properties:
             header: { type: string, description: 'Name des Headers, z. B. X-CSRF-Token oder X-WP-Nonce' }
             token: { type: string, description: Leer für Gäste ohne Anmeldung }
+            refreshUrl:
+              type: string
+              description: |
+                GET liefert {token}. Funktioniert allein mit dem Sitzungs-Cookie, auch wenn das
+                alte Token abgelaufen ist (WordPress: /app/csrf, Standalone: {apiBase}auth/csrf).
         auth:
           type: object
           required: [mode]
