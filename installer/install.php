@@ -177,11 +177,17 @@ function ki_stable_entry($installed = null)
     }
     if ($installed !== null) {
         $history = isset($list['stableHistory']) ? (array) $list['stableHistory'] : array();
-        if (!preg_match('/^(\d+)\.\d+\.\d+/', $installed, $m)) {
-            // Installierte Version unbekannt: nur weiter, wenn es keine Wahl der Hauptversion gibt.
+        if (!preg_match('/^(\d+)\.\d+\.\d+(\.\d+)?$/', $installed, $m)) {
+            // Installierte Version unbekannt: nur weiter, wenn es keine Wahl der Hauptversion gibt
+            // (gezählt werden alle nicht zurückgezogenen Versionen, auch die nur vorab erschienenen).
             $majors = array();
-            foreach ($history as $v) {
-                $majors[(int) $v] = true;
+            foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
+                if (isset($e['version']) && !in_array($e['version'], $withdrawn, true)) {
+                    $majors[(int) $e['version']] = true;
+                }
+            }
+            if (count($majors) === 0) {
+                throw new RuntimeException('Es gibt noch keine freigegebene Version. Bitte später erneut versuchen.');
             }
             if (count($majors) !== 1) {
                 throw new RuntimeException('Die installierte Version ist nicht zu erkennen (Datei VERSION fehlt oder ist beschädigt), und es gibt mehrere Hauptversionen. Bitte bei uns melden, damit nichts Falsches eingespielt wird.');
@@ -333,7 +339,8 @@ function ki_installed()
  * Prüft die Anmeldung eines Admins direkt in der Datenbank – ohne den Programmcode, der bei
  * einer Reparatur beschädigt sein kann.
  */
-function ki_admin_ok($login, $password)
+/** Verbindung zur Datenbank der Installation: array(PDO, Tabellen-Präfix). */
+function ki_db()
 {
     $config = include ki_data_dir() . '/config.php';
     if (!is_array($config) || !isset($config['db'])) {
@@ -349,6 +356,12 @@ function ki_admin_ok($login, $password)
         $prefix = '';
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    return array($pdo, $prefix);
+}
+
+function ki_admin_ok($login, $password)
+{
+    list($pdo, $prefix) = ki_db();
     $stmt = $pdo->prepare('SELECT password_hash, level FROM ' . $prefix . 'users WHERE LOWER(login) = LOWER(?) OR (email <> \'\' AND LOWER(email) = LOWER(?))');
     $stmt->execute(array($login, $login));
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -357,6 +370,27 @@ function ki_admin_ok($login, $password)
         }
     }
     return false;
+}
+
+/**
+ * Installierte Version laut Datenbank (letztes Update: bei Erfolg die neue, sonst die alte Version),
+ * falls die Datei VERSION fehlt oder beschädigt ist. Leer, wenn unbekannt (noch nie aktualisiert).
+ */
+function ki_db_version()
+{
+    try {
+        list($pdo, $prefix) = ki_db();
+        $stmt = $pdo->prepare('SELECT value FROM ' . $prefix . "settings WHERE name = 'update_last'");
+        $stmt->execute();
+        $last = json_decode((string) $stmt->fetchColumn(), true);
+    } catch (Exception $e) {
+        return '';
+    }
+    if (!is_array($last)) {
+        return '';
+    }
+    $v = !empty($last['ok']) ? (isset($last['to']) ? $last['to'] : '') : (isset($last['from']) ? $last['from'] : '');
+    return is_string($v) ? $v : '';
 }
 
 /**
@@ -456,7 +490,11 @@ if (ki_installed()) {
                 throw new RuntimeException('Benutzername oder Passwort ist falsch, oder das Konto ist kein Admin.');
             }
             @unlink($lock);
-            $entry = ki_stable_entry(trim((string) @file_get_contents(KI_DIR . '/VERSION')));
+            $installedVersion = trim((string) @file_get_contents(KI_DIR . '/VERSION'));
+            if (!preg_match('/^\d+\.\d+\.\d+(\.\d+)?$/', $installedVersion)) {
+                $installedVersion = ki_db_version(); // Datei VERSION fehlt oder ist beschädigt
+            }
+            $entry = ki_stable_entry($installedVersion);
             $work = ki_fetch_package($entry);
             try {
                 ki_place($work);

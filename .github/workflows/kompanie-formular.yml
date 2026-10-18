@@ -92,8 +92,13 @@ jobs:
               # Ein früherer Lauf dieses Formulars brach ab (Repo aus der Vorlage, Beschreibung mit der Nummer
               # dieses Issues, noch kein veröffentlichtes Release): fortsetzen. Alle Schritte danach sind
               # wiederholbar. Ist schon etwas veröffentlicht, nie überschreiben (dafür „Kompanie ändern“).
-              PUBLISHED="$(gh release list --repo "$ORG/$REPO" --exclude-drafts --limit 1)"   # Fehler brechen ab
-              if [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ] && [ -z "$PUBLISHED" ]; then
+              PUBLISHED=1
+              if [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ]; then
+                # Zahl der veröffentlichten Releases (REST; Entwürfe zählen nicht)
+                PUBLISHED="$(gh api "repos/$ORG/$REPO/releases?per_page=100" --jq '[.[] | select(.draft | not)] | length' 2> /dev/null)" \
+                  || { echo "- GitHub ist gerade nicht erreichbar. Bitte das Issue später erneut speichern." > "$OUT/fehler.txt"; exit 1; }
+              fi
+              if [ "$PUBLISHED" = 0 ]; then
                 RESUME=1
               else
                 echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"

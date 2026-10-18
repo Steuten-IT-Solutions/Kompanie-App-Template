@@ -130,11 +130,20 @@ installer "$T/i5.html" --data-urlencode "login=admin" --data-urlencode "password
 grep -q "Version $CORE.5 ist eingespielt" "$T/i5.html" && [ "$(version)" = "$CORE.5" ] && ok "Reparaturmodus bleibt bei der installierten Hauptversion (keine $NEXT_MAJOR ohne Sicherung)" \
   || fail "Hauptversion: $(sed 's/<[^>]*>/ /g' "$T/i5.html" | tr -s ' ' | head -c 400)"
 
-# 7c. Datei VERSION beschädigt und mehrere Hauptversionen freigegeben: nichts einspielen
-cp "$T/www/VERSION" "$T/version.bak" && rm "$T/www/VERSION"
+# 7c. Datei VERSION fehlt: Version aus dem letzten Update in der Datenbank, Hauptversion bleibt
+rm "$T/www/VERSION"
 cp "$SRV/rmajor/install.php" "$T/www/install.php"
 installer "$T/i6.html" --data-urlencode "login=admin" --data-urlencode "password=geheim-12345"
-grep -q "nicht zu erkennen" "$T/i6.html" && [ ! -f "$T/www/VERSION" ] && ok "Unbekannte installierte Version: Reparaturmodus spielt nichts ein" || fail "Ohne VERSION: $(sed 's/<[^>]*>/ /g' "$T/i6.html" | tr -s ' ' | head -c 400)"
+grep -q "Version $CORE.5 ist eingespielt" "$T/i6.html" && [ "$(version)" = "$CORE.5" ] && ok "VERSION fehlt: Hauptversion aus der Datenbank, Reparatur bleibt bei $CORE.x" \
+  || fail "Ohne VERSION: $(sed 's/<[^>]*>/ /g' "$T/i6.html" | tr -s ' ' | head -c 400)"
+# … und ohne Update-Eintrag in der Datenbank bei mehreren Hauptversionen: nichts einspielen
+php -r 'require $argv[1] . "/autoload.php";
+  $k = new KompanieApp\Standalone\Kernel($argv[1], new KompanieApp\Standalone\HttpContext([], ["REQUEST_METHOD" => "GET", "HTTP_HOST" => "127.0.0.1"], "/"));
+  $k->db()->execute("DELETE FROM {settings} WHERE name = ?", ["update_last"]);' "$T/www"
+cp "$T/www/VERSION" "$T/version.bak" && rm "$T/www/VERSION"
+cp "$SRV/rmajor/install.php" "$T/www/install.php"
+installer "$T/i7.html" --data-urlencode "login=admin" --data-urlencode "password=geheim-12345"
+grep -q "nicht zu erkennen" "$T/i7.html" && [ ! -f "$T/www/VERSION" ] && ok "Version unbekannt und mehrere Hauptversionen: Reparaturmodus spielt nichts ein" || fail "Unbekannt: $(sed 's/<[^>]*>/ /g' "$T/i7.html" | tr -s ' ' | head -c 400)"
 cp "$T/version.bak" "$T/www/VERSION" && rm -f "$T/www/install.php"
 
 # 8. Installer einer anderen Kompanie nimmt diese Liste nicht an
