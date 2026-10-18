@@ -139,7 +139,11 @@ function ki_http_get($url, $timeout)
 }
 
 /** Lädt die Update-Liste, prüft die Signatur und gibt den Eintrag der stabilen Version zurück. */
-function ki_stable_entry()
+/**
+ * @param string|null $installed installierte Version (Reparaturmodus): dann die neueste freigegebene Version
+ *                               derselben Hauptversion, nie ein Wechsel der Hauptversion
+ */
+function ki_stable_entry($installed = null)
 {
     global $KONFIG;
     if ($KONFIG['updatesUrl'] === '' || !$KONFIG['trustedKeys']) {
@@ -164,8 +168,23 @@ function ki_stable_entry()
         throw new RuntimeException('Die Liste der Versionen gehört nicht zu dieser Kompanie. Bitte den Installer neu von der Download-Seite laden.');
     }
     $stable = isset($list['channels']['stable']) ? $list['channels']['stable'] : null;
-    if ($stable !== null && isset($list['withdrawn']) && in_array($stable, (array) $list['withdrawn'], true)) {
+    $withdrawn = isset($list['withdrawn']) ? (array) $list['withdrawn'] : array();
+    if ($stable !== null && in_array($stable, $withdrawn, true)) {
         $stable = null;
+    }
+    if ($installed !== null && preg_match('/^(\d+)\./', $installed, $m)) {
+        // Neueste freigegebene (stableHistory), nicht zurückgezogene Version der installierten Hauptversion.
+        $history = isset($list['stableHistory']) ? (array) $list['stableHistory'] : array();
+        $stable = null;
+        foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
+            if (isset($e['version']) && strpos($e['version'], $m[1] . '.') === 0 && in_array($e['version'], $history, true) && !in_array($e['version'], $withdrawn, true)) {
+                $stable = $e['version'];
+                break;
+            }
+        }
+        if ($stable === null) {
+            throw new RuntimeException('Für die installierte Hauptversion ' . $m[1] . ' gibt es keine freigegebene Version zum Einspielen. Eine neue Hauptversion bitte in der App unter Einstellungen → Updates einspielen (dort wird vorher gesichert).');
+        }
     }
     foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
         if ($stable !== null && $e['version'] === $stable && isset($e['files']['standalone']['url'], $e['files']['standalone']['sha256'])) {
@@ -423,7 +442,7 @@ if (ki_installed()) {
                 throw new RuntimeException('Benutzername oder Passwort ist falsch, oder das Konto ist kein Admin.');
             }
             @unlink($lock);
-            $entry = ki_stable_entry();
+            $entry = ki_stable_entry(trim((string) @file_get_contents(KI_DIR . '/VERSION')));
             $work = ki_fetch_package($entry);
             try {
                 ki_place($work);

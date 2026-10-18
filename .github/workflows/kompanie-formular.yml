@@ -89,9 +89,9 @@ jobs:
           IFS=$'\t' read -r TOPIC PRIVATE TEMPLATE DESCRIPTION <<< "$INFO"
           if [ "$MODE" = neu ]; then
             if [ -n "$INFO" ]; then
-              # Ein früherer Lauf dieses Formulars brach nach dem Anlegen ab (aus der Vorlage, noch ohne Topic,
-              # Beschreibung mit der Nummer dieses Issues): fortsetzen.
-              if [ "$TOPIC" = false ] && [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ]; then
+              # Ein früherer Lauf dieses Formulars brach ab (Repo aus der Vorlage, Beschreibung mit der Nummer
+              # dieses Issues): fortsetzen. Alle Schritte danach sind wiederholbar.
+              if [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ]; then
                 RESUME=1
               else
                 echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"
@@ -120,6 +120,13 @@ jobs:
           echo "repo=$REPO" >> "$GITHUB_OUTPUT"
           echo "resume=$RESUME" >> "$GITHUB_OUTPUT"
 
+      # Vor dem Bauen hochladen: Beim Bauen laufen npm-Pakete, die den Ordner sonst noch ändern könnten.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kompanie
+          path: ${{ runner.temp }}/formular/kompanie
+          include-hidden-files: false
+
       # Prüft kompanie.json gegen das Schema und die Farben auf Kontrast (packages/branding).
       - name: App bauen (Prüfung)
         env:
@@ -138,12 +145,6 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           scripts/screenshots.sh "$OUT/vorschau"
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: kompanie
-          path: ${{ runner.temp }}/formular/kompanie
-          include-hidden-files: false
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -222,6 +223,8 @@ jobs:
           fi
           # Das Anlegen aus der Vorlage läuft im Hintergrund: warten, bis main da ist.
           for _ in $(seq 1 30); do git ls-remote --exit-code "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" refs/heads/main > /dev/null 2>&1 && break; sleep 2; done
+          git ls-remote --exit-code "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" refs/heads/main > /dev/null \
+            || { echo "::error::Das Repo ist nach 60 Sekunden noch leer. Bitte das Issue später erneut speichern (es wird fortgesetzt)."; exit 1; }
           git clone --quiet "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" "$RUNNER_TEMP/repo"
           cp "$SRC/kompanie.json" "$RUNNER_TEMP/repo/kompanie.json"
           mkdir -p "$RUNNER_TEMP/repo/assets" && rm -f "$RUNNER_TEMP/repo/assets"/logo.*

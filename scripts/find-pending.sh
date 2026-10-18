@@ -39,14 +39,17 @@ while IFS= read -r repo; do
     $list = is_array($env) ? json_decode((string) base64_decode((string) ($env["payload"] ?? ""), true), true) : null;
     $e = $list["versions"][0] ?? null;
     $same = is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && preg_match("/^[0-9.]+$/", (string) $e["version"]);
-    // Zurückgezogener Stand: nicht neu veröffentlichen (wie updates.php --find), auch bei anderer Konfiguration.
-    if ($same && (in_array($e["version"], (array) ($list["withdrawn"] ?? []), true) || ($e["configHash"] ?? "") === $argv[4])) {
+    // Zurückgezogener Stand: nicht neu veröffentlichen (wie updates.php --find), auch bei anderer Konfiguration;
+    // „-“ heißt: aktuell, ohne die Prüfung auf ein öffentliches Release (ein Entwurf darf es hier bleiben).
+    if ($same && in_array($e["version"], (array) ($list["withdrawn"] ?? []), true)) {
+        echo "-";
+    } elseif ($same && ($e["configHash"] ?? "") === $argv[4]) {
         echo $e["version"];
     }
   ' "$WORK/list.json" "$sha" "$CODE" "$CONFIG_HASH")"
   # Steht der Stand in der Liste, muss sein Release auch öffentlich sein (ein Lauf kann nach dem Eintrag in
   # die Liste, aber vor dem Veröffentlichen des Entwurfs abgebrochen sein; der nächste Lauf holt das nach).
-  if [ -n "$latest" ] && curl -fsIL --max-time 20 -o /dev/null "https://github.com/$repo/releases/download/v$latest/release.json"; then
+  if [ "$latest" = - ] || { [ -n "$latest" ] && curl -fsIL --max-time 20 -o /dev/null "https://github.com/$repo/releases/download/v$latest/release.json"; }; then
     echo "Aktuell: $repo" >&2
   else
     echo "Neu zu veröffentlichen: $repo" >&2

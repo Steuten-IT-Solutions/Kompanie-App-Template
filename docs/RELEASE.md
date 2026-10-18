@@ -68,6 +68,8 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
    und `KOMPANIE_SUPPORT` (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
    Eine Änderung daran (wie an `TrustedKeys`) ergibt beim nächsten Abgleich für jede Kompanie eine neue
    Version: Die Prüfsumme der Paket-Konfiguration (`configHash`) gehört zum veröffentlichten Stand.
+   Ausnahme: Ist die neueste Version einer Kompanie zurückgezogen, wird derselbe Stand nicht neu
+   veröffentlicht; dann braucht es eine Korrektur (neuer Commit im Kern- oder Kompanie-Repo).
 
 ## Neue Kompanie, Kompanie ändern
 
@@ -145,7 +147,9 @@ Pull Requests in einem Kompanie-Repo bauen nur eine Vorschau (`preview-kompanie.
 
 Im Kern-Repo *Actions → Versionen steuern → Run workflow*: Kompanie-Repo, Aktion `withdraw`, Version.
 `stable` fällt auf die letzte schon einmal freigegebene Version derselben Hauptversion zurück;
-Installationen auf der zurückgezogenen Version spielen sie automatisch ein. **Gibt es keine solche Version**
+Installationen auf der zurückgezogenen Version spielen sie automatisch ein (außer dort, wo automatische
+Updates gesperrt sind, z. B. in WordPress per `AUTOMATIC_UPDATER_DISABLED`; dann zeigt die Statusseite den
+Wechsel an). **Gibt es keine solche Version**
 (z. B. die erste Version einer neuen Hauptversion), bleiben die Installationen auf der zurückgezogenen
 Version; ihre Statusseite zeigt das rot an. Dann eine korrigierte Version veröffentlichen und freigeben.
 

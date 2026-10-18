@@ -120,6 +120,16 @@ grep -q '"auth"' <<< "$(curl -s "${APPURL}index.php?r=/api/v1/config")" && ok "A
 EV="$(curl -s "${APPURL}index.php?r=/api/v1/events")"; ST="$(cli status)"
 grep -q "Bleibt erhalten" <<< "$EV" && grep -qx "Benutzer: 1" <<< "$ST" && ok "Termine und Konten sind nach allen Updates und der Reparatur noch da" || fail "Daten verloren: $EV / $ST"
 
+# 7b. Reparaturmodus wechselt nie die Hauptversion (stable zeigt schon auf eine neue)
+NEXT_MAJOR="$(( ${CORE%%.*} + 1 )).0.0.1"
+php scripts/package.php --config=config/kompanie.example.json --version="$NEXT_MAJOR" --out="$SRV/rmajor" \
+  --kompanie=org/test --updates-url="$R/updates.json" --require-signature --trust-signing-key > /dev/null
+php scripts/updates.php --list="$SRV/updates.json" --add="$SRV/rmajor/release.json" --base-url="$R/rmajor/" --kompanie=org/test --channel=stable > /dev/null
+cp "$SRV/rmajor/install.php" "$T/www/install.php"
+installer "$T/i5.html" --data-urlencode "login=admin" --data-urlencode "password=geheim-12345"
+grep -q "Version $CORE.5 ist eingespielt" "$T/i5.html" && [ "$(version)" = "$CORE.5" ] && ok "Reparaturmodus bleibt bei der installierten Hauptversion (keine $NEXT_MAJOR ohne Sicherung)" \
+  || fail "Hauptversion: $(sed 's/<[^>]*>/ /g' "$T/i5.html" | tr -s ' ' | head -c 400)"
+
 # 8. Installer einer anderen Kompanie nimmt diese Liste nicht an
 release 6 org/andere
 rm -rf "$T/www2" && mkdir "$T/www2" && cp "$SRV/r6/install.php" "$T/www2/install.php"
