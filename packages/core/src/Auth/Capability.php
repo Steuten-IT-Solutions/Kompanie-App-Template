@@ -9,7 +9,7 @@ enum Capability: string
 {
     /** Eigene Punkte/Strafen, interner Kalender, interne Galerie. */
     case Member = 'member';
-    /** Punkte und Strafen vergeben, Katalog pflegen (Spieß). */
+    /** Punkte und Strafen vergeben, Katalog pflegen (Verwalter). */
     case Manage = 'manage';
     /** Öffentliche Termine pflegen. */
     case ManageEvents = 'manage_events';

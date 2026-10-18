@@ -20,6 +20,9 @@ jobs:
       - name: Kern ohne WordPress
         run: scripts/check-core-boundary.sh
 
+      - name: Neutral, ohne Kompanie-spezifische Begriffe
+        run: scripts/check-neutral.sh
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

@@ -6,13 +6,13 @@ Gemeinsamer Kern der Kompanie-App: eine installierbare Web-App (PWA) für Kompan
 - Galerie aus Google Drive,
 - Punkten und Strafen der Mitglieder.
 
-Entstanden aus der App der Marinekompanie 1973 Lank.
+Die App ist neutral gestaltet: Jede Kompanie bekommt ihr eigenes Logo, ihre Farben, ihren Namen und ihre Bezeichnungen.
 
-Die App läuft auf normalem Webspace mit PHP und MySQL/MariaDB, wahlweise
+Sie läuft auf normalem Webspace mit PHP, wahlweise
 - als **WordPress-Plugin** oder
-- als **eigenständige Version** ohne WordPress.
+- als **eigenständige Version** ohne WordPress, mit SQLite (legt der Installer selbst an) oder MySQL/MariaDB.
 
-Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Build, Icons, Prüfungen, Releases und Updates auf den Servern laufen automatisch.
+Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Build, Icons, Prüfungen, Releases und Updates auf den Servern laufen automatisch. Die Kompanien brauchen dafür kein technisches Wissen.
 
 > **Stand:** Phase 0. Architektur, API-Spezifikation, Konfigurationsschema und die Schnittstellen des Kerns sind festgelegt. Die eigentliche Logik wird ab Phase 1 aus der Lank-App übernommen.
 
@@ -39,6 +39,7 @@ scripts/              Prüf- und Build-Skripte
 
 ```bash
 scripts/check-core-boundary.sh   # Kern enthält keine WordPress-Aufrufe
+scripts/check-neutral.sh         # keine Namen oder Motive einer bestimmten Kompanie
 ```
 
 GitHub Actions prüft bei jedem Push zusätzlich die PHP-Syntax, die OpenAPI-Spezifikation und das Konfigurationsschema.

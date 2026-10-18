@@ -2,17 +2,20 @@
 
 declare(strict_types=1);
 
-namespace KompanieApp\Core\Port;
+namespace KompanieApp\Core\Storage\Sql;
 
 /**
- * Datenbankzugriff. WordPress: $wpdb. Standalone: PDO.
+ * Verbindung für die SQL-Konnektoren (MySQL/MariaDB und SQLite).
+ * WordPress: $wpdb. Standalone: PDO.
+ *
+ * Der Kern spricht nicht direkt mit SQL, sondern mit Repositories. Nur deren
+ * SQL-Umsetzung nutzt diese Verbindung.
  *
  * Abfragen nutzen Platzhalter `?` und Tabellennamen in geschweiften Klammern,
- * z. B. `SELECT * FROM {points} WHERE user_id = ?`. Der Adapter ersetzt
- * `{points}` durch den Namen mit Präfix (z. B. `wp_mkl_points`).
- * Das SQL muss auf MySQL/MariaDB und SQLite laufen.
+ * z. B. `SELECT * FROM {points} WHERE user_id = ?`. Die Verbindung ersetzt
+ * `{points}` durch den Namen mit Präfix (z. B. `wp_kompanie_points`).
  */
-interface Database
+interface Connection
 {
     /** @return array<int, array<string, mixed>> */
     public function select(string $sql, array $params = []): array;
@@ -37,6 +40,6 @@ interface Database
      */
     public function transaction(callable $fn): mixed;
 
-    /** 'mysql' oder 'sqlite', für die wenigen Stellen, an denen sich das SQL unterscheidet. */
+    /** 'mysql' oder 'sqlite'; bestimmt den Dialekt (Tabellenanlage, Upsert, Datumsfunktionen). */
     public function driver(): string;
 }

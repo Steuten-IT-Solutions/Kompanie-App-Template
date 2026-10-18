@@ -2,12 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Steuten-IT-Solutions/Kompanie-App-Template/config/kompanie.schema.json",
   "title": "Kompanie-Konfiguration",
-  "description": "Beschreibt eine Kompanie. Pflicht sind nur name und colors.primary, dazu das Logo als assets/logo.png. Alles andere hat Standardwerte oder wird beim Build berechnet. Enthält keine Zugangsdaten – die Kompanie-Repos sind öffentlich.",
+  "description": "Beschreibt eine Kompanie. Pflicht sind nur name und colors.primary, dazu ein Logo als assets/logo.png, .jpg oder .svg. Alles andere hat Standardwerte oder wird beim Build berechnet. Enthält keine Zugangsdaten – die Kompanie-Repos sind öffentlich.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "colors"],
+  "required": [
+    "name",
+    "colors"
+  ],
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "name": {
       "description": "Voller Name, z. B. im Fenstertitel und in der Kopfzeile für Gäste.",
       "type": "string",
@@ -21,7 +26,7 @@
       "maxLength": 30
     },
     "description": {
-      "description": "Kurzbeschreibung im Manifest. Standard: „Termine, News und mehr der <name>“.",
+      "description": "Kurzbeschreibung im Manifest. Standard: „Die App der <name>“.",
       "type": "string",
       "maxLength": 200
     },
@@ -31,45 +36,132 @@
       "default": "Hallo, {name}",
       "pattern": "\\{name\\}"
     },
-    "roleLabels": {
-      "description": "Anzeigenamen der Rollen. Nicht angegebene behalten den Standard.",
+    "guestWelcome": {
+      "description": "Kurzer Willkommenstext für Gäste ohne Anmeldung, z. B. auf der Startseite.",
+      "type": "string",
+      "maxLength": 300
+    },
+    "labels": {
+      "description": "Eigene Bezeichnungen. Nicht angegebene behalten den Standard.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "guest": { "type": "string", "default": "Gast" },
-        "member": { "type": "string", "default": "Mitglied" },
-        "manager": { "type": "string", "default": "Spieß" },
-        "admin": { "type": "string", "default": "Admin" }
+        "roles": {
+          "description": "Anzeigenamen der Rollen, z. B. „Spieß“, „Kassierer“ oder „Hauptmann“ für manager.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "guest": {
+              "type": "string",
+              "default": "Gast"
+            },
+            "member": {
+              "type": "string",
+              "default": "Mitglied"
+            },
+            "manager": {
+              "type": "string",
+              "default": "Verwalter"
+            },
+            "admin": {
+              "type": "string",
+              "default": "Admin"
+            }
+          }
+        },
+        "sections": {
+          "description": "Anzeigenamen der Bereiche in der Navigation und in Überschriften.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "events": {
+              "type": "string",
+              "default": "Termine"
+            },
+            "news": {
+              "type": "string",
+              "default": "News"
+            },
+            "gallery": {
+              "type": "string",
+              "default": "Galerie"
+            },
+            "points": {
+              "type": "string",
+              "default": "Punkte"
+            },
+            "penalties": {
+              "type": "string",
+              "default": "Strafen"
+            }
+          }
+        }
       }
     },
     "colors": {
       "description": "Nur die Grundfarben. Abstufungen und Dunkelmodus werden berechnet, der Kontrast wird geprüft.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["primary"],
+      "required": [
+        "primary"
+      ],
       "properties": {
-        "primary": { "$ref": "#/$defs/color", "description": "Hauptfarbe: Kopfzeile, Knöpfe, Links." },
-        "accent": { "$ref": "#/$defs/color", "description": "Akzentfarbe: Hervorhebungen. Standard: aus der Hauptfarbe berechnet." },
-        "background": { "$ref": "#/$defs/color", "description": "Optional: Hintergrund im hellen Modus. Standard: ein helles, leicht getöntes Weiß." }
+        "primary": {
+          "$ref": "#/$defs/color",
+          "description": "Hauptfarbe: Kopfzeile, Knöpfe, Links."
+        },
+        "accent": {
+          "$ref": "#/$defs/color",
+          "description": "Akzentfarbe: Hervorhebungen. Standard: aus der Hauptfarbe berechnet."
+        },
+        "background": {
+          "$ref": "#/$defs/color",
+          "description": "Optional: Hintergrund im hellen Modus. Standard: ein helles, leicht getöntes Weiß."
+        }
       }
     },
     "font": {
-      "description": "Schrift für Überschriften, aus der mitgelieferten Auswahl.",
+      "description": "Schrift für Überschriften, aus der mitgelieferten Auswahl. „System“ nutzt die Schrift des Geräts.",
       "type": "string",
-      "enum": ["Oswald", "Roboto Slab", "Source Sans 3", "System"],
-      "default": "Oswald"
+      "enum": [
+        "System",
+        "Oswald",
+        "Roboto Slab",
+        "Source Sans 3"
+      ],
+      "default": "System"
     },
     "features": {
       "description": "Welche Bereiche die App hat. Ein ausgeschalteter Bereich ist auch auf dem Server gesperrt.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "events": { "description": "Öffentliche Terminliste.", "type": "boolean", "default": true },
-        "calendar": { "description": "Kalender mit allen Terminen für Mitglieder.", "type": "boolean", "default": true },
-        "news": { "type": "boolean", "default": true },
-        "gallery": { "type": "boolean", "default": true },
-        "points": { "type": "boolean", "default": true },
-        "penalties": { "type": "boolean", "default": true }
+        "events": {
+          "description": "Öffentliche Terminliste.",
+          "type": "boolean",
+          "default": true
+        },
+        "calendar": {
+          "description": "Kalender mit allen Terminen für Mitglieder.",
+          "type": "boolean",
+          "default": true
+        },
+        "news": {
+          "type": "boolean",
+          "default": true
+        },
+        "gallery": {
+          "type": "boolean",
+          "default": true
+        },
+        "points": {
+          "type": "boolean",
+          "default": true
+        },
+        "penalties": {
+          "type": "boolean",
+          "default": true
+        }
       }
     },
     "legal": {
@@ -77,12 +169,23 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "imprintUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
-        "privacyUrl": { "type": "string", "format": "uri", "pattern": "^https://" }
+        "imprintUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "privacyUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        }
       }
     }
   },
   "$defs": {
-    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    }
   }
 }

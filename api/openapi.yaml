@@ -7,8 +7,8 @@ info:
     - WordPress: `/wp-json/kompanie-app/v1`
     - Standalone: `/api/v1`
 
-    Abgeleitet aus der REST-API der Lank-App (`mk-lank/v1`, Plugin 0.3.0). Neu sind
-    `/config` und `/auth/*`; sie ersetzen `window.MKL_CONFIG`, den WordPress-Nonce und
+    Abgeleitet aus der REST-API der ersten Umsetzung (Plugin 0.3.0). Neu sind
+    `/config` und `/auth/*`; sie ersetzen die bisher von PHP eingespeiste Konfiguration, den WordPress-Nonce und
     den festen Weg über `wp-login.php`.
 
     **Anmeldung:** Sitzungs-Cookie. Jede Anfrage, die Daten ändert, braucht das
@@ -475,7 +475,7 @@ paths:
       tags: [Verwaltung]
       summary: Neues Startpasswort für ein Mitglied erzeugen
       description: |
-        Neu gegenüber Lank. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
+        Neu gegenüber der ersten Umsetzung. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
         werden abgemeldet.
       x-capability: create_users
