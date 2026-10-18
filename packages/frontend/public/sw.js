@@ -2,8 +2,9 @@
  *
  * - Programmdateien (Hash-Dateinamen) → zuerst aus dem Speicher.
  * - App-Seite und API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version.
- * - Verwaltung für Admins (/admin/…) und Antworten mit „Cache-Control: no-store“ (z. B. die
- *   Datensicherung) → nie speichern.
+ * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
+ *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
+ *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
  * Wo API und Programmdateien liegen, steht in den Parametern ?api=…&assets=…
  * Beim Abmelden löscht die App alle Speicher.
  */
@@ -46,7 +47,7 @@ function isAdmin(url) {
 }
 
 function cacheable(res) {
-  return res && res.ok && !res.redirected && res.type === 'basic' && !/no-store/i.test(res.headers.get('Cache-Control') || '');
+  return res && res.ok && !res.redirected && res.type === 'basic';
 }
 
 async function cacheFirst(request) {

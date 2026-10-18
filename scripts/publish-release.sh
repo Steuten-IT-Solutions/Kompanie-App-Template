@@ -48,19 +48,20 @@ updates() { php "$ROOT/scripts/updates.php" --list="$WORK/site/updates.json" --k
 # Ist v$1 ein Entwurf? true/false; „none“ nur, wenn es das Release sicher nicht gibt. Bei anderen
 # Fehlern (Netz, API) mehrmals versuchen, sonst abbrechen.
 release_state() {
-  local out
+  local out err
   for attempt in 1 2 3; do
-    if out="$($GH release view "v$1" --repo "$REPO" --json isDraft --jq .isDraft 2>&1)"; then
+    if out="$($GH release view "v$1" --repo "$REPO" --json isDraft --jq .isDraft 2> "$WORK/gh-err")"; then
       echo "$out"
       return 0
     fi
-    if grep -qi "not found" <<< "$out"; then
+    err="$(cat "$WORK/gh-err")"
+    if grep -qx "release not found" <<< "$err"; then
       echo none
       return 0
     fi
     sleep $((attempt * 3))
   done
-  echo "Release v$1 nicht abfragbar: $out" >&2
+  echo "Release v$1 nicht abfragbar: $err" >&2
   exit 1
 }
 # Entwurf veröffentlichen (Prerelease, wenn noch nicht für alle freigegeben) und prüfen, dass er öffentlich ist
@@ -85,7 +86,11 @@ enable_pages() {
 
 fetch_pages
 # (Entwürfe zählen nicht: Ein abgebrochener erster Lauf hinterlässt einen, den der nächste ersetzt.)
-if [ ! -f "$WORK/site/updates.json" ] && [ -n "$($GH release list --repo "$REPO" --exclude-drafts --limit 1)" ]; then
+PUBLISHED=""
+if [ ! -f "$WORK/site/updates.json" ]; then
+  PUBLISHED="$($GH release list --repo "$REPO" --exclude-drafts --limit 1)"   # eigene Zuweisung: Fehler brechen ab
+fi
+if [ -n "$PUBLISHED" ]; then
   # Ohne Liste begänne die Nummerierung von vorn, unter den installierten Versionen.
   echo "In $REPO gibt es Releases, aber keine Update-Liste auf gh-pages. Bitte gh-pages wiederherstellen (siehe docs/RELEASE.md)." >&2
   exit 1

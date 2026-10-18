@@ -29,9 +29,12 @@ final class WpUpdateTarget implements UpdateTarget
 
     public function autoUpdateAllowed(): bool
     {
-        if ((defined('AUTOMATIC_UPDATER_DISABLED') && AUTOMATIC_UPDATER_DISABLED) || !wp_is_file_mod_allowed('automatic_updater')) {
+        $disabled = (defined('AUTOMATIC_UPDATER_DISABLED') && AUTOMATIC_UPDATER_DISABLED) || !wp_is_file_mod_allowed('automatic_updater');
+        if ((bool) apply_filters('automatic_updater_disabled', $disabled)) {
             return false;
         }
+        // Vorgabe: erlaubt (das Plugin hat keinen Schalter in der Plugin-Liste von WordPress; ein- und
+        // ausgeschaltet wird in der App). Der Filter erlaubt es Admins und Hostern, das zu übersteuern.
         $item = (object) ['plugin' => self::plugin(), 'slug' => self::SLUG];
         return (bool) apply_filters('auto_update_plugin', true, $item);
     }

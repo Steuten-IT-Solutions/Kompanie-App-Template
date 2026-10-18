@@ -15,9 +15,12 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 GH="${GH:-gh}"
 # Freigeben nur, was öffentlich ist (kein Entwurf eines abgebrochenen Laufs)
-if [ "$ACTION" = promote ] && [ "$($GH release view "v$VERSION" --repo "$REPO" --json isDraft --jq .isDraft)" != false ]; then
-  echo "Release v$VERSION ist nicht veröffentlicht (Entwurf?). Erst „Kompanie veröffentlichen“ erneut laufen lassen." >&2
-  exit 1
+if [ "$ACTION" = promote ]; then
+  DRAFT="$($GH release view "v$VERSION" --repo "$REPO" --json isDraft --jq .isDraft)" || { echo "Release v$VERSION nicht abfragbar." >&2; exit 1; }
+  if [ "$DRAFT" != false ]; then
+    echo "Release v$VERSION ist nicht veröffentlicht (Entwurf). Erst „Kompanie veröffentlichen“ erneut laufen lassen." >&2
+    exit 1
+  fi
 fi
 mark_release() {
   # Freigegeben: Das Release ist kein Vorab-Release mehr (Kennzeichnung auf GitHub; maßgeblich ist die Liste).

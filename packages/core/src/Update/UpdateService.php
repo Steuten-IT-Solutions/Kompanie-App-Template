@@ -227,9 +227,16 @@ final class UpdateService
         }
         // Nur ein Update zur selben Zeit (täglicher Abgleich, zwei Admins, erneuter Klick nach einer
         // Zeitüberschreitung). flock gibt die Sperre auch frei, wenn der Prozess abbricht.
+        // Kann das Dateisystem keine Sperren (manche Netzlaufwerke), geht es ohne weiter.
         $lock = @fopen($this->files->path('sicherungen/update.lock', false), 'c');
-        if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
-            throw new ApiError(409, 'update_running', 'Gerade läuft schon ein Update. Bitte in ein paar Minuten den Zustand neu laden.');
+        if ($lock === false) {
+            throw new ApiError(500, 'update_lock', 'Die Sperrdatei für Updates lässt sich nicht anlegen (Schreibrechte im Datenverzeichnis?).');
+        }
+        if (!flock($lock, LOCK_EX | LOCK_NB, $wouldBlock)) {
+            if ($wouldBlock) {
+                throw new ApiError(409, 'update_running', 'Gerade läuft schon ein Update. Bitte in ein paar Minuten den Zustand neu laden.');
+            }
+            $lock = null;
         }
         // Klassen, die nach dem Austausch der Dateien noch gebraucht werden, vorher laden.
         class_exists(ApiError::class);
@@ -244,12 +251,12 @@ final class UpdateService
                 @unlink($zip);
             }
         } catch (\RuntimeException $e) {
-            flock($lock, LOCK_UN);
+            $lock && flock($lock, LOCK_UN);
             $record['error'] = $e->getMessage();
             $this->settings->set(self::LAST, $record);
             throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
         }
-        flock($lock, LOCK_UN);
+        $lock && flock($lock, LOCK_UN);
         $record['ok'] = true;
         $this->settings->set(self::LAST, $record);
         if ($kind === 'rollback') {
@@ -324,7 +331,9 @@ final class UpdateService
         // .htaccess-Schutz des Ordners nicht greift.
         $dir = dirname($this->files->path('sicherungen/x', false));
         $seq = 0;
-        foreach (glob($dir . '/vor-update-*.json') ?: [] as $f) {
+        // Nur Dateien im Format mit Nummer zählen (ältere Namen ohne Nummer gelten als älter).
+        $numbered = glob($dir . '/vor-update-[0-9][0-9][0-9][0-9][0-9][0-9]-*.json') ?: [];
+        foreach ($numbered as $f) {
             $seq = max($seq, (int) substr(basename($f), strlen('vor-update-'), 6));
         }
         $name = sprintf('vor-update-%06d-%s-%s-%s.json', $seq + 1, gmdate('Ymd-His', $this->time->timestamp()), $this->currentVersion, bin2hex(random_bytes(16)));
@@ -343,8 +352,9 @@ final class UpdateService
             throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');
         }
         @chmod($path, 0600);
-        $all = glob(dirname($path) . '/vor-update-*.json') ?: [];
-        sort($all);
+        $numbered = glob($dir . '/vor-update-[0-9][0-9][0-9][0-9][0-9][0-9]-*.json') ?: [];
+        sort($numbered);
+        $all = [...array_values(array_diff(glob($dir . '/vor-update-*.json') ?: [], $numbered)), ...$numbered];
         foreach (array_slice($all, 0, max(0, count($all) - self::MAX_BACKUPS)) as $old) {
             @unlink($old);
         }

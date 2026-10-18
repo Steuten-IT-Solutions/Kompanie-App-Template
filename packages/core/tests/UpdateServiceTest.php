@@ -256,6 +256,9 @@ final class UpdateServiceTest extends TestCase
             $extra[$v] = ['schema' => 3 + $i];
         }
         $this->publish($versions, $versions, [], $extra);
+        // Eine Sicherung im früheren Namensformat (ohne Nummer) gilt als älteste.
+        @mkdir($this->dir . '/i/sicherungen', 0777, true);
+        file_put_contents($this->dir . '/i/sicherungen/vor-update-1.0.0.4-20260101-000000-abc.json', '{}');
         foreach (array_slice($versions, 0, -1) as $i => $from) {
             $s = $this->service($from);
             $this->settings->set('schema_version', 2 + $i);
@@ -267,6 +270,7 @@ final class UpdateServiceTest extends TestCase
         $this->assertStringContainsString('-1.0.0.11-', $names, 'die neueste Sicherung bleibt');
         $this->assertStringContainsString('-1.0.0.10-', $names);
         $this->assertFileExists($this->dir . '/i/sicherungen/index.html');
+        $this->assertStringNotContainsString('vor-update-1.0.0.4-', $names, 'alte Datei zuerst aufgeräumt');
     }
 
     public function testStableOnlyLockAndSkippedStatus(): void

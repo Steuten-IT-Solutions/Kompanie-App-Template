@@ -441,9 +441,38 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   expect(data.format).toBe('kompanie-app-backup');
   expect(data.variant).toBe(STANDALONE ? 'standalone' : 'wordpress');
   expect(Object.keys(data.tables)).toContain('events');
+  // Die Sicherung (und alles unter /admin/) landet nie im Speicher des Service Workers.
+  const cached = await page.evaluate(async () => {
+    const urls: string[] = [];
+    for (const name of await caches.keys()) {
+      for (const req of await (await caches.open(name)).keys()) urls.push(decodeURIComponent(req.url));
+    }
+    return urls;
+  });
+  expect(cached.filter((u) => u.includes('/admin/'))).toEqual([]);
   // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
+});
+
+test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  // Erst ab dem nächsten Laden steuert der Service Worker die Seite und speichert Antworten.
+  await page.reload();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await page.context().setOffline(true);
+  try {
+    await page.reload();
+    await expect(page.locator('.offline')).toBeVisible();
+    await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
 });
 
 test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ page }) => {

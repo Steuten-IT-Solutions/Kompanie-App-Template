@@ -172,6 +172,9 @@ try {
             } else {
                 $st = $updates->status();
                 $version = $version !== '' ? $version : (string) ($st['available'] ? $st['latest'] : ($st['withdrawn'] ? $st['fallback'] : ''));
+                if ($version === '' && $st['withdrawn']) {
+                    throw new RuntimeException('Diese Version wurde zurückgezogen, aber es gibt noch keine freigegebene Version zum Wechseln.');
+                }
                 if ($version === '') {
                     echo "Schon aktuell.\n";
                     break;

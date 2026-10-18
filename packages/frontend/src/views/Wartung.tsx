@@ -111,7 +111,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             (u.fallback ? (
               <>
                 <p className="form-error small">
-                  Diese Version wurde zurückgezogen. Version {u.fallback} wird beim nächsten Abgleich automatisch eingespielt.
+                  Diese Version wurde zurückgezogen.{' '}
+                  {u.autoAllowed ? `Version ${u.fallback} wird beim nächsten Abgleich automatisch eingespielt.` : `Bitte auf Version ${u.fallback} wechseln.`}
                 </p>
                 <button type="button" className="btn btn-block" disabled={!!busy} onClick={() => install(u.fallback!)}>
                   {busy === 'install' ? 'Wird eingespielt …' : `Jetzt auf ${u.fallback} wechseln`}
