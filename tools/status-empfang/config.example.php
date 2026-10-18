@@ -5,4 +5,6 @@ return [
     'password_hash' => '',
     // Besser außerhalb des Web-Verzeichnisses:
     'data_dir' => __DIR__ . '/data',
+    // Nur Meldungen von Repos dieser Organisation annehmen:
+    'org' => 'Steuten-IT-Solutions',
 ];

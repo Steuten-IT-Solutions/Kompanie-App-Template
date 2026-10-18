@@ -7,7 +7,8 @@
  *   GET  /?uebersicht   Übersicht (HTTP-Anmeldung mit dem Passwort aus config.php)
  *
  * Die Meldungen sind nicht signiert: Jeder könnte eine Meldung schicken. Die Übersicht ist deshalb ein
- * Hinweis, kein Beweis. Gespeichert wird je Kompanie und Variante nur die letzte Meldung (keine IP-Adressen).
+ * Hinweis, kein Beweis. Gespeichert wird je Kompanie und Variante nur die letzte Meldung (keine IP-Adressen),
+ * nur für Kompanien der Organisation (config.php: org), höchstens 2000 Zeilen, 60 Tage.
  * Einrichtung: README.md.
  */
 
@@ -15,8 +16,13 @@ declare(strict_types=1);
 
 $config = is_file(__DIR__ . '/config.php') ? require __DIR__ . '/config.php' : [];
 $dataDir = (string) ($config['data_dir'] ?? __DIR__ . '/data');
+// Nur Kompanien dieser Organisation; Fantasie-Namen anderer würden sonst die Übersicht füllen.
+$org = (string) ($config['org'] ?? 'Steuten-IT-Solutions');
+const SE_MAX_ROWS = 2000;
+const SE_KEEP_DAYS = 60;
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: no-referrer');
+header('Strict-Transport-Security: max-age=31536000');
 
 function se_db(string $dataDir): PDO
 {
@@ -39,7 +45,7 @@ function se_json(int $status, array $body): never
 }
 
 /** Prüft eine Meldung und gibt nur die bekannten Felder zurück (alles andere wird verworfen). */
-function se_clean(mixed $in): ?array
+function se_clean(mixed $in, string $org): ?array
 {
     if (!is_array($in) || ($in['format'] ?? null) !== 1) {
         return null;
@@ -47,7 +53,7 @@ function se_clean(mixed $in): ?array
     $kompanie = (string) ($in['kompanie'] ?? '');
     $version = (string) ($in['version'] ?? '');
     $variant = (string) ($in['variant'] ?? '');
-    if (!preg_match('~^[A-Za-z0-9_.-]{1,60}/[A-Za-z0-9_.-]{1,100}$~', $kompanie) || !preg_match('/^\d{1,4}(\.\d{1,6}){2,3}$/', $version)
+    if (!preg_match('~^' . preg_quote($org, '~') . '/[A-Za-z0-9_.-]{1,100}$~i', $kompanie) || !preg_match('/^\d{1,4}(\.\d{1,6}){2,3}$/', $version)
         || !in_array($variant, ['wordpress', 'standalone'], true)) {
         return null;
     }
@@ -72,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($body) > 4096) {
         se_json(413, ['error' => 'zu groß']);
     }
-    $m = se_clean(json_decode($body, true));
+    $m = se_clean(json_decode($body, true), $org);
     if ($m === null) {
         se_json(400, ['error' => 'ungültig']);
     }
@@ -88,8 +94,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($n > 2000) {
             se_json(429, ['error' => 'zu viele Meldungen']);
         }
+        $known = $db->prepare('SELECT COUNT(*) FROM meldungen WHERE kompanie = ? AND variante = ?');
+        $known->execute([$m['kompanie'], $m['variant']]);
+        if ((int) $known->fetchColumn() === 0 && (int) $db->query('SELECT COUNT(*) FROM meldungen')->fetchColumn() >= SE_MAX_ROWS) {
+            se_json(507, ['error' => 'voll']);
+        }
         $db->prepare('INSERT INTO meldungen (kompanie, variante, daten, empfangen) VALUES (?, ?, ?, ?) ON CONFLICT(kompanie, variante) DO UPDATE SET daten = excluded.daten, empfangen = excluded.empfangen')
             ->execute([$m['kompanie'], $m['variant'], json_encode($m), time()]);
+        // Kompanien, die lange nichts gemeldet haben (z. B. Zustimmung zurückgenommen), entfernen.
+        $db->prepare('DELETE FROM meldungen WHERE empfangen < ?')->execute([time() - SE_KEEP_DAYS * 86400]);
     } catch (Throwable $e) {
         error_log('Statusmeldung: ' . $e->getMessage());
         se_json(500, ['error' => 'intern']);
@@ -120,7 +133,14 @@ if ($hash === '' || !password_verify($pw, $hash)) {
 }
 header('Content-Security-Policy: default-src \'none\'; style-src \'unsafe-inline\'');
 header('Cache-Control: no-store');
-$rows = se_db($dataDir)->query('SELECT daten, empfangen FROM meldungen ORDER BY kompanie, variante')->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $rows = se_db($dataDir)->query('SELECT daten, empfangen FROM meldungen ORDER BY kompanie, variante')->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    error_log('Statusmeldungen: ' . $e->getMessage());
+    http_response_code(500);
+    echo 'Die Daten sind nicht lesbar (Datenverzeichnis und data_dir in config.php prüfen).';
+    exit;
+}
 $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 $date = static fn (int $t): string => $t > 0 ? gmdate('d.m.Y H:i', $t) . ' UTC' : '–';
 $out = '';

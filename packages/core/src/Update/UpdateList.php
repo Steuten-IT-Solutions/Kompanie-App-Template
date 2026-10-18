@@ -124,6 +124,7 @@ final class UpdateList
             'coreCommit' => (string) ($release['coreCommit'] ?? ''),
             'coreCode' => (string) ($release['coreCode'] ?? ''),
             'kompanieCommit' => (string) ($release['kompanieCommit'] ?? ''),
+            'configHash' => (string) ($release['configHash'] ?? ''),
             'minPhp' => (string) ($release['minPhp'] ?? '8.1'),
             'minWordPress' => (string) ($release['minWordPress'] ?? '6.2'),
             'extensions' => array_values((array) ($release['extensions'] ?? [])),

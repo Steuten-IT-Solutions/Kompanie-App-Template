@@ -184,4 +184,10 @@ pub "$SHA4" "$CORE $CODE" > /dev/null
 pages
 grep -q '"serial": 1[0-9]\{9\}' <<< "$(list)" && ok "Serien-Nummer mindestens die aktuelle Zeit" || fail "Serien-Nummer"
 
+# Neue Adresse für Statusmeldungen: neue Version (die Paket-Konfiguration gehört zum Stand)
+STATUS_URL=https://status.example.org/ pub "$SHA4" > /dev/null
+grep -q '"statusUrl": "https://status.example.org/"' <<< "$(unzip -p "$T/releases/v$CORE.6/kompanie-app-standalone.zip" kompanie-app/update.json)" \
+  && ok "Geänderte Adresse für Statusmeldungen ergibt eine neue Version" || fail "Statusadresse: $(ls "$T/releases")"
+if STATUS_URL=http://unsicher.example.org/ pub "$SHA4" > /dev/null 2>&1; then fail "http-Adresse für Statusmeldungen angenommen"; else ok "Adresse für Statusmeldungen nur mit https"; fi
+
 echo; echo "$pass bestanden, 0 fehlgeschlagen"

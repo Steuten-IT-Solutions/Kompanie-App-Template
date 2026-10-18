@@ -7,7 +7,7 @@
  *   php scripts/updates.php --list=updates.json --withdraw=1.2.3.4
  *   php scripts/updates.php --list=updates.json --show
  *   php scripts/updates.php --list=updates.json --next-version=1.2.3      nächste freie Versionsnummer
- *   php scripts/updates.php --list=updates.json --find=<Commit des Kompanie-Repos> --core-code=<Prüfsumme>
+ *   php scripts/updates.php --list=updates.json --find=<Commit des Kompanie-Repos> --core-code=<Prüfsumme> --config-hash=<Prüfsumme>
  *       gibt „Version early|stable“ aus, wenn die neueste Version genau diesen Stand enthält (sonst nichts)
  *
  * --channel=auto (Standard): stable, wenn der Kern schon auf der Demo geprüft ist (--stable-core=Inhalt
@@ -26,7 +26,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:']);
+$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:', 'config-hash:']);
 $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
@@ -67,7 +67,9 @@ try {
         // ist ein neuer Stand und wird neu veröffentlicht; ein zurückgezogener nicht still erneut.
         $e = $list->toArray()['versions'][0] ?? null;
         $code = (string) ($opt['core-code'] ?? '');
-        if (is_array($e) && $opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code) {
+        $config = (string) ($opt['config-hash'] ?? '');
+        if (is_array($e) && $opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code
+            && ($e['configHash'] ?? '') === $config) {
             echo $e['version'], ' ', $list->wasStable($e['version']) ? 'stable' : 'early', "\n";
         }
         exit(0);

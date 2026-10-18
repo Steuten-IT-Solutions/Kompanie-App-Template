@@ -53,16 +53,20 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
    - Den **öffentlichen Schlüssel** (Zeile `'…' => '…'`) in `packages/core/src/Update/TrustedKeys.php`
      eintragen. Ohne diesen Eintrag verweigert `package.php --require-signature` das Signieren.
 2. **GitHub App** der Organisation, installiert für alle Repos, mit den Rechten *Contents*, *Pages*,
-   *Pull requests* und *Administration* (Repos anlegen, Topics) jeweils Lesen und Schreiben: App-ID als
+   *Pull requests*, *Administration* (Repos anlegen, Topics) und *Workflows* (die Vorlage enthält
+   `.github/workflows/build.yml`; ob das Anlegen aus der Vorlage dieses Recht braucht, ist nicht geprüft)
+   jeweils Lesen und Schreiben: App-ID als
    Variable `KOMPANIE_APP_ID`, privaten Schlüssel als Secret `KOMPANIE_APP_KEY` derselben Environment.
 3. **Repo `Kompanie-App-Vorlage`** mit dem Inhalt von [`vorlage/`](../vorlage) anlegen und als
    *Template repository* markieren.
 4. Nach dem ersten Zusammenführen in `main`: Tag **`v1`** setzen (die Kompanie-Repos rufen die Vorschau
    über `preview-kompanie.yml@v1` auf).
 5. Im Kern-Repo die Labels `neue-kompanie` und `kompanie-aendern` anlegen (die Formulare setzen sie).
-6. Optional als Variablen der Environment `veroeffentlichen`: `KOMPANIE_STATUS_URL` (Empfang der
-   Statusmeldungen, siehe [`tools/status-empfang`](../tools/status-empfang)) und `KOMPANIE_SUPPORT`
-   (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
+6. Optional als **Variablen des Kern-Repos** (nicht der Environment, sonst sieht sie der Abgleich nicht):
+   `KOMPANIE_STATUS_URL` (Empfang der Statusmeldungen, https, siehe [`tools/status-empfang`](../tools/status-empfang))
+   und `KOMPANIE_SUPPORT` (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
+   Eine Änderung daran (wie an `TrustedKeys`) ergibt beim nächsten Abgleich für jede Kompanie eine neue
+   Version: Die Prüfsumme der Paket-Konfiguration (`configHash`) gehört zum veröffentlichten Stand.
 
 ## Neue Kompanie, Kompanie ändern
 
@@ -77,8 +81,10 @@ Im Kern-Repo *Issues → New issue*:
   im Repo der Kompanie einen Pull Request mit Vorschau; nach dem Zusammenführen wird veröffentlicht.
   Bereiche ein- oder ausschalten geht direkt in `kompanie.json` des Repos.
 - Fehler stehen als Kommentar im Issue; nach dem Bearbeiten des Issues läuft die Prüfung erneut.
-- Nur wer Schreibrecht auf das Kern-Repo hat, kann die Formulare auslösen (geprüft wird, wer das Issue
-  angelegt oder zuletzt bearbeitet hat). Der Text des Issues wird in einem Job ohne Geheimnisse verarbeitet.
+- Nur wer Schreibrecht auf das Kern-Repo hat, kann die Formulare auslösen: Sowohl wer das Issue angelegt hat
+  als auch wer es zuletzt bearbeitet hat, braucht Schreibrecht. Der Text des Issues wird in einem Job ohne
+  Geheimnisse verarbeitet. Nach Erfolg wird das Issue geschlossen; für weitere Änderungen ein neues Formular.
+- Bricht das Anlegen einer neuen Kompanie ab, setzt das erneute Bearbeiten des (offenen) Issues fort.
 
 ## Versionen
 

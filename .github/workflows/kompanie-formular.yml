@@ -1,7 +1,9 @@
 # Formulare „Neue Kompanie“ und „Kompanie ändern“ (.github/ISSUE_TEMPLATE): Angaben prüfen, Vorschau bauen,
 # dann das Repo anlegen und veröffentlichen bzw. im Repo der Kompanie einen Pull Request mit der Änderung öffnen.
 #
-# Nur für Personen mit Schreibrecht auf dieses Repo (das Repo ist öffentlich, Issues kann jeder anlegen).
+# Nur für Personen mit Schreibrecht auf dieses Repo (das Repo ist öffentlich, Issues kann jeder anlegen):
+# geprüft werden, wer das Issue angelegt hat, und wer es zuletzt bearbeitet hat. Nur offene Issues; nach
+# Erfolg wird das Issue geschlossen.
 # - „pruefen“ verarbeitet den Text des Issues ohne Geheimnisse (nur Lesen + Kommentieren).
 # - „anwenden“ bekommt nur das geprüfte Ergebnis und das Token der GitHub App (Environment „veroeffentlichen“).
 name: Kompanie-Formular
@@ -13,16 +15,17 @@ on:
 permissions:
   contents: read
 
+# Kein Abbruch: Ein laufendes Anlegen soll nie mittendrin enden.
 concurrency:
   group: kompanie-formular-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   ORG: Steuten-IT-Solutions
 
 jobs:
   pruefen:
-    if: contains(github.event.issue.labels.*.name, 'neue-kompanie') || contains(github.event.issue.labels.*.name, 'kompanie-aendern')
+    if: github.event.issue.state == 'open' && (contains(github.event.issue.labels.*.name, 'neue-kompanie') || contains(github.event.issue.labels.*.name, 'kompanie-aendern'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,14 +33,19 @@ jobs:
     outputs:
       mode: ${{ steps.lesen.outputs.mode }}
       repo: ${{ steps.lesen.outputs.repo }}
+      resume: ${{ steps.lesen.outputs.resume }}
     steps:
-      - name: Berechtigung prüfen (wer das Issue angelegt oder zuletzt geändert hat)
+      - name: Berechtigung prüfen (wer das Issue angelegt und wer es zuletzt geändert hat)
+        id: berechtigt
         env:
           GH_TOKEN: ${{ github.token }}
           SENDER: ${{ github.event.sender.login }}
+          AUTHOR: ${{ github.event.issue.user.login }}
         run: |
-          PERM="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$SENDER/permission" --jq .permission 2> /dev/null || echo none)"
-          case "$PERM" in admin|maintain|write) ;; *) echo "::error::$SENDER hat kein Schreibrecht auf $GITHUB_REPOSITORY."; exit 1 ;; esac
+          for WHO in "$AUTHOR" "$SENDER"; do
+            PERM="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$WHO/permission" --jq .permission 2> /dev/null || echo none)"
+            case "$PERM" in admin|maintain|write) ;; *) echo "::error::$WHO hat kein Schreibrecht auf $GITHUB_REPOSITORY."; exit 1 ;; esac
+          done
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -67,15 +75,27 @@ jobs:
           php scripts/issue-to-kompanie.php --mode="$MODE" --body="$RUNNER_TEMP/issue.md" --out="$OUT" --repo-only
           REPO="$(cat "$OUT/repo.txt")"
           mkdir -p "$OUT/kompanie"
+          RESUME=0
+          INFO="$(gh api "repos/$ORG/$REPO" --jq '[(.topics | index("kompanie-app") != null), .private, (.template_repository.full_name // "")] | @tsv' 2> /dev/null || true)"
+          IFS=$'\t' read -r TOPIC PRIVATE TEMPLATE <<< "$INFO"
           if [ "$MODE" = neu ]; then
-            if gh api "repos/$ORG/$REPO" > /dev/null 2>&1; then
-              echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"
-              exit 1
+            if [ -n "$INFO" ]; then
+              # Ein früherer Lauf brach nach dem Anlegen ab (aus der Vorlage, noch ohne Topic): fortsetzen.
+              if [ "$TOPIC" = false ] && [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ]; then
+                RESUME=1
+              else
+                echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"
+                exit 1
+              fi
             fi
             php scripts/issue-to-kompanie.php --mode=neu --body="$RUNNER_TEMP/issue.md" --out="$OUT"
           else
+            if [ "$TOPIC" != true ] || [ "$PRIVATE" != false ]; then
+              echo "- $ORG/$REPO ist kein (öffentliches) Repo einer Kompanie (Topic kompanie-app fehlt)." > "$OUT/fehler.txt"
+              exit 1
+            fi
             if ! git clone --quiet --depth 1 "https://github.com/$ORG/$REPO.git" "$OUT/kompanie" 2> /dev/null; then
-              echo "- Das Repo $ORG/$REPO gibt es nicht." > "$OUT/fehler.txt"
+              echo "- Das Repo $ORG/$REPO ließ sich nicht holen." > "$OUT/fehler.txt"
               exit 1
             fi
             rm -rf "$OUT/kompanie/.git"
@@ -88,6 +108,7 @@ jobs:
           fi
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+          echo "resume=$RESUME" >> "$GITHUB_OUTPUT"
 
       # Prüft kompanie.json gegen das Schema und die Farben auf Kontrast (packages/branding).
       - name: App bauen (Prüfung)
@@ -97,7 +118,7 @@ jobs:
           OUT: ${{ runner.temp }}/formular
         run: |
           scripts/build-frontend.sh > "$OUT/build.log" 2>&1 || {
-            { echo "- Die Angaben passen nicht:"; grep -E 'Fehler|fehler|Kontrast|muss|must' "$OUT/build.log" | head -20 | sed 's/^/  /'; } > "$OUT/fehler.txt"
+            { echo "- Die Angaben passen nicht:"; grep -E 'Fehler|fehler|Kontrast|muss|must' "$OUT/build.log" | head -20 | sed 's/^/  /' || true; } > "$OUT/fehler.txt"
             cat "$OUT/build.log"; exit 1; }
 
       - name: Bildschirmfotos
@@ -119,8 +140,9 @@ jobs:
           name: vorschau
           path: ${{ runner.temp }}/formular/vorschau
 
+      # Nur für Berechtigte (sonst könnten Fremde mit jeder Bearbeitung Kommentare auslösen).
       - name: Fehler im Issue melden
-        if: failure()
+        if: failure() && steps.berechtigt.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE: ${{ github.event.issue.number }}
@@ -133,6 +155,10 @@ jobs:
             if [ -s "$OUT/fehler.txt" ]; then cat "$OUT/fehler.txt"; else echo "Einzelheiten im [Workflow-Lauf]($RUN)."; fi
           } > "$RUNNER_TEMP/kommentar.md"
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/kommentar.md"
+          # Erledigt: schließen (spätere Bearbeitungen lösen dann nichts mehr aus)
+          if [ "$ANWENDEN" = success ] && { [ "$MODE" = aendern ] || [ "$VEROEFFENTLICHEN" = success ]; }; then
+            gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" > /dev/null
+          fi
 
   anwenden:
     needs: pruefen
@@ -155,23 +181,39 @@ jobs:
           name: kompanie
           path: ${{ runner.temp }}/kompanie
 
-      # Neue Repos anlegen darf die App nur mit Zugriff auf die ganze Organisation.
-      - name: Zugang (GitHub App)
-        id: app
+      # Neue Repos anlegen geht nur mit Zugriff auf die ganze Organisation; Ändern nur für das eine Repo.
+      - name: Zugang (GitHub App, Organisation)
+        id: app_org
+        if: needs.pruefen.outputs.mode == 'neu'
         uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
         with:
           app-id: ${{ vars.KOMPANIE_APP_ID }}
           private-key: ${{ secrets.KOMPANIE_APP_KEY }}
           owner: Steuten-IT-Solutions
 
+      - name: Zugang (GitHub App, nur dieses Repo)
+        id: app_repo
+        if: needs.pruefen.outputs.mode == 'aendern'
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        with:
+          app-id: ${{ vars.KOMPANIE_APP_ID }}
+          private-key: ${{ secrets.KOMPANIE_APP_KEY }}
+          owner: Steuten-IT-Solutions
+          repositories: ${{ needs.pruefen.outputs.repo }}
+
       - name: Repo anlegen
         if: needs.pruefen.outputs.mode == 'neu'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ steps.app_org.outputs.token }}
           REPO: ${{ needs.pruefen.outputs.repo }}
+          RESUME: ${{ needs.pruefen.outputs.resume }}
           SRC: ${{ runner.temp }}/kompanie
+          ISSUE: ${{ github.event.issue.number }}
         run: |
-          gh repo create "$ORG/$REPO" --public --template "$ORG/Kompanie-App-Vorlage" --description "App der Kompanie (Kompanie-App)"
+          if [ "$RESUME" != 1 ]; then
+            gh api -X POST "repos/$ORG/Kompanie-App-Vorlage/generate" -f owner="$ORG" -f name="$REPO" -F private=false \
+              -f description="App der Kompanie (Kompanie-App)" > /dev/null
+          fi
           # Das Anlegen aus der Vorlage läuft im Hintergrund: warten, bis main da ist.
           for _ in $(seq 1 30); do git ls-remote --exit-code "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" refs/heads/main > /dev/null 2>&1 && break; sleep 2; done
           git clone --quiet "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" "$RUNNER_TEMP/repo"
@@ -179,16 +221,18 @@ jobs:
           mkdir -p "$RUNNER_TEMP/repo/assets" && rm -f "$RUNNER_TEMP/repo/assets"/logo.*
           cp "$SRC"/assets/logo.* "$RUNNER_TEMP/repo/assets/"
           git -C "$RUNNER_TEMP/repo" add -A
-          git -C "$RUNNER_TEMP/repo" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit --quiet -m "Kompanie eingerichtet (Formular #${{ github.event.issue.number }})"
-          git -C "$RUNNER_TEMP/repo" push --quiet origin HEAD:main
+          if ! git -C "$RUNNER_TEMP/repo" diff --cached --quiet; then   # beim Fortsetzen evtl. schon da
+            git -C "$RUNNER_TEMP/repo" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "Kompanie eingerichtet (Formular #$ISSUE)"
+            git -C "$RUNNER_TEMP/repo" push --quiet origin HEAD:main
+          fi
           gh repo edit "$ORG/$REPO" --add-topic kompanie-app
 
       - name: Pull Request mit der Änderung
         id: aendern
         if: needs.pruefen.outputs.mode == 'aendern'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ steps.app_repo.outputs.token }}
           REPO: ${{ needs.pruefen.outputs.repo }}
           SRC: ${{ runner.temp }}/kompanie
           ISSUE: ${{ github.event.issue.number }}
@@ -201,14 +245,17 @@ jobs:
             mkdir -p "$RUNNER_TEMP/repo/assets" && rm -f "$RUNNER_TEMP/repo/assets"/logo.* && cp "$SRC"/assets/logo.* "$RUNNER_TEMP/repo/assets/"
           fi
           git -C "$RUNNER_TEMP/repo" add -A
+          OPEN="$(gh pr list --repo "$ORG/$REPO" --head "$BRANCH" --state open --json url --jq '.[0].url // ""')"
           if git -C "$RUNNER_TEMP/repo" diff --cached --quiet; then
+            # Nichts zu ändern; ein noch offener PR dieses Formulars wäre veraltet: schließen.
+            [ -n "$OPEN" ] && gh pr close "$OPEN" --comment "Die Angaben im Formular entsprechen jetzt dem Stand auf main." > /dev/null
             echo "pr=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git -C "$RUNNER_TEMP/repo" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit --quiet -m "Änderung aus dem Formular #$ISSUE"
           git -C "$RUNNER_TEMP/repo" push --quiet --force origin "HEAD:refs/heads/$BRANCH"
-          PR="$(gh pr view "$BRANCH" --repo "$ORG/$REPO" --json url --jq .url 2> /dev/null || true)"
+          PR="$OPEN"
           if [ -z "$PR" ]; then
             PR="$(gh pr create --repo "$ORG/$REPO" --head "$BRANCH" --base main --title "Änderung aus dem Formular #$ISSUE" \
               --body "Aus dem Formular $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/issues/$ISSUE. Vorschau: Ergebnis „vorschau“ der Checks.")"
@@ -224,7 +271,7 @@ jobs:
 
   melden:
     needs: [pruefen, anwenden, veroeffentlichen]
-    if: always() && needs.pruefen.result == 'success'
+    if: always() && !cancelled() && needs.pruefen.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       issues: write

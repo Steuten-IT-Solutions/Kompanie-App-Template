@@ -34,6 +34,14 @@ php scripts/issue-to-kompanie.php --mode=aendern --body="$T/aendern.md" --out="$
 printf '### Name des Repos\n\nkompanie-app-template\n' > "$T/res.md"
 if php scripts/issue-to-kompanie.php --mode=aendern --body="$T/res.md" --out="$T/r" --repo-only 2> /dev/null; then fail "Reservierter Name angenommen"; else ok "Reservierte Repo-Namen abgelehnt"; fi
 
+# Überschriften im Freitext: eine fremde gehört zum Text, eine bekannte macht das Formular mehrdeutig
+awk '{print} /^Herzlich willkommen!$/ {print "### Zwischentitel"}' tests/formular/neu.md > "$T/titel.md"
+php scripts/issue-to-kompanie.php --mode=neu --body="$T/titel.md" --out="$T/t" > /dev/null
+grep -q "### Zwischentitel" <<< "$(get "$T/t/kompanie.json" guestWelcome)" && [ "$(cat "$T/t/repo.txt")" = schuetzen-musterdorf ] && ok "Fremde Überschrift bleibt Teil des Textes" || fail "Fremde Überschrift"
+awk '{print} /^Herzlich willkommen!$/ {print "### Name des Repos"; print ""; print "anderes-repo"}' tests/formular/neu.md > "$T/doppelt.md"
+if php scripts/issue-to-kompanie.php --mode=neu --body="$T/doppelt.md" --out="$T/d" 2> /dev/null; then fail "Doppeltes Feld angenommen"; fi
+grep -q "doppelt" "$T/d/fehler.txt" && ok "Doppeltes Feld (Überschrift im Text) wird abgelehnt" || fail "Doppelt: $(cat "$T/d/fehler.txt")"
+
 for url in "https://example.org/logo.png" "http://github.com/user-attachments/assets/x" "https://github.com.example.org/user-attachments/x"; do
   if php scripts/fetch-logo.php --url="$url" --out="$T/logo" 2> /dev/null; then fail "Logo von $url geladen"; fi
 done

@@ -6,6 +6,8 @@
  *       [--kompanie-commit=sha] [--dist=ordner --brand=brand.json] [--updates-url=…] [--status-url=https://…]
  *       [--support="Text"] [--trust-signing-key]
  *       php scripts/package.php --code-hash     nur die Prüfsumme des Programmcodes ausgeben (für STABLE_CORE)
+ *       php scripts/package.php --config-hash --kompanie=org/repo [--status-url=… --support=…]
+ *                                               nur die Prüfsumme der Paket-Konfiguration (update.json)
  *
  * Vorher: scripts/build-frontend.sh mit KOMPANIE_CONFIG/KOMPANIE_ASSETS derselben Kompanie
  * (oder die gebaute App mit --dist und deren brand.json mit --brand angeben).
@@ -40,7 +42,7 @@ use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\Version;
 use KompanieApp\Standalone\Migrations as StandaloneMigrations;
 
-$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'kompanie-commit::', 'dist::', 'brand::', 'require-signature', 'updates-url::', 'status-url::', 'support::', 'trust-signing-key', 'code-hash']);
+$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'kompanie-commit::', 'dist::', 'brand::', 'require-signature', 'updates-url::', 'status-url::', 'support::', 'trust-signing-key', 'code-hash', 'config-hash']);
 $config = (string) ($opt['config'] ?? '');
 $version = (string) ($opt['version'] ?? '');
 $out = rtrim((string) ($opt['out'] ?? ''), '/');
@@ -48,7 +50,7 @@ $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
 };
-if (isset($opt['code-hash'])) {
+if (isset($opt['code-hash']) || isset($opt['config-hash'])) {
     $codeHashOnly = true;
 } elseif (!is_file($config) || $out === '' || !Version::valid($version)) {
     $fail('Aufruf: php scripts/package.php --config=kompanie.json --version=1.2.3.4 --out=ordner');
@@ -165,9 +167,18 @@ function kompanie_code_hash(string $root): string
     return hash('sha256', implode("\n", $lines));
 }
 
-if (isset($codeHashOnly)) {
+if (isset($opt['code-hash'])) {
     echo kompanie_code_hash($root), "\n";
     exit(0);
+}
+
+/** Leer oder eine https-Adresse; sonst Abbruch (ein Tippfehler soll nicht still nichts bewirken). */
+function kompanie_https(string $url, string $name, callable $fail): string
+{
+    if ($url !== '' && !preg_match('~^https://[^\s/?#]+~', $url)) {
+        $fail("$name muss mit https:// beginnen.");
+    }
+    return $url;
 }
 
 // Signaturschlüssel und Update-Konfiguration
@@ -198,11 +209,18 @@ $updateJson = [
     'kompanie' => $repo,
     'updatesUrl' => $updatesUrl,
     'downloadPage' => $downloadPage,
-    'statusUrl' => (string) ($opt['status-url'] ?? ''),
+    'statusUrl' => kompanie_https((string) ($opt['status-url'] ?? ''), '--status-url', $fail),
     'support' => (string) ($opt['support'] ?? ''),
     'trustedKeys' => $trusted,
 ];
 $updateEntry = ['content' => json_encode($updateJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"];
+// Prüfsumme der Paket-Konfiguration (Update-Adresse, Schlüssel, Statusmeldungen, Hilfe): Ändert sich etwas
+// davon, braucht jede Kompanie eine neue Version (scripts/updates.php --find, scripts/find-pending.sh).
+$configHash = hash('sha256', (string) json_encode($updateJson, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+if (isset($opt['config-hash'])) {
+    echo $configHash, "\n";
+    exit(0);
+}
 
 $core = kompanie_files($root . '/packages/core/src');
 $app = kompanie_files($dist, [], false);
@@ -261,6 +279,7 @@ $release = [
     'coreCommit' => (string) (getenv('KOMPANIE_CORE_COMMIT') ?: ($sha[0] ?? '')),
     'coreCode' => kompanie_code_hash($root),
     'kompanieCommit' => (string) ($opt['kompanie-commit'] ?? ''),
+    'configHash' => $configHash,
     'name' => trim($kompanie['name']),
     'version' => $version,
     'major' => Version::major($version),

@@ -96,7 +96,8 @@ if [ -n "$PUBLISHED" ]; then
   exit 1
 fi
 CODE="$(php "$ROOT/scripts/package.php" --code-hash)"
-KNOWN="$(updates --find="$KOMPANIE_SHA" --core-code="$CODE")"
+CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$REPO" --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}" "${TRUST[@]}")"
+KNOWN="$(updates --find="$KOMPANIE_SHA" --core-code="$CODE" --config-hash="$CONFIG_HASH")"
 if [ -n "$KNOWN" ]; then
   read -r KNOWN_VERSION KNOWN_CHANNEL <<< "$KNOWN"
   publish_release "$KNOWN_VERSION" "$KNOWN_CHANNEL"
@@ -132,7 +133,7 @@ for attempt in 1 2 3 4 5; do
   echo "$ADDED"
   if grep -q "schon in der Liste" <<< "$ADDED"; then
     # Der vorige Push kam an, nur die Rückmeldung nicht.
-    CHANNEL="$(updates --find="$KOMPANIE_SHA" --core-code="$CODE" | cut -d' ' -f2)"
+    CHANNEL="$(updates --find="$KOMPANIE_SHA" --core-code="$CODE" --config-hash="$CONFIG_HASH" | cut -d' ' -f2)"
     break
   fi
   CHANNEL="$(sed -n 's/.*(Kanal \(early\|stable\)).*/\1/p' <<< "$ADDED")"

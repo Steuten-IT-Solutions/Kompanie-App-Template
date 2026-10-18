@@ -41,6 +41,10 @@ function ki_page($title, $body)
 {
     global $KONFIG;
     $color = preg_match('/^#[0-9a-fA-F]{6}$/', $KONFIG['primary']) ? $KONFIG['primary'] : '#2e6b3f';
+    // Hilfe-Kontakt: E-Mail-Adresse oder https-Adresse als Link, sonst nur als Text
+    $support = isset($KONFIG['support']) ? trim((string) $KONFIG['support']) : '';
+    $href = filter_var($support, FILTER_VALIDATE_EMAIL) ? 'mailto:' . $support : (preg_match('#^https://#i', $support) ? $support : '');
+    $help = $support === '' ? '' : '<p class="hint">Hilfe: ' . ($href !== '' ? '<a href="' . ki_h($href) . '">' . ki_h($support) . '</a>' : ki_h($support)) . '</p>';
     echo '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<title>' . ki_h($title . ' – ' . $KONFIG['name']) . '</title><style>'
         . 'body{margin:0;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f5f3;color:#1b1d21}'
@@ -50,7 +54,7 @@ function ki_page($title, $body)
         . '.btn{display:inline-block;margin-top:16px;background:' . $color . ';color:#fff;border:0;border-radius:9px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none}'
         . '.ok{color:#1f6b3a}.bad{color:#a3301a;font-weight:600}.hint{color:#5d6168;font-size:.92rem}ul.checks{list-style:none;padding:0;margin:0}ul.checks li{padding:6px 0;border-bottom:1px solid #eceee9}'
         . '.error{background:#fbe9e4;border:1px solid #e9b7a8;color:#7a2412;border-radius:10px;padding:12px 14px;margin:0 0 16px}details{margin-top:12px}code{background:#eceee9;padding:1px 5px;border-radius:4px}'
-        . '</style></head><body><header><h1>' . ki_h($KONFIG['name']) . ' – ' . ki_h($title) . '</h1></header><main>' . $body . '</main></body></html>';
+        . '</style></head><body><header><h1>' . ki_h($KONFIG['name']) . ' – ' . ki_h($title) . '</h1></header><main>' . $body . $help . '</main></body></html>';
     exit;
 }
 

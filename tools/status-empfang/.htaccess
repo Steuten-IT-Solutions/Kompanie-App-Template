@@ -1,9 +1,10 @@
 Options -Indexes
-<FilesMatch "^(config\.php|config\.example\.php|README\.md|.*\.sqlite)$">
+<FilesMatch "^(config\.php|config\.example\.php|README\.md|.*\.sqlite(-journal|-wal|-shm)?)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
 </FilesMatch>
+# Gilt, wenn der Empfang im Wurzelverzeichnis der Subdomain liegt (sonst Pfad anpassen):
 RedirectMatch 404 ^/data/
 # Für die HTTP-Anmeldung bei PHP als CGI/FPM
 <IfModule mod_rewrite.c>

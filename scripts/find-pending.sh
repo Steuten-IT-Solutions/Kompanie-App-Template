@@ -2,7 +2,8 @@
 # Findet Kompanie-Repos, deren aktueller Stand (Commit auf main und Programmcode des Kerns) noch nicht
 # veröffentlicht ist (aus .github/workflows/kompanien-abgleichen.yml). Ausgabe: repos=["Org/Name", …]
 #
-# Umgebung: GH_TOKEN (nur Lesen), optional ONLY (nur dieses Repo), ORG (Standard Steuten-IT-Solutions).
+# Umgebung: GH_TOKEN (nur Lesen), optional ONLY (nur dieses Repo), ORG (Standard Steuten-IT-Solutions),
+#   STATUS_URL und SUPPORT wie beim Veröffentlichen (gehen in die Prüfsumme der Paket-Konfiguration ein).
 # Die Update-Liste wird hier nur gelesen, nicht geprüft: Sie entscheidet nur, ob ein Lauf nötig ist;
 # der Veröffentlichungs-Job prüft selbst noch einmal (mit Signatur) und tut nichts doppelt.
 set -euo pipefail
@@ -36,10 +37,11 @@ while IFS= read -r repo; do
     $env = json_decode((string) file_get_contents($argv[1]), true);
     $list = is_array($env) ? json_decode((string) base64_decode((string) ($env["payload"] ?? ""), true), true) : null;
     $e = $list["versions"][0] ?? null;
-    if (is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && preg_match("/^[0-9.]+$/", (string) $e["version"])) {
+    if (is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && ($e["configHash"] ?? "") === $argv[4]
+        && preg_match("/^[0-9.]+$/", (string) $e["version"])) {
         echo $e["version"];
     }
-  ' "$WORK/list.json" "$sha" "$CODE")"
+  ' "$WORK/list.json" "$sha" "$CODE" "$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$repo" --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}")")"
   # Steht der Stand in der Liste, muss sein Release auch öffentlich sein (ein Lauf kann nach dem Eintrag in
   # die Liste, aber vor dem Veröffentlichen des Entwurfs abgebrochen sein; der nächste Lauf holt das nach).
   if [ -n "$latest" ] && curl -fsIL --max-time 20 -o /dev/null "https://github.com/$repo/releases/download/v$latest/release.json"; then

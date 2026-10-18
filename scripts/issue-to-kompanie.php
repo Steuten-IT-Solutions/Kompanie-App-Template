@@ -55,12 +55,29 @@ const SECTIONS = [
 
 // Issue-Formulare: „### Überschrift“, Leerzeile, Wert; leere Felder als „_No response_“.
 $body = str_replace("\r\n", "\n", (string) file_get_contents((string) $opt['body']));
+// Nur bekannte Überschriften trennen Felder; eine andere „### …“-Zeile gehört zum Wert davor.
+// Taucht ein Feld doppelt auf (z. B. eine Überschrift im Freitext), ist der Text mehrdeutig: ablehnen.
 $parts = preg_split('/^### (.+)$/m', $body, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
-$f = [];
+$raw = [];
+$current = null;
 for ($i = 1; $i + 1 < count($parts); $i += 2) {
     $key = FIELDS[trim($parts[$i])] ?? null;
-    $value = trim($parts[$i + 1]);
-    if ($key !== null && $value !== '_No response_' && $value !== 'None') {
+    if ($key === null) {
+        if ($current !== null) {
+            $raw[$current] .= '### ' . $parts[$i] . $parts[$i + 1];
+        }
+        continue;
+    }
+    if (isset($raw[$key])) {
+        $errors[] = 'Das Feld „' . trim($parts[$i]) . '“ kommt doppelt vor (steht eine Überschrift mit ### im Text?).';
+    }
+    $raw[$key] = $parts[$i + 1];
+    $current = $key;
+}
+$f = [];
+foreach ($raw as $key => $value) {
+    $value = trim($value);
+    if ($value !== '_No response_' && $value !== 'None') {
         $f[$key] = $value;
     }
 }
@@ -105,6 +122,9 @@ $set = static function (array &$k, array $path, string $value, bool $removable =
     }
 };
 
+if ($text('name') === '-' || $text('primary') === '-') {
+    $errors[] = 'Name und Hauptfarbe lassen sich nicht entfernen, nur ändern.';
+}
 foreach (['name' => ['name'], 'shortName' => ['shortName'], 'greeting' => ['greeting'], 'manager' => ['labels', 'roles', 'manager'], 'penalties' => ['labels', 'sections', 'penalties']] as $field => $path) {
     $set($k, $path, $text($field), $field !== 'name');
 }
