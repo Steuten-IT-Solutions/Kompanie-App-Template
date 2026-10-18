@@ -81,10 +81,10 @@ final class App
         return new Migrator($this->db, $this->settings);
     }
 
-    /** Ausstehende Migrationen ausführen und Aufgaben einplanen. */
     /** Einstellung mit der tatsächlich laufenden Version (liest der Installer im Reparaturmodus). */
     public const VERSION_SETTING = 'running_version';
 
+    /** Ausstehende Migrationen ausführen und die laufende Version festhalten. */
     public function upgrade(): void
     {
         $migrator = $this->migrator();
@@ -93,9 +93,14 @@ final class App
         }
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
+        // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
         $version = $this->env->version();
-        if (\KompanieApp\Core\Update\Version::valid($version) && $this->settings->get(self::VERSION_SETTING) !== $version) {
-            $this->settings->set(self::VERSION_SETTING, $version);
+        try {
+            if (\KompanieApp\Core\Update\Version::valid($version) && $this->settings->get(self::VERSION_SETTING) !== $version) {
+                $this->settings->set(self::VERSION_SETTING, $version);
+            }
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: laufende Version nicht gespeichert: ' . $e->getMessage());
         }
     }
 

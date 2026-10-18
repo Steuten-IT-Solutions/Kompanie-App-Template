@@ -139,7 +139,7 @@ grep -q "Version $CORE.5 ist eingespielt" "$T/i6.html" && [ "$(version)" = "$COR
 # … und ohne diesen Eintrag bei mehreren Hauptversionen: nichts einspielen
 php -r 'require $argv[1] . "/autoload.php";
   $k = new KompanieApp\Standalone\Kernel($argv[1], new KompanieApp\Standalone\HttpContext([], ["REQUEST_METHOD" => "GET", "HTTP_HOST" => "127.0.0.1"], "/"));
-  $k->db()->execute("DELETE FROM {settings} WHERE name = ?", ["running_version"]);' "$T/www"
+  $k->db()->execute("DELETE FROM {settings} WHERE name IN (?, ?)", ["running_version", "update_last"]);' "$T/www"
 cp "$T/www/VERSION" "$T/version.bak" && rm "$T/www/VERSION"
 cp "$SRV/rmajor/install.php" "$T/www/install.php"
 installer "$T/i7.html" --data-urlencode "login=admin" --data-urlencode "password=geheim-12345"

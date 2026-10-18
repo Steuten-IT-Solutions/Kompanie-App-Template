@@ -381,18 +381,30 @@ function ki_admin_ok($login, $password)
 
 /**
  * Installierte Version laut Datenbank, falls die Datei VERSION fehlt oder beschädigt ist: die Version,
- * die die App zuletzt selbst als laufend eingetragen hat (App::VERSION_SETTING). Leer, wenn unbekannt.
+ * die die App zuletzt selbst als laufend eingetragen hat (App::VERSION_SETTING); sonst (ältere Versionen
+ * ohne diesen Eintrag) das letzte Update: bei Erfolg die neue, sonst die alte Version. Leer, wenn unbekannt.
  */
 function ki_db_version()
 {
     try {
         list($pdo, $prefix) = ki_db();
-        $stmt = $pdo->prepare('SELECT value FROM ' . $prefix . "settings WHERE name = 'running_version'");
+        $stmt = $pdo->prepare('SELECT name, value FROM ' . $prefix . "settings WHERE name IN ('running_version', 'update_last')");
         $stmt->execute();
-        $v = json_decode((string) $stmt->fetchColumn(), true);
+        $rows = array();
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $rows[$r['name']] = json_decode((string) $r['value'], true);
+        }
     } catch (Exception $e) {
         return '';
     }
+    if (isset($rows['running_version']) && is_string($rows['running_version'])) {
+        return $rows['running_version'];
+    }
+    $last = isset($rows['update_last']) ? $rows['update_last'] : null;
+    if (!is_array($last)) {
+        return '';
+    }
+    $v = !empty($last['ok']) ? (isset($last['to']) ? $last['to'] : '') : (isset($last['from']) ? $last['from'] : '');
     return is_string($v) ? $v : '';
 }
 
