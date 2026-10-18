@@ -178,12 +178,19 @@ function ki_stable_entry($installed = null)
     if ($installed !== null) {
         $history = isset($list['stableHistory']) ? (array) $list['stableHistory'] : array();
         if (!preg_match('/^(\d+)\.\d+\.\d+(\.\d+)?$/', $installed, $m)) {
-            // Installierte Version unbekannt: nur weiter, wenn es keine Wahl der Hauptversion gibt
-            // (gezählt werden alle nicht zurückgezogenen Versionen, auch die nur vorab erschienenen).
+            // Installierte Version unbekannt: nur weiter, wenn es keine Wahl der Hauptversion gibt. Gezählt wird
+            // alles, was je veröffentlicht wurde (die Liste der Versionen ist gekürzt, die Historie nicht; auch auf
+            // zurückgezogenen Versionen können noch Installationen laufen).
             $majors = array();
+            $all = array_merge($history, $withdrawn);
             foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
-                if (isset($e['version']) && !in_array($e['version'], $withdrawn, true)) {
-                    $majors[(int) $e['version']] = true;
+                if (isset($e['version'])) {
+                    $all[] = $e['version'];
+                }
+            }
+            foreach ($all as $v) {
+                if (is_string($v) && preg_match('/^\d+\./', $v)) {
+                    $majors[(int) $v] = true;
                 }
             }
             if (count($majors) === 0) {
@@ -335,10 +342,6 @@ function ki_installed()
     return is_file(ki_data_dir() . '/config.php');
 }
 
-/**
- * Prüft die Anmeldung eines Admins direkt in der Datenbank – ohne den Programmcode, der bei
- * einer Reparatur beschädigt sein kann.
- */
 /** Verbindung zur Datenbank der Installation: array(PDO, Tabellen-Präfix). */
 function ki_db()
 {
@@ -359,6 +362,10 @@ function ki_db()
     return array($pdo, $prefix);
 }
 
+/**
+ * Prüft die Anmeldung eines Admins direkt in der Datenbank – ohne den Programmcode, der bei
+ * einer Reparatur beschädigt sein kann.
+ */
 function ki_admin_ok($login, $password)
 {
     list($pdo, $prefix) = ki_db();
@@ -373,23 +380,19 @@ function ki_admin_ok($login, $password)
 }
 
 /**
- * Installierte Version laut Datenbank (letztes Update: bei Erfolg die neue, sonst die alte Version),
- * falls die Datei VERSION fehlt oder beschädigt ist. Leer, wenn unbekannt (noch nie aktualisiert).
+ * Installierte Version laut Datenbank, falls die Datei VERSION fehlt oder beschädigt ist: die Version,
+ * die die App zuletzt selbst als laufend eingetragen hat (App::VERSION_SETTING). Leer, wenn unbekannt.
  */
 function ki_db_version()
 {
     try {
         list($pdo, $prefix) = ki_db();
-        $stmt = $pdo->prepare('SELECT value FROM ' . $prefix . "settings WHERE name = 'update_last'");
+        $stmt = $pdo->prepare('SELECT value FROM ' . $prefix . "settings WHERE name = 'running_version'");
         $stmt->execute();
-        $last = json_decode((string) $stmt->fetchColumn(), true);
+        $v = json_decode((string) $stmt->fetchColumn(), true);
     } catch (Exception $e) {
         return '';
     }
-    if (!is_array($last)) {
-        return '';
-    }
-    $v = !empty($last['ok']) ? (isset($last['to']) ? $last['to'] : '') : (isset($last['from']) ? $last['from'] : '');
     return is_string($v) ? $v : '';
 }
 

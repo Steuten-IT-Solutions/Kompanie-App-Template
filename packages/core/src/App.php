@@ -82,11 +82,20 @@ final class App
     }
 
     /** Ausstehende Migrationen ausführen und Aufgaben einplanen. */
+    /** Einstellung mit der tatsächlich laufenden Version (liest der Installer im Reparaturmodus). */
+    public const VERSION_SETTING = 'running_version';
+
     public function upgrade(): void
     {
         $migrator = $this->migrator();
         if ($migrator->pending()) {
             $migrator->migrate();
+        }
+        // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
+        // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
+        $version = $this->env->version();
+        if (\KompanieApp\Core\Update\Version::valid($version) && $this->settings->get(self::VERSION_SETTING) !== $version) {
+            $this->settings->set(self::VERSION_SETTING, $version);
         }
     }
 
