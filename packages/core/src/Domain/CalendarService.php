@@ -179,7 +179,7 @@ final class CalendarService
                 $nested = 0;
                 continue;
             }
-            if ($cur !== null && str_starts_with($trimmed, 'BEGIN:')) {
+            if ($cur !== null && str_starts_with($trimmed, 'BEGIN:') && $trimmed !== 'BEGIN:VEVENT') {
                 $nested++;
                 continue;
             }
@@ -188,6 +188,8 @@ final class CalendarService
                 continue;
             }
             if ($trimmed === 'END:VEVENT') {
+                // Auch wenn ein eingebetteter Block (z. B. VALARM) nicht geschlossen wurde.
+                $nested = 0;
                 if ($cur && !empty($cur['DTSTART'])) {
                     $raw[] = $cur;
                 }
@@ -230,7 +232,14 @@ final class CalendarService
             if (self::icsHidden($e)) {
                 continue;
             }
-            foreach ($this->icsOccurrences($e, $overridden, $max) as $event) {
+            try {
+                $occurrences = $this->icsOccurrences($e, $overridden, $min, $max);
+            } catch (\Throwable $ex) {
+                // Ein kaputter Termin soll nicht den ganzen Kalender lahmlegen.
+                error_log('Kompanie-App: Termin im Kalender übersprungen: ' . $ex->getMessage());
+                continue;
+            }
+            foreach ($occurrences as $event) {
                 if (strtotime($event['end']) >= $min && strtotime($event['start']) <= $max) {
                     $events[] = $event;
                 }
@@ -243,7 +252,7 @@ final class CalendarService
      * @param array<string, true> $overridden
      * @return array<int, array<string, mixed>>
      */
-    private function icsOccurrences(array $e, array $overridden, int $max): array
+    private function icsOccurrences(array $e, array $overridden, int $min, int $max): array
     {
         $start = $this->icsDate($e['DTSTART']);
         if (!$start) {
@@ -258,16 +267,21 @@ final class CalendarService
         if (!empty($e['RRULE']) && !isset($e['RECURRENCE-ID'])) {
             $rule = new IcsRecurrence($e['RRULE']['value']);
             if ($rule->supports()) {
-                $limit = (new \DateTimeImmutable('@' . $max))->setTimezone($dt->getTimezone());
-                $starts = $rule->occurrences($dt, $limit, $allDay);
+                $tz = $dt->getTimezone();
+                $from = (new \DateTimeImmutable('@' . ($min - $duration - 86400)))->setTimezone($tz);
+                $limit = (new \DateTimeImmutable('@' . $max))->setTimezone($tz);
+                $starts = $rule->occurrences($dt, $from, $limit, $allDay);
                 $uid = $e['UID']['value'] ?? '';
+                // Ausnahmen mit Uhrzeit über den Zeitpunkt, ganztägige über das Datum
+                // (manche Programme schreiben EXDATE;VALUE=DATE auch bei Serien mit Uhrzeit).
                 $excluded = [];
                 foreach ($e['EXDATE'] ?? [] as $x) {
                     if ($xd = $this->icsDate($x)) {
-                        $excluded[$allDay ? $xd[0]->format('Y-m-d') : (string) $xd[0]->getTimestamp()] = true;
+                        $excluded[$xd[1] ? 'd' . $xd[0]->format('Y-m-d') : 't' . $xd[0]->getTimestamp()] = true;
                     }
                 }
-                $starts = array_filter($starts, static fn (\DateTimeImmutable $s): bool => !isset($excluded[$allDay ? $s->format('Y-m-d') : (string) $s->getTimestamp()])
+                $starts = array_filter($starts, static fn (\DateTimeImmutable $s): bool => !isset($excluded['t' . $s->getTimestamp()])
+                    && !isset($excluded['d' . $s->format('Y-m-d')])
                     && !isset($overridden[$uid . '|' . $s->getTimestamp()]));
             }
         }

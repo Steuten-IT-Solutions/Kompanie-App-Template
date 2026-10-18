@@ -91,7 +91,7 @@ final class Plugin
     /**
      * Ältere Versionen haben die Einstellungen ohne Autoload gespeichert. update_option()
      * ändert das nur zusammen mit dem Wert; deshalb einmal je Version direkt umstellen.
-     * Ausgenommen sind große, selten gebrauchte Werte (Galerie-Status, Zugangsschlüssel).
+     * Große, selten gebrauchte Werte (Galerie-Status, Zugangsschlüssel) werden dabei ausgeschaltet.
      */
     private static function autoloadOptions(): void
     {
@@ -100,16 +100,20 @@ final class Plugin
             "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
             $wpdb->esc_like(WpSettings::PREFIX) . '%',
         ));
-        $names = array_diff($names, array_map(static fn (string $k): string => WpSettings::PREFIX . $k, WpSettings::NO_AUTOLOAD));
-        if ($names === []) {
+        $off = array_map(static fn (string $k): string => WpSettings::PREFIX . $k, WpSettings::NO_AUTOLOAD);
+        $values = [];
+        foreach ($names as $name) {
+            $values[$name] = !in_array($name, $off, true);
+        }
+        if ($values === []) {
             return;
         }
         if (function_exists('wp_set_option_autoload_values')) {
-            wp_set_option_autoload_values(array_fill_keys($names, true));
+            wp_set_option_autoload_values($values);
             return;
         }
-        foreach ($names as $name) {
-            $wpdb->update($wpdb->options, ['autoload' => 'yes'], ['option_name' => $name]);
+        foreach ($values as $name => $autoload) {
+            $wpdb->update($wpdb->options, ['autoload' => $autoload ? 'yes' : 'no'], ['option_name' => $name]);
         }
         wp_cache_delete('alloptions', 'options');
     }

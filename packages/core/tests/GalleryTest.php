@@ -123,7 +123,13 @@ final class GalleryTest extends TestCase
         $downloads = $this->drive->downloads;
         $this->assertSame(404, $gallery->photoForDelivery($intern['id'], 'large', true, true)['status']);
         $this->assertSame($downloads, $this->drive->downloads);
-        $this->app->db->execute("UPDATE {photos} SET status = 'ready' WHERE id = ?", [$intern['id']]);
+        // Der nächste Abgleich versucht es erneut, höchstens fünfmal.
+        $gallery->sync();
+        $this->assertSame('pending', $this->app->db->scalar('SELECT status FROM {photos} WHERE id = ?', [$intern['id']]));
+        $this->app->db->execute("UPDATE {photos} SET status = 'error', attempts = 5 WHERE id = ?", [$intern['id']]);
+        $gallery->sync();
+        $this->assertSame('error', $this->app->db->scalar('SELECT status FROM {photos} WHERE id = ?', [$intern['id']]));
+        $this->app->db->execute("UPDATE {photos} SET status = 'ready', attempts = 0 WHERE id = ?", [$intern['id']]);
 
         // API: Gäste und Mitglieder
         $this->users->current = null;

@@ -28,6 +28,8 @@ final class GalleryService
     public const TASK = 'gallery_sync';
     public const INTERN_FOLDER = 'intern';
     public const SIZES = ['thumb' => 400, 'large' => 1600];
+    /** So oft wird ein Bild aufbereitet, bevor es als dauerhaft fehlerhaft gilt. */
+    public const MAX_ATTEMPTS = 5;
 
     public function __construct(
         private readonly GalleryRepository $repo,
@@ -132,6 +134,8 @@ final class GalleryService
             $this->repo->deletePhoto((int) $gone['id']);
         }
         $this->repo->deleteAlbumsExcept($seenAlbums);
+        // Vorübergehende Fehler (Zeitüberschreitung, Störung bei Google) beim nächsten Mal erneut versuchen.
+        $this->repo->retryFailed(self::MAX_ATTEMPTS);
 
         $stats['pending'] = $this->repo->countPending();
         $this->settings->set(self::STATUS_SETTING, $stats + ['last_sync' => $this->time->timestamp(), 'error' => '']);
@@ -204,7 +208,7 @@ final class GalleryService
         // Neuer Inhalt oder zwischen „intern“ und öffentlich verschoben: neu erzeugen.
         if ($row['md5'] !== $md5 || (int) $row['is_intern'] !== $intern || (int) $row['album_id'] !== $albumId) {
             $this->deleteFiles($row);
-            $data += ['md5' => (string) $md5, 'file_key' => bin2hex(random_bytes(16)), 'status' => GalleryRepository::PENDING, 'error' => ''];
+            $data += ['md5' => (string) $md5, 'file_key' => bin2hex(random_bytes(16)), 'status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
         }
         $this->repo->updatePhoto((int) $row['id'], $data);
         return [(int) $row['id'], false];
@@ -254,6 +258,7 @@ final class GalleryService
         $this->repo->updatePhoto((int) $photo['id'], [
             'status' => GalleryRepository::READY,
             'error' => '',
+            'attempts' => 0,
             'width' => $size['width'] ?? (int) $photo['width'],
             'height' => $size['height'] ?? (int) $photo['height'],
         ]);
@@ -262,7 +267,11 @@ final class GalleryService
 
     private function markFailed(array $photo, string $message): bool
     {
-        $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::FAILED, 'error' => mb_substr($message, 0, 255)]);
+        $this->repo->updatePhoto((int) $photo['id'], [
+            'status' => GalleryRepository::FAILED,
+            'error' => mb_substr($message, 0, 255),
+            'attempts' => (int) ($photo['attempts'] ?? 0) + 1,
+        ]);
         return false;
     }
 
@@ -311,7 +320,8 @@ final class GalleryService
         }
         $file = $this->path($photo, $size);
         // Fehlgeschlagene Bilder nicht bei jedem Aufruf erneut aus Drive laden lassen
-        // (sonst könnten Besucher beliebig viele Downloads auslösen); das macht der Abgleich.
+        // (sonst könnten Besucher beliebig viele Downloads auslösen); der Abgleich versucht
+        // sie erneut (retryFailed, höchstens MAX_ATTEMPTS-mal).
         if ($photo['status'] === GalleryRepository::FAILED) {
             return ['status' => 404];
         }

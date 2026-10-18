@@ -43,10 +43,17 @@ final class Text
         }
         // Nur echte Tags und Kommentare entfernen; ein einzelnes „<“ (z. B. „<10 min“) bleibt.
         // Wiederholen, bis nichts mehr passt: sonst wird aus „<<b>script>“ wieder „<script>“.
-        do {
+        // Höchstens 10 Durchläufe (gegen absichtlich tief verschachtelte Eingaben); bleibt es
+        // danach unruhig, werden alle „<“ entfernt.
+        $stable = false;
+        for ($i = 0; $i < 10 && !$stable; $i++) {
             $before = $s;
             $s = (string) preg_replace(['/<!--.*?-->/su', '#</?[a-zA-Z!/][^>]*>#u'], '', $s);
-        } while ($s !== $before);
+            $stable = $s === $before;
+        }
+        if (!$stable) {
+            $s = str_replace('<', '', $s);
+        }
         // Steuerzeichen außer Zeilenumbruch und Tabulator entfernen.
         return (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
     }

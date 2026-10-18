@@ -46,6 +46,12 @@ final class Migrator
                 continue;
             }
             foreach ($statements[$this->db->driver()] as $sql) {
+                // Spalten nur ergänzen, wenn sie fehlen: Migrationen müssen wiederholbar sein,
+                // auch wenn der Versionsstand verloren ging (Tabellen mit IF NOT EXISTS).
+                if (preg_match('/^ALTER TABLE \{([a-z_]+)\} ADD COLUMN ([a-z_]+)\b/i', $sql, $m)
+                    && in_array($m[2], Schema::columns($this->db, $m[1]), true)) {
+                    continue;
+                }
                 $this->db->execute(str_replace('{options}', $this->db->tableOptions(), $sql));
             }
             $this->settings->set($this->setting, $version);

@@ -11,7 +11,13 @@ import './styles.css';
 
 // Teilbarer Link …/installieren/ (auch ?kompanie_app=installieren oder ?r=/installieren)
 // → Anleitung in der App (#/installieren).
-if (/(^|[/=])installieren\/?$/.test(decodeURIComponent(window.location.pathname + window.location.search)) && config) {
+function sharedInstallLink(): boolean {
+  const { pathname, search } = window.location;
+  const q = new URLSearchParams(search);
+  const target = q.get('kompanie_app') ?? q.get('r') ?? pathname;
+  return /(^|\/)installieren\/?$/.test(target);
+}
+if (config && sharedInstallLink()) {
   history.replaceState(null, '', config.appUrl + '#/installieren');
 }
 // Vom Home-Bildschirm gestartet: nicht auf der Anleitung landen, sondern bei den Terminen.

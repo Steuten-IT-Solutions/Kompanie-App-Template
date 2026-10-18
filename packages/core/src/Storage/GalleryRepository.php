@@ -81,6 +81,12 @@ final class GalleryRepository
         $this->db->execute("DELETE FROM {albums} WHERE id NOT IN ($in)");
     }
 
+    /** Fehlgeschlagene Bilder für einen neuen Versuch vormerken, solange es weniger als $max Versuche waren. */
+    public function retryFailed(int $max): int
+    {
+        return $this->db->execute('UPDATE {photos} SET status = ? WHERE status = ? AND attempts < ?', [self::PENDING, self::FAILED, $max]);
+    }
+
     public function countPending(): int
     {
         return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ?', [self::PENDING]);

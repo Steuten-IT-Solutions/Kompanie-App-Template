@@ -168,12 +168,14 @@ KompanieApp\WordPress\AppPage::addRewriteRules();
 $opt = KompanieApp\WordPress\WpSettings::PREFIX;
 $wpdb = $GLOBALS['wpdb'];
 $wpdb->update($wpdb->options, ['autoload' => 'no'], ['option_name' => $opt . 'schema_version']);
+update_option($opt . 'gallery_status', ['albums' => 0], true); // wie von der Vorversion gespeichert
+$wpdb->update($wpdb->options, ['autoload' => 'yes'], ['option_name' => $opt . 'gallery_status']);
 delete_option($opt . 'roles_version');
 wp_cache_flush();
 KompanieApp\WordPress\Plugin::upgrade();
 $autoload = static fn (string $k): string => (string) $wpdb->get_var($wpdb->prepare("SELECT autoload FROM {$wpdb->options} WHERE option_name = %s", $opt . $k));
 $c->ok(in_array($autoload('schema_version'), ['yes', 'on', 'auto-on'], true) && in_array($autoload('roles_version'), ['yes', 'on', 'auto-on'], true), 'Einstellungen nach dem Update mit Autoload');
-$c->ok($autoload('drive_service_account') === '' || !in_array($autoload('drive_service_account'), ['yes', 'on', 'auto-on'], true), 'Großer Schlüssel ohne Autoload');
+$c->ok(!in_array($autoload('gallery_status'), ['yes', 'on', 'auto-on', 'auto'], true), 'Großer, selten gebrauchter Wert ohne Autoload');
 
 foreach ([$member, $manager, $admin] as $id) {
     $d->deleteUser($id);

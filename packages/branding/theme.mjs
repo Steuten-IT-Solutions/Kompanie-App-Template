@@ -60,7 +60,8 @@ export function deriveTheme(colors) {
     'on-primary': onPrimary,
     accent,
     'accent-light': accentLight,
-    'accent-dark': shiftLightness(accent, -0.2),
+    // Akzent als Schrift auf Karten (Datum der News, Pfeile).
+    'accent-dark': ensureContrast(ensureContrast(shiftLightness(accent, -0.2), card, TEXT_MIN) ?? ink, bg, TEXT_MIN) ?? ink,
     'on-accent': onAccent,
     bg,
     card,
@@ -73,8 +74,14 @@ export function deriveTheme(colors) {
     good: '#1f6b3a',
     danger: '#a3301a',
     warn,
+    // Fläche für Warnungen (offene Beträge, Warnknöpfe) mit weißer Schrift, hell wie dunkel.
+    'warn-surface': warn,
     'on-warn': '#ffffff',
   };
+  // Hinweisbanner: leicht in der Akzentfarbe getönte Karte (siehe styles.css .install-hint).
+  const hintBg = mix(card, accent, 0.16);
+  light['hint-strong'] = ensureContrast(light['primary-ink'], hintBg, TEXT_MIN) ?? ink;
+  light['hint-text'] = ensureContrast(light['ink-2'], hintBg, TEXT_MIN) ?? ink;
 
   const darkBg = fromHsl(ph, Math.min(ps, 0.45), 0.09);
   const darkCard = fromHsl(ph, Math.min(ps, 0.4), 0.14);
@@ -94,6 +101,9 @@ export function deriveTheme(colors) {
     good: '#6fd08f',
     danger: '#f08a73',
     warn: '#f0a868',
+    'accent-dark': accentTextDark,
+    'hint-strong': accentTextDark,
+    'hint-text': mix(darkInk, darkBg, 0.2),
   };
   light['accent-text'] = light['primary-text'];
 

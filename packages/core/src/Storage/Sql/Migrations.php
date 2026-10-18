@@ -182,6 +182,11 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {photos}_status ON {photos} (status)',
                 ],
             ],
+            // Fehlversuche je Bild: fehlgeschlagene Bilder werden beim Abgleich erneut versucht, höchstens 5-mal.
+            2 => [
+                'mysql' => ['ALTER TABLE {photos} ADD COLUMN attempts int(11) NOT NULL DEFAULT 0'],
+                'sqlite' => ['ALTER TABLE {photos} ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0'],
+            ],
         ];
     }
 

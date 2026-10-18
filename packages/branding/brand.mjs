@@ -108,7 +108,7 @@ async function images(logoInput, outDir, publicDir, warnings) {
   let density = 72;
   if (probe.format === 'svg') {
     const size = Math.max(probe.width ?? 0, probe.height ?? 0) || 100;
-    density = Math.min(2400, Math.max(72, Math.ceil((72 * 1024) / size)));
+    density = Math.min(10000, Math.max(72, Math.ceil((72 * 1024) / size)));
   }
   // rotate() ohne Winkel richtet nach der EXIF-Angabe aus (Handyfotos).
   const load = () => sharp(logoInput, { density }).rotate();

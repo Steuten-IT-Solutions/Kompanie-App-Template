@@ -30,6 +30,10 @@ final class CoreTest extends TestCase
         $this->assertSame('x y', Text::line('x <!-- k --> <b>y</b>'));
         $this->assertSame('alert(1)', Text::line('<<b>script>alert(1)<</b>/script>'), 'verschachtelte Tags');
         $this->assertSame('x', Text::line('<<<i>i>i>x'));
+        $deep = str_repeat('<', 20000) . str_repeat('b>', 20000) . 'x';
+        $t = microtime(true);
+        $this->assertStringNotContainsString('<', Text::line($deep));
+        $this->assertLessThan(1.0, microtime(true) - $t, 'tief verschachtelte Tags ohne quadratische Laufzeit');
         $this->assertTrue(Input::isDate('2024-02-29'));
         $this->assertFalse(Input::isDate('2026-02-30'));
         $this->assertSame(5, Input::integer('5'));
@@ -156,7 +160,7 @@ final class CoreTest extends TestCase
         $settings = new MemorySettings();
         $m = new Migrator($db, $settings);
         $this->assertTrue($m->pending());
-        $this->assertSame([1], $m->migrate());
+        $this->assertSame([1, 2], $m->migrate());
         $this->assertSame([], $m->migrate());
         $this->assertSame(Migrations::latest(), $m->current());
         $this->assertFalse($m->pending());
@@ -164,5 +168,7 @@ final class CoreTest extends TestCase
         $db->insert('events', ['title' => 'x', 'start_date' => '2030-01-01', 'location' => '', 'description' => '', 'url' => '', 'created_by' => 1, 'created_at' => '2030-01-01 00:00:00', 'updated_at' => '2030-01-01 00:00:00']);
         (new Migrator($db, new MemorySettings()))->migrate();
         $this->assertSame(1, (int) $db->scalar('SELECT COUNT(*) FROM {events}'));
+        $this->assertContains('attempts', \KompanieApp\Core\Storage\Sql\Schema::columns($db, 'photos'), 'Spalte aus Migration 2 genau einmal');
+        TestApp::dropTables($db);
     }
 }

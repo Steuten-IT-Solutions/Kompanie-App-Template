@@ -91,6 +91,47 @@ final class CalendarTest extends TestCase
         $this->assertCount(1, $by['Unbekannte Regel'], 'nicht unterstützte Regel: nur der erste Termin');
     }
 
+    /** @return string[] Beginn der Vorkommen einer Serie */
+    private function starts(string $props): array
+    {
+        $events = $this->parseAt("BEGIN:VEVENT\r\nUID:r\r\n" . $props . "SUMMARY:S\r\nEND:VEVENT\r\n");
+        $starts = array_column($events, 'start');
+        sort($starts);
+        return $starts;
+    }
+
+    public function testRecurrenceRulesFromReview(): void
+    {
+        // WKST=SU mit INTERVAL=2 (Gegenstück zum Beispiel in RFC 5545, 3.8.5.3).
+        $this->assertSame(['2026-03-03T19:00:00+01:00', '2026-03-15T19:00:00+01:00', '2026-03-17T19:00:00+01:00', '2026-03-29T19:00:00+02:00'],
+            $this->starts("DTSTART;TZID=Europe/Berlin:20260303T190000\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=4;BYDAY=TU,SU;WKST=SU\r\n"));
+        // BYDAY und BYMONTHDAY zusammen: nur Freitag, der 13.
+        $this->assertSame(['2026-03-13', '2026-11-13'],
+            $this->starts("DTSTART;VALUE=DATE:20260213\r\nRRULE:FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13;COUNT=3\r\n"));
+        // DAILY mit BYMONTHDAY schränkt ein: jeder Monatserste von März 2026 bis März 2027.
+        $this->assertCount(13, $this->starts("DTSTART;VALUE=DATE:20260301\r\nRRULE:FREQ=DAILY;BYMONTHDAY=1\r\n"));
+        // DTSTART zählt immer als erstes Vorkommen, auch wenn es nicht zur Regel passt (Mi-Start, BYDAY=MO).
+        $this->assertSame(['2026-03-04', '2026-03-09'], $this->starts("DTSTART;VALUE=DATE:20260304\r\nRRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=2\r\n"));
+        // Ungültiges BYDAY oder riesiges INTERVAL: nur der erste Termin, kein Absturz.
+        $this->assertSame(['2026-03-04'], $this->starts("DTSTART;VALUE=DATE:20260304\r\nRRULE:FREQ=WEEKLY;BYDAY=XX\r\n"));
+        $this->assertSame(['2026-03-04'], $this->starts("DTSTART;VALUE=DATE:20260304\r\nRRULE:FREQ=MONTHLY;INTERVAL=99999999999999999999\r\n"));
+        // EXDATE nur mit Datum bei einer Serie mit Uhrzeit.
+        $this->assertCount(2, $this->starts("DTSTART;TZID=Europe/Berlin:20260303T190000\r\nRRULE:FREQ=WEEKLY;COUNT=3\r\nEXDATE;VALUE=DATE:20260310\r\n"));
+    }
+
+    public function testOldSeriesAreFast(): void
+    {
+        $ics = '';
+        for ($i = 0; $i < 50; $i++) {
+            $ics .= "BEGIN:VEVENT\r\nUID:old$i\r\nDTSTART;TZID=Europe/Berlin:19000101T080000\r\nRRULE:FREQ=DAILY\r\nSUMMARY:Alt\r\nEND:VEVENT\r\n";
+        }
+        $t = microtime(true);
+        $events = $this->parseAt($ics);
+        $this->assertLessThan(5.0, microtime(true) - $t, 'Serien seit 1900 ohne Aufwand für vergangene Jahre'); // Termin am 28.2. um 8 Uhr ist um 12 Uhr vorbei
+        $this->assertGreaterThan(50 * 360, count($events), 'tägliche Termine im ganzen Vorschau-Jahr');
+        $this->assertSame('2026-03-01T08:00:00+01:00', min(array_column($events, 'start')));
+    }
+
     public function testCalendarRouteWithIcsAndCache(): void
     {
         $http = new FakeHttpClient(fn () => ['status' => 200, 'body' => $this->ics()]);

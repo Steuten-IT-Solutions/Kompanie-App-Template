@@ -5,7 +5,7 @@
   --shadow: 0 1px 0 color-mix(in srgb, var(--primary-ink) 4%, transparent), 0 4px 14px color-mix(in srgb, var(--primary-ink) 7%, transparent);
   --tabbar-h: 66px;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --warn-deep: color-mix(in srgb, var(--warn) 78%, black);
+  --warn-deep: color-mix(in srgb, var(--warn-surface) 78%, black);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -90,11 +90,11 @@ button, input, select { font: inherit; color: inherit; }
 .offline { background: #f6dfb6; color: #5a3a06; border-bottom: 1px solid var(--line-strong); }
 .install-hint {
   display: flex; gap: 10px; align-items: center; margin: 0; padding: 10px 12px 10px 14px;
-  background: color-mix(in srgb, var(--accent) 16%, var(--card)); color: var(--ink-2); border-bottom: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--accent) 16%, var(--card)); color: var(--hint-text); border-bottom: 1px solid var(--line-strong);
 }
 .install-hint-logo { width: 38px; height: 38px; flex: none; }
 .install-hint-text { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 0.85rem; line-height: 1.3; }
-.install-hint-text strong { color: var(--primary-ink); font-size: 1rem; }
+.install-hint-text strong { color: var(--hint-strong); font-size: 1rem; }
 .install-hint-btn { flex: none; font-size: 0.85rem; padding: 9px 12px; }
 .install-hint .install-hint-close { color: inherit; padding: 4px; font-size: 1.1rem; }
 
@@ -158,7 +158,7 @@ button, input, select { font: inherit; color: inherit; }
 .stat-warn, .stat-warn .stat-value { color: var(--on-warn); }
 .stat-label { font-family: var(--font-head); font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.8rem; opacity: 0.9; }
 .stat-warn {
-  background: linear-gradient(160deg, var(--warn) 0%, var(--warn-deep) 100%);
+  background: linear-gradient(160deg, var(--warn-surface) 0%, var(--warn-deep) 100%);
   box-shadow: inset 0 0 0 3px var(--warn-deep), inset 0 0 0 4px color-mix(in srgb, var(--accent-light) 55%, transparent), var(--shadow);
 }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -186,7 +186,7 @@ button, input, select { font: inherit; color: inherit; }
 .btn:hover { filter: brightness(1.06); }
 .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
 .btn-secondary { background: transparent; color: var(--accent-text); border: 1.5px solid var(--line-strong); box-shadow: none; }
-.btn-warn { background: linear-gradient(180deg, var(--warn) 0%, var(--warn-deep) 100%); color: #fff; }
+.btn-warn { background: linear-gradient(180deg, var(--warn-surface) 0%, var(--warn-deep) 100%); color: var(--on-warn); }
 .btn-danger { background: transparent; color: var(--danger); border: 1.5px solid var(--line-strong); box-shadow: none; }
 .btn-link {
   background: none; box-shadow: none; color: var(--accent-text); padding: 6px 0;
@@ -310,8 +310,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* Dunkelmodus: helle Hinweisflächen abdunkeln */
 @media (prefers-color-scheme: dark) {
-  .install-hint { background: var(--card); color: var(--ink-2); border-color: var(--line-strong); }
-  .install-hint strong { color: var(--accent-light); }
+  .install-hint { background: var(--card); color: var(--hint-text); border-color: var(--line-strong); }
+  .install-hint strong { color: var(--hint-strong); }
   .offline { background: #3a2c0c; color: #f3dca4; border-color: var(--line-strong); }
   .error { background: #3d1a14; color: #f6c7b9; border-color: #6e2c15; }
   .badge-open { background: #4a1e14; color: #f6b8a6; }
