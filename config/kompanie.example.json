@@ -1,47 +1,16 @@
 {
-  "$schema": "./kompanie.schema.json",
-  "coreVersion": "0.1.0",
-  "slug": "marinekompanie-lank",
+  "$schema": "https://raw.githubusercontent.com/Steuten-IT-Solutions/Kompanie-App-Template/v1/config/kompanie.schema.json",
   "name": "Marinekompanie 1973 Lank",
   "shortName": "Marinekompanie",
   "description": "Termine, Punkte und Strafen der Marinekompanie 1973 Lank",
-  "domain": "marinekompanie-lank.de",
-  "appPath": "/app/",
-  "locale": "de-DE",
-  "timezone": "Europe/Berlin",
-  "currency": "EUR",
   "greeting": "Ahoi, {name}",
   "roleLabels": {
-    "guest": "Gast",
-    "member": "Mitglied",
-    "manager": "Spieß",
-    "admin": "Admin"
+    "manager": "Spieß"
   },
-  "assets": {
-    "logo": "assets/logo.png",
-    "icon": "assets/icon.png",
-    "iconMaskable": "assets/icon-maskable.png"
-  },
-  "theme": {
+  "colors": {
     "primary": "#1f4498",
-    "primaryDeep": "#13306f",
-    "primaryInk": "#0d2152",
     "accent": "#c9a24a",
-    "accentLight": "#e6c97a",
-    "accentDark": "#8a6a1f",
-    "secondary": "#8b3a1e",
-    "background": "#f4efe4",
-    "card": "#fffdf8",
-    "darkBackground": "#0a1530",
-    "darkCard": "#11214a",
-    "fontHeading": "Oswald"
+    "background": "#f4efe4"
   },
-  "features": {
-    "events": true,
-    "calendar": true,
-    "news": true,
-    "gallery": true,
-    "points": true,
-    "penalties": true
-  }
+  "font": "Oswald"
 }

@@ -8,31 +8,31 @@ Gemeinsamer Kern der Kompanie-App: eine installierbare Web-App (PWA) für Kompan
 
 Entstanden aus der App der Marinekompanie 1973 Lank.
 
-Die App läuft auf normalem Webspace mit PHP und MySQL, wahlweise
+Die App läuft auf normalem Webspace mit PHP und MySQL/MariaDB, wahlweise
 - als **WordPress-Plugin** oder
 - als **eigenständige Version** ohne WordPress.
 
-Jede Kompanie hat ein eigenes, kleines Repo mit Name, Farben, Logo und den gewünschten Bereichen. Daraus baut GitHub Actions die fertige App für genau diese Kompanie.
+Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Build, Icons, Prüfungen, Releases und Updates auf den Servern laufen automatisch.
 
-> **Stand:** Phase 0. Architektur, API-Spezifikation, Konfigurationsschema und die Schnittstellen des Kerns sind festgelegt. Die eigentliche Logik wird in Phase 1 aus der Lank-App übernommen.
+> **Stand:** Phase 0. Architektur, API-Spezifikation, Konfigurationsschema und die Schnittstellen des Kerns sind festgelegt. Die eigentliche Logik wird ab Phase 1 aus der Lank-App übernommen.
 
 ## Dokumentation
 
-- [Architektur und Fahrplan](docs/ARCHITEKTUR.md)
+- [Architektur, Abläufe und Fahrplan](docs/ARCHITEKTUR.md)
 - [API-Spezifikation](api/openapi.yaml)
 - [Kompanie-Konfiguration: Schema](config/kompanie.schema.json) und [Beispiel](config/kompanie.example.json)
 
 ## Aufbau
 
 ```
-api/                 API-Vertrag (OpenAPI)
-config/              Schema und Beispiel für kompanie.json
-packages/core/       PHP-Kern ohne WordPress
-packages/frontend/   React-PWA (folgt in Phase 3)
-adapters/wordpress/  WordPress-Plugin (folgt in Phase 2)
-adapters/standalone/ eigenständige Version (folgt in Phase 4)
-kompanie-vorlage/    Gerüst für ein Kompanie-Repo (folgt in Phase 5)
-scripts/             Prüf- und Build-Skripte
+api/                  API-Vertrag (OpenAPI)
+config/               Schema und Beispiel für kompanie.json
+packages/core/        PHP-Kern ohne WordPress
+packages/frontend/    React-PWA (folgt in Phase 2)
+adapters/wordpress/   WordPress-Plugin (folgt in Phase 1)
+adapters/standalone/  eigenständige Version (folgt in Phase 3)
+installer/            Web-Installer (folgt in Phase 5)
+scripts/              Prüf- und Build-Skripte
 ```
 
 ## Prüfungen

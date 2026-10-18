@@ -17,4 +17,6 @@ enum Capability: string
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
+    /** Einstellungen und Updates (bei WordPress im WP-Admin). */
+    case ManageSettings = 'manage_settings';
 }

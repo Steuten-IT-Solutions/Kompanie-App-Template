@@ -11,10 +11,11 @@ info:
     `/config` und `/auth/*`; sie ersetzen `window.MKL_CONFIG`, den WordPress-Nonce und
     den festen Weg über `wp-login.php`.
 
-    **Anmeldung:** Sitzungs-Cookie. Jede Anfrage, die Daten ändert, braucht den
-    Header `X-CSRF-Token`. Ist er abgelaufen, antwortet der Server mit 403 und
-    `code: csrf_invalid`; die App holt dann über `GET /auth/csrf` einen neuen und
-    wiederholt die Anfrage einmal.
+    **Anmeldung:** Sitzungs-Cookie. Jede Anfrage, die Daten ändert, braucht das
+    CSRF-Token in dem Header, den `/config` unter `csrf.header` nennt (WordPress:
+    `X-WP-Nonce`, Standalone: `X-CSRF-Token`). Ist es abgelaufen, antwortet der
+    Server mit 403 und `code: csrf_invalid` (WordPress: `rest_cookie_invalid_nonce`);
+    die App holt dann über `GET /auth/csrf` ein neues und wiederholt die Anfrage einmal.
 
     **Rechte:** Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung.
     Mitglieder sehen nur ihre eigenen Punkte und Strafen.
@@ -438,6 +439,10 @@ paths:
     patch:
       tags: [Verwaltung]
       summary: Rolle in der App setzen (nicht die eigene)
+      description: |
+        `admin` ist nur in der eigenständigen Version erlaubt; bei WordPress werden
+        Admin-Rechte nur im WP-Backend vergeben. Der letzte Admin kann nicht
+        herabgestuft werden.
       x-capability: promote_users
       requestBody:
         required: true
@@ -449,7 +454,7 @@ paths:
               properties:
                 level:
                   type: string
-                  enum: [guest, member, manager]
+                  enum: [guest, member, manager, admin]
       responses:
         '200':
           description: OK
@@ -682,16 +687,22 @@ components:
           type: array
           items:
             type: string
-            enum: [member, manage, manage_events, create_users, promote_users]
+            enum: [member, manage, manage_events, create_users, promote_users, manage_settings]
 
     AppConfig:
       type: object
-      required: [apiBase, appUrl, auth, features, user]
+      required: [apiBase, appUrl, auth, csrf, features, user, version]
       properties:
         apiBase: { type: string }
         appUrl: { type: string }
+        version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         siteUrl: { type: string, description: Startseite der Webseite, falls vorhanden }
-        csrfToken: { type: string, description: Leer für Gäste ohne Anmeldung }
+        csrf:
+          type: object
+          required: [header, token]
+          properties:
+            header: { type: string, description: 'Name des Headers, z. B. X-CSRF-Token oder X-WP-Nonce' }
+            token: { type: string, description: Leer für Gäste ohne Anmeldung }
         auth:
           type: object
           required: [mode]

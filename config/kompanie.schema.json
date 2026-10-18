@@ -2,42 +2,37 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Steuten-IT-Solutions/Kompanie-App-Template/config/kompanie.schema.json",
   "title": "Kompanie-Konfiguration",
-  "description": "Beschreibt eine Kompanie. Wird beim Build in die App eingesetzt. Enthält keine Zugangsdaten.",
+  "description": "Beschreibt eine Kompanie. Pflicht sind nur name und colors.primary, dazu das Logo als assets/logo.png. Alles andere hat Standardwerte oder wird beim Build berechnet. Enthält keine Zugangsdaten – die Kompanie-Repos sind öffentlich.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["coreVersion", "name", "shortName", "domain", "theme", "features"],
+  "required": ["name", "colors"],
   "properties": {
     "$schema": { "type": "string" },
-    "coreVersion": {
-      "description": "Version des Kerns, mit der gebaut wird (Git-Tag ohne „v“).",
+    "name": {
+      "description": "Voller Name, z. B. im Fenstertitel und in der Kopfzeile für Gäste.",
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "minLength": 1,
+      "maxLength": 80
     },
-    "slug": {
-      "description": "Kurzer technischer Name, z. B. für Dateinamen der ZIPs.",
-      "type": "string",
-      "pattern": "^[a-z0-9-]+$"
-    },
-    "name": { "description": "Voller Name, z. B. im Fenstertitel.", "type": "string", "minLength": 1 },
     "shortName": {
-      "description": "Name unter dem App-Symbol auf dem Home-Bildschirm. Wird bei mehr als etwa 12 Zeichen abgeschnitten.",
+      "description": "Name unter dem App-Symbol auf dem Home-Bildschirm. Standard: name. Mehr als etwa 12 Zeichen werden auf dem Handy abgeschnitten.",
       "type": "string",
       "minLength": 1,
       "maxLength": 30
     },
-    "description": { "type": "string" },
-    "domain": { "description": "Domain der Webseite ohne https://, z. B. für die Installationsanleitung.", "type": "string" },
-    "appPath": { "description": "Pfad der App auf dem Server.", "type": "string", "default": "/app/" },
-    "locale": { "type": "string", "default": "de-DE" },
-    "timezone": { "type": "string", "default": "Europe/Berlin" },
-    "currency": { "description": "ISO-4217-Code für Strafen.", "type": "string", "default": "EUR" },
-    "greeting": {
-      "description": "Begrüßung in der Kopfzeile; {name} wird durch den Namen ersetzt.",
+    "description": {
+      "description": "Kurzbeschreibung im Manifest. Standard: „Termine, News und mehr der <name>“.",
       "type": "string",
-      "default": "Hallo, {name}"
+      "maxLength": 200
+    },
+    "greeting": {
+      "description": "Begrüßung in der Kopfzeile; {name} wird durch den Namen des Mitglieds ersetzt.",
+      "type": "string",
+      "default": "Hallo, {name}",
+      "pattern": "\\{name\\}"
     },
     "roleLabels": {
-      "description": "Anzeigenamen der Rollen.",
+      "description": "Anzeigenamen der Rollen. Nicht angegebene behalten den Standard.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -47,46 +42,43 @@
         "admin": { "type": "string", "default": "Admin" }
       }
     },
-    "assets": {
-      "description": "Pfade relativ zum Kompanie-Repo.",
+    "colors": {
+      "description": "Nur die Grundfarben. Abstufungen und Dunkelmodus werden berechnet, der Kontrast wird geprüft.",
       "type": "object",
       "additionalProperties": false,
+      "required": ["primary"],
       "properties": {
-        "logo": { "type": "string", "default": "assets/logo.png" },
-        "icon": { "description": "Quadratisches Bild, mindestens 512 × 512 px. Daraus entstehen alle App-Icons.", "type": "string", "default": "assets/icon.png" },
-        "iconMaskable": { "description": "Optional: Icon mit Sicherheitsabstand für Android.", "type": "string" }
+        "primary": { "$ref": "#/$defs/color", "description": "Hauptfarbe: Kopfzeile, Knöpfe, Links." },
+        "accent": { "$ref": "#/$defs/color", "description": "Akzentfarbe: Hervorhebungen. Standard: aus der Hauptfarbe berechnet." },
+        "background": { "$ref": "#/$defs/color", "description": "Optional: Hintergrund im hellen Modus. Standard: ein helles, leicht getöntes Weiß." }
       }
     },
-    "theme": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["primary", "accent"],
-      "properties": {
-        "primary": { "$ref": "#/$defs/color", "description": "Hauptfarbe (Kopfzeile, Knöpfe)." },
-        "primaryDeep": { "$ref": "#/$defs/color" },
-        "primaryInk": { "$ref": "#/$defs/color" },
-        "accent": { "$ref": "#/$defs/color", "description": "Akzentfarbe." },
-        "accentLight": { "$ref": "#/$defs/color" },
-        "accentDark": { "$ref": "#/$defs/color" },
-        "secondary": { "$ref": "#/$defs/color" },
-        "background": { "$ref": "#/$defs/color" },
-        "card": { "$ref": "#/$defs/color" },
-        "darkBackground": { "$ref": "#/$defs/color" },
-        "darkCard": { "$ref": "#/$defs/color" },
-        "fontHeading": { "description": "Schrift für Überschriften; wird lokal eingebunden, kein Google-Fonts-Abruf.", "type": "string" }
-      }
+    "font": {
+      "description": "Schrift für Überschriften, aus der mitgelieferten Auswahl.",
+      "type": "string",
+      "enum": ["Oswald", "Roboto Slab", "Source Sans 3", "System"],
+      "default": "Oswald"
     },
     "features": {
-      "description": "Welche Bereiche die App hat.",
+      "description": "Welche Bereiche die App hat. Ein ausgeschalteter Bereich ist auch auf dem Server gesperrt.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "events": { "description": "Öffentliche Terminliste.", "type": "boolean", "default": true },
-        "calendar": { "description": "Google Kalender / iCal für Mitglieder.", "type": "boolean", "default": true },
+        "calendar": { "description": "Kalender mit allen Terminen für Mitglieder.", "type": "boolean", "default": true },
         "news": { "type": "boolean", "default": true },
         "gallery": { "type": "boolean", "default": true },
         "points": { "type": "boolean", "default": true },
         "penalties": { "type": "boolean", "default": true }
+      }
+    },
+    "legal": {
+      "description": "Rechtstexte für die eigenständige Version ohne eigene Webseite. Alternativ legal/impressum.md und legal/datenschutz.md im Repo ablegen.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "imprintUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "privacyUrl": { "type": "string", "format": "uri", "pattern": "^https://" }
       }
     }
   },
