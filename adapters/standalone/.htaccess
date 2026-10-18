@@ -1,0 +1,21 @@
+# Kompanie-App (eigenständige Version) für Apache und LiteSpeed.
+# Ohne mod_rewrite läuft die App trotzdem: dann über index.php?r=/…
+
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Programmcode und Daten sind nie direkt abrufbar.
+  RewriteRule ^(data|src|core|bin)(/|$) - [F,L]
+  RewriteRule ^(autoload\.php|data-dir\.php|VERSION)$ - [F,L]
+  # Alles, was keine Datei ist, beantwortet index.php.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "^sw\.js$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

@@ -37,6 +37,7 @@ tags:
   - name: News
   - name: Galerie
   - name: Verwaltung
+  - name: Einstellungen
 
 paths:
   /config:
@@ -635,6 +636,125 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /admin/settings:
+    get:
+      tags: [Einstellungen]
+      summary: Einstellungen für Kalender, Galerie und Neuigkeiten
+      description: Geheime Werte (iCal-Adresse, API-Schlüssel, Dienstkonto) werden nie zurückgegeben, nur ob sie gesetzt sind.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Einstellungen ändern
+      description: Nur mitgeschickte Felder werden übernommen; ein leerer Text löscht den Wert.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                calendar_ics_url: { type: string, description: 'Geheime iCal-Adresse; webcal:// wird als https:// gespeichert' }
+                google_api_key: { type: string }
+                calendar_ids: { type: string, description: Kommagetrennte Kalender-IDs (nur mit API-Schlüssel) }
+                calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
+                gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
+                news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
+                news_url: { type: string, description: Nur eigenständige Version }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/calendar/test:
+    post:
+      tags: [Einstellungen]
+      summary: Kalender ohne Zwischenspeicher abrufen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, sample]
+                properties:
+                  count: { type: integer }
+                  sample:
+                    type: array
+                    maxItems: 5
+                    items:
+                      type: object
+                      properties:
+                        start: { type: string }
+                        title: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/news/test:
+    post:
+      tags: [Einstellungen]
+      summary: Quelle der Neuigkeiten ohne Zwischenspeicher abrufen (nur eigenständige Version)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer, description: Beiträge auf der ersten Seite }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/sync:
+    post:
+      tags: [Einstellungen]
+      summary: Galerie von Hand abgleichen und Bilder aufbereiten
+      description: |
+        Gleicht mit Google Drive ab und bereitet Bilder auf, solange das Zeitbudget reicht (etwa 20 Sekunden).
+        Steht danach noch etwas aus (`pending` > 0), ruft die App mit `only_process: true` erneut auf.
+      x-capability: manage_settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                only_process: { type: boolean, default: false }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  albums: { type: integer }
+                  photos: { type: integer }
+                  processed: { type: integer }
+                  pending: { type: integer }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
 security:
   - session: []
 
@@ -678,8 +798,39 @@ components:
           description: |
             z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
             `feature_disabled` (404, Bereich in kompanie.json ausgeschaltet), `method_not_allowed` (405),
-            `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500)
+            `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500).
+            Nur eigenständige Version: `login_failed` (400), `too_many_attempts` (429),
+            `unsupported_media_type` (415, Änderungen nur als JSON), `not_installed` (503).
+            Nur WordPress: `use_login_page` (400).
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
+
+    AdminSettings:
+      type: object
+      required: [calendar, gallery, news]
+      properties:
+        calendar:
+          type: object
+          properties:
+            source: { type: string, enum: [ics, google, none] }
+            ics_url_set: { type: boolean }
+            google_api_key_set: { type: boolean }
+            calendar_ids: { type: string }
+            cache_minutes: { type: integer }
+        gallery:
+          type: object
+          properties:
+            configured: { type: boolean }
+            root: { type: string }
+            service_account_email: { type: string }
+            status:
+              type: object
+              description: Stand des letzten Abgleichs (albums, photos, new, pending, last_sync, error)
+        news:
+          type: [object, 'null']
+          description: null, wenn die Neuigkeiten aus den Beiträgen der WordPress-Seite kommen.
+          properties:
+            source: { type: string, enum: [none, wordpress, rss] }
+            url: { type: string }
 
     Level:
       type: string

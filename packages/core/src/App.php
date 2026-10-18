@@ -11,6 +11,7 @@ use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\ScoreService;
+use KompanieApp\Core\Domain\SettingsService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
@@ -140,6 +141,11 @@ final class App
     public function drive(): DriveClient
     {
         return $this->service(DriveClient::class, fn () => new DriveClient($this->settings, $this->http, $this->cache, $this->files, $this->time()));
+    }
+
+    public function settingsService(): SettingsService
+    {
+        return $this->service(SettingsService::class, fn () => new SettingsService($this));
     }
 
     public function gallery(): GalleryService

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, levelLabel } from '../api';
+import { api, can, config, levelLabel } from '../api';
 import { isStandalone } from '../install';
 import { navigate } from '../router';
 
@@ -39,6 +39,16 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         <h2 className="account-name">{config?.user?.name}</h2>
         <p className="muted small">Rolle: {levelLabel(config?.user?.level ?? 'guest')}</p>
       </div>
+
+      {can('manage_settings') && config?.variant === 'standalone' && (
+        <div className="card account-card">
+          <h3>Einstellungen</h3>
+          <p className="muted small">Kalender, Galerie und Neuigkeiten einrichten.</p>
+          <button className="btn btn-secondary btn-block" onClick={() => navigate('einstellungen')}>
+            Einstellungen öffnen
+          </button>
+        </div>
+      )}
 
       {!isStandalone() && (
         <div className="card account-card">

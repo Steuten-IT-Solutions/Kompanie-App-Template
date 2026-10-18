@@ -10,3 +10,9 @@ packages/frontend/test-results/
 packages/frontend/playwright-report/
 adapters/wordpress/app/
 adapters/wordpress/kompanie.json
+adapters/standalone/app/
+adapters/standalone/sw.js
+adapters/standalone/data/
+adapters/standalone/media/
+adapters/standalone/kompanie.json
+adapters/standalone/data-dir.php

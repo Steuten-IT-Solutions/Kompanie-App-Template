@@ -151,3 +151,44 @@ jobs:
           name: screenshots
           path: screenshots
           if-no-files-found: ignore
+
+  standalone:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kompanie_test
+          MARIADB_USER: kompanie
+          MARIADB_PASSWORD: kompanie
+        ports: ['3306:3306']
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Niedrigste unterstützte PHP-Version, wie auf älteren Webspaces.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: pdo_sqlite, pdo_mysql, gd, sodium, zip, mbstring, curl, openssl, simplexml
+          tools: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Frontend bauen und in die eigenständige Version legen
+        run: scripts/build-frontend.sh
+
+      - name: HTTP-Tests mit SQLite (API-Szenario, Anmeldung, CSRF, Sicherung)
+        run: php tests/standalone/run-tests.php
+
+      - name: HTTP-Tests mit MariaDB
+        run: php tests/standalone/run-tests.php --mysql='127.0.0.1;kompanie_test;kompanie;kompanie'
+
+      - name: E2E-Tests (Playwright, Installation im Unterordner /app/)
+        run: |
+          npx playwright install --with-deps chromium
+          scripts/e2e-standalone.sh --reporter=line

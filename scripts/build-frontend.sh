@@ -7,9 +7,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 [ -d node_modules ] || npm ci --no-audit --no-fund
 npm run build
-for target in adapters/wordpress/app; do
+for target in adapters/wordpress/app adapters/standalone/app; do
   rm -rf "$target"
   mkdir -p "$target"
   cp -R packages/frontend/dist/. "$target/"
 done
-echo "Frontend gebaut und nach adapters/wordpress/app kopiert."
+# Eigenständige Version: Service Worker neben index.php, damit sein Bereich die ganze App umfasst.
+cp packages/frontend/dist/sw.js adapters/standalone/sw.js
+echo "Frontend gebaut und nach adapters/wordpress/app und adapters/standalone/app kopiert."

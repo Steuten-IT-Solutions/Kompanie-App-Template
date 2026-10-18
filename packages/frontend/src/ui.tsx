@@ -27,7 +27,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   }, [...deps, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
-  return { data, error, loading, reload };
+  return { data, error, loading, reload, setData };
 }
 
 export function Loading() {

@@ -1,25 +1,40 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 
-// E2E-Tests gegen das WordPress-Plugin auf einer Test-Instanz (scripts/setup-test-wp.sh)
-// mit der Beispielkonfiguration (config/kompanie.example.json):
-// Verwalter heißt dort „Spieß“, der Bereich Strafen „Kasse“.
+// E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
+// Verwalter heißt dort „Spieß“, der Bereich Strafen „Kasse“. Die App liegt unter /app/.
+// - WordPress-Plugin (Standard): scripts/setup-test-wp.sh, Anmeldung über wp-login.php
+// - eigenständige Version (KOMPANIE_VARIANT=standalone): tests/standalone/e2e-router.php,
+//   Anmeldung über das Formular in der App
 
 const PASSWORD = process.env.KOMPANIE_TEST_PASSWORD ?? 'test1234';
 const ADMIN_PASSWORD = process.env.KOMPANIE_ADMIN_PASSWORD ?? 'admin';
 const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 const MANAGER = 'Spieß';
+const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
+
+/** Anmeldeformular: wp-login.php bzw. das Formular der App. */
+async function fillLogin(page: Page, user: string, password: string) {
+  if (STANDALONE) {
+    await expect(page).toHaveURL(/#\/anmelden$/);
+    await page.getByLabel('Benutzername').fill(user);
+    await page.getByLabel('Passwort').fill(password);
+    await page.locator('form.login').getByRole('button', { name: 'Anmelden' }).click();
+  } else {
+    await expect(page).toHaveURL(/wp-login\.php/);
+    await page.fill('#user_login', user);
+    await page.fill('#user_pass', password);
+    await page.click('#wp-submit');
+  }
+}
 
 async function login(page: Page, user: string, password = PASSWORD) {
   await page.context().clearCookies();
   await page.goto('/app/');
   // Gäste sehen die öffentliche Ansicht; angemeldet wird über den Knopf in der Kopfleiste.
   await page.locator('.topbar').getByRole('button', { name: 'Anmelden' }).click();
-  await expect(page).toHaveURL(/wp-login\.php/);
-  await page.fill('#user_login', user);
-  await page.fill('#user_pass', password);
-  await page.click('#wp-submit');
+  await fillLogin(page, user, password);
   await expect(page).toHaveURL(/\/app\/?(#.*)?$/);
-  await expect(page.locator('.topbar')).toBeVisible();
+  await expect(page.locator('.topbar-account')).toHaveText('Konto');
 }
 
 async function shot(page: Page, name: string) {
@@ -170,16 +185,23 @@ test('Mitglied 2 sieht keine fremden Einträge und keine Verwaltungsdaten', asyn
 
 test('Abgelaufenes Token wird erneuert, ohne dass die App auffällt', async ({ page }) => {
   await login(page, 'mitglied1');
-  const result = await page.evaluate(async () => {
+  // WordPress prüft das Token bei jeder Anfrage, die eigenständige Version nur bei Änderungen.
+  // Geprüft wird eine Änderung, die nach der Token-Prüfung mit 400 abgelehnt wird (leeres Passwort).
+  const result = await page.evaluate(async (standalone) => {
     const cfg = window.KOMPANIE_CONFIG!;
-    // Mit falschem Token antwortet WordPress mit 403 rest_cookie_invalid_nonce.
-    const bad = await fetch(cfg.apiBase + 'me', { headers: { [cfg.csrf.header]: 'ungueltig' }, credentials: 'same-origin' });
+    const send = (token: string) =>
+      standalone
+        ? fetch(cfg.apiBase + 'me/password', { method: 'POST', headers: { [cfg.csrf.header]: token, 'Content-Type': 'application/json' }, body: '{}', credentials: 'same-origin' })
+        : fetch(cfg.apiBase + 'me', { headers: { [cfg.csrf.header]: token }, credentials: 'same-origin' });
+    const bad = await send('ungueltig');
     const body = await bad.json();
     const fresh = await (await fetch(cfg.csrf.refreshUrl, { credentials: 'same-origin' })).json();
-    const ok = await fetch(cfg.apiBase + 'me', { headers: { [cfg.csrf.header]: fresh.token }, credentials: 'same-origin' });
+    const ok = await send(fresh.token);
     return { badStatus: bad.status, code: body.code, okStatus: ok.status };
-  });
-  expect(result).toEqual({ badStatus: 403, code: 'rest_cookie_invalid_nonce', okStatus: 200 });
+  }, STANDALONE);
+  expect(result).toEqual(
+    STANDALONE ? { badStatus: 403, code: 'csrf_invalid', okStatus: 400 } : { badStatus: 403, code: 'rest_cookie_invalid_nonce', okStatus: 200 },
+  );
 });
 
 test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) => {
@@ -373,13 +395,43 @@ test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ p
   await page.context().clearCookies();
   await page.goto('/app/');
   await page.locator('.topbar').getByRole('button', { name: 'Anmelden' }).click();
-  await expect(page.locator('#rememberme')).toBeChecked();
-  await page.fill('#user_login', 'mitglied1');
-  await page.fill('#user_pass', PASSWORD);
-  await page.click('#wp-submit');
-  await expect(page.locator('.topbar')).toBeVisible();
-  const cookie = (await page.context().cookies()).find((c) => c.name.startsWith('wordpress_logged_in_'));
+  await expect(STANDALONE ? page.getByLabel('Angemeldet bleiben') : page.locator('#rememberme')).toBeChecked();
+  await fillLogin(page, 'mitglied1', PASSWORD);
+  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  const cookie = (await page.context().cookies()).find((c) => (STANDALONE ? c.name === 'kompanie_session' : c.name.startsWith('wordpress_logged_in_')));
   expect(cookie).toBeDefined();
   const days = (cookie!.expires - Date.now() / 1000) / 86400;
   expect(days).toBeGreaterThan(390);
+});
+
+test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein (nur eigenständige Version)', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  if (!STANDALONE) {
+    // Bei WordPress stehen die Einstellungen im WP-Admin.
+    await expect(page.getByRole('button', { name: 'Einstellungen öffnen' })).toHaveCount(0);
+    return;
+  }
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
+  await expect(page.getByText('✓ Ein Kalender ist eingerichtet.')).toBeVisible();
+  await expect(page.getByText('https://kalender.test')).toHaveCount(0); // geheime Adresse wird nicht angezeigt
+
+  await page.getByRole('button', { name: 'Kalender testen' }).click();
+  await expect(page.getByText(/3 Termine gefunden/)).toBeVisible();
+
+  const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
+  await cal.getByLabel('Neue iCal-Adresse (ersetzt die bisherige)').fill('ftp://falsch');
+  await cal.getByRole('button', { name: 'Speichern' }).click();
+  await expect(cal.locator('.form-error')).toBeVisible();
+
+  const gallery = page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' });
+  await expect(gallery.getByText('test@example.iam.gserviceaccount.com')).toBeVisible();
+  await gallery.getByRole('button', { name: 'Jetzt abgleichen' }).click();
+  await expect(gallery.getByText('Fertig: 2 Alben, 4 Bilder.')).toBeVisible();
+
+  const news = page.locator('.settings-section', { hasText: 'Neuigkeiten' });
+  await news.getByRole('button', { name: 'Neuigkeiten testen' }).click();
+  await expect(news.getByText('2 Beiträge gefunden.')).toBeVisible();
+  await shot(page, '18-einstellungen');
 });

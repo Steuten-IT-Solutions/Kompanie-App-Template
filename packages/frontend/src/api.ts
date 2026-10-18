@@ -319,4 +319,35 @@ export const api = {
     request<Penalty[]>('POST', '/penalties', data),
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),
   deletePenalty: (id: number) => request<{ deleted: boolean }>('DELETE', `/penalties/${id}`),
+
+  settings: () => request<AdminSettings>('GET', '/admin/settings'),
+  updateSettings: (data: AdminSettingsInput) => request<AdminSettings>('PATCH', '/admin/settings', data),
+  testCalendar: () => request<{ count: number; sample: { start: string; title: string }[] }>('POST', '/admin/calendar/test'),
+  testNews: () => request<{ count: number }>('POST', '/admin/news/test'),
+  syncGallery: (onlyProcess = false) =>
+    request<{ albums: number; photos: number; processed: number; pending: number }>('POST', '/admin/gallery/sync', { only_process: onlyProcess }),
 };
+
+export type NewsSourceType = 'none' | 'wordpress' | 'rss';
+
+export interface AdminSettings {
+  calendar: { source: 'ics' | 'google' | 'none'; ics_url_set: boolean; google_api_key_set: boolean; calendar_ids: string; cache_minutes: number };
+  gallery: {
+    configured: boolean;
+    root: string;
+    service_account_email: string;
+    status: { albums?: number; photos?: number; pending?: number; last_sync?: number; error?: string };
+  };
+  news: { source: NewsSourceType; url: string } | null;
+}
+
+export interface AdminSettingsInput {
+  calendar_ics_url?: string;
+  google_api_key?: string;
+  calendar_ids?: string;
+  calendar_cache_minutes?: number;
+  drive_service_account?: string;
+  gallery_root?: string;
+  news_source?: NewsSourceType;
+  news_url?: string;
+}

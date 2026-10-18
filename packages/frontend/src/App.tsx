@@ -6,6 +6,7 @@ import logoUrl from './generated/logo.png';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import { navigate, useRoute } from './router';
 import Anmelden from './views/Anmelden';
+import Einstellungen from './views/Einstellungen';
 import Galerie from './views/Galerie';
 import Installieren from './views/Installieren';
 import Konto from './views/Konto';
@@ -16,9 +17,9 @@ import TermineVerwalten from './views/TermineVerwalten';
 import Verwaltung from './views/Verwaltung';
 
 type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
-type View = Tab | 'konto' | 'installieren' | 'anmelden';
+type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen';
 
-const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden'];
+const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden', 'einstellungen'];
 
 /** Ältere Links weiter unterstützen. */
 const ALIASES: Record<string, string[]> = {
@@ -45,6 +46,7 @@ const TITLES: Record<View, string> = {
   konto: 'Mein Konto',
   installieren: 'App installieren',
   anmelden: 'Anmelden',
+  einstellungen: 'Einstellungen',
 };
 
 function Icon({ name }: { name: Tab }) {
@@ -160,6 +162,8 @@ export default function App() {
     konto: !!user,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
+    // Bei WordPress stehen die Einstellungen im WP-Admin.
+    einstellungen: can('manage_settings') && config?.variant === 'standalone',
   };
   const tabs = (['termine', 'news', 'galerie', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
@@ -223,7 +227,7 @@ export default function App() {
       </header>
 
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
-      {tab !== 'installieren' && tab !== 'anmelden' && <InstallBanner onToast={showToast} />}
+      {tab !== 'installieren' && tab !== 'anmelden' && tab !== 'einstellungen' && <InstallBanner onToast={showToast} />}
 
       <main className="content">
         {!user && brand.guestWelcome && tab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
@@ -236,6 +240,7 @@ export default function App() {
         {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
         {tab === 'installieren' && <Installieren onToast={showToast} />}
         {tab === 'anmelden' && <Anmelden />}
+        {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
       </main>
 
       {toast && (

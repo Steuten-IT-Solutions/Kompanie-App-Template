@@ -182,7 +182,7 @@ Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung. Stornierte Einträ
 
 ### Routen
 
-Der Kern enthält **eine Routentabelle**. WordPress registriert sie unter `/wp-json/kompanie-app/v1/` (bei einfachen Permalinks über `?rest_route=`), Standalone unter `/api/v1/` und **ohne URL-Umschreibung** über `index.php/api/v1/…`. Ist ein Bereich ausgeschaltet, sind auch seine Routen gesperrt.
+Der Kern enthält **eine Routentabelle**. WordPress registriert sie unter `/wp-json/kompanie-app/v1/` (bei einfachen Permalinks über `?rest_route=`), Standalone unter `/api/v1/` und **ohne URL-Umschreibung** über `index.php?r=/api/v1/…` (ein Query-Parameter funktioniert auf jedem Server, auch wo `PATH_INFO` fehlt; `index.php/api/v1/…` wird zusätzlich verstanden). Ist ein Bereich ausgeschaltet, sind auch seine Routen gesperrt.
 
 ## 8. Frontend
 
@@ -340,6 +340,9 @@ Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachho
 - **Datenbank:** SQLite (legt der Installer an) oder MySQL/MariaDB.
 - **Sicherheit:** Begrenzung fehlgeschlagener Anmeldungen, geschützte Dateien und Datenbank außerhalb des Web-Verzeichnisses oder gesperrt **und** geprüft, Sicherheits-Header.
 - **Läuft auf** Apache, nginx und LiteSpeed, im Hauptverzeichnis oder Unterordner, mit oder ohne URL-Umschreibung.
+- **Einstellungen in der App** für Admins: Kalender, Galerie, Quelle der Neuigkeiten (fremde WordPress-Seite oder RSS/Atom-Feed). Geheime Werte zeigt die App nie wieder an.
+- **Datensicherung** im gemeinsamen Export-Format (`bin/kompanie.php export`/`import`; in der App ab Phase 5).
+- Einzelheiten: [adapters/standalone/README.md](../adapters/standalone/README.md).
 - **Termine auf fremden Webseiten:** einbettbarer Ausschnitt `/embed/termine`. *Später.*
 
 ## 15. Umstellung der ersten Kompanie (Lank)
