@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 // Erwartet die Testbenutzer verwalter, mitglied1, mitglied2 (Passwort test1234) und admin/admin.
 export default defineConfig({
   testDir: './e2e',
+  // Bildschirmfotos nur auf Wunsch (scripts/screenshots.sh), sonst die Funktionstests.
+  testMatch: process.env.KOMPANIE_SCREENSHOTS ? 'screenshots.spec.ts' : 'app.spec.ts',
   globalSetup: './e2e/global-setup.ts',
   workers: 1,
   timeout: 60_000,

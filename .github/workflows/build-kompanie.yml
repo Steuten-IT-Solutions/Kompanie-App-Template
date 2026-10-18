@@ -1,0 +1,146 @@
+# Baut die App einer Kompanie: Branding, Pakete, Bildschirmfotos, Release, Update-Liste, Download-Seite.
+# Wird aus jedem Kompanie-Repo aufgerufen (Vorlage: vorlage/.github/workflows/build.yml).
+#
+# Voraussetzungen im Kompanie-Repo: kompanie.json, assets/logo.(png|jpg|svg), GitHub Pages aus dem
+# Branch gh-pages, Organisations-Secret KOMPANIE_SIGNING_KEY (über `secrets: inherit`).
+name: Kompanie bauen
+
+on:
+  workflow_call:
+    inputs:
+      core-ref:
+        description: Version des Kerns (Tag, z. B. v1)
+        type: string
+        default: v1
+      publish:
+        description: Release veröffentlichen (sonst nur bauen und prüfen, z. B. in Pull Requests)
+        type: boolean
+        default: true
+    secrets:
+      KOMPANIE_SIGNING_KEY:
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kompanie-build-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kompanie-Repo holen
+        uses: actions/checkout@v4
+        with:
+          path: kompanie
+
+      - name: Kern holen
+        uses: actions/checkout@v4
+        with:
+          repository: Steuten-IT-Solutions/Kompanie-App-Template
+          ref: ${{ inputs.core-ref }}
+          path: core
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, gd, sodium, zip, mbstring, curl, openssl, simplexml
+          tools: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: core/package-lock.json
+
+      - name: Schlüssel prüfen
+        if: inputs.publish
+        env:
+          KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
+        run: |
+          if [ -z "$KOMPANIE_SIGNING_KEY" ]; then
+            echo "::error::Das Organisations-Secret KOMPANIE_SIGNING_KEY fehlt (siehe docs/RELEASE.md im Kern)."
+            exit 1
+          fi
+
+      - name: App bauen (Branding aus kompanie.json und Logo)
+        working-directory: core
+        env:
+          KOMPANIE_CONFIG: ${{ github.workspace }}/kompanie/kompanie.json
+          KOMPANIE_ASSETS: ${{ github.workspace }}/kompanie/assets
+        run: scripts/build-frontend.sh
+
+      - name: Version bestimmen
+        id: version
+        working-directory: core
+        run: |
+          CORE="$(tr -d '[:space:]' < VERSION)"
+          echo "core=$CORE" >> "$GITHUB_OUTPUT"
+          echo "version=$CORE.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "stable-core=$(tr -d '[:space:]' < STABLE_CORE 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Bildschirmfotos (hell und dunkel)
+        working-directory: core
+        run: |
+          npx playwright install --with-deps chromium
+          scripts/screenshots.sh "${{ github.workspace }}/out/screenshots"
+
+      - name: Pakete bauen und signieren
+        working-directory: core
+        env:
+          KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
+        run: >
+          php scripts/package.php
+          --config="${{ github.workspace }}/kompanie/kompanie.json"
+          --version="${{ steps.version.outputs.version }}"
+          --out="${{ github.workspace }}/out/release"
+          --kompanie="${{ github.repository }}"
+          ${{ inputs.publish && '--require-signature' || '' }}
+
+      - name: Ergebnis zum Ansehen
+        uses: actions/upload-artifact@v4
+        with:
+          name: kompanie-app-${{ steps.version.outputs.version }}
+          path: out
+
+      - name: Release veröffentlichen
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$V" out/release/* \
+            --repo "${{ github.repository }}" \
+            --title "Version $V" \
+            --notes "Kern ${{ steps.version.outputs.core }}, gebaut aus ${{ github.sha }}. Pakete und Signatur: release.json."
+
+      - name: Update-Liste und Download-Seite
+        if: inputs.publish
+        working-directory: core
+        env:
+          KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          SITE="${{ github.workspace }}/site"
+          cd "${{ github.workspace }}/kompanie"
+          if git fetch --depth=1 origin gh-pages 2>/dev/null; then
+            git worktree add "$SITE" origin/gh-pages --detach
+          else
+            git worktree add --detach "$SITE"
+            git -C "$SITE" checkout --orphan gh-pages-neu
+            git -C "$SITE" rm -rf --quiet . || true
+          fi
+          cd "${{ github.workspace }}/core"
+          php scripts/updates.php --list="$SITE/updates.json" \
+            --add="${{ github.workspace }}/out/release/release.json" \
+            --base-url="https://github.com/${{ github.repository }}/releases/download/v$V/" \
+            --stable-core="${{ steps.version.outputs.stable-core }}"
+          php scripts/download-page.php --updates="$SITE/updates.json" --out="$SITE" --screenshots="${{ github.workspace }}/out/screenshots"
+          touch "$SITE/.nojekyll"
+          cd "$SITE"
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Version $V"
+          git push --quiet origin HEAD:refs/heads/gh-pages

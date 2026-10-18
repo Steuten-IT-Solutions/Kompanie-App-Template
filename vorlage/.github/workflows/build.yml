@@ -1,0 +1,23 @@
+# Baut die App dieser Kompanie, sobald sich kompanie.json oder das Logo ändert, und wenn ein
+# neuer Kern erscheint („Alle Kompanien neu bauen“). Nichts hier muss angepasst werden.
+name: App bauen
+
+on:
+  push:
+    branches: [main]
+    paths: ['kompanie.json', 'assets/**', 'legal/**']
+  pull_request:
+    paths: ['kompanie.json', 'assets/**', 'legal/**']
+  repository_dispatch:
+    types: [kern-release]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: Steuten-IT-Solutions/Kompanie-App-Template/.github/workflows/build-kompanie.yml@v1
+    with:
+      publish: ${{ github.event_name != 'pull_request' }}
+    secrets: inherit

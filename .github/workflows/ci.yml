@@ -192,3 +192,16 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           scripts/e2e-standalone.sh --reporter=line
+
+      - name: Release-Ablauf (Pakete, Signatur, Update-Liste, Download-Seite, Paket starten)
+        run: tests/release/run-tests.sh
+
+      - name: Bildschirmfotos
+        run: scripts/screenshots.sh screenshots-standalone
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-standalone
+          path: screenshots-standalone
+          if-no-files-found: ignore

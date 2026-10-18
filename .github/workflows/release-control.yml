@@ -1,0 +1,83 @@
+# Steuert die Update-Liste einer Kompanie: Version für alle freigeben (stable) oder zurückziehen.
+# Wird aus jedem Kompanie-Repo aufgerufen (Vorlage: vorlage/.github/workflows/versionen.yml) und
+# später automatisch nach dem Test der Demo-Installation.
+name: Versionen steuern
+
+on:
+  workflow_call:
+    inputs:
+      action:
+        description: promote (für alle freigeben) oder withdraw (zurückziehen)
+        type: string
+        required: true
+      version:
+        description: Version, z. B. 1.4.0.3
+        type: string
+        required: true
+      core-ref:
+        type: string
+        default: v1
+    secrets:
+      KOMPANIE_SIGNING_KEY:
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kompanie-build-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Eingaben prüfen
+        env:
+          ACTION: ${{ inputs.action }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$ACTION" == "promote" || "$ACTION" == "withdraw" ]] || { echo "::error::Unbekannte Aktion: $ACTION"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(\.[0-9]{1,6})?$ ]] || { echo "::error::Ungültige Version: $VERSION"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          path: kompanie
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Steuten-IT-Solutions/Kompanie-App-Template
+          ref: ${{ inputs.core-ref }}
+          path: core
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: sodium
+          tools: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: core/package-lock.json
+
+      - name: Update-Liste ändern und Download-Seite neu erzeugen
+        env:
+          KOMPANIE_SIGNING_KEY: ${{ secrets.KOMPANIE_SIGNING_KEY }}
+          ACTION: ${{ inputs.action }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          SITE="$GITHUB_WORKSPACE/site"
+          git -C kompanie fetch --depth=1 origin gh-pages
+          git -C kompanie worktree add "$SITE" origin/gh-pages --detach
+          cd core
+          npm ci --no-audit --no-fund
+          (cd packages/frontend && KOMPANIE_CONFIG="$GITHUB_WORKSPACE/kompanie/kompanie.json" KOMPANIE_ASSETS="$GITHUB_WORKSPACE/kompanie/assets" npm run brand)
+          php scripts/updates.php --list="$SITE/updates.json" --"$ACTION"="$VERSION"
+          php scripts/download-page.php --updates="$SITE/updates.json" --out="$SITE"
+          cd "$SITE"
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "$ACTION $VERSION"
+          git push --quiet origin HEAD:refs/heads/gh-pages

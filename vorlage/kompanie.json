@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Steuten-IT-Solutions/Kompanie-App-Template/v1/config/kompanie.schema.json",
+  "name": "Musterkompanie Beispielstadt",
+  "shortName": "Musterkompanie",
+  "greeting": "Hallo, {name}",
+  "guestWelcome": "Willkommen bei der Musterkompanie! Hier findest du unsere Termine, Neuigkeiten und Bilder.",
+  "labels": {
+    "roles": {
+      "manager": "Spieß"
+    },
+    "sections": {
+      "penalties": "Kasse"
+    }
+  },
+  "colors": {
+    "primary": "#2e6b3f",
+    "accent": "#d9a441"
+  }
+}
