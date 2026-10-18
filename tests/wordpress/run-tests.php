@@ -177,6 +177,11 @@ $autoload = static fn (string $k): string => (string) $wpdb->get_var($wpdb->prep
 $c->ok(in_array($autoload('schema_version'), ['yes', 'on', 'auto-on'], true) && in_array($autoload('roles_version'), ['yes', 'on', 'auto-on'], true), 'Einstellungen nach dem Update mit Autoload');
 $c->ok(!in_array($autoload('gallery_status'), ['yes', 'on', 'auto-on', 'auto'], true), 'Großer, selten gebrauchter Wert ohne Autoload');
 
+// Atomarer Zähler (Passwortwechsel-Grenze) in der Options-Tabelle
+$cache = new KompanieApp\WordPress\WpCache();
+$key = 'test_' . wp_generate_password(6, false);
+$c->ok($cache->increment($key, 900) === 1 && $cache->increment($key, 900) === 2 && $cache->increment($key . 'x', 900) === 1, 'Zähler im Cache zählt atomar je Schlüssel');
+
 foreach ([$member, $manager, $admin] as $id) {
     $d->deleteUser($id);
 }

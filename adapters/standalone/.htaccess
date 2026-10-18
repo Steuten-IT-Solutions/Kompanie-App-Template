@@ -8,7 +8,9 @@ DirectoryIndex index.php
   RewriteEngine On
   # Programmcode und Daten sind nie direkt abrufbar.
   RewriteRule ^(data|src|core|bin)(/|$) - [F,L]
-  RewriteRule ^(autoload\.php|data-dir\.php|VERSION)$ - [F,L]
+  RewriteRule ^(autoload\.php|data-dir\.php|VERSION|update\.json)$ - [F,L]
+  # Arbeitsordner während eines Updates
+  RewriteRule ^\.(neu|alt)- - [F,L]
   # Alles, was keine Datei ist, beantwortet index.php.
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteRule ^ index.php [QSA,L]

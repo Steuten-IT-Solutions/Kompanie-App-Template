@@ -72,8 +72,10 @@ mit einem stündlichen Cronjob beim Hoster: `php /pfad/bin/kompanie.php cron` od
 - Fehlversuche bei der Anmeldung sind begrenzt (in 15 Minuten: je Konto und Gerät 5, je IP-Adresse bzw.
   IPv6-/64-Netz 20, je Konto 50). Gezählt wird je Konto, gleich ob per Name oder E-Mail. Geräte, auf denen
   sich das Konto schon angemeldet hat, zählen beim Konto-Limit nicht mit – Fremde können den Besitzer so
-  nicht aussperren. Hinter einem Proxy oder CDN sehen alle Anfragen gleich aus (eine IP-Adresse); dann
-  greift vor allem die Grenze je Konto und Gerät.
+  nicht aussperren. **Achtung hinter einem Proxy oder CDN** (z. B. Cloudflare): Dann kommen alle Anfragen
+  scheinbar von derselben IP-Adresse, und die Grenzen je Gerät und je IP gelten für alle zusammen – Fremde
+  könnten so die Anmeldung für alle sperren. Die App wertet absichtlich keine weitergeleiteten Adressen aus
+  (sie ließen sich fälschen); solche Installationen sollten ohne vorgeschalteten Proxy laufen.
 - Falsche „aktuelle Passwörter“ beim Passwortwechsel: höchstens 5 in 15 Minuten.
 - Sicherheits-Header und Content-Security-Policy mit Nonce für die App-Seite; Fehler erscheinen nie mit
   Einzelheiten im Browser, sondern nur im Fehlerprotokoll des Servers.

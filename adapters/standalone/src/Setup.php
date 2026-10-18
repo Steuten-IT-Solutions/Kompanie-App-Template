@@ -20,15 +20,17 @@ final class Setup
     public static function install(Kernel $kernel, array $db, string $baseUrl, string $urlMode = 'query'): void
     {
         // Die Adresse wird fest eingetragen: Sie darf nie aus dem Host-Header einer Anfrage kommen.
-        if (!preg_match('~^https?://[^/\s?#]+(/[^\s?#]*)?$~', $baseUrl)) {
-            throw new \RuntimeException('Bitte die Adresse der App angeben, z. B. https://beispiel.de/app/');
-        }
+        $baseUrl = self::normalizeUrl($baseUrl);
         $data = $kernel->dataDir();
         if (Config::exists($data)) {
             throw new \RuntimeException('Die App ist hier schon eingerichtet (config.php vorhanden).');
         }
         self::prepareDataDir($data);
         if (($db['driver'] ?? 'sqlite') === 'sqlite') {
+            $version = extension_loaded('pdo_sqlite') ? (string) (new \PDO('sqlite::memory:'))->query('SELECT sqlite_version()')->fetchColumn() : '';
+            if ($version !== '' && version_compare($version, '3.24.0', '<')) {
+                throw new \RuntimeException("Die SQLite-Version des Servers ($version) ist zu alt (mindestens 3.24). Bitte eine MySQL-Datenbank nutzen oder beim Hoster nachfragen.");
+            }
             if (!extension_loaded('pdo_sqlite')) {
                 throw new \RuntimeException('PHP kann keine SQLite-Datenbank anlegen (Erweiterung pdo_sqlite fehlt). Sie lässt sich meist im Kundenmenü des Hosters einschalten; alternativ eine MySQL-Datenbank nutzen.');
             }
@@ -39,7 +41,7 @@ final class Setup
             throw new \RuntimeException('PHP kann keine MySQL-Datenbank ansprechen (Erweiterung pdo_mysql fehlt).');
         }
         $settings = Config::defaults($db);
-        $settings['base_url'] = rtrim($baseUrl, '/') . '/';
+        $settings['base_url'] = $baseUrl;
         $settings['url_mode'] = $urlMode === 'rewrite' ? 'rewrite' : 'query';
         // Erst die Verbindung prüfen, dann config.php schreiben: Ein Tippfehler im Passwort soll
         // keine halbe Installation hinterlassen.
@@ -49,6 +51,26 @@ final class Setup
         if ($settings['db']['driver'] === 'sqlite') {
             @chmod($data . '/' . $settings['db']['path'], 0640); // nur für den PHP-Benutzer
         }
+    }
+
+    /**
+     * Prüft die Adresse der App und schreibt Umlaut-Domains so, wie Browser sie senden (Punycode).
+     */
+    public static function normalizeUrl(string $url): string
+    {
+        $url = trim($url);
+        if (!preg_match('~^(https?)://([^/\s?#:]+)(:\d+)?(/[^\s?#]*)?$~i', $url, $m)) {
+            throw new \RuntimeException('Bitte die Adresse der App angeben, z. B. https://beispiel.de/app/');
+        }
+        $host = strtolower($m[2]);
+        if (preg_match('/[^\x20-\x7e]/', $host)) {
+            $ascii = function_exists('idn_to_ascii') ? idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46) : false;
+            if (!is_string($ascii) || $ascii === '') {
+                throw new \RuntimeException('Die Adresse enthält Umlaute. Bitte die Schreibweise mit „xn--“ verwenden (zeigt der Hoster an).');
+            }
+            $host = $ascii;
+        }
+        return strtolower($m[1]) . '://' . $host . ($m[3] ?? '') . rtrim($m[4] ?? '', '/') . '/';
     }
 
     /** Legt das Datenverzeichnis an und sperrt es für den Webserver (Apache; nginx siehe README). */

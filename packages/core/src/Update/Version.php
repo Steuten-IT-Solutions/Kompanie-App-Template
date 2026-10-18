@@ -12,7 +12,7 @@ final class Version
 {
     public static function valid(string $v): bool
     {
-        return (bool) preg_match('/^\d{1,4}\.\d{1,4}\.\d{1,4}(\.\d{1,6})?$/', $v);
+        return (bool) preg_match('/^\d{1,4}\.\d{1,4}\.\d{1,4}(\.\d{1,6})?\z/', $v);
     }
 
     /** -1, 0 oder 1 wie version_compare, aber nur für gültige Versionen. */

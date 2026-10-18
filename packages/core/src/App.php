@@ -12,10 +12,14 @@ use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
+use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Port\AuthContext;
+use KompanieApp\Core\Port\BackupProvider;
+use KompanieApp\Core\Port\HealthChecks;
+use KompanieApp\Core\Port\UpdateTarget;
 use KompanieApp\Core\Port\Authenticator;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\Clock;
@@ -34,6 +38,8 @@ use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Update\StatusReporter;
+use KompanieApp\Core\Update\UpdateService;
 
 /**
  * Setzt den Kern aus den Umsetzungen der Ports zusammen, die ein Adapter liefert.
@@ -42,7 +48,7 @@ use KompanieApp\Core\Storage\Sql\Migrator;
 final class App
 {
     /** Wiederkehrende Aufgaben: Name => Abstand in Sekunden */
-    public const TASKS = [GalleryService::TASK => 3600];
+    public const TASKS = [GalleryService::TASK => 3600, UpdateService::TASK => UpdateService::INTERVAL, StatusReporter::TASK => 86400];
 
     /** @var array<string, object> */
     private array $services = [];
@@ -62,6 +68,11 @@ final class App
         public readonly Authenticator $authenticator,
         public readonly UserDirectory $users,
         public readonly KompanieConfig $config,
+        public readonly ?UpdateTarget $updateTarget = null,
+        public readonly ?BackupProvider $backup = null,
+        public readonly ?HealthChecks $healthChecks = null,
+        /** @var array<string, mixed> update.json des Pakets: updatesUrl, trustedKeys, statusUrl, kompanie, support */
+        public readonly array $packageConfig = [],
     ) {
     }
 
@@ -82,10 +93,13 @@ final class App
     /** Plant die wiederkehrenden Aufgaben ein bzw. aus, je nach Einrichtung. */
     public function scheduleTasks(): void
     {
-        if ($this->config->featureEnabled('gallery') && $this->gallery()->isConfigured()) {
-            $this->scheduler->schedule(GalleryService::TASK, self::TASKS[GalleryService::TASK]);
-        } else {
-            $this->scheduler->unschedule(GalleryService::TASK);
+        $wanted = [
+            GalleryService::TASK => $this->config->featureEnabled('gallery') && $this->gallery()->isConfigured(),
+            UpdateService::TASK => $this->updates()->configured(),
+            StatusReporter::TASK => $this->statusReporter()->enabled(),
+        ];
+        foreach ($wanted as $task => $on) {
+            $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
         }
     }
 
@@ -95,6 +109,10 @@ final class App
         try {
             if ($task === GalleryService::TASK && $this->config->featureEnabled('gallery')) {
                 $this->gallery()->runTask(25);
+            } elseif ($task === UpdateService::TASK) {
+                $this->updates()->runTask();
+            } elseif ($task === StatusReporter::TASK) {
+                $this->statusReporter()->runTask();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -146,6 +164,30 @@ final class App
     public function settingsService(): SettingsService
     {
         return $this->service(SettingsService::class, fn () => new SettingsService($this));
+    }
+
+    public function updates(): UpdateService
+    {
+        return $this->service(UpdateService::class, fn () => new UpdateService(
+            $this->settings,
+            $this->http,
+            $this->files,
+            $this->time(),
+            $this->env->version(),
+            $this->updateTarget,
+            $this->backup,
+            $this->packageConfig,
+        ));
+    }
+
+    public function status(): StatusService
+    {
+        return $this->service(StatusService::class, fn () => new StatusService($this));
+    }
+
+    public function statusReporter(): StatusReporter
+    {
+        return $this->service(StatusReporter::class, fn () => new StatusReporter($this));
     }
 
     public function gallery(): GalleryService

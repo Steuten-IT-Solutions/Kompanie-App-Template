@@ -30,6 +30,12 @@ final class Time
         return $this->clock->timezone();
     }
 
+    /** Zeitpunkt in der Zeitzone der Kompanie formatieren. */
+    public function format(int $timestamp, string $format): string
+    {
+        return (new \DateTimeImmutable('@' . $timestamp))->setTimezone($this->timezone())->format($format);
+    }
+
     public function timestamp(): int
     {
         return $this->clock->now()->getTimestamp();

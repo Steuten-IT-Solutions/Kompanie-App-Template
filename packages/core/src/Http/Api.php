@@ -9,6 +9,8 @@ use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
+use KompanieApp\Core\Domain\StatusService;
+use KompanieApp\Core\Update\StatusReporter;
 
 /**
  * Die Routentabelle der API (siehe api/openapi.yaml) und ihre Ausführung.
@@ -21,6 +23,8 @@ use KompanieApp\Core\Domain\Input;
 final class Api
 {
     public const NEWS_PER_PAGE = 10;
+    /** Der Einrichtungsassistent wurde abgeschlossen oder übersprungen. */
+    public const SETUP_SETTING = 'setup_done';
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -122,6 +126,8 @@ final class Api
             ],
             'features' => $features,
             'user' => $a->authContext->currentUser()?->toArray(),
+            // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
+            'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
         ];
     }
 
@@ -208,6 +214,61 @@ final class Api
             new Route('POST', '/admin/calendar/test', Cap::ManageSettings, fn () => $a->settingsService()->testCalendar(), null, $denySettings),
             new Route('POST', '/admin/news/test', Cap::ManageSettings, fn () => $a->settingsService()->testNews(), null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
+
+            // Status, Updates, Datensicherung, Einrichtung (Admins)
+            new Route('GET', '/admin/status', Cap::ManageSettings, fn () => $a->status()->report() + [
+                'updates' => $a->updates()->status(),
+                'statusReports' => ['enabled' => (bool) $a->settings->get(StatusReporter::SETTING, false), 'available' => (string) ($a->packageConfig['statusUrl'] ?? '') !== '', 'payload' => $a->statusReporter()->payload()],
+                'setupDone' => (bool) $a->settings->get(self::SETUP_SETTING, false),
+            ], null, $denySettings),
+            new Route('POST', '/admin/update/check', Cap::ManageSettings, function () use ($a) {
+                $a->updates()->check();
+                return $a->updates()->status();
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/install', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->updates()->install(is_string($r->input('version')) ? $r->input('version') : '', 'manual', Input::bool($r->input('major')));
+                return ['installed' => $r->input('version')];
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/rollback', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->updates()->rollback(is_string($r->input('version')) ? $r->input('version') : '');
+                return ['installed' => $r->input('version')];
+            }, null, $denySettings),
+            new Route('PATCH', '/admin/update', Cap::ManageSettings, function (Request $r) use ($a) {
+                if ($r->has('auto')) {
+                    $a->updates()->setAuto(Input::bool($r->input('auto')));
+                }
+                if ($r->has('status_reports')) {
+                    $a->settings->set(StatusReporter::SETTING, Input::bool($r->input('status_reports')));
+                }
+                $a->scheduleTasks();
+                return $a->updates()->status();
+            }, null, $denySettings),
+            new Route('GET', '/admin/backup', Cap::ManageSettings, function () use ($a) {
+                $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+                $data = $backup->export();
+                $a->settings->set(StatusService::BACKUP_SETTING, $a->time()->timestamp());
+                $name = 'sicherung-' . $a->time()->format($a->time()->timestamp(), 'Y-m-d') . '.json';
+                return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup', Cap::ManageSettings, function (Request $r) use ($a) {
+                $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+                if (!$backup->canImport()) {
+                    throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
+                }
+                if (!Input::bool($r->input('confirm')) || !is_string($r->input('backup'))) {
+                    throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
+                }
+                try {
+                    $backup->import($r->input('backup'));
+                } catch (\RuntimeException $e) {
+                    throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
+                }
+                return ['restored' => true];
+            }, null, $denySettings),
+            new Route('POST', '/admin/setup/done', Cap::ManageSettings, function () use ($a) {
+                $a->settings->set(self::SETUP_SETTING, true);
+                return ['done' => true];
+            }, null, $denySettings),
 
             // Punkte und Strafen
             new Route('POST', '/points', Cap::Manage, fn (Request $r) => Response::created($a->scores()->givePoints($r->body, $this->user()->id)), 'points', $denyManage),

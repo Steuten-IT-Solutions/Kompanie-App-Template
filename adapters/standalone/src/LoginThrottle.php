@@ -34,9 +34,13 @@ final class LoginThrottle
      */
     public function attempt(string $account, string $ip, bool $knownDevice): bool
     {
-        $ok = true;
-        foreach ($this->keys($account, $ip, $knownDevice) as $kind => $key) {
-            $ok = $this->increment($key) <= self::LIMITS[$kind] && $ok;
+        $keys = $this->keys($account, $ip, $knownDevice);
+        // Erst Gerät und IP zählen. Das Konto-Limit nur, wenn diese noch nicht erreicht sind –
+        // sonst könnte eine einzige IP den Konto-Zähler füllen und so den Besitzer aussperren.
+        $ok = $this->increment($keys['pair']) <= self::LIMITS['pair'];
+        $ok = $this->increment($keys['ip']) <= self::LIMITS['ip'] && $ok;
+        if ($ok && isset($keys['account'])) {
+            $ok = $this->increment($keys['account']) <= self::LIMITS['account'];
         }
         if (random_int(1, 50) === 1) {
             $this->db->execute('DELETE FROM {login_attempts} WHERE window_start < ?', [time() - self::WINDOW]);
@@ -47,6 +51,7 @@ final class LoginThrottle
     /** Nach erfolgreicher Anmeldung: Versuch zurücknehmen, Zähler des Geräts löschen. */
     public function success(string $account, string $ip, bool $knownDevice): void
     {
+        // Bei Erfolg wurden alle Zähler erhöht (sonst wäre attempt() false gewesen): zurücknehmen.
         $keys = $this->keys($account, $ip, $knownDevice);
         $this->db->execute('DELETE FROM {login_attempts} WHERE name = ?', [$keys['pair']]);
         unset($keys['pair']);

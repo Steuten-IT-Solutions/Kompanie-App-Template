@@ -18,7 +18,7 @@ export KOMPANIE_SIGNING_KEY="$(php scripts/keygen.php | sed -n 2p)"
 CORE="$(tr -d '[:space:]' < VERSION)"
 BASE=https://github.com/org/kompanie-test/releases/download
 
-php scripts/package.php --config=config/kompanie.example.json --version="$CORE.1" --out="$T/r1" --kompanie=org/kompanie-test --require-signature > /dev/null
+php scripts/package.php --config=config/kompanie.example.json --version="$CORE.1" --out="$T/r1" --kompanie=org/kompanie-test --require-signature --trust-signing-key > /dev/null
 [ -f "$T/r1/kompanie-app-wordpress.zip" ] && [ -f "$T/r1/kompanie-app-standalone.zip" ] && ok "Pakete gebaut" || fail "Pakete fehlen"
 grep -q '"format": "kompanie-app-signed"' "$T/r1/release.json" && ok "release.json signiert" || fail "release.json nicht signiert"
 if KOMPANIE_SIGNING_KEY= php scripts/package.php --config=config/kompanie.example.json --version="$CORE.9" --out="$T/x" --require-signature 2> /dev/null; then
@@ -34,7 +34,7 @@ php scripts/updates.php --list="$T/updates.json" --promote="$CORE.1" > /dev/null
 [ "$(show)" = "$CORE.1 $CORE.1" ] && ok "Befördern nach stable" || fail "Kanal: $(show)"
 
 # Nur das Aussehen geändert (gleicher Kern): direkt stable
-php scripts/package.php --config=config/kompanie.example.json --version="$CORE.2" --out="$T/r2" --kompanie=org/kompanie-test --require-signature > /dev/null
+php scripts/package.php --config=config/kompanie.example.json --version="$CORE.2" --out="$T/r2" --kompanie=org/kompanie-test --require-signature --trust-signing-key > /dev/null
 php scripts/updates.php --list="$T/updates.json" --add="$T/r2/release.json" --base-url="$BASE/v$CORE.2/" > /dev/null
 [ "$(show)" = "$CORE.2 $CORE.2" ] && ok "Gleicher Kern: direkt stable" || fail "Kanal: $(show)"
 php scripts/updates.php --list="$T/updates.json" --withdraw="$CORE.2" > /dev/null

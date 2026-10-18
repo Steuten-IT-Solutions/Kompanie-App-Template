@@ -32,6 +32,7 @@ final class SessionAuth implements Authenticator, AuthContext
         private readonly HttpContext $http,
         private readonly StandaloneEnvironment $env,
         private readonly string $secret,
+        private readonly \KompanieApp\Core\Port\Settings $settings,
     ) {
     }
 
@@ -85,10 +86,11 @@ final class SessionAuth implements Authenticator, AuthContext
         if (in_array($this->http->method(), self::SAFE_METHODS, true)) {
             return;
         }
-        // HTML-Formulare fremder Seiten können kein application/json senden. Gäste (Anmeldung)
-        // müssen es immer angeben; angemeldete Anfragen ohne Inhalt (z. B. Abmelden) dürfen ohne.
+        // HTML-Formulare fremder Seiten können kein application/json senden. Anfragen mit Inhalt
+        // müssen es angeben (Formulare schicken immer einen Content-Type mit). Ohne Inhalt geht es
+        // weiter zur Rechteprüfung, damit eine abgelaufene Sitzung 401 ergibt.
         $type = strtolower(trim(explode(';', (string) $this->http->header('Content-Type'))[0]));
-        if (($type !== '' || $this->currentUser() === null) && $type !== 'application/json') {
+        if (($type !== '' || $this->http->hasBody()) && $type !== 'application/json') {
             throw new ApiError(415, 'unsupported_media_type', 'Bitte Daten als JSON senden.');
         }
         // Browser melden, ob eine Anfrage von einer fremden Seite kommt.
@@ -126,7 +128,7 @@ final class SessionAuth implements Authenticator, AuthContext
             throw new ApiError(429, 'too_many_attempts', 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.');
         }
         // Auch ohne Konto einen Hash gleicher Stärke prüfen, damit die Antwortzeit nichts verrät.
-        $hash = $row ? (string) $row['password_hash'] : password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
+        $hash = $row ? (string) $row['password_hash'] : $this->dummyHash();
         if (!password_verify($password, $hash) || !$row) {
             throw new ApiError(400, 'login_failed', 'Benutzername oder Passwort ist falsch.');
         }
@@ -136,9 +138,27 @@ final class SessionAuth implements Authenticator, AuthContext
         // Nie eine bestehende Sitzung weiterverwenden (Session Fixation).
         $this->sessions->destroy();
         $this->sessions->start($id, $remember);
-        $this->rememberDevice($id);
+        if ($remember) {
+            // Nur auf eigenen Geräten („Angemeldet bleiben“) als bekanntes Gerät merken.
+            $this->rememberDevice($id);
+        }
         $this->user = false;
         return $this->currentUser() ?? throw new \LogicException('Anmeldung fehlgeschlagen.');
+    }
+
+    /**
+     * Vergleichs-Hash mit den aktuellen Einstellungen von password_hash (z. B. höhere Kosten unter
+     * PHP 8.4), einmal erzeugt und gespeichert: So kostet eine Anmeldung mit unbekanntem Namen
+     * genau eine Prüfung, wie mit bekanntem.
+     */
+    private function dummyHash(): string
+    {
+        $hash = $this->settings->get('login_dummy_hash');
+        if (!is_string($hash) || password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+            $hash = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+            $this->settings->set('login_dummy_hash', $hash);
+        }
+        return $hash;
     }
 
     private function isKnownDevice(int $userId): bool

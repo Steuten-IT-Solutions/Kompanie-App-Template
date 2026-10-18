@@ -36,6 +36,13 @@ final class HttpContext
         return is_string($v) ? $v : null;
     }
 
+    /** Ob die Anfrage einen Inhalt mitbringt (Content-Length > 0 oder stückweise übertragen). */
+    public function hasBody(): bool
+    {
+        return (int) ($this->server['CONTENT_LENGTH'] ?? $this->server['HTTP_CONTENT_LENGTH'] ?? 0) > 0
+            || isset($this->server['HTTP_TRANSFER_ENCODING']);
+    }
+
     public function method(): string
     {
         return strtoupper((string) ($this->server['REQUEST_METHOD'] ?? 'GET'));

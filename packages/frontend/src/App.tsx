@@ -194,9 +194,7 @@ export default function App() {
   if (!config) {
     return (
       <main className="content">
-        <ErrorBoundary key={rawPath.join('/')}>
         <p className="error">Die App muss über ihre Adresse auf der Webseite geöffnet werden.</p>
-        </ErrorBoundary>
       </main>
     );
   }
@@ -233,6 +231,7 @@ export default function App() {
       {tab !== 'installieren' && tab !== 'anmelden' && tab !== 'einstellungen' && <InstallBanner onToast={showToast} />}
 
       <main className="content">
+        <ErrorBoundary key={rawPath.join('/')}>
         {!user && brand.guestWelcome && tab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
         {tab === 'termine' &&
           (path[1] === 'verwalten' && features?.events && can('manage_events') ? <TermineVerwalten onToast={showToast} /> : <Termine />)}
@@ -244,6 +243,7 @@ export default function App() {
         {tab === 'installieren' && <Installieren onToast={showToast} />}
         {tab === 'anmelden' && <Anmelden />}
         {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
+        </ErrorBoundary>
       </main>
 
       {toast && (

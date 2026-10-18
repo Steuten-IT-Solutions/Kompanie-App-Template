@@ -22,7 +22,7 @@ final class MemberService
     ) {
     }
 
-    /** Falsche „aktuelle Passwörter“ beim Passwortwechsel: höchstens so viele in 15 Minuten. */
+    /** Versuche beim Passwortwechsel (Prüfung des aktuellen Passworts): höchstens so viele in 15 Minuten. */
     public const PASSWORD_ATTEMPTS = 5;
 
     /** @return array<string, mixed> */
@@ -185,13 +185,11 @@ final class MemberService
         $new = is_string($new) ? $new : '';
         // Wer nur eine fremde Sitzung hat (z. B. ein nicht abgemeldetes Gerät), soll das Passwort
         // nicht unbegrenzt raten und so das Konto übernehmen können.
-        $key = 'pwfail_' . $user->id;
-        $fails = (int) ($this->cache?->get($key) ?? 0);
-        if ($fails >= self::PASSWORD_ATTEMPTS) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.');
+        // Jeder Versuch wird vor der Prüfung atomar gezählt (auch bei gleichzeitigen Anfragen).
+        if ($this->cache !== null && $this->cache->increment('pwchange_' . $user->id, 900) > self::PASSWORD_ATTEMPTS) {
+            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
         }
         if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
-            $this->cache?->set($key, $fails + 1, 900);
             throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
         }
         if (mb_strlen($new) < Passwords::MIN_LENGTH) {
@@ -208,7 +206,6 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }
-        $this->cache?->delete($key);
         $this->auth->afterPasswordChange($user->id);
     }
 }

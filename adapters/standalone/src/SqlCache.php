@@ -40,4 +40,17 @@ final class SqlCache implements Cache
     {
         $this->db->execute('DELETE FROM {cache} WHERE name = ?', [$key]);
     }
+
+    public function increment(string $key, int $windowSeconds): int
+    {
+        $window = max(1, $windowSeconds);
+        $bucket = intdiv(time(), $window);
+        $name = 'ctr:' . substr(hash('sha256', $key), 0, 40) . ':' . $bucket;
+        $expires = ($bucket + 1) * $window;
+        $sql = $this->db->driver() === 'mysql'
+            ? 'INSERT INTO {cache} (name, value, expires_at) VALUES (?, \'1\', ?) ON DUPLICATE KEY UPDATE value = value + 1'
+            : 'INSERT INTO {cache} (name, value, expires_at) VALUES (?, \'1\', ?) ON CONFLICT(name) DO UPDATE SET value = CAST(value AS INTEGER) + 1';
+        $this->db->execute($sql, [$name, $expires]);
+        return (int) $this->db->scalar('SELECT value FROM {cache} WHERE name = ?', [$name]);
+    }
 }

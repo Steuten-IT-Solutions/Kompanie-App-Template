@@ -30,4 +30,12 @@ final class ArrayCache implements Cache
     {
         unset($this->items[$key]);
     }
+
+    public function increment(string $key, int $windowSeconds): int
+    {
+        $bucket = 'ctr:' . $key . ':' . intdiv(time(), max(1, $windowSeconds));
+        $n = (int) ($this->get($bucket) ?? 0) + 1;
+        $this->set($bucket, $n, $windowSeconds);
+        return $n;
+    }
 }

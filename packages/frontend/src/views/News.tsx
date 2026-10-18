@@ -19,7 +19,7 @@ function newsDate(iso: string): string {
 function cleanHtml(html: string): string {
   const clean = DOMPurify.sanitize(html, {
     ADD_ATTR: ['target'],
-    FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select', 'option', 'link', 'meta', 'base'],
+    FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select', 'option', 'link', 'meta', 'base', 'dialog', 'details', 'summary', 'marquee'],
     FORBID_ATTR: ['style', 'class', 'id'],
     RETURN_DOM_FRAGMENT: true,
   });

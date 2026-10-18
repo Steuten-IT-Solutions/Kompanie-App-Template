@@ -182,10 +182,18 @@ try {
     }
     $c->ok($throttle->attempt('u99', '10.0.1.1', false) === false, 'Konto-Limit für unbekannte Geräte (verteiltes Raten)');
     $c->ok($throttle->attempt('u99', '10.0.1.2', true) === true, 'Bekanntes Gerät des Besitzers kommt trotzdem herein');
+    for ($i = 0; $i < 60; $i++) {
+        $throttle->attempt('u77', '10.9.9.9', false);
+    }
+    $c->ok($throttle->attempt('u77', '10.8.8.8', false) === true, 'Eine einzelne IP kann das Konto-Limit nicht füllen');
     $c->ok(KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:2::1') === KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:2:ffff::9')
         && KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:3::1') !== KompanieApp\Standalone\LoginThrottle::network('2001:db8:1:2::1'), 'IPv6: ein /64-Netz zählt wie eine Adresse');
     $r = $login('anna', 'anna-passwort');
-    $c->ok(str_contains($r[2]['set-cookie'], SessionAuth::DEVICE_COOKIE . '='), 'Nach der Anmeldung ist das Gerät bekannt');
+    $c->ok(str_contains($r[2]['set-cookie'], SessionAuth::DEVICE_COOKIE . '='), 'Nach der Anmeldung mit „Angemeldet bleiben“ ist das Gerät bekannt');
+    $c->ok(!str_contains($login('anna', 'anna-passwort', false)[2]['set-cookie'], SessionAuth::DEVICE_COOKIE . '='), 'Ohne „Angemeldet bleiben“ wird das Gerät nicht gemerkt');
+    $login('niemand-' . bin2hex(random_bytes(3)), 'x');
+    $c->ok(is_string(json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'login_dummy_hash'"), true)), 'Vergleichs-Hash für unbekannte Namen wird einmal erzeugt und gespeichert');
+    $c->ok($as(str_repeat('0', 64), 'DELETE', 'events/1')[0] === 401, 'Abgelaufene Sitzung und Anfrage ohne Inhalt: 401 statt 415');
     $kernel->db()->execute('DELETE FROM {login_attempts}');
 
     $c->section('Passwort ändern, Abmelden, Verlängerung');
@@ -243,7 +251,10 @@ try {
     $c->ok(!str_contains((string) @file_get_contents($listenLog), 'cron'), 'Host-Header lenkt den Selbstaufruf nicht um (Cron-Schlüssel bleibt geheim)');
     $c->ok((int) $kernel->db()->scalar("SELECT next_run FROM {tasks} WHERE name = 'testaufgabe'") > time(), 'Fällige Aufgabe läuft über den Selbstaufruf an die eingetragene Adresse');
     $redirect = $d->send('GET', $base, ['Host' => "localhost:$port"], null);
-    $c->ok($redirect[0] === 301 && ($redirect[2]['location'] ?? '') === $base, 'Andere Schreibweise der Adresse wird auf die eingetragene umgeleitet');
+    $c->ok($redirect[0] === 302 && ($redirect[2]['location'] ?? '') === $base, 'Andere Schreibweise der Adresse wird (vorläufig) auf die eingetragene umgeleitet');
+    $proxied = $d->send('GET', $base, ['Host' => 'backend.intern:8080', 'X-Forwarded-Host' => "127.0.0.1:$port"], null);
+    $c->ok($proxied[0] === 200, 'Hinter einem Proxy zählt X-Forwarded-Host (keine Umleitungsschleife)');
+    $c->ok(Setup::normalizeUrl('https://Bücher-Verein.de/app') === 'https://xn--bcher-verein-dlb.de/app/' || !function_exists('idn_to_ascii'), 'Umlaut-Domain wird so gespeichert, wie Browser sie senden');
     $c->ok((bool) preg_match('/^kompanie-[a-f0-9]{32}\.sqlite$/', (string) (Config::load($data)->toArray()['db']['path'] ?? '')) || $kernel->db()->driver() === 'mysql', 'SQLite-Datei mit zufälligem Namen');
     $cfgFile = $data . '/config.php';
     $saved = (string) file_get_contents($cfgFile);

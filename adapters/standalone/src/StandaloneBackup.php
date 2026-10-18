@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Standalone;
 
+use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\Sql\Migrator;
@@ -13,7 +14,7 @@ use KompanieApp\Core\Storage\Sql\Migrator;
  * und Einstellungen. Sitzungen, Zwischenspeicher und Anmeldeversuche gehören nicht dazu;
  * nach dem Wiederherstellen melden sich alle neu an.
  */
-final class StandaloneBackup
+final class StandaloneBackup implements BackupProvider
 {
     public const TABLES = [...Backup::CORE_TABLES, 'users'];
     /** Gehören zur Installation, nicht zu den Daten. */
@@ -47,6 +48,11 @@ final class StandaloneBackup
             'tables' => (new Backup($this->kernel->db()))->dump(self::TABLES),
             'settings' => $settings,
         ];
+    }
+
+    public function canImport(): bool
+    {
+        return true;
     }
 
     /** Ersetzt alle Daten durch die Sicherung. */

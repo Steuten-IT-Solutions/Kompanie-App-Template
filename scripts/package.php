@@ -3,6 +3,7 @@
  * Packt die gebaute App einer Kompanie in die beiden Pakete und schreibt release.json.
  *
  *   php scripts/package.php --config=pfad/kompanie.json --version=0.1.0.3 --out=dist/release [--kompanie=org/repo]
+ *       [--updates-url=…] [--status-url=https://…] [--support="Text"] [--trust-signing-key]
  *
  * Vorher: scripts/build-frontend.sh mit KOMPANIE_CONFIG/KOMPANIE_ASSETS derselben Kompanie.
  * Signiert wird mit dem Schlüssel aus der Umgebungsvariablen KOMPANIE_SIGNING_KEY (Base64);
@@ -12,6 +13,13 @@
  *   kompanie-app-wordpress.zip   Plugin zum Hochladen in WordPress (Ordner kompanie-app/)
  *   kompanie-app-standalone.zip  eigenständige Version (Ordner kompanie-app/), lädt der Installer
  *   release.json                 Version, Voraussetzungen, SHA-256 der Pakete; signiert
+ *   install.php                  Installer der eigenständigen Version für diese Kompanie
+ *
+ * In beide Pakete kommt update.json: Adresse der Update-Liste (Standard bei --kompanie=org/repo:
+ * https://org.github.io/repo/updates.json), vertrauenswürdige Schlüssel (TrustedKeys; mit
+ * --trust-signing-key zusätzlich der Signaturschlüssel – nur für Tests), Statusmeldungen, Hilfe.
+ * Mit --require-signature muss der Signaturschlüssel in TrustedKeys stehen, sonst könnten die
+ * Installationen keine Updates prüfen.
  */
 
 declare(strict_types=1);
@@ -21,10 +29,11 @@ require $root . '/adapters/standalone/autoload.php';
 
 use KompanieApp\Core\Storage\Sql\Migrations as CoreMigrations;
 use KompanieApp\Core\Update\SignedEnvelope;
+use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\Version;
 use KompanieApp\Standalone\Migrations as StandaloneMigrations;
 
-$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'require-signature']);
+$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'require-signature', 'updates-url::', 'status-url::', 'support::', 'trust-signing-key']);
 $config = (string) ($opt['config'] ?? '');
 $version = (string) ($opt['version'] ?? '');
 $out = rtrim((string) ($opt['out'] ?? ''), '/');
@@ -87,6 +96,37 @@ function kompanie_zip(string $file, array $entries): void
     $zip->close();
 }
 
+// Signaturschlüssel und Update-Konfiguration
+$key = getenv('KOMPANIE_SIGNING_KEY');
+$signing = null;
+if (is_string($key) && trim($key) !== '') {
+    $signing = SignedEnvelope::keyPairFromSecret($key);
+} elseif (isset($opt['require-signature'])) {
+    $fail('KOMPANIE_SIGNING_KEY fehlt; ohne Signatur wird nichts veröffentlicht.');
+}
+$trusted = TrustedKeys::all();
+if ($signing !== null && isset($opt['trust-signing-key'])) {
+    $trusted[SignedEnvelope::keyId($signing[1])] = base64_encode($signing[1]);
+}
+if ($signing !== null && isset($opt['require-signature']) && !isset($trusted[SignedEnvelope::keyId($signing[1])])) {
+    $fail('Der Signaturschlüssel steht nicht in packages/core/src/Update/TrustedKeys.php. Ohne diesen Eintrag könnten die Installationen keine Updates prüfen (siehe docs/RELEASE.md).');
+}
+$repo = (string) ($opt['kompanie'] ?? '');
+$updatesUrl = (string) ($opt['updates-url'] ?? '');
+if ($updatesUrl === '' && preg_match('#^([^/]+)/([^/]+)$#', $repo, $m)) {
+    $updatesUrl = 'https://' . strtolower($m[1]) . '.github.io/' . $m[2] . '/updates.json';
+}
+$downloadPage = $updatesUrl !== '' ? substr($updatesUrl, 0, (int) strrpos($updatesUrl, '/') + 1) : '';
+$updateJson = [
+    'kompanie' => $repo,
+    'updatesUrl' => $updatesUrl,
+    'downloadPage' => $downloadPage,
+    'statusUrl' => (string) ($opt['status-url'] ?? ''),
+    'support' => (string) ($opt['support'] ?? ''),
+    'trustedKeys' => $trusted,
+];
+$updateEntry = ['content' => json_encode($updateJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"];
+
 $core = kompanie_files($root . '/packages/core/src');
 $app = kompanie_files($dist);
 $kompanieJson = ['content' => (string) file_get_contents($config)];
@@ -110,6 +150,7 @@ foreach ($app as $rel => $src) {
     $wp["kompanie-app/app/$rel"] = $src;
 }
 $wp['kompanie-app/kompanie.json'] = $kompanieJson;
+$wp['kompanie-app/update.json'] = $updateEntry;
 
 // Eigenständige Version
 $sa = [];
@@ -126,6 +167,7 @@ $sa['kompanie-app/core/.htaccess'] = ['content' => (string) file_get_contents($r
 $sa['kompanie-app/sw.js'] = $dist . '/sw.js';
 $sa['kompanie-app/kompanie.json'] = $kompanieJson;
 $sa['kompanie-app/VERSION'] = ['content' => $version . "\n"];
+$sa['kompanie-app/update.json'] = $updateEntry;
 
 $packages = ['wordpress' => $wp, 'standalone' => $sa];
 $files = [];
@@ -149,13 +191,27 @@ $release = [
     'files' => $files,
 ];
 
-$key = getenv('KOMPANIE_SIGNING_KEY');
-if (is_string($key) && trim($key) !== '') {
-    [$secret, $public] = SignedEnvelope::keyPairFromSecret($key);
+// Installer für diese Kompanie: Update-Adresse und Schlüssel einsetzen.
+$installer = (string) file_get_contents($root . '/installer/install.php');
+$installerConfig = var_export([
+    'name' => trim($kompanie['name']),
+    'updatesUrl' => $updatesUrl,
+    'kompanie' => $repo,
+    'trustedKeys' => $trusted,
+    'primary' => (string) ($kompanie['colors']['primary'] ?? '#2e6b3f'),
+    'downloadPage' => $downloadPage,
+    'support' => (string) ($opt['support'] ?? ''),
+], true);
+$installer = (string) preg_replace('#/\*KOMPANIE_INSTALLER_CONFIG\*/.*/\*KOMPANIE_INSTALLER_CONFIG_ENDE\*/#s', addcslashes($installerConfig, '\\$'), $installer, 1, $n);
+if ($n !== 1) {
+    $fail('Platzhalter im Installer nicht gefunden.');
+}
+file_put_contents("$out/install.php", $installer);
+
+if ($signing !== null) {
+    [$secret, $public] = $signing;
     file_put_contents("$out/release.json", SignedEnvelope::sign($release, $secret, SignedEnvelope::keyId($public)));
     echo "Signiert mit Schlüssel " . SignedEnvelope::keyId($public) . ".\n";
-} elseif (isset($opt['require-signature'])) {
-    $fail('KOMPANIE_SIGNING_KEY fehlt; ohne Signatur wird nichts veröffentlicht.');
 } else {
     file_put_contents("$out/release.json", json_encode($release, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
     fwrite(STDERR, "Hinweis: ohne KOMPANIE_SIGNING_KEY – release.json ist nicht signiert (nur für Tests).\n");

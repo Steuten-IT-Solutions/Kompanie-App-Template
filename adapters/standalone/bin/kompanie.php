@@ -107,7 +107,7 @@ try {
             $kernel->upgrade();
             $backup = new StandaloneBackup($kernel);
             // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
-            $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '.json';
+            $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.json';
             file_put_contents($before, json_encode($backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
             @chmod($before, 0600);
             echo "Bisheriger Stand gesichert: $before\n";

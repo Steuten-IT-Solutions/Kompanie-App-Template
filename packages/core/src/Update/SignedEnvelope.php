@@ -23,7 +23,7 @@ final class SignedEnvelope
     public static function sign(array $payload, string $secretKey, string $keyId): string
     {
         self::requireSodium();
-        $bytes = (string) json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $bytes = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
         return (string) json_encode([
             'format' => self::FORMAT,
             'keyId' => $keyId,

@@ -79,6 +79,18 @@ final class Kernel
         return $this->root . '/data';
     }
 
+    /**
+     * update.json des Pakets: Adresse der Update-Liste, vertrauenswürdige Schlüssel, Statusmeldungen.
+     * Fehlt sie (Entwicklung), gibt es keine Updates.
+     *
+     * @return array<string, mixed>
+     */
+    public function packageConfig(): array
+    {
+        $data = json_decode((string) @file_get_contents($this->root . '/update.json'), true);
+        return is_array($data) ? $data : [];
+    }
+
     public function version(): string
     {
         $v = @file_get_contents($this->root . '/VERSION');
@@ -156,6 +168,7 @@ final class Kernel
             $this->http,
             $this->env,
             $config->secret(),
+            $settings,
         );
         $data = $this->dataDir();
         $this->app = new App(
@@ -173,6 +186,10 @@ final class Kernel
             authenticator: $this->auth,
             users: $users,
             config: $this->kompanieConfig(),
+            updateTarget: new StandaloneUpdateTarget($this->root, $data),
+            backup: new StandaloneBackup($this),
+            healthChecks: new StandaloneHealthChecks($config, $httpClient, $cache),
+            packageConfig: $this->packageConfig(),
         );
         return $this->app;
     }
@@ -396,11 +413,15 @@ final class Kernel
     {
         header('Cache-Control: no-store');
         // Mit fest eingetragener Adresse: andere Schreibweisen (z. B. mit/ohne www) dorthin umleiten,
-        // sonst lehnt die Herkunftsprüfung die Anmeldung als „fremde Seite“ ab.
+        // sonst lehnt die Herkunftsprüfung die Anmeldung als „fremde Seite“ ab. Hinter einem Proxy
+        // zählt X-Forwarded-Host; 302 statt 301, damit Browser eine falsche Umleitung nicht dauerhaft merken.
         $base = $this->config()->baseUrl();
-        if ($base !== '' && strcasecmp((string) parse_url($base, PHP_URL_HOST), (string) parse_url($this->http->baseUrl(), PHP_URL_HOST)) !== 0
-            && $this->http->method() === 'GET') {
-            header('Location: ' . $base, true, 301);
+        $baseHost = strtolower((string) parse_url($base, PHP_URL_HOST));
+        $hosts = array_map(static fn ($h): string => strtolower((string) preg_replace('/:\d+$/', '', trim((string) $h))), array_filter([
+            $this->http->host(), ...explode(',', (string) $this->http->header('X-Forwarded-Host')),
+        ]));
+        if ($base !== '' && $this->http->method() === 'GET' && !in_array($baseHost, $hosts, true)) {
+            header('Location: ' . $base, true, 302);
             return;
         }
         $file = $this->appDir() . '/index.html';
