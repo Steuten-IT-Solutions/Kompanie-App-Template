@@ -138,10 +138,13 @@ function ki_http_get($url, $timeout)
     return array($status, $body);
 }
 
-/** Lädt die Update-Liste, prüft die Signatur und gibt den Eintrag der stabilen Version zurück. */
 /**
+ * Lädt die Update-Liste, prüft die Signatur und gibt den Eintrag der stabilen Version zurück.
+ *
  * @param string|null $installed installierte Version (Reparaturmodus): dann die neueste freigegebene Version
- *                               derselben Hauptversion, nie ein Wechsel der Hauptversion
+ *                               derselben Hauptversion, nie ein Wechsel der Hauptversion. Leer = unbekannt
+ *                               (Datei VERSION beschädigt): nur, wenn alle freigegebenen Versionen eine
+ *                               einzige Hauptversion haben.
  */
 function ki_stable_entry($installed = null)
 {
@@ -172,9 +175,20 @@ function ki_stable_entry($installed = null)
     if ($stable !== null && in_array($stable, $withdrawn, true)) {
         $stable = null;
     }
-    if ($installed !== null && preg_match('/^(\d+)\./', $installed, $m)) {
-        // Neueste freigegebene (stableHistory), nicht zurückgezogene Version der installierten Hauptversion.
+    if ($installed !== null) {
         $history = isset($list['stableHistory']) ? (array) $list['stableHistory'] : array();
+        if (!preg_match('/^(\d+)\.\d+\.\d+/', $installed, $m)) {
+            // Installierte Version unbekannt: nur weiter, wenn es keine Wahl der Hauptversion gibt.
+            $majors = array();
+            foreach ($history as $v) {
+                $majors[(int) $v] = true;
+            }
+            if (count($majors) !== 1) {
+                throw new RuntimeException('Die installierte Version ist nicht zu erkennen (Datei VERSION fehlt oder ist beschädigt), und es gibt mehrere Hauptversionen. Bitte bei uns melden, damit nichts Falsches eingespielt wird.');
+            }
+            $m = array(1 => (string) key($majors));
+        }
+        // Neueste freigegebene (stableHistory), nicht zurückgezogene Version der installierten Hauptversion.
         $stable = null;
         foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
             if (isset($e['version']) && strpos($e['version'], $m[1] . '.') === 0 && in_array($e['version'], $history, true) && !in_array($e['version'], $withdrawn, true)) {
@@ -183,7 +197,7 @@ function ki_stable_entry($installed = null)
             }
         }
         if ($stable === null) {
-            throw new RuntimeException('Für die installierte Hauptversion ' . $m[1] . ' gibt es keine freigegebene Version zum Einspielen. Eine neue Hauptversion bitte in der App unter Einstellungen → Updates einspielen (dort wird vorher gesichert).');
+            throw new RuntimeException('Für die installierte Hauptversion ' . $m[1] . ' gibt es gerade keine freigegebene Version zum Einspielen. Bitte bei uns melden; eine neue Hauptversion wird nur in der App unter Einstellungen → Updates eingespielt (dort wird vorher gesichert).');
         }
     }
     foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {

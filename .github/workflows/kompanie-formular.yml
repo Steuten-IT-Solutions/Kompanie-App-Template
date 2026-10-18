@@ -90,8 +90,10 @@ jobs:
           if [ "$MODE" = neu ]; then
             if [ -n "$INFO" ]; then
               # Ein früherer Lauf dieses Formulars brach ab (Repo aus der Vorlage, Beschreibung mit der Nummer
-              # dieses Issues): fortsetzen. Alle Schritte danach sind wiederholbar.
-              if [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ]; then
+              # dieses Issues, noch kein veröffentlichtes Release): fortsetzen. Alle Schritte danach sind
+              # wiederholbar. Ist schon etwas veröffentlicht, nie überschreiben (dafür „Kompanie ändern“).
+              PUBLISHED="$(gh release list --repo "$ORG/$REPO" --exclude-drafts --limit 1)"   # Fehler brechen ab
+              if [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ] && [ -z "$PUBLISHED" ]; then
                 RESUME=1
               else
                 echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"

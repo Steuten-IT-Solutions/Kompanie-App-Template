@@ -130,6 +130,13 @@ installer "$T/i5.html" --data-urlencode "login=admin" --data-urlencode "password
 grep -q "Version $CORE.5 ist eingespielt" "$T/i5.html" && [ "$(version)" = "$CORE.5" ] && ok "Reparaturmodus bleibt bei der installierten Hauptversion (keine $NEXT_MAJOR ohne Sicherung)" \
   || fail "Hauptversion: $(sed 's/<[^>]*>/ /g' "$T/i5.html" | tr -s ' ' | head -c 400)"
 
+# 7c. Datei VERSION beschädigt und mehrere Hauptversionen freigegeben: nichts einspielen
+cp "$T/www/VERSION" "$T/version.bak" && rm "$T/www/VERSION"
+cp "$SRV/rmajor/install.php" "$T/www/install.php"
+installer "$T/i6.html" --data-urlencode "login=admin" --data-urlencode "password=geheim-12345"
+grep -q "nicht zu erkennen" "$T/i6.html" && [ ! -f "$T/www/VERSION" ] && ok "Unbekannte installierte Version: Reparaturmodus spielt nichts ein" || fail "Ohne VERSION: $(sed 's/<[^>]*>/ /g' "$T/i6.html" | tr -s ' ' | head -c 400)"
+cp "$T/version.bak" "$T/www/VERSION" && rm -f "$T/www/install.php"
+
 # 8. Installer einer anderen Kompanie nimmt diese Liste nicht an
 release 6 org/andere
 rm -rf "$T/www2" && mkdir "$T/www2" && cp "$SRV/r6/install.php" "$T/www2/install.php"
