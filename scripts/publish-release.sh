@@ -100,6 +100,10 @@ CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$REPO" 
 KNOWN="$(updates --find="$KOMPANIE_SHA" --core-code="$CODE" --config-hash="$CONFIG_HASH")"
 if [ -n "$KNOWN" ]; then
   read -r KNOWN_VERSION KNOWN_CHANNEL <<< "$KNOWN"
+  if [ "$KNOWN_CHANNEL" = withdrawn ]; then
+    echo "Dieser Stand (Version $KNOWN_VERSION) wurde zurückgezogen und wird nicht neu veröffentlicht. Bitte zuerst den Fehler beheben."
+    exit 0
+  fi
   publish_release "$KNOWN_VERSION" "$KNOWN_CHANNEL"
   echo "Dieser Stand ist schon als Version $KNOWN_VERSION veröffentlicht."
   exit 0

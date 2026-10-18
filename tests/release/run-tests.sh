@@ -190,4 +190,9 @@ grep -q '"statusUrl": "https://status.example.org/"' <<< "$(unzip -p "$T/release
   && ok "Geänderte Adresse für Statusmeldungen ergibt eine neue Version" || fail "Statusadresse: $(ls "$T/releases")"
 if STATUS_URL=http://unsicher.example.org/ pub "$SHA4" > /dev/null 2>&1; then fail "http-Adresse für Statusmeldungen angenommen"; else ok "Adresse für Statusmeldungen nur mit https"; fi
 
+# Zurückgezogener Stand kommt auch mit geänderter Paket-Konfiguration nicht wieder
+env REPO=org/kompanie-test ACTION=withdraw VERSION="$CORE.6" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > /dev/null
+OUT4="$(STATUS_URL=https://status.example.org/ SUPPORT=hilfe@example.org pub "$SHA4")"
+grep -q "zurückgezogen und wird nicht neu veröffentlicht" <<< "$OUT4" && [ ! -d "$T/releases/v$CORE.7" ] && ok "Zurückgezogener Stand wird nicht neu veröffentlicht (auch mit neuer Konfiguration)" || fail "Zurückgezogen: $OUT4"
+
 echo; echo "$pass bestanden, 0 fehlgeschlagen"

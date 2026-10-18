@@ -29,8 +29,11 @@ final class WpUpdateTarget implements UpdateTarget
 
     public function autoUpdateAllowed(): bool
     {
-        $disabled = (defined('AUTOMATIC_UPDATER_DISABLED') && AUTOMATIC_UPDATER_DISABLED) || !wp_is_file_mod_allowed('automatic_updater');
-        if ((bool) apply_filters('automatic_updater_disabled', $disabled)) {
+        // Wie WordPress selbst: Dateiänderungen gesperrt geht vor jedem Filter.
+        if (!wp_is_file_mod_allowed('automatic_updater')) {
+            return false;
+        }
+        if ((bool) apply_filters('automatic_updater_disabled', defined('AUTOMATIC_UPDATER_DISABLED') && AUTOMATIC_UPDATER_DISABLED)) {
             return false;
         }
         // Vorgabe: erlaubt (das Plugin hat keinen Schalter in der Plugin-Liste von WordPress; ein- und

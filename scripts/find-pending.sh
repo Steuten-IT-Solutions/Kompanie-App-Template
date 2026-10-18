@@ -30,6 +30,7 @@ while IFS= read -r repo; do
     echo "Übersprungen (main nicht erreichbar): $repo" >&2
     continue
   fi
+  CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$repo" --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}")"   # eigene Zuweisung: Fehler brechen ab
   # Liste als Datei (kann über 100 KB groß sein, zu groß für ein Argument)
   curl -fsSL --max-time 20 -o "$WORK/list.json" "https://raw.githubusercontent.com/$repo/gh-pages/updates.json" 2> /dev/null || echo '{}' > "$WORK/list.json"
   # Nur die neueste Version zählt (wie updates.php --find): Ein Revert ist ein neuer Stand.
@@ -37,11 +38,12 @@ while IFS= read -r repo; do
     $env = json_decode((string) file_get_contents($argv[1]), true);
     $list = is_array($env) ? json_decode((string) base64_decode((string) ($env["payload"] ?? ""), true), true) : null;
     $e = $list["versions"][0] ?? null;
-    if (is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && ($e["configHash"] ?? "") === $argv[4]
-        && preg_match("/^[0-9.]+$/", (string) $e["version"])) {
+    $same = is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && preg_match("/^[0-9.]+$/", (string) $e["version"]);
+    // Zurückgezogener Stand: nicht neu veröffentlichen (wie updates.php --find), auch bei anderer Konfiguration.
+    if ($same && (in_array($e["version"], (array) ($list["withdrawn"] ?? []), true) || ($e["configHash"] ?? "") === $argv[4])) {
         echo $e["version"];
     }
-  ' "$WORK/list.json" "$sha" "$CODE" "$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$repo" --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}")")"
+  ' "$WORK/list.json" "$sha" "$CODE" "$CONFIG_HASH")"
   # Steht der Stand in der Liste, muss sein Release auch öffentlich sein (ein Lauf kann nach dem Eintrag in
   # die Liste, aber vor dem Veröffentlichen des Entwurfs abgebrochen sein; der nächste Lauf holt das nach).
   if [ -n "$latest" ] && curl -fsIL --max-time 20 -o /dev/null "https://github.com/$repo/releases/download/v$latest/release.json"; then

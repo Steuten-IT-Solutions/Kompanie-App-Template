@@ -53,7 +53,7 @@ function se_clean(mixed $in, string $org): ?array
     $kompanie = (string) ($in['kompanie'] ?? '');
     $version = (string) ($in['version'] ?? '');
     $variant = (string) ($in['variant'] ?? '');
-    if (!preg_match('~^' . preg_quote($org, '~') . '/[A-Za-z0-9_.-]{1,100}$~i', $kompanie) || !preg_match('/^\d{1,4}(\.\d{1,6}){2,3}$/', $version)
+    if (!preg_match('~^' . preg_quote($org, '~') . '/[A-Za-z0-9_.-]{1,100}$~', $kompanie) || !preg_match('/^\d{1,4}(\.\d{1,6}){2,3}$/', $version)
         || !in_array($variant, ['wordpress', 'standalone'], true)) {
         return null;
     }
@@ -94,6 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($n > 2000) {
             se_json(429, ['error' => 'zu viele Meldungen']);
         }
+        // Erst aufräumen, dann zählen: Kompanien ohne Meldung seit 60 Tagen (z. B. Zustimmung zurückgenommen).
+        $db->prepare('DELETE FROM meldungen WHERE empfangen < ?')->execute([time() - SE_KEEP_DAYS * 86400]);
         $known = $db->prepare('SELECT COUNT(*) FROM meldungen WHERE kompanie = ? AND variante = ?');
         $known->execute([$m['kompanie'], $m['variant']]);
         if ((int) $known->fetchColumn() === 0 && (int) $db->query('SELECT COUNT(*) FROM meldungen')->fetchColumn() >= SE_MAX_ROWS) {
@@ -101,8 +103,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $db->prepare('INSERT INTO meldungen (kompanie, variante, daten, empfangen) VALUES (?, ?, ?, ?) ON CONFLICT(kompanie, variante) DO UPDATE SET daten = excluded.daten, empfangen = excluded.empfangen')
             ->execute([$m['kompanie'], $m['variant'], json_encode($m), time()]);
-        // Kompanien, die lange nichts gemeldet haben (z. B. Zustimmung zurückgenommen), entfernen.
-        $db->prepare('DELETE FROM meldungen WHERE empfangen < ?')->execute([time() - SE_KEEP_DAYS * 86400]);
     } catch (Throwable $e) {
         error_log('Statusmeldung: ' . $e->getMessage());
         se_json(500, ['error' => 'intern']);

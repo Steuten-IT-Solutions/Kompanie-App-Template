@@ -175,7 +175,7 @@ if (isset($opt['code-hash'])) {
 /** Leer oder eine https-Adresse; sonst Abbruch (ein Tippfehler soll nicht still nichts bewirken). */
 function kompanie_https(string $url, string $name, callable $fail): string
 {
-    if ($url !== '' && !preg_match('~^https://[^\s/?#]+~', $url)) {
+    if ($url !== '' && (!preg_match('~^https://[^\s/?#]+(/\S*)?$~', $url) || filter_var($url, FILTER_VALIDATE_URL) === false)) {
         $fail("$name muss mit https:// beginnen.");
     }
     return $url;

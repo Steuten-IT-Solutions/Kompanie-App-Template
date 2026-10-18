@@ -23,7 +23,8 @@ kurz halten.
 
 - Meldungen sind **nicht signiert**; jeder kann eine schicken. Die Übersicht ist ein Hinweis, kein Beweis.
 - Angenommen werden nur Meldungen von Repos der Organisation (`org` in `config.php`), höchstens 2000
-  Zeilen; Einträge ohne Meldung seit 60 Tagen werden entfernt. Die Anmeldung zur Übersicht bremst nur
+  Zeilen; Einträge ohne Meldung seit 60 Tagen werden entfernt. Wer die Tabelle mit erfundenen Meldungen
+  füllt, kann neue Kompanien bis zu 60 Tage aus der Übersicht halten (dann die Datenbank leeren). Die Anmeldung zur Übersicht bremst nur
   leicht (1 Sekunde je Fehlversuch): ein langes Passwort verwenden.
 - Je Kompanie und Variante wird nur die letzte Meldung gespeichert (mehrere Installationen derselben
   Kompanie und Variante überschreiben sich).

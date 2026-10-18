@@ -67,6 +67,7 @@ jobs:
         env:
           BODY: ${{ github.event.issue.body }}
           NEU: ${{ contains(github.event.issue.labels.*.name, 'neue-kompanie') }}
+          ISSUE: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ github.token }}
           OUT: ${{ runner.temp }}/formular
         run: |
@@ -76,12 +77,21 @@ jobs:
           REPO="$(cat "$OUT/repo.txt")"
           mkdir -p "$OUT/kompanie"
           RESUME=0
-          INFO="$(gh api "repos/$ORG/$REPO" --jq '[(.topics | index("kompanie-app") != null), .private, (.template_repository.full_name // "")] | @tsv' 2> /dev/null || true)"
-          IFS=$'\t' read -r TOPIC PRIVATE TEMPLATE <<< "$INFO"
+          # gh api gibt bei Fehlern den Fehlertext auf stdout aus: Exit-Code auswerten; nur 404 heißt „gibt es nicht“.
+          if INFO="$(gh api "repos/$ORG/$REPO" --jq '[(.topics | index("kompanie-app") != null), .private, (.template_repository.full_name // ""), .description // ""] | @tsv' 2> "$RUNNER_TEMP/gh-err")"; then
+            :
+          elif grep -q "HTTP 404" "$RUNNER_TEMP/gh-err"; then
+            INFO=""
+          else
+            echo "- GitHub ist gerade nicht erreichbar. Bitte das Issue später erneut speichern." > "$OUT/fehler.txt"
+            exit 1
+          fi
+          IFS=$'\t' read -r TOPIC PRIVATE TEMPLATE DESCRIPTION <<< "$INFO"
           if [ "$MODE" = neu ]; then
             if [ -n "$INFO" ]; then
-              # Ein früherer Lauf brach nach dem Anlegen ab (aus der Vorlage, noch ohne Topic): fortsetzen.
-              if [ "$TOPIC" = false ] && [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ]; then
+              # Ein früherer Lauf dieses Formulars brach nach dem Anlegen ab (aus der Vorlage, noch ohne Topic,
+              # Beschreibung mit der Nummer dieses Issues): fortsetzen.
+              if [ "$TOPIC" = false ] && [ "$TEMPLATE" = "$ORG/Kompanie-App-Vorlage" ] && [ "$DESCRIPTION" = "App der Kompanie (Formular #$ISSUE)" ]; then
                 RESUME=1
               else
                 echo "- Das Repo $ORG/$REPO gibt es schon. Für Änderungen bitte das Formular „Kompanie ändern“ nutzen." > "$OUT/fehler.txt"
@@ -155,10 +165,6 @@ jobs:
             if [ -s "$OUT/fehler.txt" ]; then cat "$OUT/fehler.txt"; else echo "Einzelheiten im [Workflow-Lauf]($RUN)."; fi
           } > "$RUNNER_TEMP/kommentar.md"
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/kommentar.md"
-          # Erledigt: schließen (spätere Bearbeitungen lösen dann nichts mehr aus)
-          if [ "$ANWENDEN" = success ] && { [ "$MODE" = aendern ] || [ "$VEROEFFENTLICHEN" = success ]; }; then
-            gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" > /dev/null
-          fi
 
   anwenden:
     needs: pruefen
@@ -212,7 +218,7 @@ jobs:
         run: |
           if [ "$RESUME" != 1 ]; then
             gh api -X POST "repos/$ORG/Kompanie-App-Vorlage/generate" -f owner="$ORG" -f name="$REPO" -F private=false \
-              -f description="App der Kompanie (Kompanie-App)" > /dev/null
+              -f description="App der Kompanie (Formular #$ISSUE)" > /dev/null
           fi
           # Das Anlegen aus der Vorlage läuft im Hintergrund: warten, bis main da ist.
           for _ in $(seq 1 30); do git ls-remote --exit-code "https://x-access-token:$GH_TOKEN@github.com/$ORG/$REPO.git" refs/heads/main > /dev/null 2>&1 && break; sleep 2; done
@@ -308,3 +314,7 @@ jobs:
             echo "Vorschau (Bildschirmfotos): Ergebnis „vorschau“ im [Workflow-Lauf]($RUN)."
           } > "$RUNNER_TEMP/kommentar.md"
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/kommentar.md"
+          # Erledigt: schließen (spätere Bearbeitungen lösen dann nichts mehr aus)
+          if [ "$ANWENDEN" = success ] && { [ "$MODE" = aendern ] || [ "$VEROEFFENTLICHEN" = success ]; }; then
+            gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" > /dev/null
+          fi

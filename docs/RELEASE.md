@@ -62,7 +62,8 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
 4. Nach dem ersten Zusammenführen in `main`: Tag **`v1`** setzen (die Kompanie-Repos rufen die Vorschau
    über `preview-kompanie.yml@v1` auf).
 5. Im Kern-Repo die Labels `neue-kompanie` und `kompanie-aendern` anlegen (die Formulare setzen sie).
-6. Optional als **Variablen des Kern-Repos** (nicht der Environment, sonst sieht sie der Abgleich nicht):
+6. Optional als **Variablen des Kern-Repos** (nicht der Environment, sonst sieht sie der Abgleich nicht;
+   gleichnamige Variablen der Environment hätten beim Veröffentlichen Vorrang, also dort keine anlegen):
    `KOMPANIE_STATUS_URL` (Empfang der Statusmeldungen, https, siehe [`tools/status-empfang`](../tools/status-empfang))
    und `KOMPANIE_SUPPORT` (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
    Eine Änderung daran (wie an `TrustedKeys`) ergibt beim nächsten Abgleich für jede Kompanie eine neue

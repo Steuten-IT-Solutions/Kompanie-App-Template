@@ -441,15 +441,20 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   expect(data.format).toBe('kompanie-app-backup');
   expect(data.variant).toBe(STANDALONE ? 'standalone' : 'wordpress');
   expect(Object.keys(data.tables)).toContain('events');
-  // Die Sicherung (und alles unter /admin/) landet nie im Speicher des Service Workers.
-  const cached = await page.evaluate(async () => {
-    const urls: string[] = [];
-    for (const name of await caches.keys()) {
-      for (const req of await (await caches.open(name)).keys()) urls.push(decodeURIComponent(req.url));
-    }
-    return urls;
-  });
-  expect(cached.filter((u) => u.includes('/admin/'))).toEqual([]);
+  // Die Sicherung (und alles unter /admin/) landet nie im Speicher des Service Workers. Gegenprobe: Der
+  // Service Worker steuert die Seite und hat andere API-Antworten gespeichert (sonst wäre die Prüfung leer).
+  const cachedUrls = () =>
+    page.evaluate(async () => {
+      const urls: string[] = [];
+      for (const name of await caches.keys()) {
+        for (const req of await (await caches.open(name)).keys()) urls.push(decodeURIComponent(req.url));
+      }
+      return urls;
+    });
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  const apiBase = await page.evaluate(() => new URL(window.KOMPANIE_CONFIG!.apiBase, location.href).href);
+  await expect.poll(async () => (await cachedUrls()).some((u) => u.startsWith(decodeURIComponent(apiBase)))).toBe(true);
+  expect((await cachedUrls()).filter((u) => u.includes('/admin/'))).toEqual([]);
   // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
@@ -465,6 +470,17 @@ test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async 
   await page.reload();
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  // Gegenprobe: Die Termine liegen wirklich im Speicher des Service Workers.
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        for (const name of await caches.keys()) {
+          for (const req of await (await caches.open(name)).keys()) if (decodeURIComponent(req.url).includes('events')) return true;
+        }
+        return false;
+      }),
+    )
+    .toBe(true);
   await page.context().setOffline(true);
   try {
     await page.reload();

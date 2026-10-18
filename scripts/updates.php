@@ -8,7 +8,8 @@
  *   php scripts/updates.php --list=updates.json --show
  *   php scripts/updates.php --list=updates.json --next-version=1.2.3      nächste freie Versionsnummer
  *   php scripts/updates.php --list=updates.json --find=<Commit des Kompanie-Repos> --core-code=<Prüfsumme> --config-hash=<Prüfsumme>
- *       gibt „Version early|stable“ aus, wenn die neueste Version genau diesen Stand enthält (sonst nichts)
+ *       gibt „Version early|stable“ aus, wenn die neueste Version genau diesen Stand enthält, „Version withdrawn“,
+ *       wenn sie denselben Code und Commit hat, aber zurückgezogen ist (sonst nichts)
  *
  * --channel=auto (Standard): stable, wenn der Kern schon auf der Demo geprüft ist (--stable-core=Inhalt
  * von STABLE_CORE: „Kern-Version Code-Prüfsumme“) oder sich nur das Aussehen ändert; sonst early.
@@ -68,8 +69,11 @@ try {
         $e = $list->toArray()['versions'][0] ?? null;
         $code = (string) ($opt['core-code'] ?? '');
         $config = (string) ($opt['config-hash'] ?? '');
-        if (is_array($e) && $opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code
-            && ($e['configHash'] ?? '') === $config) {
+        $same = is_array($e) && $opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code;
+        if ($same && $list->isWithdrawn($e['version'])) {
+            // Zurückgezogener Stand: nie still neu veröffentlichen, auch nicht mit anderer Paket-Konfiguration.
+            echo $e['version'], " withdrawn\n";
+        } elseif ($same && ($e['configHash'] ?? '') === $config) {
             echo $e['version'], ' ', $list->wasStable($e['version']) ? 'stable' : 'early', "\n";
         }
         exit(0);
