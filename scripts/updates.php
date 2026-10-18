@@ -76,7 +76,8 @@ try {
     if (isset($opt['add'])) {
         $release = SignedEnvelope::open((string) file_get_contents((string) $opt['add']), $trusted);
         $base = (string) ($opt['base-url'] ?? '');
-        if (!preg_match('#^https://#', $base)) {
+        // Nur https (für Tests auch http auf dem eigenen Rechner, wie im UpdateService).
+        if (!preg_match('#^(https://|http://(127\.0\.0\.1|localhost)[:/])#', $base)) {
             $fail('--base-url muss mit https:// beginnen.');
         }
         $channel = (string) ($opt['channel'] ?? 'auto');

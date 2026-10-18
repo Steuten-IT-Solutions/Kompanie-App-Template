@@ -14,12 +14,15 @@ Sie läuft auf normalem Webspace mit PHP, wahlweise
 
 Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Build, Icons, Prüfungen, Releases und Updates auf den Servern laufen automatisch. Die Kompanien brauchen dafür kein technisches Wissen.
 
-> **Stand:** Phase 0. Architektur, API-Spezifikation, Konfigurationsschema und die Schnittstellen des Kerns sind festgelegt. Die eigentliche Logik wird ab Phase 1 aus der Lank-App übernommen.
+> **Stand:** Phasen 1–5 umgesetzt (Kern, WordPress-Plugin, neutrale App, eigenständige Version, Branding,
+> signierte Releases, Installer, automatische Updates, Wartung in der App). Offen: Phase 6 (Formulare und
+> Statusübersicht für uns) und die Punkte in [OFFENE-PUNKTE.md](docs/OFFENE-PUNKTE.md).
 
 ## Dokumentation
 
 - [Architektur, Abläufe und Fahrplan](docs/ARCHITEKTUR.md)
 - [Planung der offenen Punkte](docs/OFFENE-PUNKTE.md)
+- [Veröffentlichen und Updates](docs/RELEASE.md)
 - [API-Spezifikation](api/openapi.yaml)
 - [Kompanie-Konfiguration: Schema](config/kompanie.schema.json) und [Beispiel](config/kompanie.example.json)
 
@@ -29,11 +32,14 @@ Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin
 api/                  API-Vertrag (OpenAPI)
 config/               Schema und Beispiel für kompanie.json
 packages/core/        PHP-Kern ohne WordPress
-packages/frontend/    React-PWA (folgt in Phase 2)
-adapters/wordpress/   WordPress-Plugin (folgt in Phase 1)
-adapters/standalone/  eigenständige Version (folgt in Phase 3)
-installer/            Web-Installer (folgt in Phase 5)
-scripts/              Prüf- und Build-Skripte
+packages/frontend/    React-PWA
+packages/branding/    Farben, Icons und Logo aus kompanie.json
+adapters/wordpress/   WordPress-Plugin
+adapters/standalone/  eigenständige Version
+installer/            Web-Installer install.php
+scripts/              Prüf-, Build- und Veröffentlichungs-Skripte
+vorlage/              Inhalt eines Kompanie-Repos (Vorlage)
+tests/                Tests der Adapter, des Release-Ablaufs, des Installers und der Updates
 ```
 
 ## Prüfungen
@@ -43,4 +49,13 @@ scripts/check-core-boundary.sh   # Kern enthält keine WordPress-Aufrufe
 scripts/check-neutral.sh         # keine Namen oder Motive einer bestimmten Kompanie
 ```
 
-GitHub Actions prüft bei jedem Push zusätzlich die PHP-Syntax, die OpenAPI-Spezifikation und das Konfigurationsschema.
+```bash
+vendor/bin/phpunit                         # Kern
+php tests/standalone/run-tests.php         # eigenständige Version (HTTP)
+scripts/e2e-standalone.sh                  # E2E (Playwright), eigenständige Version
+tests/release/run-tests.sh                 # Pakete, Signatur, Update-Liste, Veröffentlichen
+tests/update/run-tests.sh                  # install.php, Update, Zurückrollen, Zurückziehen, Reparatur
+```
+
+GitHub Actions führt bei jedem Push alle Prüfungen aus, auch die WordPress-Tests, beide Datenbanken und die
+OpenAPI-Spezifikation ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).

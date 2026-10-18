@@ -62,6 +62,23 @@ Adresse im Hintergrund (höchstens einmal pro Minute). Zuverlässiger wird es
 mit einem stündlichen Cronjob beim Hoster: `php /pfad/bin/kompanie.php cron` oder ein Abruf der Cron-Adresse
 (`php bin/kompanie.php status` zeigt sie an).
 
+## Updates
+
+Die App prüft einmal täglich die signierte Update-Liste ihrer Kompanie und spielt neue Versionen derselben
+Hauptversion selbst ein (abschaltbar unter *Einstellungen → Updates*). Dabei werden die Programmdateien
+getauscht; bei einem Fehler kommt der vorige Stand zurück. `data/`, `media/` und `data-dir.php` bleiben
+unberührt. Vor Updates mit Datenbank-Änderungen sichert die App die Daten (die letzten fünf Sicherungen).
+
+```sh
+php bin/kompanie.php update-check              # Liste prüfen und anzeigen
+php bin/kompanie.php update                    # neueste freigegebene Version einspielen
+php bin/kompanie.php rollback --version=1.4.0.2   # auf eine ältere Version zurück
+```
+
+Bitte als derselbe Benutzer ausführen, unter dem PHP auf dem Webspace läuft (sonst gehören die neuen Dateien
+einem anderen Benutzer). Klappt gar nichts mehr: `install.php` von der Download-Seite erneut hochladen und
+öffnen; nach Anmeldung eines Admins spielt er die freigegebene Version neu ein, die Daten bleiben.
+
 ## Sicherheit
 
 - Passwörter mit `password_hash`; vergessene Passwörter setzt ein Admin neu (kein E-Mail-Versand).
@@ -88,7 +105,8 @@ nginx wertet `.htaccess` nicht aus. Das Datenverzeichnis muss dann gesperrt werd
 
 ```nginx
 location ~ ^/app/(data|src|core|bin)/ { deny all; return 404; }
-location ~ ^/app/(data-dir\.php|autoload\.php|VERSION|kompanie\.json)$ { deny all; return 404; }
+location ~ ^/app/(data-dir\.php|autoload\.php|VERSION|kompanie\.json|update\.json)$ { deny all; return 404; }
+location ~ ^/app/\. { deny all; return 404; }   # Arbeitsordner von Updates (.neu-…, .alt-…)
 location /app/ { try_files $uri /app/index.php$is_args$args; }
 location = /app/index.php { include fastcgi_params; fastcgi_param SCRIPT_FILENAME $document_root/app/index.php; fastcgi_pass php; }
 ```
@@ -96,7 +114,8 @@ location = /app/index.php { include fastcgi_params; fastcgi_param SCRIPT_FILENAM
 Besser liegt das Datenverzeichnis ganz außerhalb des Web-Verzeichnisses (`data-dir.php`, siehe oben).
 Die SQLite-Datei hat einen zufälligen Namen (`kompanie-<32 Zeichen>.sqlite`), damit sie auch bei einer
 fehlenden Sperre nicht zu erraten ist.
-Der Installer (Phase 5) prüft, ob die Daten von außen wirklich nicht erreichbar sind.
+Der Installer prüft, ob die Daten von außen wirklich nicht erreichbar sind, und legt sie sonst außerhalb
+des Web-Verzeichnisses ab (oder bricht ab, wenn das nicht geht).
 
 ## Tests
 

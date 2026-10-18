@@ -209,6 +209,9 @@ jobs:
       - name: Release-Ablauf (Pakete, Signatur, Update-Liste, Download-Seite, Paket starten)
         run: tests/release/run-tests.sh
 
+      - name: Installer und Updates (install.php, Update, Zurückrollen, Zurückziehen, Reparatur)
+        run: tests/update/run-tests.sh
+
       - name: Bildschirmfotos
         run: scripts/screenshots.sh screenshots-standalone
 

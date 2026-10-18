@@ -64,7 +64,7 @@ if (version_compare(PHP_VERSION, KI_MIN_PHP, '<')) {
 function ki_checks()
 {
     $c = array();
-    $c[] = array('PHP-Version ' . PHP_VERSION, true, '');
+    $c[] = array('PHP-Version ' . PHP_VERSION . ' (mindestens 8.1)', version_compare(PHP_VERSION, '8.1', '>='), 'Die App braucht PHP 8.1 oder neuer. Die PHP-Version lässt sich meist im Kundenmenü des Hosters umstellen.');
     $db = extension_loaded('pdo_sqlite') || extension_loaded('pdo_mysql');
     $c[] = array('Datenbank (SQLite oder MySQL)', $db, 'Bitte beim Hoster die PHP-Erweiterung „pdo_sqlite“ einschalten (oder „pdo_mysql“ und eine MySQL-Datenbank anlegen).');
     foreach (array('sodium' => 'Signaturen prüfen', 'zip' => 'Pakete entpacken', 'openssl' => 'Verbindung zu Google', 'mbstring' => 'Umlaute', 'json' => 'Daten', 'gd' => 'Galeriebilder verkleinern', 'simplexml' => 'News-Feeds') as $ext => $why) {

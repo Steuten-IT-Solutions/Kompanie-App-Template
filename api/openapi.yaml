@@ -38,6 +38,7 @@ tags:
   - name: Galerie
   - name: Verwaltung
   - name: Einstellungen
+  - name: Wartung
 
 paths:
   /config:
@@ -755,10 +756,213 @@ paths:
                   photos: { type: integer }
                   processed: { type: integer }
                   pending: { type: integer }
+                  failed: { type: integer, description: Bilder, die sich nicht laden ließen (werden beim nächsten Abgleich erneut versucht) }
+                  error: { type: string, description: Fehler des Abgleichs, sonst leer }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+
+  /admin/status:
+    get:
+      tags: [Wartung]
+      summary: Zustand der Installation (Ampel), Updates, Statusmeldungen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, support, updates, statusReports, setupDone]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, label, level, text]
+                      properties:
+                        key: { type: string, description: 'z. B. updates, gallery, calendar, backup, server' }
+                        label: { type: string }
+                        level: { type: string, enum: [ok, warn, error, off] }
+                        text: { type: string }
+                  support: { type: string, description: Kontakt für Hilfe (E-Mail oder Webadresse), sonst leer }
+                  updates: { $ref: '#/components/schemas/UpdateStatus' }
+                  statusReports:
+                    type: object
+                    properties:
+                      enabled: { type: boolean, description: Der Admin hat Statusmeldungen zugestimmt }
+                      available: { type: boolean, description: Das Paket nennt einen Empfänger }
+                      payload: { type: object, description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte)' }
+                  setupDone: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/update/check:
+    post:
+      tags: [Wartung]
+      summary: Update-Liste jetzt laden und prüfen (Signatur, Kompanie, laufende Nummer)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/update/install:
+    post:
+      tags: [Wartung]
+      summary: Eine Version aus der geprüften Liste einspielen
+      description: Vorher wird bei Datenbank-Änderungen automatisch gesichert. Eine neue Hauptversion nur mit `major` true.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: string, example: 1.4.0.3 }
+                major: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Eingespielt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installed: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/update/rollback:
+    post:
+      tags: [Wartung]
+      summary: Auf eine ältere Version derselben Hauptversion zurück
+      description: Die bisherige Version wird danach beim automatischen Update übersprungen, bis eine neuere erscheint.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: string }
+      responses:
+        '200':
+          description: Eingespielt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installed: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/update:
+    patch:
+      tags: [Wartung]
+      summary: Automatische Updates und Statusmeldungen ein- oder ausschalten
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auto: { type: boolean }
+                status_reports: { type: boolean, description: Zustimmung zu täglichen Statusmeldungen }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup:
+    get:
+      tags: [Wartung]
+      summary: Datensicherung herunterladen
+      description: |
+        Gemeinsames Format `kompanie-app-backup` (Tabellen und Einstellungen; eigenständige Version
+        auch Konten mit Passwort-Hashes). Enthält Zugangsschlüssel – sicher aufbewahren.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Sicherung (mit Content-Disposition attachment)
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Wartung]
+      summary: Sicherung wiederherstellen (ersetzt alle Daten)
+      description: |
+        Eigenständige Version: nur Sicherungen der eigenständigen Version mit mindestens einem Admin;
+        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backup, confirm]
+              properties:
+                backup: { type: string, description: Inhalt der Sicherungsdatei }
+                confirm: { type: boolean, enum: [true] }
+      responses:
+        '200':
+          description: Wiederhergestellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/setup/done:
+    post:
+      tags: [Wartung]
+      summary: Einrichtungsassistent abschließen (setupPending wird danach false)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  done: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
 
 security:
   - session: []
@@ -856,6 +1060,40 @@ components:
             type: string
             enum: [member, manage, manage_events, create_users, promote_users, manage_settings]
 
+    UpdateStatus:
+      type: object
+      properties:
+        configured: { type: boolean, description: Paket mit Update-Adresse und der Adapter kann einspielen }
+        current: { type: string }
+        channel: { type: string, enum: [early, stable] }
+        auto: { type: boolean }
+        checked_at: { type: [integer, 'null'] }
+        error: { type: string, description: Fehler der letzten Prüfung, sonst leer }
+        latest: { type: [string, 'null'] }
+        available: { type: boolean, description: Neuere Version derselben Hauptversion verfügbar }
+        major: { type: boolean, description: Neue Hauptversion verfügbar (nur mit Bestätigung) }
+        majorVersion: { type: string }
+        withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
+        fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
+        problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              version: { type: string }
+              published: { type: string }
+        last:
+          type: [object, 'null']
+          description: Letzter Update-Versuch
+          properties:
+            from: { type: string }
+            to: { type: string }
+            kind: { type: string, enum: [auto, manual, rollback, withdrawn] }
+            at: { type: integer }
+            ok: { type: boolean }
+            error: { type: string }
+
     AppConfig:
       type: object
       required: [apiBase, appUrl, swUrl, auth, csrf, features, user, version]
@@ -866,6 +1104,7 @@ components:
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
+        setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         csrf:
           type: object
           required: [header, token, refreshUrl]

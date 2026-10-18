@@ -60,7 +60,7 @@ Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt oh
 ### Update (niemand)
 
 1. Wir veröffentlichen ein Kern-Release.
-2. Alle Kompanie-Repos bauen automatisch neu und veröffentlichen ein Release.
+2. Das Kern-Repo baut daraus automatisch für jede Kompanie eine neue Version („Kompanien abgleichen“), zuerst für die Demo-Installation; nach dem Test geben wir sie für alle frei.
 3. Die Server holen sich das Update selbst, prüfen Signatur und Voraussetzungen, sichern die Daten, spielen es ein und führen die Migrationen aus.
 
 Was passiert, wenn etwas davon nicht geht, steht in [Abschnitt 11](#11-updates-und-zurückrollen).
@@ -262,8 +262,8 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 | Normalfall | automatisch, ohne Zutun |
 | automatische Updates abgeschaltet (von der Kompanie, vom Hoster oder in WordPress gesperrt) | Hinweis für Admins in der App: **„Jetzt aktualisieren“**, ein Klick |
 | WordPress verlangt FTP-Zugangsdaten zum Schreiben | Hinweis mit Erklärung; als Ausweg die Plugin-Datei über *Plugin hochladen* ersetzen |
-| Server erfüllt die Voraussetzungen der neuen Version nicht (z. B. PHP zu alt) | Update wird **nicht** eingespielt, die App läuft weiter. Admins sehen in Alltagssprache, was beim Hoster umzustellen ist, mit Anleitung je Hoster |
-| Update scheitert mittendrin | automatische Rückkehr zur vorigen Version, Hinweis für Admins |
+| Server erfüllt die Voraussetzungen der neuen Version nicht (z. B. PHP zu alt) | Update wird **nicht** eingespielt, die App läuft weiter. Admins sehen in Alltagssprache, was beim Hoster umzustellen ist (Anleitungen je Hoster: später) |
+| Update scheitert mittendrin | automatische Rückkehr zur vorigen Version (eigenständig: Dateitausch mit Rücktausch; WordPress: Upgrader mit Sicherung des Plugin-Ordners, ab WordPress 6.3), Hinweis für Admins |
 | nichts davon klappt | `install.php` erneut hochladen und öffnen: Er erkennt die bestehende Installation und bietet **„Aktualisieren“** und **„Reparieren“** an |
 | neue Hauptversion | nie automatisch; Admins sehen eine kurze Erklärung und aktualisieren mit einem Klick |
 
@@ -273,8 +273,8 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 
 Jede Kompanie kann in der App unter *Einstellungen → Updates* auf eine **ältere Version** zurückgehen, mit einem Klick und ohne Datenverlust:
 
-- **Innerhalb einer Hauptversion ändern Migrationen nur additiv:** neue Tabellen oder Spalten, nie Umbenennen oder Löschen. Ältere `1.x`-Versionen laufen deshalb auch mit dem neueren Datenbestand. Zurückrollen heißt nur, den Programmcode zu tauschen. Die CI prüft das: Die Contract-Tests der vorigen Version laufen gegen den Datenbestand der neuen.
-- Der Server behält die **letzten drei Versionen**. Ältere lädt er bei Bedarf signiert nach.
+- **Innerhalb einer Hauptversion ändern Migrationen nur additiv:** neue Tabellen oder Spalten, nie Umbenennen oder Löschen. Ältere `1.x`-Versionen laufen deshalb auch mit dem neueren Datenbestand. Zurückrollen heißt nur, den Programmcode zu tauschen. (Geplant: Die CI prüft das, indem die Contract-Tests der vorigen Version gegen den Datenbestand der neuen laufen.)
+- Ältere Versionen lädt der Server bei Bedarf über die signierte Update-Liste nach (sie behält die letzten 60 Versionen und die zuletzt freigegebenen).
 - Nach dem Zurückrollen **überspringt** das automatische Update diese Version, bis eine neuere erscheint.
 - **Über eine Hauptversion zurück** geht nur mit der Sicherung, die vor dem Update automatisch angelegt wurde. Die App sagt deutlich, dass Einträge seit dem Update dann verloren gehen.
 
@@ -287,8 +287,8 @@ Jede Kompanie kann in der App unter *Einstellungen → Updates* auf eine **älte
 ### Update-Liste und gestaffelte Verteilung
 
 - Die Server fragen **nicht die GitHub-API** (Limit von 60 Anfragen pro Stunde je IP-Adresse; auf Webspace teilen sich viele Seiten eine Adresse). Stattdessen liest jeder Server einmal täglich die **signierte Update-Liste** `updates.json` seiner Kompanie von GitHub Pages.
-- **Erst die Demo, dann alle:** Jede Version läuft zuerst auf unserer Demo-Installation und wird automatisch getestet (Kanal `early`). Ist der Test grün und nichts gestoppt, bekommen sie alle Kompanien (Kanal `stable`). Testkompanien gibt es nicht.
-- Eine **zurückgezogene Version** rollen die Server automatisch zurück.
+- **Erst die Demo, dann alle:** Jede Version mit neuem Programmcode läuft zuerst auf unserer Demo-Installation (Kanal `early`) und wird getestet (automatisch: Phase 6). Danach bekommen sie alle Kompanien (Kanal `stable`, Freigabe im Kern-Repo). Testkompanien gibt es nicht.
+- Eine **zurückgezogene Version** rollen die Server automatisch zurück, auf die zuletzt freigegebene derselben Hauptversion (gibt es keine, zeigt die Statusseite das rot an).
 
 Einzelheiten: [Offene Punkte, Abschnitt 1](OFFENE-PUNKTE.md#1-update-verteilung-und-gestaffelte-releases).
 
@@ -298,20 +298,23 @@ Einzelheiten: [Offene Punkte, Abschnitt 1](OFFENE-PUNKTE.md#1-update-verteilung-
 
 Eine einzelne Datei, auf die Kompanie zugeschnitten (Repo-Name und Signaturschlüssel sind eingesetzt).
 
-1. **Voraussetzungen prüfen**: PHP-Version, Erweiterungen, Schreibrechte, HTTPS, Speicherplatz, ausgehende Verbindungen. Jedes Problem wird in Alltagssprache erklärt, mit Anleitung für den jeweiligen Hoster (erkannt am Server, wenn möglich).
-2. **WordPress erkennen.** Liegt WordPress daneben, wird nach Anmeldung eines WP-Administrators das Plugin installiert. Sonst die eigenständige Version.
-3. **Datenbank anlegen** (SQLite automatisch, siehe Abschnitt 6) und **Selbsttest** für geschützte Ordner.
-4. **Release laden**, Signatur prüfen, entpacken. Funktioniert im Domain-Hauptverzeichnis und in einem Unterordner (`/app/`), mit und ohne URL-Umschreibung.
-5. Übergabe an den **Einrichtungsassistenten**.
-6. Der Installer **löscht sich selbst** (sonst sperrt er sich). Erneut hochgeladen dient er als Werkzeug zum Aktualisieren und Reparieren.
+1. **Voraussetzungen prüfen**: PHP-Version (ab 8.1), Erweiterungen, Datenbank-Treiber, Schreibrechte, Speicherplatz, ausgehende Verbindungen. Jedes Problem wird in Alltagssprache erklärt (Anleitungen je Hoster: später).
+2. **WordPress erkennen.** Liegt WordPress im selben Ordner, erklärt der Installer, wie das Plugin installiert wird, und richtet nichts ein.
+3. **Release laden**: signierte Update-Liste der eigenen Kompanie, stabile Version, SHA-256 und Größe des Pakets prüfen, sicher entpacken. Funktioniert im Domain-Hauptverzeichnis und in einem Unterordner (`/app/`), mit und ohne URL-Umschreibung.
+4. **Datenbank anlegen** (SQLite automatisch, siehe Abschnitt 6) und **Selbsttest** für geschützte Ordner: Sind die Daten von außen erreichbar, verlegt er sie außerhalb des Web-Verzeichnisses oder bricht ab.
+5. **Ersten Admin anlegen**; danach führt die App durch den **Einrichtungsassistenten**.
+6. Der Installer **löscht sich selbst**. Erneut hochgeladen dient er (nach Anmeldung eines Admins) zum Aktualisieren und Reparieren; die Daten bleiben.
 
-### Einrichtungsassistent (beide Varianten)
+### Einrichtungsassistent (beide Varianten, in der App)
 
-1. erster Admin (nur Standalone)
-2. Kalender: geheime iCal-Adresse einfügen (mit bebilderter Anleitung, wo man sie in Google findet), Testabruf
-3. Galerie: „Mit Google verbinden“ bzw. Ordnerfreigabe, Live-Prüfung
-4. News (nur Standalone): Adresse einer vorhandenen Webseite oder überspringen
-5. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
+Beim ersten Öffnen durch einen Admin bietet die App den Assistenten an:
+
+1. Kalender: geheime iCal-Adresse einfügen (mit Anleitung, wo man sie in Google findet), Testabruf
+2. Galerie: Ordnerfreigabe für ein Dienstkonto, Abgleich mit Fortschritt („Mit Google verbinden“ hängt vom Galerie-Test ab)
+3. News (nur eigenständige Version): Adresse einer vorhandenen Webseite oder eines Feeds, Testabruf
+4. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
+
+Der erste Admin entsteht bei der eigenständigen Version im Installer, bei WordPress ist es ein WordPress-Administrator.
 
 Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachholen.
 
@@ -319,7 +322,7 @@ Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachho
 
 - **Statusseite für Admins** mit Ampel in Alltagssprache: Updates, Galerie-Abgleich, Kalender, letzte Sicherung, Server. Bei Gelb/Rot steht dabei, was zu tun ist, oder „Bitte melde dich bei …“ mit unseren Kontaktdaten.
 - **Hinweise direkt in der App** für Admins, statt E-Mails (E-Mail-Versand ist auf Webspace oft unzuverlässig).
-- **Statusmeldungen an uns, nur mit Zustimmung:** Version, PHP-Version, Ergebnis des letzten Updates und Abgleichs, Fehlercodes. Keine Mitgliederdaten. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
+- **Statusmeldungen an uns, nur mit Zustimmung:** Version, Variante, PHP-Version, Datenbank-Art, Ergebnis des letzten Updates, ob Update-Prüfung und Galerie-Abgleich klappen. Keine Mitgliederdaten; was genau gesendet wird, zeigt die App vor der Zustimmung an. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
 - **Hilfe-Texte** an jeder Einstellung; Fachbegriffe nur mit Erklärung.
 
 ## 14. Die beiden Adapter
@@ -328,10 +331,12 @@ Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachho
 
 - Liefert die App unter `/app/` aus, inkl. geschützter Galeriebilder unter `/app/foto/…`.
 - Zusätzliche WP-Rollen für Mitglieder und Verwalter, Einstellung im Benutzerprofil.
-- Einstellungsseite im WP-Admin mit demselben Assistenten und derselben Statusseite.
+- Einstellungsseite im WP-Admin (Kalender, Galerie); Assistent, Statusseite, Updates und Datensicherung für WordPress-Administratoren in der App.
+- **Updates** über den Upgrader von WordPress mit dem geprüften Paket (Sicherung des Plugin-Ordners ab WordPress 6.3); verlangt WordPress FTP-Zugangsdaten, erklärt die App den Ausweg.
+- **Datensicherung** der App-Daten und Einstellungen; Wiederherstellen nur auf derselben Website (die Benutzer sind WordPress-Konten).
 - Shortcodes `[kompanie_termine]` und `[kompanie_galerie]`.
 - „Angemeldet bleiben“ 400 Tage mit automatischer Verlängerung.
-- **Verträglich mit typischen WordPress-Umgebungen:** App-Seite und API senden „nicht zwischenspeichern“ an Cache-Plugins und CDNs; der Assistent erkennt, wenn ein Sicherheits-Plugin die REST-API sperrt, und erklärt die Freigabe. Nur Einzelseiten, kein Multisite (vorerst).
+- **Verträglich mit typischen WordPress-Umgebungen:** App-Seite und API senden „nicht zwischenspeichern“ an Cache-Plugins und CDNs; später soll der Assistent erkennen, wenn ein Sicherheits-Plugin die REST-API sperrt, und die Freigabe erklären. Nur Einzelseiten, kein Multisite (vorerst).
 
 ### Eigenständige Version (`adapters/standalone`)
 
@@ -341,7 +346,8 @@ Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachho
 - **Sicherheit:** Begrenzung fehlgeschlagener Anmeldungen, geschützte Dateien und Datenbank außerhalb des Web-Verzeichnisses oder gesperrt **und** geprüft, Sicherheits-Header.
 - **Läuft auf** Apache, nginx und LiteSpeed, im Hauptverzeichnis oder Unterordner, mit oder ohne URL-Umschreibung.
 - **Einstellungen in der App** für Admins: Kalender, Galerie, Quelle der Neuigkeiten (fremde WordPress-Seite oder RSS/Atom-Feed). Geheime Werte zeigt die App nie wieder an.
-- **Datensicherung** im gemeinsamen Export-Format (`bin/kompanie.php export`/`import`; in der App ab Phase 5).
+- **Datensicherung** im gemeinsamen Export-Format, in der App und über `bin/kompanie.php export`/`import`.
+- **Updates** durch Tausch der Programmdateien (mit Rücktausch bei Fehlern), auch über `bin/kompanie.php update-check`/`update`/`rollback`.
 - Einzelheiten: [adapters/standalone/README.md](../adapters/standalone/README.md).
 - **Termine auf fremden Webseiten:** einbettbarer Ausschnitt `/embed/termine`. *Später.*
 
@@ -361,8 +367,8 @@ Festgehalten für die Planung:
 - **Repository-Contract-Tests** gegen MySQL/MariaDB und SQLite.
 - **API-Contract-Tests** gegen beide Adapter.
 - **E2E-Tests** (Playwright) gegen beide Adapter.
-- **Installer und Updater:** frische Installation (Apache und nginx, Hauptverzeichnis und Unterordner), Update, Zurückrollen, falsche Signatur, zu alte PHP-Version, abgebrochenes Update.
-- **Rückwärtstest:** Contract-Tests der vorigen Version gegen den Datenbestand der neuen.
+- **Installer und Updater** (`tests/update/run-tests.sh`, mit dem PHP-Testserver): frische Installation mit `install.php`, Update, Zurückrollen, Zurückziehen, manipuliertes Paket, ältere Liste, Reparaturmodus, Liste einer fremden Kompanie. Release-Ablauf: `tests/release/run-tests.sh`. Geplant: Apache und nginx, zu alte PHP-Version.
+- **Rückwärtstest** (geplant): Contract-Tests der vorigen Version gegen den Datenbestand der neuen.
 - **Branding:** Kontrastprüfung, Icon-Erzeugung, Screenshots.
 - **Grenz- und Neutralitätsprüfung** in der CI.
 
@@ -383,8 +389,8 @@ Festgehalten für die Planung:
 
 ### Was wir dafür in der Organisation brauchen
 
-- eine **GitHub App** zum Anlegen der Kompanie-Repos und Auslösen ihrer Builds
-- einen **Ed25519-Signaturschlüssel** als Organisations-Secret
+- eine **GitHub App** mit Schreibrecht auf die Kompanie-Repos (Releases, `gh-pages`; später auch zum Anlegen neuer Repos)
+- einen **Ed25519-Signaturschlüssel** als Secret der Environment `veroeffentlichen` im Kern-Repo (siehe [RELEASE.md](RELEASE.md))
 - ein **Google-Cloud-Projekt** mit OAuth-Client (Galerie-Test)
 - ein leeres Repo **`Kompanie-App-Vorlage`**
 - eine Subdomain auf unserem Webspace für den Empfang der **Statusmeldungen** (nur von Kompanien, die zustimmen)

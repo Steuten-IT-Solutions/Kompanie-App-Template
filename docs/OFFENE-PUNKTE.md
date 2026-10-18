@@ -64,10 +64,11 @@ Ablauf:
 *Einschätzung:* Der Demo-Test findet Fehler in den getesteten Abläufen, aber nicht alles, was nur bei echten Daten oder einem bestimmten Hoster auftritt. Dafür sind Zurückziehen, automatisches Zurückrollen und die Statusmeldungen (Punkt 4) da. Eine Haltezeit lässt sich später ergänzen, falls nötig.
 
 **Schritte:**
-- `updates.json` und ihre Signatur im Build-Workflow erzeugen (Phase 4)
-- Updater liest `updates.json`, Kanäle, Zurückziehen (Phase 5)
-- Demo-Installation mit Beispieldaten auf unserem Webspace, automatischer Test (Phase 5)
-- Workflows „Befördern“ und „Version zurückziehen“ (Phase 6)
+- ✓ `updates.json` und ihre Signatur beim Veröffentlichen erzeugen (Phase 4)
+- ✓ Updater liest `updates.json`, Kanäle, Zurückziehen (Phase 5)
+- ✓ Befördern und Zurückziehen von Hand: *Actions → Versionen steuern* (Phase 4/5)
+- offen: Demo-Installation mit Beispieldaten auf unserem Webspace, automatischer Test und automatisches
+  Befördern mit `release-stopp` (Phase 6; braucht den Webspace)
 
 ---
 
@@ -82,7 +83,8 @@ Ohne WordPress bleibt ein technischer Schritt: eine Datei auf den Webspace laden
 - Der Installer erkennt den Hoster, wo möglich, und verlinkt die passende Anleitung direkt bei jedem Problem.
 - Die Anleitungen liegen **im Kern-Repo** und erscheinen auf allen Download-Seiten. Eine Korrektur erreicht so alle Kompanien.
 
-**Schritte:** Gerüst der Anleitungen und die allgemeine Anleitung in Phase 5; je Hoster, sobald eine Kompanie dort installiert.
+**Schritte:** ✓ Kurze allgemeine Anleitung auf jeder Download-Seite (Phase 5). Offen: ausführliche Anleitungen
+und Videos je Hoster, sobald eine Kompanie dort installiert; Erkennen des Hosters im Installer.
 
 ---
 
@@ -140,7 +142,8 @@ Ohne WordPress bleibt ein technischer Schritt: eine Datei auf den Webspace laden
 - **Warnung per E-Mail an uns**, wenn eine Kompanie länger als 2 Tage rot ist oder sich nach einem Release Fehler häufen. Dann prüfen wir, ob die Version zurückgezogen werden muss (Punkt 1).
 - Die Zustimmung wird im Einrichtungsassistenten erfragt und mit Datum gespeichert; abschaltbar unter *Einstellungen*.
 
-**Schritte:** Meldung im Kern (Phase 5) → Empfänger und Übersicht (Phase 6). *Braucht:* Subdomain auf unserem Webspace.
+**Schritte:** ✓ Meldung im Kern, nur mit Zustimmung, Inhalt vorher einsehbar (Phase 5) → Empfänger und
+Übersicht (Phase 6). *Braucht:* Subdomain auf unserem Webspace.
 
 ---
 
