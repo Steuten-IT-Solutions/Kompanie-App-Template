@@ -41,7 +41,8 @@ final class Text
         if (!mb_check_encoding($s, 'UTF-8')) {
             return '';
         }
-        $s = strip_tags($s);
+        // Nur echte Tags und Kommentare entfernen; ein einzelnes „<“ (z. B. „<10 min“) bleibt.
+        $s = (string) preg_replace(['/<!--.*?-->/su', '#</?[a-zA-Z][^>]*>#u'], '', $s);
         // Steuerzeichen außer Zeilenumbruch und Tabulator entfernen.
         return (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
     }

@@ -19,6 +19,8 @@ final class CalendarTest extends TestCase
         $d = static fn (int $days): string => gmdate('Ymd', time() + $days * 86400);
         return "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a1\r\nDTSTART;VALUE=DATE:" . $d(10) . "\r\nDTEND;VALUE=DATE:" . $d(11) . "\r\nSUMMARY:Sommerfest\\, Musterstadt\r\nLOCATION:Festplatz\r\nEND:VEVENT\r\n"
             . "BEGIN:VEVENT\r\nUID:a2\r\nDTSTART;TZID=Europe/Berlin:" . $d(20) . "T190000\r\nDTEND;TZID=Europe/Berlin:" . $d(20) . "T220000\r\nSUMMARY:Vereins\r\n abend\r\nDESCRIPTION:Bitte <b>pünktlich</b>\\nsein\r\nEND:VEVENT\r\n"
+            . "BEGIN:VEVENT\r\nUID:p1\r\nCLASS:PRIVATE\r\nDTSTART;VALUE=DATE:" . $d(12) . "\r\nSUMMARY:Arzttermin\r\nEND:VEVENT\r\n"
+            . "BEGIN:VEVENT\r\nUID:c1\r\nSTATUS:CANCELLED\r\nDTSTART;VALUE=DATE:" . $d(13) . "\r\nSUMMARY:Abgesagt\r\nEND:VEVENT\r\n"
             . "BEGIN:VEVENT\r\nUID:old\r\nDTSTART:20200101T100000Z\r\nDTEND:20200101T110000Z\r\nSUMMARY:Alt\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
     }
 

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
+use KompanieApp\Core\Domain\Input;
 
 /**
  * Die Routentabelle der API (siehe api/openapi.yaml) und ihre Ausführung.
@@ -143,7 +144,7 @@ final class Api
                 $a->authenticator->login(
                     is_string($r->input('username')) ? trim($r->input('username')) : '',
                     is_string($r->input('password')) ? $r->input('password') : '',
-                    $r->input('remember') === null ? true : (bool) $r->input('remember'),
+                    $r->input('remember') === null ? true : Input::bool($r->input('remember')),
                 );
                 return $this->config();
             }),

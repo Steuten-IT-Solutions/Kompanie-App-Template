@@ -88,10 +88,15 @@ final class App
         }
     }
 
+    /** Führt eine geplante Aufgabe aus. Fehler werden protokolliert, nicht weitergeworfen. */
     public function runTask(string $task): void
     {
-        if ($task === GalleryService::TASK && $this->config->featureEnabled('gallery')) {
-            $this->gallery()->runTask(25);
+        try {
+            if ($task === GalleryService::TASK && $this->config->featureEnabled('gallery')) {
+                $this->gallery()->runTask(25);
+            }
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
         }
     }
 

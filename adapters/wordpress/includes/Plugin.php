@@ -39,7 +39,7 @@ final class Plugin
                 clock: new \KompanieApp\Core\Infra\SystemClock(wp_timezone()),
                 env: $env,
                 authContext: $users,
-                authenticator: new WpAuthenticator($users, $env),
+                authenticator: new WpAuthenticator($env),
                 users: $users,
                 config: self::config(),
             );
@@ -59,10 +59,11 @@ final class Plugin
 
     public static function boot(): void
     {
-        add_action('plugins_loaded', [self::class, 'upgrade']);
+        // Erst auf init: Dann hat auch das Theme seine Filter (z. B. upload_dir) gesetzt.
+        add_action('init', [self::class, 'upgrade'], 1);
         add_action('rest_api_init', static fn () => RestBridge::register(self::app()));
         add_action(WpScheduler::HOOK, static fn (string $task) => self::app()->runTask($task));
-        add_action('init', static fn () => self::app()->scheduleTasks());
+        add_action('init', static fn () => self::app()->scheduleTasks(), 20);
         Session::init();
         AppPage::init();
         if (is_admin()) {
@@ -98,6 +99,7 @@ final class Plugin
         foreach (array_keys(App::TASKS) as $task) {
             (new WpScheduler())->unschedule($task);
         }
+        AppPage::removeRewriteRules();
         flush_rewrite_rules();
     }
 }

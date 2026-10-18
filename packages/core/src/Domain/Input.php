@@ -58,9 +58,14 @@ final class Input
         if ($url === '') {
             return '';
         }
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-        if (!in_array($scheme, ['http', 'https'], true) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        // Auch Umlaute in Adresse oder Pfad zulassen (z. B. https://bürger-verein.de/fest).
+        $parts = parse_url($url);
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if (!in_array($scheme, ['http', 'https'], true) || ($parts['host'] ?? '') === '' || preg_match('/[\s"<>\x00-\x1F\x7F]/u', $url)) {
             throw ApiError::invalid($message);
+        }
+        if (mb_strlen($url) > 255) {
+            throw ApiError::invalid('Der Link ist zu lang (höchstens 255 Zeichen).');
         }
         return $url;
     }

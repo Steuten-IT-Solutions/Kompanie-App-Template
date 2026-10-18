@@ -131,6 +131,40 @@ $app->calendar()->clearCache();
 remove_filter('pre_http_request', $icsFilter, 10);
 $c->ok($s === 200 && in_array('Vereinsabend', array_column($cal, 'title'), true), 'Kalender aus iCal-Link der Test-Instanz');
 
+$c->section('Befunde aus dem Review');
+wp_set_current_user(0);
+[$s, $body] = $d->request('POST', '/auth/login', ['username' => 'mitglied1', 'password' => 'test1234']);
+$c->ok($s === 400 && $body['code'] === 'use_login_page' && get_current_user_id() === 0, 'Keine Anmeldung über die API (Login-CSRF, Login-Schutz-Plugins)');
+wp_set_current_user($member);
+$logout = (string) $app->api()->config()['auth']['logoutUrl'];
+$c->ok(!str_contains($logout, '&amp;') && str_contains($logout, '_wpnonce='), 'Abmelde-Adresse ohne HTML-Maskierung');
+// Plugins für WebP/AVIF dürfen die Galeriebilder nicht umleiten.
+$toWebp = static fn () => ['image/jpeg' => 'image/webp'];
+add_filter('image_editor_output_format', $toWebp);
+$tmp = wp_tempnam('ka-src');
+$im = imagecreatetruecolor(800, 600);
+imagejpeg($im, $tmp);
+$target = get_temp_dir() . 'ka-out-' . wp_generate_password(6, false) . '-thumb.jpg';
+$size = (new KompanieApp\WordPress\WpImageResizer())->resizeToJpeg($tmp, $target, 400, 80);
+remove_filter('image_editor_output_format', $toWebp);
+$c->ok(is_file($target) && getimagesize($target)['mime'] === 'image/jpeg' && $size['width'] === 400, 'Galeriebilder bleiben JPEG, auch mit WebP-Plugin');
+@unlink($tmp);
+@unlink($target);
+// Einfache Permalinks: Adressen über ?kompanie_app=…
+$structure = get_option('permalink_structure');
+update_option('permalink_structure', '');
+$env = new KompanieApp\WordPress\WpEnvironment();
+$c->ok(str_contains($env->appUrl('csrf'), 'kompanie_app=csrf') && str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto%2F3%2Fthumb') || str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto/3/thumb'), 'Einfache Permalinks: App-Adressen über Parameter');
+update_option('permalink_structure', $structure);
+$c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
+// Deaktivieren entfernt die /app/-Regeln.
+global $wp_rewrite;
+KompanieApp\WordPress\AppPage::addRewriteRules();
+KompanieApp\WordPress\AppPage::removeRewriteRules();
+$c->ok(!isset($wp_rewrite->extra_rules_top['^app/?$']), 'Regeln für /app/ lassen sich entfernen');
+KompanieApp\WordPress\AppPage::addRewriteRules();
+$c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'schema_version') !== false && wp_load_alloptions()[KompanieApp\WordPress\WpSettings::PREFIX . 'calendar_ics_url'] ?? false, 'Einstellungen mit Autoload');
+
 foreach ([$member, $manager, $admin] as $id) {
     $d->deleteUser($id);
 }

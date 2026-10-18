@@ -25,9 +25,21 @@ final class WpEnvironment implements Environment
         return rest_url(self::NAMESPACE . '/');
     }
 
-    public function appUrl(): string
+    /**
+     * Adresse der App bzw. eines Unterpfads. Mit einfachen Permalinks (ohne URL-Umschreibung)
+     * über ?kompanie_app=…, sonst /app/….
+     */
+    public function appUrl(string $path = ''): string
     {
-        return home_url('/app/');
+        if (!self::prettyPermalinks()) {
+            return add_query_arg(AppPage::QUERY_VAR, $path === '' ? 'index' : $path, home_url('/'));
+        }
+        return home_url('/app/' . $path);
+    }
+
+    public static function prettyPermalinks(): bool
+    {
+        return (string) get_option('permalink_structure') !== '';
     }
 
     public function siteUrl(): ?string
@@ -37,6 +49,6 @@ final class WpEnvironment implements Environment
 
     public function photoUrl(int $id, string $size): string
     {
-        return $this->appUrl() . 'foto/' . $id . '/' . $size;
+        return $this->appUrl('foto/' . $id . '/' . $size);
     }
 }

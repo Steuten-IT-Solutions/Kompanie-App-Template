@@ -32,6 +32,7 @@ if ! $WP core is-installed 2>/dev/null; then
   if [ -n "${KOMPANIE_WP_DB_HOST:-}" ]; then
     $WP config create --dbname="$KOMPANIE_WP_DB_NAME" --dbuser="$KOMPANIE_WP_DB_USER" --dbpass="$KOMPANIE_WP_DB_PASS" \
       --dbhost="$KOMPANIE_WP_DB_HOST" --skip-check --force
+    $WP db create >/dev/null 2>&1 || true
   else
     $WP config create --dbname=wp --dbuser=x --dbpass=x --skip-check --force
   fi
@@ -47,14 +48,16 @@ fi
 ln -sfn "$ROOT/adapters/wordpress" "$DIR/wp/wp-content/plugins/kompanie-app"
 $WP plugin activate kompanie-app
 
-for u in verwalter mitglied1 mitglied2; do
-  $WP user get "$u" >/dev/null 2>&1 || \
-    $WP user create "$u" "$u@example.com" --user_pass=test1234 --role=kompanie_member --display_name="${u^}" >/dev/null
+for u in Verwalter Mitglied1 Mitglied2; do
+  login=$(echo "$u" | tr '[:upper:]' '[:lower:]')
+  $WP user get "$login" >/dev/null 2>&1 || \
+    $WP user create "$login" "$login@example.com" --user_pass=test1234 --role=kompanie_member --display_name="$u" >/dev/null
 done
 $WP user add-role verwalter kompanie_manager >/dev/null
 
 # Beispieltermine als iCal-Feed (ersetzt im Test den Google Kalender).
 Y=$(date +%Y); N=$((Y + 1))
+IN7=$(php -r 'echo date("Ymd", time() + 7 * 86400);')
 cat > "$DIR/wp/test.ics" <<ICS
 BEGIN:VCALENDAR
 VERSION:2.0
@@ -67,8 +70,8 @@ LOCATION:Marktplatz
 END:VEVENT
 BEGIN:VEVENT
 UID:e2
-DTSTART;TZID=Europe/Berlin:$(date -d '+7 days' +%Y%m%d)T190000
-DTEND;TZID=Europe/Berlin:$(date -d '+7 days' +%Y%m%d)T230000
+DTSTART;TZID=Europe/Berlin:${IN7}T190000
+DTEND;TZID=Europe/Berlin:${IN7}T230000
 SUMMARY:Vereinsabend
 LOCATION:Vereinslokal
 DESCRIPTION:Bitte pünktlich sein!

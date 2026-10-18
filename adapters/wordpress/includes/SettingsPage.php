@@ -21,8 +21,22 @@ final class SettingsPage
             static fn () => self::render(Plugin::app()),
         ));
         add_action('admin_post_kompanie_app_calendar', static fn () => self::saveCalendar(Plugin::app()));
+        add_action('admin_notices', [self::class, 'permalinkNotice']);
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
         add_action('admin_post_kompanie_app_gallery_sync', static fn () => self::syncGallery(Plugin::app()));
+    }
+
+    /** Ohne „schöne“ Permalinks läuft die App unter ?kompanie_app=…; /app/ ist einprägsamer. */
+    public static function permalinkNotice(): void
+    {
+        if (WpEnvironment::prettyPermalinks() || !current_user_can('manage_options')) {
+            return;
+        }
+        printf(
+            '<div class="notice notice-info"><p>Die App ist erreichbar unter <a href="%1$s">%1$s</a>. Für die kürzere Adresse <code>/app/</code> unter <a href="%2$s">Einstellungen → Permalinks</a> z. B. „Beitragsname“ wählen.</p></div>',
+            esc_url((new WpEnvironment())->appUrl()),
+            esc_url(admin_url('options-permalink.php')),
+        );
     }
 
     private static function url(array $args = []): string

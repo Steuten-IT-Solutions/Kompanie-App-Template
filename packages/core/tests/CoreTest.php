@@ -25,6 +25,9 @@ final class CoreTest extends TestCase
         $this->assertSame("Zeile 1\nZeile 2", Text::multiline("<i>Zeile 1</i>  \r\n Zeile 2 "));
         $this->assertSame('', Text::line(['x']));
         $this->assertSame('abc', Text::line('abcdef', 3));
+        $this->assertSame('Zu spät <10 min', Text::line('Zu spät <10 min'), 'einzelnes < bleibt');
+        $this->assertSame('a<b und c', Text::line('a<b und c'));
+        $this->assertSame('x y', Text::line('x <!-- k --> <b>y</b>'));
         $this->assertTrue(Input::isDate('2024-02-29'));
         $this->assertFalse(Input::isDate('2026-02-30'));
         $this->assertSame(5, Input::integer('5'));
@@ -32,8 +35,38 @@ final class CoreTest extends TestCase
         $this->assertNull(Input::integer(1.5));
         $this->assertNull(Input::integer('1e3'));
         $this->assertSame('https://a.de/x', Input::url('https://a.de/x', 'f'));
+        $this->assertSame('https://bürger-verein.de/schützenfest', Input::url('https://bürger-verein.de/schützenfest', 'f'));
+        $this->assertTrue(Input::bool('true'));
+        $this->assertFalse(Input::bool('false'));
         $this->expectException(\KompanieApp\Core\Http\ApiError::class);
         Input::url('ftp://a.de', 'f');
+    }
+
+    public function testLimitsFitEveryDatabase(): void
+    {
+        foreach (['sqlite', getenv('KOMPANIE_TEST_MYSQL') ? 'mysql' : null] as $driver) {
+            if ($driver === null) {
+                continue;
+            }
+            $db = TestApp::connection($driver);
+            try {
+                $users = new FakeUsers();
+                $app = TestApp::create($db, $users);
+                $users->current = $users->add('admin', Level::Admin);
+                $res = $app->api()->handle(new Request('POST', '/catalog', [], ['title' => 'x', 'points' => 1, 'sort' => 10000000000]));
+                $this->assertSame(201, $res->status, $driver);
+                $this->assertSame(1000000, $res->data['sort']);
+                $res = $app->api()->handle(new Request('POST', '/events', [], ['title' => 'x', 'start_date' => '2031-01-01', 'description' => str_repeat('ä', 40000), 'url' => 'https://example.org/schützenfest']));
+                $this->assertSame(201, $res->status, $driver);
+                $this->assertSame(10000, mb_strlen($res->data['description']));
+                $res = $app->api()->handle(new Request('PATCH', '/events/' . $res->data['id'], [], ['location' => 'Halle']));
+                $this->assertSame(200, $res->status, 'Termin mit Umlaut-Link bleibt änderbar');
+                $res = $app->api()->handle(new Request('POST', '/points', [], ['user_ids' => [$users->add('m', Level::Member)], 'points' => 1, 'reason' => 'Zu spät <10 min']));
+                $this->assertSame('Zu spät <10 min', $res->data[0]['reason']);
+            } finally {
+                TestApp::dropTables($db);
+            }
+        }
     }
 
     public function testPasswords(): void
@@ -88,7 +121,7 @@ final class CoreTest extends TestCase
         $res = $app->api()->handle(new Request('POST', '/auth/login', [], ['username' => 'chef', 'password' => 'falsch']));
         $this->assertSame(400, $res->status);
         $this->assertNull($users->current);
-        $res = $app->api()->handle(new Request('POST', '/auth/login', [], ['username' => 'chef', 'password' => 'richtig123']));
+        $res = $app->api()->handle(new Request('POST', '/auth/login', [], ['username' => 'chef', 'password' => 'richtig123', 'remember' => 'false']));
         $this->assertSame(200, $res->status);
         $this->assertSame($a, $res->data['user']['id'], 'Antwort enthält die neue Konfiguration');
         $this->assertNotSame('', $res->data['csrf']['token']);

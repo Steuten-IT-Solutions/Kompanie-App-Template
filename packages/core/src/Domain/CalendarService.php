@@ -178,7 +178,7 @@ final class CalendarService
                 continue;
             }
             if ($trimmed === 'END:VEVENT') {
-                if ($cur && !empty($cur['DTSTART'])) {
+                if ($cur && !empty($cur['DTSTART']) && !self::icsHidden($cur)) {
                     $event = $this->icsEvent($cur);
                     if ($event && strtotime($event['end']) >= $min && strtotime($event['start']) <= $max) {
                         $events[] = $event;
@@ -203,6 +203,17 @@ final class CalendarService
             $cur[$name] = ['value' => $value, 'params' => $params];
         }
         return $events;
+    }
+
+    /**
+     * Private und vertrauliche Termine (CLASS) sowie abgesagte (STATUS) nicht zeigen –
+     * wie bei der Google-API. Die geheime iCal-Adresse von Google enthält auch private Termine.
+     */
+    private static function icsHidden(array $e): bool
+    {
+        $class = strtoupper(trim($e['CLASS']['value'] ?? 'PUBLIC'));
+        $status = strtoupper(trim($e['STATUS']['value'] ?? ''));
+        return in_array($class, ['PRIVATE', 'CONFIDENTIAL'], true) || $status === 'CANCELLED';
     }
 
     private static function icsText(string $v): string

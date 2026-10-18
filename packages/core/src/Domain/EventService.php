@@ -14,6 +14,7 @@ use KompanieApp\Core\Storage\EventRepository;
 final class EventService
 {
     private const FIELDS = ['title', 'start_date', 'start_time', 'end_date', 'end_time', 'location', 'description', 'url'];
+    public const MAX_DESCRIPTION = 10000;
 
     public function __construct(
         private readonly EventRepository $events,
@@ -132,8 +133,8 @@ final class EventService
             'end_date' => $endDate === '' || $endDate === $startDate ? null : $endDate,
             'end_time' => $endTime,
             'location' => Text::line($get('location'), 191),
-            'description' => Text::multiline($get('description')),
-            'url' => mb_substr($url, 0, 255),
+            'description' => Text::multiline($get('description'), self::MAX_DESCRIPTION),
+            'url' => $url,
         ];
     }
 

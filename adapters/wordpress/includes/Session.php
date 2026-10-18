@@ -75,7 +75,7 @@ final class Session
     public static function checkRememberMe(): void
     {
         $redirect = isset($_REQUEST['redirect_to']) ? (string) wp_unslash($_REQUEST['redirect_to']) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-        if (!str_contains($redirect, '/app/')) {
+        if (!str_contains($redirect, '/app/') && !str_contains($redirect, AppPage::QUERY_VAR . '=')) {
             return;
         }
         echo "<script>(function(){var r=document.getElementById('rememberme');if(r){r.checked=true;}})();</script>\n";

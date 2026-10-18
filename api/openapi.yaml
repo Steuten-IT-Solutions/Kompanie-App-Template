@@ -287,7 +287,7 @@ paths:
         in: path
         required: true
         description: Kennung aus der News-Quelle (bei WordPress die Beitrags-ID).
-        schema: { type: string }
+        schema: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
     get:
       tags: [News]
       summary: Einzelne Neuigkeit mit Inhalt (HTML)
@@ -473,6 +473,7 @@ paths:
                   level: { $ref: '#/components/schemas/Level' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /members/{id}/password:
     parameters:
@@ -495,6 +496,7 @@ paths:
                 required: [password]
                 properties:
                   password: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -706,7 +708,7 @@ components:
         appUrl: { type: string }
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
-        siteUrl: { type: string, description: Startseite der Webseite, falls vorhanden }
+        siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         csrf:
           type: object
           required: [header, token, refreshUrl]
@@ -725,8 +727,8 @@ components:
             mode:
               type: string
               enum: [form, redirect]
-            loginUrl: { type: string, description: Nur bei `redirect` }
-            logoutUrl: { type: string, description: Nur bei `redirect` }
+            loginUrl: { type: [string, 'null'], description: Nur bei `redirect` }
+            logoutUrl: { type: [string, 'null'], description: Nur bei `redirect` und Anmeldung }
         features:
           type: object
           description: Bereiche, die eingeschaltet **und** auf dem Server eingerichtet sind.

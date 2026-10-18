@@ -20,13 +20,12 @@ final class Shortcodes
         add_shortcode('kompanie_galerie', static fn () => self::gallery($app));
     }
 
+    /**
+     * CSS bei jedem Shortcode mitgeben: Plugins (SEO, Open Graph) rendern Inhalte teils vorab
+     * und verwerfen sie; eine „nur einmal“-Ausgabe ginge dann verloren. Doppelt schadet nicht.
+     */
     private static function styles(App $app): string
     {
-        static $done = false;
-        if ($done) {
-            return '';
-        }
-        $done = true;
         $primary = $app->config->primaryColor();
         $accent = $app->config->accentColor();
         return '<style id="kompanie-app-css">
@@ -57,13 +56,9 @@ final class Shortcodes
 </style>';
     }
 
+    /** Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). */
     private static function lightbox(): string
     {
-        static $done = false;
-        if ($done) {
-            return '';
-        }
-        $done = true;
         return '<script>
 (function(){if(window.kaLightbox)return;window.kaLightbox=1;
 document.addEventListener("click",function(e){var a=e.target.closest("[data-ka-lightbox]");if(!a)return;e.preventDefault();

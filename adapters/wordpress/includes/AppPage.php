@@ -32,10 +32,22 @@ final class AppPage
         add_action('template_redirect', static fn () => self::dispatch(Plugin::app()), 0);
     }
 
+    public const RULES = ['^app/?$' => 'index', '^app/(.+)$' => '$matches[1]'];
+
     public static function addRewriteRules(): void
     {
-        add_rewrite_rule('^app/?$', 'index.php?' . self::QUERY_VAR . '=index', 'top');
-        add_rewrite_rule('^app/(.+)$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top');
+        foreach (self::RULES as $regex => $value) {
+            add_rewrite_rule($regex, 'index.php?' . self::QUERY_VAR . '=' . $value, 'top');
+        }
+    }
+
+    /** Beim Deaktivieren: Regeln entfernen, bevor sie neu geschrieben werden. */
+    public static function removeRewriteRules(): void
+    {
+        global $wp_rewrite;
+        foreach (array_keys(self::RULES) as $regex) {
+            unset($wp_rewrite->extra_rules_top[$regex]);
+        }
     }
 
     public static function distDir(): string
@@ -97,12 +109,15 @@ final class AppPage
         }
         header('Content-Type: application/javascript; charset=utf-8');
         header('Cache-Control: no-cache');
-        header('Service-Worker-Allowed: ' . wp_parse_url($app->env->appUrl(), PHP_URL_PATH));
+        header('Service-Worker-Allowed: ' . (string) wp_parse_url($app->env->appUrl(), PHP_URL_PATH));
         readfile($file);
     }
 
     private static function sendCsrf(App $app): void
     {
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
         nocache_headers();
         header('Content-Type: application/json; charset=utf-8');
         if (!is_user_logged_in()) {
@@ -124,7 +139,9 @@ final class AppPage
         header('Content-Type: image/jpeg');
         header('Content-Length: ' . filesize($res['file']));
         header('X-Content-Type-Options: nosniff');
-        header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=31536000, immutable');
+        // Über diese Adresse kommen auch noch nicht aufbereitete öffentliche Bilder; ein Bild kann
+        // später nach „intern“ verschoben werden. Deshalb hier nie dauerhaft öffentlich speichern lassen.
+        header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
         readfile($res['file']);
     }
 
@@ -145,7 +162,7 @@ final class AppPage
 
         $head = sprintf(
             '<link rel="manifest" href="%s"><script>window.KOMPANIE_CONFIG=%s;</script>',
-            esc_url($app->env->appUrl() . 'manifest.webmanifest'),
+            esc_url((new WpEnvironment())->appUrl('manifest.webmanifest')),
             wp_json_encode($app->api()->config(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES),
         );
         $html = (string) file_get_contents($file);

@@ -175,7 +175,7 @@ final class ScoreService
             throw ApiError::invalid('Bitte einen Titel angeben.');
         }
         $points = self::parsePoints($in['points'] ?? null);
-        $id = $this->catalog->insert($title, $points, Input::integer($in['sort'] ?? 0) ?? 0);
+        $id = $this->catalog->insert($title, $points, self::sort($in['sort'] ?? 0));
         return self::formatCatalog((array) $this->catalog->find($id));
     }
 
@@ -199,7 +199,7 @@ final class ScoreService
             $data['active'] = Input::bool($in['active']) ? 1 : 0;
         }
         if (($in['sort'] ?? null) !== null) {
-            $data['sort'] = Input::integer($in['sort']) ?? 0;
+            $data['sort'] = self::sort($in['sort']);
         }
         $this->catalog->update($id, $data);
         return self::formatCatalog((array) $this->catalog->find($id));
@@ -233,6 +233,12 @@ final class ScoreService
             }
         }
         return array_values($ids);
+    }
+
+    /** Reihenfolge im Katalog; begrenzt, damit sie in jede Datenbankspalte passt. */
+    private static function sort(mixed $raw): int
+    {
+        return max(-1000000, min(1000000, Input::integer($raw) ?? 0));
     }
 
     private static function parsePoints(mixed $raw): int

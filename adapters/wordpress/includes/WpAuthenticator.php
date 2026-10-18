@@ -15,7 +15,7 @@ use KompanieApp\Core\Port\Authenticator;
  */
 final class WpAuthenticator implements Authenticator
 {
-    public function __construct(private readonly WpUsers $users, private readonly WpEnvironment $env)
+    public function __construct(private readonly WpEnvironment $env)
     {
     }
 
@@ -31,7 +31,8 @@ final class WpAuthenticator implements Authenticator
 
     public function logoutUrl(): ?string
     {
-        return is_user_logged_in() ? wp_logout_url($this->env->appUrl()) : null;
+        // wp_logout_url() liefert eine HTML-maskierte Adresse (&amp;); für JSON und JavaScript entschlüsseln.
+        return is_user_logged_in() ? html_entity_decode(wp_logout_url($this->env->appUrl()), ENT_QUOTES, 'UTF-8') : null;
     }
 
     public function csrfHeader(): string
@@ -50,21 +51,17 @@ final class WpAuthenticator implements Authenticator
      */
     public function csrfRefreshUrl(): string
     {
-        return $this->env->appUrl() . 'csrf';
+        return $this->env->appUrl('csrf');
     }
 
+    /**
+     * Bei WordPress meldet man sich über wp-login.php an. Eine Anmeldung über die API
+     * würde Login-Schutz- und Zwei-Faktor-Plugins umgehen und wäre ohne Nonce von
+     * fremden Seiten auslösbar (Login-CSRF).
+     */
     public function login(string $username, string $password, bool $remember): User
     {
-        $user = Session::withCookieSync(static fn () => wp_signon([
-            'user_login' => $username,
-            'user_password' => $password,
-            'remember' => $remember,
-        ], is_ssl()));
-        if (is_wp_error($user)) {
-            throw ApiError::invalid('Benutzername oder Passwort ist falsch.');
-        }
-        wp_set_current_user($user->ID);
-        return $this->users->currentUser() ?? throw ApiError::notLoggedIn();
+        throw new ApiError(400, 'use_login_page', 'Bitte über die Anmeldeseite der Webseite anmelden.');
     }
 
     public function logout(): void

@@ -18,7 +18,8 @@ final class WpSettings implements Settings
 
     public function set(string $key, mixed $value): void
     {
-        update_option(self::PREFIX . $key, $value, false);
+        // Kleine Einstellungen, die bei jedem Aufruf gebraucht werden: mit Autoload.
+        update_option(self::PREFIX . $key, $value, true);
     }
 
     public function delete(string $key): void

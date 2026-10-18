@@ -110,8 +110,9 @@ final class WpdbConnection implements Connection
                 return '%d';
             }
             if (is_float($v)) {
-                $values[] = $v;
-                return '%f';
+                // %f würde auf 6 Nachkommastellen runden.
+                $values[] = var_export($v, true);
+                return '%s';
             }
             $values[] = (string) $v;
             return '%s';

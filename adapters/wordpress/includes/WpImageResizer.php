@@ -23,9 +23,20 @@ final class WpImageResizer implements ImageResizer
         }
         $editor->resize($maxEdge, $maxEdge, false);
         $editor->set_quality($quality);
-        $saved = $editor->save($targetFile, 'image/jpeg');
+        // Plugins für moderne Formate (WebP/AVIF) dürfen die Ausgabe hier nicht umleiten:
+        // Dateiname und Auslieferung erwarten JPEG.
+        $noConversion = static fn (): array => [];
+        add_filter('image_editor_output_format', $noConversion, PHP_INT_MAX);
+        try {
+            $saved = $editor->save($targetFile, 'image/jpeg');
+        } finally {
+            remove_filter('image_editor_output_format', $noConversion, PHP_INT_MAX);
+        }
         if (is_wp_error($saved)) {
             throw new \RuntimeException($saved->get_error_message());
+        }
+        if (($saved['path'] ?? $targetFile) !== $targetFile && is_file($saved['path'])) {
+            rename($saved['path'], $targetFile);
         }
         $size = $editor->get_size();
         return ['width' => (int) $size['width'], 'height' => (int) $size['height']];
