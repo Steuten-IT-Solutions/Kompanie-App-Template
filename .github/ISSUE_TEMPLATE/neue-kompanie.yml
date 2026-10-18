@@ -60,7 +60,7 @@ body:
       label: Bezeichnung für Strafen
       description: Optional, z. B. „Kasse“. Leer = „Strafen“.
   - type: checkboxes
-    id: off
+    id: weglassen
     attributes:
       label: Diese Bereiche weglassen
       options:
