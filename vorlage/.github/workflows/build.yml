@@ -1,0 +1,21 @@
+# Baut eine Vorschau der App dieser Kompanie (Bildschirmfotos, Pakete zum Ansehen), z. B. für Pull
+# Requests. Nichts hier muss angepasst werden.
+#
+# Veröffentlicht wird nicht von hier: Das Kern-Repo prüft alle 30 Minuten, ob sich main geändert hat,
+# und baut, signiert und veröffentlicht dann selbst. Dieses Repo braucht dafür keine Geheimnisse.
+name: App bauen
+
+on:
+  push:
+    branches: [main]
+    paths: ['kompanie.json', 'assets/**']
+  pull_request:
+    paths: ['kompanie.json', 'assets/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vorschau:
+    uses: Steuten-IT-Solutions/Kompanie-App-Template/.github/workflows/preview-kompanie.yml@v1

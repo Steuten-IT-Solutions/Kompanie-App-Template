@@ -3,19 +3,27 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
         with:
           php-version: '8.1'
+          extensions: pdo_sqlite, pdo_mysql, gd, sodium, zip, mbstring
+          tools: none
 
       - name: PHP-Syntax
-        run: find packages adapters -name '*.php' -print0 | xargs -0 -r -n1 php -l
+        run: find packages adapters tests -name '*.php' -print0 | xargs -0 -r -n1 php -l
 
       - name: Kern ohne WordPress
         run: scripts/check-core-boundary.sh
@@ -23,9 +31,12 @@ jobs:
       - name: Neutral, ohne Kompanie-spezifische Begriffe
         run: scripts/check-neutral.sh
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
+
+      - name: Empfang der Statusmeldungen
+        run: tests/status/run-tests.sh
 
       - name: OpenAPI und Konfigurationsschema
         run: |
@@ -38,3 +49,181 @@ jobs:
           jsonschema.Draft202012Validator(schema).validate(json.load(open('config/kompanie.example.json')))
           print('kompanie.example.json passt zum Schema')
           PY
+
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kompanie_test
+          MARIADB_USER: kompanie
+          MARIADB_PASSWORD: kompanie
+        ports: ['3306:3306']
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, pdo_mysql, gd, sodium, zip, mbstring, intl
+          tools: composer
+
+      - name: Abhängigkeiten
+        run: composer install --no-interaction --no-progress
+
+      - name: Kern-Tests (SQLite und MariaDB)
+        env:
+          KOMPANIE_TEST_MYSQL: 127.0.0.1;kompanie_test;kompanie;kompanie
+        run: vendor/bin/phpunit
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Abhängigkeiten
+        run: npm ci --no-audit --no-fund
+
+      - name: Formulare „Neue Kompanie“ / „Kompanie ändern“ (Issue → kompanie.json)
+        run: tests/formular/run-tests.sh
+
+      - name: Branding-Tests (Farben, Kontrast, Icons, Konfiguration)
+        run: npm run test:branding
+
+      - name: Frontend bauen (inkl. TypeScript-Prüfung)
+        run: npm run build
+
+  wordpress:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kompanie_wp
+          MARIADB_USER: kompanie
+          MARIADB_PASSWORD: kompanie
+        ports: ['3306:3306']
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, pdo_mysql, mysqli, gd, sodium, zip, mbstring
+          tools: none
+
+      - name: Test-WordPress mit MariaDB
+        env:
+          KOMPANIE_WP_DB_HOST: 127.0.0.1
+          KOMPANIE_WP_DB_NAME: kompanie_wp
+          KOMPANIE_WP_DB_USER: kompanie
+          KOMPANIE_WP_DB_PASS: kompanie
+        run: scripts/setup-test-wp.sh .wp-test
+
+      - name: WordPress-Tests (API-Szenario und Plugin)
+        run: php .wp-test/wp-cli.phar --allow-root --path=.wp-test/wp eval-file tests/wordpress/run-tests.php
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Frontend bauen und ins Plugin legen
+        run: scripts/build-frontend.sh
+
+      - name: E2E-Tests (Playwright)
+        env:
+          KOMPANIE_WP_CLI: php .wp-test/wp-cli.phar --allow-root --path=.wp-test/wp
+          KOMPANIE_SCREENSHOT_DIR: ${{ github.workspace }}/screenshots
+        run: |
+          mkdir -p screenshots
+          npx playwright install --with-deps chromium
+          (PHP_CLI_SERVER_WORKERS=4 php -S localhost:8888 -t .wp-test/wp .wp-test/router.php > /tmp/php-server.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://localhost:8888/wp-login.php && break; sleep 1; done
+          cd packages/frontend && npx playwright test --reporter=line
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: ignore
+
+  standalone:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kompanie_test
+          MARIADB_USER: kompanie
+          MARIADB_PASSWORD: kompanie
+        ports: ['3306:3306']
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # Niedrigste unterstützte PHP-Version, wie auf älteren Webspaces.
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.1'
+          extensions: pdo_sqlite, pdo_mysql, gd, sodium, zip, mbstring, curl, openssl, simplexml
+          tools: none
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Frontend bauen und in die eigenständige Version legen
+        run: scripts/build-frontend.sh
+
+      - name: HTTP-Tests mit SQLite (API-Szenario, Anmeldung, CSRF, Sicherung)
+        run: php tests/standalone/run-tests.php
+
+      - name: HTTP-Tests mit MariaDB
+        run: php tests/standalone/run-tests.php --mysql='127.0.0.1;kompanie_test;kompanie;kompanie'
+
+      - name: E2E-Tests (Playwright, Installation im Unterordner /app/)
+        run: |
+          npx playwright install --with-deps chromium
+          scripts/e2e-standalone.sh --reporter=line
+
+      - name: Release-Ablauf (Pakete, Signatur, Update-Liste, Download-Seite, Paket starten)
+        run: tests/release/run-tests.sh
+
+      - name: Installer und Updates (install.php, Update, Zurückrollen, Zurückziehen, Reparatur)
+        run: tests/update/run-tests.sh
+
+      - name: Bildschirmfotos
+        run: scripts/screenshots.sh screenshots-standalone
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: screenshots-standalone
+          path: screenshots-standalone
+          if-no-files-found: ignore

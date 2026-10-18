@@ -2,3 +2,17 @@ node_modules/
 vendor/
 dist/
 .DS_Store
+.phpunit.cache/
+.wp-test/
+packages/frontend/src/generated/
+packages/frontend/public/icons/
+packages/frontend/test-results/
+packages/frontend/playwright-report/
+adapters/wordpress/app/
+adapters/wordpress/kompanie.json
+adapters/standalone/app/
+adapters/standalone/sw.js
+adapters/standalone/data/
+adapters/standalone/media/
+adapters/standalone/kompanie.json
+adapters/standalone/data-dir.php

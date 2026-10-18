@@ -17,13 +17,15 @@
       "description": "Voller Name, z. B. im Fenstertitel und in der Kopfzeile für Gäste.",
       "type": "string",
       "minLength": 1,
-      "maxLength": 80
+      "maxLength": 80,
+      "pattern": "\\S"
     },
     "shortName": {
       "description": "Name unter dem App-Symbol auf dem Home-Bildschirm. Standard: name. Mehr als etwa 12 Zeichen werden auf dem Handy abgeschnitten.",
       "type": "string",
       "minLength": 1,
-      "maxLength": 30
+      "maxLength": 30,
+      "pattern": "\\S"
     },
     "description": {
       "description": "Kurzbeschreibung im Manifest. Standard: „Die App der <name>“.",
@@ -53,19 +55,31 @@
           "properties": {
             "guest": {
               "type": "string",
-              "default": "Gast"
+              "default": "Gast",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "member": {
               "type": "string",
-              "default": "Mitglied"
+              "default": "Mitglied",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "manager": {
               "type": "string",
-              "default": "Verwalter"
+              "default": "Verwalter",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "admin": {
               "type": "string",
-              "default": "Admin"
+              "default": "Admin",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },
@@ -76,23 +90,38 @@
           "properties": {
             "events": {
               "type": "string",
-              "default": "Termine"
+              "default": "Termine",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "news": {
               "type": "string",
-              "default": "News"
+              "default": "News",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "gallery": {
               "type": "string",
-              "default": "Galerie"
+              "default": "Galerie",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "points": {
               "type": "string",
-              "default": "Punkte"
+              "default": "Punkte",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             },
             "penalties": {
               "type": "string",
-              "default": "Strafen"
+              "default": "Strafen",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         }

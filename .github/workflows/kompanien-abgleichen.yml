@@ -1,0 +1,64 @@
+# Veröffentlicht neue Versionen für alle Kompanien (Repos der Organisation mit dem Topic kompanie-app),
+# deren Stand noch nicht veröffentlicht ist: nach einer Änderung im Kompanie-Repo (kompanie.json, Logo)
+# und nach einer Änderung am Programmcode des Kerns (dann für alle Kompanien, zuerst im Kanal early).
+# Läuft alle 30 Minuten und von Hand. Veröffentlicht wird nur, was sich geändert hat (kein erzwungener
+# Neubau). Die Kompanie-Repos brauchen dafür keine Geheimnisse und keinen Zugriff auf dieses Repo.
+# Hinweis: Bei öffentlichen Repos schaltet GitHub zeitgesteuerte Workflows nach 60 Tagen ohne Aktivität
+# im Repo ab (siehe docs/RELEASE.md).
+name: Kompanien abgleichen
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: Nur dieses Kompanie-Repo (leer = alle)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kompanien-abgleichen
+  cancel-in-progress: false
+
+jobs:
+  finden:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      repos: ${{ steps.finden.outputs.repos }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+        with:
+          php-version: '8.2'
+          tools: none
+
+      - name: Kompanien mit neuem Stand finden
+        id: finden
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ONLY: ${{ inputs.repo }}
+          # Wie beim Veröffentlichen (Prüfsumme der Paket-Konfiguration). Variablen der Environment
+          # „veroeffentlichen“ sind hier nicht sichtbar; deshalb als Variablen des Repos anlegen.
+          STATUS_URL: ${{ vars.KOMPANIE_STATUS_URL }}
+          SUPPORT: ${{ vars.KOMPANIE_SUPPORT }}
+        run: scripts/find-pending.sh >> "$GITHUB_OUTPUT"
+
+  veroeffentlichen:
+    needs: finden
+    if: needs.finden.outputs.repos != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        repo: ${{ fromJSON(needs.finden.outputs.repos) }}
+    uses: ./.github/workflows/publish-kompanie.yml
+    with:
+      repo: ${{ matrix.repo }}

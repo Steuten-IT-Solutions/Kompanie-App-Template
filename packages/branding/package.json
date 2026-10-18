@@ -1,0 +1,18 @@
+{
+  "name": "@kompanie-app/branding",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Erzeugt aus kompanie.json und dem Logo Farben, Icons und Texte für die App.",
+  "bin": {
+    "kompanie-brand": "./brand.mjs"
+  },
+  "scripts": {
+    "brand": "node brand.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "sharp": "^0.35.3"
+  }
+}

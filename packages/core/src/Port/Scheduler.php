@@ -6,12 +6,12 @@ namespace KompanieApp\Core\Port;
 
 /**
  * Wiederkehrende Aufgaben, z. B. der stündliche Galerie-Abgleich.
- * WordPress: WP-Cron. Standalone: Cronjob des Hosters, sonst Pseudo-Cron bei Seitenaufrufen.
+ * WordPress: WP-Cron. Standalone: Pseudo-Cron bei Seitenaufrufen, optional Cronjob des Hosters.
+ * Fällige Aufgaben führt der Adapter über App::runTask() aus.
  */
 interface Scheduler
 {
-    /** @param callable(): void $task */
-    public function every(string $name, int $intervalSeconds, callable $task): void;
+    public function schedule(string $task, int $intervalSeconds): void;
 
-    public function cancel(string $name): void;
+    public function unschedule(string $task): void;
 }

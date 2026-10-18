@@ -1,0 +1,122 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Standalone;
+
+use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Port\UserDirectory;
+use KompanieApp\Core\Storage\Sql\Connection;
+
+/** Benutzer der eigenständigen Version in der Tabelle users. */
+final class PdoUsers implements UserDirectory
+{
+    public function __construct(private readonly Connection $db, private readonly ?Sessions $sessions = null)
+    {
+    }
+
+    public function find(int $id): ?User
+    {
+        $row = $id > 0 ? $this->db->selectOne('SELECT * FROM {users} WHERE id = ?', [$id]) : null;
+        return $row ? self::toUser($row) : null;
+    }
+
+    /** @return array<string, mixed>|null Zeile für die Anmeldung (Benutzername oder E-Mail). */
+    public function findForLogin(string $loginOrEmail): ?array
+    {
+        $row = $this->db->selectOne('SELECT * FROM {users} WHERE LOWER(login) = LOWER(?)', [$loginOrEmail]);
+        if (!$row && str_contains($loginOrEmail, '@')) {
+            $rows = $this->db->select('SELECT * FROM {users} WHERE LOWER(email) = LOWER(?)', [$loginOrEmail]);
+            $row = count($rows) === 1 ? $rows[0] : null;
+        }
+        return $row;
+    }
+
+    public function list(bool $includeGuests): array
+    {
+        $where = $includeGuests ? '' : "WHERE level <> 'guest'";
+        return array_map([self::class, 'toUser'], $this->db->select("SELECT * FROM {users} $where ORDER BY name ASC, id ASC"));
+    }
+
+    public function create(string $name, string $login, string $email, string $password): int
+    {
+        return $this->add($name, $login, $email, $password, Level::Member);
+    }
+
+    public function add(string $name, string $login, string $email, string $password, Level $level): int
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        return $this->db->insert('users', [
+            'login' => $login,
+            'email' => $email,
+            'name' => $name,
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'level' => $level->value,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    public function canAssignAdmin(): bool
+    {
+        return true;
+    }
+
+    public function setLevel(int $id, Level $level): void
+    {
+        $this->db->update('users', ['level' => $level->value, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+    }
+
+    public function countAdmins(): int
+    {
+        return (int) $this->db->scalar("SELECT COUNT(*) FROM {users} WHERE level = 'admin'");
+    }
+
+    public function count(): int
+    {
+        return (int) $this->db->scalar('SELECT COUNT(*) FROM {users}');
+    }
+
+    public function verifyPassword(int $id, string $password): bool
+    {
+        $hash = $this->db->scalar('SELECT password_hash FROM {users} WHERE id = ?', [$id]);
+        return is_string($hash) && password_verify($password, $hash);
+    }
+
+    public function setPassword(int $id, string $password): void
+    {
+        $this->db->update('users', ['password_hash' => password_hash($password, PASSWORD_DEFAULT), 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+        $this->sessions?->destroyAllFor($id);
+    }
+
+    /** Hash nach einer Änderung des Verfahrens (z. B. höhere Kosten) erneuern. */
+    public function rehashIfNeeded(int $id, string $password, string $hash): void
+    {
+        if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
+            $this->db->update('users', ['password_hash' => password_hash($password, PASSWORD_DEFAULT)], ['id' => $id]);
+        }
+    }
+
+    public function touchLogin(int $id): void
+    {
+        $this->db->update('users', ['last_login_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+    }
+
+    public function loginExists(string $login): bool
+    {
+        return (int) $this->db->scalar('SELECT COUNT(*) FROM {users} WHERE LOWER(login) = LOWER(?)', [$login]) > 0;
+    }
+
+    public function emailExists(string $email): bool
+    {
+        return (int) $this->db->scalar("SELECT COUNT(*) FROM {users} WHERE email <> '' AND LOWER(email) = LOWER(?)", [$email]) > 0;
+    }
+
+    /** @param array<string, mixed> $row */
+    public static function toUser(array $row): User
+    {
+        $level = Level::tryFrom((string) $row['level']) ?? Level::Guest;
+        return new User((int) $row['id'], (string) $row['name'], (string) $row['login'], $level, $level->capabilities());
+    }
+}

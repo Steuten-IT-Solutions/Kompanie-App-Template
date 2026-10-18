@@ -15,7 +15,8 @@ info:
     CSRF-Token in dem Header, den `/config` unter `csrf.header` nennt (WordPress:
     `X-WP-Nonce`, Standalone: `X-CSRF-Token`). Ist es abgelaufen, antwortet der
     Server mit 403 und `code: csrf_invalid` (WordPress: `rest_cookie_invalid_nonce`);
-    die App holt dann über `GET /auth/csrf` ein neues und wiederholt die Anfrage einmal.
+    die App holt dann über `csrf.refreshUrl` aus `/config` ein neues und wiederholt die
+    Anfrage einmal.
 
     **Rechte:** Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung.
     Mitglieder sehen nur ihre eigenen Punkte und Strafen.
@@ -36,6 +37,8 @@ tags:
   - name: News
   - name: Galerie
   - name: Verwaltung
+  - name: Einstellungen
+  - name: Wartung
 
 paths:
   /config:
@@ -192,6 +195,11 @@ paths:
                 items: { $ref: '#/components/schemas/CalendarEvent' }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
+        '503':
+          description: Kalender noch nicht eingerichtet (code not_configured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /events:
     get:
@@ -281,7 +289,7 @@ paths:
         in: path
         required: true
         description: Kennung aus der News-Quelle (bei WordPress die Beitrags-ID).
-        schema: { type: string }
+        schema: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
     get:
       tags: [News]
       summary: Einzelne Neuigkeit mit Inhalt (HTML)
@@ -467,6 +475,7 @@ paths:
                   level: { $ref: '#/components/schemas/Level' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /members/{id}/password:
     parameters:
@@ -489,6 +498,7 @@ paths:
                 required: [password]
                 properties:
                   password: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -627,6 +637,338 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /admin/settings:
+    get:
+      tags: [Einstellungen]
+      summary: Einstellungen für Kalender, Galerie und Neuigkeiten
+      description: Geheime Werte (iCal-Adresse, API-Schlüssel, Dienstkonto) werden nie zurückgegeben, nur ob sie gesetzt sind.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Einstellungen ändern
+      description: Nur mitgeschickte Felder werden übernommen; ein leerer Text löscht den Wert.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                calendar_ics_url: { type: string, description: 'Geheime iCal-Adresse; webcal:// wird als https:// gespeichert' }
+                google_api_key: { type: string }
+                calendar_ids: { type: string, description: Kommagetrennte Kalender-IDs (nur mit API-Schlüssel) }
+                calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
+                gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
+                news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
+                news_url: { type: string, description: Nur eigenständige Version }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/calendar/test:
+    post:
+      tags: [Einstellungen]
+      summary: Kalender ohne Zwischenspeicher abrufen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count, sample]
+                properties:
+                  count: { type: integer }
+                  sample:
+                    type: array
+                    maxItems: 5
+                    items:
+                      type: object
+                      properties:
+                        start: { type: string }
+                        title: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/news/test:
+    post:
+      tags: [Einstellungen]
+      summary: Quelle der Neuigkeiten ohne Zwischenspeicher abrufen (nur eigenständige Version)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer, description: Beiträge auf der ersten Seite }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/sync:
+    post:
+      tags: [Einstellungen]
+      summary: Galerie von Hand abgleichen und Bilder aufbereiten
+      description: |
+        Gleicht mit Google Drive ab und bereitet Bilder auf, solange das Zeitbudget reicht (etwa 20 Sekunden).
+        Steht danach noch etwas aus (`pending` > 0), ruft die App mit `only_process: true` erneut auf.
+      x-capability: manage_settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                only_process: { type: boolean, default: false }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  albums: { type: integer }
+                  photos: { type: integer }
+                  processed: { type: integer }
+                  pending: { type: integer }
+                  failed: { type: integer, description: Bilder, die sich nicht laden ließen (werden beim nächsten Abgleich erneut versucht) }
+                  error: { type: string, description: Fehler des Abgleichs, sonst leer }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/status:
+    get:
+      tags: [Wartung]
+      summary: Zustand der Installation (Ampel), Updates, Statusmeldungen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, support, updates, statusReports, setupDone]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, label, level, text]
+                      properties:
+                        key: { type: string, description: 'z. B. updates, gallery, calendar, backup, server' }
+                        label: { type: string }
+                        level: { type: string, enum: [ok, warn, error, off] }
+                        text: { type: string }
+                  support: { type: string, description: Kontakt für Hilfe (E-Mail oder Webadresse), sonst leer }
+                  updates: { $ref: '#/components/schemas/UpdateStatus' }
+                  statusReports:
+                    type: object
+                    properties:
+                      enabled: { type: boolean, description: Der Admin hat Statusmeldungen zugestimmt }
+                      available: { type: boolean, description: Das Paket nennt einen Empfänger }
+                      payload: { type: object, description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte)' }
+                  setupDone: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/update/check:
+    post:
+      tags: [Wartung]
+      summary: Update-Liste jetzt laden und prüfen (Signatur, Kompanie, laufende Nummer)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/update/install:
+    post:
+      tags: [Wartung]
+      summary: Eine Version aus der geprüften Liste einspielen
+      description: |
+        Vorher wird bei Datenbank-Änderungen und vor einer neuen Hauptversion automatisch gesichert. Eine neue
+        Hauptversion nur mit `major` true. Im Kanal stable nur schon freigegebene Versionen. 409, wenn gerade
+        schon ein Update läuft.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: string, example: 1.4.0.3 }
+                major: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Eingespielt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installed: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/update/rollback:
+    post:
+      tags: [Wartung]
+      summary: Auf eine ältere Version derselben Hauptversion zurück
+      description: Die bisherige Version wird danach beim automatischen Update übersprungen, bis eine neuere erscheint.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: string }
+      responses:
+        '200':
+          description: Eingespielt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installed: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /admin/update:
+    patch:
+      tags: [Wartung]
+      summary: Automatische Updates und Statusmeldungen ein- oder ausschalten
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auto: { type: boolean }
+                status_reports: { type: boolean, description: Zustimmung zu täglichen Statusmeldungen }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup:
+    get:
+      tags: [Wartung]
+      summary: Datensicherung herunterladen
+      description: |
+        Gemeinsames Format `kompanie-app-backup` (Tabellen und Einstellungen; eigenständige Version
+        auch Konten mit Passwort-Hashes). Enthält Zugangsschlüssel – sicher aufbewahren.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Sicherung (mit Content-Disposition attachment)
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Wartung]
+      summary: Sicherung wiederherstellen (ersetzt alle Daten)
+      description: |
+        Eigenständige Version: nur Sicherungen der eigenständigen Version mit mindestens einem Admin;
+        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backup, confirm]
+              properties:
+                backup: { type: string, description: Inhalt der Sicherungsdatei }
+                confirm: { type: boolean, enum: [true] }
+      responses:
+        '200':
+          description: Wiederhergestellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/setup/done:
+    post:
+      tags: [Wartung]
+      summary: Einrichtungsassistent abschließen (setupPending wird danach false)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  done: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
 security:
   - session: []
 
@@ -667,8 +1009,42 @@ components:
       properties:
         code:
           type: string
-          description: z. B. `not_logged_in`, `forbidden`, `invalid`, `not_found`, `csrf_invalid`, `upstream_error`
+          description: |
+            z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
+            `feature_disabled` (404, Bereich in kompanie.json ausgeschaltet), `method_not_allowed` (405),
+            `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500).
+            Nur eigenständige Version: `login_failed` (400), `too_many_attempts` (429),
+            `unsupported_media_type` (415, Änderungen nur als JSON), `not_installed` (503).
+            Nur WordPress: `use_login_page` (400).
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
+
+    AdminSettings:
+      type: object
+      required: [calendar, gallery, news]
+      properties:
+        calendar:
+          type: object
+          properties:
+            source: { type: string, enum: [ics, google, none] }
+            ics_url_set: { type: boolean }
+            google_api_key_set: { type: boolean }
+            calendar_ids: { type: string }
+            cache_minutes: { type: integer }
+        gallery:
+          type: object
+          properties:
+            configured: { type: boolean }
+            root: { type: string }
+            service_account_email: { type: string }
+            status:
+              type: object
+              description: Stand des letzten Abgleichs (albums, photos, new, pending, last_sync, error)
+        news:
+          type: [object, 'null']
+          description: null, wenn die Neuigkeiten aus den Beiträgen der WordPress-Seite kommen.
+          properties:
+            source: { type: string, enum: [none, wordpress, rss] }
+            url: { type: string }
 
     Level:
       type: string
@@ -689,20 +1065,64 @@ components:
             type: string
             enum: [member, manage, manage_events, create_users, promote_users, manage_settings]
 
+    UpdateStatus:
+      type: object
+      properties:
+        configured: { type: boolean, description: Paket mit Update-Adresse und der Adapter kann einspielen }
+        current: { type: string }
+        channel: { type: string, enum: [early, stable] }
+        auto: { type: boolean }
+        checked_at: { type: [integer, 'null'] }
+        error: { type: string, description: Fehler der letzten Prüfung, sonst leer }
+        latest: { type: [string, 'null'] }
+        available: { type: boolean, description: Neuere Version derselben Hauptversion verfügbar }
+        major: { type: boolean, description: Neue Hauptversion verfügbar (nur mit Bestätigung) }
+        majorVersion: { type: string }
+        withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
+        fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
+        skipped: { type: boolean, description: 'latest wird nach dem Zurückrollen nicht automatisch eingespielt' }
+        autoAllowed: { type: boolean, description: 'Automatische Updates sind hier erlaubt (WordPress kann sie sperren)' }
+        problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              version: { type: string }
+              published: { type: string }
+        last:
+          type: [object, 'null']
+          description: Letzter Update-Versuch
+          properties:
+            from: { type: string }
+            to: { type: string }
+            kind: { type: string, enum: [auto, manual, rollback, withdrawn] }
+            at: { type: integer }
+            ok: { type: boolean }
+            error: { type: string }
+
     AppConfig:
       type: object
-      required: [apiBase, appUrl, auth, csrf, features, user, version]
+      required: [apiBase, appUrl, swUrl, auth, csrf, features, user, version]
       properties:
         apiBase: { type: string }
         appUrl: { type: string }
+        swUrl: { type: string, description: 'Adresse des Service Workers (Bereich: appUrl)' }
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
-        siteUrl: { type: string, description: Startseite der Webseite, falls vorhanden }
+        variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
+        siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
+        setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         csrf:
           type: object
-          required: [header, token]
+          required: [header, token, refreshUrl]
           properties:
             header: { type: string, description: 'Name des Headers, z. B. X-CSRF-Token oder X-WP-Nonce' }
             token: { type: string, description: Leer für Gäste ohne Anmeldung }
+            refreshUrl:
+              type: string
+              description: |
+                GET liefert {token}. Funktioniert allein mit dem Sitzungs-Cookie, auch wenn das
+                alte Token abgelaufen ist (WordPress: /app/csrf, Standalone: {apiBase}auth/csrf).
         auth:
           type: object
           required: [mode]
@@ -710,8 +1130,8 @@ components:
             mode:
               type: string
               enum: [form, redirect]
-            loginUrl: { type: string, description: Nur bei `redirect` }
-            logoutUrl: { type: string, description: Nur bei `redirect` }
+            loginUrl: { type: [string, 'null'], description: Nur bei `redirect` }
+            logoutUrl: { type: [string, 'null'], description: Nur bei `redirect` und Anmeldung }
         features:
           type: object
           description: Bereiche, die eingeschaltet **und** auf dem Server eingerichtet sind.
@@ -814,7 +1234,7 @@ components:
       properties:
         id: { type: string }
         title: { type: string }
-        date: { type: string }
+        date: { type: string, description: 'ISO 8601 (UTC); leer, wenn die Quelle kein lesbares Datum liefert' }
         excerpt: { type: string }
         image: { type: [string, 'null'] }
         link: { type: string }
