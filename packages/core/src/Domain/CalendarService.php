@@ -183,17 +183,18 @@ final class CalendarService
                 $nested++;
                 continue;
             }
-            if ($cur !== null && str_starts_with($trimmed, 'END:') && $nested > 0) {
-                $nested--;
-                continue;
-            }
-            if ($trimmed === 'END:VEVENT') {
-                // Auch wenn ein eingebetteter Block (z. B. VALARM) nicht geschlossen wurde.
+            // END:VEVENT schließt den Termin immer, auch wenn ein eingebetteter Block
+            // (z. B. VALARM) nicht geschlossen wurde.
+            if ($trimmed === 'END:VEVENT' && $cur !== null) {
                 $nested = 0;
                 if ($cur && !empty($cur['DTSTART'])) {
                     $raw[] = $cur;
                 }
                 $cur = null;
+                continue;
+            }
+            if ($cur !== null && str_starts_with($trimmed, 'END:') && $nested > 0) {
+                $nested--;
                 continue;
             }
             if ($cur === null || $nested > 0 || !str_contains($line, ':')) {

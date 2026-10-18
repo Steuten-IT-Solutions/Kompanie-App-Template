@@ -30,6 +30,8 @@ final class CoreTest extends TestCase
         $this->assertSame('x y', Text::line('x <!-- k --> <b>y</b>'));
         $this->assertSame('alert(1)', Text::line('<<b>script>alert(1)<</b>/script>'), 'verschachtelte Tags');
         $this->assertSame('x', Text::line('<<<i>i>i>x'));
+        $this->assertSame('alert(1)', Text::line("<\x01script>alert(1)</\x01script>"), 'Steuerzeichen im Tag');
+        $this->assertSame('a', Text::line("a<\x0Bsvg onload=alert(1)>"));
         $deep = str_repeat('<', 20000) . str_repeat('b>', 20000) . 'x';
         $t = microtime(true);
         $this->assertStringNotContainsString('<', Text::line($deep));

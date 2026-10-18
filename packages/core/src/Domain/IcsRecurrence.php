@@ -18,7 +18,11 @@ final class IcsRecurrence
     private const DAYS = ['MO' => 1, 'TU' => 2, 'WE' => 3, 'TH' => 4, 'FR' => 5, 'SA' => 6, 'SU' => 7];
     private const KNOWN = ['FREQ', 'INTERVAL', 'COUNT', 'UNTIL', 'BYDAY', 'BYMONTHDAY', 'BYMONTH', 'WKST'];
     private const MAX_INTERVAL = 1000;
-    /** Obergrenzen gegen lange Laufzeiten bei kaputten oder sehr alten Serien. */
+    /**
+     * Obergrenzen gegen lange Laufzeiten bei kaputten oder sehr alten Serien. Mit COUNT muss ab
+     * DTSTART gezählt werden; Serien, deren Abschnitte bis heute darüber hinausgehen (z. B. täglich
+     * seit über 50 Jahren mit COUNT), erscheinen deshalb nicht.
+     */
     private const MAX_PERIODS = 20000;
     private const MAX_RESULTS = 1000;
 
@@ -69,8 +73,9 @@ final class IcsRecurrence
                 }
             }
         }
-        // BYDAY ohne BYMONTH bei YEARLY bezieht sich auf das ganze Jahr; BYMONTHDAY gibt es bei WEEKLY nicht.
-        if ($freq === 'YEARLY' && isset($r['BYDAY']) && !isset($r['BYMONTH'])) {
+        // BYDAY oder BYMONTHDAY ohne BYMONTH beziehen sich bei YEARLY auf das ganze Jahr (nicht
+        // unterstützt); BYMONTHDAY gibt es bei WEEKLY nicht.
+        if ($freq === 'YEARLY' && (isset($r['BYDAY']) || isset($r['BYMONTHDAY'])) && !isset($r['BYMONTH'])) {
             return false;
         }
         return !($freq === 'WEEKLY' && isset($r['BYMONTHDAY']));
@@ -175,8 +180,13 @@ final class IcsRecurrence
                 $list = array_filter($list, fn (\DateTimeImmutable $c): bool => in_array((int) $c->format('j'), $this->monthDays($c), true));
             }
         }
-        usort($list, static fn ($a, $b) => $a <=> $b);
-        return array_values($list);
+        // Ein Vorkommen zählt einmal, auch bei doppelten Angaben (z. B. BYDAY=TU,TU).
+        $unique = [];
+        foreach ($list as $c) {
+            $unique[$c->getTimestamp()] = $c;
+        }
+        ksort($unique);
+        return array_values($unique);
     }
 
     /** Beginn der Woche von $start nach WKST (Standard Montag), mit Uhrzeit von $start. */

@@ -56,6 +56,13 @@ final class CalendarTest extends TestCase
         $this->assertSame('Bitte pünktlich', $events[0]['description']);
     }
 
+    public function testUnclosedValarm(): void
+    {
+        $events = $this->parseAt("BEGIN:VEVENT\r\nUID:a\r\nDTSTART:20260310T180000Z\r\nSUMMARY:Erster\r\nBEGIN:VALARM\r\nDESCRIPTION:Alarm\r\nEND:VEVENT\r\n"
+            . "BEGIN:VEVENT\r\nUID:b\r\nDTSTART:20260311T180000Z\r\nSUMMARY:Zweiter\r\nEND:VEVENT\r\n");
+        $this->assertSame(['Erster', 'Zweiter'], array_column($events, 'title'));
+    }
+
     public function testWeeklySeriesStartedLongAgo(): void
     {
         $events = $this->parseAt("BEGIN:VEVENT\r\nUID:w1\r\nDTSTART;TZID=Europe/Berlin:20240102T193000\r\nDTEND;TZID=Europe/Berlin:20240102T213000\r\n"
@@ -115,6 +122,9 @@ final class CalendarTest extends TestCase
         // Ungültiges BYDAY oder riesiges INTERVAL: nur der erste Termin, kein Absturz.
         $this->assertSame(['2026-03-04'], $this->starts("DTSTART;VALUE=DATE:20260304\r\nRRULE:FREQ=WEEKLY;BYDAY=XX\r\n"));
         $this->assertSame(['2026-03-04'], $this->starts("DTSTART;VALUE=DATE:20260304\r\nRRULE:FREQ=MONTHLY;INTERVAL=99999999999999999999\r\n"));
+        // Doppelte Angaben zählen einmal; YEARLY mit BYMONTHDAY ohne BYMONTH: nur der erste Termin.
+        $this->assertSame(['2026-03-03', '2026-03-10', '2026-03-17', '2026-03-24'], $this->starts("DTSTART;VALUE=DATE:20260303\r\nRRULE:FREQ=WEEKLY;BYDAY=TU,TU;COUNT=4\r\n"));
+        $this->assertSame(['2026-03-03'], $this->starts("DTSTART;VALUE=DATE:20260303\r\nRRULE:FREQ=YEARLY;BYMONTHDAY=15\r\n"));
         // EXDATE nur mit Datum bei einer Serie mit Uhrzeit.
         $this->assertCount(2, $this->starts("DTSTART;TZID=Europe/Berlin:20260303T190000\r\nRRULE:FREQ=WEEKLY;COUNT=3\r\nEXDATE;VALUE=DATE:20260310\r\n"));
     }

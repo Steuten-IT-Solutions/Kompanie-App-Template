@@ -16,7 +16,7 @@ final class Schema
         }
         return array_map(
             static fn (array $r): string => (string) $r['COLUMN_NAME'],
-            $db->select('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION', [$name]),
+            $db->select('SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(?) ORDER BY ORDINAL_POSITION', [$name]),
         );
     }
 }
