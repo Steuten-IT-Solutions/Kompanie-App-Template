@@ -40,6 +40,8 @@ $m1 = $users->add($demo ? 'Max Muster' : 'Mitglied1', 'mitglied1', '', 'test1234
 $m2 = $users->add($demo ? 'Erika Beispiel' : 'Mitglied2', 'mitglied2', '', 'test1234', Level::Member);
 
 $app = $kernel->app();
+// Alle Bereiche an (eine neue Installation hat keine; sonst wählt sie der Admin in der Einrichtung).
+$app->features()->update(array_fill_keys(KompanieApp\Core\Domain\Features::keys(), true));
 $app->settings->set('calendar_ics_url', 'https://kalender.test/test.ics');
 $app->settings->set('news_source', 'rss');
 $app->settings->set('news_url', 'https://news.test/feed');

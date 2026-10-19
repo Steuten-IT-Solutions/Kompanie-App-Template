@@ -84,7 +84,7 @@ final class StatusService
     private function gallery(): array
     {
         $g = $this->app->gallery();
-        if (!$this->app->config->featureEnabled('gallery')) {
+        if (!$this->app->features()->enabled('gallery')) {
             return $this->item('gallery', 'Galerie', 'off', 'Die Galerie ist ausgeschaltet.');
         }
         if (!$g->isConfigured()) {
@@ -108,7 +108,7 @@ final class StatusService
 
     private function calendar(): array
     {
-        if (!$this->app->config->featureEnabled('calendar')) {
+        if (!$this->app->features()->enabled('calendar')) {
             return $this->item('calendar', 'Kalender', 'off', 'Der Kalender ist ausgeschaltet.');
         }
         return $this->app->calendar()->isConfigured()

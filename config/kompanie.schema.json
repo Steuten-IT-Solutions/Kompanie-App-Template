@@ -161,7 +161,8 @@
       "default": "System"
     },
     "features": {
-      "description": "Welche Bereiche die App hat. Ein ausgeschalteter Bereich ist auch auf dem Server gesperrt.",
+      "description": "Veraltet: Welche Bereiche die App hat, entscheidet der Admin der Kompanie in der App (Ersteinrichtung bzw. Einstellungen → Bereiche). Wird ignoriert; nur bestehende Installationen übernehmen die Werte einmalig beim Wechsel auf die neue Version.",
+      "deprecated": true,
       "type": "object",
       "additionalProperties": false,
       "properties": {

@@ -59,17 +59,6 @@ body:
     attributes:
       label: Bezeichnung für Strafen
       description: Optional, z. B. „Kasse“. Leer = „Strafen“.
-  - type: checkboxes
-    id: weglassen
-    attributes:
-      label: Diese Bereiche weglassen
-      options:
-        - label: Öffentliche Termine
-        - label: Kalender für Mitglieder
-        - label: News
-        - label: Galerie
-        - label: Punkte
-        - label: Strafen
   - type: textarea
     id: logo
     attributes:

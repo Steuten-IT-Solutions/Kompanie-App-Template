@@ -96,8 +96,9 @@ final class CoreTest extends TestCase
         $this->assertSame('Spieß', $c->roleLabel('manager'));
         $this->assertSame('Mitglied', $c->roleLabel('member'));
         $this->assertSame('Kasse', $c->sectionLabel('penalties'));
-        $this->assertFalse($c->featureEnabled('penalties'));
-        $this->assertTrue($c->featureEnabled('gallery'));
+        $this->assertFalse($c->legacyFeature('penalties'));
+        $this->assertTrue($c->legacyFeature('gallery'));
+        $this->assertSame('Kalender', $c->sectionLabel('calendar', 'Kalender'));
         $this->assertSame('Kompanie-App', (new KompanieConfig([]))->name());
         $this->assertSame('#2f5d8a', (new KompanieConfig(['colors' => ['primary' => 'rot']]))->primaryColor());
     }
@@ -105,11 +106,11 @@ final class CoreTest extends TestCase
     public function testDisabledFeatureHasNoRoutes(): void
     {
         $users = new FakeUsers();
-        $app = TestApp::create(TestApp::connection(), $users, ['features' => ['penalties' => false, 'events' => false]]);
+        $app = TestApp::create(TestApp::connection(), $users, features: ['penalties' => false, 'events' => false, 'points' => true, 'gallery' => true]);
         $users->current = $users->add('admin', Level::Admin);
         foreach ([['GET', '/me/penalties'], ['POST', '/penalties'], ['GET', '/events']] as [$m, $p]) {
             $res = $app->api()->handle(new Request($m, $p));
-            $this->assertSame(404, $res->status, "$m $p");
+            $this->assertSame(403, $res->status, "$m $p");
             $this->assertSame('feature_disabled', $res->data['code']);
         }
         $this->assertSame(200, $app->api()->handle(new Request('GET', '/me/points'))->status);

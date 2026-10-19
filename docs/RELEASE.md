@@ -75,14 +75,15 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
 
 Im Kern-Repo *Issues → New issue*:
 
-- **„Neue Kompanie“**: Name, Repo-Name, Farben, Texte, Bereiche, Logo (ins Feld ziehen). Der Workflow
+- **„Neue Kompanie“**: Name, Repo-Name, Farben, Texte, Logo (ins Feld ziehen). Welche Bereiche die App hat,
+  wählt der Admin der Kompanie bei der Ersteinrichtung in der App. Der Workflow
   [`kompanie-formular.yml`](../.github/workflows/kompanie-formular.yml) prüft die Angaben (Schema, Kontrast,
   Logo nur von GitHub, höchstens 5 MB, PNG/JPEG/WebP/SVG), baut eine Vorschau, legt das Repo aus der Vorlage
   an (öffentlich, Topic `kompanie-app`) und veröffentlicht die erste Version. Ergebnis und Link zur
   Download-Seite stehen danach als Kommentar im Issue.
 - **„Kompanie ändern“**: nur die zu ändernden Felder ausfüllen (`-` entfernt einen Wert). Der Workflow öffnet
   im Repo der Kompanie einen Pull Request mit Vorschau; nach dem Zusammenführen wird veröffentlicht.
-  Bereiche ein- oder ausschalten geht direkt in `kompanie.json` des Repos.
+  Bereiche schaltet der Admin der Kompanie in der App (*Einstellungen → Bereiche*), nicht `kompanie.json`.
 - Fehler stehen als Kommentar im Issue; nach dem Bearbeiten des Issues läuft die Prüfung erneut.
 - Nur wer Schreibrecht auf das Kern-Repo hat, kann die Formulare auslösen: Sowohl wer das Issue angelegt hat
   als auch wer es zuletzt bearbeitet hat, braucht Schreibrecht. Der Text des Issues wird in einem Job ohne

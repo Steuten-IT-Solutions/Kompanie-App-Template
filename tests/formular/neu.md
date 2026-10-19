@@ -35,15 +35,6 @@ Spieß
 
 _No response_
 
-### Diese Bereiche weglassen
-
-- [ ] Öffentliche Termine
-- [ ] Kalender für Mitglieder
-- [X] News
-- [ ] Galerie
-- [x] Punkte
-- [ ] Strafen
-
 ### Logo
 
 <img width="512" alt="logo" src="https://github.com/user-attachments/assets/0f0e5a2c-1b2d-4c3e-8f9a-0123456789ab" />

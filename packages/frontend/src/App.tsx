@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, can, config, isMember, toLogin } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo.png';
@@ -170,11 +170,20 @@ export default function App() {
   };
   const tabs = (['termine', 'news', 'galerie', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
-  const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : (tabs[0] ?? 'installieren');
+  // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
+  const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
+  const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : start;
 
   const [toast, setToast] = useState<string | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   const showToast = useCallback((msg: string) => setToast(msg), []);
+  // Bereiche wurden ein- oder ausgeschaltet: Tabs und Ansichten neu bestimmen.
+  const [, setConfigVersion] = useState(0);
+  useEffect(() => {
+    const changed = () => setConfigVersion((v) => v + 1);
+    window.addEventListener(CONFIG_CHANGED, changed);
+    return () => window.removeEventListener(CONFIG_CHANGED, changed);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -237,8 +246,8 @@ export default function App() {
         {config.setupPending && tab !== 'einrichtung' && (
           <div className="card setup-hint">
             <p>
-              <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch Kalender, Fotos und Neuigkeiten verbinden – dauert ein
-              paar Minuten.
+              <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und
+              sie verbinden – dauert ein paar Minuten.
             </p>
             <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
               Einrichtung starten

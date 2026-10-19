@@ -607,7 +607,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ki_checks_ok($checks)) {
         $kernel = new KompanieApp\Standalone\Kernel(KI_DIR, $http);
         KompanieApp\Standalone\Setup::createAdmin($kernel, $name, $login, $email, $password);
         $deleted = ki_self_delete();
-        ki_page('Fertig', '<div class="card"><h2>Die App ist eingerichtet</h2><p>Version ' . ki_h($entry['version']) . '. Jetzt mit dem eben angelegten Admin-Konto anmelden; danach führt die App durch die restliche Einrichtung (Kalender, Galerie, Neuigkeiten).</p>'
+        ki_page('Fertig', '<div class="card"><h2>Die App ist eingerichtet</h2><p>Version ' . ki_h($entry['version']) . '. Jetzt mit dem eben angelegten Admin-Konto anmelden; danach führt die App durch die restliche Einrichtung (Bereiche wählen, dann z. B. Kalender, Galerie, Neuigkeiten).</p>'
             . ($deleted ? '<p class="hint">Der Installer hat sich selbst gelöscht.</p>' : '<p class="bad">Bitte die Datei install.php jetzt im Dateimanager löschen.</p>')
             . '<a class="btn" href="' . ki_h($base) . '">Zur App</a></div>');
     } catch (Exception $e) {

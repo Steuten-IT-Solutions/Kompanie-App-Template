@@ -29,5 +29,7 @@ foreach (['verwalter' => 'manager', 'mitglied1' => 'member', 'mitglied2' => 'mem
 global $wpdb;
 $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like(KompanieApp\WordPress\WpSettings::PREFIX . KompanieApp\WordPress\WpCache::COUNTER) . '%'));
 delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'setup_done');
+// Alle Bereiche wieder an (der Test der Einrichtung schaltet einen aus und wieder ein).
+KompanieApp\WordPress\Plugin::app()->features()->update(array_fill_keys(KompanieApp\Core\Domain\Features::keys(), true));
 delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'backup_last'); // Ampel „Datensicherung“ wieder gelb
 echo "Testdaten zurückgesetzt.\n";

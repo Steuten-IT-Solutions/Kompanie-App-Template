@@ -8,6 +8,7 @@ use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
+use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\ScoreService;
@@ -88,9 +89,12 @@ final class App
     public function upgrade(): void
     {
         $migrator = $this->migrator();
+        // Vor den Migrationen merken, ob die Installation schon bestand (für die Bereiche, s. u.).
+        $existing = $migrator->current() > 0;
         if ($migrator->pending()) {
             $migrator->migrate();
         }
+        $this->features()->initialize($existing);
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
@@ -108,7 +112,7 @@ final class App
     public function scheduleTasks(): void
     {
         $wanted = [
-            GalleryService::TASK => $this->config->featureEnabled('gallery') && $this->gallery()->isConfigured(),
+            GalleryService::TASK => $this->features()->enabled('gallery') && $this->gallery()->isConfigured(),
             UpdateService::TASK => $this->updates()->configured(),
             StatusReporter::TASK => $this->statusReporter()->enabled(),
         ];
@@ -121,7 +125,7 @@ final class App
     public function runTask(string $task): void
     {
         try {
-            if ($task === GalleryService::TASK && $this->config->featureEnabled('gallery')) {
+            if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
             } elseif ($task === UpdateService::TASK) {
                 $this->updates()->runTask();
@@ -131,6 +135,11 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
         }
+    }
+
+    public function features(): Features
+    {
+        return $this->service(Features::class, fn () => new Features($this));
     }
 
     public function api(): Api

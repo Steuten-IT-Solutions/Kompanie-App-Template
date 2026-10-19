@@ -427,3 +427,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .payload { overflow-x: auto; background: var(--bg); padding: 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
 .settings-section details { margin: 12px 0; }
 .setup-steps { color: var(--muted); margin: 0 0 12px; }
+
+/* Bereiche (Ersteinrichtung und Einstellungen) */
+.feature-list { margin: 8px 0 4px; }
+.feature-toggle { align-items: flex-start; }
+.feature-toggle input { flex: none; margin-top: 2px; }
+.feature-toggle strong { display: block; color: var(--ink); }
+.feature-desc { display: block; margin-top: 2px; }
+.btn-inline { padding: 0; min-height: 0; font-size: inherit; vertical-align: baseline; }

@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Tests\Support;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Infra\ArrayCache;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
@@ -40,6 +41,7 @@ final class TestApp
 
     /**
      * @param array<string, mixed> $config Inhalt von kompanie.json
+     * @param array<string, bool>|false|null $features Bereiche; null = alle an (wie nach der Ersteinrichtung), false = unverändert lassen
      */
     public static function create(
         Connection $db,
@@ -49,6 +51,7 @@ final class TestApp
         ?string $filesDir = null,
         ?MemorySettings $settings = null,
         ?FixedClock $clock = null,
+        array|false|null $features = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -68,6 +71,9 @@ final class TestApp
             config: new KompanieConfig($config),
         );
         $app->upgrade();
+        if ($features !== false) {
+            $app->features()->update($features ?? array_fill_keys(Features::keys(), true));
+        }
         return $app;
     }
 }

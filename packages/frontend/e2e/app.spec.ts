@@ -410,17 +410,55 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await expect(hint).toBeVisible();
   await hint.getByRole('button', { name: 'Einrichtung starten' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einrichtung');
-  await page.getByRole('button', { name: "Los geht's" }).click();
-  // Kalender, Galerie (und bei der eigenständigen Version Neuigkeiten) lassen sich überspringen.
+  // Erster Schritt: Bereiche wählen. Ohne Galerie entfällt deren Schritt.
+  await expect(page.getByRole('heading', { name: 'Willkommen!' })).toBeVisible();
+  await page.getByRole('checkbox', { name: /^Galerie/ }).uncheck();
+  await page.getByRole('button', { name: 'Weiter', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Kalender für Mitglieder' })).toBeVisible();
+  // Kalender (und bei der eigenständigen Version Neuigkeiten) lassen sich überspringen.
   while (await page.getByRole('heading', { name: 'Fast fertig' }).count() === 0) {
+    await expect(page.getByRole('heading', { name: 'Galerie aus Google Drive' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   }
   await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
   await expect(page).toHaveURL(/#\/verwaltung$/);
   await expect(hint).toHaveCount(0);
+  const nav = page.getByRole('navigation', { name: 'Hauptnavigation' });
+  await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.topbar-account')).toHaveText('Konto');
   await expect(hint).toHaveCount(0);
+  await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
+  // Ausgeschaltet heißt auch auf dem Server gesperrt.
+  await page.context().clearCookies();
+  const blocked = await page.request.get(STANDALONE ? '/app/api/v1/gallery' : '/?rest_route=/kompanie-app/v1/gallery');
+  expect(blocked.status()).toBe(403);
+  expect((await blocked.json()).code).toBe('feature_disabled');
+
+  // Einstellungen → Bereiche: Galerie wieder einschalten, die Alben sind unverändert da.
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  const bereiche = page.locator('.settings-section', { hasText: 'Bereiche' }).first();
+  // Der Schalter speichert sofort und zeigt den neuen Stand erst nach der Antwort des Servers.
+  await bereiche.getByRole('checkbox', { name: /^Galerie/ }).click();
+  await expect(page.locator('.toast')).toHaveText('Galerie eingeschaltet');
+  await expect(bereiche.getByRole('checkbox', { name: /^Galerie/ })).toBeChecked();
+  await nav.getByRole('button', { name: 'Galerie' }).click();
+  await expect(page.locator('.album-card', { hasText: 'Sommerfest' })).toBeVisible();
+
+  // Ausschalten nur nach Rückfrage; Abbrechen lässt den Bereich an.
+  await page.goto('/app/#/einstellungen');
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain('Die Daten bleiben erhalten');
+    void d.dismiss();
+  });
+  await bereiche.getByRole('checkbox', { name: /^Galerie/ }).click();
+  await expect(bereiche.getByRole('checkbox', { name: /^Galerie/ })).toBeChecked();
+
+  // Wer kein Admin ist, kommt nicht an die Bereiche.
+  await login(page, 'verwalter');
+  await page.goto('/app/#/einstellungen');
+  await expect(page.getByRole('heading', { name: 'Bereiche' })).toHaveCount(0);
 });
 
 test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ page }) => {
