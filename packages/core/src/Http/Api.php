@@ -127,12 +127,20 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
+            // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
+            'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
             'user' => $a->authContext->currentUser()?->toArray(),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
         ];
+    }
+
+    /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */
+    public static function handbookUrl(string $updatesUrl): ?string
+    {
+        return preg_match('#^(https://[^?\#]+/)updates\.json$#', trim($updatesUrl), $m) ? $m[1] . 'handbuch/' : null;
     }
 
     /** @return Route[] */

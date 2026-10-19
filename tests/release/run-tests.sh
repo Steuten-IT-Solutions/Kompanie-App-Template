@@ -50,6 +50,7 @@ else
 fi
 
 php scripts/download-page.php --updates="$T/updates.json" --out="$T/site" > /dev/null
+[ -f "$T/site/handbuch/index.html" ] && grep -q 'href="handbuch/index.html"' "$T/site/index.html" && ok "Download-Seite mit Handbuch (handbuch/)" || fail "Handbuch fehlt auf der Seite"
 grep -q "$BASE/v$CORE.1/kompanie-app-wordpress.zip" "$T/site/index.html" && ok "Download-Seite verlinkt die stable-Version" || fail "Download-Seite ohne Link"
 
 # Eigenständiges Paket entpacken, einrichten, starten

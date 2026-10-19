@@ -34,6 +34,8 @@ export interface AppConfig {
   csrf: { header: string; token: string; refreshUrl: string };
   auth: { mode: 'form' | 'redirect'; loginUrl: string | null; logoutUrl: string | null };
   features: Record<Feature, boolean>;
+  /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
+  handbookUrl?: string | null;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */

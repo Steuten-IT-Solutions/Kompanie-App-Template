@@ -23,6 +23,7 @@ Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin
 - [Architektur, Abläufe und Fahrplan](docs/ARCHITEKTUR.md)
 - [Planung der offenen Punkte](docs/OFFENE-PUNKTE.md)
 - [Veröffentlichen und Updates](docs/RELEASE.md)
+- [Handbuch](docs/handbuch/) für Mitglieder und Admins: in der App hinter „?“ und je Kompanie auf GitHub Pages unter `/handbuch/`
 - [API-Spezifikation](api/openapi.yaml)
 - [Kompanie-Konfiguration: Schema](config/kompanie.schema.json) und [Beispiel](config/kompanie.example.json)
 
@@ -55,6 +56,7 @@ php tests/standalone/run-tests.php         # eigenständige Version (HTTP)
 scripts/e2e-standalone.sh                  # E2E (Playwright), eigenständige Version
 tests/release/run-tests.sh                 # Pakete, Signatur, Update-Liste, Veröffentlichen
 tests/update/run-tests.sh                  # install.php, Update, Zurückrollen, Zurückziehen, Reparatur
+tests/handbuch/run-tests.sh                # Handbuch: Aufbau, Platzhalter, Ausgabe für App und Webseite
 ```
 
 GitHub Actions führt bei jedem Push alle Prüfungen aus, auch die WordPress-Tests, beide Datenbanken und die

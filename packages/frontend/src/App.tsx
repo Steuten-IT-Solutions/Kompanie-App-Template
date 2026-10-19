@@ -19,11 +19,12 @@ const Installieren = lazyView(() => import('./views/Installieren'));
 const Konto = lazyView(() => import('./views/Konto'));
 const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
+const Hilfe = lazyView(() => import('./views/Hilfe'));
 
 type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
-type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung';
+type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
 
-const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden', 'einstellungen', 'einrichtung'];
+const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden', 'einstellungen', 'einrichtung', 'hilfe'];
 
 /** Ältere Links weiter unterstützen. */
 const ALIASES: Record<string, string[]> = {
@@ -52,6 +53,7 @@ const titles = (): Record<View, string> => ({
   anmelden: 'Anmelden',
   einstellungen: 'Einstellungen',
   einrichtung: 'Einrichtung',
+  hilfe: 'Hilfe',
 });
 
 function Icon({ name }: { name: Tab }) {
@@ -174,6 +176,7 @@ export default function App() {
     anmelden: !user && config?.auth.mode === 'form',
     einstellungen: can('manage_settings'),
     einrichtung: can('manage_settings'),
+    hilfe: true,
   };
   const tabs = (['termine', 'news', 'galerie', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
@@ -228,6 +231,14 @@ export default function App() {
           <div className="topbar-title">{caps(titles()[tab])}</div>
           <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
         </div>
+        <button
+          className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
+          onClick={() => navigate('hilfe')}
+          aria-label="Hilfe"
+          aria-current={tab === 'hilfe' ? 'page' : undefined}
+        >
+          ?
+        </button>
         {user ? (
           <button
             className={`btn btn-link topbar-account ${tab === 'konto' ? 'active' : ''}`}
@@ -274,6 +285,7 @@ export default function App() {
         {tab === 'anmelden' && <Anmelden />}
         {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
         {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
+        {tab === 'hilfe' && <Hilfe slug={path[1]} />}
         </Suspense>
         </ErrorBoundary>
       </main>

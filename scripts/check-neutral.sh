@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PATTERN='\b(marine[a-zäöüß]*|maritim[a-zäöüß]*|lank|mk-lank|mkl_[a-z_]*|ahoi|anker|navy|brass|messing[a-z]*|steuerrad|wappen|antreten)\b|⚓'
 PATHS=()
-for p in packages adapters installer api config/kompanie.example.json; do
+for p in packages adapters installer api config/kompanie.example.json docs/handbuch; do
   [ -e "$ROOT/$p" ] && PATHS+=("$ROOT/$p")
 done
 HITS=$(grep -rniEI "$PATTERN" "${PATHS[@]}" --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=dist --exclude-dir=generated --exclude-dir=app --exclude-dir=test-results --exclude-dir=e2e --exclude='README.md' || true)

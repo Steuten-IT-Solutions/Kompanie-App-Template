@@ -1294,6 +1294,7 @@ components:
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
+        handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         csrf:
           type: object
