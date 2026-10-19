@@ -28,6 +28,7 @@ final class ApiScenario
             $this->roles();
             $this->customRoles();
             $this->events();
+            $this->push();
             $this->config();
         } finally {
             $this->d->actAs(null);
@@ -441,6 +442,69 @@ final class ApiScenario
             $c->ok($this->req('DELETE', "/events/$id")[0] === 200, "Termin $id löschen");
         }
         $c->ok($this->req('DELETE', '/events/' . $ev1['id'])[0] === 404, 'Gelöschter Termin → 404');
+    }
+
+    /** Ein Gerät mit echtem P-256-Schlüssel (der Server prüft ihn), aber ohne Versand. */
+    private static function device(): array
+    {
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+        $ec = $key === false ? [] : (array) (openssl_pkey_get_details($key)['ec'] ?? []);
+        $b64 = static fn (string $raw): string => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        $raw = "\x04" . str_pad((string) ($ec['x'] ?? ''), 32, "\0", STR_PAD_LEFT) . str_pad((string) ($ec['y'] ?? ''), 32, "\0", STR_PAD_LEFT);
+        return ['endpoint' => 'https://fcm.googleapis.com/fcm/send/kptest-' . bin2hex(random_bytes(8)), 'keys' => ['p256dh' => $b64($raw), 'auth' => $b64(random_bytes(16))]];
+    }
+
+    /** Web Push (Issue #19): Abos für Konten und Gäste, ohne Nachrichten zu senden. */
+    private function push(): void
+    {
+        $c = $this->c;
+        $c->section('Benachrichtigungen');
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/push/key');
+        $c->ok($s === 200 && is_bool($d['supported'] ?? null), 'GET /push/key öffentlich');
+        if (!($d['supported'] ?? false)) {
+            $c->ok(true, 'Server ohne Push-Unterstützung: übrige Prüfungen übersprungen');
+            return;
+        }
+        $c->ok(strlen((string) $d['publicKey']) === 87, 'Öffentlicher Schlüssel (65 Bytes, base64url)');
+        $guest = self::device();
+        $c->ok($this->req('POST', '/me/push', $guest)[0] === 401, 'POST /me/push ohne Anmeldung → 401');
+        $c->ok($this->req('POST', '/push', ['endpoint' => 'https://intern.example.test/x'] + $guest)[0] === 400, 'Push-Adresse eines fremden Servers → 400');
+        [$s, $d] = $this->req('POST', '/push', $guest + ['types' => ['events', 'points']]);
+        $c->ok($s === 200 && $d['types'] === ['events'], 'Gast abonniert nur öffentliche Arten');
+        [$s, $d] = $this->req('POST', '/push/status', ['endpoint' => $guest['endpoint'], 'auth' => $guest['keys']['auth']]);
+        $c->ok($s === 200 && ($d['subscription']['types'] ?? null) === ['events'] && !in_array('points', array_column((array) $d['types'], 'key'), true), 'Gast sieht sein Abo und nur öffentliche Arten');
+        [, $d] = $this->req('POST', '/push/status', ['endpoint' => $guest['endpoint'], 'auth' => self::device()['keys']['auth']]);
+        $c->ok(is_array($d) && array_key_exists('subscription', $d) && $d['subscription'] === null, 'Ohne das Geheimnis des Geräts kein Abo sichtbar');
+        $c->ok($this->req('PUT', '/push', ['endpoint' => $guest['endpoint'], 'auth' => self::device()['keys']['auth'], 'types' => []])[0] === 404, 'Fremdes Gast-Abo ändern → 404');
+        $c->ok($this->req('POST', '/push', ['endpoint' => $guest['endpoint'], 'keys' => self::device()['keys']])[0] === 403, 'Gerät mit anderem Geheimnis übernehmen → 403');
+
+        $this->d->actAs($this->m1);
+        [$s, $d] = $this->req('POST', '/me/push', $guest + ['types' => ['points', 'news']]);
+        $c->ok($s === 200 && $d['types'] === ['points', 'news'] && $d['details'] === false, 'Mitglied übernimmt das Gerät mit Punkten');
+        [$s, $d] = $this->req('PUT', '/me/push', ['endpoint' => $guest['endpoint'], 'details' => true]);
+        $c->ok($s === 200 && $d['details'] === true && $d['types'] === ['points', 'news'], 'Details einschalten, Arten bleiben');
+        $this->d->actAs($this->m2);
+        $c->ok($this->req('PUT', '/me/push', ['endpoint' => $guest['endpoint'], 'types' => []])[0] === 404, 'Abo eines anderen Mitglieds ändern → 404');
+        [, $d] = $this->req('DELETE', '/me/push', ['endpoint' => $guest['endpoint']]);
+        $c->ok(($d['deleted'] ?? null) === false, 'Abo eines anderen Mitglieds löschen → nichts gelöscht');
+        $this->d->actAs(null);
+        [, $d] = $this->req('DELETE', '/push', ['endpoint' => $guest['endpoint'], 'auth' => $guest['keys']['auth']]);
+        $c->ok(($d['deleted'] ?? null) === false, 'Gast löscht kein Konto-Abo');
+        $this->d->actAs($this->m1);
+        [, $d] = $this->req('DELETE', '/me/push', ['endpoint' => $guest['endpoint']]);
+        $c->ok(($d['deleted'] ?? null) === true, 'Mitglied meldet das Gerät ab');
+
+        $c->ok($this->req('GET', '/admin/push')[0] === 403, 'GET /admin/push als Mitglied → 403');
+        $admin = $this->user('kptest_admin_push', 'admin');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('GET', '/admin/push');
+        $c->ok($s === 200 && is_int($d['devices'] ?? null) && is_int($d['reminderHour'] ?? null), 'GET /admin/push als Admin');
+        $hour = (int) ($d['reminderHour'] ?? 18);
+        $c->ok($this->req('PATCH', '/admin/push', ['reminder_hour' => 24])[0] === 400, 'Ungültige Stunde → 400');
+        [$s, $d] = $this->req('PATCH', '/admin/push', ['reminder_hour' => 7]);
+        $c->ok($s === 200 && $d['reminderHour'] === 7, 'Uhrzeit der Erinnerung ändern');
+        $this->req('PATCH', '/admin/push', ['reminder_hour' => $hour]);
     }
 
     private function config(): void

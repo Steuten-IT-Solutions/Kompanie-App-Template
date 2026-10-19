@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\StatusService;
+use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Update\StatusReporter;
@@ -77,6 +78,45 @@ final class Api
             $this->app->telemetry()->record($e instanceof \PDOException || $e instanceof DatabaseException ? Code::DbError : Code::ServerError);
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
+    }
+
+    /**
+     * Folgen einer Aktion (z. B. Benachrichtigungen) dürfen sie nie scheitern lassen.
+     *
+     * @param \Closure(): mixed $fn
+     */
+    private function notify(\Closure $fn): void
+    {
+        try {
+            $fn();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Benachrichtigung nicht eingereiht: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Verfügbare Typen und das Abo dieses Geräts (Endpoint im Inhalt, nicht in der Adresse).
+     *
+     * @return array<string, mixed>
+     */
+    private function pushStatus(Request $r, ?User $user): array
+    {
+        $push = $this->app->push();
+        $sub = null;
+        if ($r->input('endpoint') !== null) {
+            try {
+                $sub = $push->own($user, $r->input('endpoint'), $user === null ? $r->input('auth') : null);
+            } catch (ApiError) {
+                $sub = null;
+            }
+        }
+        $labels = $push->types();
+        return [
+            'supported' => $push->supported(),
+            'publicKey' => $push->publicKey(),
+            'types' => array_map(static fn (string $k): array => ['key' => $k, 'label' => $labels[$k]['label']], $push->availableTypes($user)),
+            'subscription' => PushService::formatSubscription($sub),
+        ];
     }
 
     private function authorize(Route $route): void
@@ -188,14 +228,43 @@ final class Api
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
                 return ['changed' => true];
             }),
+            // Web Push (Issue #19): Konten über /me/push, Gäste über /push (Ändern und Löschen nur mit dem auth-Geheimnis).
+            new Route('GET', '/push/key', $P, fn () => ['supported' => $a->push()->supported(), 'publicKey' => $a->push()->publicKey()]),
+            new Route('POST', '/me/push/status', $L, fn (Request $r) => $this->pushStatus($r, $this->user())),
+            new Route('POST', '/push/status', $P, fn (Request $r) => $this->pushStatus($r, null)),
+            new Route('POST', '/me/push', $L, fn (Request $r) => PushService::formatSubscription($a->push()->subscribe(
+                $this->user(), $r->input('endpoint'), $r->input('keys'), $r->input('types'), $r->input('details'), $r->client,
+            ))),
+            new Route('POST', '/push', $P, fn (Request $r) => PushService::formatSubscription($a->push()->subscribe(
+                null, $r->input('endpoint'), $r->input('keys'), $r->input('types'), $r->input('details'), $r->client,
+            ))),
+            new Route('PUT', '/me/push', $L, fn (Request $r) => PushService::formatSubscription($a->push()->update($this->user(), $r->input('endpoint'), null, $r->input('types'), $r->input('details')))),
+            new Route('PUT', '/push', $P, fn (Request $r) => PushService::formatSubscription($a->push()->update(null, $r->input('endpoint'), $r->input('auth'), $r->input('types'), null))),
+            new Route('DELETE', '/me/push', $L, fn (Request $r) => ['deleted' => $a->push()->unsubscribe($this->user(), $r->input('endpoint'), null)]),
+            new Route('DELETE', '/push', $P, fn (Request $r) => ['deleted' => $a->push()->unsubscribe(null, $r->input('endpoint'), $r->input('auth'))]),
+            new Route('POST', '/me/push/test', $L, function (Request $r) use ($a) {
+                $a->push()->sendTest($a->push()->own($this->user(), $r->input('endpoint'), null));
+                return ['sent' => true];
+            }),
+            new Route('POST', '/push/test', $P, function (Request $r) use ($a) {
+                $a->push()->sendTest($a->push()->own(null, $r->input('endpoint'), $r->input('auth')));
+                return ['sent' => true];
+            }),
             new Route('GET', '/calendar', Cap::Member, fn () => $a->calendar()->events(), 'calendar', $denyMember),
 
             // Öffentliche Termine
             new Route('GET', '/events', $P, fn () => $a->events()->upcoming(), 'events'),
-            new Route('POST', '/events', Cap::ManageEvents, fn (Request $r) => Response::created(
-                $a->events()->create(EventService::input($r->body), $this->user()->id),
-            ), 'events', $denyEvents),
-            new Route('PATCH', '/events/{id}', Cap::ManageEvents, fn (Request $r) => $a->events()->update($r->id(), EventService::input($r->body)), 'events', $denyEvents),
+            new Route('POST', '/events', Cap::ManageEvents, function (Request $r) use ($a) {
+                $event = $a->events()->create(EventService::input($r->body), $this->user()->id);
+                $this->notify(static fn () => $a->pushTriggers()->publicEventSaved($event));
+                return Response::created($event);
+            }, 'events', $denyEvents),
+            new Route('PATCH', '/events/{id}', Cap::ManageEvents, function (Request $r) use ($a) {
+                $before = $a->events()->get($r->id());
+                $event = $a->events()->update($r->id(), EventService::input($r->body));
+                $this->notify(static fn () => $a->pushTriggers()->publicEventSaved($event, $before));
+                return $event;
+            }, 'events', $denyEvents),
             new Route('DELETE', '/events/{id}', Cap::ManageEvents, function (Request $r) use ($a) {
                 $a->events()->delete($r->id());
                 return ['deleted' => true];
@@ -229,6 +298,14 @@ final class Api
 
             // Einstellungen (Admins)
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
+            // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung
+            new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),
+            new Route('PATCH', '/admin/push', Cap::ManageSettings, function (Request $r) use ($a) {
+                if ($r->has('reminder_hour')) {
+                    $a->push()->setReminderHour($r->input('reminder_hour'));
+                }
+                return $a->push()->adminStatus();
+            }, null, $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
             // Rollen (Issue #28): nur Admins (manage_settings lässt sich keiner anderen Rolle geben)
             new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $a->roles()->describe(), null, $denySettings),
@@ -315,12 +392,20 @@ final class Api
             }, null, $denySettings),
 
             // Punkte und Strafen
-            new Route('POST', '/points', Cap::ManagePoints, fn (Request $r) => Response::created($a->scores()->givePoints($r->body, $this->user()->id)), 'points', $denyManage),
+            new Route('POST', '/points', Cap::ManagePoints, function (Request $r) use ($a) {
+                $rows = $a->scores()->givePoints($r->body, $this->user()->id);
+                $this->notify(static fn () => $a->pushTriggers()->pointsAdded($rows));
+                return Response::created($rows);
+            }, 'points', $denyManage),
             new Route('DELETE', '/points/{id}', Cap::ManagePoints, function (Request $r) use ($a) {
                 $a->scores()->cancelPoints($r->id(), $this->user()->id);
                 return ['deleted' => true];
             }, 'points', $denyManage),
-            new Route('POST', '/penalties', Cap::ManagePenalties, fn (Request $r) => Response::created($a->scores()->givePenalty($r->body, $this->user()->id)), 'penalties', $denyManage),
+            new Route('POST', '/penalties', Cap::ManagePenalties, function (Request $r) use ($a) {
+                $rows = $a->scores()->givePenalty($r->body, $this->user()->id);
+                $this->notify(static fn () => $a->pushTriggers()->penaltiesAdded($rows));
+                return Response::created($rows);
+            }, 'penalties', $denyManage),
             new Route('PATCH', '/penalties/{id}', Cap::ManagePenalties, fn (Request $r) => $a->scores()->setPenaltyStatus($r->id(), $r->input('status'), $this->user()->id), 'penalties', $denyManage),
             new Route('DELETE', '/penalties/{id}', Cap::ManagePenalties, function (Request $r) use ($a) {
                 $a->scores()->cancelPenalty($r->id(), $this->user()->id);

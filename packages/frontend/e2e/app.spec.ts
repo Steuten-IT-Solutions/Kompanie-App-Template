@@ -282,6 +282,120 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
   expect(status).toBe(401);
 });
 
+/**
+ * Headless-Chromium hat keinen Push-Dienst: Erlaubnis und PushManager nachbilden. Das Abo hat einen echten
+ * P-256-Schlüssel (der Server prüft ihn) und liegt im localStorage, damit es ein Neuladen übersteht.
+ */
+async function fakePush(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(Notification, 'permission', { get: () => localStorage.getItem('fake-push-perm') ?? 'default' });
+    Notification.requestPermission = async () => {
+      localStorage.setItem('fake-push-perm', 'granted');
+      return 'granted';
+    };
+    const b64u = (buf: ArrayBuffer) =>
+      btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    const make = (json: { endpoint: string; keys: { p256dh: string; auth: string } }, key: ArrayBuffer) =>
+      ({
+        endpoint: json.endpoint,
+        options: { applicationServerKey: key, userVisibleOnly: true },
+        toJSON: () => json,
+        unsubscribe: async () => {
+          localStorage.removeItem('fake-push-sub');
+          return true;
+        },
+      }) as unknown as PushSubscription;
+    PushManager.prototype.getSubscription = async () => {
+      const saved = localStorage.getItem('fake-push-sub');
+      if (!saved) return null;
+      const { json, key } = JSON.parse(saved);
+      return make(json, Uint8Array.from(atob(key), (c) => c.charCodeAt(0)).buffer);
+    };
+    PushManager.prototype.subscribe = async (options?: PushSubscriptionOptionsInit) => {
+      const pair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+      const raw = await crypto.subtle.exportKey('raw', pair.publicKey);
+      const json = {
+        endpoint: 'https://fcm.googleapis.com/fcm/send/e2e-' + crypto.randomUUID(),
+        keys: { p256dh: b64u(raw), auth: b64u(crypto.getRandomValues(new Uint8Array(16)).buffer) },
+      };
+      const key = new Uint8Array(options!.applicationServerKey as ArrayBuffer).slice().buffer;
+      localStorage.setItem('fake-push-sub', JSON.stringify({ json, key: btoa(String.fromCharCode(...new Uint8Array(key))) }));
+      return make(json, key);
+    };
+  });
+}
+
+test('Benachrichtigungen auf dem iPhone: erst die App installieren', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.getByRole('button', { name: 'Bei neuen Terminen benachrichtigen' }).click();
+  await expect(page.getByText('nur in der installierten App')).toBeVisible();
+  await page.getByRole('button', { name: 'App installieren' }).click();
+  await expect(page).toHaveURL(/#\/installieren$/);
+});
+
+test.describe('Android', () => {
+  const { defaultBrowserType: _browser, ...pixel } = devices['Pixel 7'];
+  test.use(pixel);
+
+  test('Benachrichtigungen: Gast ohne Konto und Mitglied schalten sie ein und aus', async ({ page }) => {
+    await fakePush(page);
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.getByRole('button', { name: 'Bei neuen Terminen benachrichtigen' }).click();
+    await expect(page.getByRole('heading', { name: 'Benachrichtigungen' }).last()).toBeVisible();
+    // Gäste: nur Öffentliches
+    await expect(page.getByLabel('Termine: neue und geänderte')).toBeChecked();
+    await expect(page.getByText('Kasse: neue Einträge')).toHaveCount(0);
+    await page.getByLabel('News: neue Beiträge').uncheck();
+    await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
+    await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
+    await shot(page, '13-benachrichtigungen-gast');
+    // Der Server kennt das Abo samt Auswahl (auch nach dem Neuladen).
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
+    await expect(page.getByLabel('News: neue Beiträge')).not.toBeChecked();
+    await page.getByRole('button', { name: 'Benachrichtigungen ausschalten' }).click();
+    await expect(page.getByRole('button', { name: 'Benachrichtigungen einschalten' })).toBeVisible();
+
+    // Mitglied: eigene Punkte und Kasse, Schalter für Beträge
+    await login(page, 'mitglied1');
+    await page.getByRole('button', { name: 'Konto' }).click();
+    await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
+    await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
+    await expect(page.getByLabel('Kasse: neue Einträge')).toBeChecked();
+    await expect(page.getByLabel('Kasse: Betrag und Grund in der Nachricht zeigen')).not.toBeChecked();
+    await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
+    await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
+    await page.getByLabel('Kasse: Betrag und Grund in der Nachricht zeigen').check();
+    const device = await page.evaluate(() => JSON.parse(localStorage.getItem('fake-push-sub') ?? 'null').json);
+    const status = async () =>
+      page.evaluate(async (d) => {
+        const c = window.KOMPANIE_CONFIG!;
+        const res = await fetch(c.apiBase + 'me/push/status', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [c.csrf.header]: c.csrf.token },
+          body: JSON.stringify({ endpoint: d.endpoint }),
+        });
+        return (await res.json()).subscription;
+      }, device);
+    await expect.poll(status).toEqual({ types: ['penalties', 'points', 'events', 'reminder', 'news'], details: true });
+
+    // Abmelden meldet das Gerät beim Server ab.
+    await page.getByRole('button', { name: 'Konto' }).click();
+    await page.getByRole('button', { name: 'Abmelden' }).click();
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('fake-push-sub'))).toBeNull();
+    await login(page, 'mitglied1');
+    expect(await status()).toBeNull();
+  });
+});
+
 test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');

@@ -53,7 +53,9 @@ final class RestBridge
                 $params[$p] = (string) $wp->get_url_params()[$p];
             }
         }
-        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params);
+        // REMOTE_ADDR nur für Begrenzungen (z. B. neue Gast-Abos für Push); Weiterleitungs-Header kann jeder setzen.
+        $client = isset($_SERVER['REMOTE_ADDR']) && is_string($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client);
         $res = $app->api()->dispatch($route, $request);
         $out = new \WP_REST_Response($res->data, $res->status);
         foreach ($res->headers as $name => $value) {

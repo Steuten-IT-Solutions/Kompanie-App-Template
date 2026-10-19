@@ -10,10 +10,24 @@ use KompanieApp\Core\Port\Scheduler;
 final class WpScheduler implements Scheduler
 {
     public const HOOK = 'kompanie_app_task';
+    /** Eigener Zeitplan für Aufgaben unter einer Stunde (z. B. Abgleich für Push alle 15 Minuten). */
+    public const QUARTER_HOUR = 'kompanie_app_15min';
+
+    /** Filter cron_schedules: den eigenen Zeitplan anmelden. */
+    public static function schedules(array $schedules): array
+    {
+        $schedules[self::QUARTER_HOUR] = ['interval' => 900, 'display' => 'Alle 15 Minuten (Kompanie-App)'];
+        return $schedules;
+    }
 
     public function schedule(string $task, int $intervalSeconds): void
     {
-        $recurrence = $intervalSeconds >= DAY_IN_SECONDS ? 'daily' : ($intervalSeconds >= 12 * HOUR_IN_SECONDS ? 'twicedaily' : 'hourly');
+        $recurrence = match (true) {
+            $intervalSeconds >= DAY_IN_SECONDS => 'daily',
+            $intervalSeconds >= 12 * HOUR_IN_SECONDS => 'twicedaily',
+            $intervalSeconds >= HOUR_IN_SECONDS => 'hourly',
+            default => self::QUARTER_HOUR,
+        };
         // Hat sich der Abstand geändert (z. B. Statusmeldung früher täglich, jetzt stündlich), neu einplanen.
         $current = self::recurrence($task);
         if ($current !== null && $current !== $recurrence) {

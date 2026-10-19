@@ -34,6 +34,8 @@ use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Port\Scheduler;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Port\UserDirectory;
+use KompanieApp\Core\Push\PushService;
+use KompanieApp\Core\Push\PushTriggers;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
@@ -59,6 +61,8 @@ final class App
         CalendarService::TASK => 3600,
         UpdateService::TASK => UpdateService::INTERVAL,
         StatusReporter::TASK => StatusReporter::INTERVAL,
+        PushService::TASK_SEND => 3600,
+        PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
     ];
 
     /**
@@ -153,6 +157,10 @@ final class App
             CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured(),
             UpdateService::TASK => $this->updates()->configured(),
             StatusReporter::TASK => $this->statusReporter()->enabled(),
+            // Versand: stündlich als Rückfall, sonst nach dem Einreihen vorgezogen (Scheduler::runSoon).
+            PushService::TASK_SEND => $this->push()->supported(),
+            PushService::TASK_WATCH => $this->push()->supported()
+                && ($this->features()->enabled('calendar') || $this->features()->enabled('news') || $this->features()->enabled('events')),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -186,6 +194,10 @@ final class App
                 $this->updates()->runTask();
             } elseif ($task === StatusReporter::TASK) {
                 $this->statusReporter()->runTask();
+            } elseif ($task === PushService::TASK_SEND) {
+                $this->push()->processQueue();
+            } elseif ($task === PushService::TASK_WATCH) {
+                $this->pushTriggers()->watch();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -252,6 +264,16 @@ final class App
             $this->telemetry()->record(Code::PhpFatal);
         } catch (\Throwable) {
         }
+    }
+
+    public function push(): PushService
+    {
+        return $this->service(PushService::class, fn () => new PushService($this));
+    }
+
+    public function pushTriggers(): PushTriggers
+    {
+        return $this->service(PushTriggers::class, fn () => new PushTriggers($this, $this->push()));
     }
 
     public function telemetry(): Telemetry

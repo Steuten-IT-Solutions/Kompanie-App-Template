@@ -439,7 +439,55 @@ export const api = {
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
+
+  // Benachrichtigungen (Web Push): Konten über /me/push, Gäste über /push mit dem auth-Geheimnis des Geräts.
+  pushStatus: (device: PushDevice | null) =>
+    request<PushStatus>('POST', pushPath('/status'), device ? { endpoint: device.endpoint, auth: guestAuth(device) } : {}),
+  pushSubscribe: (device: PushDevice, types: PushType[], details?: boolean) =>
+    request<PushSubscriptionInfo>('POST', pushPath(''), { endpoint: device.endpoint, keys: device.keys, types, details }),
+  pushUpdate: (device: PushDevice, data: { types?: PushType[]; details?: boolean }) =>
+    request<PushSubscriptionInfo>('PUT', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device), ...data }),
+  pushUnsubscribe: (device: PushDevice) =>
+    request<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device) }),
+  pushTest: (device: PushDevice) =>
+    request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
+  pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
+  setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
+
+export type PushType = 'penalties' | 'points' | 'events' | 'reminder' | 'news';
+
+/** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
+export interface PushDevice {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export interface PushSubscriptionInfo {
+  types: PushType[];
+  details: boolean;
+}
+
+export interface PushStatus {
+  supported: boolean;
+  publicKey: string;
+  types: { key: PushType; label: string }[];
+  subscription: PushSubscriptionInfo | null;
+}
+
+export interface PushAdmin {
+  supported: boolean;
+  missing: string[];
+  devices: number;
+  accounts: number;
+  guests: number;
+  queued: number;
+  reminderHour: number;
+}
+
+const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;
+// Nur Gäste weisen sich mit dem Geheimnis aus; Konten über die Anmeldung.
+const guestAuth = (device: PushDevice): string | undefined => (config?.user ? undefined : device.keys.auth);
 
 export type StatusLevel = 'ok' | 'warn' | 'error' | 'off';
 

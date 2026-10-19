@@ -31,6 +31,8 @@ final class Backup
         'schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq',
         'tasks_last_run', 'installation_id', 'installation_secret', 'telemetry_registered', 'telemetry_last', 'telemetry_heartbeat', 'telemetry_checks',
         'telemetry_errors', 'telemetry_pending', 'telemetry_events',
+        // Web Push: Schlüssel und Stand der Abgleiche gehören zu dieser Installation (Abos sind nicht in Sicherungen).
+        'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
     public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos'];

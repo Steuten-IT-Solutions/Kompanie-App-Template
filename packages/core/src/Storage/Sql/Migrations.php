@@ -192,6 +192,70 @@ final class Migrations
                 'mysql' => ['ALTER TABLE {points} ADD COLUMN factor decimal(4,2) NOT NULL DEFAULT 1.00'],
                 'sqlite' => ['ALTER TABLE {points} ADD COLUMN factor REAL NOT NULL DEFAULT 1'],
             ],
+            // Web Push (Issue #19): Abos der Geräte (user_id 0 = Gast) und Warteschlange für den Versand.
+            // Nicht in Sicherungen: Abos gehören zu den Schlüsseln dieser Installation.
+            4 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {push_subscriptions} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  endpoint text NOT NULL,
+  endpoint_hash char(64) NOT NULL,
+  p256dh varchar(100) NOT NULL,
+  auth varchar(40) NOT NULL,
+  types varchar(255) NOT NULL DEFAULT \'\',
+  details tinyint(1) NOT NULL DEFAULT 0,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  last_sent_at datetime DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY endpoint_hash (endpoint_hash),
+  KEY user_id (user_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {push_queue} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  subscription_id bigint(20) unsigned NOT NULL,
+  payload text NOT NULL,
+  urgency varchar(10) NOT NULL DEFAULT \'normal\',
+  ttl int(11) NOT NULL DEFAULT 86400,
+  attempts int(11) NOT NULL DEFAULT 0,
+  next_try datetime NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY next_try (next_try),
+  KEY subscription_id (subscription_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {push_subscriptions} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL DEFAULT 0,
+  endpoint TEXT NOT NULL,
+  endpoint_hash TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  types TEXT NOT NULL DEFAULT \'\',
+  details INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_sent_at TEXT DEFAULT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {push_subscriptions}_endpoint_hash ON {push_subscriptions} (endpoint_hash)',
+                    'CREATE INDEX IF NOT EXISTS {push_subscriptions}_user_id ON {push_subscriptions} (user_id)',
+                    'CREATE TABLE IF NOT EXISTS {push_queue} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  subscription_id INTEGER NOT NULL,
+  payload TEXT NOT NULL,
+  urgency TEXT NOT NULL DEFAULT \'normal\',
+  ttl INTEGER NOT NULL DEFAULT 86400,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_try TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {push_queue}_next_try ON {push_queue} (next_try)',
+                    'CREATE INDEX IF NOT EXISTS {push_queue}_subscription_id ON {push_queue} (subscription_id)',
+                ],
+            ],
         ];
     }
 

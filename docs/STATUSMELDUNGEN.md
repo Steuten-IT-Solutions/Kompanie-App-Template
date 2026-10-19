@@ -91,6 +91,7 @@ letzten Meldung.
 | 401 `{"code":"bad_signature"}` | Signatur fehlt oder falsch | Ereignis beim nächsten Lauf erneut (`key` nur, solange nicht bestätigt) |
 | 409 `{"code":"unknown_installation"}` | Installation unbekannt und kein `key` (z. B. Cockpit neu aufgebaut) | Ereignis beim nächsten Lauf erneut, wieder mit `key` |
 | 409 `{"code":"replay"}` | `nonce` schon gesehen oder `sent` außerhalb des Zeitfensters | Ereignis verwerfen |
+| 403 `{"code":"unknown_company"}` | Kompanie ist im Cockpit (noch) nicht als Projekt eingetragen | Ereignis verwerfen; Lebenszeichen kommen ohnehin stündlich, sobald sie eingetragen ist |
 | 413, sonstige 4xx | zu groß bzw. nicht annehmbar | Ereignis verwerfen |
 | 429, 5xx, keine Antwort | zu viele, Fehler beim Empfänger | Ereignis beim nächsten Lauf erneut |
 

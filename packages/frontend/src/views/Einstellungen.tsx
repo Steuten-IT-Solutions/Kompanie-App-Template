@@ -19,6 +19,7 @@ export default function Einstellungen({ onToast }: { onToast: (msg: string) => v
       <Bereiche onToast={onToast} refresh={setupSaved} onSaved={() => setFeaturesSaved((n) => n + 1)} />
       <Rollen onToast={onToast} refresh={featuresSaved} />
       <Wartung onToast={onToast} />
+      <PushSettings onToast={onToast} />
       <Verbindungen onToast={onToast} onSetupSaved={() => setSetupSaved((n) => n + 1)} />
     </div>
   );
@@ -39,6 +40,65 @@ function Verbindungen({ onToast, onSetupSaved }: { onToast: (msg: string) => voi
       <Gallery settings={s} onSaved={onSaved} onToast={onToast} />
       {s.news && <News settings={s} onSaved={onSaved} onToast={onToast} />}
     </>
+  );
+}
+
+/** Benachrichtigungen: wie viele Geräte angemeldet sind und wann die Erinnerung an Termine am nächsten Tag kommt. */
+function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const p = data!;
+
+  async function setHour(hour: number) {
+    setBusy(true);
+    setSaveError(null);
+    try {
+      setData(await api.setPushReminderHour(hour));
+      onToast('Gespeichert');
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" id="einstellungen-benachrichtigungen">
+      <h3>Benachrichtigungen</h3>
+      {p.supported ? (
+        <p className="small muted">
+          {p.devices === 1 ? '1 Gerät' : `${p.devices} Geräte`} angemeldet ({p.accounts} {p.accounts === 1 ? 'Konto' : 'Konten'}, {p.guests}{' '}
+          {p.guests === 1 ? 'Gast' : 'Gäste'}).
+          {p.queued > 0 && ` ${p.queued} Nachrichten warten auf den Versand.`}
+        </p>
+      ) : (
+        <p className="small" role="alert">
+          Der Server kann keine Benachrichtigungen senden. Es fehlt: {p.missing.join(', ')}. Dein Hoster kann das in den PHP-Einstellungen
+          einschalten.
+        </p>
+      )}
+      <label className="field">
+        <span>Erinnerung an Termine am nächsten Tag ab</span>
+        <select value={p.reminderHour} disabled={busy} onChange={(e) => setHour(Number(e.target.value))}>
+          {Array.from({ length: 24 }, (_, h) => (
+            <option key={h} value={h}>
+              {String(h).padStart(2, '0')}:00 Uhr
+            </option>
+          ))}
+        </select>
+      </label>
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+      <p className="small muted">
+        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
+      </p>
+    </section>
   );
 }
 
