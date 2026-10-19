@@ -38,7 +38,10 @@ const FIELDS = [
     'Akzentfarbe' => 'accent',
     'Begrüßung' => 'greeting',
     'Willkommenstext für Gäste' => 'guestWelcome',
+    'Bezeichnung für die Leitung' => 'manager',
+    // Überschrift des Formulars vor der Rolle organizer (Issue #3): damals hieß manager „Verwalter“.
     'Bezeichnung für Verwalter' => 'manager',
+    'Bezeichnung für Verwalter (Termine und Dokumente)' => 'organizer',
     'Bezeichnung für Strafen' => 'penalties',
     'Logo' => 'logo',
     'Neues Logo' => 'logo',
@@ -116,7 +119,7 @@ $set = static function (array &$k, array $path, string $value, bool $removable =
 if ($text('name') === '-' || $text('primary') === '-') {
     $errors[] = 'Name und Hauptfarbe lassen sich nicht entfernen, nur ändern.';
 }
-foreach (['name' => ['name'], 'shortName' => ['shortName'], 'greeting' => ['greeting'], 'manager' => ['labels', 'roles', 'manager'], 'penalties' => ['labels', 'sections', 'penalties']] as $field => $path) {
+foreach (['name' => ['name'], 'shortName' => ['shortName'], 'greeting' => ['greeting'], 'manager' => ['labels', 'roles', 'manager'], 'organizer' => ['labels', 'roles', 'organizer'], 'penalties' => ['labels', 'sections', 'penalties']] as $field => $path) {
     $set($k, $path, $text($field), $field !== 'name');
 }
 $welcome = trim((string) preg_replace("/[ \t]+/", ' ', $f['guestWelcome'] ?? ''));

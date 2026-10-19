@@ -27,9 +27,13 @@ Moin, {name}
 Herzlich willkommen!
 Schön, dass du da bist.
 
-### Bezeichnung für Verwalter
+### Bezeichnung für die Leitung
 
 Spieß
+
+### Bezeichnung für Verwalter (Termine und Dokumente)
+
+Schriftführer
 
 ### Bezeichnung für Strafen
 

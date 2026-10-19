@@ -169,11 +169,22 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `member` | eigene Punkte/Strafen, interner Kalender, interne Galerie |
 | `manage` | Punkte und Strafen vergeben, Katalog pflegen |
 | `manage_events` | öffentliche Termine pflegen |
+| `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (die Dokumente selbst kommen mit #2) |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
 | `promote_users` | Rollen vergeben |
 | `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |
 
-Rollen: `guest`, `member`, `manager`, `admin`. Die Bezeichnungen kommen aus `kompanie.json`.
+Rollen in Stufen; jede hat die Rechte der darunter. Die Bezeichnungen kommen aus `kompanie.json` (Standard in Klammern).
+
+| Rolle | Rechte |
+|---|---|
+| `guest` (Gast) | nur öffentliche Inhalte |
+| `member` (Mitglied) | `member` |
+| `organizer` (Verwalter) | dazu `manage_events`, `manage_documents`, aber keine Punkte oder Strafen |
+| `manager` (Leitung) | dazu `manage` |
+| `admin` (Admin) | alle |
+
+Bis zur Version mit `organizer` hieß `manager` standardmäßig „Verwalter“ und durfte keine öffentlichen Termine pflegen. Kompanien mit eigener Bezeichnung (z. B. „Spieß“) merken von der Umbenennung nichts.
 
 - **WordPress:** Admin ist, wer WP-Administrator ist. Admin-Rechte werden nur im WP-Backend vergeben.
 - **Standalone:** Admins können andere zu Admins machen. Der **letzte Admin kann nicht herabgestuft** werden, niemand ändert seine eigene Rolle.
@@ -343,7 +354,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 ### WordPress-Plugin (`adapters/wordpress`)
 
 - Liefert die App unter `/app/` aus, inkl. geschützter Galeriebilder unter `/app/foto/…`.
-- Zusätzliche WP-Rollen für Mitglieder und Verwalter, Einstellung im Benutzerprofil.
+- Zusätzliche WP-Rollen `kompanie_member`, `kompanie_organizer` und `kompanie_manager` (Bezeichnungen aus `kompanie.json`, werden bei jedem Update angeglichen), Einstellung im Benutzerprofil.
 - Einstellungsseite im WP-Admin (Kalender, Galerie); Assistent, Statusseite, Updates und Datensicherung für WordPress-Administratoren in der App.
 - **Updates** über den Upgrader von WordPress mit dem geprüften Paket (Sicherung des Plugin-Ordners ab WordPress 6.3); verlangt WordPress FTP-Zugangsdaten, erklärt die App den Ausweg.
 - **Datensicherung** der App-Daten und Einstellungen; Wiederherstellen nur auf derselben Website (die Benutzer sind WordPress-Konten).

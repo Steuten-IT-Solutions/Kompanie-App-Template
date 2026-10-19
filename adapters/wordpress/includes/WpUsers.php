@@ -78,9 +78,12 @@ final class WpUsers implements UserDirectory, AuthContext
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
         }
         $user->remove_role(Roles::ROLE_MANAGER);
+        $user->remove_role(Roles::ROLE_ORGANIZER);
         $user->remove_role(Roles::ROLE_MEMBER);
         if ($level === Level::Manager) {
             $user->add_role(Roles::ROLE_MANAGER);
+        } elseif ($level === Level::Organizer) {
+            $user->add_role(Roles::ROLE_ORGANIZER);
         } elseif ($level === Level::Member) {
             $user->add_role(Roles::ROLE_MEMBER);
         }
@@ -131,6 +134,9 @@ final class WpUsers implements UserDirectory, AuthContext
         if (user_can($u, Roles::CAP_MANAGE)) {
             return Level::Manager;
         }
+        if (user_can($u, Roles::CAP_EVENTS)) {
+            return Level::Organizer;
+        }
         return user_can($u, Roles::CAP_MEMBER) ? Level::Member : Level::Guest;
     }
 
@@ -140,6 +146,7 @@ final class WpUsers implements UserDirectory, AuthContext
             Roles::CAP_MEMBER => Capability::Member,
             Roles::CAP_MANAGE => Capability::Manage,
             Roles::CAP_EVENTS => Capability::ManageEvents,
+            Roles::CAP_DOCUMENTS => Capability::ManageDocuments,
             'create_users' => Capability::CreateUsers,
             'promote_users' => Capability::PromoteUsers,
             'manage_options' => Capability::ManageSettings,

@@ -49,7 +49,7 @@
       "additionalProperties": false,
       "properties": {
         "roles": {
-          "description": "Anzeigenamen der Rollen, z. B. „Spieß“, „Kassierer“ oder „Hauptmann“ für manager.",
+          "description": "Anzeigenamen der Rollen, z. B. „Spieß“, „Kassierer“ oder „Hauptmann“ für manager. organizer pflegt öffentliche Termine und Dokumente, manager zusätzlich Punkte und Strafen.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -67,9 +67,16 @@
               "maxLength": 30,
               "pattern": "\\S"
             },
-            "manager": {
+            "organizer": {
               "type": "string",
               "default": "Verwalter",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "manager": {
+              "type": "string",
+              "default": "Leitung",
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"

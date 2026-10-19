@@ -100,7 +100,7 @@ final class Plugin
         $app = self::app();
         $app->upgrade();
         if (get_option(WpSettings::PREFIX . 'roles_version') !== KOMPANIE_APP_VERSION) {
-            Roles::install($app->config->roleLabel('member'), $app->config->roleLabel('manager'));
+            Roles::install(['member' => $app->config->roleLabel('member'), 'organizer' => $app->config->roleLabel('organizer'), 'manager' => $app->config->roleLabel('manager')]);
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
             self::autoloadOptions();
         }

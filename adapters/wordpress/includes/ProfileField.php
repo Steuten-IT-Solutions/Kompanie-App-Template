@@ -34,7 +34,8 @@ final class ProfileField
             $options = [
                 'guest' => $c->roleLabel('guest') . ' – nur öffentliche Inhalte',
                 'member' => $c->roleLabel('member') . ' – eigene Punkte und Strafen',
-                'manager' => $c->roleLabel('manager') . ' – Punkte und Strafen verwalten',
+                'organizer' => $c->roleLabel('organizer') . ' – Termine und Dokumente pflegen',
+                'manager' => $c->roleLabel('manager') . ' – zusätzlich Punkte und Strafen verwalten',
             ];
             echo '<select name="kompanie_app_level" id="kompanie_app_level">';
             foreach ($options as $value => $label) {

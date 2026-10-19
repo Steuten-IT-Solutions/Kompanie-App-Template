@@ -3,8 +3,8 @@
 
 import brand from './generated/brand';
 
-export type Level = 'admin' | 'manager' | 'member' | 'guest';
-export type Capability = 'member' | 'manage' | 'manage_events' | 'create_users' | 'promote_users' | 'manage_settings';
+export type Level = 'admin' | 'manager' | 'organizer' | 'member' | 'guest';
+export type Capability = 'member' | 'manage' | 'manage_events' | 'manage_documents' | 'create_users' | 'promote_users' | 'manage_settings';
 export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties';
 
 export interface AppUser {

@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
-// Verwalter heißt dort „Spieß“, der Bereich Strafen „Kasse“. Die App liegt unter /app/.
+// Die Leitung (manager) heißt dort „Spieß“, der Bereich Strafen „Kasse“; Verwalter (organizer) behält den Standard. Die App liegt unter /app/.
 // - WordPress-Plugin (Standard): scripts/setup-test-wp.sh, Anmeldung über wp-login.php
 // - eigenständige Version (KOMPANIE_VARIANT=standalone): tests/standalone/e2e-router.php,
 //   Anmeldung über das Formular in der App
@@ -286,6 +286,27 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: MANAGER }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await page.locator('.role-control').getByRole('button', { name: 'Mitglied' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
+});
+
+test('Admin macht ein Mitglied zum Verwalter: Termine pflegen ja, Punkte und Strafen nein', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await page.locator('.role-control').getByRole('button', { name: 'Verwalter' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Verwalter');
+
+  await login(page, 'mitglied2');
+  await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(page.getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
+  await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
+  // Die Rechte auf dem Server prüft das API-Szenario (tests/contract) für beide Varianten.
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await page.locator('.role-control').getByRole('button', { name: 'Mitglied' }).click();
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
