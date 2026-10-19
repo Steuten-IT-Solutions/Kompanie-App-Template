@@ -150,12 +150,12 @@ final class GalleryRepository
         return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ?', [self::PENDING]);
     }
 
-    /** @return array<string, mixed>|null nächstes aufzubereitendes Bild, neueste Alben zuerst */
+    /** @return array<string, mixed>|null nächstes aufzubereitendes Bild: wenigste Versuche, dann neueste Alben zuerst */
     public function nextPending(): ?array
     {
         return $this->db->selectOne(
             'SELECT p.* FROM {photos} p JOIN {albums} a ON a.id = p.album_id WHERE p.status = ?
-             ORDER BY a.sort_date DESC, p.taken_at ASC, p.id ASC LIMIT 1',
+             ORDER BY p.attempts ASC, a.sort_date DESC, p.taken_at ASC, p.id ASC LIMIT 1',
             [self::PENDING],
         );
     }

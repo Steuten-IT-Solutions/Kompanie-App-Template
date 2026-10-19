@@ -65,9 +65,11 @@ final class CurlHttpClient implements ExtendedHttpClient
             $codes[spl_object_id($info['handle'])] = (int) $info['result'];
         }
         foreach ($handles as $k => [$ch, $state]) {
-            $code = $codes[spl_object_id($ch)] ?? CURLE_OK;
+            // Ohne Eintrag ist die Anfrage nicht fertig geworden (curl_multi_exec hat abgebrochen).
+            $code = $codes[spl_object_id($ch)] ?? null;
+            $error = $code === null ? 'Die Anfrage wurde nicht abgeschlossen.' : ($code === CURLE_OK ? '' : (curl_error($ch) ?: curl_strerror($code) ?: 'Keine Verbindung.'));
             try {
-                $out[$k] = $this->result($ch, $state, $code === CURLE_OK ? '' : (curl_error($ch) ?: curl_strerror($code) ?: 'Keine Verbindung.'));
+                $out[$k] = $this->result($ch, $state, $error);
             } catch (\RuntimeException $e) {
                 $out[$k] = $e;
             }

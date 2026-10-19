@@ -1,4 +1,6 @@
 # Gebaute App (Ordner app/), Apache und LiteSpeed: Komprimierung und Zwischenspeicher.
+# Nur Anweisungen, die AllowOverride FileInfo erlauben (wie die Permalinks von WordPress);
+# mod_expires bräuchte zusätzlich „Indexes“ und führte sonst zu Fehler 500.
 # Kommt beim Paketieren bzw. mit scripts/build-frontend.sh als app/.htaccess in beide Adapter.
 # Die gehashten Dateien in app/assets/ regelt app/assets/.htaccess (ein Jahr, unveränderlich).
 
@@ -21,15 +23,4 @@
   <FilesMatch "^(index\.html|sw\.js)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
-</IfModule>
-
-<IfModule !mod_headers.c>
-  <IfModule mod_expires.c>
-    ExpiresActive On
-    ExpiresByType image/png "access plus 1 day"
-    ExpiresByType image/x-icon "access plus 1 day"
-    ExpiresByType image/webp "access plus 1 day"
-    ExpiresByType image/svg+xml "access plus 1 day"
-    ExpiresByType application/manifest+json "access plus 1 day"
-  </IfModule>
 </IfModule>

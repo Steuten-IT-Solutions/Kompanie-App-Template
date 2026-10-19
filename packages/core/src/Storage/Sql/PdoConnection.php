@@ -8,6 +8,7 @@ namespace KompanieApp\Core\Storage\Sql;
 final class PdoConnection implements Connection
 {
     private readonly string $driver;
+    private bool $inTransaction = false;
 
     public function __construct(private readonly \PDO $pdo, private readonly string $prefix = '')
     {
@@ -94,17 +95,27 @@ final class PdoConnection implements Connection
 
     public function transaction(callable $fn): mixed
     {
-        if ($this->pdo->inTransaction()) {
+        if ($this->inTransaction) {
             return $fn();
         }
-        $this->pdo->beginTransaction();
+        // SQLite: gleich die Schreibsperre holen (BEGIN IMMEDIATE). Ein normales BEGIN liest erst und
+        // scheitert beim ersten Schreiben sofort mit „database is locked“, wenn ein anderer Aufruf
+        // inzwischen geschrieben hat (busy_timeout hilft dann nicht). So wartet es vorher.
+        if ($this->driver === 'sqlite') {
+            $this->pdo->exec('BEGIN IMMEDIATE');
+        } else {
+            $this->pdo->beginTransaction();
+        }
+        $this->inTransaction = true;
         try {
             $result = $fn();
-            $this->pdo->commit();
+            $this->driver === 'sqlite' ? $this->pdo->exec('COMMIT') : $this->pdo->commit();
             return $result;
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
+            $this->driver === 'sqlite' ? $this->pdo->exec('ROLLBACK') : $this->pdo->rollBack();
             throw $e;
+        } finally {
+            $this->inTransaction = false;
         }
     }
 

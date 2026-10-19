@@ -664,7 +664,12 @@ final class Kernel
             return;
         }
         $url = $this->config()->urlMode() === 'rewrite' ? $base . 'cron' : $base . 'index.php?r=/cron';
-        $sent = self::fireAndForget($url, ['X-Kompanie-Cron' => $this->cronKey()], self::SPAWN_TIMEOUT);
+        try {
+            $sent = self::fireAndForget($url, ['X-Kompanie-Cron' => $this->cronKey()], self::SPAWN_TIMEOUT);
+        } catch (\Throwable $e) {
+            // z. B. stream_socket_client vom Hoster abgeschaltet: wie ein Fehlschlag behandeln (seltener versuchen, Statusseite)
+            $sent = 'Der Selbstaufruf ist auf diesem Server nicht möglich (' . $e->getMessage() . ').';
+        }
         if ($sent !== null) {
             $failures++;
             $error = $sent;

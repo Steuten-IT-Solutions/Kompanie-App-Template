@@ -154,7 +154,13 @@ final class GalleryService
                         $seenAlbums[] = $albumId;
                         $stats['albums']++;
                         $existing = $this->repo->photosByDriveIds(array_map(static fn (array $i): string => (string) $i[0]['id'], $images));
+                        $done = [];
                         foreach ($images as [$file, $intern]) {
+                            // Dieselbe Datei kann zweimal kommen (mehrere Ordner in Drive): nur einmal anlegen.
+                            if (isset($done[(string) $file['id']])) {
+                                continue;
+                            }
+                            $done[(string) $file['id']] = true;
                             [$photoId, $isNew] = $this->upsertPhoto($albumId, $file, $intern, $existing[(string) $file['id']] ?? null);
                             $seenPhotos[] = $photoId;
                             $stats['photos']++;
@@ -316,6 +322,13 @@ final class GalleryService
 
     public function generate(array $photo): bool
     {
+        $attempts = (int) ($photo['attempts'] ?? 0);
+        if ($attempts >= self::MAX_ATTEMPTS) {
+            return $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+        }
+        // Den Versuch vorab vermerken: Bricht PHP mittendrin ab (Speicher, Zeitlimit), kommt das Bild
+        // beim nächsten Lauf nach den anderen dran (nextPending) und hält sie nicht auf.
+        $this->repo->updatePhoto((int) $photo['id'], ['attempts' => $attempts + 1]);
         try {
             $tmp = $this->drive->download((string) $photo['drive_file_id']);
         } catch (\RuntimeException $e) {
@@ -326,7 +339,8 @@ final class GalleryService
             foreach (self::SIZES as $name => $max) {
                 $size = $this->images->resizeToJpeg($tmp, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
             }
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
+            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException
             return $this->markFailed($photo, $e->getMessage());
         } finally {
             @unlink($tmp);
@@ -485,6 +499,8 @@ final class GalleryService
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
                 'name' => (string) $ph['name'],
+                // noch nicht aufbereitet: Die Adressen liefern vorerst einen Platzhalter (202)
+                'ready' => $ph['status'] === GalleryRepository::READY,
             ], $photos),
         ];
     }

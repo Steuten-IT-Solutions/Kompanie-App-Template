@@ -49,9 +49,11 @@ final class PseudoScheduler implements Scheduler
     public function runSoon(string $task): void
     {
         $now = time();
-        if ($this->db->execute('UPDATE {tasks} SET next_run = ? WHERE name = ? AND next_run > ?', [$now, $task, $now]) > 0) {
-            $this->refresh();
-        }
+        $this->db->execute('UPDATE {tasks} SET next_run = ? WHERE name = ? AND next_run > ?', [$now, $task, $now]);
+        // Immer abgleichen, auch wenn die Aufgabe schon fällig war: Hat ein anderer Aufruf zeitgleich
+        // einen späteren nächsten Lauf gemerkt, bliebe sie sonst bis dahin liegen. (runSoon kommt
+        // selten, z. B. höchstens einmal pro Minute aus der Galerie.)
+        $this->refresh();
     }
 
     /** Ohne Datenbankabfrage: aus der Einstellung mit dem nächsten Lauf. */

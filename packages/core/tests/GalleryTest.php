@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Level;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
 use KompanieApp\Core\Tests\Support\CountingPdo;
 use KompanieApp\Core\Tests\Support\DriveMock;
@@ -264,5 +265,37 @@ final class GalleryTest extends TestCase
         $app->gallery()->sync();
         $app->gallery()->runProcessTask(0); // Zeitbudget aufgebraucht, Bilder bleiben ausstehend
         $this->assertSame([GalleryService::PROCESS_TASK], $app->scheduler->soon, 'bei ausstehenden Bildern bald wieder');
+    }
+
+    public function testCrashedPhotoDoesNotBlockOthers(): void
+    {
+        $gallery = $this->app->gallery();
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $gallery->sync();
+        $db = $this->app->db;
+        $repo = (new \ReflectionProperty($gallery, 'repo'))->getValue($gallery);
+        $first = (int) $repo->nextPending()['id'];
+        // So sieht es aus, wenn PHP beim Aufbereiten abstürzt (Speicher, Zeitlimit): Versuch vermerkt, Bild noch ausstehend.
+        $db->update('photos', ['attempts' => 1], ['id' => $first]);
+        $this->assertNotSame($first, (int) $repo->nextPending()['id'], 'ein abgestürztes Bild kommt nach den anderen dran');
+
+        // Stürzt es immer wieder ab, gilt es nach MAX_ATTEMPTS als fehlgeschlagen; die anderen werden fertig.
+        $db->update('photos', ['attempts' => GalleryService::MAX_ATTEMPTS], ['id' => $first]);
+        $gallery->processPending(60);
+        $this->assertSame(GalleryRepository::FAILED, $db->scalar('SELECT status FROM {photos} WHERE id = ?', [$first]));
+        $this->assertSame(0, $gallery->countPending());
+        $this->assertSame(0, (int) $db->scalar("SELECT COUNT(*) FROM {photos} WHERE status = 'ready' AND attempts <> 0"), 'fertige Bilder ohne offene Versuche');
+    }
+
+    public function testSameDriveFileTwiceInAlbumIsSyncedOnce(): void
+    {
+        $gallery = $this->app->gallery();
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $before = $gallery->sync()['photos'];
+        $this->drive->tree['A1'][] = $this->drive->tree['A1'][0];
+        $stats = $gallery->sync();
+        $this->assertSame($before, $stats['photos'], 'doppelte Datei nur einmal');
     }
 }
