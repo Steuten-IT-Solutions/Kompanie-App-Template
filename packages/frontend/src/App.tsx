@@ -150,18 +150,20 @@ async function clearCaches() {
  */
 async function logout(onError: (msg: string) => void) {
   // Solange die Sitzung noch gilt: Dieses Gerät bekommt keine Nachrichten des Kontos mehr.
-  await forgetPushOnLogout();
+  const finishPush = await forgetPushOnLogout();
   if (config?.auth.mode === 'form') {
     try {
       await api.logout();
     } catch (err) {
       // 401: Die Sitzung ist auf dem Server schon beendet.
       if (!(err instanceof ApiError && err.status === 401)) {
+        await finishPush(false);
         onError('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.');
         return;
       }
     }
   }
+  await finishPush(true);
   await clearCaches().catch(() => undefined);
   if (config?.auth.mode === 'redirect' && config.auth.logoutUrl) {
     window.location.href = config.auth.logoutUrl;

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api, can, config, isMember, type CalendarEvent } from '../api';
-import { pushSupport } from '../push';
+import GuestPushButton from '../GuestPushButton';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
@@ -40,13 +40,7 @@ export default function Termine() {
       </button>
     ) : null;
 
-  // Gäste ohne Konto: neue Termine als Benachrichtigung (Konten stellen das unter „Mein Konto“ ein).
-  const notify =
-    !config?.user && pushSupport() !== 'unsupported' ? (
-      <button className="btn btn-secondary btn-block push-guest" onClick={() => navigate('benachrichtigungen')}>
-        Bei neuen Terminen benachrichtigen
-      </button>
-    ) : null;
+  const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;

@@ -53,10 +53,14 @@ final class PushService
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
     public const MAX_PER_USER = 10;
+    private const GUEST_EXPIRY_DAYS = 180;
     public const MAX_GUESTS = 2000;
     /** Neue Gast-Abos je Gerät/Adresse und Stunde */
     public const GUEST_RATE = 20;
     private const BATCH = 50;
+    private const BATCH_SEQUENTIAL = 20;
+    /** Sekunden, die beanspruchte Nachrichten einem Lauf gehören */
+    private const LEASE = 600;
     private const MAX_ATTEMPTS = 3;
     public const TTL = 86400;
     /** Ab so vielen neuen Kalenderterminen auf einmal eine Sammelnachricht */
@@ -87,20 +91,21 @@ final class PushService
     }
 
     /**
-     * VAPID-Schlüsselpaar, beim ersten Bedarf erzeugt; der private Schlüssel wird nie ausgegeben.
+     * VAPID-Schlüsselpaar, erzeugt beim Einplanen der Aufgaben (App::scheduleTasks, nach Einrichtung und Update),
+     * sonst beim ersten Bedarf; der private Schlüssel wird nie ausgegeben.
      *
      * @return array{public: string, private: string}|null
      */
     private function vapid(): ?array
     {
-        $keys = $this->app->settings->get(self::VAPID_SETTING);
-        if (is_array($keys) && is_string($keys['public'] ?? null) && is_string($keys['private'] ?? null)) {
-            return ['public' => $keys['public'], 'private' => $keys['private']];
+        $stored = static fn (mixed $k): ?array => is_array($k) && is_string($k['public'] ?? null) && is_string($k['private'] ?? null)
+            ? ['public' => $k['public'], 'private' => $k['private']] : null;
+        $keys = $stored($this->app->settings->get(self::VAPID_SETTING));
+        if ($keys !== null || !$this->supported()) {
+            return $keys;
         }
-        if (!$this->supported()) {
-            return null;
-        }
-        $keys = WebPushCrypto::newKeyPair();
+        // Hat eine gleichzeitige Anfrage gerade eins erzeugt, dieses nehmen (sonst passten Abos nicht zum Schlüssel).
+        $keys = $stored($this->app->settings->fresh(self::VAPID_SETTING)) ?? WebPushCrypto::newKeyPair();
         $this->app->settings->set(self::VAPID_SETTING, $keys);
         return $keys;
     }
@@ -154,7 +159,8 @@ final class PushService
     /** Termine aus dem internen Kalender (Mitglieder, wenn der Bereich Kalender an ist) oder aus der öffentlichen Liste. */
     public function usesCalendar(?User $user): bool
     {
-        return $user !== null && $user->isMember() && $this->app->features()->enabled('calendar');
+        // Wie die App (Bereich an und eingerichtet): Sonst sehen Mitglieder die öffentliche Terminliste.
+        return $user !== null && $user->isMember() && $this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured();
     }
 
     /** @param list<string> $features */
@@ -204,6 +210,7 @@ final class PushService
         $allowed = $this->availableTypes($user);
         $same = $existing !== null && $existing['user_id'] === $userId;
         $types = $types !== null ? self::cleanTypes($types, $allowed) : ($same ? self::cleanTypes($existing['types'], $allowed) : $allowed);
+        self::requireTypes($types);
         $details = $details !== null ? (bool) $details : ($same && $existing['details']);
         $now = $this->app->time()->nowUtc();
         if ($existing !== null) {
@@ -251,7 +258,7 @@ final class PushService
         $sub = $this->own($user, $endpoint, $auth);
         $values = [];
         if ($types !== null) {
-            $values['types'] = self::cleanTypes($types, $this->availableTypes($user));
+            $values['types'] = self::requireTypes(self::cleanTypes($types, $this->availableTypes($user)));
         }
         if ($details !== null) {
             $values['details'] = (bool) $details;
@@ -296,7 +303,11 @@ final class PushService
     {
         $parts = is_string($endpoint) && strlen($endpoint) <= 2048 ? parse_url($endpoint) : false;
         $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
+        // Nur einfache Hostnamen und keine Sonderzeichen in der Adresse (Unterschiede zwischen parse_url und cURL).
         $known = false;
+        if (preg_match('/^[a-z0-9.-]+$/', $host) !== 1 || !is_string($endpoint) || preg_match('{^https://[A-Za-z0-9.-]+/[A-Za-z0-9._~:/?#\[\]@!$&\'()*+,;=%-]*$}', $endpoint) !== 1) {
+            $host = '';
+        }
         foreach (self::PUSH_HOSTS as $pattern) {
             $known = $known || preg_match($pattern, $host) === 1;
         }
@@ -320,14 +331,66 @@ final class PushService
         return array_values(array_intersect($allowed, $given));
     }
 
+    /**
+     * Ein Abo ohne Arten bekäme nie eine Nachricht, würde also auch nie als abgemeldet erkannt und belegte nur
+     * einen der begrenzten Plätze für Gäste.
+     *
+     * @param list<string> $types
+     * @return list<string>
+     */
+    private static function requireTypes(array $types): array
+    {
+        if ($types === []) {
+            throw ApiError::invalid('Bitte mindestens eine Art von Benachrichtigungen auswählen.');
+        }
+        return $types;
+    }
+
     private function guestLimit(string $client): void
     {
         if ($this->repository()->countGuests() >= self::MAX_GUESTS) {
             throw new ApiError(503, 'push_full', 'Zurzeit sind keine weiteren Abos möglich.');
         }
-        if ($this->app->cache->increment('push_guest_' . hash('sha256', $client), 3600) > self::GUEST_RATE) {
+        if ($this->app->cache->increment('push_guest_' . hash('sha256', self::clientKey($client)), 3600) > self::GUEST_RATE) {
             throw new ApiError(429, 'too_many_attempts', 'Zu viele Anfragen. Bitte später erneut versuchen.');
         }
+    }
+
+    /** IPv6: das ganze /64-Netz zählt als ein Anfragender (so viele Adressen hat jeder Anschluss). */
+    private static function clientKey(string $client): string
+    {
+        $bin = filter_var($client, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? inet_pton($client) : false;
+        return $bin !== false ? bin2hex(substr($bin, 0, 8)) . '::/64' : $client;
+    }
+
+    /**
+     * Gast-Abos, die seit GUEST_EXPIRY_DAYS weder geändert wurden noch eine Nachricht bekommen haben, entfernen
+     * (z. B. Geräte, die es nicht mehr gibt, oder Abos, deren Push-Dienst Fehler statt „abgemeldet“ meldet).
+     */
+    public function expireGuests(): int
+    {
+        $limit = gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() - self::GUEST_EXPIRY_DAYS * 86400);
+        return $this->repository()->deleteStaleGuests($limit);
+    }
+
+    /**
+     * Gehört das Abo dieses Geräts (nachgewiesen durch sein auth-Geheimnis) einem Konto, das hier nicht mehr
+     * angemeldet ist (abgemeldet ohne die App, Sitzung abgelaufen, jemand anderes angemeldet), wird es entfernt:
+     * Sonst bekäme der nächste Mensch am Gerät die Nachrichten des Kontos.
+     */
+    public function releaseForeign(?User $user, mixed $endpoint, mixed $auth): bool
+    {
+        $raw = WebPushCrypto::b64uDecode(is_string($auth) ? $auth : '');
+        try {
+            $sub = $raw === null ? null : $this->repository()->byEndpoint(self::validEndpoint($endpoint));
+        } catch (ApiError) {
+            return false;
+        }
+        if ($sub === null || $sub['user_id'] === 0 || $sub['user_id'] === ($user?->id ?? 0) || !hash_equals($sub['auth'], WebPushCrypto::b64uEncode((string) $raw))) {
+            return false;
+        }
+        $this->repository()->delete($sub['id']);
+        return true;
     }
 
     /* ---------------------------------------------------------------- */
@@ -410,7 +473,7 @@ final class PushService
     /** @param Message $message */
     private static function json(array $message): string
     {
-        return (string) json_encode($message, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return (string) json_encode($message, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     /* ---------------------------------------------------------------- */
@@ -425,43 +488,50 @@ final class PushService
     public function processQueue(int $limit = self::BATCH): int
     {
         $repo = $this->repository();
-        $now = $this->app->time()->nowUtc();
-        $rows = $repo->due($now, $limit);
+        $ts = $this->app->time()->timestamp();
+        $now = gmdate('Y-m-d H:i:s', $ts);
+        // Nacheinander (ohne cURL, z. B. WordPress) dauert jede Anfrage bis zu ihrem Zeitlimit: kleinere Durchgänge.
+        $parallel = $this->app->http instanceof ExtendedHttpClient;
+        $rows = $repo->claim($now, gmdate('Y-m-d H:i:s', $ts + self::LEASE), $parallel ? $limit : min($limit, self::BATCH_SEQUENTIAL));
         $keys = $this->vapid();
         $sent = 0;
-        $done = [];
-        $requests = [];
-        foreach ($rows as $row) {
-            if ($row['endpoint'] === null || $row['p256dh'] === null || $row['auth'] === null || $keys === null) {
-                $done[] = $row['id'];
-                continue;
+        // In Teilen senden und jeden Teil gleich abschließen: Bricht der Lauf ab, kommt höchstens ein Teil doppelt.
+        foreach (array_chunk($rows, $parallel ? 25 : 5) as $chunk) {
+            $done = [];
+            $requests = [];
+            foreach ($chunk as $row) {
+                $age = max(0, $ts - (int) strtotime($row['created_at'] . ' UTC'));
+                if ($row['endpoint'] === null || $row['p256dh'] === null || $row['auth'] === null || $keys === null || $age >= $row['ttl']) {
+                    $done[] = $row['id']; // Abo weg, kein Push möglich oder zu alt
+                    continue;
+                }
+                try {
+                    $requests[$row['id']] = $this->request(['ttl' => $row['ttl'] - $age] + $row, $keys);
+                } catch (\RuntimeException $e) {
+                    error_log('Kompanie-App: Push nicht vorbereitet: ' . $e->getMessage());
+                    $done[] = $row['id'];
+                }
             }
-            try {
-                $requests[$row['id']] = $this->request($row, $keys);
-            } catch (\RuntimeException $e) {
-                error_log('Kompanie-App: Push nicht vorbereitet: ' . $e->getMessage());
-                $done[] = $row['id'];
+            $responses = $this->sendAll($requests);
+            foreach ($chunk as $row) {
+                if (!isset($requests[$row['id']])) {
+                    continue;
+                }
+                $status = self::classify($responses[$row['id']] ?? new \RuntimeException('keine Antwort'), (string) $row['endpoint']);
+                if ($status === 'ok') {
+                    $sent++;
+                    $done[] = $row['id'];
+                    $repo->markSent($row['subscription_id'], $now);
+                } elseif ($status === 'gone') {
+                    $repo->delete($row['subscription_id']);
+                } elseif ($status === 'retry' && $row['attempts'] < self::MAX_ATTEMPTS) {
+                    $repo->retry($row['id'], gmdate('Y-m-d H:i:s', $ts + 300 * $row['attempts']));
+                } else {
+                    $done[] = $row['id'];
+                }
             }
+            $repo->dequeue($done);
         }
-        $responses = $this->sendAll($requests);
-        foreach ($rows as $row) {
-            if (!isset($requests[$row['id']])) {
-                continue;
-            }
-            $status = self::classify($responses[$row['id']] ?? new \RuntimeException('keine Antwort'));
-            if ($status === 'ok') {
-                $sent++;
-                $done[] = $row['id'];
-                $repo->markSent($row['subscription_id'], $now);
-            } elseif ($status === 'gone') {
-                $repo->delete($row['subscription_id']);
-            } elseif ($status === 'retry' && $row['attempts'] + 1 < self::MAX_ATTEMPTS) {
-                $repo->retry($row['id'], $row['attempts'] + 1, gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() + 300 * ($row['attempts'] + 1)));
-            } else {
-                $done[] = $row['id'];
-            }
-        }
-        $repo->dequeue($done);
         // Noch mehr fällig (größer als ein Durchgang): gleich weitermachen.
         $next = $repo->nextDue();
         if ($next !== null && $next <= $now) {
@@ -479,9 +549,9 @@ final class PushService
     {
         $keys = $this->vapid() ?? throw new ApiError(501, 'push_unsupported', 'Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.');
         $row = ['id' => 0, 'subscription_id' => $sub['id'], 'payload' => self::json(self::message($this->app->config->name(), 'Benachrichtigungen funktionieren.', 'benachrichtigungen', 'test')),
-            'urgency' => 'high', 'ttl' => 300, 'attempts' => 0, 'endpoint' => $sub['endpoint'], 'p256dh' => $sub['p256dh'], 'auth' => $sub['auth']];
+            'urgency' => 'high', 'ttl' => 300, 'attempts' => 0, 'created_at' => '', 'endpoint' => $sub['endpoint'], 'p256dh' => $sub['p256dh'], 'auth' => $sub['auth']];
         $res = $this->sendAll([0 => $this->request($row, $keys)])[0] ?? new \RuntimeException('keine Antwort');
-        $status = self::classify($res);
+        $status = self::classify($res, $sub['endpoint']);
         if ($status === 'gone') {
             $this->repository()->delete($sub['id']);
             throw new ApiError(410, 'push_gone', 'Der Push-Dienst kennt dieses Gerät nicht mehr. Bitte Benachrichtigungen neu aktivieren.');
@@ -537,16 +607,22 @@ final class PushService
         return $out;
     }
 
-    /** @param array{status: int, headers?: array<string, string>, body?: string}|\RuntimeException $res ok | gone | retry | error */
-    private static function classify(array|\RuntimeException $res): string
+    /**
+     * ok | gone | retry | error. FCM antwortet mit 403, wenn das Abo zu einem anderen Serverschlüssel gehört (z. B.
+     * nach einer Neuinstallation): Das Abo taugt dann nie mehr und wird wie ein abgemeldetes entfernt.
+     *
+     * @param array{status: int, headers?: array<string, string>, body?: string}|\RuntimeException $res
+     */
+    private static function classify(array|\RuntimeException $res, string $endpoint): string
     {
         if ($res instanceof \RuntimeException) {
             return 'retry';
         }
         $code = (int) $res['status'];
+        $fcm = parse_url($endpoint, PHP_URL_HOST) === 'fcm.googleapis.com';
         return match (true) {
             $code >= 200 && $code < 300 => 'ok',
-            $code === 404 || $code === 410 => 'gone',
+            $code === 404 || $code === 410 || ($code === 403 && $fcm) => 'gone',
             $code === 429 || $code >= 500 => 'retry',
             default => 'error',
         };

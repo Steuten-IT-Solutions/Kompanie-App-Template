@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type NewsItem } from '../api';
 import { newsDate } from '../format';
+import GuestPushButton from '../GuestPushButton';
 import { navigate } from '../router';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 
@@ -22,7 +23,14 @@ function NewsList() {
 
   if (loading && items.length === 0) return <Loading />;
   if (error && items.length === 0) return <ErrorBox message={error} onRetry={reload} />;
-  if (items.length === 0) return <Empty>Noch keine Neuigkeiten.</Empty>;
+  const notify = <GuestPushButton label="Bei neuen Beiträgen benachrichtigen" />;
+  if (items.length === 0)
+    return (
+      <>
+        <Empty>Noch keine Neuigkeiten.</Empty>
+        {notify}
+      </>
+    );
 
   return (
     <div>
@@ -43,6 +51,7 @@ function NewsList() {
           {loading ? 'Lädt …' : 'Ältere Beiträge'}
         </button>
       )}
+      {notify}
     </div>
   );
 }

@@ -470,13 +470,14 @@ final class ApiScenario
         $guest = self::device();
         $c->ok($this->req('POST', '/me/push', $guest)[0] === 401, 'POST /me/push ohne Anmeldung → 401');
         $c->ok($this->req('POST', '/push', ['endpoint' => 'https://intern.example.test/x'] + $guest)[0] === 400, 'Push-Adresse eines fremden Servers → 400');
+        $c->ok($this->req('POST', '/push', $guest + ['types' => ['points']])[0] === 400, 'Gast ohne erlaubte Arten → 400');
         [$s, $d] = $this->req('POST', '/push', $guest + ['types' => ['events', 'points']]);
         $c->ok($s === 200 && $d['types'] === ['events'], 'Gast abonniert nur öffentliche Arten');
         [$s, $d] = $this->req('POST', '/push/status', ['endpoint' => $guest['endpoint'], 'auth' => $guest['keys']['auth']]);
         $c->ok($s === 200 && ($d['subscription']['types'] ?? null) === ['events'] && !in_array('points', array_column((array) $d['types'], 'key'), true), 'Gast sieht sein Abo und nur öffentliche Arten');
         [, $d] = $this->req('POST', '/push/status', ['endpoint' => $guest['endpoint'], 'auth' => self::device()['keys']['auth']]);
         $c->ok(is_array($d) && array_key_exists('subscription', $d) && $d['subscription'] === null, 'Ohne das Geheimnis des Geräts kein Abo sichtbar');
-        $c->ok($this->req('PUT', '/push', ['endpoint' => $guest['endpoint'], 'auth' => self::device()['keys']['auth'], 'types' => []])[0] === 404, 'Fremdes Gast-Abo ändern → 404');
+        $c->ok($this->req('PUT', '/push', ['endpoint' => $guest['endpoint'], 'auth' => self::device()['keys']['auth'], 'types' => ['news']])[0] === 404, 'Fremdes Gast-Abo ändern → 404');
         $c->ok($this->req('POST', '/push', ['endpoint' => $guest['endpoint'], 'keys' => self::device()['keys']])[0] === 403, 'Gerät mit anderem Geheimnis übernehmen → 403');
 
         $this->d->actAs($this->m1);
@@ -485,7 +486,7 @@ final class ApiScenario
         [$s, $d] = $this->req('PUT', '/me/push', ['endpoint' => $guest['endpoint'], 'details' => true]);
         $c->ok($s === 200 && $d['details'] === true && $d['types'] === ['points', 'news'], 'Details einschalten, Arten bleiben');
         $this->d->actAs($this->m2);
-        $c->ok($this->req('PUT', '/me/push', ['endpoint' => $guest['endpoint'], 'types' => []])[0] === 404, 'Abo eines anderen Mitglieds ändern → 404');
+        $c->ok($this->req('PUT', '/me/push', ['endpoint' => $guest['endpoint'], 'types' => ['news']])[0] === 404, 'Abo eines anderen Mitglieds ändern → 404');
         [, $d] = $this->req('DELETE', '/me/push', ['endpoint' => $guest['endpoint']]);
         $c->ok(($d['deleted'] ?? null) === false, 'Abo eines anderen Mitglieds löschen → nichts gelöscht');
         $this->d->actAs(null);
@@ -494,6 +495,13 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         [, $d] = $this->req('DELETE', '/me/push', ['endpoint' => $guest['endpoint']]);
         $c->ok(($d['deleted'] ?? null) === true, 'Mitglied meldet das Gerät ab');
+        // Sitzung beendet, ohne die App abzumelden: Beim nächsten Start gibt das Gerät das Konto-Abo frei.
+        $this->req('POST', '/me/push', $guest);
+        $this->d->actAs(null);
+        $this->req('POST', '/push/status', ['endpoint' => $guest['endpoint'], 'auth' => $guest['keys']['auth']]);
+        $this->d->actAs($this->m1);
+        [, $d] = $this->req('POST', '/me/push/status', ['endpoint' => $guest['endpoint']]);
+        $c->ok(is_array($d) && array_key_exists('subscription', $d) && $d['subscription'] === null, 'Abo eines abgemeldeten Kontos fällt beim nächsten Start weg');
 
         $c->ok($this->req('GET', '/admin/push')[0] === 403, 'GET /admin/push als Mitglied → 403');
         $admin = $this->user('kptest_admin_push', 'admin');

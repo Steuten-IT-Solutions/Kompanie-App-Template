@@ -105,6 +105,7 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       setDevice(d);
       setStatus({ ...status, subscription: sub });
       setTypes(sub.types);
+      setDetails(sub.details);
       onToast('Benachrichtigungen sind an');
     });
 
@@ -156,7 +157,13 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       <div className="push-types">
         {status.types.map((t) => (
           <label key={t.key} className="toggle">
-            <input type="checkbox" checked={types.includes(t.key)} disabled={busy} onChange={(e) => toggleType(t.key, e.target.checked)} />
+            {/* Mindestens eine Art bleibt an; ganz aus geht über „ausschalten“. */}
+            <input
+              type="checkbox"
+              checked={types.includes(t.key)}
+              disabled={busy || (active && types.length === 1 && types.includes(t.key))}
+              onChange={(e) => toggleType(t.key, e.target.checked)}
+            />
             <span>{t.label}</span>
           </label>
         ))}

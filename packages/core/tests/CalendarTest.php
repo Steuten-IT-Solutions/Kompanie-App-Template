@@ -198,6 +198,19 @@ final class CalendarTest extends TestCase
         $this->assertStringContainsString('key=KEY', $http->calls[0]['url']);
     }
 
+    public function testGoogleCalendarPagesAreFollowed(): void
+    {
+        $http = new FakeHttpClient(static function (string $m, string $url): array {
+            $page = str_contains($url, 'pageToken=') ? (int) substr($url, strrpos($url, '=') + 1) : 0;
+            $item = ['id' => 'e' . $page, 'summary' => 'Termin ' . $page, 'start' => ['date' => '2030-05-0' . ($page + 1)], 'end' => ['date' => '2030-05-0' . ($page + 2)]];
+            return ['status' => 200, 'body' => (string) json_encode(['items' => [$item]] + ($page < 9 ? ['nextPageToken' => (string) ($page + 1)] : []))];
+        });
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com', 'google_api_key' => 'KEY']);
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings);
+        $this->assertSame(['Termin 0', 'Termin 1', 'Termin 2', 'Termin 3'], array_column($app->calendar()->events(), 'title'), 'höchstens 4 Seiten');
+        $this->assertStringContainsString('key=KEY', $http->calls[1]['url']);
+    }
+
     public function testStaleCopyErrorCacheAndBackgroundRefresh(): void
     {
         $down = false;

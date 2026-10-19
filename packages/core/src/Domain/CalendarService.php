@@ -200,12 +200,26 @@ final class CalendarService
             if ($res instanceof \RuntimeException) {
                 throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
             }
-            $body = json_decode($res['body'], true);
-            if ($res['status'] !== 200 || !is_array($body)) {
-                $msg = $body['error']['message'] ?? ('HTTP ' . $res['status']);
-                throw ApiError::upstream('Google Kalender: ' . $msg);
+            $items = [];
+            // Mehr als 250 Termine im Jahr: weiterblättern (höchstens 4 Seiten). Sonst fehlten die späteren, und der
+            // Abgleich für Benachrichtigungen hielte sie für neu, sobald vorne alte Termine wegfallen.
+            for ($page = 0; $page < 4; $page++) {
+                $body = json_decode($res['body'], true);
+                if ($res['status'] !== 200 || !is_array($body)) {
+                    $msg = $body['error']['message'] ?? ('HTTP ' . $res['status']);
+                    throw ApiError::upstream('Google Kalender: ' . $msg);
+                }
+                array_push($items, ...array_values((array) ($body['items'] ?? [])));
+                $token = $body['nextPageToken'] ?? null;
+                if (!is_string($token) || $token === '' || $page === 3) {
+                    break;
+                }
+                $res = $this->tryGet($request['url'] . '&pageToken=' . rawurlencode($token));
+                if ($res instanceof \RuntimeException) {
+                    throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+                }
             }
-            foreach ($body['items'] ?? [] as $item) {
+            foreach ($items as $item) {
                 if (in_array($item['visibility'] ?? '', ['private', 'confidential'], true) || ($item['status'] ?? '') === 'cancelled') {
                     continue;
                 }

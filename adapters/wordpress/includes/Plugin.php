@@ -88,7 +88,14 @@ final class Plugin
         add_filter('cron_schedules', [WpScheduler::class, 'schedules']);
         add_action(WpScheduler::HOOK, static fn (string $task) => WpUpdateTarget::$installed ? null : self::app()->runTask($task));
         // Abos eines gelöschten Kontos entfernen (Issue #19).
-        add_action('deleted_user', static fn (int $id) => self::app()->push()->deleteForUser($id));
+        add_action('deleted_user', static function (int $id): void {
+            try {
+                self::app()->push()->deleteForUser($id);
+            } catch (\Throwable $e) {
+                // Das Löschen des Benutzers darf daran nicht scheitern.
+                error_log('Kompanie-App: Push-Abos nicht entfernt: ' . $e->getMessage());
+            }
+        });
         // Aufgaben werden nicht bei jedem Seitenaufruf eingeplant, sondern nach einem Update (App::upgrade),
         // beim Aktivieren, beim Speichern von Einstellungen und beim Öffnen der Einstellungsseite.
         Session::init();

@@ -8,7 +8,7 @@ namespace KompanieApp\Core\Push;
  * Web Push ohne Fremdbibliothek (Issue #19): Verschlüsselung der Nachricht nach RFC 8291
  * (Content-Encoding aes128gcm) und VAPID-Token nach RFC 8292 (ES256). Braucht OpenSSL mit der Kurve
  * P-256 (prime256v1), openssl_pkey_derive und aes-128-gcm; requirements() nennt, was fehlt.
- * Übernommen aus der ersten Umsetzung (Lank, MKL_Push) und dort mit dem Testvektor aus RFC 8291 geprüft.
+ * Geprüft mit dem Testvektor aus RFC 8291, Anhang A (WebPushCryptoTest).
  */
 final class WebPushCrypto
 {

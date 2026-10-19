@@ -7,7 +7,7 @@ namespace KompanieApp\Core\Push;
 use KompanieApp\Core\App;
 
 /**
- * Wann eine Benachrichtigung entsteht (Issue #19, Gleichstand mit Lank):
+ * Wann eine Benachrichtigung entsteht (Issue #19):
  *
  * - neue Punkte bzw. Strafen: nur an das betroffene Mitglied (bei Strafen Betrag und Grund nur, wenn das Mitglied
  *   „Details anzeigen“ eingeschaltet hat);
@@ -79,6 +79,7 @@ final class PushTriggers
             $this->checkNews();
         }
         $this->sendReminders($now);
+        $this->push->expireGuests();
     }
 
     /**
@@ -142,7 +143,11 @@ final class PushTriggers
         return $count;
     }
 
-    /** Neue Neuigkeiten seit dem letzten Abgleich; beim ersten Lauf nur merken. */
+    /**
+     * Neue Neuigkeiten seit dem letzten Abgleich; beim ersten Lauf nur merken. Neu ist ein Beitrag, dessen Kennung
+     * noch nicht vorkam und der nicht älter ist als der neueste bisher gesehene: Wird einer gelöscht, rutschen
+     * ältere in die ersten zehn, ohne neu zu sein.
+     */
     public function checkNews(): int
     {
         if (!$this->app->news->available()) {
@@ -153,21 +158,37 @@ final class PushTriggers
         } catch (\RuntimeException) {
             return 0;
         }
-        $ids = array_values(array_map(static fn (array $i): string => (string) $i['id'], $items));
-        $seen = $this->app->settings->get(PushService::NEWS_SETTING);
-        if ($ids !== $seen) {
-            // Die letzten 50 merken: Eine Neuigkeit, die aus den ersten 10 rutscht und wieder auftaucht, kommt nicht doppelt.
-            $this->app->settings->set(PushService::NEWS_SETTING, array_values(array_slice(array_unique(array_merge($ids, is_array($seen) ? $seen : [])), 0, 50)));
+        $stored = $this->app->settings->get(PushService::NEWS_SETTING);
+        $seen = is_array($stored) && is_array($stored['ids'] ?? null) ? array_map('strval', $stored['ids']) : null;
+        $newest = is_array($stored) && is_string($stored['newest'] ?? null) ? $stored['newest'] : '';
+        $time = static fn (array $i): int => (int) strtotime((string) ($i['date'] ?? ''));
+        $fresh = [];
+        foreach (array_reverse($items) as $item) {
+            $id = (string) $item['id'];
+            if ($seen !== null && !in_array($id, $seen, true) && ($newest === '' || $time($item) === 0 || $time($item) >= (int) strtotime($newest))) {
+                $fresh[] = $item;
+            }
         }
-        if (!is_array($seen)) {
-            return 0;
+        $ids = array_values(array_map(static fn (array $i): string => (string) $i['id'], $items));
+        foreach ($items as $item) {
+            if ($time($item) > (int) strtotime($newest !== '' ? $newest : '@0')) {
+                $newest = (string) $item['date'];
+            }
+        }
+        // Die letzten 50 merken: Eine Neuigkeit, die aus den ersten 10 rutscht und wieder auftaucht, kommt nicht doppelt.
+        $next = ['ids' => array_values(array_slice(array_unique(array_merge($ids, $seen ?? [])), 0, 50)), 'newest' => $newest];
+        if ($next !== $stored) {
+            $this->app->settings->set(PushService::NEWS_SETTING, $next);
+        }
+        $label = $this->app->config->sectionLabel('news', 'News');
+        $plain = static fn (array $i): string => html_entity_decode(strip_tags((string) $i['title']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if (count($fresh) > 3) {
+            $titles = implode(', ', array_map($plain, array_slice(array_reverse($fresh), 0, 3)));
+            return $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message($label, sprintf('%d neue Beiträge, z. B. %s', count($fresh), $titles), 'news', 'news-neu'));
         }
         $count = 0;
-        foreach (array_reverse($items) as $item) {
-            if (!in_array((string) $item['id'], $seen, true)) {
-                $title = html_entity_decode(strip_tags((string) $item['title']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                $count += $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message($this->app->config->sectionLabel('news', 'News'), $title, 'news/' . rawurlencode((string) $item['id']), 'news-' . $item['id']));
-            }
+        foreach ($fresh as $item) {
+            $count += $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message($label, $plain($item), 'news/' . rawurlencode((string) $item['id']), 'news-' . $item['id']));
         }
         return $count;
     }

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Push\WebPushCrypto;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
@@ -30,6 +31,14 @@ final class PushServiceTest extends TestCase
     private array $pushStatus = [];
     /** Inhalt des iCal-Feeds */
     private string $ics = '';
+    /** Neuigkeiten der Quelle: [Titel, Datum], neueste zuerst */
+    private array $feed = [];
+
+    /** @return list<array{0: string, 1: string}> */
+    public function feed(): array
+    {
+        return $this->feed;
+    }
 
     protected function setUp(): void
     {
@@ -187,6 +196,112 @@ final class PushServiceTest extends TestCase
         $this->assertSame('too_many_attempts', $e->errorCode);
         $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '8.8.8.8');
         $this->assertSame(PushService::GUEST_RATE + 1, $p->repository()->countGuests(), 'andere Adresse geht');
+
+        // IPv6: ein /64-Netz zählt als ein Anfragender.
+        for ($i = 0; $i < PushService::GUEST_RATE; $i++) {
+            $d = self::device('v6-' . $i);
+            $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '2001:db8:1:2::' . dechex($i + 1));
+        }
+        $d = self::device('v6-zu-viel');
+        try {
+            $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '2001:db8:1:2:ffff::1');
+            $this->fail('Begrenzung für IPv6 greift nicht');
+        } catch (ApiError $e) {
+            $this->assertSame(429, $e->status);
+        }
+    }
+
+    public function testGuestRulesStaleAccountsAndExpiry(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $d = self::device('a');
+        foreach ([[], ['points']] as $types) {
+            try {
+                $p->subscribe(null, $d['endpoint'], $d['keys'], $types, null, '1.1.1.1');
+                $this->fail('ohne Arten angenommen');
+            } catch (ApiError $e) {
+                $this->assertSame(400, $e->status, 'Abo ohne (erlaubte) Arten');
+            }
+        }
+        try {
+            $p->subscribe(null, 'https://fcm.googleapis.com\\@intern.example.test/x', $d['keys'], null, null, '1.1.1.1');
+            $this->fail('Adresse mit Sonderzeichen angenommen');
+        } catch (ApiError $e) {
+            $this->assertSame(400, $e->status);
+        }
+
+        // Konto nicht mehr angemeldet: Das Gerät (mit seinem Geheimnis) gibt das Abo frei, ohne Geheimnis nicht.
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $p->subscribe($m, $d['endpoint'], $d['keys'], null, null, '');
+        $this->assertFalse($p->releaseForeign(null, $d['endpoint'], self::device('x')['keys']['auth']));
+        $this->assertFalse($p->releaseForeign($m, $d['endpoint'], $d['keys']['auth']), 'noch angemeldet');
+        $this->assertTrue($p->releaseForeign(null, $d['endpoint'], $d['keys']['auth']));
+        $this->assertNull($p->repository()->byEndpoint($d['endpoint']));
+
+        // Gast-Abos ohne Änderung und ohne Nachricht seit 180 Tagen verfallen; Konten nicht.
+        $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '1.1.1.1');
+        $k = self::device('k');
+        $p->subscribe($m, $k['endpoint'], $k['keys'], null, null, '');
+        $this->clock->at = $this->clock->now()->modify('+179 days');
+        $this->assertSame(0, $p->expireGuests());
+        $this->clock->at = $this->clock->now()->modify('+2 days');
+        $this->assertSame(1, $p->expireGuests());
+        $this->assertNotNull($p->repository()->byEndpoint($k['endpoint']));
+    }
+
+    public function testNewsOnlyGenuinelyNewPosts(): void
+    {
+        $test = $this;
+        $news = new class ($test) implements NewsSource {
+            public function __construct(private readonly PushServiceTest $test)
+            {
+            }
+
+            public function available(): bool
+            {
+                return true;
+            }
+
+            public function page(int $page, int $perPage): array
+            {
+                $items = array_map(static fn (array $i): array => ['id' => $i[0], 'title' => $i[0], 'date' => gmdate('c', (int) strtotime($i[1]))], $this->test->feed());
+                return ['items' => array_slice($items, 0, $perPage), 'totalPages' => 1];
+            }
+
+            public function item(string $id): ?array
+            {
+                return null;
+            }
+        };
+        $app = TestApp::create(TestApp::connection(), $this->users, [], $this->http, null, $this->settings, $this->clock, null, [], $this->scheduler, $news);
+        $g = self::device('g');
+        $app->push()->subscribe(null, $g['endpoint'], $g['keys'], ['news'], null, '1.1.1.1');
+        $t = $app->pushTriggers();
+        $check = static fn (): int => $t->checkNews();
+        $this->feed = [['B', 'Mon, 02 Mar 2026 10:00:00 +0100'], ['A', 'Sun, 01 Mar 2026 10:00:00 +0100'], ['Alt', 'Sun, 01 Feb 2026 10:00:00 +0100']];
+        $this->assertSame(0, $check(), 'erster Lauf: nur merken');
+        array_unshift($this->feed, ['C', 'Thu, 05 Mar 2026 10:00:00 +0100']);
+        $this->assertSame(1, $check());
+        $this->assertSame(0, $check(), 'nicht doppelt');
+        // C gelöscht, ein älterer Beitrag rückt nach: nicht neu.
+        array_shift($this->feed);
+        $this->feed[] = ['Uralt', 'Thu, 01 Jan 2026 10:00:00 +0100'];
+        $this->assertSame(0, $check());
+        // Viele auf einmal: eine Zusammenfassung.
+        foreach (['D', 'E', 'F', 'G'] as $n => $title) {
+            array_unshift($this->feed, [$title, sprintf('Sun, %02d Mar 2026 10:00:00 +0100', 10 + $n)]);
+        }
+        $this->assertSame(1, $check());
+        $app->push()->repository()->dequeue(array_column($app->push()->repository()->claim('9999-12-31 00:00:00', '9999-12-31 00:00:00', 100), 'id'));
+    }
+
+    public function testMembersWithUnconfiguredCalendarGetPublicEvents(): void
+    {
+        $this->settings = new MemorySettings([]);
+        $app = $this->app();
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $this->assertFalse($app->push()->usesCalendar($m), 'Kalender an, aber ohne Adresse');
     }
 
     public function testQueueSendsEncryptedSignedMessagesAndCleansUp(): void
@@ -226,6 +341,40 @@ final class PushServiceTest extends TestCase
         }
         $this->assertSame(0, $p->repository()->counts()['queued'], 'nach drei Versuchen verworfen');
         $this->assertNotNull($p->repository()->byEndpoint($b['endpoint']), '5xx löscht das Abo nicht');
+    }
+
+    public function testClaimedMessagesAreNotSentTwiceAndOldOnesExpire(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $a = self::device('a');
+        $p->subscribe($m, $a['endpoint'], $a['keys'], ['points'], null, '');
+        $app->pushTriggers()->pointsAdded([['id' => 1, 'user_id' => $m->id, 'points' => 1, 'reason' => 'x']]);
+
+        // Ein anderer Lauf hat die Nachricht gerade beansprucht: Dieser sendet sie nicht noch einmal.
+        $now = gmdate('Y-m-d H:i:s', $this->clock->now()->getTimestamp());
+        $this->assertCount(1, $p->repository()->claim($now, gmdate('Y-m-d H:i:s', $this->clock->now()->getTimestamp() + 600), 10));
+        $this->assertSame([], $p->repository()->claim($now, $now, 10), 'schon beansprucht');
+        $this->assertSame(0, $p->processQueue());
+        $this->assertSame([], $this->pushes());
+        // Bricht der Lauf ab, ist sie nach der Sperre wieder fällig; die Lebensdauer zählt ab dem Einreihen.
+        $this->clock->at = $this->clock->now()->modify('+11 minutes');
+        $this->assertSame(1, $p->processQueue());
+        $this->assertSame((string) (86400 - 660), $this->pushes()[0]['headers']['TTL']);
+
+        // Zu alt (länger als die Lebensdauer in der Warteschlange): verworfen statt gesendet.
+        $app->pushTriggers()->pointsAdded([['id' => 2, 'user_id' => $m->id, 'points' => 1, 'reason' => 'y']]);
+        $this->clock->at = $this->clock->now()->modify('+25 hours');
+        $this->assertSame(0, $p->processQueue());
+        $this->assertCount(1, $this->pushes());
+        $this->assertSame(0, $p->repository()->counts()['queued']);
+
+        // FCM mit 403 (Abo gehört zu einem anderen Serverschlüssel): Abo entfernt.
+        $this->pushStatus[$a['endpoint']] = 403;
+        $app->pushTriggers()->pointsAdded([['id' => 3, 'user_id' => $m->id, 'points' => 1, 'reason' => 'z']]);
+        $p->processQueue();
+        $this->assertNull($p->repository()->byEndpoint($a['endpoint']));
     }
 
     public function testPointsMessageWithoutDetailsSwitch(): void
@@ -307,7 +456,7 @@ final class PushServiceTest extends TestCase
         $admin = $this->users->add('admin', Roles::ADMIN);
         $this->users->current = $admin;
         $app->api()->handle(new Request('POST', '/events', [], ['title' => 'Vereinsabend', 'start_date' => '2026-10-20', 'start_time' => '19:00']));
-        $app->push()->repository()->dequeue(array_column($app->push()->repository()->due('9999-12-31 00:00:00', 100), 'id'));
+        $app->push()->repository()->dequeue(array_column($app->push()->repository()->claim('9999-12-31 00:00:00', '9999-12-31 00:00:00', 100), 'id'));
         $tz = new \DateTimeZone('Europe/Berlin');
         $t = $app->pushTriggers();
         $this->assertSame(0, $t->sendReminders(new \DateTimeImmutable('2026-10-19 17:59', $tz)), 'vor 18 Uhr nichts');

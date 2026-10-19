@@ -202,7 +202,9 @@ paths:
     post:
       tags: [Benachrichtigungen]
       summary: Mögliche Arten und das Abo dieses Geräts (Konto)
-      description: POST, damit die Push-Adresse nicht in Protokollen von Adressen landet.
+      description: |
+        POST, damit die Push-Adresse nicht in Protokollen von Adressen landet. Mit `auth` gibt das Gerät außerdem ein
+        Abo frei, das einem anderen, hier nicht mehr angemeldeten Konto gehört (die App fragt dazu beim Start nach).
       requestBody:
         content:
           application/json:
@@ -210,6 +212,7 @@ paths:
               type: object
               properties:
                 endpoint: { type: string }
+                auth: { type: string, description: auth-Geheimnis des Geräts (base64url) }
       responses:
         '200': { $ref: '#/components/responses/PushStatus' }
         '401': { $ref: '#/components/responses/Error' }
@@ -218,6 +221,7 @@ paths:
     post:
       tags: [Benachrichtigungen]
       summary: Mögliche Arten und das Abo dieses Geräts (Gast ohne Konto)
+      description: Gibt wie `/me/push/status` das Abo eines hier nicht mehr angemeldeten Kontos frei.
       security: []
       requestBody:
         content:
@@ -236,7 +240,8 @@ paths:
       summary: Gerät für Benachrichtigungen anmelden (Konto)
       description: |
         Übernimmt ein vorhandenes Abo desselben Geräts (gleiches auth-Geheimnis), z. B. nach einem Kontowechsel.
-        Höchstens 10 Geräte je Konto; das älteste fällt dann weg. Ohne `types` alle möglichen Arten.
+        Höchstens 10 Geräte je Konto; das älteste fällt dann weg. Ohne `types` alle möglichen Arten; mindestens eine
+        erlaubte Art muss übrig bleiben (sonst 400).
       requestBody:
         required: true
         content:
@@ -261,7 +266,7 @@ paths:
               properties:
                 endpoint: { type: string }
                 types: { type: array, items: { $ref: '#/components/schemas/PushType' } }
-                details: { type: boolean, description: Beträge und Gründe in der Nachricht zeigen (sonst nur ein Hinweis) }
+                details: { type: boolean, description: 'Bei Strafen Betrag und Grund in der Nachricht zeigen (sonst nur ein Hinweis); Punkte zeigen immer Wert und Grund' }
       responses:
         '200': { $ref: '#/components/responses/PushSubscription' }
         '401': { $ref: '#/components/responses/Error' }
@@ -286,7 +291,9 @@ paths:
     post:
       tags: [Benachrichtigungen]
       summary: Gerät für öffentliche Benachrichtigungen anmelden (Gast ohne Konto)
-      description: Nur öffentliche Arten (Termine, Erinnerung, News). Neue Gast-Abos sind je Anfragendem und insgesamt begrenzt.
+      description: |
+        Nur öffentliche Arten (Termine, Erinnerung, News). Neue Gast-Abos sind je Anfragendem (IPv6: je /64-Netz) und
+        insgesamt begrenzt; ohne Änderung und ohne Nachricht verfallen sie nach 180 Tagen.
       security: []
       requestBody:
         required: true

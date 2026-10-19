@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { isStandalone } from './install';
 import App from './App';
 import { config } from './api';
+import { checkPushOnStart } from './push';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -40,8 +41,11 @@ if ('serviceWorker' in navigator && cfg) {
     const sw = new URL(cfg.swUrl, location.href);
     sw.searchParams.set('api', new URL(cfg.apiBase, location.href).href);
     sw.searchParams.set('assets', assets);
-    navigator.serviceWorker.register(sw.toString(), { scope: cfg.appUrl }).catch(() => {
-      /* Ohne Service Worker läuft die App trotzdem, nur nicht offline. */
-    });
+    navigator.serviceWorker
+      .register(sw.toString(), { scope: cfg.appUrl })
+      .then(() => checkPushOnStart())
+      .catch(() => {
+        /* Ohne Service Worker läuft die App trotzdem, nur nicht offline. */
+      });
   });
 }

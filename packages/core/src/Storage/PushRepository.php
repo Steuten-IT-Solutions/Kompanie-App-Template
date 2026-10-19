@@ -11,7 +11,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  *
  * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, details: bool}
  * @phpstan-type QueueItem array{id: int, subscription_id: int, payload: string, urgency: string, ttl: int, attempts: int,
- *     endpoint: ?string, p256dh: ?string, auth: ?string}
+ *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string}
  */
 final class PushRepository
 {
@@ -90,6 +90,18 @@ final class PushRepository
         $this->db->execute('DELETE FROM {push_subscriptions} WHERE id = ?', [$id]);
     }
 
+    public function deleteStaleGuests(string $before): int
+    {
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $this->db->select(
+            'SELECT id FROM {push_subscriptions} WHERE user_id = 0 AND updated_at < ? AND (last_sent_at IS NULL OR last_sent_at < ?)',
+            [$before, $before],
+        ));
+        foreach ($ids as $id) {
+            $this->delete($id);
+        }
+        return count($ids);
+    }
+
     public function clearQueueFor(int $subscriptionId): void
     {
         $this->db->execute('DELETE FROM {push_queue} WHERE subscription_id = ?', [$subscriptionId]);
@@ -121,14 +133,33 @@ final class PushRepository
         }
     }
 
-    /** @return list<QueueItem> fällige Nachrichten, älteste zuerst */
-    public function due(string $now, int $limit): array
+    /**
+     * Beansprucht fällige Nachrichten für diesen Lauf: Jede Zeile bekommt einzeln einen neuen Zeitpunkt (Sperre bis
+     * $leaseUntil) und einen Versuch mehr. Nur Zeilen, bei denen das geklappt hat, gehören diesem Lauf; ein zweiter,
+     * gleichzeitiger Lauf sendet sie also nicht noch einmal. Bricht der Lauf ab, sind sie nach der Sperre wieder fällig.
+     *
+     * @return list<QueueItem> älteste zuerst
+     */
+    public function claim(string $now, string $leaseUntil, int $limit): array
     {
-        $rows = $this->db->select(
-            'SELECT q.id, q.subscription_id, q.payload, q.urgency, q.ttl, q.attempts, s.endpoint, s.p256dh, s.auth
-             FROM {push_queue} q LEFT JOIN {push_subscriptions} s ON s.id = q.subscription_id
-             WHERE q.next_try <= ? ORDER BY q.id ASC LIMIT ' . max(1, $limit),
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $this->db->select(
+            'SELECT id FROM {push_queue} WHERE next_try <= ? ORDER BY id ASC LIMIT ' . max(1, $limit),
             [$now],
+        ));
+        $won = [];
+        foreach ($ids as $id) {
+            if ($this->db->execute('UPDATE {push_queue} SET next_try = ?, attempts = attempts + 1 WHERE id = ? AND next_try <= ?', [$leaseUntil, $id, $now]) === 1) {
+                $won[] = $id;
+            }
+        }
+        if ($won === []) {
+            return [];
+        }
+        $rows = $this->db->select(
+            'SELECT q.id, q.subscription_id, q.payload, q.urgency, q.ttl, q.attempts, q.created_at, s.endpoint, s.p256dh, s.auth
+             FROM {push_queue} q LEFT JOIN {push_subscriptions} s ON s.id = q.subscription_id
+             WHERE q.id IN (' . implode(', ', array_fill(0, count($won), '?')) . ') ORDER BY q.id ASC',
+            $won,
         );
         return array_values(array_map(static fn (array $r): array => [
             'id' => (int) $r['id'],
@@ -137,6 +168,7 @@ final class PushRepository
             'urgency' => (string) $r['urgency'],
             'ttl' => (int) $r['ttl'],
             'attempts' => (int) $r['attempts'],
+            'created_at' => (string) $r['created_at'],
             'endpoint' => isset($r['endpoint']) ? (string) $r['endpoint'] : null,
             'p256dh' => isset($r['p256dh']) ? (string) $r['p256dh'] : null,
             'auth' => isset($r['auth']) ? (string) $r['auth'] : null,
@@ -151,9 +183,9 @@ final class PushRepository
         }
     }
 
-    public function retry(int $id, int $attempts, string $nextTry): void
+    public function retry(int $id, string $nextTry): void
     {
-        $this->db->execute('UPDATE {push_queue} SET attempts = ?, next_try = ? WHERE id = ?', [$attempts, $nextTry, $id]);
+        $this->db->execute('UPDATE {push_queue} SET next_try = ? WHERE id = ?', [$nextTry, $id]);
     }
 
     public function nextDue(): ?string

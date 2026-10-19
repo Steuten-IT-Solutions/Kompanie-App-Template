@@ -104,6 +104,8 @@ final class Api
         $push = $this->app->push();
         $sub = null;
         if ($r->input('endpoint') !== null) {
+            // Die App fragt beim Start nach: Abos eines Kontos, das hier nicht mehr angemeldet ist, fallen dann weg.
+            $push->releaseForeign($user, $r->input('endpoint'), $r->input('auth'));
             try {
                 $sub = $push->own($user, $r->input('endpoint'), $user === null ? $r->input('auth') : null);
             } catch (ApiError) {

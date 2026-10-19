@@ -89,17 +89,43 @@ export async function disablePush(device: PushDevice): Promise<void> {
 }
 
 /**
- * Beim Abmelden vom Konto: Das Gerät bekommt keine Nachrichten des Kontos mehr. Fehler (z. B. offline) halten
- * das Abmelden nicht auf; der Server entfernt das Abo spätestens, wenn sich jemand anderes darauf anmeldet.
+ * Beim Abmelden vom Konto, solange die Sitzung noch gilt: Das Abo des Kontos auf dem Server löschen. Gibt eine
+ * Funktion zurück, die nach dem Abmelden das Abo im Browser beendet (ok = true) oder, wenn das Abmelden
+ * gescheitert ist, das Abo mit den bisherigen Einstellungen wiederherstellt (ok = false). Fehler halten das
+ * Abmelden nicht auf; ist die Sitzung schon beendet, gibt die App das Abo beim nächsten Start frei.
  */
-export async function forgetPushOnLogout(): Promise<void> {
+export async function forgetPushOnLogout(): Promise<(ok: boolean) => Promise<void>> {
+  const nothing = async () => undefined;
+  try {
+    if (pushSupport() !== 'ok' || !config) return nothing;
+    // Nicht auf den Service Worker warten: Ohne Registrierung gibt es auch kein Abo.
+    const sub = await (await navigator.serviceWorker.getRegistration(config.appUrl))?.pushManager.getSubscription();
+    const device = sub ? toDevice(sub) : null;
+    if (!sub || !device) return nothing;
+    const before = (await api.pushStatus(device).catch(() => null))?.subscription ?? null;
+    await api.pushForget(device).catch(() => undefined);
+    return async (ok) => {
+      try {
+        if (ok) await sub.unsubscribe();
+        else if (before) await api.pushSubscribe(device, before.types, before.details);
+      } catch {
+        // offline o. ä.
+      }
+    };
+  } catch {
+    return nothing; // Kein Push in diesem Browser
+  }
+}
+
+/**
+ * Beim Start der App: Hat dieses Gerät ein Abo, fragt die App den Server danach. Gehört es einem Konto, das hier
+ * nicht mehr angemeldet ist (Sitzung abgelaufen, anderswo abgemeldet), gibt der Server es dabei frei.
+ */
+export async function checkPushOnStart(): Promise<void> {
   try {
     const device = await currentDevice();
-    if (!device) return;
-    await api.pushUnsubscribe(device).catch(() => undefined);
-    const sub = await (await registration())?.pushManager.getSubscription();
-    await sub?.unsubscribe();
+    if (device) await api.pushStatus(device);
   } catch {
-    // Kein Push in diesem Browser
+    // offline o. ä.: beim nächsten Start
   }
 }

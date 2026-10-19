@@ -165,6 +165,8 @@ final class App
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
         }
+        // Schlüssel für Web Push gleich anlegen, nicht erst bei der ersten (womöglich gleichzeitigen) Anfrage.
+        $this->push()->publicKey();
         $version = $this->env->version();
         if ($this->settings->get(self::PLAN_SETTING) !== $version) {
             $this->settings->set(self::PLAN_SETTING, $version);

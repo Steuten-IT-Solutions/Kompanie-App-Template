@@ -318,6 +318,8 @@ async function requestFull<T>(
   body?: unknown,
   query?: Record<string, string>,
   retry = true,
+  /** 401 nur melden, nicht zur Anmeldung weiterleiten (z. B. beim Abmelden) */
+  quiet = false,
 ): Promise<{ data: T; headers: Headers }> {
   if (!config) {
     throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
@@ -340,11 +342,11 @@ async function requestFull<T>(
 
   const data = await res.json().catch(() => null);
 
-  if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
+  if (res.status === 403 && retry && !quiet && CSRF_ERRORS.includes(data?.code)) {
     await refreshCsrf();
     return requestFull<T>(method, path, body, query, false);
   }
-  if (res.status === 401 && config.user) {
+  if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
   }
   if (!res.ok) {
@@ -441,14 +443,18 @@ export const api = {
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
   // Benachrichtigungen (Web Push): Konten über /me/push, Gäste über /push mit dem auth-Geheimnis des Geräts.
+  // Mit dem Geheimnis auch für Konten: Ein Abo eines hier nicht mehr angemeldeten Kontos gibt der Server dann frei.
   pushStatus: (device: PushDevice | null) =>
-    request<PushStatus>('POST', pushPath('/status'), device ? { endpoint: device.endpoint, auth: guestAuth(device) } : {}),
+    request<PushStatus>('POST', pushPath('/status'), device ? { endpoint: device.endpoint, auth: device.keys.auth } : {}),
   pushSubscribe: (device: PushDevice, types: PushType[], details?: boolean) =>
     request<PushSubscriptionInfo>('POST', pushPath(''), { endpoint: device.endpoint, keys: device.keys, types, details }),
   pushUpdate: (device: PushDevice, data: { types?: PushType[]; details?: boolean }) =>
     request<PushSubscriptionInfo>('PUT', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device), ...data }),
   pushUnsubscribe: (device: PushDevice) =>
     request<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device) }),
+  /** Beim Abmelden: ohne Weiterleitung, wenn die Sitzung schon beendet ist. */
+  pushForget: async (device: PushDevice) =>
+    (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint }, undefined, true, true)).data,
   pushTest: (device: PushDevice) =>
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
