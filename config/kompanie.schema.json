@@ -49,7 +49,7 @@
       "additionalProperties": false,
       "properties": {
         "roles": {
-          "description": "Anzeigenamen der Rollen, z. B. „Spieß“, „Kassierer“ oder „Hauptmann“ für manager. organizer pflegt öffentliche Termine und Dokumente, manager zusätzlich Punkte und Strafen.",
+          "description": "Namen der festen Rollen (Gast, Mitglied, Admin) bei der Ersteinrichtung. Danach benennt und verwaltet der Admin die Rollen in der App (Einstellungen → Rollen); spätere Änderungen hier wirken nicht mehr. organizer und manager gelten nur für Installationen, die diese früheren Rollen schon hatten.",
           "type": "object",
           "additionalProperties": false,
           "properties": {

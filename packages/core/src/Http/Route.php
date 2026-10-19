@@ -20,13 +20,13 @@ final class Route
     public readonly \Closure $handler;
 
     /**
-     * @param string|Capability $access PUBLIC, LOGIN oder ein nötiges Recht
+     * @param string|Capability|Capability[] $access PUBLIC, LOGIN, ein nötiges Recht oder eines von mehreren
      * @param string|null $feature Bereich (Domain\Features); ist er aus, antwortet die Route mit 403 feature_disabled
      */
     public function __construct(
         public readonly string $method,
         public readonly string $path,
-        public readonly string|Capability $access,
+        public readonly string|Capability|array $access,
         callable $handler,
         public readonly ?string $feature = null,
         public readonly string $denyMessage = 'Dafür fehlt dir die Berechtigung.',

@@ -70,6 +70,7 @@ final class TestApp
             users: $users,
             config: new KompanieConfig($config),
         );
+        $users->capabilities = static fn (string $role): array => $app->roles()->capabilities($role);
         $app->upgrade();
         if ($features !== false) {
             $app->features()->update($features ?? array_fill_keys(Features::keys(), true));

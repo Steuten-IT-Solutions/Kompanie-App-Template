@@ -26,7 +26,7 @@ final class Backup
      * wiederhergestellt (Schema-Stand, Update-Zustand mit der laufenden Nummer der Liste, übersprungene
      * Version, Einrichtung abgeschlossen, Zeitpunkt der letzten Sicherung, Version der Aufgabenplanung).
      */
-    public const LOCAL_SETTINGS = ['schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned'];
+    public const LOCAL_SETTINGS = ['schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq'];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
     public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos'];
 

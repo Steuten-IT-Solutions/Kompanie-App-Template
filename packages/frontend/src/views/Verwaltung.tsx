@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, can, config, levelLabel, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
+import { api, can, config, levelLabel, roleFactor, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
 import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
@@ -10,12 +10,16 @@ type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog';
 
 const sec = brand.labels.sections;
 
+/** Bereich an und das Recht dazu (Punkte bzw. Strafen vergeben sind getrennte Rechte). */
+const canPoints = (): boolean => !!config?.features.points && can('manage_points');
+const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
+
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
 
-  const points = !!config?.features.points;
-  const penalties = !!config?.features.penalties;
+  const points = canPoints();
+  const penalties = canPenalties();
   const tabs = (
     [
       { id: 'mitglieder', label: 'Mitglieder', on: true },
@@ -72,11 +76,11 @@ function Members() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
-  const totalOpen = (data ?? []).filter((m) => m.level !== 'guest').reduce((s, m) => s + m.open_cents, 0);
+  const totalOpen = (data ?? []).filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
 
   return (
     <div>
-      {config?.features.penalties && (
+      {canPenalties() && (
         <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />
       )}
       {can('create_users') && (
@@ -104,12 +108,12 @@ function Members() {
             <div className="row-main">
               <div className="row-title">
                 {m.name}{' '}
-                {m.level !== 'member' && <span className={`badge badge-level-${m.level}`}>{caps(levelLabel(m.level))}</span>}
+                {m.level !== 'member' && <span className={`badge ${m.level === 'guest' ? 'badge-level-guest' : 'badge-role'}`}>{caps(levelLabel(m.level))}</span>}
               </div>
               <div className="row-sub">
-                {config?.features.points && `${m.points.toLocaleString('de-DE')} ${sec.points}`}
-                {config?.features.points && m.open_cents > 0 && ' · '}
-                {m.open_cents > 0 && <span className="neg">{formatEuro(m.open_cents)} offen</span>}
+                {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
+                {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
+                {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
             <span className="chevron" aria-hidden="true">›</span>
@@ -153,19 +157,19 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
       <RoleControl id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
       <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
       <div className="stats">
-        {config?.features.points && <StatCard label={sec.points} value={m.points.toLocaleString('de-DE')} tone="good" />}
-        {config?.features.penalties && (
-          <StatCard label="Offen" value={formatEuro(m.open_cents)} tone={m.open_cents > 0 ? 'warn' : 'good'} />
+        {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
+        {canPenalties() && (
+          <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
         )}
       </div>
       {m.level !== 'guest' && (
         <div className="button-row">
-          {config?.features.points && (
+          {canPoints() && (
             <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
               {sec.points} vergeben
             </button>
           )}
-          {config?.features.penalties && (
+          {canPenalties() && (
             <button className="btn btn-warn" onClick={() => navigate(`verwaltung/strafe/${m.id}`)}>
               {sec.penalties}: Eintrag
             </button>
@@ -173,8 +177,8 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
         </div>
       )}
 
-      {config?.features.penalties && <h3 className="section-title">{sec.penalties}</h3>}
-      {!config?.features.penalties ? null : m.penalties.length === 0 ? (
+      {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
+      {!canPenalties() ? null : m.penalties.length === 0 ? (
         <Empty>Keine Einträge.</Empty>
       ) : (
         <ul className="card-list">
@@ -218,8 +222,8 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
         </ul>
       )}
 
-      {config?.features.points && <h3 className="section-title">{sec.points}</h3>}
-      {!config?.features.points ? null : m.point_list.length === 0 ? (
+      {canPoints() && <h3 className="section-title">{sec.points}</h3>}
+      {!canPoints() ? null : m.point_list.length === 0 ? (
         <Empty>Keine Einträge.</Empty>
       ) : (
         <ul className="card-list">
@@ -295,25 +299,24 @@ function RoleControl({
       setBusy(false);
     }
   }
-  const levels: Level[] = adminsHere ? ['guest', 'member', 'organizer', 'manager', 'admin'] : ['guest', 'member', 'organizer', 'manager'];
+  // Rollen der Installation (Einstellungen → Rollen); Admin nur, wo Admins in der App ernannt werden.
+  const levels: Level[] = (config?.roles ?? []).map((r) => r.key).filter((k) => k !== 'admin' || adminsHere);
   return (
-    <div className="role-control">
+    <label className="field role-control">
       <span className="field-label">Rolle in der App</span>
-      <div className="segmented small" role="group" aria-label="Rolle in der App">
+      <select value={level} disabled={busy} onChange={(e) => change(e.target.value)}>
+        {!levels.includes(level) && (
+          <option value={level} disabled>
+            Unbekannte Rolle – bitte wählen
+          </option>
+        )}
         {levels.map((l) => (
-          <button
-            key={l}
-            className={level === l ? 'active' : ''}
-            disabled={busy}
-            aria-pressed={level === l}
-            aria-label={levelLabel(l)}
-            onClick={() => change(l)}
-          >
-            {caps(levelLabel(l))}
-          </button>
+          <option key={l} value={l}>
+            {levelLabel(l)}
+          </option>
         ))}
-      </div>
-    </div>
+      </select>
+    </label>
   );
 }
 
@@ -482,10 +485,17 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [applyFactor, setApplyFactor] = useState(true);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [members, catalog] = data as [MemberSummary[], CatalogItem[]];
+  // Punktefaktor der Rolle (z. B. 0,5 für junge Mitglieder): gilt beim Buchen, lässt sich übergehen.
+  const withFactor = selected.filter((id) => roleFactor(members.find((m) => m.id === id)?.level ?? 'member') !== 1);
+  const factorNote = (m: MemberSummary) => {
+    const f = roleFactor(m.level);
+    return f !== 1 ? `×${f.toLocaleString('de-DE')}` : null;
+  };
 
   function chooseCatalog(id: string) {
     setCatalogId(id);
@@ -510,6 +520,7 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
         points: n,
         reason: reason.trim(),
         date,
+        apply_factor: applyFactor,
         ...(catalogId ? { catalog_id: Number(catalogId) } : {}),
       });
       onToast(`${formatPoints(n)} ${sec.points} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
@@ -550,8 +561,23 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
       </label>
       <div className="field">
         <span>Mitglieder</span>
-        <MemberPicker members={members} selected={selected} onChange={setSelected} />
+        <MemberPicker members={members} selected={selected} onChange={setSelected} note={factorNote} />
       </div>
+      {withFactor.length > 0 && (
+        <label className="toggle">
+          <input type="checkbox" checked={applyFactor} onChange={(e) => setApplyFactor(e.target.checked)} />
+          <span>
+            Punktefaktor der Rolle anwenden
+            <span className="small muted feature-desc">
+              {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen anderen Faktor als 1
+              {Number(points) && applyFactor
+                ? `, z. B. ×${roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member').toLocaleString('de-DE')} → ${(Number(points) * roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member')).toLocaleString('de-DE')} ${sec.points}`
+                : ''}
+              .
+            </span>
+          </span>
+        </label>
+      )}
       {formError && <p className="form-error" role="alert">{formError}</p>}
       <button className="btn btn-block" type="submit" disabled={busy}>
         {busy ? 'Speichert …' : `${sec.points} vergeben`}

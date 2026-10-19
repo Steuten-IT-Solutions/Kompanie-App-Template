@@ -35,16 +35,16 @@ const ALIASES: Record<string, string[]> = {
 const features = config?.features;
 const sec = brand.labels.sections;
 
-const TAB_LABELS: Record<Tab, string> = {
+const tabLabels = (): Record<Tab, string> => ({
   termine: sec.events,
   news: sec.news,
   galerie: sec.gallery,
   meins: 'Meins',
-  verwaltung: brand.labels.roles.manager,
-};
+  verwaltung: 'Verwaltung',
+});
 
-const TITLES: Record<View, string> = {
-  ...TAB_LABELS,
+const titles = (): Record<View, string> => ({
+  ...tabLabels(),
   // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
   news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
   konto: 'Mein Konto',
@@ -52,7 +52,7 @@ const TITLES: Record<View, string> = {
   anmelden: 'Anmelden',
   einstellungen: 'Einstellungen',
   einrichtung: 'Einrichtung',
-};
+});
 
 function Icon({ name }: { name: Tab }) {
   const paths: Record<Tab, string> = {
@@ -162,8 +162,13 @@ export default function App() {
     news: !!features?.news,
     galerie: !!features?.gallery,
     meins: isMember() && !!(features?.points || features?.penalties),
-    // Die Verwaltung beginnt mit der Mitgliederliste; die braucht das Recht manage.
-    verwaltung: can('manage'),
+    // Die Verwaltung beginnt mit der Mitgliederliste: für alle, die Punkte oder Strafen vergeben,
+    // Mitglieder anlegen oder Rollen vergeben (auch wenn Punkte und Strafen aus sind).
+    verwaltung:
+      (!!features?.points && can('manage_points')) ||
+      (!!features?.penalties && can('manage_penalties')) ||
+      can('create_users') ||
+      can('promote_users'),
     konto: !!user,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
@@ -220,7 +225,7 @@ export default function App() {
       <header className="topbar">
         <img src={logoUrl} alt="" className="logo" />
         <div className="topbar-text">
-          <div className="topbar-title">{caps(TITLES[tab])}</div>
+          <div className="topbar-title">{caps(titles()[tab])}</div>
           <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
         </div>
         {user ? (
@@ -285,12 +290,12 @@ export default function App() {
             <button
               key={t}
               className={tab === t ? 'active' : ''}
-              aria-label={TAB_LABELS[t]}
+              aria-label={tabLabels()[t]}
               onClick={() => navigate(t)}
               aria-current={tab === t ? 'page' : undefined}
             >
               <Icon name={t} />
-              <span>{caps(TAB_LABELS[t])}</span>
+              <span>{caps(tabLabels()[t])}</span>
             </button>
           ))}
         </nav>

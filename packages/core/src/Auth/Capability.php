@@ -9,12 +9,14 @@ enum Capability: string
 {
     /** Eigene Punkte/Strafen, interner Kalender, interne Galerie. */
     case Member = 'member';
-    /** Punkte und Strafen vergeben, Katalog pflegen (Rolle manager, Standard „Leitung“). */
-    case Manage = 'manage';
-    /** Öffentliche Termine pflegen (ab Rolle organizer, Standard „Verwalter“). */
+    /** Punkte vergeben und stornieren, Punktekatalog pflegen (Bereich Punkte). */
+    case ManagePoints = 'manage_points';
+    /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen). */
+    case ManagePenalties = 'manage_penalties';
+    /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
     /**
-     * Dokumente pflegen und alle Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (ab Rolle organizer).
+     * Dokumente pflegen und alle Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit.
      * Die Dokumente selbst kommen mit Issue #2.
      */
     case ManageDocuments = 'manage_documents';

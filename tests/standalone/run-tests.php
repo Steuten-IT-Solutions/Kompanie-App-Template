@@ -27,7 +27,7 @@ use KompanieApp\Contract\Checks;
 use KompanieApp\Core\Tests\Support\CountingPdo;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
 use KompanieApp\Contract\HttpDriver;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Standalone\Config;
 use KompanieApp\Standalone\HttpContext;
 use KompanieApp\Standalone\Kernel;
@@ -90,8 +90,8 @@ try {
 
     echo "\n== Eigenständige Version ==\n";
     $users = $kernel->users();
-    $anna = $users->add('Anna Admin', 'anna', 'anna@example.org', 'anna-passwort', Level::Admin);
-    $max = $users->add('Max Mitglied', 'max', 'max@example.org', 'max-passwort', Level::Member);
+    $anna = $users->add('Anna Admin', 'anna', 'anna@example.org', 'anna-passwort', Roles::ADMIN);
+    $max = $users->add('Max Mitglied', 'max', 'max@example.org', 'max-passwort', Roles::MEMBER);
     $json = ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
     $login = static fn (string $u, string $p, ?bool $remember = true, array $headers = []) => $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $headers + $json, (string) json_encode(['username' => $u, 'password' => $p] + ($remember === null ? [] : ['remember' => $remember])));
     $cookieOf = static fn (array $res): ?string => preg_match('/' . Sessions::COOKIE . '=([a-f0-9]{64})/', $res[2]['set-cookie'], $m) ? $m[1] : null;

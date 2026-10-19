@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Storage\GalleryRepository;
@@ -139,7 +139,7 @@ final class GalleryTest extends TestCase
         $res = $this->app->api()->handle(new Request('GET', '/gallery'));
         $this->assertSame(200, $res->status);
         $this->assertNotContains('Vereinsabend', array_column($res->data['years'][0]['albums'], 'title'));
-        $this->users->current = $this->users->add('mitglied', Level::Member);
+        $this->users->current = $this->users->add('mitglied', Roles::MEMBER);
         $res = $this->app->api()->handle(new Request('GET', '/gallery/' . $member['Vereinsabend']['id']));
         $this->assertSame(200, $res->status);
 

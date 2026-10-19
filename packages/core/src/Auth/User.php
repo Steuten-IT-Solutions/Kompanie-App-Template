@@ -12,7 +12,8 @@ final class User
         public readonly int $id,
         public readonly string $name,
         public readonly string $login,
-        public readonly Level $level,
+        /** Schlüssel der Rolle (Auth\Roles bzw. vom Admin angelegt) */
+        public readonly string $role,
         public readonly array $capabilities,
     ) {
     }
@@ -27,6 +28,11 @@ final class User
         return $this->can(Capability::Member);
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->role === Roles::ADMIN;
+    }
+
     /** @return array{id: int, name: string, login: string, level: string, capabilities: string[]} */
     public function toArray(): array
     {
@@ -34,7 +40,7 @@ final class User
             'id' => $this->id,
             'name' => $this->name,
             'login' => $this->login,
-            'level' => $this->level->value,
+            'level' => $this->role,
             'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->capabilities),
         ];
     }

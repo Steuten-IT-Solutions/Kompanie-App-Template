@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Contract;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Standalone\Kernel;
 use KompanieApp\Standalone\Sessions;
 
@@ -161,7 +161,7 @@ final class HttpDriver implements ApiDriver
         if ($existing) {
             $this->deleteUser((int) $existing);
         }
-        return $this->kernel->users()->add(ucfirst($login), $login, '', bin2hex(random_bytes(8)), Level::from($level));
+        return $this->kernel->users()->add(ucfirst($login), $login, '', bin2hex(random_bytes(8)), $level);
     }
 
     public function deleteUser(int $id): void

@@ -187,6 +187,11 @@ final class Migrations
                 'mysql' => ['ALTER TABLE {photos} ADD COLUMN attempts int(11) NOT NULL DEFAULT 0'],
                 'sqlite' => ['ALTER TABLE {photos} ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0'],
             ],
+            // Punktefaktor der Rolle beim Buchen (Issue #28): zählt points × factor.
+            3 => [
+                'mysql' => ['ALTER TABLE {points} ADD COLUMN factor decimal(4,2) NOT NULL DEFAULT 1.00'],
+                'sqlite' => ['ALTER TABLE {points} ADD COLUMN factor REAL NOT NULL DEFAULT 1'],
+            ],
         ];
     }
 

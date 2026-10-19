@@ -6,7 +6,7 @@ namespace KompanieApp\Core\Tests\Support;
 
 use KompanieApp\Contract\ApiDriver;
 use KompanieApp\Core\App;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Http\Request;
 
 /** Führt das API-Szenario direkt gegen den Kern aus. */
@@ -32,7 +32,7 @@ final class CoreDriver implements ApiDriver
 
     public function createUser(string $login, string $level): int
     {
-        return $this->users->add($login, Level::from($level));
+        return $this->users->add($login, $level);
     }
 
     public function deleteUser(int $id): void

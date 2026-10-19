@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Tests;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\Request;
@@ -151,7 +151,7 @@ final class CalendarTest extends TestCase
         $users = new FakeUsers();
         $settings = new MemorySettings(['calendar_ics_url' => 'webcal://calendar.google.com/x/basic.ics']);
         $app = TestApp::create(TestApp::connection(), $users, [], $http, null, $settings);
-        $users->current = $users->add('m', Level::Member);
+        $users->current = $users->add('m', Roles::MEMBER);
 
         $res = $app->api()->handle(new Request('GET', '/calendar'));
         $this->assertSame(200, $res->status);
@@ -160,7 +160,7 @@ final class CalendarTest extends TestCase
         $app->api()->handle(new Request('GET', '/calendar'));
         $this->assertCount(1, $http->calls, 'Zwischenspeicher');
 
-        $users->current = $users->add('g', Level::Guest);
+        $users->current = $users->add('g', Roles::GUEST);
         $this->assertSame(403, $app->api()->handle(new Request('GET', '/calendar'))->status);
     }
 
@@ -168,7 +168,7 @@ final class CalendarTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $users->current = $users->add('m', Level::Member);
+        $users->current = $users->add('m', Roles::MEMBER);
         $res = $app->api()->handle(new Request('GET', '/calendar'));
         $this->assertSame(503, $res->status);
         $this->assertSame('not_configured', $res->data['code']);

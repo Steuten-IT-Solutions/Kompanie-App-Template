@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 
 /** „Rolle in der App“ im Benutzerprofil des WP-Admin. */
 final class ProfileField
@@ -21,25 +21,31 @@ final class ProfileField
 
     private static function render(App $app, \WP_User $user): void
     {
-        if (!current_user_can('promote_users')) {
+        // Die eigene Rolle ändert niemand selbst (wie in der App).
+        if (!current_user_can('promote_users') || (int) $user->ID === get_current_user_id()) {
             return;
         }
         $c = $app->config;
-        $level = WpUsers::level($user);
+        $level = WpUsers::role($user);
         echo '<h2>' . esc_html($c->shortName()) . ' – App</h2><table class="form-table" role="presentation"><tr>';
         echo '<th scope="row"><label for="kompanie_app_level">Rolle in der App</label></th><td>';
-        if ($level === Level::Admin) {
-            echo '<strong>' . esc_html($c->roleLabel('admin')) . '</strong> – Administratoren dürfen in der App alles.';
+        if ($level === Roles::ADMIN) {
+            echo '<strong>' . esc_html($app->roles()->label(Roles::ADMIN)) . '</strong> – Administratoren dürfen in der App alles.';
         } else {
-            $options = [
-                'guest' => $c->roleLabel('guest') . ' – nur öffentliche Inhalte',
-                'member' => $c->roleLabel('member') . ' – eigene Punkte und Strafen',
-                'organizer' => $c->roleLabel('organizer') . ' – Termine und Dokumente pflegen',
-                'manager' => $c->roleLabel('manager') . ' – zusätzlich Punkte und Strafen verwalten',
-            ];
+            // Rollen der App (Einstellungen → Rollen), ohne Admin: Admins werden im WP-Backend vergeben.
+            $options = [];
+            foreach ($app->roles()->all() as $key => $role) {
+                if ($key !== Roles::ADMIN) {
+                    $options[$key] = $role['label'];
+                }
+            }
             echo '<select name="kompanie_app_level" id="kompanie_app_level">';
+            if (!isset($options[$level])) {
+                // Rolle, die es in der App nicht (mehr) gibt: nicht stillschweigend die erste Option speichern.
+                echo '<option value="" selected disabled>Unbekannte Rolle – bitte wählen</option>';
+            }
             foreach ($options as $value => $label) {
-                printf('<option value="%s"%s>%s</option>', esc_attr($value), selected($level->value, $value, false), esc_html($label));
+                printf('<option value="%s"%s>%s</option>', esc_attr($value), selected($level, $value, false), esc_html($label));
             }
             echo '</select>';
             wp_nonce_field('kompanie_app_level_' . $user->ID, 'kompanie_app_level_nonce');
@@ -49,17 +55,21 @@ final class ProfileField
 
     private static function save(App $app, int $userId): void
     {
-        if (!current_user_can('promote_users') || !current_user_can('edit_user', $userId)) {
+        if (!current_user_can('promote_users') || !current_user_can('edit_user', $userId) || $userId === get_current_user_id()) {
             return;
         }
         $nonce = isset($_POST['kompanie_app_level_nonce']) ? sanitize_key(wp_unslash($_POST['kompanie_app_level_nonce'])) : '';
         if (!isset($_POST['kompanie_app_level']) || !wp_verify_nonce($nonce, 'kompanie_app_level_' . $userId)) {
             return;
         }
-        $level = Level::tryFrom(sanitize_key(wp_unslash($_POST['kompanie_app_level'])));
-        if ($level !== null && $level !== Level::Admin) {
+        $level = sanitize_key(wp_unslash($_POST['kompanie_app_level']));
+        $actor = $app->authContext->currentUser();
+        $target = $app->users->find($userId);
+        // Wie in der App: keine Rechte weitergeben, die man selbst nicht hat (WP-Administratoren dürfen alles).
+        if ($level !== Roles::ADMIN && $app->roles()->exists($level) && $actor !== null && $target !== null
+            && $app->roles()->canHandle($actor, $level) && $app->roles()->canHandleUser($actor, $target)) {
             try {
-                $app->users->setLevel($userId, $level);
+                $app->users->setRole($userId, $level);
             } catch (\DomainException) {
                 // Administratoren bleiben unverändert.
             }

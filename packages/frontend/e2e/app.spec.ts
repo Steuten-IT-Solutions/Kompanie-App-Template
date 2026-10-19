@@ -1,7 +1,7 @@
 import { devices, expect, test, type Page } from '@playwright/test';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
-// Die Leitung (manager) heißt dort „Spieß“, der Bereich Strafen „Kasse“; Verwalter (organizer) behält den Standard. Die App liegt unter /app/.
+// Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
 // - WordPress-Plugin (Standard): scripts/setup-test-wp.sh, Anmeldung über wp-login.php
 // - eigenständige Version (KOMPANIE_VARIANT=standalone): tests/standalone/e2e-router.php,
 //   Anmeldung über das Formular in der App
@@ -9,7 +9,10 @@ import { devices, expect, test, type Page } from '@playwright/test';
 const PASSWORD = process.env.KOMPANIE_TEST_PASSWORD ?? 'test1234';
 const ADMIN_PASSWORD = process.env.KOMPANIE_ADMIN_PASSWORD ?? 'admin';
 const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
-const MANAGER = 'Spieß';
+/** Tab für Punkte und Strafen */
+const MANAGER = 'Verwaltung';
+/** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
+const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
 
 /** Anmeldeformular: wp-login.php bzw. das Formular der App. */
@@ -62,7 +65,7 @@ test('Mitglied sieht Termine, aber keine Verwaltung', async ({ page }) => {
   await login(page, 'mitglied1');
   await expect(page.locator('.topbar-sub')).toHaveText('Hallo, Mitglied1');
   await expect(page.getByText('Vereinsabend')).toBeVisible();
-  await expect(page.getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
   await page.getByText('Vereinsabend').click();
   await expect(page.getByText('Bitte pünktlich sein!')).toBeVisible();
   await expect(page.getByRole('button', { name: 'In meinen Kalender' })).toBeVisible();
@@ -80,7 +83,7 @@ test('Mitglied sieht Termine, aber keine Verwaltung', async ({ page }) => {
 
 test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ page }) => {
   await login(page, 'verwalter');
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await shot(page, '5-verwaltung-mitglieder');
 
   await page.getByRole('button', { name: 'Katalog' }).click();
@@ -121,7 +124,7 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
 
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByPlaceholder('Vorname Nachname').fill('Neue Testperson');
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
@@ -142,12 +145,12 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
 
   await login(page, username, fresh);
   await expect(page.locator('.topbar-sub')).toHaveText('Hallo, Neue Testperson');
-  await expect(page.getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
 });
 
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
   await login(page, 'verwalter');
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await expect(page.locator('.stat').first()).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Mitglied anlegen' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
@@ -257,7 +260,7 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await expect(page.getByText('Vereinsabend')).toHaveCount(0); // nur im Kalender für Mitglieder
   await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
   await shot(page, '11-gast-termine');
 
   await page.getByRole('button', { name: 'News' }).click();
@@ -291,10 +294,10 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
 
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await expect(page.locator('.role-control').getByRole('button', { name: 'Admin' })).toHaveCount(0); // WordPress: Admins im Backend
-  await page.locator('.role-control').getByRole('button', { name: 'Gast' }).click();
+  if (!STANDALONE) await expect(page.locator('.role-control option', { hasText: 'Admin' })).toHaveCount(0); // WordPress: Admins im Backend
+  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Gast' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Gast');
   await shot(page, '13-rolle');
 
@@ -303,32 +306,66 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await expect(page.getByRole('button', { name: 'Konto' })).toBeVisible();
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await page.locator('.role-control').getByRole('button', { name: 'Mitglied' }).click();
+  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
 });
 
-test('Admin macht ein Mitglied zum Verwalter: Termine pflegen ja, Punkte und Strafen nein', async ({ page }) => {
+test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Strafen nein', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await page.locator('.role-control').getByRole('button', { name: 'Verwalter' }).click();
-  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Verwalter');
+  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Termine verwalten' });
+  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Termine verwalten');
 
   await login(page, 'mitglied2');
   await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
-  await expect(page.getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
   await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
   await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
   // Die Rechte auf dem Server prüft das API-Szenario (tests/contract) für beide Varianten.
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: MANAGER }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await page.locator('.role-control').getByRole('button', { name: 'Mitglied' }).click();
+  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
+});
+
+test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  const rollen = page.locator('#einstellungen-rollen');
+  await expect(rollen.locator('.row-title', { hasText: SPIESS })).toBeVisible();
+  await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
+  await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
+  await rollen.getByLabel('Name der Rolle').fill('Kassenwart');
+  await rollen.getByLabel(/^Kasse vergeben/).check();
+  await rollen.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
+  await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toContainText('0 Personen');
+  await shot(page, '20-rollen');
+
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Kassenwart' });
+  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Kassenwart');
+
+  await login(page, 'mitglied2');
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toHaveCount(0);
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await rollen.getByRole('button', { name: 'Kassenwart bearbeiten' }).click();
+  page.once('dialog', (d) => d.accept());
+  await rollen.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
+  await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
 });
 
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {

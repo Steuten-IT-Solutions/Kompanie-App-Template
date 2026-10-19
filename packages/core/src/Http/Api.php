@@ -84,7 +84,8 @@ final class Api
         if ($user === null) {
             throw ApiError::notLoggedIn();
         }
-        if ($route->access instanceof Cap && !$user->can($route->access)) {
+        $needed = $route->access instanceof Cap ? [$route->access] : (is_array($route->access) ? $route->access : []);
+        if ($needed !== [] && !array_filter($needed, static fn (Cap $c): bool => $user->can($c))) {
             throw ApiError::forbidden($route->denyMessage);
         }
     }
@@ -126,6 +127,8 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
+            // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
+            'roles' => $a->roles()->publicList(),
             'user' => $a->authContext->currentUser()?->toArray(),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
@@ -143,6 +146,9 @@ final class Api
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
+        // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
+        // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
+        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::CreateUsers, Cap::PromoteUsers];
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [
@@ -198,13 +204,13 @@ final class Api
                 ?? throw ApiError::notFound('Beitrag nicht gefunden.'), 'news'),
 
             // Punktekatalog
-            new Route('GET', '/catalog', $L, fn (Request $r) => $a->scores()->catalog($r->queryFlag('all') && $this->can(Cap::Manage)), 'points'),
-            new Route('POST', '/catalog', Cap::Manage, fn (Request $r) => Response::created($a->scores()->createCatalogItem($r->body)), 'points', $denyManage),
-            new Route('PATCH', '/catalog/{id}', Cap::Manage, fn (Request $r) => $a->scores()->updateCatalogItem($r->id(), $r->body), 'points', $denyManage),
+            new Route('GET', '/catalog', $L, fn (Request $r) => $a->scores()->catalog($r->queryFlag('all') && $this->can(Cap::ManagePoints)), 'points'),
+            new Route('POST', '/catalog', Cap::ManagePoints, fn (Request $r) => Response::created($a->scores()->createCatalogItem($r->body)), 'points', $denyManage),
+            new Route('PATCH', '/catalog/{id}', Cap::ManagePoints, fn (Request $r) => $a->scores()->updateCatalogItem($r->id(), $r->body), 'points', $denyManage),
 
             // Mitglieder
-            new Route('GET', '/members', Cap::Manage, fn (Request $r) => $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers)), null, $denyManage),
-            new Route('GET', '/members/{id}', Cap::Manage, fn (Request $r) => $a->members()->detail($r->id()), null, $denyManage),
+            new Route('GET', '/members', $manage, fn (Request $r) => $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user()), null, $denyManage),
+            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user()), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, fn (Request $r) => Response::created($a->members()->create($r->body)), null, $denyUsers),
@@ -212,6 +218,21 @@ final class Api
             // Einstellungen (Admins)
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
+            // Rollen (Issue #28): nur Admins (manage_settings lässt sich keiner anderen Rolle geben)
+            new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $a->roles()->describe(), null, $denySettings),
+            new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->create($r->body);
+                return Response::created($a->roles()->describe());
+            }, null, $denySettings),
+            new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->update((string) $r->params['key'], $r->body);
+                return $a->roles()->describe();
+            }, null, $denySettings),
+            new Route('DELETE', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $replacement = $r->query['replacement'] ?? null;
+                $a->roles()->delete((string) $r->params['key'], is_string($replacement) ? $replacement : null);
+                return $a->roles()->describe();
+            }, null, $denySettings),
             new Route('GET', '/admin/features', Cap::ManageSettings, fn () => $a->features()->describe(), null, $denySettings),
             new Route('PUT', '/admin/features', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->features()->update($r->body);
@@ -277,14 +298,14 @@ final class Api
             }, null, $denySettings),
 
             // Punkte und Strafen
-            new Route('POST', '/points', Cap::Manage, fn (Request $r) => Response::created($a->scores()->givePoints($r->body, $this->user()->id)), 'points', $denyManage),
-            new Route('DELETE', '/points/{id}', Cap::Manage, function (Request $r) use ($a) {
+            new Route('POST', '/points', Cap::ManagePoints, fn (Request $r) => Response::created($a->scores()->givePoints($r->body, $this->user()->id)), 'points', $denyManage),
+            new Route('DELETE', '/points/{id}', Cap::ManagePoints, function (Request $r) use ($a) {
                 $a->scores()->cancelPoints($r->id(), $this->user()->id);
                 return ['deleted' => true];
             }, 'points', $denyManage),
-            new Route('POST', '/penalties', Cap::Manage, fn (Request $r) => Response::created($a->scores()->givePenalty($r->body, $this->user()->id)), 'penalties', $denyManage),
-            new Route('PATCH', '/penalties/{id}', Cap::Manage, fn (Request $r) => $a->scores()->setPenaltyStatus($r->id(), $r->input('status'), $this->user()->id), 'penalties', $denyManage),
-            new Route('DELETE', '/penalties/{id}', Cap::Manage, function (Request $r) use ($a) {
+            new Route('POST', '/penalties', Cap::ManagePenalties, fn (Request $r) => Response::created($a->scores()->givePenalty($r->body, $this->user()->id)), 'penalties', $denyManage),
+            new Route('PATCH', '/penalties/{id}', Cap::ManagePenalties, fn (Request $r) => $a->scores()->setPenaltyStatus($r->id(), $r->input('status'), $this->user()->id), 'penalties', $denyManage),
+            new Route('DELETE', '/penalties/{id}', Cap::ManagePenalties, function (Request $r) use ($a) {
                 $a->scores()->cancelPenalty($r->id(), $this->user()->id);
                 return ['deleted' => true];
             }, 'penalties', $denyManage),

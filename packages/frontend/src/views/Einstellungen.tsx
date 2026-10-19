@@ -1,19 +1,23 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { api, applyFeatures, type AdminSettings, type Feature, type FeatureInfo, type NewsSourceType } from '../api';
+import { api, applyFeatures, refreshRoles, type AdminSettings, type Feature, type FeatureInfo, type NewsSourceType } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Rollen from './Rollen';
 import Wartung from './Wartung';
 
 /**
- * Einstellungen für Admins (beide Varianten): Bereiche, Zustand, Updates und Datensicherung, dann Kalender,
+ * Einstellungen für Admins (beide Varianten): Bereiche, Rollen, Zustand, Updates und Datensicherung, dann Kalender,
  * Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
  * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
  */
 export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
   // Nach dem Speichern von Kalender, Galerie oder News: „eingerichtet?“ der Bereiche neu laden.
   const [setupSaved, setSetupSaved] = useState(0);
+  // Nach dem Schalten von Bereichen: Standardrollen neu laden.
+  const [featuresSaved, setFeaturesSaved] = useState(0);
   return (
     <div className="settings">
-      <Bereiche onToast={onToast} refresh={setupSaved} />
+      <Bereiche onToast={onToast} refresh={setupSaved} onSaved={() => setFeaturesSaved((n) => n + 1)} />
+      <Rollen onToast={onToast} refresh={featuresSaved} />
       <Wartung onToast={onToast} />
       <Verbindungen onToast={onToast} onSetupSaved={() => setSetupSaved((n) => n + 1)} />
     </div>
@@ -99,7 +103,7 @@ export function FeatureSwitches({
  * Einstellungen → Bereiche: Jeder Schalter speichert sofort; beim Ausschalten wird nachgefragt.
  * Jeder geladene Stand geht auch an die App (Tabs), z. B. wenn ein Bereich gerade eingerichtet wurde.
  */
-function Bereiche({ onToast, refresh }: { onToast: (msg: string) => void; refresh: number }) {
+function Bereiche({ onToast, refresh, onSaved }: { onToast: (msg: string) => void; refresh: number; onSaved: () => void }) {
   const { data, error, loading, reload, setData } = useAsync(
     () =>
       api.features().then((list) => {
@@ -124,6 +128,8 @@ function Bereiche({ onToast, refresh }: { onToast: (msg: string) => void; refres
       const next = await api.setFeatures({ [key]: on });
       setData(next);
       applyFeatures(next);
+      await refreshRoles();
+      onSaved();
       onToast(on ? `${name} eingeschaltet` : `${name} ausgeschaltet`);
     } catch (err) {
       setSaveError((err as Error).message);

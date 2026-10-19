@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Tests;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\Passwords;
@@ -60,7 +60,7 @@ final class CoreTest extends TestCase
             try {
                 $users = new FakeUsers();
                 $app = TestApp::create($db, $users);
-                $users->current = $users->add('admin', Level::Admin);
+                $users->current = $users->add('admin', Roles::ADMIN);
                 $res = $app->api()->handle(new Request('POST', '/catalog', [], ['title' => 'x', 'points' => 1, 'sort' => 10000000000]));
                 $this->assertSame(201, $res->status, $driver);
                 $this->assertSame(1000000, $res->data['sort']);
@@ -69,7 +69,7 @@ final class CoreTest extends TestCase
                 $this->assertSame(10000, mb_strlen($res->data['description']));
                 $res = $app->api()->handle(new Request('PATCH', '/events/' . $res->data['id'], [], ['location' => 'Halle']));
                 $this->assertSame(200, $res->status, 'Termin mit Umlaut-Link bleibt änderbar');
-                $res = $app->api()->handle(new Request('POST', '/points', [], ['user_ids' => [$users->add('m', Level::Member)], 'points' => 1, 'reason' => 'Zu spät <10 min']));
+                $res = $app->api()->handle(new Request('POST', '/points', [], ['user_ids' => [$users->add('m', Roles::MEMBER)], 'points' => 1, 'reason' => 'Zu spät <10 min']));
                 $this->assertSame('Zu spät <10 min', $res->data[0]['reason']);
             } finally {
                 TestApp::dropTables($db);
@@ -108,7 +108,7 @@ final class CoreTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users, features: ['penalties' => false, 'events' => false, 'points' => true, 'gallery' => true]);
-        $users->current = $users->add('admin', Level::Admin);
+        $users->current = $users->add('admin', Roles::ADMIN);
         foreach ([['GET', '/me/penalties'], ['POST', '/penalties'], ['GET', '/events']] as [$m, $p]) {
             $res = $app->api()->handle(new Request($m, $p));
             $this->assertSame(403, $res->status, "$m $p");
@@ -125,8 +125,8 @@ final class CoreTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $a = $users->add('chef', Level::Admin, 'richtig123');
-        $b = $users->add('zweiter', Level::Admin);
+        $a = $users->add('chef', Roles::ADMIN, 'richtig123');
+        $b = $users->add('zweiter', Roles::ADMIN);
 
         $res = $app->api()->handle(new Request('POST', '/auth/login', [], ['username' => 'chef', 'password' => 'falsch']));
         $this->assertSame(400, $res->status);
@@ -150,7 +150,7 @@ final class CoreTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $users->current = $users->add('m', Level::Member, 'altes-passwort');
+        $users->current = $users->add('m', Roles::MEMBER, 'altes-passwort');
         $res = $app->api()->handle(new Request('POST', '/me/password', [], ['current_password' => 'altes-passwort', 'new_password' => ' mit-leer ']));
         $this->assertSame(400, $res->status, 'Leerzeichen am Rand');
         $res = $app->api()->handle(new Request('POST', '/me/password', [], ['current_password' => 'altes-passwort', 'new_password' => 'neues-passwort']));
@@ -162,7 +162,7 @@ final class CoreTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $users->current = $id = $users->add('m', Level::Member);
+        $users->current = $id = $users->add('m', Roles::MEMBER);
         $users->setPassword($id, 'richtig-123');
         $try = static fn (string $cur) => $app->api()->handle(new Request('POST', '/me/password', [], ['current_password' => $cur, 'new_password' => 'ganz-neu-456']))->status;
         for ($i = 0; $i < 5; $i++) {
@@ -178,7 +178,7 @@ final class CoreTest extends TestCase
         $settings = new MemorySettings();
         $m = new Migrator($db, $settings);
         $this->assertTrue($m->pending());
-        $this->assertSame([1, 2], $m->migrate());
+        $this->assertSame(range(1, Migrations::latest()), $m->migrate());
         $this->assertSame([], $m->migrate());
         $this->assertSame(Migrations::latest(), $m->current());
         $this->assertFalse($m->pending());

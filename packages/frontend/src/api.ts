@@ -3,8 +3,17 @@
 
 import brand from './generated/brand';
 
-export type Level = 'admin' | 'manager' | 'organizer' | 'member' | 'guest';
-export type Capability = 'member' | 'manage' | 'manage_events' | 'manage_documents' | 'create_users' | 'promote_users' | 'manage_settings';
+/** Schlüssel einer Rolle: guest, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
+export type Level = string;
+export type Capability =
+  | 'member'
+  | 'manage_points'
+  | 'manage_penalties'
+  | 'manage_events'
+  | 'manage_documents'
+  | 'create_users'
+  | 'promote_users'
+  | 'manage_settings';
 export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties';
 
 export interface AppUser {
@@ -25,6 +34,8 @@ export interface AppConfig {
   csrf: { header: string; token: string; refreshUrl: string };
   auth: { mode: 'form' | 'redirect'; loginUrl: string | null; logoutUrl: string | null };
   features: Record<Feature, boolean>;
+  /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
+  roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
   user: AppUser | null;
   /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
@@ -64,7 +75,47 @@ export function applyFeatures(list: FeatureInfo[]): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
-export const levelLabel = (level: Level): string => brand.labels.roles[level] ?? level;
+export interface RoleInfo {
+  key: Level;
+  label: string;
+  points_factor: number;
+}
+
+/** Für Einstellungen → Rollen (nur Admins). */
+export interface RoleAdmin extends RoleInfo {
+  capabilities: Capability[];
+  users: number;
+  system: boolean;
+  deletable: boolean;
+}
+
+export type RoleInput = { label?: string; capabilities?: Capability[]; points_factor?: number | string };
+
+export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
+
+export const levelLabel = (level: Level): string =>
+  roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
+
+/** Punktefaktor der Rolle (1 ohne Angabe). */
+export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
+
+/** Nach dem Schalten von Bereichen: Standardrollen können dazugekommen oder weggefallen sein. */
+export async function refreshRoles(): Promise<RoleAdmin[] | null> {
+  try {
+    const list = await api.roles();
+    applyRoles(list);
+    return list;
+  } catch {
+    return null; // z. B. offline; beim nächsten Laden stimmt es wieder
+  }
+}
+
+/** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
+export function applyRoles(list: RoleAdmin[]): void {
+  if (!config) return;
+  config.roles = list.map(({ key, label, points_factor }) => ({ key, label, points_factor }));
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
 
 /** Darf der angemeldete Benutzer das? */
 export const can = (cap: Capability): boolean => !!config?.user?.capabilities.includes(cap);
@@ -82,7 +133,10 @@ export interface Me {
 export interface PointEntry {
   id: number;
   user_id: number;
+  /** zählt: gebuchte Punkte × Faktor der Rolle */
   points: number;
+  base_points?: number;
+  factor?: number;
   reason: string;
   catalog_id: number | null;
   date: string;
@@ -184,8 +238,9 @@ export interface MemberSummary {
   id: number;
   name: string;
   level: Level;
-  points: number;
-  open_cents: number;
+  /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
+  points: number | null;
+  open_cents: number | null;
 }
 
 export interface MemberDetail extends MemberSummary {
@@ -341,7 +396,12 @@ export const api = {
   },
   createUser: (data: { name: string; username?: string; email?: string }) => request<CreatedUser>('POST', '/users', data),
 
-  givePoints: (data: { user_ids: number[]; points?: number; catalog_id?: number; reason?: string; date?: string }) =>
+  roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
+  createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),
+  updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
+  deleteRole: (key: Level, replacement?: Level) =>
+    request<RoleAdmin[]>('DELETE', `/admin/roles/${encodeURIComponent(key)}`, undefined, replacement ? { replacement } : undefined),
+  givePoints: (data: { user_ids: number[]; points?: number; catalog_id?: number; reason?: string; date?: string; apply_factor?: boolean }) =>
     request<PointEntry[]>('POST', '/points', data),
   deletePoints: (id: number) => request<{ deleted: boolean }>('DELETE', `/points/${id}`),
 

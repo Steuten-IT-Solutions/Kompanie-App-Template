@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\Auth\Roles as AppRolesKeys;
+
 /**
- * Rollen und Rechte der App in WordPress.
+ * Frühere WP-Rollen der App (vor Issue #28). Heute steht die Rolle in einer Benutzer-Option
+ * (WpUsers::ROLE_META), ihre Rechte kommen aus der App (Einstellungen → Rollen). Die WP-Rollen bleiben
+ * angelegt und werden für Mitglied, Verwalter und Leitung weiter vergeben, damit Konten bis zur
+ * Übernahme (migrateUsers) und nach einem Zurückrollen ihre Rechte behalten.
  *
  * - Admin     = WordPress-Administrator, darf alles.
  * - Leitung   = Rolle kompanie_manager (Punkte/Strafen verwalten + alles von Verwalter).
@@ -32,9 +37,16 @@ final class Roles
      *
      * @param array{member: string, organizer: string, manager: string} $labels
      */
-    public static function install(array $labels): void
+    public static function install(array $labels, bool $organizer = true, bool $manager = true): void
     {
-        $roles = [self::ROLE_MEMBER => $labels['member'], self::ROLE_ORGANIZER => $labels['organizer'], self::ROLE_MANAGER => $labels['manager']];
+        $roles = [self::ROLE_MEMBER => $labels['member']];
+        // Verwalter/Leitung nur in Installationen, die diese Rollen der App noch haben; vorhandene bleiben.
+        if ($organizer || get_role(self::ROLE_ORGANIZER)) {
+            $roles[self::ROLE_ORGANIZER] = $labels['organizer'];
+        }
+        if ($manager || get_role(self::ROLE_MANAGER)) {
+            $roles[self::ROLE_MANAGER] = $labels['manager'];
+        }
         foreach ($roles as $roleName => $label) {
             if (!get_role($roleName)) {
                 add_role($roleName, $label, ['read' => true]);
@@ -80,5 +92,34 @@ final class Roles
         if ($changed && $wpRoles->use_db) {
             update_option($wpRoles->role_key, $wpRoles->roles);
         }
+    }
+
+    /**
+     * Einmalig nach dem Update auf Issue #28: Wer noch eine frühere WP-Rolle oder ein früheres WP-Recht der
+     * App hat und kein Meta, bekommt die entsprechende Rolle als Meta. Die WP-Rollen bleiben als Rückfall.
+     * Administratoren nicht: Ihre Rolle kommt immer aus WordPress.
+     *
+     * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? Sonst wird es Mitglied.
+     * @return int Anzahl übernommener Konten
+     */
+    public static function migrateUsers(?\Closure $known = null): int
+    {
+        $noMeta = [['key' => WpUsers::metaKey(), 'compare' => 'NOT EXISTS']];
+        $byRole = get_users(['role__in' => [self::ROLE_MEMBER, self::ROLE_ORGANIZER, self::ROLE_MANAGER], 'meta_query' => $noMeta]);
+        $byCap = get_users(['capability__in' => WpUsers::LEGACY_CAPS, 'meta_query' => $noMeta]);
+        $count = 0;
+        $seen = [];
+        foreach (array_merge($byRole, $byCap) as $u) {
+            $id = (int) $u->ID;
+            if (isset($seen[$id]) || WpUsers::role($u) === AppRolesKeys::ADMIN) {
+                continue;
+            }
+            $seen[$id] = true;
+            $role = WpUsers::legacyRole($u);
+            update_user_option($id, WpUsers::ROLE_META, $known === null || $known($role) ? $role : AppRolesKeys::MEMBER, false);
+            update_user_option($id, WpUsers::ACCOUNT_META, '1', false);
+            $count++;
+        }
+        return $count;
     }
 }

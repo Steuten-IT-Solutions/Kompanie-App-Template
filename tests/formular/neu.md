@@ -27,13 +27,9 @@ Moin, {name}
 Herzlich willkommen!
 Schön, dass du da bist.
 
-### Bezeichnung für die Leitung
+### Bezeichnung für Mitglieder
 
-Spieß
-
-### Bezeichnung für Verwalter (Termine und Dokumente)
-
-Schriftführer
+Kamerad
 
 ### Bezeichnung für Strafen
 

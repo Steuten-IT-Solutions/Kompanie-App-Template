@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Http\Request;
@@ -169,7 +169,7 @@ final class NewsAndSettingsTest extends TestCase
         $body = '<html><body>keine Neuigkeiten</body></html>';
         $app->cache->delete('news_' . md5('https://v.example/feed'));
         $this->assertSame(502, $app->api()->handle(new Request('GET', '/news'))->status);
-        $users->current = $users->add('a', Level::Admin);
+        $users->current = $users->add('a', Roles::ADMIN);
         $res = $app->api()->handle(new Request('POST', '/admin/news/test'));
         $this->assertSame(502, $res->status);
         $this->assertStringContainsString('kein RSS- oder Atom-Feed', $res->data['message']);
@@ -207,8 +207,8 @@ final class NewsAndSettingsTest extends TestCase
             : ['status' => 200, 'body' => "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nDTSTART;VALUE=DATE:" . gmdate('Ymd', time() + 5 * 86400) . "\r\nSUMMARY:Fest\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"]);
         $users = new FakeUsers();
         $app = $this->app($http, new MemorySettings(), $users);
-        $admin = $users->add('a', Level::Admin);
-        $manager = $users->add('m', Level::Manager);
+        $admin = $users->add('a', Roles::ADMIN);
+        $manager = $users->add('m', Roles::MANAGER);
         $h = static fn (string $method, string $path, array $body = []) => $app->api()->handle(new Request($method, $path, [], $body));
 
         $users->current = $manager;
