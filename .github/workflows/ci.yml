@@ -38,9 +38,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Empfang der Statusmeldungen
-        run: tests/status/run-tests.sh
-
       - name: OpenAPI und Konfigurationsschema
         run: |
           pip install --quiet openapi-spec-validator jsonschema

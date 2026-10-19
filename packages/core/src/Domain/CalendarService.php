@@ -95,22 +95,25 @@ final class CalendarService
      * Für die geplante Aufgabe: den Kalender im Hintergrund erneuern, damit Anfragen ihn selten
      * selbst abrufen müssen. Fehler werden protokolliert; die alte Fassung bleibt.
      */
-    public function refreshIfStale(): void
+    /** @return bool false, wenn der Abruf gescheitert ist (für die Fehlercodes der Statusmeldungen) */
+    public function refreshIfStale(): bool
     {
         if (!$this->isConfigured()) {
-            return;
+            return true;
         }
         $copy = $this->copy();
         // Gerade erst abgerufen (z. B. von einer Anfrage): nichts zu tun. Ohne Sperre: Die Aufgabe
         // läuft ohnehin nur einmal, und die Sperre einer Anfrage soll sie nicht eine Stunde aufschieben.
         if ($copy !== null && $copy['fetched_at'] > $this->time->timestamp() - 300) {
-            return;
+            return true;
         }
         try {
             $this->refresh();
         } catch (ApiError $e) {
             error_log('Kompanie-App: Kalender nicht erneuert: ' . $e->getMessage());
+            return false;
         }
+        return true;
     }
 
     public function clearCache(): void

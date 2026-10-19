@@ -12,6 +12,8 @@ use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Port\UpdateTarget;
+use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Telemetry;
 
 /**
  * Updates der Installation: Update-Liste prüfen, passende Version wählen, Paket laden und
@@ -45,6 +47,8 @@ final class UpdateService
         private readonly ?UpdateTarget $target,
         private readonly ?BackupProvider $backup,
         private readonly array $config,
+        /** Fehlercodes für die Statusmeldungen (Issue #20), nur mit Zustimmung */
+        private readonly ?Telemetry $telemetry = null,
     ) {
     }
 
@@ -100,6 +104,7 @@ final class UpdateService
             $state['error'] = $e->getMessage();
             $state['list'] = $this->settings->get(self::STATE, [])['list'] ?? null;
             $this->settings->set(self::STATE, $state);
+            $this->telemetry?->record(Code::UpdateCheck);
             throw ApiError::upstream($e->getMessage());
         }
         $this->settings->set(self::STATE, $state);
@@ -242,6 +247,8 @@ final class UpdateService
         // Klassen, die nach dem Austausch der Dateien noch gebraucht werden, vorher laden.
         class_exists(ApiError::class);
         class_exists(Version::class);
+        class_exists(Code::class);
+        class_exists(StatusReporter::class); // für Telemetry::record (Zustimmung) nach dem Austausch
         $record = ['from' => $this->currentVersion, 'to' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'ok' => false, 'error' => ''];
         try {
             $zip = $this->download($file);
@@ -258,11 +265,15 @@ final class UpdateService
             $lock && flock($lock, LOCK_UN);
             $record['error'] = $e->getMessage();
             $this->settings->set(self::LAST, $record);
+            $this->telemetry?->record(Code::UpdateFailed);
             throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
         }
         $lock && flock($lock, LOCK_UN);
         $record['ok'] = true;
         $this->settings->set(self::LAST, $record);
+        if ($kind === 'rollback' || $kind === 'withdrawn') {
+            $this->telemetry?->record(Code::Rollback);
+        }
         if ($kind === 'rollback') {
             $this->settings->set(self::SKIP, $this->currentVersion);
         } elseif (Version::compare($version, $this->currentVersion) > 0) {

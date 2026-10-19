@@ -122,8 +122,8 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
             <label className="toggle">
               <input type="checkbox" checked={reports} onChange={(e) => setReports(e.target.checked)} />
               <span>
-                Einmal täglich eine kurze Statusmeldung an die Betreuer der App senden (Version, PHP-Version, ob Updates und Galerie
-                klappen; keine Namen oder Inhalte). So fallen Probleme früher auf.
+                Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen (Version, PHP-Version, Ampel je Bereich,
+                Fehlercodes), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So fallen Probleme früher auf.
               </span>
             </label>
           )}

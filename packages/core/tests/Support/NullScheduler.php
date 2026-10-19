@@ -35,4 +35,11 @@ final class NullScheduler implements Scheduler
             $this->soon[] = $task;
         }
     }
+
+    public string $kind = 'real';
+
+    public function kind(): string
+    {
+        return $this->kind;
+    }
 }

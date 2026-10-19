@@ -52,6 +52,7 @@ final class Plugin
                 backup: new WpBackup($db, KOMPANIE_APP_VERSION, $config->name()),
                 packageConfig: self::packageConfig(),
             );
+            self::$app->watchFatals();
         }
         return self::$app;
     }

@@ -56,6 +56,14 @@ final class PseudoScheduler implements Scheduler
         $this->refresh();
     }
 
+    /** real, wenn ein Cronjob des Hosters in den letzten zwei Stunden lief, sonst pseudo. */
+    public function kind(): string
+    {
+        $runs = $this->settings->get(Kernel::CRON_RUNS_SETTING);
+        $hosted = is_array($runs) ? max((int) ($runs['cron'] ?? 0), (int) ($runs['cli'] ?? 0)) : 0;
+        return $hosted > time() - 7200 ? 'real' : 'pseudo';
+    }
+
     /** Ohne Datenbankabfrage: aus der Einstellung mit dem nächsten Lauf. */
     public function anyDue(): bool
     {

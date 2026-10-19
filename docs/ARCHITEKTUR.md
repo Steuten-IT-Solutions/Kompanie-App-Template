@@ -163,7 +163,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 
 **Lange Aufgaben in Häppchen.** Auf Webspace bricht PHP oft nach 30 Sekunden ab. Der Galerie-Abgleich arbeitet mit einem Zeitbudget pro Aufruf und setzt beim nächsten fort. **Ein Cronjob beim Hoster ist nicht nötig**, macht die Aufgaben aber zuverlässiger; der Assistent bietet ihn nur als Zusatz an, die Statusseite empfiehlt ihn mit der passenden Adresse.
 
-**Aufgaben (Scheduler).** Wiederkehrend sind: Galerie-Abgleich (`gallery_sync`, stündlich), Aufbereitung ausstehender Galeriebilder (`gallery_process`), Kalender erneuern (`calendar_refresh`, stündlich), Update-Prüfung, Statusmeldung. Eingeplant bzw. ausgeplant wird **nicht bei jeder Anfrage**, sondern beim Speichern von Einstellungen (Bereiche, Kalender, Galerie, Updates), im Cron-Lauf, nach einem Update oder einer Migration (`App::upgrade()` vergleicht die Version mit der Einstellung `tasks_planned`) und nach dem Wiederherstellen einer Sicherung. WordPress plant außerdem beim Aktivieren und beim Öffnen der Einstellungsseite, nicht mehr auf `init`. `Scheduler::runSoon()` lässt eine Aufgabe bald laufen (z. B. weitere Bilder aufbereiten).
+**Aufgaben (Scheduler).** Wiederkehrend sind: Galerie-Abgleich (`gallery_sync`, stündlich), Aufbereitung ausstehender Galeriebilder (`gallery_process`), Kalender erneuern (`calendar_refresh`, stündlich), Update-Prüfung, Statusmeldung (stündlich, bei schweren Fehlern vorgezogen). Eingeplant bzw. ausgeplant wird **nicht bei jeder Anfrage**, sondern beim Speichern von Einstellungen (Bereiche, Kalender, Galerie, Updates), im Cron-Lauf, nach einem Update oder einer Migration (`App::upgrade()` vergleicht die Version mit der Einstellung `tasks_planned`) und nach dem Wiederherstellen einer Sicherung. WordPress plant außerdem beim Aktivieren und beim Öffnen der Einstellungsseite, nicht mehr auf `init`. `Scheduler::runSoon()` lässt eine Aufgabe bald laufen (z. B. weitere Bilder aufbereiten).
 
 **Pseudo-Cron (eigenständige Version).** Der nächste Fälligkeitszeitpunkt steht in der Einstellung `tasks_next_run`; die Einstellungen lädt jede Anfrage ohnehin mit einer Abfrage. Eine normale Anfrage liest deshalb die Tabelle `tasks` nicht und schreibt nichts. Ist etwas fällig:
 - Mit PHP-FPM oder LiteSpeed schließt der Server die Antwort ab (`fastcgi_finish_request`) und arbeitet im selben Prozess weiter.
@@ -380,7 +380,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 
 - **Statusseite für Admins** mit Ampel in Alltagssprache: Updates, Galerie-Abgleich, Kalender, letzte Sicherung, Server. Bei Gelb/Rot steht dabei, was zu tun ist, oder „Bitte melde dich bei …“ mit unseren Kontaktdaten.
 - **Hinweise direkt in der App** für Admins, statt E-Mails (E-Mail-Versand ist auf Webspace oft unzuverlässig).
-- **Statusmeldungen an uns, nur mit Zustimmung:** Version, Variante, PHP-Version, Datenbank-Art, Ergebnis des letzten Updates, ob Update-Prüfung und Galerie-Abgleich klappen. Keine Mitgliederdaten; was genau gesendet wird, zeigt die App vor der Zustimmung an. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
+- **Statusmeldungen an uns, nur mit Zustimmung:** stündlich ein Lebenszeichen (Version, Variante, PHP-Version, Datenbank-Art, Ampel je Bereich, Fehlercodes der letzten 24 Stunden), schwere Fehler sofort; signiert je Installation ([STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)). Keine Mitgliederdaten und keine Fehlertexte; was genau gesendet wird, zeigt die App vor der Zustimmung an. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
 - **Hilfe-Texte** an jeder Einstellung; Fachbegriffe nur mit Erklärung.
 
 ## 14. Die beiden Adapter
@@ -443,7 +443,7 @@ Festgehalten für die Planung:
 | 3 | **Eigenständige Version:** Benutzer, Sitzung, Einstellungen, SQLite und MySQL über PDO, Export/Import | eigenständige Version |
 | 4 | **Branding und Build:** Farben, Icons, Signatur, Screenshots, `Kompanie-App-Vorlage`, Download-Seite | Kompanie-Repo baut signierte Pakete |
 | 5 | **Installer, Assistent, Updates:** automatische Updates, Ein-Klick-Update, Zurückrollen, Sicherung, Statusseite | Installation und Pflege ohne Handarbeit |
-| 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, „Kompanien abgleichen“, Empfang und Übersicht der Statusmeldungen (`tools/status-empfang`); offen: automatischer Demo-Test mit Befördern (braucht die Demo-Installation) | neue Kompanie nur durch Eintragen |
+| 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, „Kompanien abgleichen“, Empfang und Übersicht der Statusmeldungen (im Cockpit, Repo `project-cockpit`; Format in [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)); offen: automatischer Demo-Test mit Befördern (braucht die Demo-Installation) | neue Kompanie nur durch Eintragen |
 | später | Hoster-Anleitungen erweitern, `/embed/termine`, Multisite | |
 | – | Umstellung Lank | eigener Plan |
 

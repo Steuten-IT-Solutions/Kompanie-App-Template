@@ -11,4 +11,6 @@ Unter **Konto → Einstellungen → Zustand der App** zeigt eine Ampel, ob alles
 - **Grau**: nicht eingerichtet bzw. in dieser Installation nicht verfügbar.
 
 ## Statusmeldungen an uns
-Wenn ihr zustimmt, schickt die App einmal täglich eine kurze Statusmeldung an die Betreuer der App (Version und Ampel, ohne Namen oder Inhalte), damit sie Probleme früh sehen. Die Zustimmung lässt sich jederzeit zurücknehmen.
+Wenn du zustimmst, schickt die App den Betreuern der App stündlich ein kurzes Lebenszeichen (u. a. Version, Ampel je Bereich, Fehlercodes der letzten 24 Stunden) und meldet schwere Fehler sofort, z. B. ein gescheitertes Update. Namen, Inhalte und Fehlertexte werden nie gesendet. So sehen die Betreuer Probleme früh.
+
+Unter **Konto → Einstellungen → Updates** siehst du, was genau gesendet wird, und wann die letzte Meldung ging. Die Zustimmung lässt sich dort jederzeit zurücknehmen; dann werden auch die gezählten Fehler gelöscht.

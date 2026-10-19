@@ -98,12 +98,43 @@ withdraw 3
 task
 [ "$(version)" = "$CORE.2" ] && ok "Zurückgezogene Version: automatisch zurück auf $CORE.2" || fail "Version nach Zurückziehen: $(version)"
 
+# Statusmeldungen (Issue #20): mit Zustimmung kommt das gescheiterte Update (Schritt 5) sofort als Ereignis an.
+cat > "$SRV/status.php" <<'PHP'
+<?php
+file_put_contents(__DIR__ . '/status.log', json_encode(['sig' => $_SERVER['HTTP_X_KOMPANIE_SIGNATURE'] ?? '', 'body' => file_get_contents('php://input')]) . "\n", FILE_APPEND);
+http_response_code(201);
+echo '{}';
+PHP
+php -r '$f = $argv[1] . "/update.json"; $d = json_decode(file_get_contents($f), true); $d["statusUrl"] = $argv[2]; file_put_contents($f, json_encode($d));' "$T/www" "$R/status.php"
+kernel() { # kernel '<PHP mit $app>'
+  php -r 'require $argv[1] . "/autoload.php";
+    $k = new KompanieApp\Standalone\Kernel($argv[1], new KompanieApp\Standalone\HttpContext([], ["REQUEST_METHOD" => "GET", "HTTP_HOST" => "127.0.0.1"], "/"));
+    $k->upgrade(); $app = $k->app(); eval($argv[2]);' "$T/www" "$1"
+}
+kernel '$app->settings->set("status_reports", true); $app->scheduleTasks(); $app->runTask("status_report");'
+
 # 5. Manipuliertes Paket wird abgelehnt, die bisherige Version läuft weiter
 cp "$SRV/updates.json" "$T/alte-liste.json"
 release 4 && promote 4
 echo "manipuliert" >> "$SRV/r4/kompanie-app-standalone.zip"
 if cli update > "$T/u4.log" 2>&1; then fail "Manipuliertes Paket eingespielt"; fi
 grep -q "stimmt nicht mit der signierten Liste" "$T/u4.log" && [ "$(version)" = "$CORE.2" ] && ok "Manipuliertes Paket abgelehnt, $CORE.2 läuft weiter" || fail "Manipulation: $(cat "$T/u4.log")"
+kernel '$app->runTask("status_report");'
+php -r '
+$lines = array_map(fn ($l) => json_decode($l, true), file($argv[1], FILE_IGNORE_NEW_LINES));
+$first = json_decode($lines[0]["body"], true);
+$key = $first["key"] ?? "";
+$ok = count($lines) === 3 && $first["format"] === 2 && $first["kind"] === "heartbeat" && strlen($key) === 64;
+foreach ($lines as $l) {
+    $ok = $ok && hash_equals("sha256=" . hash_hmac("sha256", $l["body"], $key), $l["sig"]);
+}
+$ev = json_decode($lines[1]["body"], true);
+$ok = $ok && $ev["kind"] === "event" && $ev["event"] === "UPDATE_FAILED" && !isset($ev["key"]) && ($ev["errors"]["UPDATE_FAILED"] ?? 0) === 1
+  && !str_contains($lines[1]["body"], "stimmt nicht");
+$red = json_decode($lines[2]["body"], true);
+$ok = $ok && $red["event"] === "CHECK_ERROR" && $red["checks"]["updates"] === "error";
+exit($ok ? 0 : 1);' "$SRV/status.log" && ok "Statusmeldung: Lebenszeichen mit Geheimnis, gescheitertes Update und rote Ampel sofort als signierte Ereignisse ohne Fehlertext" \
+  || fail "Statusmeldungen: $(php -r 'foreach (file($argv[1]) as $l) { $b = json_decode(json_decode($l, true)["body"], true); echo $b["kind"], ":", $b["event"] ?? "", " errors=", json_encode($b["errors"]), " checks=", json_encode($b["checks"]), "\n"; }' "$SRV/status.log")"
 
 # 6. Eine ältere (ebenfalls signierte) Liste wird nicht angenommen
 cp "$T/alte-liste.json" "$SRV/updates.json"

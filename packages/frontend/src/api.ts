@@ -470,7 +470,13 @@ export interface AdminStatus {
   items: { key: string; label: string; level: StatusLevel; text: string }[];
   support: string;
   updates: UpdateStatus;
-  statusReports: { enabled: boolean; available: boolean; payload: Record<string, unknown> };
+  statusReports: {
+    enabled: boolean;
+    available: boolean;
+    payload: Record<string, unknown>;
+    /** Letzte Meldung: Zeitpunkt, angenommen?, Lebenszeichen oder Ereignis */
+    last: { at: number; ok: boolean; kind: 'heartbeat' | 'event' } | null;
+  };
   setupDone: boolean;
 }
 

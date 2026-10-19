@@ -18,6 +18,7 @@ use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
+use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Port\HealthChecks;
@@ -40,6 +41,8 @@ use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateService;
 
@@ -55,7 +58,7 @@ final class App
         GalleryService::PROCESS_TASK => 3600,
         CalendarService::TASK => 3600,
         UpdateService::TASK => UpdateService::INTERVAL,
-        StatusReporter::TASK => 86400,
+        StatusReporter::TASK => StatusReporter::INTERVAL,
     ];
 
     /**
@@ -64,6 +67,9 @@ final class App
      * im Cron und nach einem Update bzw. einer Migration (dann passt diese Einstellung nicht mehr).
      */
     public const PLAN_SETTING = 'tasks_planned';
+
+    /** Einstellung: letzter Lauf einer Hintergrundaufgabe (Unix-Zeit, für die Statusmeldungen) */
+    public const TASK_RUN_SETTING = 'tasks_last_run';
 
     /** @var array<string, object> */
     private array $services = [];
@@ -157,16 +163,25 @@ final class App
         }
     }
 
-    /** Führt eine geplante Aufgabe aus. Fehler werden protokolliert, nicht weitergeworfen. */
+    /**
+     * Führt eine geplante Aufgabe aus. Fehler werden protokolliert und als Fehlercode gezählt
+     * (Statusmeldungen, nur mit Zustimmung), nicht weitergeworfen.
+     */
     public function runTask(string $task): void
     {
+        $this->noteTaskRun();
         try {
             if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
+                if ((string) ($this->gallery()->status()['error'] ?? '') !== '') {
+                    $this->telemetry()->record(Code::GallerySync);
+                }
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
-                $this->calendar()->refreshIfStale();
+                if (!$this->calendar()->refreshIfStale()) {
+                    $this->telemetry()->record(Code::CalendarFetch);
+                }
             } elseif ($task === UpdateService::TASK) {
                 $this->updates()->runTask();
             } elseif ($task === StatusReporter::TASK) {
@@ -174,7 +189,80 @@ final class App
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
+            // Die Statusmeldung selbst nicht zählen (sonst meldete sie beim nächsten Mal ihr eigenes Scheitern),
+            // Fehler der Update-Liste zählt UpdateService schon.
+            if ($task !== StatusReporter::TASK && !($task === UpdateService::TASK && $e instanceof ApiError)) {
+                $this->telemetry()->record(Code::TaskFailed);
+            }
         }
+    }
+
+    /** Letzten Lauf merken, höchstens alle fünf Minuten geschrieben (mehrere Aufgaben laufen oft zusammen). */
+    private function noteTaskRun(): void
+    {
+        try {
+            $now = $this->time()->timestamp();
+            $last = $this->settings->get(self::TASK_RUN_SETTING);
+            if (!is_numeric($last) || $now - (int) $last >= 300) {
+                $this->settings->set(self::TASK_RUN_SETTING, $now);
+            }
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Lauf der Aufgaben nicht vermerkt: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Schwere PHP-Fehler in der App als Fehlercode zählen (nur der Code, kein Text). Ruft der Adapter
+     * einmal je Anfrage auf; Fehler anderer Plugins oder Programme zählen nicht. Bei WordPress läuft vorher
+     * dessen eigener Fehler-Handler (Fehlerseite ohne exit), danach diese Funktion.
+     */
+    public function watchFatals(): void
+    {
+        static $registered = false;
+        if ($registered) {
+            return;
+        }
+        $registered = true;
+        register_shutdown_function(function (): void {
+            $e = error_get_last();
+            if ($e !== null) {
+                $this->recordFatal($e);
+            }
+        });
+    }
+
+    /**
+     * Zählt einen schweren PHP-Fehler, wenn er in der App passiert ist (höchstens einmal je Anfrage).
+     *
+     * @param array{type?: int, file?: string} $error wie error_get_last()
+     */
+    public function recordFatal(array $error): void
+    {
+        static $recorded = false;
+        // Im Paket liegt der Kern unter <Plugin bzw. App>/core: dann zählt der ganze Ordner der App,
+        // in der Entwicklung (packages/core/src) nur der Kern.
+        $root = (basename(__DIR__) === 'core' ? dirname(__DIR__) : __DIR__) . DIRECTORY_SEPARATOR;
+        if ($recorded || !in_array($error['type'] ?? 0, [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)
+            || !str_starts_with((string) ($error['file'] ?? ''), $root)) {
+            return;
+        }
+        $recorded = true;
+        // Bei zu wenig Speicher scheitert auch das Zählen; dann eben nicht.
+        try {
+            $this->telemetry()->record(Code::PhpFatal);
+        } catch (\Throwable) {
+        }
+    }
+
+    public function telemetry(): Telemetry
+    {
+        return $this->service(Telemetry::class, fn () => new Telemetry(
+            $this->settings,
+            $this->scheduler,
+            $this->time(),
+            fn (): bool => $this->statusReporter()->enabled(),
+            StatusReporter::TASK,
+        ));
     }
 
     public function features(): Features
@@ -246,6 +334,7 @@ final class App
             $this->updateTarget,
             $this->backup,
             $this->packageConfig,
+            $this->telemetry(),
         ));
     }
 
