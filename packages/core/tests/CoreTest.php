@@ -94,6 +94,7 @@ final class CoreTest extends TestCase
         $c = new KompanieConfig(['name' => 'Musterkompanie', 'labels' => ['roles' => ['manager' => 'Spieß'], 'sections' => ['penalties' => 'Kasse']], 'features' => ['penalties' => false]]);
         $this->assertSame('Musterkompanie', $c->shortName());
         $this->assertSame('Spieß', $c->roleLabel('manager'));
+        $this->assertSame('Verwalter', $c->roleLabel('organizer'));
         $this->assertSame('Mitglied', $c->roleLabel('member'));
         $this->assertSame('Kasse', $c->sectionLabel('penalties'));
         $this->assertFalse($c->legacyFeature('penalties'));

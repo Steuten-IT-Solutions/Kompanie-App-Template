@@ -103,10 +103,10 @@ final class ApiScenario
         [$s, $d] = $this->req('GET', '/me');
         $c->ok($s === 200 && $d['level'] === 'member', 'GET /me als Mitglied → level member');
 
-        $c->section('Verwalter vergibt Punkte und Strafen');
+        $c->section('Leitung vergibt Punkte und Strafen');
         $this->d->actAs($this->spiess);
         [$s, $d] = $this->req('GET', '/me');
-        $c->ok($s === 200 && $d['level'] === 'manager', 'GET /me als Verwalter → level manager');
+        $c->ok($s === 200 && $d['level'] === 'manager', 'GET /me als Leitung → level manager');
 
         [$s, $cat] = $this->req('POST', '/catalog', ['title' => 'Teilnahme Sommerfest', 'points' => 5]);
         $c->ok($s === 201 && $cat['points'] === 5, 'Katalogeintrag anlegen');
@@ -189,7 +189,7 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         $c->ok($this->req('POST', '/users', ['name' => 'Hans Probe'])[0] === 403, 'Mitglied darf keine Benutzer anlegen → 403');
         $this->d->actAs($this->spiess);
-        $c->ok($this->req('POST', '/users', ['name' => 'Hans Probe'])[0] === 403, 'Verwalter darf keine Benutzer anlegen → 403');
+        $c->ok($this->req('POST', '/users', ['name' => 'Hans Probe'])[0] === 403, 'Leitung darf keine Benutzer anlegen → 403');
 
         $this->d->actAs($admin);
         [$s, $u1] = $this->req('POST', '/users', ['name' => 'Kptest Müller']);
@@ -217,7 +217,7 @@ final class ApiScenario
 
         $c->section('Startpasswort zurücksetzen');
         $this->d->actAs($this->spiess);
-        $c->ok($this->req('POST', '/members/' . $u1['id'] . '/password')[0] === 403, 'Verwalter darf keine Passwörter zurücksetzen → 403');
+        $c->ok($this->req('POST', '/members/' . $u1['id'] . '/password')[0] === 403, 'Leitung darf keine Passwörter zurücksetzen → 403');
         $this->d->actAs($admin);
         [$s, $d] = $this->req('POST', '/members/' . $u1['id'] . '/password');
         $c->ok($s === 200 && strlen($d['password']) === 12 && $this->d->checkPassword($u1['id'], $d['password']) && !$this->d->checkPassword($u1['id'], $u1['password']), 'Admin erzeugt neues Startpasswort, altes gilt nicht mehr');
@@ -244,28 +244,32 @@ final class ApiScenario
     private function roles(): void
     {
         $c = $this->c;
-        $c->section('Rollen: Gast, Mitglied, Verwalter, Admin');
+        $c->section('Rollen: Gast, Mitglied, Verwalter, Leitung, Admin');
         $gast = $this->user('kptest_gast', 'guest');
+        $verwalter = $this->user('kptest_verwalter', 'organizer');
         $admin = $this->user('kptest_admin2', 'admin');
         $m2 = $this->m2;
 
-        // [Methode, Pfad, Inhalt, erwarteter Status je Rolle: anonym, Gast, Mitglied, Verwalter, Admin]
+        // [Methode, Pfad, Inhalt, erwarteter Status je Rolle: anonym, Gast, Mitglied, Verwalter (organizer), Leitung (manager), Admin]
         $matrix = [
-            ['GET', '/config', [], [200, 200, 200, 200, 200]],
-            ['GET', '/events', [], [200, 200, 200, 200, 200]],
-            ['GET', '/news', [], [200, 200, 200, 200, 200]],
-            ['GET', '/gallery', [], [200, 200, 200, 200, 200]],
-            ['GET', '/me', [], [401, 200, 200, 200, 200]],
-            ['GET', '/me/points', [], [401, 403, 200, 200, 200]],
-            ['GET', '/me/penalties', [], [401, 403, 200, 200, 200]],
-            ['GET', '/catalog', [], [401, 200, 200, 200, 200]],
-            ['GET', '/members', [], [401, 403, 403, 200, 200]],
-            ['POST', '/events', ['title' => ''], [401, 403, 403, 403, 400]],
-            ['PATCH', "/members/$m2/role", ['level' => 'egal'], [401, 403, 403, 403, 400]],
-            ['POST', '/users', ['name' => ''], [401, 403, 403, 403, 400]],
-            ['POST', '/points', ['user_ids' => []], [401, 403, 403, 400, 400]],
+            ['GET', '/config', [], [200, 200, 200, 200, 200, 200]],
+            ['GET', '/events', [], [200, 200, 200, 200, 200, 200]],
+            ['GET', '/news', [], [200, 200, 200, 200, 200, 200]],
+            ['GET', '/gallery', [], [200, 200, 200, 200, 200, 200]],
+            ['GET', '/me', [], [401, 200, 200, 200, 200, 200]],
+            ['GET', '/me/points', [], [401, 403, 200, 200, 200, 200]],
+            ['GET', '/me/penalties', [], [401, 403, 200, 200, 200, 200]],
+            ['GET', '/catalog', [], [401, 200, 200, 200, 200, 200]],
+            ['GET', '/members', [], [401, 403, 403, 403, 200, 200]],
+            ['POST', '/events', ['title' => ''], [401, 403, 403, 400, 400, 400]],
+            ['PATCH', "/members/$m2/role", ['level' => 'egal'], [401, 403, 403, 403, 403, 400]],
+            ['POST', '/users', ['name' => ''], [401, 403, 403, 403, 403, 400]],
+            ['POST', '/points', ['user_ids' => []], [401, 403, 403, 403, 400, 400]],
+            ['POST', '/penalties', ['user_ids' => []], [401, 403, 403, 403, 400, 400]],
+            ['POST', '/catalog', ['label' => ''], [401, 403, 403, 403, 400, 400]],
+            ['GET', '/admin/settings', [], [401, 403, 403, 403, 403, 200]],
         ];
-        $who = [null, $gast, $this->m1, $this->spiess, $admin];
+        $who = [null, $gast, $this->m1, $verwalter, $this->spiess, $admin];
         foreach ($matrix as [$method, $path, $body, $expected]) {
             $got = [];
             foreach ($who as $uid) {
@@ -279,11 +283,24 @@ final class ApiScenario
         [, $d] = $this->req('GET', '/me');
         $c->ok($d['level'] === 'guest', 'GET /me als Gast-Konto → level guest');
 
+        $this->d->actAs($verwalter);
+        [, $d] = $this->req('GET', '/config');
+        $caps = (array) ($d['user']['capabilities'] ?? []);
+        $c->ok(($d['user']['level'] ?? '') === 'organizer' && in_array('manage_events', $caps, true) && in_array('manage_documents', $caps, true) && !in_array('manage', $caps, true), 'GET /config als Verwalter → organizer mit Terminen und Dokumenten, ohne Punkte/Strafen');
+        [$s, $ev] = $this->req('POST', '/events', ['title' => 'Kptest Verwalter-Termin', 'start_date' => '2099-05-01']);
+        $c->ok($s === 201, 'Verwalter legt öffentlichen Termin an');
+        if (isset($ev['id'])) {
+            $c->ok($this->req('DELETE', '/events/' . $ev['id'])[0] === 200, 'Verwalter löscht öffentlichen Termin');
+        }
+        $this->d->actAs($this->spiess);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(in_array('manage_events', (array) ($d['user']['capabilities'] ?? []), true), 'Leitung darf jetzt auch öffentliche Termine pflegen');
+
         $this->d->actAs($this->spiess);
         [, $members] = $this->req('GET', '/members');
         $c->ok(!in_array($gast, array_column($members, 'id'), true), 'Mitgliederliste enthält keine Gäste');
         [, $members] = $this->req('GET', '/members', [], ['all' => '1']);
-        $c->ok(!in_array($gast, array_column($members, 'id'), true), 'Verwalter bekommt auch mit all=1 keine Gäste');
+        $c->ok(!in_array($gast, array_column($members, 'id'), true), 'Leitung bekommt auch mit all=1 keine Gäste');
         $c->ok($this->req('POST', '/points', ['user_ids' => [$gast], 'points' => 1, 'reason' => 'x'])[0] === 400, 'Gast kann keine Punkte bekommen → 400');
 
         $this->d->actAs($admin);
@@ -293,8 +310,10 @@ final class ApiScenario
 
         [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'member']);
         $c->ok($s === 200 && $d['level'] === 'member', 'Admin macht Gast zum Mitglied');
+        [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'organizer']);
+        $c->ok($s === 200 && $d['level'] === 'organizer', 'Admin macht Mitglied zum Verwalter (organizer)');
         [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'manager']);
-        $c->ok($s === 200 && $d['level'] === 'manager', 'Admin macht Mitglied zum Verwalter');
+        $c->ok($s === 200 && $d['level'] === 'manager', 'Admin macht Verwalter zur Leitung (manager)');
         [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'guest']);
         $c->ok($s === 200 && $d['level'] === 'guest', 'Zurück zum Gast');
         $c->ok($this->req('PATCH', "/members/$admin/role", ['level' => 'guest'])[0] === 400, 'Eigene Rolle nicht änderbar → 400');

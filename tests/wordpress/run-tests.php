@@ -36,11 +36,32 @@ echo "== Gemeinsames API-Szenario ==\n";
 echo "\n== WordPress ==\n";
 $c->section('Rollen und Rechte');
 $member = $d->createUser('kpwp_mitglied', 'member');
-$manager = $d->createUser('kpwp_verwalter', 'manager');
+$organizer = $d->createUser('kpwp_verwalter', 'organizer');
+$manager = $d->createUser('kpwp_leitung', 'manager');
 $admin = $d->createUser('kpwp_admin', 'admin');
-$c->ok(user_can($member, Roles::CAP_MEMBER) && !user_can($member, Roles::CAP_MANAGE), 'Mitglied: Recht kompanie_member');
-$c->ok(user_can($manager, Roles::CAP_MANAGE) && user_can($manager, Roles::CAP_MEMBER), 'Verwalter: Verwalten und Mitglied');
-$c->ok(user_can($admin, Roles::CAP_EVENTS) && user_can($admin, Roles::CAP_MANAGE), 'Administrator: alle App-Rechte');
+$c->ok(user_can($member, Roles::CAP_MEMBER) && !user_can($member, Roles::CAP_MANAGE) && !user_can($member, Roles::CAP_EVENTS), 'Mitglied: Recht kompanie_member');
+$c->ok(user_can($organizer, Roles::CAP_MEMBER) && user_can($organizer, Roles::CAP_EVENTS) && user_can($organizer, Roles::CAP_DOCUMENTS) && !user_can($organizer, Roles::CAP_MANAGE), 'Verwalter: Termine, Dokumente und Mitglied, keine Punkte/Strafen');
+$c->ok(KompanieApp\WordPress\WpUsers::level(get_userdata($organizer)) === KompanieApp\Core\Auth\Level::Organizer, 'Verwalter: Stufe organizer');
+$c->ok(user_can($manager, Roles::CAP_MANAGE) && user_can($manager, Roles::CAP_MEMBER) && user_can($manager, Roles::CAP_EVENTS) && user_can($manager, Roles::CAP_DOCUMENTS), 'Leitung: Verwalten, Termine, Dokumente und Mitglied');
+$c->ok(user_can($admin, Roles::CAP_EVENTS) && user_can($admin, Roles::CAP_MANAGE) && user_can($admin, Roles::CAP_DOCUMENTS), 'Administrator: alle App-Rechte');
+$app->users->setLevel($organizer, KompanieApp\Core\Auth\Level::Manager);
+clean_user_cache($organizer);
+$c->ok(!in_array(Roles::ROLE_ORGANIZER, get_userdata($organizer)->roles, true) && in_array(Roles::ROLE_MANAGER, get_userdata($organizer)->roles, true), 'Verwalter → Leitung: alte Rolle entfernt');
+$app->users->setLevel($organizer, KompanieApp\Core\Auth\Level::Organizer);
+clean_user_cache($organizer);
+
+// Update einer bestehenden Installation: kompanie_manager hieß „Verwalter“ und hatte keine Termine; kompanie_organizer fehlte.
+get_role(Roles::ROLE_MANAGER)->remove_cap(Roles::CAP_EVENTS);
+get_role(Roles::ROLE_MANAGER)->remove_cap(Roles::CAP_DOCUMENTS);
+remove_role(Roles::ROLE_ORGANIZER);
+$wpRoles = wp_roles();
+$wpRoles->roles[Roles::ROLE_MANAGER]['name'] = 'Verwalter';
+update_option($wpRoles->role_key, $wpRoles->roles);
+Roles::install(['member' => 'Mitglied', 'organizer' => 'Verwalter', 'manager' => 'Spieß']);
+$c->ok(get_role(Roles::ROLE_MANAGER)->has_cap(Roles::CAP_EVENTS) && get_role(Roles::ROLE_MANAGER)->has_cap(Roles::CAP_DOCUMENTS), 'Update: kompanie_manager bekommt Termine und Dokumente');
+$c->ok(get_role(Roles::ROLE_ORGANIZER) !== null && get_role(Roles::ROLE_ORGANIZER)->has_cap(Roles::CAP_EVENTS), 'Update: kompanie_organizer wird angelegt');
+$c->ok(wp_roles()->role_names[Roles::ROLE_MANAGER] === 'Spieß' && wp_roles()->role_names[Roles::ROLE_ORGANIZER] === 'Verwalter', 'Update: Bezeichnungen der Rollen aus kompanie.json');
+$c->ok(get_option($wpRoles->role_key)[Roles::ROLE_MANAGER]['name'] === 'Spieß', 'Update: Bezeichnung gespeichert');
 $app->users->setLevel($member, KompanieApp\Core\Auth\Level::Guest);
 clean_user_cache($member);
 $c->ok(['subscriber'] === array_values(get_userdata($member)->roles), 'Zurück zum Gast: Konto behält Rolle Abonnent');
@@ -230,7 +251,7 @@ try {
 $c->ok(is_file(KOMPANIE_APP_FILE) && is_link(WP_PLUGIN_DIR . '/kompanie-app'), 'Plugin-Ordner unverändert');
 @unlink($zipFile);
 
-foreach ([$member, $manager, $admin] as $id) {
+foreach ([$member, $organizer, $manager, $admin] as $id) {
     $d->deleteUser($id);
 }
 wp_set_current_user(0);

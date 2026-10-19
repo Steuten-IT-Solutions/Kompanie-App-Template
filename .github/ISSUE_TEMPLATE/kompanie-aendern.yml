@@ -46,7 +46,13 @@ body:
   - type: input
     id: manager
     attributes:
-      label: Bezeichnung für Verwalter
+      label: Bezeichnung für die Leitung
+      description: Vergibt Punkte und Strafen; „-“ setzt „Leitung“.
+  - type: input
+    id: organizer
+    attributes:
+      label: Bezeichnung für Verwalter (Termine und Dokumente)
+      description: „-“ setzt „Verwalter“.
   - type: input
     id: penalties
     attributes:

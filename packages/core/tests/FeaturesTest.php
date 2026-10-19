@@ -56,7 +56,7 @@ final class FeaturesTest extends TestCase
         $h = static fn (string $m, array $body = []) => $app->api()->handle(new Request($m, '/admin/features', [], $body));
 
         $this->assertSame(401, $h('GET')->status);
-        foreach ([Level::Manager, Level::Member, Level::Guest] as $level) {
+        foreach ([Level::Manager, Level::Organizer, Level::Member, Level::Guest] as $level) {
             $users->current = $users->add('u-' . $level->value, $level);
             $this->assertSame(403, $h('GET')->status, $level->value);
             $this->assertSame(403, $h('PUT', ['news' => true])->status, $level->value);

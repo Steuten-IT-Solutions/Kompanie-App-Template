@@ -295,7 +295,7 @@ function RoleControl({
       setBusy(false);
     }
   }
-  const levels: Level[] = adminsHere ? ['guest', 'member', 'manager', 'admin'] : ['guest', 'member', 'manager'];
+  const levels: Level[] = adminsHere ? ['guest', 'member', 'organizer', 'manager', 'admin'] : ['guest', 'member', 'organizer', 'manager'];
   return (
     <div className="role-control">
       <span className="field-label">Rolle in der App</span>

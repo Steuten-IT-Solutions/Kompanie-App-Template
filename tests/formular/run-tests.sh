@@ -14,7 +14,10 @@ get() { php -r '$k = json_decode(file_get_contents($argv[1]), true); foreach (ex
 php scripts/issue-to-kompanie.php --mode=neu --body=tests/formular/neu.md --out="$T/n" > /dev/null
 K="$T/n/kompanie.json"
 [ "$(get "$K" name)" = "Schützenkompanie Musterdorf" ] && [ "$(get "$K" colors.primary)" = "#1a4d8f" ] && ok "Name und Farbe (klein geschrieben)" || fail "Name/Farbe"
-[ "$(get "$K" labels.roles.manager)" = "Spieß" ] && [ "$(get "$K" labels.sections)" = "" ] && ok "Bezeichnungen; leere Gruppen entfallen" || fail "Bezeichnungen: $(cat "$K")"
+[ "$(get "$K" labels.roles.manager)" = "Spieß" ] && [ "$(get "$K" labels.roles.organizer)" = "Schriftführer" ] && [ "$(get "$K" labels.sections)" = "" ] && ok "Bezeichnungen; leere Gruppen entfallen" || fail "Bezeichnungen: $(cat "$K")"
+sed 's/^### Bezeichnung für die Leitung$/### Bezeichnung für Verwalter/; /^### Bezeichnung für Verwalter (Termine/,/^Schriftführer$/d' tests/formular/neu.md > "$T/alt.md"
+php scripts/issue-to-kompanie.php --mode=neu --body="$T/alt.md" --out="$T/alt" > /dev/null
+[ "$(get "$T/alt/kompanie.json" labels.roles.manager)" = "Spieß" ] && [ "$(get "$T/alt/kompanie.json" labels.roles.organizer)" = "" ] && ok "Formular von vor der Rolle Verwalter: „Bezeichnung für Verwalter“ gilt für die Leitung" || fail "Altes Formular: $(cat "$T/alt/kompanie.json")"
 [ "$(get "$K" features)" = '' ] && ok "Keine Bereiche in kompanie.json (schaltet der Admin in der App)" || fail "Bereiche: $(get "$K" features)"
 [ "$(cat "$T/n/repo.txt")" = "schuetzen-musterdorf" ] && grep -q "user-attachments/assets/0f0e5a2c" "$T/n/logo-url.txt" && ok "Repo-Name und Logo-Anhang" || fail "Repo/Logo"
 (cd packages/branding && node -e "
