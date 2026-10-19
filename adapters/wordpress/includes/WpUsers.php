@@ -32,6 +32,12 @@ final class WpUsers implements UserDirectory, AuthContext
      * Frühere WP-Rolle zu einer Rolle der App: Wird der Programmcode auf eine Version vor Issue #28
      * zurückgerollt, behalten Mitglieder, Verwalter und Leitung so ihre Rechte.
      */
+    /** Wer eines dieser WP-Rechte hat, gilt als Benutzer der Webseite (Passwort nur mit WP-Recht). */
+    private const WEBSITE_CAPS = ['edit_posts', 'list_users', 'edit_users', 'create_users', 'promote_users', 'manage_options'];
+
+    /** Frühere WP-Rechte der App (vor #28), auch über eigene WP-Rollen vergeben, z. B. mit einem Rollen-Plugin. */
+    public const LEGACY_CAPS = [Roles::CAP_MEMBER, Roles::CAP_MANAGE, Roles::CAP_EVENTS];
+
     private const LEGACY_WP_ROLES = [AppRoles::MEMBER => Roles::ROLE_MEMBER, AppRoles::ORGANIZER => Roles::ROLE_ORGANIZER, AppRoles::MANAGER => Roles::ROLE_MANAGER];
 
     /**
@@ -67,7 +73,8 @@ final class WpUsers implements UserDirectory, AuthContext
             $args['meta_query'] = [['key' => self::metaKey(), 'compare' => 'EXISTS']];
             $ids = get_users(['meta_query' => $args['meta_query'], 'fields' => 'ID']);
             $legacy = get_users(['role__in' => [Roles::ROLE_MEMBER, Roles::ROLE_ORGANIZER, Roles::ROLE_MANAGER, 'administrator'], 'fields' => 'ID']);
-            $ids = array_values(array_unique(array_map('intval', array_merge($ids, $legacy))));
+            $legacyCaps = get_users(['capability__in' => self::LEGACY_CAPS, 'fields' => 'ID']);
+            $ids = array_values(array_unique(array_map('intval', array_merge($ids, $legacy, $legacyCaps))));
             if ($ids === []) {
                 return [];
             }
@@ -147,9 +154,10 @@ final class WpUsers implements UserDirectory, AuthContext
         $actor = get_current_user_id();
         $target = get_userdata($id);
         if ($actor !== 0 && $actor !== $id) {
-            // Wer die Webseite bearbeiten darf (Redakteure, Administratoren), dessen Passwort nur mit dem Recht
-            // aus WordPress; sonst genügt das Recht „Mitglieder anlegen“ der Rolle in der App.
-            $websiteUser = $target && (user_can($target, 'edit_posts') || is_super_admin($id));
+            // Wer die Webseite bearbeiten oder Benutzer verwalten darf (Redakteure, Administratoren, eigene
+            // WP-Rollen), dessen Passwort nur mit dem Recht aus WordPress; sonst genügt das Recht
+            // „Mitglieder anlegen“ der Rolle in der App.
+            $websiteUser = $target && (is_super_admin($id) || array_filter(self::WEBSITE_CAPS, static fn (string $cap): bool => user_can($target, $cap)) !== []);
             $may = $websiteUser ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
             if (!$may || $this->find($id) === null) {
                 throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
@@ -205,14 +213,17 @@ final class WpUsers implements UserDirectory, AuthContext
         return !is_string($meta) || $meta === '';
     }
 
-    /** Rolle nach den früheren WP-Rollen der App (vor Issue #28). */
+    /**
+     * Rolle nach den früheren WP-Rollen und -Rechten der App (vor Issue #28), wie damals über die Rechte
+     * bestimmt: Sie können auch über andere WP-Rollen vergeben sein (z. B. kompanie_member für Redakteure).
+     */
     public static function legacyRole(\WP_User $u): string
     {
         $roles = (array) $u->roles;
         return match (true) {
-            in_array(Roles::ROLE_MANAGER, $roles, true) => AppRoles::MANAGER,
-            in_array(Roles::ROLE_ORGANIZER, $roles, true) => AppRoles::ORGANIZER,
-            in_array(Roles::ROLE_MEMBER, $roles, true) => AppRoles::MEMBER,
+            in_array(Roles::ROLE_MANAGER, $roles, true) || user_can($u, Roles::CAP_MANAGE) => AppRoles::MANAGER,
+            in_array(Roles::ROLE_ORGANIZER, $roles, true) || user_can($u, Roles::CAP_EVENTS) => AppRoles::ORGANIZER,
+            in_array(Roles::ROLE_MEMBER, $roles, true) || user_can($u, Roles::CAP_MEMBER) => AppRoles::MEMBER,
             default => AppRoles::GUEST,
         };
     }

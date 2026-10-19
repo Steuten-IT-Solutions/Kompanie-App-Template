@@ -391,6 +391,21 @@ final class ApiScenario
         [$s] = $this->req('DELETE', '/admin/roles/' . $key, [], ['replacement' => 'member']);
         $this->d->actAs($m);
         $c->ok($s === 200 && $this->req('GET', '/me')[1]['level'] === 'member', 'Gelöscht, Person ist wieder Mitglied');
+
+        // Wer Konten anlegen darf, ohne Admin zu sein: Passwörter nur von Mitgliedern mit eigenen Rechten.
+        $this->d->actAs($admin);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => ['member', 'create_users']]);
+        $pflege = (string) (array_column((array) $d, 'key', 'label')['Kptest Kontenpflege'] ?? '');
+        $holder = $this->user('kptest_rollen_pflege', $pflege);
+        $guest = $this->user('kptest_rollen_gast', 'guest');
+        $boss = $this->user('kptest_rollen_leitung', $this->leitung);
+        $this->d->actAs($holder);
+        $c->ok($this->req('POST', "/members/$m/password")[0] === 200, 'Kontenpflege setzt Passwort eines Mitglieds zurück');
+        $c->ok($this->req('POST', "/members/$guest/password")[0] === 403, 'Kontenpflege: Passwort eines Gasts → 403');
+        $c->ok($this->req('POST', "/members/$boss/password")[0] === 403, 'Kontenpflege: Passwort einer Person mit mehr Rechten → 403');
+        $c->ok($this->req('POST', "/members/$admin/password")[0] === 403, 'Kontenpflege: Passwort eines Admins → 403');
+        $this->d->actAs($admin);
+        $this->req('DELETE', '/admin/roles/' . $pflege, [], ['replacement' => 'member']);
     }
 
     private function events(): void

@@ -95,22 +95,30 @@ final class Roles
     }
 
     /**
-     * Einmalig nach dem Update auf Issue #28: Wer noch eine frühere WP-Rolle der App hat und kein
-     * Meta, bekommt die gleichnamige Rolle als Meta. Die WP-Rollen bleiben als Rückfall erhalten.
+     * Einmalig nach dem Update auf Issue #28: Wer noch eine frühere WP-Rolle oder ein früheres WP-Recht der
+     * App hat und kein Meta, bekommt die entsprechende Rolle als Meta. Die WP-Rollen bleiben als Rückfall.
+     * Administratoren nicht: Ihre Rolle kommt immer aus WordPress.
      *
+     * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? Sonst wird es Mitglied.
      * @return int Anzahl übernommener Konten
      */
-    /** @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? Sonst wird es Mitglied. */
     public static function migrateUsers(?\Closure $known = null): int
     {
-        $users = get_users([
-            'role__in' => [self::ROLE_MEMBER, self::ROLE_ORGANIZER, self::ROLE_MANAGER],
-            'meta_query' => [['key' => WpUsers::metaKey(), 'compare' => 'NOT EXISTS']],
-        ]);
-        foreach ($users as $u) {
+        $noMeta = [['key' => WpUsers::metaKey(), 'compare' => 'NOT EXISTS']];
+        $byRole = get_users(['role__in' => [self::ROLE_MEMBER, self::ROLE_ORGANIZER, self::ROLE_MANAGER], 'meta_query' => $noMeta]);
+        $byCap = get_users(['capability__in' => WpUsers::LEGACY_CAPS, 'meta_query' => $noMeta]);
+        $count = 0;
+        $seen = [];
+        foreach (array_merge($byRole, $byCap) as $u) {
+            $id = (int) $u->ID;
+            if (isset($seen[$id]) || WpUsers::role($u) === AppRolesKeys::ADMIN) {
+                continue;
+            }
+            $seen[$id] = true;
             $role = WpUsers::legacyRole($u);
-            update_user_option((int) $u->ID, WpUsers::ROLE_META, $known === null || $known($role) ? $role : AppRolesKeys::MEMBER, false);
+            update_user_option($id, WpUsers::ROLE_META, $known === null || $known($role) ? $role : AppRolesKeys::MEMBER, false);
+            $count++;
         }
-        return count($users);
+        return $count;
     }
 }

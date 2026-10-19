@@ -317,6 +317,26 @@ final class RoleService
         return true;
     }
 
+    /**
+     * Darf $actor diese Person verwalten (Rolle ändern, Passwort zurücksetzen)? Wie canHandle für ihre
+     * Rolle, zusätzlich für die Rechte, die sie tatsächlich hat (bei WordPress auch aus WP-Rollen).
+     */
+    public function canHandleUser(User $actor, User $target): bool
+    {
+        if ($actor->isAdmin()) {
+            return true;
+        }
+        if ($target->isAdmin() || !$this->canHandle($actor, $target->role)) {
+            return false;
+        }
+        foreach ($target->capabilities as $cap) {
+            if (!$actor->can($cap) || $cap === Capability::PromoteUsers || $cap === Capability::CreateUsers) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** @param array<string, array{key: string, label: string, capabilities: string[], points_factor: float}> $roles */
     private function save(array $roles): void
     {

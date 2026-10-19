@@ -67,7 +67,7 @@ final class ProfileField
         $target = $app->users->find($userId);
         // Wie in der App: keine Rechte weitergeben, die man selbst nicht hat (WP-Administratoren dürfen alles).
         if ($level !== Roles::ADMIN && $app->roles()->exists($level) && $actor !== null && $target !== null
-            && $app->roles()->canHandle($actor, $level) && $app->roles()->canHandle($actor, $target->role)) {
+            && $app->roles()->canHandle($actor, $level) && $app->roles()->canHandleUser($actor, $target)) {
             try {
                 $app->users->setRole($userId, $level);
             } catch (\DomainException) {

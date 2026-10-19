@@ -413,7 +413,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
-      x-capability: 'manage_points oder manage_penalties (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
+      x-capability: 'manage_points, manage_penalties, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
       parameters:
         - name: all
           in: query
@@ -435,7 +435,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
-      x-capability: 'manage_points oder manage_penalties (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
+      x-capability: 'manage_points, manage_penalties, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
       responses:
         '200':
           description: OK
@@ -488,7 +488,8 @@ paths:
       description: |
         Neu gegenüber der ersten Umsetzung. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
-        werden abgemeldet.
+        werden abgemeldet. Wer kein Admin ist, darf das nur bei Mitgliedern, deren Rechte er selbst hat
+        (ohne create_users und promote_users), nicht bei Gästen und Admins.
       x-capability: create_users
       responses:
         '200':

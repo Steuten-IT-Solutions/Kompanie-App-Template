@@ -24,6 +24,7 @@ use KompanieApp\Contract\Checks;
 use KompanieApp\Contract\WpDriver;
 use KompanieApp\WordPress\Plugin;
 use KompanieApp\WordPress\Roles;
+use KompanieApp\WordPress\WpUsers;
 
 do_action('rest_api_init', rest_get_server());
 $c = new Checks(true);
@@ -74,6 +75,45 @@ $legacy = wp_insert_user(['user_login' => 'kpwp_alt2', 'user_pass' => wp_generat
 clean_user_cache($legacy);
 $c->ok(Roles::migrateUsers(static fn (string $role): bool => true) >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'organizer', 'Übernahme bei älterer Installation: frühere WP-Rolle → Meta');
 wp_delete_user($legacy);
+
+// Frühere WP-Rechte über eine eigene WP-Rolle (z. B. mit einem Rollen-Plugin vergeben) zählen wie damals.
+add_role('kpwp_vorstand', 'Vorstand', ['read' => true, Roles::CAP_MEMBER => true, Roles::CAP_MANAGE => true]);
+$vorstand = wp_insert_user(['user_login' => 'kpwp_vorstand', 'user_pass' => wp_generate_password(), 'role' => 'kpwp_vorstand']);
+clean_user_cache($vorstand);
+$c->ok(WpUsers::legacyRole(get_userdata($vorstand)) === 'manager', 'Früheres Recht kompanie_manage über eigene WP-Rolle → Leitung');
+$listed = array_map(static fn (KompanieApp\Core\Auth\User $u): int => $u->id, $app->users->list(false));
+$c->ok(in_array($vorstand, $listed, true), 'Konto mit früherem WP-Recht steht in der Mitgliederliste');
+$c->ok(Roles::migrateUsers(static fn (string $role): bool => true) >= 1 && get_user_meta($vorstand, WpUsers::metaKey(), true) === 'manager', 'Übernahme: früheres WP-Recht → Meta');
+wp_delete_user($vorstand);
+remove_role('kpwp_vorstand');
+
+// Wer in der App Konten anlegen darf, setzt keine Passwörter von Benutzerverwaltern der Webseite zurück.
+add_role('kpwp_userpflege', 'Benutzerpflege', ['read' => true, 'list_users' => true, 'edit_users' => true]);
+$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => ['member', 'create_users']]);
+$pflegeKey = $pflegeRole['key'];
+$pfleger = $d->createUser('kpwp_pfleger', 'member');
+$app->users->setRole($pfleger, $pflegeKey);
+$webUser = $d->createUser('kpwp_webuser', 'member');
+get_userdata($webUser)->add_role('kpwp_userpflege');
+$plain = $d->createUser('kpwp_schlicht', 'member');
+clean_user_cache($pfleger);
+wp_set_current_user($pfleger);
+$refused = static function (int $id) use ($app): bool {
+    try {
+        $app->users->setPassword($id, wp_generate_password());
+        return false;
+    } catch (\DomainException) {
+        return true;
+    }
+};
+$c->ok($refused($webUser), 'Passwort eines Benutzers mit WP-Benutzerrechten nur mit WP-Recht');
+$c->ok(!$refused($plain), 'Passwort eines Mitglieds mit dem App-Recht „Mitglieder anlegen“');
+wp_set_current_user(0);
+foreach ([$pfleger, $webUser, $plain] as $id) {
+    wp_delete_user($id);
+}
+$app->roles()->delete($pflegeKey, 'member');
+remove_role('kpwp_userpflege');
 
 // Bezeichnungen der früheren WP-Rollen folgen kompanie.json.
 $wpRoles = wp_roles();

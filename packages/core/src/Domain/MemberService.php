@@ -113,7 +113,7 @@ final class MemberService
             throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
         }
         // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
-        if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandle($actor, $target->role))) {
+        if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandleUser($actor, $target))) {
             throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
         }
         if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
@@ -190,8 +190,12 @@ final class MemberService
         if ($target->isAdmin() && !$actor->isAdmin()) {
             throw ApiError::forbidden('Nur Admins dürfen Passwörter von Admins zurücksetzen.');
         }
-        // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen.
-        if ($this->roles !== null && !$this->roles->canHandle($actor, $target->role)) {
+        // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen,
+        // oder (bei WordPress) das Konto einer Person, die gar nicht zur Kompanie gehört (Gast).
+        if (!$actor->isAdmin() && $target->role === Roles::GUEST) {
+            throw ApiError::forbidden('Passwörter von Gästen setzen nur Admins zurück.');
+        }
+        if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {
             throw ApiError::forbidden('Das Passwort dieser Person darfst du nicht zurücksetzen.');
         }
         $password = Passwords::readable(12);
