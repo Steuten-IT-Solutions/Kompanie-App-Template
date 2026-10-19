@@ -84,6 +84,7 @@ $c->ok(WpUsers::legacyRole(get_userdata($vorstand)) === 'manager', 'Früheres Re
 $listed = array_map(static fn (KompanieApp\Core\Auth\User $u): int => $u->id, $app->users->list(false));
 $c->ok(in_array($vorstand, $listed, true), 'Konto mit früherem WP-Recht steht in der Mitgliederliste');
 $c->ok(Roles::migrateUsers(static fn (string $role): bool => true) >= 1 && get_user_meta($vorstand, WpUsers::metaKey(), true) === 'manager', 'Übernahme: früheres WP-Recht → Meta');
+$c->ok(get_user_meta($vorstand, $GLOBALS['wpdb']->get_blog_prefix() . WpUsers::ACCOUNT_META, true) === '1', 'Übernahme markiert das Konto als Konto der Kompanie');
 wp_delete_user($vorstand);
 remove_role('kpwp_vorstand');
 
@@ -108,6 +109,11 @@ $refused = static function (int $id) use ($app): bool {
 };
 $c->ok($refused($webUser), 'Passwort eines Benutzers mit WP-Benutzerrechten nur mit WP-Recht');
 $c->ok(!$refused($plain), 'Passwort eines Mitglieds mit dem App-Recht „Mitglieder anlegen“');
+$marked = static fn (int $id): bool => get_user_meta($id, $GLOBALS['wpdb']->get_blog_prefix() . WpUsers::ACCOUNT_META, true) === '1';
+$c->ok($marked($plain), 'Konto, dem eine Rolle mit WP-Recht gegeben wurde, ist als Konto der Kompanie markiert');
+$neu = $app->users->create('Kpwp Neu', 'kpwp_neu', 'kpwp_neu@example.com', wp_generate_password());
+$c->ok($marked($neu), 'Von der App angelegtes Konto ist markiert');
+wp_delete_user($neu);
 // Konto der Webseite (z. B. Kunde, Forum), das erst über die App zum Mitglied gemacht wird: nicht übernehmbar.
 wp_set_current_user(0);
 $app->roles()->update($pflegeKey, ['capabilities' => ['member', 'create_users', 'promote_users']]);
