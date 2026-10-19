@@ -270,6 +270,25 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
   expect(status).toBe(401);
 });
 
+test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  // Ab jetzt antwortet die API für Termine sehr langsam: Die Liste muss trotzdem sofort da sein.
+  await page.context().route(/events/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.getByRole('button', { name: 'News' }).click();
+    await expect(page.locator('.news-card').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Termine' }).click();
+    await expect(page.getByText('Tag der offenen Tür')).toBeVisible({ timeout: 1500 });
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: MANAGER }).click();
@@ -547,6 +566,46 @@ test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async 
     await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   } finally {
     await page.context().setOffline(false);
+  }
+});
+
+test('Service Worker: Programmdateien vorab gespeichert, alte Speicher gelöscht, langsames Netz', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.evaluate(async () => {
+    // Stand vor einem Update: alter Speicher einer früheren Version, Service Worker noch nicht da.
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    await (await caches.open('kompanie-static-v2')).put('/alt.js', new Response('alt'));
+  });
+  await page.reload();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  const statics = () => page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('kompanie-static-')));
+  await expect.poll(statics).toHaveLength(1);
+  expect((await statics())[0]).not.toBe('kompanie-static-v2');
+  // Auch die erst bei Bedarf geladenen Ansichten liegen schon im Speicher (offline verfügbar).
+  const cached = await page.evaluate(async () => {
+    const name = (await caches.keys()).find((k) => k.startsWith('kompanie-static-'))!;
+    return (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname.split('/').pop());
+  });
+  expect(cached.some((f) => /^Verwaltung-.*\.js$/.test(f ?? ''))).toBe(true);
+  expect(cached.some((f) => /^Einstellungen-.*\.js$/.test(f ?? ''))).toBe(true);
+
+  // Langsames Netz: Die gespeicherte App-Seite erscheint nach höchstens 3 Sekunden.
+  await page.reload();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await page.context().route(/\/app\/?$/, async (route) => {
+    await new Promise((r) => setTimeout(r, 10000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    const start = Date.now();
+    await page.goto('/app/', { waitUntil: 'commit', timeout: 9000 });
+    await expect(page.locator('.topbar')).toBeVisible({ timeout: 9000 });
+    expect(Date.now() - start).toBeLessThan(6000);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
   }
 });
 

@@ -97,6 +97,12 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     };
   }, [go, onClose]);
 
+  // Vorheriges und nächstes Bild schon laden, damit das Wischen ohne Wartezeit klappt.
+  useEffect(() => {
+    if (photos.length < 2) return;
+    for (const n of [i + 1, i - 1 + photos.length]) new Image().src = photos[n % photos.length].large;
+  }, [i, photos]);
+
   const p = photos[i];
   return (
     <div
