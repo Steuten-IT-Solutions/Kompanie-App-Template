@@ -37,7 +37,6 @@ const DEFAULTS = {
   greeting: 'Hallo, {name}',
   roles: { guest: 'Gast', member: 'Mitglied', manager: 'Verwalter', admin: 'Admin' },
   sections: { events: 'Termine', news: 'News', gallery: 'Galerie', points: 'Punkte', penalties: 'Strafen' },
-  features: { events: true, calendar: true, news: true, gallery: true, points: true, penalties: true },
 };
 
 export class BrandError extends Error {}
@@ -76,7 +75,8 @@ export function loadConfig(file) {
       roles: { ...DEFAULTS.roles, ...(data.labels?.roles ?? {}) },
       sections: { ...DEFAULTS.sections, ...(data.labels?.sections ?? {}) },
     },
-    features: { ...DEFAULTS.features, ...(data.features ?? {}) },
+    // Veraltet (Bereiche schaltet der Admin in der App); nur für den Hinweis beim Build.
+    legacyFeatures: data.features !== undefined,
     font: data.font ?? 'System',
     colors: data.colors,
     legal: data.legal ?? {},
@@ -153,6 +153,9 @@ export async function build({ config, assets, out, publicDir }) {
     throw new BrandError(`Farben nicht verwendbar:\n  - ${theme.errors.join('\n  - ')}`);
   }
   const warnings = [...theme.warnings];
+  if (cfg.legacyFeatures) {
+    warnings.push('„features“ in kompanie.json wird ignoriert: Welche Bereiche die App hat, schaltet der Admin in der App (Einstellungen → Bereiche). Der Eintrag kann entfernt werden.');
+  }
   mkdirSync(out, { recursive: true });
   mkdirSync(publicDir, { recursive: true });
 
@@ -171,7 +174,6 @@ export async function build({ config, assets, out, publicDir }) {
     greeting: cfg.greeting,
     guestWelcome: cfg.guestWelcome,
     labels: cfg.labels,
-    features: cfg.features,
     font: cfg.font,
     themeColor: theme.light.primary,
     backgroundColor: theme.light.bg,

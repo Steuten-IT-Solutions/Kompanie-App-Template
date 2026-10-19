@@ -21,7 +21,7 @@ final class Route
 
     /**
      * @param string|Capability $access PUBLIC, LOGIN oder ein nötiges Recht
-     * @param string|null $feature Bereich aus kompanie.json; ist er aus, gibt es die Route nicht
+     * @param string|null $feature Bereich (Domain\Features); ist er aus, antwortet die Route mit 403 feature_disabled
      */
     public function __construct(
         public readonly string $method,

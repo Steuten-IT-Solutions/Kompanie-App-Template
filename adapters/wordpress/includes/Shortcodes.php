@@ -79,7 +79,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
 
     private static function events(App $app, array $atts): string
     {
-        if (!$app->config->featureEnabled('events')) {
+        if (!$app->features()->enabled('events')) {
             return '';
         }
         $limit = max(1, min(100, (int) ($atts['anzahl'] ?? 10)));
@@ -135,7 +135,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
 
     private static function gallery(App $app): string
     {
-        if (!$app->config->featureEnabled('gallery')) {
+        if (!$app->features()->enabled('gallery')) {
             return '';
         }
         $member = (bool) $app->authContext->currentUser()?->isMember();

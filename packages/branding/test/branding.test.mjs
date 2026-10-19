@@ -91,7 +91,8 @@ test('kompanie.json: Pflichtfelder, Standardwerte, verständliche Fehler', () =>
   assert.equal(cfg.shortName, 'TV Beispiel');
   assert.equal(cfg.greeting, 'Hallo, {name}');
   assert.equal(cfg.labels.roles.manager, 'Verwalter');
-  assert.equal(cfg.features.gallery, true);
+  assert.equal(cfg.legacyFeatures, false);
+  assert.equal(loadConfig(join(tmp({ name: 'x', colors: { primary: '#123456' }, features: { news: false } }), 'kompanie.json')).legacyFeatures, true, 'veraltetes „features“ ist gültig, kein Abbruch');
   assert.throws(() => loadConfig(join(tmp({ name: 'x', colors: { primary: 'blau' } }), 'kompanie.json')), BrandError);
   assert.throws(() => loadConfig(join(tmp({ colors: { primary: '#123456' } }), 'kompanie.json')), /nicht gültig/);
 });

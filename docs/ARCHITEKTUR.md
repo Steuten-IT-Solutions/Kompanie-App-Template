@@ -53,7 +53,7 @@ Die Download-Seite der Kompanie zeigt zwei große Knöpfe mit bebilderter Anleit
 - **„Wir haben eine WordPress-Webseite“:** Plugin-Datei herunterladen, in WordPress unter *Plugins → Installieren → Plugin hochladen* auswählen, aktivieren. Kein FTP nötig.
 - **„Wir haben keine WordPress-Webseite“:** `install.php` herunterladen und auf den Webspace laden (über den Dateimanager des Hosters oder FTP), im Browser öffnen. Der Installer erledigt den Rest.
 
-Danach führt der **Einrichtungsassistent** durch das, was nur die Kompanie wissen kann: erster Admin (nur ohne WordPress), Kalender-Link, Galerie. Jeder Schritt wird sofort geprüft. **Eine Datenbank muss die Kompanie nicht anlegen**: Der Installer wählt den Datenspeicher selbst.
+Danach führt der **Einrichtungsassistent** durch das, was nur die Kompanie wissen kann: erster Admin (nur ohne WordPress), welche Bereiche sie nutzt, Kalender-Link, Galerie. Jeder Schritt wird sofort geprüft. **Eine Datenbank muss die Kompanie nicht anlegen**: Der Installer wählt den Datenspeicher selbst.
 
 Das Hochladen einer Datei auf den Webspace ist der einzige technische Schritt ohne WordPress. Dafür gibt es **Anleitungen und Kurzvideos für die gängigen Hoster** (z. B. IONOS, Strato, all-inkl, netcup, Hetzner). Eine Installation durch uns gibt es nicht (siehe [Offene Punkte, Abschnitt 2](OFFENE-PUNKTE.md#2-hilfe-beim-hochladen-von-installphp)).
 
@@ -122,7 +122,8 @@ Eine **Neutralitätsprüfung** in der CI stellt sicher, dass in App, Kern, Adapt
 - Name und Kurzname (Kopfzeile, Fenstertitel, Home-Bildschirm, Installationsanleitung)
 - Begrüßung, Willkommenstext für Gäste
 - **Bezeichnungen:** Rollen (z. B. „Spieß“, „Kassierer“, „Hauptmann“) und Bereiche (z. B. „Punkte“ → „Orden“, „Strafen“ → „Kasse“)
-- welche Bereiche es gibt
+
+Welche Bereiche eine Kompanie nutzt, steht **nicht** in `kompanie.json`: Das entscheidet ihr Admin in der App (siehe Abschnitt 12, „Bereiche“).
 
 ## 6. Datenspeicher und Konnektoren
 
@@ -238,6 +239,8 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 
 **Zugangsdaten** gehören nie in `kompanie.json` oder ins Repo; die Kompanie-Repos sind öffentlich.
 
+**Bereiche** stehen nicht in `kompanie.json` (siehe Abschnitt 12). Ein altes Feld `features` ist weiterhin gültig, wird aber ignoriert; der Build gibt dazu einen Hinweis aus.
+
 **Rechtstexte:** Felder `legal.imprintUrl`/`legal.privacyUrl` oder Dateien `legal/impressum.md`/`legal/datenschutz.md`. *Ob die App ein eigenes Impressum braucht und was in die Datenschutzerklärung gehört, muss rechtlich geprüft werden.* Danach liegen Vorlagen im Kern, die die App mit ihren Daten füllt (siehe [Offene Punkte, Abschnitt 3](OFFENE-PUNKTE.md#3-rechtstexte-und-datenschutz)).
 
 **Vorschau:** Die CI jedes Kompanie-Repos startet die App mit Beispieldaten und hängt Screenshots (hell/dunkel) an Pull Requests und Releases.
@@ -310,14 +313,23 @@ Eine einzelne Datei, auf die Kompanie zugeschnitten (Repo-Name und Signaturschl�
 
 Beim ersten Öffnen durch einen Admin bietet die App den Assistenten an:
 
-1. Kalender: geheime iCal-Adresse einfügen (mit Anleitung, wo man sie in Google findet), Testabruf
-2. Galerie: Ordnerfreigabe für ein Dienstkonto, Abgleich mit Fortschritt („Mit Google verbinden“ hängt vom Galerie-Test ab)
-3. News (nur eigenständige Version): Adresse einer vorhandenen Webseite oder eines Feeds, Testabruf
-4. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
+1. **Bereiche wählen** (Termine, Kalender, News, Galerie, Punkte, Strafen), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
+2. Kalender (nur wenn gewählt): geheime iCal-Adresse einfügen (mit Anleitung, wo man sie in Google findet), Testabruf
+3. Galerie (nur wenn gewählt): Ordnerfreigabe für ein Dienstkonto, Abgleich mit Fortschritt („Mit Google verbinden“ hängt vom Galerie-Test ab)
+4. News (nur wenn gewählt, nur eigenständige Version): Adresse einer vorhandenen Webseite oder eines Feeds, Testabruf
+5. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
 
 Der erste Admin entsteht bei der eigenständigen Version im Installer, bei WordPress ist es ein WordPress-Administrator.
 
-Jeder Schritt lässt sich überspringen und später unter *Einstellungen* nachholen.
+Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* nachholen.
+
+### Bereiche
+
+- **Nur der Admin entscheidet** (`manage_settings`): in der Ersteinrichtung, später unter *Einstellungen → Bereiche* in der App, bei WordPress zusätzlich im WP-Admin. API: `GET`/`PUT /admin/features`.
+- **Eine Stelle im Kern:** `Domain\Features` sagt, ob ein Bereich an ist, und führt die Liste aller Bereiche (Bezeichnung, Beschreibung, Abhängigkeiten, ob er eingerichtet werden muss). Neue Bereiche tragen sich dort ein, nicht in `kompanie.json`.
+- **Ausgeschaltet:** Der Bereich verschwindet aus der App, seine Routen antworten mit **403 `feature_disabled`**, seine Hintergrundaufgaben laufen nicht. **Die Daten bleiben erhalten**; nach dem Wiedereinschalten ist alles wieder da. Beim Ausschalten fragt die App nach.
+- **Eingeschaltet, aber nicht eingerichtet** (z. B. Kalender ohne Adresse): in den Einstellungen markiert, mit Link zur Einrichtung. `/config` meldet nur Bereiche, die an **und** eingerichtet sind.
+- **Bestehende Installationen** übernehmen beim Wechsel auf die Version mit dieser Funktion einmalig die Werte aus dem alten Feld `features` ihrer `kompanie.json` (dort war „an“ der Standard), damit nichts plötzlich verschwindet. Danach gilt nur noch die Einstellung.
 
 ## 13. Pflege ohne technisches Wissen
 

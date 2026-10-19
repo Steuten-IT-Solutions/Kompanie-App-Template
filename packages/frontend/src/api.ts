@@ -39,6 +39,31 @@ declare global {
 
 export const config: AppConfig | undefined = window.KOMPANIE_CONFIG;
 
+/** Bereich mit Schalter für die Ersteinrichtung und die Einstellungen der Admins. */
+export interface FeatureInfo {
+  key: Feature;
+  label: string;
+  description: string;
+  enabled: boolean;
+  requires: Feature[];
+  /** null = braucht keine Einrichtung */
+  configured: boolean | null;
+  /** Abschnitt der Einstellungen bzw. Schritt der Ersteinrichtung, z. B. „kalender“ */
+  setup: string | null;
+}
+
+export const CONFIG_CHANGED = 'kompanie-config-changed';
+
+/**
+ * Übernimmt geänderte Bereiche in die geladene Konfiguration (wie /config: an und eingerichtet)
+ * und sagt der App, dass sie Tabs und Ansichten neu bestimmen soll.
+ */
+export function applyFeatures(list: FeatureInfo[]): void {
+  if (!config) return;
+  for (const f of list) config.features[f.key] = f.enabled && f.configured !== false;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
 export const levelLabel = (level: Level): string => brand.labels.roles[level] ?? level;
 
 /** Darf der angemeldete Benutzer das? */
@@ -323,6 +348,8 @@ export const api = {
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),
   deletePenalty: (id: number) => request<{ deleted: boolean }>('DELETE', `/penalties/${id}`),
 
+  features: () => request<FeatureInfo[]>('GET', '/admin/features'),
+  setFeatures: (data: Partial<Record<Feature, boolean>>) => request<FeatureInfo[]>('PUT', '/admin/features', data),
   settings: () => request<AdminSettings>('GET', '/admin/settings'),
   updateSettings: (data: AdminSettingsInput) => request<AdminSettings>('PATCH', '/admin/settings', data),
   testCalendar: () => request<{ count: number; sample: { start: string; title: string }[] }>('POST', '/admin/calendar/test'),

@@ -10,8 +10,6 @@ namespace KompanieApp\Core\Config;
  */
 final class KompanieConfig
 {
-    public const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties'];
-
     private const ROLE_LABELS = ['guest' => 'Gast', 'member' => 'Mitglied', 'manager' => 'Verwalter', 'admin' => 'Admin'];
     private const SECTION_LABELS = ['events' => 'Termine', 'news' => 'News', 'gallery' => 'Galerie', 'points' => 'Punkte', 'penalties' => 'Strafen'];
 
@@ -44,20 +42,15 @@ final class KompanieConfig
         return $this->string('description', 'Die App der ' . $this->name());
     }
 
-    public function featureEnabled(string $feature): bool
+    /**
+     * Früherer Schalter `features` in kompanie.json (Standard: an). Gilt nicht mehr – Bereiche schaltet
+     * der Admin in der App (Domain\Features). Wird nur einmalig gelesen, wenn eine bestehende
+     * Installation auf diese Version wechselt, damit kein ausgeschalteter Bereich plötzlich erscheint.
+     */
+    public function legacyFeature(string $feature): bool
     {
         $features = is_array($this->data['features'] ?? null) ? $this->data['features'] : [];
         return (bool) ($features[$feature] ?? true);
-    }
-
-    /** @return array<string, bool> */
-    public function features(): array
-    {
-        $out = [];
-        foreach (self::FEATURES as $f) {
-            $out[$f] = $this->featureEnabled($f);
-        }
-        return $out;
     }
 
     public function roleLabel(string $level): string
@@ -68,12 +61,12 @@ final class KompanieConfig
             : (self::ROLE_LABELS[$level] ?? $level);
     }
 
-    public function sectionLabel(string $section): string
+    public function sectionLabel(string $section, ?string $default = null): string
     {
         $labels = $this->data['labels']['sections'] ?? [];
         return is_array($labels) && is_string($labels[$section] ?? null) && $labels[$section] !== ''
             ? $labels[$section]
-            : (self::SECTION_LABELS[$section] ?? $section);
+            : (self::SECTION_LABELS[$section] ?? $default ?? $section);
     }
 
     public function primaryColor(): string

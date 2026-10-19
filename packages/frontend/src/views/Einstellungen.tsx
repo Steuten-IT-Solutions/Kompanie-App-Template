@@ -1,16 +1,17 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { api, type AdminSettings, type NewsSourceType } from '../api';
+import { api, applyFeatures, type AdminSettings, type Feature, type FeatureInfo, type NewsSourceType } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import Wartung from './Wartung';
 
 /**
- * Einstellungen für Admins (beide Varianten): Zustand, Updates und Datensicherung, dann Kalender,
+ * Einstellungen für Admins (beide Varianten): Bereiche, Zustand, Updates und Datensicherung, dann Kalender,
  * Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
  * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
  */
 export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div className="settings">
+      <Bereiche onToast={onToast} />
       <Wartung onToast={onToast} />
       <Verbindungen onToast={onToast} />
     </div>
@@ -31,11 +32,109 @@ function Verbindungen({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/** Scrollt zum Abschnitt eines Bereichs (Kalender, Galerie, News), z. B. aus „noch nicht eingerichtet“. */
+function scrollToSetup(setup: string) {
+  document.getElementById(`einstellungen-${setup}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/**
+ * Schalter je Bereich mit einem Satz, wofür er da ist. Gemeinsam für die Ersteinrichtung und die Einstellungen.
+ * Ein Bereich, der einen anderen braucht, lässt sich erst einschalten, wenn der andere an ist.
+ */
+export function FeatureSwitches({
+  list,
+  value,
+  onChange,
+  disabled,
+  onSetup,
+}: {
+  list: FeatureInfo[];
+  value: Record<Feature, boolean>;
+  onChange: (key: Feature, on: boolean) => void;
+  disabled?: boolean;
+  /** Link „einrichten“ bei Bereichen, die an, aber noch nicht eingerichtet sind */
+  onSetup?: (setup: string) => void;
+}) {
+  const label = (key: Feature) => list.find((f) => f.key === key)?.label ?? key;
+  return (
+    <div className="feature-list">
+      {list.map((f) => {
+        const missing = f.requires.filter((r) => !value[r]);
+        const blocked = !value[f.key] && missing.length > 0;
+        return (
+          <label key={f.key} className="toggle feature-toggle">
+            <input
+              type="checkbox"
+              checked={value[f.key]}
+              disabled={disabled || blocked}
+              onChange={(e) => onChange(f.key, e.target.checked)}
+            />
+            <span>
+              <strong>{f.label}</strong>
+              <span className="small muted feature-desc">{f.description}</span>
+              {blocked && <span className="small feature-desc">Braucht {missing.map(label).join(' und ')}.</span>}
+              {onSetup && value[f.key] && f.configured === false && f.setup && (
+                <span className="small feature-desc">
+                  Noch nicht eingerichtet.{' '}
+                  <button type="button" className="btn btn-link btn-inline" onClick={() => onSetup(f.setup!)}>
+                    Jetzt einrichten
+                  </button>
+                </span>
+              )}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Einstellungen → Bereiche: Jeder Schalter speichert sofort; beim Ausschalten wird nachgefragt. */
+function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.features(), []);
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const list = data!;
+  const value = Object.fromEntries(list.map((f) => [f.key, f.enabled])) as Record<Feature, boolean>;
+
+  async function toggle(key: Feature, on: boolean) {
+    const name = list.find((f) => f.key === key)?.label ?? key;
+    if (!on && !window.confirm(`„${name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.`)) return;
+    setBusy(true);
+    setSaveError(null);
+    try {
+      const next = await api.setFeatures({ [key]: on });
+      setData(next);
+      applyFeatures(next);
+      onToast(on ? `${name} eingeschaltet` : `${name} ausgeschaltet`);
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" id="einstellungen-bereiche">
+      <h3>Bereiche</h3>
+      <p className="small muted">Welche Bereiche die App für alle hat. Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.</p>
+      <FeatureSwitches list={list} value={value} onChange={toggle} disabled={busy} onSetup={scrollToSetup} />
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export type SectionProps = { settings: AdminSettings; onSaved: (s: AdminSettings) => void; onToast: (msg: string) => void };
 
-function Section({ title, children, onSubmit, busy, error }: { title: string; children: ReactNode; onSubmit: (e: FormEvent) => void; busy: boolean; error: string | null }) {
+function Section({ id, title, children, onSubmit, busy, error }: { id?: string; title: string; children: ReactNode; onSubmit: (e: FormEvent) => void; busy: boolean; error: string | null }) {
   return (
-    <form className="form card settings-section" onSubmit={onSubmit}>
+    <form className="form card settings-section" id={id ? `einstellungen-${id}` : undefined} onSubmit={onSubmit}>
       <h3>{title}</h3>
       {children}
       {error && (
@@ -94,6 +193,7 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
 
   return (
     <Section
+      id="kalender"
       title="Kalender für Mitglieder"
       busy={busy}
       error={error}
@@ -171,6 +271,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
 
   return (
     <Section
+      id="galerie"
       title="Galerie aus Google Drive"
       busy={busy}
       error={error}
@@ -249,6 +350,7 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
 
   return (
     <Section
+      id="news"
       title="Neuigkeiten"
       busy={busy}
       error={error}

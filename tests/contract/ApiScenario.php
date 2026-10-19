@@ -21,6 +21,7 @@ final class ApiScenario
     public function run(): void
     {
         try {
+            $this->features();
             $this->scores();
             $this->createUsers();
             $this->password();
@@ -47,6 +48,36 @@ final class ApiScenario
     {
         [$s, $data] = $this->d->request($method, $path, $body, $query);
         return [$s, $data];
+    }
+
+    /** Bereiche (Issue #7): nur Admins schalten; danach sind für die übrigen Abschnitte alle an. */
+    private function features(): void
+    {
+        $c = $this->c;
+        $c->section('Bereiche ein- und ausschalten');
+        $admin = $this->user('kptest_bereiche', 'admin');
+        $member = $this->user('kptest_bereiche_m', 'member');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/admin/features')[0] === 401, 'GET /admin/features ohne Anmeldung → 401');
+        $this->d->actAs($member);
+        $c->ok($this->req('GET', '/admin/features')[0] === 403, 'GET /admin/features als Mitglied → 403');
+        $c->ok($this->req('PUT', '/admin/features', ['points' => true])[0] === 403, 'PUT /admin/features als Mitglied → 403');
+
+        $this->d->actAs($admin);
+        $c->ok($this->req('PUT', '/admin/features', ['inventar' => true])[0] === 400, 'Unbekannter Bereich → 400');
+        $c->ok($this->req('PUT', '/admin/features', ['points' => 'ja'])[0] === 400, 'Kein Wahrheitswert → 400');
+        [$s, $d] = $this->req('PUT', '/admin/features', ['events' => false]);
+        $c->ok($s === 200 && array_column((array) $d, 'enabled', 'key')['events'] === false, 'Termine ausschalten');
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/events');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
+
+        $this->d->actAs($admin);
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true];
+        [$s, $d] = $this->req('PUT', '/admin/features', $all);
+        $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/events')[0] === 200, 'Eingeschalteter Bereich wieder erreichbar');
     }
 
     private function scores(): void

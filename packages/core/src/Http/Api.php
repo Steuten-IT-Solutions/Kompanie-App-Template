@@ -18,7 +18,7 @@ use KompanieApp\Core\Update\StatusReporter;
  *
  * Grundsätze:
  * - Die /me-Routen lesen die Benutzer-ID immer aus der Sitzung, nie aus der Anfrage.
- * - Ist ein Bereich in kompanie.json ausgeschaltet, gibt es seine Routen nicht.
+ * - Ist ein Bereich ausgeschaltet (Domain\Features), antworten seine Routen mit 403 feature_disabled.
  */
 final class Api
 {
@@ -61,8 +61,8 @@ final class Api
     public function dispatch(Route $route, Request $request): Response
     {
         try {
-            if ($route->feature !== null && !$this->app->config->featureEnabled($route->feature)) {
-                throw new ApiError(404, 'feature_disabled', 'Dieser Bereich ist ausgeschaltet.');
+            if ($route->feature !== null && !$this->app->features()->enabled($route->feature)) {
+                throw new ApiError(403, 'feature_disabled', 'Dieser Bereich ist ausgeschaltet.');
             }
             $this->authorize($route);
             $result = ($route->handler)($request);
@@ -103,10 +103,11 @@ final class Api
     public function config(): array
     {
         $a = $this->app;
-        $features = $a->config->features();
-        $features['calendar'] = $features['calendar'] && $a->calendar()->isConfigured();
-        $features['gallery'] = $features['gallery'] && $a->gallery()->isConfigured();
-        $features['news'] = $features['news'] && $a->news->available();
+        // Für die App: an und eingerichtet (ein Kalender ohne Adresse hätte nichts zu zeigen).
+        $features = [];
+        foreach ($a->features()->all() as $key => $on) {
+            $features[$key] = $on && $a->features()->configured($key);
+        }
         return [
             'apiBase' => $a->env->apiBase(),
             'appUrl' => $a->env->appUrl(),
@@ -211,6 +212,11 @@ final class Api
             // Einstellungen (Admins)
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
+            new Route('GET', '/admin/features', Cap::ManageSettings, fn () => $a->features()->describe(), null, $denySettings),
+            new Route('PUT', '/admin/features', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->features()->update($r->body);
+                return $a->features()->describe();
+            }, null, $denySettings),
             new Route('POST', '/admin/calendar/test', Cap::ManageSettings, fn () => $a->settingsService()->testCalendar(), null, $denySettings),
             new Route('POST', '/admin/news/test', Cap::ManageSettings, fn () => $a->settingsService()->testNews(), null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),

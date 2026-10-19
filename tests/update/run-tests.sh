@@ -71,9 +71,10 @@ if [ -f "$T/www/data-dir.php" ]; then
 fi
 
 # Daten, die alle Updates, das Zurückrollen und die Reparatur überstehen müssen
+# (Bereich „Termine“ einschalten wie in der Ersteinrichtung; eine neue Installation hat keine Bereiche)
 php -r 'require $argv[1] . "/autoload.php";
   $k = new KompanieApp\Standalone\Kernel($argv[1], new KompanieApp\Standalone\HttpContext([], ["REQUEST_METHOD" => "GET", "HTTP_HOST" => "127.0.0.1"], "/"));
-  $k->upgrade(); $k->db()->insert("events", ["title" => "Bleibt erhalten", "start_date" => "2030-01-01", "description" => "", "created_by" => 1, "created_at" => "2026-01-01 00:00:00", "updated_at" => "2026-01-01 00:00:00"]);' "$T/www"
+  $k->upgrade(); $k->app()->features()->update(["events" => true]); $k->db()->insert("events", ["title" => "Bleibt erhalten", "start_date" => "2030-01-01", "description" => "", "created_by" => 1, "created_at" => "2026-01-01 00:00:00", "updated_at" => "2026-01-01 00:00:00"]);' "$T/www"
 
 # 2. Neue Version: erst early (keine Wirkung auf stable), nach der Freigabe Update
 release 2

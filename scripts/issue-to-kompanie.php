@@ -40,17 +40,8 @@ const FIELDS = [
     'Willkommenstext für Gäste' => 'guestWelcome',
     'Bezeichnung für Verwalter' => 'manager',
     'Bezeichnung für Strafen' => 'penalties',
-    'Diese Bereiche weglassen' => 'off',
     'Logo' => 'logo',
     'Neues Logo' => 'logo',
-];
-const SECTIONS = [
-    'Öffentliche Termine' => 'events',
-    'Kalender für Mitglieder' => 'calendar',
-    'News' => 'news',
-    'Galerie' => 'gallery',
-    'Punkte' => 'points',
-    'Strafen' => 'penalties',
 ];
 
 // Issue-Formulare: „### Überschrift“, Leerzeile, Wert; leere Felder als „_No response_“.
@@ -139,11 +130,6 @@ foreach (['primary', 'accent'] as $c) {
     $set($k, ['colors', $c], $v, $c === 'accent');
 }
 if ($mode === 'neu') {
-    foreach (SECTIONS as $label => $feature) {
-        if (preg_match('/^- \[[xX]\] ' . preg_quote($label, '/') . '$/m', $f['off'] ?? '')) {
-            $k['features'][$feature] = false;
-        }
-    }
     if ($text('name') === '') {
         $errors[] = 'Der Name der Kompanie fehlt.';
     }

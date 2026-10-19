@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Tests;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Level;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Infra\ArrayCache;
 use KompanieApp\Core\Infra\GdImageResizer;
@@ -44,6 +45,7 @@ final class NewsAndSettingsTest extends TestCase
             config: new KompanieConfig([]),
         );
         $app->upgrade();
+        $app->features()->update(array_fill_keys(Features::keys(), true));
         return $app;
     }
 

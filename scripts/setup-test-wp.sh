@@ -92,6 +92,8 @@ mkdir -p "$DIR/wp/wp-content/mu-plugins"
 ln -sfn "$ROOT/tests/wordpress/drive-mock.php" "$DIR/wp/wp-content/mu-plugins/kompanie-drive-mock.php"
 $WP eval '
 $app = KompanieApp\WordPress\Plugin::app();
+// Alle Bereiche an (eine neue Installation hat keine; sonst wählt sie der Admin in der Einrichtung).
+$app->features()->update( array_fill_keys( KompanieApp\Core\Domain\Features::keys(), true ) );
 $key = openssl_pkey_new( array( "private_key_bits" => 2048, "private_key_type" => OPENSSL_KEYTYPE_RSA ) );
 openssl_pkey_export( $key, $pem );
 $app->drive()->saveServiceAccount( wp_json_encode( array( "client_email" => "test@example.iam.gserviceaccount.com", "private_key" => $pem ) ) );

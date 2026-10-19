@@ -13,7 +13,7 @@ Hier wird nur eingetragen, was die Kompanie ausmacht.
 
 | Datei | Inhalt |
 |---|---|
-| `kompanie.json` | Name, Farben, Begrüßung, Bezeichnungen, Bereiche – Beschreibung aller Felder im [Schema](https://github.com/Steuten-IT-Solutions/Kompanie-App-Template/blob/main/config/kompanie.schema.json). Pflicht sind nur `name` und `colors.primary`. |
+| `kompanie.json` | Name, Farben, Begrüßung, Bezeichnungen – Beschreibung aller Felder im [Schema](https://github.com/Steuten-IT-Solutions/Kompanie-App-Template/blob/main/config/kompanie.schema.json). Pflicht sind nur `name` und `colors.primary`. |
 | `assets/logo.png` | Logo (oder `.svg`, `.jpg`, `.jpeg`, `.webp`) |
 | `legal/` | geplant: `impressum.md`, `datenschutz.md` (wartet auf die rechtliche Prüfung; wird noch nicht verwendet) |
 

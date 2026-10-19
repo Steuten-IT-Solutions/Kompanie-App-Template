@@ -637,6 +637,50 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /admin/features:
+    get:
+      tags: [Einstellungen]
+      summary: Bereiche der App mit Schalter, Bezeichnung und Einrichtungsstand
+      description: |
+        Welche Bereiche eine Kompanie nutzt, entscheidet allein ihr Admin (Ersteinrichtung bzw. Einstellungen → Bereiche).
+        Neue Installationen starten ohne Bereiche. Ein ausgeschalteter Bereich verschwindet aus der App, seine Routen
+        antworten mit 403 `feature_disabled`, seine Hintergrundaufgaben laufen nicht; die Daten bleiben erhalten.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Feature' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Bereiche ein- und ausschalten
+      description: Nur mitgeschickte Bereiche werden geändert. Unbekannte Bereiche oder Werte, die kein Wahrheitswert sind → 400.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: { type: boolean }
+              example: { gallery: true, penalties: false }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Feature' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/settings:
     get:
       tags: [Einstellungen]
@@ -1003,6 +1047,26 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    Feature:
+      type: object
+      required: [key, label, description, enabled, requires, configured, setup]
+      properties:
+        key:
+          type: string
+          enum: [events, calendar, news, gallery, points, penalties]
+        label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
+        description: { type: string, description: Ein Satz, wofür der Bereich da ist }
+        enabled: { type: boolean }
+        requires:
+          type: array
+          items: { type: string }
+          description: Bereiche, die eingeschaltet sein müssen
+        configured:
+          type: [boolean, 'null']
+          description: Ob der Bereich eingerichtet ist (z. B. Kalender mit Adresse); null = braucht keine Einrichtung
+        setup:
+          type: [string, 'null']
+          description: Abschnitt der Einstellungen bzw. Schritt der Ersteinrichtung, z. B. `kalender`
     Error:
       type: object
       required: [code, message]
@@ -1011,7 +1075,7 @@ components:
           type: string
           description: |
             z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
-            `feature_disabled` (404, Bereich in kompanie.json ausgeschaltet), `method_not_allowed` (405),
+            `feature_disabled` (403, Bereich vom Admin ausgeschaltet), `method_not_allowed` (405),
             `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500).
             Nur eigenständige Version: `login_failed` (400), `too_many_attempts` (429),
             `unsupported_media_type` (415, Änderungen nur als JSON), `not_installed` (503).
@@ -1134,7 +1198,7 @@ components:
             logoutUrl: { type: [string, 'null'], description: Nur bei `redirect` und Anmeldung }
         features:
           type: object
-          description: Bereiche, die eingeschaltet **und** auf dem Server eingerichtet sind.
+          description: Bereiche, die der Admin eingeschaltet hat **und** die auf dem Server eingerichtet sind.
           properties:
             events: { type: boolean }
             calendar: { type: boolean }

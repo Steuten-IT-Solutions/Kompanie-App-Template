@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Http\ApiError;
 
-/** Einstellungen → <Name der Kompanie>: Kalender und Galerie. */
+/** Einstellungen → <Name der Kompanie>: Bereiche, Kalender und Galerie. */
 final class SettingsPage
 {
     public const PAGE = 'kompanie-app';
@@ -20,6 +22,7 @@ final class SettingsPage
             self::PAGE,
             static fn () => self::render(Plugin::app()),
         ));
+        add_action('admin_post_kompanie_app_features', static fn () => self::saveFeatures(Plugin::app()));
         add_action('admin_post_kompanie_app_calendar', static fn () => self::saveCalendar(Plugin::app()));
         add_action('admin_notices', [self::class, 'permalinkNotice']);
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
@@ -86,6 +89,29 @@ final class SettingsPage
                 Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, die Galerie <code>[kompanie_galerie]</code>.
             </p>
 
+            <h2 id="bereiche">Bereiche</h2>
+            <p>Welche Bereiche die App für alle hat (dasselbe wie in der App unter <em>Einstellungen → Bereiche</em>).
+               Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="kompanie_app_features" />
+                <?php wp_nonce_field('kompanie_app_features'); ?>
+                <fieldset>
+                    <?php foreach ($app->features()->describe() as $f) : ?>
+                        <p>
+                            <label>
+                                <input type="checkbox" name="features[]" value="<?php echo esc_attr($f['key']); ?>" <?php checked($f['enabled']); ?> />
+                                <strong><?php echo esc_html($f['label']); ?></strong> – <?php echo esc_html($f['description']); ?>
+                            </label>
+                            <?php if ($f['enabled'] && $f['configured'] === false) : ?>
+                                <br /><span class="description">Noch nicht eingerichtet (siehe unten).</span>
+                            <?php endif; ?>
+                        </p>
+                    <?php endforeach; ?>
+                </fieldset>
+                <?php submit_button('Bereiche speichern', 'secondary'); ?>
+            </form>
+
+            <hr />
             <h2 id="kalender">Kalender</h2>
             <p>Am einfachsten: In Google Kalender unter <em>Einstellungen → Kalender → Kalender integrieren</em> die
                <strong>„Privatadresse im iCal-Format“</strong> kopieren und hier einfügen.</p>
@@ -174,6 +200,22 @@ final class SettingsPage
         } catch (\Throwable $e) {
             echo '<div class="notice notice-error inline"><p>' . esc_html($e->getMessage()) . '</p></div>';
         }
+    }
+
+    private static function saveFeatures(App $app): never
+    {
+        self::guard('kompanie_app_features');
+        $on = isset($_POST['features']) && is_array($_POST['features']) ? array_map('sanitize_key', wp_unslash($_POST['features'])) : [];
+        $state = [];
+        foreach (Features::keys() as $key) {
+            $state[$key] = in_array($key, $on, true);
+        }
+        try {
+            $app->features()->update($state);
+        } catch (ApiError $e) {
+            self::back($e->getMessage(), true, 'bereiche');
+        }
+        self::back('Bereiche gespeichert.', false, 'bereiche');
     }
 
     private static function saveCalendar(App $app): never
