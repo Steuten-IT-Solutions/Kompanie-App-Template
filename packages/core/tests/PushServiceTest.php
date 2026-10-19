@@ -202,6 +202,13 @@ final class PushServiceTest extends TestCase
             $d = self::device('v6-' . $i);
             $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '2001:db8:1:2::' . dechex($i + 1));
         }
+        // IPv4 in IPv6-Form zählt je IPv4-Adresse, nicht alle zusammen.
+        for ($i = 0; $i < PushService::GUEST_RATE; $i++) {
+            $d = self::device('v4m-' . $i);
+            $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '::ffff:7.7.7.7');
+        }
+        $d = self::device('v4m-andere');
+        $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '::ffff:6.6.6.6');
         $d = self::device('v6-zu-viel');
         try {
             $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '2001:db8:1:2:ffff::1');
@@ -245,7 +252,11 @@ final class PushServiceTest extends TestCase
         $p->subscribe($m, $k['endpoint'], $k['keys'], null, null, '');
         $this->clock->at = $this->clock->now()->modify('+179 days');
         $this->assertSame(0, $p->expireGuests());
+        // App auf dem Gerät geöffnet (Status abgefragt): zählt wie eine Änderung.
+        $app->api()->handle(new Request('POST', '/push/status', [], ['endpoint' => $d['endpoint'], 'auth' => $d['keys']['auth']]));
         $this->clock->at = $this->clock->now()->modify('+2 days');
+        $this->assertSame(0, $p->expireGuests());
+        $this->clock->at = $this->clock->now()->modify('+180 days');
         $this->assertSame(1, $p->expireGuests());
         $this->assertNotNull($p->repository()->byEndpoint($k['endpoint']));
     }
@@ -370,11 +381,18 @@ final class PushServiceTest extends TestCase
         $this->assertCount(1, $this->pushes());
         $this->assertSame(0, $p->repository()->counts()['queued']);
 
-        // FCM mit 403 (Abo gehört zu einem anderen Serverschlüssel): Abo entfernt.
+        // FCM mit 403 für alle: eher unser Fehler (z. B. Uhrzeit) – Abos bleiben.
         $this->pushStatus[$a['endpoint']] = 403;
         $app->pushTriggers()->pointsAdded([['id' => 3, 'user_id' => $m->id, 'points' => 1, 'reason' => 'z']]);
         $p->processQueue();
+        $this->assertNotNull($p->repository()->byEndpoint($a['endpoint']));
+        // 403 nur für eines, FCM nimmt andere an: Dieses Abo gehört zu einem anderen Schlüssel und wird entfernt.
+        $b = self::device('b');
+        $p->subscribe($m, $b['endpoint'], $b['keys'], ['points'], null, '');
+        $app->pushTriggers()->pointsAdded([['id' => 4, 'user_id' => $m->id, 'points' => 1, 'reason' => 'z']]);
+        $p->processQueue();
         $this->assertNull($p->repository()->byEndpoint($a['endpoint']));
+        $this->assertNotNull($p->repository()->byEndpoint($b['endpoint']));
     }
 
     public function testPointsMessageWithoutDetailsSwitch(): void

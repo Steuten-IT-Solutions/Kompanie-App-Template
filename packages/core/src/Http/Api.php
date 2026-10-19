@@ -108,6 +108,7 @@ final class Api
             $push->releaseForeign($user, $r->input('endpoint'), $r->input('auth'));
             try {
                 $sub = $push->own($user, $r->input('endpoint'), $user === null ? $r->input('auth') : null);
+                $push->seen($sub); // Die App wird auf dem Gerät noch genutzt: Gast-Abo verfällt nicht.
             } catch (ApiError) {
                 $sub = null;
             }

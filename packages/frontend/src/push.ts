@@ -102,7 +102,7 @@ export async function forgetPushOnLogout(): Promise<(ok: boolean) => Promise<voi
     const sub = await (await navigator.serviceWorker.getRegistration(config.appUrl))?.pushManager.getSubscription();
     const device = sub ? toDevice(sub) : null;
     if (!sub || !device) return nothing;
-    const before = (await api.pushStatus(device).catch(() => null))?.subscription ?? null;
+    const before = (await api.pushStatusQuiet(device).catch(() => null))?.subscription ?? null;
     await api.pushForget(device).catch(() => undefined);
     return async (ok) => {
       try {

@@ -356,17 +356,40 @@ final class PushService
         }
     }
 
-    /** IPv6: das ganze /64-Netz zählt als ein Anfragender (so viele Adressen hat jeder Anschluss). */
+    /**
+     * IPv6: das ganze /64-Netz zählt als ein Anfragender (so viele Adressen hat jeder Anschluss). IPv4 in IPv6-Form
+     * (::ffff:a.b.c.d, manche Server melden IPv4 so) zählt als die IPv4-Adresse.
+     */
     private static function clientKey(string $client): string
     {
         $bin = filter_var($client, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? inet_pton($client) : false;
-        return $bin !== false ? bin2hex(substr($bin, 0, 8)) . '::/64' : $client;
+        if ($bin === false) {
+            return $client;
+        }
+        if (str_starts_with($bin, str_repeat("\0", 10) . "\xff\xff")) {
+            return (string) inet_ntop(substr($bin, 12));
+        }
+        return bin2hex(substr($bin, 0, 8)) . '::/64';
     }
 
     /**
-     * Gast-Abos, die seit GUEST_EXPIRY_DAYS weder geändert wurden noch eine Nachricht bekommen haben, entfernen
+     * Gast-Abos, die seit GUEST_EXPIRY_DAYS weder geändert noch in der App aufgerufen wurden und keine Nachricht
+     * bekommen haben, entfernen
      * (z. B. Geräte, die es nicht mehr gibt, oder Abos, deren Push-Dienst Fehler statt „abgemeldet“ meldet).
      */
+    /**
+     * Vermerkt, dass die App auf dem Gerät noch genutzt wird (höchstens einmal am Tag ein Schreibzugriff).
+     *
+     * @param Subscription $sub
+     */
+    public function seen(array $sub): void
+    {
+        $now = $this->app->time()->timestamp();
+        if ($sub['updated_at'] === '' || (int) strtotime($sub['updated_at'] . ' UTC') < $now - 86400) {
+            $this->repository()->update($sub['id'], [], gmdate('Y-m-d H:i:s', $now));
+        }
+    }
+
     public function expireGuests(): int
     {
         $limit = gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() - self::GUEST_EXPIRY_DAYS * 86400);
@@ -513,11 +536,18 @@ final class PushService
                 }
             }
             $responses = $this->sendAll($requests);
+            // FCM-403 heißt nur dann „Abo gehört zu einem anderen Schlüssel“, wenn FCM andere Nachrichten dieses Teils
+            // angenommen hat; sonst liegt es eher an uns (z. B. falsche Uhrzeit des Servers) und alle Abos blieben weg.
+            $fcmAccepts = false;
+            foreach ($responses as $id => $res) {
+                $fcmAccepts = $fcmAccepts || (is_array($res) && $res['status'] >= 200 && $res['status'] < 300
+                    && parse_url($requests[$id]['url'], PHP_URL_HOST) === 'fcm.googleapis.com');
+            }
             foreach ($chunk as $row) {
                 if (!isset($requests[$row['id']])) {
                     continue;
                 }
-                $status = self::classify($responses[$row['id']] ?? new \RuntimeException('keine Antwort'), (string) $row['endpoint']);
+                $status = self::classify($responses[$row['id']] ?? new \RuntimeException('keine Antwort'), (string) $row['endpoint'], $fcmAccepts);
                 if ($status === 'ok') {
                     $sent++;
                     $done[] = $row['id'];
@@ -609,11 +639,12 @@ final class PushService
 
     /**
      * ok | gone | retry | error. FCM antwortet mit 403, wenn das Abo zu einem anderen Serverschlüssel gehört (z. B.
-     * nach einer Neuinstallation): Das Abo taugt dann nie mehr und wird wie ein abgemeldetes entfernt.
+     * nach einer Neuinstallation): Das Abo taugt dann nie mehr und wird wie ein abgemeldetes entfernt – aber nur,
+     * wenn FCM gleichzeitig andere Nachrichten angenommen hat ($fcmAccepts), unsere Anmeldung also stimmt.
      *
      * @param array{status: int, headers?: array<string, string>, body?: string}|\RuntimeException $res
      */
-    private static function classify(array|\RuntimeException $res, string $endpoint): string
+    private static function classify(array|\RuntimeException $res, string $endpoint, bool $fcmAccepts = false): string
     {
         if ($res instanceof \RuntimeException) {
             return 'retry';
@@ -622,7 +653,7 @@ final class PushService
         $fcm = parse_url($endpoint, PHP_URL_HOST) === 'fcm.googleapis.com';
         return match (true) {
             $code >= 200 && $code < 300 => 'ok',
-            $code === 404 || $code === 410 || ($code === 403 && $fcm) => 'gone',
+            $code === 404 || $code === 410 || ($code === 403 && $fcm && $fcmAccepts) => 'gone',
             $code === 429 || $code >= 500 => 'retry',
             default => 'error',
         };

@@ -9,7 +9,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Abos für Web Push (user_id 0 = Gast) und die Warteschlange für den Versand (Issue #19).
  *
- * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, details: bool}
+ * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, details: bool, updated_at: string}
  * @phpstan-type QueueItem array{id: int, subscription_id: int, payload: string, urgency: string, ttl: int, attempts: int,
  *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string}
  */
@@ -209,6 +209,7 @@ final class PushRepository
             'auth' => (string) $r['auth'],
             'types' => $types === '' ? [] : explode(',', $types),
             'details' => (bool) $r['details'],
+            'updated_at' => (string) ($r['updated_at'] ?? ''),
         ];
     }
 }

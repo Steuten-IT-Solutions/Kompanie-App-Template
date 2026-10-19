@@ -165,11 +165,16 @@ final class App
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
         }
-        // Schlüssel für Web Push gleich anlegen, nicht erst bei der ersten (womöglich gleichzeitigen) Anfrage.
-        $this->push()->publicKey();
         $version = $this->env->version();
         if ($this->settings->get(self::PLAN_SETTING) !== $version) {
             $this->settings->set(self::PLAN_SETTING, $version);
+        }
+        // Schlüssel für Web Push gleich anlegen, nicht erst bei der ersten (womöglich gleichzeitigen) Anfrage. Scheitert
+        // das (z. B. OpenSSL ohne nutzbare Konfiguration), darf das Einplanen der übrigen Aufgaben nicht scheitern.
+        try {
+            $this->push()->publicKey();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Schlüssel für Benachrichtigungen nicht erzeugt: ' . $e->getMessage());
         }
     }
 

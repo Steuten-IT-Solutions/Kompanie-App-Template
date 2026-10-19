@@ -285,8 +285,8 @@ function sessionExpired(): never {
   throw new ApiError('Sitzung abgelaufen – bitte neu anmelden.', 401, 'not_logged_in');
 }
 
-/** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). */
-export async function refreshCsrf(): Promise<void> {
+/** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). quiet: ohne Weiterleitung zur Anmeldung. */
+export async function refreshCsrf(quiet = false): Promise<void> {
   let res: Response;
   try {
     res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
@@ -295,6 +295,7 @@ export async function refreshCsrf(): Promise<void> {
   }
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.token) {
+    if (quiet) throw new ApiError('Sitzung abgelaufen.', 401, 'not_logged_in');
     sessionExpired();
   }
   csrfToken = data.token;
@@ -342,9 +343,9 @@ async function requestFull<T>(
 
   const data = await res.json().catch(() => null);
 
-  if (res.status === 403 && retry && !quiet && CSRF_ERRORS.includes(data?.code)) {
-    await refreshCsrf();
-    return requestFull<T>(method, path, body, query, false);
+  if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
+    await refreshCsrf(quiet);
+    return requestFull<T>(method, path, body, query, false, quiet);
   }
   if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
@@ -452,7 +453,18 @@ export const api = {
     request<PushSubscriptionInfo>('PUT', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device), ...data }),
   pushUnsubscribe: (device: PushDevice) =>
     request<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device) }),
-  /** Beim Abmelden: ohne Weiterleitung, wenn die Sitzung schon beendet ist. */
+  // Beim Abmelden: ohne Weiterleitung, wenn die Sitzung schon beendet ist.
+  pushStatusQuiet: async (device: PushDevice) =>
+    (
+      await requestFull<PushStatus>(
+        'POST',
+        pushPath('/status'),
+        { endpoint: device.endpoint, auth: device.keys.auth },
+        undefined,
+        true,
+        true,
+      )
+    ).data,
   pushForget: async (device: PushDevice) =>
     (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint }, undefined, true, true)).data,
   pushTest: (device: PushDevice) =>

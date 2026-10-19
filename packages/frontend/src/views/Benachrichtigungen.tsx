@@ -29,7 +29,9 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       if (!alive) return;
       setDevice(d);
       setStatus(s);
-      setTypes(s.subscription?.types ?? s.types.map((t) => t.key));
+      // Gespeicherte Arten, die es nicht mehr gibt (Bereich ausgeschaltet), nicht mitzählen.
+      const available = s.types.map((t) => t.key);
+      setTypes(s.subscription ? s.subscription.types.filter((k) => available.includes(k)) : available);
       setDetails(s.subscription?.details ?? false);
       setError(null);
     })().catch((e: Error) => alive && setError(e.message));

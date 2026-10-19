@@ -18,7 +18,7 @@ Mit **Testnachricht senden** prüfst du, ob alles klappt. Die Einstellung gilt n
 - **Erinnerung am Vortag**: einmal am Tag vor einem Termin, ab der Uhrzeit, die der Admin festlegt (üblich 18 Uhr), spätestens vier Stunden danach.
 - **{bereich.news}: neue Beiträge**: wenn ein neuer Beitrag erscheint.
 
-Ohne Konto gibt es nur die öffentlichen Termine und Neuigkeiten. Ohne Konto eingeschaltete Benachrichtigungen enden von selbst, wenn sie ein halbes Jahr lang weder geändert wurden noch eine Nachricht gebracht haben.
+Ohne Konto gibt es nur die öffentlichen Termine und Neuigkeiten. Ohne Konto eingeschaltete Benachrichtigungen enden von selbst, wenn die App auf dem Gerät ein halbes Jahr lang nicht geöffnet wurde und keine Nachricht kam.
 
 ## iPhone und iPad
 Benachrichtigungen gibt es dort nur in der installierten App (ab iOS 16.4), nicht in Safari. Hol dir die App zuerst auf den Home-Bildschirm, siehe [Die App aufs Handy holen](seite:app-installieren), und öffne sie von dort.
