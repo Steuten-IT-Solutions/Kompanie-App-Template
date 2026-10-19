@@ -53,12 +53,6 @@ final class GalleryRepository
         return false;
     }
 
-    /** @return array<string, mixed>|null */
-    public function photoByDriveId(string $driveFileId): ?array
-    {
-        return $this->db->selectOne('SELECT * FROM {photos} WHERE drive_file_id = ?', [$driveFileId]);
-    }
-
     /**
      * Vorhandene Bilder zu Drive-Dateien, mit wenigen Abfragen (in Blöcken zu 500).
      *
