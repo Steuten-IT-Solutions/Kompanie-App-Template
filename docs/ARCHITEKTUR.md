@@ -24,6 +24,7 @@ Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompan
 | Installation | **Web-Installer** (`install.php`) für die Kompanien, **Formular „Neue Kompanie“** für uns. |
 | Updates | **Automatisch**, signiert, abschaltbar. **Zurückrollen auf eine ältere Version** ist jederzeit möglich. |
 | Mitglieder | Werden **nur vom Admin** angelegt (wie heute). |
+| Handbuch | Eine Quelle in `docs/handbuch/`: in der App hinter „?“ (offline, passend zu Version, Rechten und Bereichen) und je Kompanie auf GitHub Pages unter `/handbuch/`, jeweils mit ihren Bezeichnungen. |
 | Statusmeldungen an uns | **Nur mit Zustimmung** der Kompanie. |
 | Galerie (Google Drive) | Erst ein Test-Prototyp für „Mit Google verbinden“, sonst Ordnerfreigabe an ein Dienstkonto je Kompanie. |
 | Erste Kompanie (Lank) | Wird umgestellt, aber in einem eigenen, später geplanten Schritt. |
@@ -230,6 +231,12 @@ Der Kern enthält **eine Routentabelle**. WordPress registriert sie unter `/wp-j
 | Service Worker kennt den API-Pfad fest | API-Pfad beim Registrieren übergeben |
 | Build im Plugin-Ordner | Build nach `dist/`, das Paket-Skript verteilt es |
 
+### Handbuch
+
+Die Seiten stehen in `docs/handbuch/*.md`, mit Kopfbereich (Titel, Reihenfolge, Rechte, Bereiche, Variante) und Platzhaltern für die Bezeichnungen der Kompanie (`{bereich.points}`, `{rolle.member}` …). `scripts/handbuch.php` prüft sie (`--check`), erzeugt die Daten für die Hilfe in der App (`--app`) und die statischen Seiten für GitHub Pages (`--site`). Die App zeigt nur Seiten, die zu Rechten, eingeschalteten Bereichen und Variante passen.
+
+**Regel:** Wer eine Funktion ändert oder hinzufügt, passt die Handbuchseiten im selben Pull Request an. `--check` verlangt für jeden Bereich mit eigenen Rechten eine Seite.
+
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 
 ## 9. Google: Galerie und Kalender
@@ -422,7 +429,8 @@ Festgehalten für die Planung:
 - **Installer und Updater** (`tests/update/run-tests.sh`, mit dem PHP-Testserver): frische Installation mit `install.php`, Update, Zurückrollen, Zurückziehen, manipuliertes Paket, ältere Liste, Reparaturmodus, Liste einer fremden Kompanie. Release-Ablauf: `tests/release/run-tests.sh`. Geplant: Apache und nginx, zu alte PHP-Version.
 - **Rückwärtstest** (geplant): Contract-Tests der vorigen Version gegen den Datenbestand der neuen.
 - **Branding:** Kontrastprüfung, Icon-Erzeugung, Screenshots.
-- **Grenz- und Neutralitätsprüfung** in der CI.
+- **Handbuch** (`tests/handbuch/run-tests.sh`): Kopfbereich, Platzhalter, Verweise, Ausgabe für App und Webseite.
+- **Grenz- und Neutralitätsprüfung** in der CI (auch für das Handbuch).
 
 ## 17. Fahrplan
 
