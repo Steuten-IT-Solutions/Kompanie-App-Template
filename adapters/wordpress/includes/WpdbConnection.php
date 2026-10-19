@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\Storage\Sql\Connection;
+use KompanieApp\Core\Storage\Sql\DatabaseException;
 
 /**
  * Datenbankzugriff über $wpdb. Platzhalter ? werden in wpdb-Formate übersetzt.
@@ -52,7 +53,7 @@ final class WpdbConnection implements Connection
         $ok = $this->wpdb->insert($this->table($table), $this->scalarValues($row));
         $this->check();
         if ($ok === false) {
-            throw new \RuntimeException('Datenbankfehler beim Speichern.');
+            throw new DatabaseException('Datenbankfehler beim Speichern.');
         }
         return (int) $this->wpdb->insert_id;
     }
@@ -140,7 +141,7 @@ final class WpdbConnection implements Connection
         if ($this->wpdb->last_error !== '') {
             $error = $this->wpdb->last_error;
             $this->wpdb->last_error = '';
-            throw new \RuntimeException('Datenbankfehler: ' . $error);
+            throw new DatabaseException('Datenbankfehler: ' . $error);
         }
     }
 }

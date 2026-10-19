@@ -367,6 +367,12 @@ try {
     $c->ok(json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'calendar_ics_url'")) === 'https://calendar.example.org/geheim/basic.ics', 'webcal:// wird als https:// gespeichert');
     $c->ok($d->request('PATCH', '/admin/settings', ['news_source' => 'none', 'calendar_ics_url' => ''])[1]['calendar']['source'] === 'none', 'Einstellungen lassen sich wieder leeren');
     $c->ok($d->request('POST', '/admin/gallery/sync')[0] === 503, 'Abgleich ohne Galerie → 503 not_configured');
+    $settings = $kernel->app()->settings;
+    $settings->set('kptest_frisch', ['a']);
+    $kernel->db()->execute("UPDATE {settings} SET value = ? WHERE name = 'kptest_frisch'", [json_encode(['a', 'b'])]); // wie eine andere Anfrage
+    $c->ok($settings->get('kptest_frisch') === ['a'] && $settings->fresh('kptest_frisch') === ['a', 'b'] && $settings->get('kptest_frisch') === ['a', 'b'], 'fresh() liest am Zwischenspeicher vorbei');
+    $settings->delete('kptest_frisch');
+    $c->ok($settings->fresh('kptest_frisch', 'weg') === 'weg', 'fresh(): fehlender Wert → Vorgabe');
 
     $c->section('Datensicherung');
     $d->actAs($anna);

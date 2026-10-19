@@ -9,10 +9,14 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Port\UpdateTarget;
+use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FixedClock;
 use KompanieApp\Core\Tests\Support\MemorySettings;
+use KompanieApp\Core\Tests\Support\NullScheduler;
 use KompanieApp\Core\Update\SignedEnvelope;
+use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateList;
 use KompanieApp\Core\Update\UpdateService;
 use PHPUnit\Framework\TestCase;
@@ -77,7 +81,7 @@ final class UpdateServiceTest extends TestCase
         $this->listJson = SignedEnvelope::sign($payload, $this->secret, $this->keyId);
     }
 
-    private function service(string $current): UpdateService
+    private function service(string $current, ?Telemetry $telemetry = null): UpdateService
     {
         $test = $this;
         $target = new class ($test) implements UpdateTarget {
@@ -130,7 +134,32 @@ final class UpdateServiceTest extends TestCase
         };
         $dir = $this->dir;
         return new UpdateService($this->settings, $this->http, new LocalFileStorage("$dir/p", 'https://x/', "$dir/i", ''), new Time(new FixedClock()), $current, $target, $backup,
-            ['updatesUrl' => 'https://org.github.io/k/updates.json', 'trustedKeys' => $this->trusted, 'kompanie' => 'org/k']);
+            ['updatesUrl' => 'https://org.github.io/k/updates.json', 'trustedKeys' => $this->trusted, 'kompanie' => 'org/k'], $telemetry);
+    }
+
+    /** Statusmeldungen (Issue #20): gescheitertes Update, Zurückrollen und Fehler der Liste als Codes. */
+    public function testFailuresAreCountedForStatusReports(): void
+    {
+        $scheduler = new NullScheduler();
+        $scheduler->schedule(StatusReporter::TASK, 3600);
+        $t = new Telemetry($this->settings, $scheduler, new Time(new FixedClock()), static fn (): bool => true, StatusReporter::TASK);
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $s = $this->service('1.0.0.1', $t);
+        $this->failInstall = true;
+        $this->assertThrows(fn () => $s->install('1.0.0.2'), 'bisherige Version läuft weiter');
+        $this->assertSame(['UPDATE_FAILED' => 1], $t->errors());
+        $this->assertSame([Code::UpdateFailed], $t->pending());
+        $this->assertSame([StatusReporter::TASK], $scheduler->soon, 'Versand vorgezogen');
+
+        $this->listJson = 'kaputt';
+        $this->assertThrows(fn () => $s->check(), '');
+        $this->assertSame(1, $t->errors()['UPDATE_CHECK'] ?? 0);
+
+        $this->failInstall = false;
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $this->service('1.0.0.2', $t)->runTask();
+        $this->assertSame(1, $t->errors()['ROLLBACK'] ?? 0);
+        $this->assertSame([Code::UpdateFailed, Code::Rollback], $t->pending());
     }
 
     public function testAutomaticUpdateWithinMajorOnly(): void

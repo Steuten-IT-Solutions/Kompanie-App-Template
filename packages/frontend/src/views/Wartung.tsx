@@ -246,10 +246,21 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 });
               }}
             />
-            <span>Einmal täglich eine kurze Statusmeldung an die Betreuer der App senden (ohne Namen oder Inhalte)</span>
+            <span>
+              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen, schwere Fehler sofort (ohne Namen, Inhalte oder
+              Fehlertexte)
+            </span>
           </label>
+          {reports && (
+            <p className="small muted status-last">
+              Letzte Meldung:{' '}
+              {status.statusReports.last
+                ? `${date(status.statusReports.last.at)}${status.statusReports.last.ok ? '' : ' (nicht angekommen, wird beim nächsten Mal erneut versucht)'}`
+                : 'noch keine'}
+            </p>
+          )}
           <button type="button" className="btn btn-link small" onClick={() => setShowPayload(!showPayload)}>
-            {showPayload ? 'Inhalt ausblenden' : 'Was genau gesendet wird'}
+            {showPayload ? 'Inhalt ausblenden' : 'Was genau gesendet wird (Beispiel: Lebenszeichen)'}
           </button>
           {showPayload && <pre className="small payload">{JSON.stringify(status.statusReports.payload, null, 2)}</pre>}
         </>

@@ -52,6 +52,8 @@ final class TestApp
         ?MemorySettings $settings = null,
         ?FixedClock $clock = null,
         array|false|null $features = null,
+        array $packageConfig = [],
+        ?NullScheduler $scheduler = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -61,7 +63,7 @@ final class TestApp
             http: $http ?? new FakeHttpClient(),
             files: new LocalFileStorage($filesDir . '/public', 'https://example.org/media', $filesDir . '/private', ''),
             images: new GdImageResizer(),
-            scheduler: new NullScheduler(),
+            scheduler: $scheduler ?? new NullScheduler(),
             news: new NullNewsSource(),
             clock: $clock ?? new FixedClock(),
             env: new FakeEnvironment(),
@@ -69,6 +71,7 @@ final class TestApp
             authenticator: $users,
             users: $users,
             config: new KompanieConfig($config),
+            packageConfig: $packageConfig,
         );
         $users->capabilities = static fn (string $role): array => $app->roles()->capabilities($role);
         $app->upgrade();

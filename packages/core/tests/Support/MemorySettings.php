@@ -18,6 +18,11 @@ final class MemorySettings implements Settings
         return array_key_exists($key, $this->values) ? $this->values[$key] : $default;
     }
 
+    public function fresh(string $key, mixed $default = null): mixed
+    {
+        return $this->get($key, $default);
+    }
+
     public function set(string $key, mixed $value): void
     {
         $this->values[$key] = $value;

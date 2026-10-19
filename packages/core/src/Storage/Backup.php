@@ -24,9 +24,14 @@ final class Backup
     /**
      * Einstellungen, die zur Installation gehören, nicht zu den Daten: Sie werden weder gesichert noch
      * wiederhergestellt (Schema-Stand, Update-Zustand mit der laufenden Nummer der Liste, übersprungene
-     * Version, Einrichtung abgeschlossen, Zeitpunkt der letzten Sicherung, Version der Aufgabenplanung).
+     * Version, Einrichtung abgeschlossen, Zeitpunkt der letzten Sicherung, Version der Aufgabenplanung,
+     * Installations-ID und Geheimnis der Statusmeldungen samt ihrem Zustand, Fehlerzähler).
      */
-    public const LOCAL_SETTINGS = ['schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq'];
+    public const LOCAL_SETTINGS = [
+        'schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq',
+        'tasks_last_run', 'installation_id', 'installation_secret', 'telemetry_registered', 'telemetry_last', 'telemetry_heartbeat', 'telemetry_checks',
+        'telemetry_errors', 'telemetry_pending', 'telemetry_events',
+    ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
     public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos'];
 

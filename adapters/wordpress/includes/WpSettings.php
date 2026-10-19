@@ -19,6 +19,16 @@ final class WpSettings implements Settings
         return get_option(self::PREFIX . $key, $default);
     }
 
+    public function fresh(string $key, mixed $default = null): mixed
+    {
+        global $wpdb;
+        // Am Objekt-Cache vorbei direkt aus der Datenbank (get_option läse aus alloptions bzw. dem Cache).
+        $raw = $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", self::PREFIX . $key));
+        wp_cache_delete(self::PREFIX . $key, 'options');
+        wp_cache_delete('alloptions', 'options');
+        return $raw === null ? $default : maybe_unserialize($raw);
+    }
+
     public function set(string $key, mixed $value): void
     {
         // Kleine Einstellungen, die bei jedem Aufruf gebraucht werden: mit Autoload.

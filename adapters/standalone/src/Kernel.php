@@ -213,6 +213,7 @@ final class Kernel
             healthChecks: new StandaloneHealthChecks($config, $httpClient, $cache, $settings, $this),
             packageConfig: $this->packageConfig(),
         );
+        $this->app->watchFatals();
         return $this->app;
     }
 

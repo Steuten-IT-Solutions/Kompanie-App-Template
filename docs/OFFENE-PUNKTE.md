@@ -115,35 +115,34 @@ und Videos je Hoster, sobald eine Kompanie dort installiert; Erkennen des Hoster
 
 ## 4. Statusmeldungen
 
-### Vorschlag: kleiner Empfänger auf unserem eigenen Webspace
+Empfang, Verlauf, Ampel und Warnungen baut das **Steuten IT Solutions Cockpit** (Repo `project-cockpit`,
+Subdomain auf unserem Webspace). Das frühere `tools/status-empfang` ist dadurch ersetzt und entfernt.
 
-- Adresse z. B. `https://status.<unsere-domain>/` auf normalem PHP-Webspace. Kein eigener Server, kein Cloud-Dienst.
-- Gebaut **mit dem Kern selbst** (SQLite, Benutzerverwaltung, Updates). Er wird also wie eine Kompanie installiert und aktualisiert.
-- Die Server **senden** einmal täglich, nur wenn die Kompanie zugestimmt hat. „Holen“ durch uns ginge nicht ohne zusätzliche Zugangsdaten auf jedem Server.
-
-### Inhalt einer Meldung (abschließend)
-
-| Feld | Beispiel |
-|---|---|
-| Installations-ID (zufällig, bei der Installation erzeugt) | `9f3c…` |
-| Kompanie (Repo-Name) | `kompanie-musterstadt` |
-| Variante, Datenbank | `standalone`, `sqlite` |
-| Version, Ring | `1.4.0.3`, `stable` |
-| PHP-Version, Webserver | `8.3`, `nginx` |
-| letztes Update: Zeit, Ergebnis | `2026-11-02`, `ok` |
-| letzter Galerie-Abgleich, Kalenderabruf: Ergebnis | `ok` / Fehlercode |
-| Fehlercodes der letzten 24 h (ohne Texte, ohne Daten) | `GALLERY_403` |
-
-**Keine** Namen, keine Mitgliederzahlen, keine Inhalte. IP-Adressen speichert der Empfänger nicht; der Hoster protokolliert sie trotzdem in seinen Server-Logs, das gehört in die Datenschutzerklärung.
-
+- Die Server **senden** nur, wenn die Kompanie zugestimmt hat: stündlich ein Lebenszeichen, schwere Fehler
+  sofort (je Code höchstens einmal pro Stunde). „Holen“ durch uns ginge nicht ohne zusätzliche Zugangsdaten.
+- **Inhalt (abschließend)** und Protokoll: [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md) (Format 2). Kurz:
+  Installations-ID, Kompanie, Version, Variante, PHP, Datenbank, Ampel je Bereich (nur Stufe), Fehlercodes
+  der letzten 24 Stunden mit Anzahl, Art und letzter Lauf der Hintergrundaufgaben, eingeschaltete Bereiche,
+  Ergebnis des letzten Updates und Galerie-Abgleichs.
+- **Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. IP-Adressen speichert der
+  Empfänger nicht; der Hoster protokolliert sie trotzdem in seinen Server-Logs, das gehört in die
+  Datenschutzerklärung.
+- **Signiert** (HMAC-SHA256) mit einem Geheimnis je Installation; das Cockpit lernt es bei der ersten
+  Meldung (Vertrauen beim ersten Kontakt).
 - **Aufbewahrung:** 90 Tage, danach automatisch gelöscht.
-- **Signiert** mit einem Schlüssel je Installation, damit niemand Meldungen fälschen kann.
-- **Übersicht** für uns: Ampel je Kompanie, Version, Ring.
-- **Warnung per E-Mail an uns**, wenn eine Kompanie länger als 2 Tage rot ist oder sich nach einem Release Fehler häufen. Dann prüfen wir, ob die Version zurückgezogen werden muss (Punkt 1).
-- Die Zustimmung wird im Einrichtungsassistenten erfragt und mit Datum gespeichert; abschaltbar unter *Einstellungen*.
+- **Still** gilt eine Installation nach 2 Stunden ohne Lebenszeichen (echter Cronjob oder WP-Cron) bzw.
+  24 Stunden (Pseudo-Cron).
+- **Warnungen per E-Mail und Push** an uns bei neuen Ereignissen, roter Ampel, ausbleibendem Lebenszeichen
+  und gehäuften Fehlern nach einem Release. Dann prüfen wir, ob die Version zurückgezogen werden muss
+  (Punkt 1).
+- Die Zustimmung wird im Einrichtungsassistenten erfragt; abschaltbar unter *Einstellungen → Updates*. Beim
+  Abschalten werden auch die Fehlerzähler gelöscht.
 
-**Schritte:** ✓ Meldung im Kern, nur mit Zustimmung, Inhalt vorher einsehbar (Phase 5) → Empfänger und
-Übersicht (Phase 6). *Braucht:* Subdomain auf unserem Webspace.
+**Datenschutz:** Die Erweiterung (stündlich, Fehlercodes) gehört in die Prüfung aus Abschnitt 3 und in die
+Datenschutzerklärung der Kompanien; ob ein AVV nötig ist, klären wir dort.
+
+**Schritte:** ✓ Meldung im Kern, nur mit Zustimmung, Inhalt vorher einsehbar (Phase 5) → ✓ Format 2 in der
+App (#20) → Empfang, Verlauf und Warnungen im Cockpit (project-cockpit#12).
 
 ---
 

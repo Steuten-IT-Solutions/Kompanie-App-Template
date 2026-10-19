@@ -10,6 +10,8 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\StatusService;
+use KompanieApp\Core\Storage\Sql\DatabaseException;
+use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Update\StatusReporter;
 
 /**
@@ -71,6 +73,8 @@ final class Api
             return Response::error($e);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            // Nur der Code, nie der Text (Statusmeldungen, nur mit Zustimmung).
+            $this->app->telemetry()->record($e instanceof \PDOException || $e instanceof DatabaseException ? Code::DbError : Code::ServerError);
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
     }
@@ -253,7 +257,7 @@ final class Api
             // Status, Updates, Datensicherung, Einrichtung (Admins)
             new Route('GET', '/admin/status', Cap::ManageSettings, fn () => $a->status()->report() + [
                 'updates' => $a->updates()->status(),
-                'statusReports' => ['enabled' => (bool) $a->settings->get(StatusReporter::SETTING, false), 'available' => (string) ($a->packageConfig['statusUrl'] ?? '') !== '', 'payload' => $a->statusReporter()->payload()],
+                'statusReports' => ['enabled' => (bool) $a->settings->get(StatusReporter::SETTING, false), 'available' => (string) ($a->packageConfig['statusUrl'] ?? '') !== '', 'payload' => $a->statusReporter()->payload(), 'last' => $a->statusReporter()->last()],
                 'setupDone' => (bool) $a->settings->get(self::SETUP_SETTING, false),
             ], null, $denySettings),
             new Route('POST', '/admin/update/check', Cap::ManageSettings, function () use ($a) {
@@ -273,7 +277,12 @@ final class Api
                     $a->updates()->setAuto(Input::bool($r->input('auto')));
                 }
                 if ($r->has('status_reports')) {
-                    $a->settings->set(StatusReporter::SETTING, Input::bool($r->input('status_reports')));
+                    $on = Input::bool($r->input('status_reports'));
+                    $a->settings->set(StatusReporter::SETTING, $on);
+                    if (!$on) {
+                        // Ohne Zustimmung auch keine Fehlerzähler mehr aufheben.
+                        $a->telemetry()->forget();
+                    }
                 }
                 $a->scheduleTasks();
                 return $a->updates()->status();

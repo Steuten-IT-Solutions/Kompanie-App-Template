@@ -23,6 +23,17 @@ final class SqlSettings implements Settings
         return array_key_exists($key, $this->all) ? $this->all[$key] : $default;
     }
 
+    public function fresh(string $key, mixed $default = null): mixed
+    {
+        $raw = $this->db->scalar('SELECT value FROM {settings} WHERE name = ?', [$key]);
+        $this->all ??= $this->load();
+        if ($raw === null || $raw === false) {
+            unset($this->all[$key]);
+            return $default;
+        }
+        return $this->all[$key] = json_decode((string) $raw, true);
+    }
+
     public function set(string $key, mixed $value): void
     {
         $json = (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

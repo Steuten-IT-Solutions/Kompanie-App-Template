@@ -252,6 +252,12 @@ remove_filter('pre_http_request', $icsFilter, 10);
 $c->ok($s === 200 && in_array('Vereinsabend', array_column($cal, 'title'), true), 'Kalender aus iCal-Link der Test-Instanz');
 
 $c->section('Befunde aus dem Review');
+$wpSettings = new KompanieApp\WordPress\WpSettings();
+$wpSettings->set('kptest_frisch', ['a']);
+$wpSettings->get('kptest_frisch');
+$GLOBALS['wpdb']->update($GLOBALS['wpdb']->options, ['option_value' => maybe_serialize(['a', 'b'])], ['option_name' => 'kompanie_app_kptest_frisch']); // wie eine andere Anfrage
+$c->ok($wpSettings->get('kptest_frisch') === ['a'] && $wpSettings->fresh('kptest_frisch') === ['a', 'b'] && $wpSettings->get('kptest_frisch') === ['a', 'b'], 'fresh() liest am Options-Cache vorbei');
+$wpSettings->delete('kptest_frisch');
 wp_set_current_user(0);
 [$s, $body] = $d->request('POST', '/auth/login', ['username' => 'mitglied1', 'password' => 'test1234']);
 $c->ok($s === 400 && $body['code'] === 'use_login_page' && get_current_user_id() === 0, 'Keine Anmeldung über die API (Login-CSRF, Login-Schutz-Plugins)');
