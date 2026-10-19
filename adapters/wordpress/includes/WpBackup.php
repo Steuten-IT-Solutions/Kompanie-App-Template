@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\App;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\GalleryRepository;
@@ -74,6 +75,8 @@ final class WpBackup implements BackupProvider
                 $wp->set($key, $value);
             }
         }
+        // Andere Bereiche oder eine andere Galerie: beim nächsten Aufruf neu einplanen (App::upgrade).
+        $wp->delete(App::PLAN_SETTING);
     }
 
     /** @return string[] Namen der Einstellungen ohne Präfix */

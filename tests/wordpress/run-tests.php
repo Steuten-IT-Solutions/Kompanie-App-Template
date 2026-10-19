@@ -128,6 +128,17 @@ $c->ok(is_file($uploads['basedir'] . '/kompanie-galerie-intern/.htaccess'), 'Ges
 $c->ok($gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', false, false)['status'] === 401, 'Gast bekommt kein internes Bild');
 $res = $gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', true, true);
 $c->ok($res['status'] === 200 && "\xFF\xD8" === substr((string) file_get_contents($res['file']), 0, 2), 'Mitglied bekommt das interne Bild (JPEG)');
+$c->section('Aufgaben');
+$task = [\KompanieApp\Core\Domain\GalleryService::TASK];
+$hook = \KompanieApp\WordPress\WpScheduler::HOOK;
+$c->ok((bool) wp_next_scheduled($hook, $task) && get_option('kompanie_app_' . \KompanieApp\Core\App::PLAN_SETTING) === KOMPANIE_APP_VERSION, 'Galerie-Abgleich eingeplant, Planung für diese Version vermerkt');
+wp_clear_scheduled_hook($hook, $task);
+Plugin::upgrade(); // läuft bei jedem Seitenaufruf (init)
+$c->ok(!wp_next_scheduled($hook, $task), 'Normaler Seitenaufruf plant keine Aufgaben ein');
+delete_option('kompanie_app_' . \KompanieApp\Core\App::PLAN_SETTING);
+Plugin::upgrade(); // nach einem Update passt die vermerkte Version nicht mehr
+$c->ok((bool) wp_next_scheduled($hook, $task), 'Nach einem Update werden die Aufgaben neu eingeplant');
+
 $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);
 $html = do_shortcode('[kompanie_galerie]');

@@ -38,12 +38,23 @@ final class Kernel
 {
     public const DEV_VERSION = '0.0.0-dev';
 
+    /** Einstellung: letzter Lauf je Art (siehe runDueTasks), Unix-Zeit. */
+    public const CRON_RUNS_SETTING = 'cron_runs';
+    /** Einstellung: Stand des Selbstaufrufs (letzter Versuch, Fehlschläge in Folge, letzter Fehler). */
+    public const CRON_SPAWN_SETTING = 'cron_spawn';
+
+    /** Zeitgrenze (Sekunden) beim Selbstaufruf für den Verbindungsaufbau, bei https auch für TLS. */
+    private const SPAWN_TIMEOUT = 0.1;
+    /** Längste Pause zwischen zwei Versuchen, wenn der Selbstaufruf fehlschlägt. */
+    private const SPAWN_MAX_BACKOFF = 3600;
+
     private ?App $app = null;
     private ?Config $config = null;
     private ?PdoConnection $db = null;
     private ?Sessions $sessions = null;
     private ?SessionAuth $auth = null;
     private ?PseudoScheduler $scheduler = null;
+    private ?SqlSettings $settings = null;
     private ?StandaloneEnvironment $env = null;
     private HttpContext $http;
 
@@ -130,7 +141,13 @@ final class Kernel
 
     public function scheduler(): PseudoScheduler
     {
-        return $this->scheduler ??= new PseudoScheduler($this->db());
+        return $this->scheduler ??= new PseudoScheduler($this->db(), $this->settings());
+    }
+
+    /** Einstellungen; eine Instanz für App und Pseudo-Cron (alle Einstellungen in einer Abfrage). */
+    public function settings(): SqlSettings
+    {
+        return $this->settings ??= new SqlSettings($this->db());
     }
 
     public function users(): PdoUsers
@@ -159,7 +176,7 @@ final class Kernel
         }
         $config = $this->config();
         $db = $this->db();
-        $settings = new SqlSettings($db);
+        $settings = $this->settings();
         $cache = new SqlCache($db);
         $httpClient = $this->httpClient ?? new CurlHttpClient('Kompanie-App/' . $this->version());
         $siteUrl = trim((string) $settings->get('site_url', ''));
@@ -192,7 +209,7 @@ final class Kernel
             config: $this->kompanieConfig(),
             updateTarget: new StandaloneUpdateTarget($this->root, $data),
             backup: new StandaloneBackup($this),
-            healthChecks: new StandaloneHealthChecks($config, $httpClient, $cache),
+            healthChecks: new StandaloneHealthChecks($config, $httpClient, $cache, $settings, $this),
             packageConfig: $this->packageConfig(),
         );
         return $this->app;
@@ -209,13 +226,31 @@ final class Kernel
         $app->upgrade();
     }
 
-    /** Führt die fälligen Aufgaben aus (jede mit eigenem Zeitbudget, siehe App::runTask). */
-    public function runDueTasks(): void
+    /**
+     * Führt die fälligen Aufgaben aus (jede mit eigenem Zeitbudget, siehe App::runTask).
+     * $via: cron (Cron-Adresse, vom Hoster aufgerufen), cli (bin/kompanie.php cron),
+     * spawn (Selbstaufruf), request (nach einer Anfrage im selben Prozess); für die Statusseite.
+     */
+    public function runDueTasks(string $via = 'cli'): void
     {
         $app = $this->app();
+        $this->recordCronRun($via);
         $app->scheduleTasks();
         foreach ($this->scheduler()->claimDue() as $task) {
             $app->runTask($task);
+        }
+    }
+
+    private function recordCronRun(string $via): void
+    {
+        $runs = $this->settings()->get(self::CRON_RUNS_SETTING);
+        $runs = is_array($runs) ? $runs : [];
+        $now = time();
+        // Ein Cronjob läuft oft minütlich: dann nur alle fünf Minuten schreiben. Selbstaufrufe
+        // immer, daran erkennt spawnCron(), ob der letzte Aufruf angekommen ist.
+        if ($via === 'spawn' || $now - (int) ($runs[$via] ?? 0) >= 300) {
+            $runs[$via] = $now;
+            $this->settings()->set(self::CRON_RUNS_SETTING, $runs);
         }
     }
 
@@ -398,7 +433,8 @@ final class Kernel
     private function sendCron(): void
     {
         // Schlüssel im Header (Selbstaufruf) oder als Parameter (Cronjob des Hosters).
-        $key = (string) ($this->http->header('X-Kompanie-Cron') ?? (is_string($_GET['key'] ?? null) ? $_GET['key'] : ''));
+        $header = $this->http->header('X-Kompanie-Cron');
+        $key = (string) ($header ?? (is_string($_GET['key'] ?? null) ? $_GET['key'] : ''));
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
             $this->sendPlain(403, 'Falscher Schlüssel.');
@@ -408,9 +444,13 @@ final class Kernel
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
+        ob_start(); // für flushResponse(): Länge der Antwort
         $this->sendPlain(200, 'OK');
-        $this->finishResponse();
-        $this->runDueTasks();
+        // Der Aufrufer (Selbstaufruf, wget/curl des Hosters) soll nicht auf die Aufgaben warten.
+        if (!$this->finishResponse()) {
+            $this->flushResponse();
+        }
+        $this->runDueTasks($header !== null ? 'spawn' : 'cron');
     }
 
     private function sendApp(): void
@@ -507,26 +547,32 @@ final class Kernel
     }
 
     /**
-     * Nach der Antwort: fällige Aufgaben (Pseudo-Cron). Wo der Server die Antwort vorab
+     * Nach der Antwort: fällige Aufgaben (Pseudo-Cron). Ob etwas fällig ist, steht in den
+     * Einstellungen (keine eigene Abfrage, siehe PseudoScheduler). Wo der Server die Antwort vorab
      * abschließen kann (PHP-FPM, LiteSpeed), direkt hier; sonst über einen Aufruf der
-     * Cron-Adresse im Hintergrund, damit Besucher nicht warten.
+     * Cron-Adresse im Hintergrund, auf den der Besucher nicht wartet.
      */
     private function afterResponse(): void
     {
         try {
-            $this->app()->scheduleTasks();
             if (!$this->scheduler()->anyDue()) {
                 return;
             }
             if ($this->finishResponse()) {
                 ignore_user_abort(true);
-                $this->runDueTasks();
+                $this->runDueTasks('request');
             } else {
                 $this->spawnCron();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgaben: ' . $e->getMessage());
         }
+    }
+
+    /** Kann der Server die Antwort abschließen und danach weiterarbeiten (PHP-FPM, LiteSpeed)? */
+    public static function canFinishResponse(): bool
+    {
+        return function_exists('fastcgi_finish_request') || function_exists('litespeed_finish_request');
     }
 
     private function finishResponse(): bool
@@ -541,32 +587,118 @@ final class Kernel
     }
 
     /**
-     * Ruft die eigene Cron-Adresse im Hintergrund auf. Nur mit fest eingetragener Adresse
-     * (base_url aus config.php), nie mit der Adresse aus der Anfrage (Host-Header), und höchstens
-     * einmal pro Minute. Der Schlüssel geht im Header, nicht in der Adresse.
+     * Ohne PHP-FPM: die Antwort mit Länge und „Connection: close“ vollständig schicken, damit der
+     * Aufrufer nicht auf das Ende des Skripts wartet. Wirkt nicht, wenn der Webserver die Ausgabe
+     * selbst puffert (z. B. zum Komprimieren); dann wartet der Aufrufer wie bisher.
+     */
+    private function flushResponse(): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+        // Innere Puffer in den äußersten übernehmen; dessen Inhalt ist die ganze Antwort.
+        while (ob_get_level() > 1) {
+            ob_end_flush();
+        }
+        if (ob_get_level() === 0) {
+            return; // ohne Ausgabepuffer ist die Länge nicht bekannt
+        }
+        header('Content-Length: ' . (int) ob_get_length());
+        header('Connection: close');
+        ob_end_flush();
+        flush();
+    }
+
+    /**
+     * Ruft die eigene Cron-Adresse im Hintergrund auf, ohne auf die Antwort zu warten: Verbindung
+     * aufbauen, Anfrage schreiben, schließen. Nur mit fest eingetragener Adresse (base_url aus
+     * config.php), nie mit der Adresse aus der Anfrage (Host-Header). Der Schlüssel geht im Header,
+     * nicht in der Adresse.
+     *
+     * Höchstens einmal pro Minute. Kommt ein Aufruf nicht an (keine Verbindung, vom Hoster gesperrt,
+     * die Cron-Adresse meldet sich nicht), zählt das als Fehlschlag; dann wird es seltener versucht
+     * (bis einmal pro Stunde), und die Statusseite empfiehlt einen Cronjob.
      */
     private function spawnCron(): void
     {
         $base = $this->config()->baseUrl();
-        if ($base === '' || !function_exists('curl_init')) {
+        if ($base === '') {
             return;
         }
-        $cache = $this->app()->cache;
-        if ($cache->get('cron_spawned') !== null) {
+        $settings = $this->settings();
+        $state = $settings->get(self::CRON_SPAWN_SETTING);
+        $state = is_array($state) ? $state : [];
+        $at = (int) ($state['at'] ?? 0);
+        $failures = (int) ($state['failures'] ?? 0);
+        $error = (string) ($state['error'] ?? '');
+        $checked = !empty($state['checked']);
+        $runs = $settings->get(self::CRON_RUNS_SETTING);
+        $arrived = is_array($runs) ? (int) ($runs['spawn'] ?? 0) : 0;
+        $now = time();
+        if ($at > 0 && !$checked) {
+            // Ist der letzte Selbstaufruf angekommen? Er vermerkt sich in CRON_RUNS_SETTING.
+            if ($arrived >= $at) {
+                $failures = 0;
+                $error = '';
+            } elseif ($now - $at >= 60) {
+                $failures++;
+                $error = 'Der Aufruf der eigenen Cron-Adresse kam nicht an.';
+            } else {
+                return; // vielleicht läuft er noch
+            }
+            $checked = true;
+        }
+        if ($now - $at < min(self::SPAWN_MAX_BACKOFF, 60 * 2 ** min($failures, 6))) {
+            if ($checked !== !empty($state['checked'])) {
+                $settings->set(self::CRON_SPAWN_SETTING, ['at' => $at, 'failures' => $failures, 'error' => $error, 'checked' => true]);
+            }
             return;
         }
-        $cache->set('cron_spawned', 1, 60);
         $url = $this->config()->urlMode() === 'rewrite' ? $base . 'cron' : $base . 'index.php?r=/cron';
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT_MS => 300,
-            CURLOPT_NOSIGNAL => true,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_HTTPHEADER => ['X-Kompanie-Cron: ' . $this->cronKey()],
-        ]);
-        curl_exec($ch);
-        curl_close($ch);
+        $sent = self::fireAndForget($url, ['X-Kompanie-Cron' => $this->cronKey()], self::SPAWN_TIMEOUT);
+        if ($sent !== null) {
+            $failures++;
+            $error = $sent;
+        }
+        $settings->set(self::CRON_SPAWN_SETTING, ['at' => $now, 'failures' => $failures, 'error' => $error, 'checked' => $sent !== null]);
+    }
+
+    /**
+     * Schickt eine GET-Anfrage und schließt die Verbindung, ohne auf die Antwort zu warten.
+     *
+     * @param array<string, string> $headers
+     * @return string|null null, wenn gesendet, sonst die Fehlermeldung
+     */
+    public static function fireAndForget(string $url, array $headers, float $timeout): ?string
+    {
+        $u = parse_url($url);
+        $scheme = strtolower((string) ($u['scheme'] ?? ''));
+        $host = (string) ($u['host'] ?? '');
+        if (!in_array($scheme, ['http', 'https'], true) || $host === '') {
+            return 'Ungültige Adresse.';
+        }
+        $port = (int) ($u['port'] ?? ($scheme === 'https' ? 443 : 80));
+        // Bei https gilt die Zeit für den Verbindungsaufbau und für TLS. Das Zertifikat wird wie
+        // üblich geprüft: Der Cron-Schlüssel geht im Header mit.
+        $target = ($scheme === 'https' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
+        $context = stream_context_create(['ssl' => ['peer_name' => $host, 'SNI_enabled' => true]]);
+        $errno = 0;
+        $errstr = '';
+        $fp = @stream_socket_client($target, $errno, $errstr, $timeout, STREAM_CLIENT_CONNECT, $context);
+        if ($fp === false) {
+            return 'Keine Verbindung zur eigenen Adresse' . ($errstr !== '' ? ' (' . $errstr . ')' : '') . '.';
+        }
+        $path = ($u['path'] ?? '/') . (isset($u['query']) ? '?' . $u['query'] : '');
+        $request = 'GET ' . $path . " HTTP/1.1\r\nHost: " . $host . (isset($u['port']) ? ':' . $port : '')
+            . "\r\nUser-Agent: Kompanie-App\r\nConnection: close\r\n";
+        foreach ($headers as $k => $v) {
+            $request .= $k . ': ' . $v . "\r\n";
+        }
+        $request .= "\r\n";
+        stream_set_timeout($fp, 0, (int) ($timeout * 1000000));
+        $written = @fwrite($fp, $request);
+        fclose($fp);
+        return $written === strlen($request) ? null : 'Die Anfrage an die eigene Adresse ließ sich nicht senden.';
     }
 
     private static function tempDir(string $data): string

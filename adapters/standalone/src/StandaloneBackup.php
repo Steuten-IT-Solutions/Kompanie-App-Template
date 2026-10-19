@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Standalone;
 
+use KompanieApp\Core\App;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\GalleryRepository;
@@ -18,7 +19,7 @@ final class StandaloneBackup implements BackupProvider
 {
     public const TABLES = [...Backup::CORE_TABLES, 'users'];
     /** Gehören zur Installation, nicht zu den Daten. */
-    private const SKIP_SETTINGS = [...Backup::LOCAL_SETTINGS, Migrations::SETTING];
+    private const SKIP_SETTINGS = [...Backup::LOCAL_SETTINGS, Migrations::SETTING, PseudoScheduler::NEXT_SETTING, Kernel::CRON_RUNS_SETTING, Kernel::CRON_SPAWN_SETTING];
 
     public function __construct(private readonly Kernel $kernel)
     {
@@ -78,6 +79,8 @@ final class StandaloneBackup implements BackupProvider
             $db->execute('UPDATE {photos} SET status = ?', [GalleryRepository::PENDING]);
             $db->execute('DELETE FROM {sessions}');
             $db->execute('DELETE FROM {cache}');
+            // Andere Bereiche oder eine andere Galerie: beim nächsten Aufruf neu einplanen (App::upgrade).
+            $db->execute('DELETE FROM {settings} WHERE name = ?', [App::PLAN_SETTING]);
         });
     }
 }

@@ -56,6 +56,13 @@ final class App
         StatusReporter::TASK => 86400,
     ];
 
+    /**
+     * Einstellung: Version, für die die Aufgaben zuletzt eingeplant wurden. Eingeplant wird nicht bei
+     * jeder Anfrage, sondern beim Speichern von Einstellungen (Features, SettingsService, Updates),
+     * im Cron und nach einem Update bzw. einer Migration (dann passt diese Einstellung nicht mehr).
+     */
+    public const PLAN_SETTING = 'tasks_planned';
+
     /** @var array<string, object> */
     private array $services = [];
 
@@ -96,8 +103,10 @@ final class App
         $migrator = $this->migrator();
         // Vor den Migrationen merken, ob die Installation schon bestand (für die Bereiche, s. u.).
         $existing = $migrator->current() > 0;
+        $migrated = false;
         if ($migrator->pending()) {
             $migrator->migrate();
+            $migrated = true;
         }
         $this->features()->initialize($existing);
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
@@ -111,9 +120,21 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: laufende Version nicht gespeichert: ' . $e->getMessage());
         }
+        // Nach einem Update oder einer Migration neu einplanen (neue Aufgaben, geänderte Abstände).
+        // Sonst nicht: Eine normale Anfrage soll die Aufgaben weder lesen noch schreiben.
+        if ($migrated || $this->settings->get(self::PLAN_SETTING) !== $version) {
+            try {
+                $this->scheduleTasks();
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Aufgaben nicht eingeplant: ' . $e->getMessage());
+            }
+        }
     }
 
-    /** Plant die wiederkehrenden Aufgaben ein bzw. aus, je nach Einrichtung. */
+    /**
+     * Plant die wiederkehrenden Aufgaben ein bzw. aus, je nach Einrichtung. Aufrufen, wenn sich
+     * die Einrichtung geändert hat (nicht bei jeder Anfrage, siehe PLAN_SETTING).
+     */
     public function scheduleTasks(): void
     {
         $wanted = [
@@ -124,6 +145,10 @@ final class App
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
+        }
+        $version = $this->env->version();
+        if ($this->settings->get(self::PLAN_SETTING) !== $version) {
+            $this->settings->set(self::PLAN_SETTING, $version);
         }
     }
 
