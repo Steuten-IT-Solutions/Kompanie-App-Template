@@ -11,8 +11,8 @@ type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog';
 const sec = brand.labels.sections;
 
 /** Bereich an und das Recht dazu (Punkte bzw. Strafen vergeben sind getrennte Rechte). */
-const canPoints = (): boolean => !!canPoints() && can('manage_points');
-const canPenalties = (): boolean => !!canPenalties() && can('manage_penalties');
+const canPoints = (): boolean => !!config?.features.points && can('manage_points');
+const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | undefined, path[1]];
