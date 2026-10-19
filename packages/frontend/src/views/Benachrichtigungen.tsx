@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import brand from '../generated/brand';
 import { api, config, type PushDevice, type PushStatus, type PushType } from '../api';
-import { currentDevice, disablePush, enablePush, pushSupport } from '../push';
+import { currentDevice, disablePush, enablePush, matchesServerKey, pushSupport } from '../push';
 import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
 
@@ -24,8 +24,15 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
     if (support !== 'ok') return;
     let alive = true;
     (async () => {
-      const d = await currentDevice().catch(() => null);
-      const s = await api.pushStatus(d);
+      let d = await currentDevice().catch(() => null);
+      let s = await api.pushStatus(d);
+      // Abo zu einem früheren Schlüssel des Servers (z. B. nach einer Neuinstallation): still erneuern, sonst kämen
+      // keine Nachrichten mehr an.
+      if (d && s.subscription && s.supported && Notification.permission === 'granted' && !(await matchesServerKey(s.publicKey))) {
+        const old = s.subscription;
+        d = await enablePush(s.publicKey);
+        s = { ...s, subscription: await api.pushSubscribe(d, old.types, config?.user ? old.details : undefined) };
+      }
       if (!alive) return;
       setDevice(d);
       setStatus(s);

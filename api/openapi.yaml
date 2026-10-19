@@ -359,6 +359,8 @@ paths:
         '200': { $ref: '#/components/responses/PushTest' }
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
 
   /push/test:
@@ -379,6 +381,8 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/PushTest' }
         '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
 
   /calendar:
@@ -1462,7 +1466,8 @@ components:
             z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
             `feature_disabled` (403, Bereich vom Admin ausgeschaltet), `method_not_allowed` (405),
             `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500).
-            Push (Issue #19): `push_unsupported` (501), `push_full` (503), `too_many_attempts` (429).
+            Push (Issue #19): `push_unsupported` (501), `push_full` (503), `too_many_attempts` (429),
+            `push_gone` (410) und `push_key_mismatch` (409, Gerät neu anmelden) bei der Testnachricht.
             Nur eigenständige Version: `login_failed` (400), `too_many_attempts` (429),
             `unsupported_media_type` (415, Änderungen nur als JSON), `not_installed` (503).
             Nur WordPress: `use_login_page` (400).

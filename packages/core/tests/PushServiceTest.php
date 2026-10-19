@@ -386,6 +386,14 @@ final class PushServiceTest extends TestCase
         $app->pushTriggers()->pointsAdded([['id' => 3, 'user_id' => $m->id, 'points' => 1, 'reason' => 'z']]);
         $p->processQueue();
         $this->assertNotNull($p->repository()->byEndpoint($a['endpoint']));
+        // Testnachricht mit 403: Hinweis, das Gerät neu anzumelden; das Abo bleibt (könnte auch an uns liegen).
+        try {
+            $p->sendTest((array) $p->repository()->byEndpoint($a['endpoint']));
+            $this->fail('403 ohne Fehler');
+        } catch (ApiError $e) {
+            $this->assertSame('push_key_mismatch', $e->errorCode);
+        }
+        $this->assertNotNull($p->repository()->byEndpoint($a['endpoint']));
         // 403 nur für eines, FCM nimmt andere an: Dieses Abo gehört zu einem anderen Schlüssel und wird entfernt.
         $b = self::device('b');
         $p->subscribe($m, $b['endpoint'], $b['keys'], ['points'], null, '');

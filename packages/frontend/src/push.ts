@@ -31,6 +31,12 @@ function toDevice(sub: PushSubscription): PushDevice | null {
   return json.endpoint && p256dh && auth ? { endpoint: json.endpoint, keys: { p256dh, auth } } : null;
 }
 
+/** Gehört das Abo dieses Browsers zum aktuellen Schlüssel des Servers? (true ohne Abo) */
+export async function matchesServerKey(publicKey: string): Promise<boolean> {
+  const sub = await (await registration())?.pushManager.getSubscription();
+  return !sub || sameKey(sub, fromB64u(publicKey));
+}
+
 /** Das Abo dieses Browsers (unabhängig davon, ob der Server es kennt). */
 export async function currentDevice(): Promise<PushDevice | null> {
   if (pushSupport() !== 'ok') return null;

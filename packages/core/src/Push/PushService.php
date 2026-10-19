@@ -373,11 +373,6 @@ final class PushService
     }
 
     /**
-     * Gast-Abos, die seit GUEST_EXPIRY_DAYS weder geändert noch in der App aufgerufen wurden und keine Nachricht
-     * bekommen haben, entfernen
-     * (z. B. Geräte, die es nicht mehr gibt, oder Abos, deren Push-Dienst Fehler statt „abgemeldet“ meldet).
-     */
-    /**
      * Vermerkt, dass die App auf dem Gerät noch genutzt wird (höchstens einmal am Tag ein Schreibzugriff).
      *
      * @param Subscription $sub
@@ -390,6 +385,11 @@ final class PushService
         }
     }
 
+    /**
+     * Gast-Abos, die seit GUEST_EXPIRY_DAYS weder geändert noch in der App aufgerufen wurden und keine Nachricht
+     * bekommen haben, entfernen
+     * (z. B. Geräte, die es nicht mehr gibt, oder Abos, deren Push-Dienst Fehler statt „abgemeldet“ meldet).
+     */
     public function expireGuests(): int
     {
         $limit = gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() - self::GUEST_EXPIRY_DAYS * 86400);
@@ -585,6 +585,10 @@ final class PushService
         if ($status === 'gone') {
             $this->repository()->delete($sub['id']);
             throw new ApiError(410, 'push_gone', 'Der Push-Dienst kennt dieses Gerät nicht mehr. Bitte Benachrichtigungen neu aktivieren.');
+        }
+        if (is_array($res) && $res['status'] === 403 && parse_url($sub['endpoint'], PHP_URL_HOST) === 'fcm.googleapis.com') {
+            // Meist gehört das Abo zu einem früheren Schlüssel des Servers; das Gerät muss sich neu anmelden.
+            throw new ApiError(409, 'push_key_mismatch', 'Der Push-Dienst lehnt die Nachricht ab. Bitte Benachrichtigungen aus- und wieder einschalten.');
         }
         if ($status !== 'ok') {
             $code = $res instanceof \RuntimeException ? 'keine Verbindung' : 'HTTP ' . $res['status'];
