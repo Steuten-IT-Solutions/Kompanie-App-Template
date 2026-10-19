@@ -49,7 +49,12 @@ use KompanieApp\Core\Update\UpdateService;
 final class App
 {
     /** Wiederkehrende Aufgaben: Name => Abstand in Sekunden */
-    public const TASKS = [GalleryService::TASK => 3600, UpdateService::TASK => UpdateService::INTERVAL, StatusReporter::TASK => 86400];
+    public const TASKS = [
+        GalleryService::TASK => 3600,
+        CalendarService::TASK => 3600,
+        UpdateService::TASK => UpdateService::INTERVAL,
+        StatusReporter::TASK => 86400,
+    ];
 
     /** @var array<string, object> */
     private array $services = [];
@@ -113,6 +118,7 @@ final class App
     {
         $wanted = [
             GalleryService::TASK => $this->features()->enabled('gallery') && $this->gallery()->isConfigured(),
+            CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured(),
             UpdateService::TASK => $this->updates()->configured(),
             StatusReporter::TASK => $this->statusReporter()->enabled(),
         ];
@@ -127,6 +133,8 @@ final class App
         try {
             if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
+            } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
+                $this->calendar()->refreshIfStale();
             } elseif ($task === UpdateService::TASK) {
                 $this->updates()->runTask();
             } elseif ($task === StatusReporter::TASK) {

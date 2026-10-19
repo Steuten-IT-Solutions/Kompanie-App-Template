@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Domain\CalendarService;
+use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
@@ -193,5 +196,113 @@ final class CalendarTest extends TestCase
         $this->assertSame('Hallo', $events[0]['description']);
         $this->assertStringContainsString('a%40group.calendar.google.com/events', $http->calls[0]['url']);
         $this->assertStringContainsString('key=KEY', $http->calls[0]['url']);
+    }
+
+    public function testStaleCopyErrorCacheAndBackgroundRefresh(): void
+    {
+        $down = false;
+        $http = new FakeHttpClient(function () use (&$down): array {
+            if ($down) {
+                throw new \RuntimeException('Zeitüberschreitung');
+            }
+            return ['status' => 200, 'body' => $this->ics()];
+        });
+        $clock = new FixedClock(new \DateTimeImmutable());
+        $settings = new MemorySettings(['calendar_ics_url' => 'https://example.org/k.ics', 'calendar_cache_minutes' => 15]);
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings, $clock);
+        $cal = $app->calendar();
+
+        $this->assertCount(2, $cal->events());
+        $this->assertCount(1, $http->calls);
+        $cal->events();
+        $this->assertCount(1, $http->calls, 'frisch: kein Abruf');
+
+        // Nach Ablauf und bei einer Störung: alte Fassung statt Fehler, der Fehler wird gemerkt.
+        $clock->at = $clock->now()->modify('+16 minutes');
+        $down = true;
+        $this->assertCount(2, $cal->events(), 'Rückfall auf die alte Fassung');
+        $this->assertCount(2, $http->calls);
+        $this->assertCount(2, $cal->events());
+        $this->assertCount(2, $http->calls, 'Fehler-Cache: kein neuer Abruf während der Störung');
+
+        // Ohne alte Fassung: Fehler, aber auch der wird nur einmal je Minute abgerufen.
+        $app->cache->delete(CalendarService::CACHE_KEY);
+        try {
+            $cal->events();
+            $this->fail('Fehler erwartet');
+        } catch (ApiError $e) {
+            $this->assertSame(502, $e->status);
+            $this->assertStringContainsString('Zeitüberschreitung', $e->getMessage());
+        }
+        $this->assertCount(2, $http->calls, 'gemerkter Fehler, kein Abruf');
+        $cal->clearCache();
+        try {
+            $cal->events();
+            $this->fail('Fehler erwartet');
+        } catch (ApiError) {
+        }
+        $this->assertCount(3, $http->calls, 'nach dem Leeren (z. B. „Kalender testen“) wird wieder abgerufen');
+
+        // Die Aufgabe im Hintergrund erneuert, sobald der Kalender wieder erreichbar ist.
+        $down = false;
+        $app->runTask(CalendarService::TASK);
+        $this->assertCount(4, $http->calls);
+        $this->assertCount(2, $cal->events(), 'aus dem Zwischenspeicher');
+        $this->assertCount(4, $http->calls);
+        $app->runTask(CalendarService::TASK);
+        $this->assertCount(4, $http->calls, 'gerade erst abgerufen: Aufgabe tut nichts');
+
+        // Veraltet, aber eine andere Anfrage ruft gerade ab (Sperre): alte Fassung ohne Abruf.
+        $clock->at = $clock->now()->modify('+20 minutes');
+        $app->cache->increment(CalendarService::CACHE_KEY . '_lock', 30);
+        $this->assertCount(2, $cal->events());
+        $this->assertCount(4, $http->calls, 'Sperre: nur ein Abruf gleichzeitig');
+    }
+
+    public function testCalendarTaskIsScheduledOnlyWhenConfigured(): void
+    {
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], null, null, new MemorySettings());
+        $this->assertArrayNotHasKey(CalendarService::TASK, $app->scheduler->scheduled);
+        $app->settingsService()->update(['calendar_ics_url' => 'https://example.org/k.ics']);
+        $this->assertArrayHasKey(CalendarService::TASK, $app->scheduler->scheduled);
+    }
+
+    public function testGoogleCalendarsAreFetchedInParallel(): void
+    {
+        $http = new class implements ExtendedHttpClient {
+            /** @var array<int, string[]> */
+            public array $batches = [];
+
+            public function request(string $method, string $url, array $headers = [], ?string $body = null, int $timeoutSeconds = 15): array
+            {
+                $this->batches[] = [$url];
+                return ['status' => 200, 'headers' => [], 'body' => '{"items":[]}'];
+            }
+
+            public function requestAll(array $requests, int $timeoutSeconds = 15): array
+            {
+                $this->batches[] = array_column($requests, 'url');
+                $out = [];
+                foreach ($requests as $k => $r) {
+                    $id = str_contains($r['url'], 'b%40') ? 'b' : 'a';
+                    $out[$k] = ['status' => 200, 'headers' => [], 'body' => (string) json_encode(['items' => [
+                        ['id' => $id, 'summary' => 'Termin ' . $id, 'start' => ['date' => '2030-05-0' . ($id === 'a' ? 2 : 1)], 'end' => ['date' => '2030-05-03']],
+                    ]])];
+                }
+                return $out;
+            }
+
+            public function download(string $url, string $file, array $headers = [], int $timeoutSeconds = 90): array
+            {
+                throw new \RuntimeException('nicht gebraucht');
+            }
+        };
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com, b@group.calendar.google.com', 'google_api_key' => 'KEY']);
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], null, null, $settings);
+        $cal = new CalendarService($settings, $http, $app->cache, $app->time());
+        $events = $cal->events();
+        $this->assertCount(1, $http->batches, 'beide Kalender in einem Durchgang');
+        $this->assertCount(2, $http->batches[0]);
+        $this->assertSame(['Termin b', 'Termin a'], array_column($events, 'title'), 'zusammengeführt und nach Beginn sortiert');
     }
 }

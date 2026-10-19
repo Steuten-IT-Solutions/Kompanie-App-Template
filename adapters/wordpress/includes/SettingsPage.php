@@ -226,6 +226,7 @@ final class SettingsPage
         $app->settings->set('calendar_ids', isset($_POST['calendar_ids']) ? sanitize_text_field(wp_unslash($_POST['calendar_ids'])) : '');
         $app->settings->set('google_api_key', isset($_POST['google_api_key']) ? sanitize_text_field(wp_unslash($_POST['google_api_key'])) : '');
         $app->calendar()->clearCache();
+        $app->scheduleTasks();
         self::back('Gespeichert.', false, 'kalender', ['kompanie_test' => 1]);
     }
 
