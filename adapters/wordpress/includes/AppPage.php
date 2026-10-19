@@ -80,7 +80,7 @@ final class AppPage
         $c = $app->config;
         $icons = KOMPANIE_APP_URL . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
-        header('Cache-Control: public, max-age=3600');
+        header('Cache-Control: public, max-age=86400');
         echo wp_json_encode([
             'name' => $c->name(),
             'short_name' => $c->shortName(),

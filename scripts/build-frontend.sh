@@ -11,6 +11,11 @@ for target in adapters/wordpress/app adapters/standalone/app; do
   rm -rf "$target"
   mkdir -p "$target"
   cp -R packages/frontend/dist/. "$target/"
+  # Zwischenspeicher und Komprimierung (Apache/LiteSpeed); nicht Teil des Builds, damit aus dem
+  # Build-Ergebnis nie eine .htaccess übernommen wird (siehe scripts/import-build.php).
+  cp adapters/shared/app.htaccess "$target/.htaccess"
+  mkdir -p "$target/assets"
+  cp adapters/shared/app-assets.htaccess "$target/assets/.htaccess"
 done
 # Eigenständige Version: Service Worker neben index.php, damit sein Bereich die ganze App umfasst.
 cp packages/frontend/dist/sw.js adapters/standalone/sw.js

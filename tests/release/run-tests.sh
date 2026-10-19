@@ -67,6 +67,12 @@ SA_LIST="$(unzip -l "$T/r1/kompanie-app-standalone.zip")"
 WP_LIST="$(unzip -l "$T/r1/kompanie-app-wordpress.zip")"
 grep -qE 'tests/|e2e/|node_modules' <<< "$SA_LIST" && fail "Paket enthält Entwicklungsdateien" || ok "Paket ohne Entwicklungsdateien"
 grep -q 'kompanie-app/core/App.php' <<< "$WP_LIST" && ok "Plugin enthält den Kern" || fail "Kern fehlt im Plugin"
+for zip in standalone wordpress; do
+  unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/app/assets/.htaccess | grep -q 'max-age=31536000, immutable' \
+    && unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/app/.htaccess | grep -q 'AddOutputFilterByType DEFLATE' \
+    || fail "Cache-Header/Komprimierung fehlen im Paket ($zip)"
+done
+ok "Beide Pakete: App-Dateien ein Jahr im Browser-Cache, Komprimierung (app/.htaccess, app/assets/.htaccess)"
 
 # Veröffentlichen wie im Workflow: Build-Ergebnis gefiltert übernehmen, im Veröffentlichungs-Job selbst
 # paketieren und signieren, Release + gh-pages (mit einem Bare-Repo statt GitHub und einer Attrappe der GitHub-CLI).

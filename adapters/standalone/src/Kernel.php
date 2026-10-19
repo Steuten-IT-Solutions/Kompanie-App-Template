@@ -378,7 +378,7 @@ final class Kernel
         $icons = $app->env->appUrl() . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
         // Adressen hängen ohne fest eingetragene base_url von der Anfrage ab: nicht in fremden Caches speichern.
-        header('Cache-Control: private, max-age=3600');
+        header('Cache-Control: private, max-age=86400');
         $this->securityHeaders();
         echo json_encode([
             'name' => $c->name(),

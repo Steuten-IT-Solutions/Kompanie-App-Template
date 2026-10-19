@@ -1,0 +1,17 @@
+# Gehashte Dateien der gebauten App (app/assets/): Der Name ändert sich mit jedem Inhalt,
+# deshalb dürfen Browser sie ein Jahr lang ohne Nachfrage verwenden.
+# Kommt beim Paketieren bzw. mit scripts/build-frontend.sh als app/assets/.htaccess in beide Adapter.
+
+<IfModule mod_headers.c>
+  # FilesMatch statt Header direkt: Sonst gälte für Bilder hier die kürzere Regel aus app/.htaccess.
+  <FilesMatch ".">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+<IfModule !mod_headers.c>
+  <IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 1 year"
+  </IfModule>
+</IfModule>

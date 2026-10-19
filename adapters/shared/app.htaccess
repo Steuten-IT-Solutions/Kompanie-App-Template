@@ -1,0 +1,35 @@
+# Gebaute App (Ordner app/), Apache und LiteSpeed: Komprimierung und Zwischenspeicher.
+# Kommt beim Paketieren bzw. mit scripts/build-frontend.sh als app/.htaccess in beide Adapter.
+# Die gehashten Dateien in app/assets/ regelt app/assets/.htaccess (ein Jahr, unveränderlich).
+
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType image/svg+xml .svg
+</IfModule>
+
+<IfModule mod_deflate.c>
+  <IfModule mod_filter.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json application/manifest+json image/svg+xml
+  </IfModule>
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Icons und Manifest: einen Tag; index.html und sw.js immer neu prüfen (sonst kommen Updates nicht an).
+  <FilesMatch "\.(png|ico|webp|svg|webmanifest)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+  <FilesMatch "^(index\.html|sw\.js)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+<IfModule !mod_headers.c>
+  <IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png "access plus 1 day"
+    ExpiresByType image/x-icon "access plus 1 day"
+    ExpiresByType image/webp "access plus 1 day"
+    ExpiresByType image/svg+xml "access plus 1 day"
+    ExpiresByType application/manifest+json "access plus 1 day"
+  </IfModule>
+</IfModule>

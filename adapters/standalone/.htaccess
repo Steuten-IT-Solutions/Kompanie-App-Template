@@ -21,3 +21,11 @@ DirectoryIndex index.php
     Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>
+
+# Komprimierung für App-Seite, API und Manifest (aus index.php) sowie sw.js.
+# Zwischenspeicher und Komprimierung der App-Dateien: app/.htaccess und app/assets/.htaccess.
+<IfModule mod_deflate.c>
+  <IfModule mod_filter.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json application/manifest+json image/svg+xml
+  </IfModule>
+</IfModule>

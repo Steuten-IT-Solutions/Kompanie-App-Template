@@ -157,6 +157,7 @@ function kompanie_code_hash(string $root): string
             'build-frontend.sh' => $root . '/scripts/build-frontend.sh',
             'package.php' => $root . '/scripts/package.php',
         ],
+        'shared' => $f('adapters/shared'),
     ];
     $lines = [];
     foreach ($parts as $part => $files) {
@@ -224,6 +225,12 @@ if (isset($opt['config-hash'])) {
 
 $core = kompanie_files($root . '/packages/core/src');
 $app = kompanie_files($dist, [], false);
+// Zwischenspeicher und Komprimierung der App-Dateien (Apache/LiteSpeed), in beide Pakete. Aus dem Repo,
+// nicht aus dem Build: Dateien wie .htaccess nimmt scripts/import-build.php aus dem Build nie an.
+$appHtaccess = [
+    'app/.htaccess' => $root . '/adapters/shared/app.htaccess',
+    'app/assets/.htaccess' => $root . '/adapters/shared/app-assets.htaccess',
+];
 $kompanieJson = ['content' => (string) file_get_contents($config)];
 
 // WordPress-Plugin
@@ -244,6 +251,9 @@ foreach ($core as $rel => $src) {
 foreach ($app as $rel => $src) {
     $wp["kompanie-app/app/$rel"] = $src;
 }
+foreach ($appHtaccess as $rel => $src) {
+    $wp["kompanie-app/$rel"] = $src;
+}
 $wp['kompanie-app/kompanie.json'] = $kompanieJson;
 $wp['kompanie-app/update.json'] = $updateEntry;
 
@@ -257,6 +267,9 @@ foreach ($core as $rel => $src) {
 }
 foreach ($app as $rel => $src) {
     $sa["kompanie-app/app/$rel"] = $src;
+}
+foreach ($appHtaccess as $rel => $src) {
+    $sa["kompanie-app/$rel"] = $src;
 }
 $sa['kompanie-app/core/.htaccess'] = ['content' => (string) file_get_contents($root . '/adapters/standalone/src/.htaccess')];
 $sa['kompanie-app/sw.js'] = $dist . '/sw.js';
