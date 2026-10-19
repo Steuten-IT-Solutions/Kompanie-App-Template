@@ -17,21 +17,74 @@ final class GalleryRepository
     {
     }
 
-    /** @param array<string, mixed> $data */
-    public function upsertAlbum(string $driveId, array $data): int
+    /**
+     * Legt ein Album an oder aktualisiert es, aber nur, wenn sich etwas geändert hat
+     * ($always: Felder, die allein keinen Schreibzugriff auslösen, z. B. synced_at).
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $always
+     */
+    public function upsertAlbum(string $driveId, array $data, array $always = []): int
     {
-        $id = $this->db->scalar('SELECT id FROM {albums} WHERE drive_id = ?', [$driveId]);
-        if ($id !== null) {
-            $this->db->update('albums', $data, ['id' => (int) $id]);
-            return (int) $id;
+        $row = $this->db->selectOne('SELECT * FROM {albums} WHERE drive_id = ?', [$driveId]);
+        if ($row !== null) {
+            if (self::changed($row, $data)) {
+                $this->db->update('albums', $data + $always, ['id' => (int) $row['id']]);
+            }
+            return (int) $row['id'];
         }
-        return $this->db->insert('albums', ['drive_id' => $driveId] + $data);
+        return $this->db->insert('albums', ['drive_id' => $driveId] + $data + $always);
+    }
+
+    /**
+     * Unterscheidet sich ein Feld der Zeile? Zahlen und Texte vergleicht die Datenbank je nach
+     * Treiber unterschiedlich typisiert; deshalb als Text verglichen.
+     *
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $data
+     */
+    public static function changed(array $row, array $data): bool
+    {
+        foreach ($data as $k => $v) {
+            if (!array_key_exists($k, $row) || ($row[$k] === null) !== ($v === null) || (string) $row[$k] !== (string) $v) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** @return array<string, mixed>|null */
     public function photoByDriveId(string $driveFileId): ?array
     {
         return $this->db->selectOne('SELECT * FROM {photos} WHERE drive_file_id = ?', [$driveFileId]);
+    }
+
+    /**
+     * Vorhandene Bilder zu Drive-Dateien, mit wenigen Abfragen (in Blöcken zu 500).
+     *
+     * @param string[] $driveFileIds
+     * @return array<string, array<string, mixed>> Drive-ID => Zeile
+     */
+    public function photosByDriveIds(array $driveFileIds): array
+    {
+        $out = [];
+        foreach (array_chunk(array_values(array_unique($driveFileIds)), 500) as $chunk) {
+            $in = implode(', ', array_fill(0, count($chunk), '?'));
+            foreach ($this->db->select("SELECT * FROM {photos} WHERE drive_file_id IN ($in)", $chunk) as $row) {
+                $out[(string) $row['drive_file_id']] = $row;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    public function transaction(callable $fn): mixed
+    {
+        return $this->db->transaction($fn);
     }
 
     /** @return array<string, mixed>|null */
@@ -70,20 +123,26 @@ final class GalleryRepository
         $this->db->execute('DELETE FROM {photos} WHERE id = ?', [$id]);
     }
 
-    /** @param int[] $keep */
+    /**
+     * Erst zählen, dann löschen: Ohne Treffer bleibt der Abgleich ohne Schreibzugriff
+     * (in SQLite bräuchte auch ein DELETE ohne Treffer die Schreibsperre).
+     *
+     * @param int[] $keep
+     */
     public function deleteAlbumsExcept(array $keep): void
     {
-        if ($keep === []) {
-            $this->db->execute('DELETE FROM {albums}');
-            return;
+        $where = $keep === [] ? '' : ' WHERE id NOT IN (' . implode(', ', array_map('intval', $keep)) . ')';
+        if ((int) $this->db->scalar('SELECT COUNT(*) FROM {albums}' . $where) > 0) {
+            $this->db->execute('DELETE FROM {albums}' . $where);
         }
-        $in = implode(', ', array_map('intval', $keep));
-        $this->db->execute("DELETE FROM {albums} WHERE id NOT IN ($in)");
     }
 
     /** Fehlgeschlagene Bilder für einen neuen Versuch vormerken, solange es weniger als $max Versuche waren. */
     public function retryFailed(int $max): int
     {
+        if ((int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ? AND attempts < ?', [self::FAILED, $max]) === 0) {
+            return 0;
+        }
         return $this->db->execute('UPDATE {photos} SET status = ? WHERE status = ? AND attempts < ?', [self::PENDING, self::FAILED, $max]);
     }
 

@@ -51,6 +51,7 @@ final class App
     /** Wiederkehrende Aufgaben: Name => Abstand in Sekunden */
     public const TASKS = [
         GalleryService::TASK => 3600,
+        GalleryService::PROCESS_TASK => 3600,
         CalendarService::TASK => 3600,
         UpdateService::TASK => UpdateService::INTERVAL,
         StatusReporter::TASK => 86400,
@@ -137,8 +138,10 @@ final class App
      */
     public function scheduleTasks(): void
     {
+        $gallery = $this->features()->enabled('gallery') && $this->gallery()->isConfigured();
         $wanted = [
-            GalleryService::TASK => $this->features()->enabled('gallery') && $this->gallery()->isConfigured(),
+            GalleryService::TASK => $gallery,
+            GalleryService::PROCESS_TASK => $gallery,
             CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured(),
             UpdateService::TASK => $this->updates()->configured(),
             StatusReporter::TASK => $this->statusReporter()->enabled(),
@@ -158,6 +161,8 @@ final class App
         try {
             if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
+            } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
+                $this->gallery()->runProcessTask(25);
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $this->calendar()->refreshIfStale();
             } elseif ($task === UpdateService::TASK) {
@@ -256,6 +261,8 @@ final class App
             $this->settings,
             $this->env,
             $this->time(),
+            $this->scheduler,
+            $this->cache,
         ));
     }
 

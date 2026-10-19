@@ -419,6 +419,15 @@ final class Kernel
         $user = $app->authContext->currentUser();
         $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
         $this->securityHeaders();
+        if (isset($res['placeholder'])) {
+            // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
+            http_response_code($res['status']);
+            header('Content-Type: image/svg+xml');
+            header('Cache-Control: no-store');
+            header('Retry-After: ' . (int) ($res['retryAfter'] ?? 30));
+            echo $res['placeholder'];
+            return;
+        }
         if ($res['status'] !== 200) {
             http_response_code($res['status']);
             return;

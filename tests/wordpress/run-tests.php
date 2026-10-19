@@ -128,6 +128,12 @@ $c->ok(is_file($uploads['basedir'] . '/kompanie-galerie-intern/.htaccess'), 'Ges
 $c->ok($gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', false, false)['status'] === 401, 'Gast bekommt kein internes Bild');
 $res = $gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', true, true);
 $c->ok($res['status'] === 200 && "\xFF\xD8" === substr((string) file_get_contents($res['file']), 0, 2), 'Mitglied bekommt das interne Bild (JPEG)');
+$db = $app->db;
+$db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['pending', $intern['id'] ?? 0]);
+$pending = $gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', true, true);
+$c->ok($pending['status'] === 202 && str_starts_with($pending['placeholder'] ?? '', '<svg') && ($pending['retryAfter'] ?? 0) > 0, 'Noch nicht aufbereitetes Bild: 202 mit Platzhalter, ohne Erzeugung während der Anfrage');
+$db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['ready', $intern['id'] ?? 0]);
+
 $c->section('Aufgaben');
 $task = [\KompanieApp\Core\Domain\GalleryService::TASK];
 $hook = \KompanieApp\WordPress\WpScheduler::HOOK;
