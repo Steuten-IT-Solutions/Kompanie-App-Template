@@ -8,7 +8,7 @@ export default function Galerie({ albumId }: { albumId?: number }) {
 }
 
 function Overview() {
-  const { data, error, loading, reload } = useAsync(api.gallery);
+  const { data, error, loading, reload } = useAsync(api.gallery, [], 'galerie');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
@@ -39,13 +39,34 @@ function Overview() {
   );
 }
 
+/** Noch nicht aufbereitete Bilder: so oft neu laden (alle 30 s), danach erst beim nächsten Öffnen. */
+const PENDING_RETRIES = 20;
+
+/** Adresse eines Platzhalters mit Zähler, damit der Browser das Bild neu holt statt aus dem Speicher. */
+function retryUrl(url: string, n: number): string {
+  return n === 0 ? url : `${url}${url.includes('?') ? '&' : '?'}v=${n}`;
+}
+
 function Album({ id }: { id: number }) {
-  const { data, error, loading, reload } = useAsync(() => api.galleryAlbum(id), [id]);
+  const { data, error, loading, reload } = useAsync(() => api.galleryAlbum(id), [id], 'galerie-album');
   const [open, setOpen] = useState<number | null>(null);
+  const [retry, setRetry] = useState(0);
+  const pending = !!data?.photos.some((p) => !p.ready);
+
+  // Bilder werden im Hintergrund aufbereitet: nachsehen, bis alle fertig sind.
+  useEffect(() => {
+    if (!pending || retry >= PENDING_RETRIES) return;
+    const t = setTimeout(() => {
+      setRetry((n) => n + 1);
+      reload();
+    }, 30000);
+    return () => clearTimeout(t);
+  }, [pending, retry, reload]);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const album = data!;
+  const photos = album.photos.map((p) => (p.ready ? p : { ...p, thumb: retryUrl(p.thumb, retry), large: retryUrl(p.large, retry) }));
 
   return (
     <div>
@@ -56,7 +77,7 @@ function Album({ id }: { id: number }) {
         {album.title} <span className="muted album-year">{album.year}</span>
       </h2>
       <ul className="photo-grid">
-        {album.photos.map((p, i) => (
+        {photos.map((p, i) => (
           <li key={p.id}>
             <button className="photo" onClick={() => setOpen(i)} aria-label={`Bild ${i + 1} öffnen`}>
               <img src={p.thumb} alt="" loading="lazy" />
@@ -69,7 +90,7 @@ function Album({ id }: { id: number }) {
           </li>
         ))}
       </ul>
-      {open !== null && <Lightbox photos={album.photos} start={open} onClose={() => setOpen(null)} />}
+      {open !== null && <Lightbox photos={photos} start={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
@@ -96,6 +117,12 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       document.body.style.overflow = overflow;
     };
   }, [go, onClose]);
+
+  // Vorheriges und nächstes Bild schon laden, damit das Wischen ohne Wartezeit klappt.
+  useEffect(() => {
+    if (photos.length < 2) return;
+    for (const n of [i + 1, i - 1 + photos.length]) new Image().src = photos[n % photos.length].large;
+  }, [i, photos]);
 
   const p = photos[i];
   return (

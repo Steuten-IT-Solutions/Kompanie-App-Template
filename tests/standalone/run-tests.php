@@ -20,9 +20,12 @@ require $root . '/tests/contract/ApiDriver.php';
 require $root . '/tests/contract/Checks.php';
 require $root . '/tests/contract/ApiScenario.php';
 require __DIR__ . '/HttpDriver.php';
+require $root . '/packages/core/tests/Support/CountingPdo.php';
 
 use KompanieApp\Contract\ApiScenario;
 use KompanieApp\Contract\Checks;
+use KompanieApp\Core\Tests\Support\CountingPdo;
+use KompanieApp\Core\Storage\Sql\PdoConnection;
 use KompanieApp\Contract\HttpDriver;
 use KompanieApp\Core\Auth\Level;
 use KompanieApp\Standalone\Config;
@@ -243,13 +246,99 @@ try {
     usleep(400000);
     $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
     $kernel->db()->insert('tasks', ['name' => 'testaufgabe', 'interval_seconds' => 3600, 'next_run' => time() - 10]);
-    $kernel->app()->cache->delete('cron_spawned');
+    $kernel->scheduler()->refresh(); // direkt in die Tabelle geschrieben: nächsten Lauf neu merken
+    $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
     $d->send('GET', $base . 'index.php?r=/api/v1/config', ['Host' => "127.0.0.1:$listenPort"], null);
     usleep(1500000);
     proc_terminate($listener);
     proc_close($listener);
     $c->ok(!str_contains((string) @file_get_contents($listenLog), 'cron'), 'Host-Header lenkt den Selbstaufruf nicht um (Cron-Schlüssel bleibt geheim)');
     $c->ok((int) $kernel->db()->scalar("SELECT next_run FROM {tasks} WHERE name = 'testaufgabe'") > time(), 'Fällige Aufgabe läuft über den Selbstaufruf an die eingetragene Adresse');
+
+    $c->section('Pseudo-Cron: normale Anfragen ohne Schreibzugriff, Selbstaufruf ohne Warten');
+    if ($kernel->db()->driver() === 'sqlite') {
+        // Eine Anfrage im selben Prozess nachstellen, mit einer Verbindung, die alle Abfragen mitschreibt.
+        $counted = static function (?Config $config = null) use ($app, $port, $data): array {
+            $k = new Kernel($app, new HttpContext([], ['HTTP_HOST' => "127.0.0.1:$port"], '/'));
+            $cfg = Config::load($data);
+            $pdo = new CountingPdo('sqlite:' . $data . '/' . $cfg->toArray()['db']['path']);
+            (new ReflectionProperty(Kernel::class, 'db'))->setValue($k, new PdoConnection($pdo));
+            if ($config !== null) {
+                (new ReflectionProperty(Kernel::class, 'config'))->setValue($k, $config);
+            }
+            return [$k, $pdo];
+        };
+        $afterResponse = static fn (Kernel $k) => (new ReflectionMethod(Kernel::class, 'afterResponse'))->invoke($k);
+        $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
+        $kernel->scheduler()->refresh();
+        [$k, $pdo] = $counted();
+        $k->upgrade();
+        $k->app()->api()->config();
+        $afterResponse($k);
+        $c->ok($pdo->writes() === [], 'Normale Anfrage schreibt nichts (Aufgaben werden nicht bei jeder Anfrage eingeplant)' . ($pdo->writes() ? ': ' . implode(' | ', $pdo->writes()) : ''));
+        $c->ok(!preg_grep('/\{?tasks\}?/', $pdo->log), 'Normale Anfrage liest die Aufgaben nicht (nächster Lauf steht in den Einstellungen)');
+
+        // Fällige Aufgabe ohne PHP-FPM: Selbstaufruf, ohne auf die Antwort zu warten.
+        $kernel->db()->insert('tasks', ['name' => 'testaufgabe', 'interval_seconds' => 3600, 'next_run' => time() - 10]);
+        $kernel->scheduler()->refresh();
+        $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
+        [$k] = $counted();
+        $k->upgrade();
+        $t = microtime(true);
+        $afterResponse($k);
+        $elapsed = microtime(true) - $t;
+        $c->ok($elapsed < 0.15, sprintf('Selbstaufruf wartet nicht auf die Aufgaben (%.0f ms)', $elapsed * 1000));
+        $ran = false;
+        for ($i = 0; $i < 30 && !$ran; $i++) {
+            usleep(100000);
+            $ran = (int) $kernel->db()->scalar("SELECT next_run FROM {tasks} WHERE name = 'testaufgabe'") > time();
+        }
+        $c->ok($ran, 'Die Aufgabe läuft trotzdem (im aufgerufenen Prozess)');
+        // Warten, bis der aufgerufene Prozess fertig ist: Zuletzt merkt er sich den nächsten Lauf.
+        // Sonst übernimmt er womöglich die fällige Aufgabe des nächsten Abschnitts (8 Worker).
+        for ($i = 0; $i < 50; $i++) {
+            $next = json_decode((string) $kernel->db()->scalar('SELECT value FROM {settings} WHERE name = ?', [KompanieApp\Standalone\PseudoScheduler::NEXT_SETTING]), true);
+            if (is_array($next) && (int) ($next['at'] ?? 0) > time()) {
+                break;
+            }
+            usleep(100000);
+        }
+        usleep(200000);
+        $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
+
+        // Selbstaufruf schlägt fehl: zählen, seltener versuchen, auf der Statusseite melden.
+        $kernel->db()->insert('tasks', ['name' => 'testaufgabe', 'interval_seconds' => 3600, 'next_run' => time() - 10]);
+        $kernel->scheduler()->refresh();
+        $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
+        $kernel->app()->settings->delete(Kernel::CRON_RUNS_SETTING);
+        $closed = $port + 2;
+        $unreachable = new Config($data, ['base_url' => "http://127.0.0.1:$closed/"] + Config::load($data)->toArray());
+        [$k] = $counted($unreachable);
+        $t = microtime(true);
+        $afterResponse($k);
+        $c->ok(microtime(true) - $t < 0.3, 'Nicht erreichbare Adresse hält die Anfrage nicht auf');
+        $state = json_decode((string) $kernel->db()->scalar('SELECT value FROM {settings} WHERE name = ?', [Kernel::CRON_SPAWN_SETTING]), true);
+        $c->ok(($state['failures'] ?? 0) === 1 && ($state['error'] ?? '') !== '', 'Fehlschlag wird gezählt');
+        [$k] = $counted($unreachable);
+        $afterResponse($k);
+        $state2 = json_decode((string) $kernel->db()->scalar('SELECT value FROM {settings} WHERE name = ?', [Kernel::CRON_SPAWN_SETTING]), true);
+        $c->ok(($state2['failures'] ?? 0) === 1 && ($state2['at'] ?? 0) === ($state['at'] ?? -1), 'Danach wird seltener versucht (kein neuer Versuch innerhalb der Wartezeit)');
+        $kernel->app()->settings->set(Kernel::CRON_SPAWN_SETTING, ['at' => time() - 7200, 'failures' => 3, 'error' => 'Keine Verbindung zur eigenen Adresse.', 'checked' => true]);
+        [$k] = $counted($unreachable);
+        $cron = array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'cron'))[0] ?? [];
+        $c->ok(($cron['level'] ?? '') === 'error' && str_contains($cron['text'] ?? '', 'Cronjob') && str_contains($cron['text'] ?? '', 'key='), 'Statusseite meldet den fehlschlagenden Selbstaufruf und empfiehlt einen Cronjob mit Adresse');
+        $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
+        $kernel->scheduler()->refresh();
+        $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
+        $d->send('GET', $kernel->cronUrl(), [], null);
+        // Die Antwort kommt vor den Aufgaben; der Lauf wird danach vermerkt.
+        for ($i = 0; $i < 30 && !str_contains((string) $kernel->db()->scalar('SELECT value FROM {settings} WHERE name = ?', [Kernel::CRON_RUNS_SETTING]), '"cron"'); $i++) {
+            usleep(100000);
+        }
+        [$k] = $counted();
+        $cron = array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'cron'))[0] ?? [];
+        $c->ok(($cron['level'] ?? '') === 'ok' && str_contains($cron['text'] ?? '', 'Cronjob beim Hoster'), 'Mit Cronjob des Hosters: Statusseite grün');
+    }
     $redirect = $d->send('GET', $base, ['Host' => "localhost:$port"], null);
     $c->ok($redirect[0] === 302 && ($redirect[2]['location'] ?? '') === $base, 'Andere Schreibweise der Adresse wird (vorläufig) auf die eingetragene umgeleitet');
     $proxied = $d->send('GET', $base, ['Host' => 'backend.intern:8080', 'X-Forwarded-Host' => "127.0.0.1:$port"], null);

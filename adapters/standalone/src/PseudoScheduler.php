@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace KompanieApp\Standalone;
 
 use KompanieApp\Core\Port\Scheduler;
+use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
  * Wiederkehrende Aufgaben ohne Cronjob: Nach einer Anfrage prüft der Server, ob etwas fällig ist,
  * und erledigt es, nachdem die Antwort verschickt ist (siehe Kernel). Ein Cronjob des Hosters
  * (bin/kompanie.php cron oder die Cron-Adresse) macht es zuverlässiger, ist aber nicht nötig.
+ *
+ * Der nächste Fälligkeitszeitpunkt steht zusätzlich in den Einstellungen (NEXT_SETTING). Die liest
+ * jede Anfrage ohnehin auf einmal; eine normale Anfrage braucht für den Pseudo-Cron deshalb keine
+ * eigene Abfrage und schreibt nichts. Die Tabelle tasks wird nur gelesen, wenn etwas fällig ist.
  */
 final class PseudoScheduler implements Scheduler
 {
-    public function __construct(private readonly Connection $db)
+    /** Einstellung: ['at' => nächster Lauf (Unix-Zeit) oder null ohne geplante Aufgaben] */
+    public const NEXT_SETTING = 'tasks_next_run';
+
+    public function __construct(private readonly Connection $db, private readonly Settings $settings)
     {
     }
 
@@ -23,6 +31,7 @@ final class PseudoScheduler implements Scheduler
         $row = $this->db->selectOne('SELECT interval_seconds FROM {tasks} WHERE name = ?', [$task]);
         if (!$row) {
             $this->db->insert('tasks', ['name' => $task, 'interval_seconds' => $intervalSeconds, 'next_run' => time() + 60]);
+            $this->refresh();
         } elseif ((int) $row['interval_seconds'] !== $intervalSeconds) {
             $this->db->update('tasks', ['interval_seconds' => $intervalSeconds], ['name' => $task]);
         }
@@ -30,12 +39,38 @@ final class PseudoScheduler implements Scheduler
 
     public function unschedule(string $task): void
     {
-        $this->db->execute('DELETE FROM {tasks} WHERE name = ?', [$task]);
+        // Erst lesen: Ein DELETE ohne Treffer bräuchte in SQLite trotzdem die Schreibsperre.
+        if ($this->db->scalar('SELECT COUNT(*) FROM {tasks} WHERE name = ?', [$task]) > 0) {
+            $this->db->execute('DELETE FROM {tasks} WHERE name = ?', [$task]);
+            $this->refresh();
+        }
     }
 
+    public function runSoon(string $task): void
+    {
+        $now = time();
+        $this->db->execute('UPDATE {tasks} SET next_run = ? WHERE name = ? AND next_run > ?', [$now, $task, $now]);
+        // Immer abgleichen, auch wenn die Aufgabe schon fällig war: Hat ein anderer Aufruf zeitgleich
+        // einen späteren nächsten Lauf gemerkt, bliebe sie sonst bis dahin liegen. (runSoon kommt
+        // selten, z. B. höchstens einmal pro Minute aus der Galerie.)
+        $this->refresh();
+    }
+
+    /** Ohne Datenbankabfrage: aus der Einstellung mit dem nächsten Lauf. */
     public function anyDue(): bool
     {
-        return (int) $this->db->scalar('SELECT COUNT(*) FROM {tasks} WHERE next_run <= ?', [time()]) > 0;
+        $next = $this->nextRun();
+        return $next !== null && $next <= time();
+    }
+
+    /** Nächster Lauf (Unix-Zeit) oder null, wenn keine Aufgabe geplant ist. */
+    public function nextRun(): ?int
+    {
+        $stored = $this->settings->get(self::NEXT_SETTING);
+        if (!is_array($stored) || !array_key_exists('at', $stored)) {
+            return $this->refresh();
+        }
+        return is_numeric($stored['at']) ? (int) $stored['at'] : null;
     }
 
     /**
@@ -57,7 +92,26 @@ final class PseudoScheduler implements Scheduler
                 $claimed[] = (string) $t['name'];
             }
         }
+        $this->refresh();
         return $claimed;
+    }
+
+    /**
+     * Liest den nächsten Lauf aus der Tabelle und merkt ihn in den Einstellungen
+     * (geschrieben wird nur, wenn er sich geändert hat). Verglichen wird mit dem Wert in der
+     * Datenbank, nicht mit dem beim Start dieses Aufrufs geladenen: Ein anderer Aufruf (z. B. der
+     * Cron) kann ihn inzwischen geändert haben.
+     */
+    public function refresh(): ?int
+    {
+        $min = $this->db->scalar('SELECT MIN(next_run) FROM {tasks}');
+        $next = $min === null ? null : (int) $min;
+        $raw = $this->db->scalar('SELECT value FROM {settings} WHERE name = ?', [self::NEXT_SETTING]);
+        $stored = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($stored) || !array_key_exists('at', $stored) || $stored['at'] !== $next) {
+            $this->settings->set(self::NEXT_SETTING, ['at' => $next]);
+        }
+        return $next;
     }
 
     /** @return array<string, int> Aufgabe => nächster Lauf (Unix-Zeit) */

@@ -81,7 +81,8 @@ final class Plugin
         add_action('rest_api_init', static fn () => RestBridge::register(self::app()));
         // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
         add_action(WpScheduler::HOOK, static fn (string $task) => WpUpdateTarget::$installed ? null : self::app()->runTask($task));
-        add_action('init', static fn () => self::app()->scheduleTasks(), 20);
+        // Aufgaben werden nicht bei jedem Seitenaufruf eingeplant, sondern nach einem Update (App::upgrade),
+        // beim Aktivieren, beim Speichern von Einstellungen und beim Öffnen der Einstellungsseite.
         Session::init();
         AppPage::init();
         if (is_admin()) {
@@ -139,6 +140,8 @@ final class Plugin
     public static function activate(): void
     {
         self::upgrade();
+        // Beim Deaktivieren wurden die Aufgaben ausgeplant.
+        self::app()->scheduleTasks();
         AppPage::addRewriteRules();
         flush_rewrite_rules();
     }

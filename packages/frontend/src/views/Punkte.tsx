@@ -1,14 +1,14 @@
-import { api } from '../api';
+import { api, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatPoints } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
 
-export default function Punkte() {
-  const { data, error, loading, reload } = useAsync(() => Promise.all([api.me(), api.myPoints()]));
+export default function Punkte({ me }: { me: Me }) {
+  const { data, error, loading, reload } = useAsync(api.myPoints, [], 'me/points');
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const [me, points] = data!;
+  const points = data!;
 
   return (
     <div>

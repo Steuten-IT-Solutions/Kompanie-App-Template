@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\Cache;
+use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
 
@@ -16,11 +17,25 @@ use KompanieApp\Core\Port\Settings;
  *  1. Geheime iCal-Adresse (Standard, ohne Google Cloud).
  *  2. Google-Kalender-IDs mit API-Schlüssel (nur öffentliche Kalender).
  *
- * Das Ergebnis wird zwischengespeichert; Schlüssel verlassen nie den Server.
+ * Schlüssel verlassen nie den Server.
+ *
+ * Zwischenspeicher: Die letzte gute Fassung bleibt lange erhalten (KEEP_SECONDS), mit einem
+ * „frisch bis“-Zeitpunkt (Einstellung calendar_cache_minutes). Ist sie veraltet, erneuert sie
+ * höchstens eine Anfrage je LOCK_SECONDS (Sperre); alle anderen bekommen sofort die alte Fassung,
+ * bei einer Störung auch diese. Ein Fehler wird ERROR_SECONDS gemerkt, damit bei einer Störung nicht jede Anfrage
+ * bis zum Timeout wartet. Im Hintergrund erneuert die Aufgabe TASK den Kalender stündlich.
  */
 final class CalendarService
 {
     public const CACHE_KEY = 'calendar_events';
+    public const ERROR_KEY = 'calendar_error';
+    public const TASK = 'calendar_refresh';
+    /** So lange bleibt die letzte gute Fassung als Rückfall erhalten. */
+    public const KEEP_SECONDS = 30 * 86400;
+    /** So lange wird ein Fehler gemerkt (kein neuer Abruf). */
+    public const ERROR_SECONDS = 60;
+    /** Sperre gegen gleichzeitige Abrufe. */
+    private const LOCK_SECONDS = 30;
     private const GOOGLE_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/%s/events';
 
     public function __construct(
@@ -55,24 +70,97 @@ final class CalendarService
     /** @return array<int, array<string, mixed>> nach Beginn sortiert */
     public function events(): array
     {
-        $cached = $this->cache->get(self::CACHE_KEY);
-        if (is_array($cached)) {
-            return $cached;
+        $copy = $this->copy();
+        if ($copy !== null && $copy['fresh_until'] > $this->time->timestamp()) {
+            return $copy['events'];
         }
-        $events = match ($this->source()) {
-            'google' => $this->fetchGoogle(),
-            'ics' => $this->fetchIcs((string) $this->settings->get('calendar_ics_url')),
-            default => throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.'),
-        };
-        usort($events, static fn (array $a, array $b): int => strcmp($a['start'], $b['start']));
-        $minutes = max(1, (int) $this->settings->get('calendar_cache_minutes', 15));
-        $this->cache->set(self::CACHE_KEY, $events, $minutes * 60);
-        return $events;
+        if ($copy !== null) {
+            if ($this->cache->get(self::ERROR_KEY) === null && $this->lock()) {
+                try {
+                    return $this->refresh();
+                } catch (ApiError $e) {
+                    error_log('Kompanie-App: Kalender nicht erneuert, alte Fassung ausgeliefert: ' . $e->getMessage());
+                }
+            }
+            return $copy['events'];
+        }
+        $error = $this->cache->get(self::ERROR_KEY);
+        if (is_string($error) && $this->isConfigured()) {
+            throw ApiError::upstream($error);
+        }
+        return $this->refresh();
+    }
+
+    /**
+     * Für die geplante Aufgabe: den Kalender im Hintergrund erneuern, damit Anfragen ihn selten
+     * selbst abrufen müssen. Fehler werden protokolliert; die alte Fassung bleibt.
+     */
+    public function refreshIfStale(): void
+    {
+        if (!$this->isConfigured()) {
+            return;
+        }
+        $copy = $this->copy();
+        // Gerade erst abgerufen (z. B. von einer Anfrage): nichts zu tun. Ohne Sperre: Die Aufgabe
+        // läuft ohnehin nur einmal, und die Sperre einer Anfrage soll sie nicht eine Stunde aufschieben.
+        if ($copy !== null && $copy['fetched_at'] > $this->time->timestamp() - 300) {
+            return;
+        }
+        try {
+            $this->refresh();
+        } catch (ApiError $e) {
+            error_log('Kompanie-App: Kalender nicht erneuert: ' . $e->getMessage());
+        }
     }
 
     public function clearCache(): void
     {
         $this->cache->delete(self::CACHE_KEY);
+        $this->cache->delete(self::ERROR_KEY);
+    }
+
+    /** @return array{events: array<int, array<string, mixed>>, fetched_at: int, fresh_until: int}|null letzte gute Fassung */
+    private function copy(): ?array
+    {
+        $c = $this->cache->get(self::CACHE_KEY);
+        if (!is_array($c) || !is_array($c['events'] ?? null) || !isset($c['fetched_at'], $c['fresh_until'])) {
+            return null; // auch der Zwischenspeicher älterer Versionen (nur die Liste)
+        }
+        return ['events' => $c['events'], 'fetched_at' => (int) $c['fetched_at'], 'fresh_until' => (int) $c['fresh_until']];
+    }
+
+    /** Nur eine Anfrage je LOCK_SECONDS ruft den Kalender ab (atomar über Cache::increment). */
+    private function lock(): bool
+    {
+        return $this->cache->increment(self::CACHE_KEY . '_lock', self::LOCK_SECONDS) === 1;
+    }
+
+    /**
+     * Ruft den Kalender ab und speichert ihn als neue gute Fassung.
+     * Fehler der Gegenseite werden ERROR_SECONDS gemerkt.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function refresh(): array
+    {
+        try {
+            $events = match ($this->source()) {
+                'google' => $this->fetchGoogle(),
+                'ics' => $this->fetchIcs((string) $this->settings->get('calendar_ics_url')),
+                default => throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.'),
+            };
+        } catch (ApiError $e) {
+            if ($e->status === 502) {
+                $this->cache->set(self::ERROR_KEY, $e->getMessage(), self::ERROR_SECONDS);
+            }
+            throw $e;
+        }
+        usort($events, static fn (array $a, array $b): int => strcmp($a['start'], $b['start']));
+        $now = $this->time->timestamp();
+        $minutes = max(1, (int) $this->settings->get('calendar_cache_minutes', 15));
+        $this->cache->set(self::CACHE_KEY, ['events' => $events, 'fetched_at' => $now, 'fresh_until' => $now + $minutes * 60], self::KEEP_SECONDS);
+        $this->cache->delete(self::ERROR_KEY);
+        return $events;
     }
 
     /** @return array{0: int, 1: int} Zeitraum: ab gestern bis ein Jahr in die Zukunft */
@@ -87,7 +175,7 @@ final class CalendarService
     {
         [$min, $max] = $this->range();
         $key = (string) $this->settings->get('google_api_key', '');
-        $events = [];
+        $requests = [];
         foreach ($this->calendarIds() as $calId) {
             $params = [
                 'singleEvents' => 'true',
@@ -98,8 +186,17 @@ final class CalendarService
                 'timeZone' => $this->time->timezone()->getName(),
                 'key' => $key,
             ];
-            $url = sprintf(self::GOOGLE_EVENTS_URL, rawurlencode($calId)) . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-            $res = $this->get($url);
+            $requests[$calId] = ['method' => 'GET', 'url' => sprintf(self::GOOGLE_EVENTS_URL, rawurlencode($calId)) . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986)];
+        }
+        // Mehrere Kalender gleichzeitig abrufen, wenn der HttpClient das kann; sonst nacheinander.
+        $responses = $this->http instanceof ExtendedHttpClient && count($requests) > 1 ? $this->http->requestAll($requests, 15) : [];
+        $events = [];
+        foreach ($requests as $calId => $request) {
+            $calId = (string) $calId;
+            $res = $responses[$calId] ?? $this->tryGet($request['url']);
+            if ($res instanceof \RuntimeException) {
+                throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+            }
             $body = json_decode($res['body'], true);
             if ($res['status'] !== 200 || !is_array($body)) {
                 $msg = $body['error']['message'] ?? ('HTTP ' . $res['status']);
@@ -152,10 +249,20 @@ final class CalendarService
     /** @return array{status: int, headers: array<string, string>, body: string} */
     private function get(string $url): array
     {
+        $res = $this->tryGet($url);
+        if ($res instanceof \RuntimeException) {
+            throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+        }
+        return $res;
+    }
+
+    /** @return array{status: int, headers: array<string, string>, body: string}|\RuntimeException */
+    private function tryGet(string $url): array|\RuntimeException
+    {
         try {
             return $this->http->request('GET', $url, [], null, 15);
         } catch (\RuntimeException $e) {
-            throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $e->getMessage());
+            return $e;
         }
     }
 

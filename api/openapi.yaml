@@ -184,6 +184,10 @@ paths:
     get:
       tags: [Termine]
       summary: Alle Termine aus Google Kalender / iCal (nur Mitglieder)
+      description: |
+        Der Server hält die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
+        im Hintergrund. Ist sie veraltet und der Kalender gerade nicht erreichbar, kommt die alte Fassung
+        mit 200. 502 nur, wenn es noch keine Fassung gibt; ein solcher Fehler wird etwa 60 Sekunden gemerkt.
       x-capability: member
       responses:
         '200':
@@ -1325,12 +1329,22 @@ components:
       type: object
       properties:
         id: { type: integer }
-        thumb: { type: string }
-        large: { type: string }
+        thumb:
+          type: string
+          description: |
+            Adresse des Vorschaubilds. Öffentliche fertige Bilder als statische Datei, sonst über die App
+            (`…/foto/<id>/thumb`, außerhalb der API). Dort antwortet der Server für Bilder, die noch nicht
+            aufbereitet sind, mit **202**, einem grauen SVG-Platzhalter im Seitenverhältnis des Fotos,
+            `Cache-Control: no-store` und `Retry-After` (Sekunden); die Aufbereitung läuft im Hintergrund.
+            Fertige Bilder: 200 mit JPEG. Interne Bilder ohne Mitgliedschaft: 401/403.
+        large: { type: string, description: Adresse der Großansicht (Verhalten wie thumb) }
         width: { type: integer }
         height: { type: integer }
         intern: { type: boolean }
         name: { type: string }
+        ready:
+          type: boolean
+          description: false, solange das Bild noch aufbereitet wird (die Adressen liefern dann den Platzhalter). Die App lädt das Album dann alle 30 s neu.
 
     GalleryAlbum:
       type: object

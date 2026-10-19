@@ -14,4 +14,10 @@ interface Scheduler
     public function schedule(string $task, int $intervalSeconds): void;
 
     public function unschedule(string $task): void;
+
+    /**
+     * Eine geplante Aufgabe möglichst bald ausführen (z. B. weitere Galeriebilder aufbereiten).
+     * Ist sie nicht geplant, passiert nichts. Der nächste reguläre Lauf verschiebt sich dadurch.
+     */
+    public function runSoon(string $task): void;
 }

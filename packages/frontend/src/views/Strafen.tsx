@@ -1,4 +1,4 @@
-import { api, type Penalty } from '../api';
+import { api, type Me, type Penalty } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
@@ -20,12 +20,12 @@ export function PenaltyRow({ p, actions }: { p: Penalty; actions?: React.ReactNo
   );
 }
 
-export default function Strafen() {
-  const { data, error, loading, reload } = useAsync(() => Promise.all([api.me(), api.myPenalties()]));
+export default function Strafen({ me }: { me: Me }) {
+  const { data, error, loading, reload } = useAsync(api.myPenalties, [], 'me/penalties');
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const [me, penalties] = data!;
+  const penalties = data!;
   const open = penalties.filter((p) => p.status === 'open');
   const paid = penalties.filter((p) => p.status === 'paid');
 

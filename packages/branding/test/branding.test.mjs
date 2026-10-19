@@ -144,6 +144,9 @@ test('Logo-Verarbeitung: Vollfläche bleibt, durchsichtiger Rand fällt weg, EXI
   let dir = tmp({ name: 'A', colors: { primary: '#2e6b3f' } }, { 'logo.png': full });
   await build({ config: join(dir, 'kompanie.json'), assets: join(dir, 'assets'), out: join(dir, 'o'), publicDir: join(dir, 'o') });
   assert.equal((await sharp(join(dir, 'o', 'logo.png')).metadata()).width, 512, 'nicht zugeschnitten');
+  const small = await sharp(join(dir, 'o', 'logo-small.webp')).metadata();
+  assert.equal(small.format, 'webp');
+  assert.equal(small.height, 144, 'Kopfzeilen-Logo in dreifacher Größe');
   const [r, g, b] = await pixel(join(dir, 'o', 'icons', 'icon-512.png'), 60, 60);
   assert.ok(r > 180 && g < 40 && b < 40, `Ecke des Icons ist rot (${r},${g},${b})`);
 

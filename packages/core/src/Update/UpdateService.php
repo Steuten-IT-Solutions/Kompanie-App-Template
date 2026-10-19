@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Update;
 
+use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\BackupProvider;
@@ -246,6 +247,9 @@ final class UpdateService
             $zip = $this->download($file);
             try {
                 $this->backupBefore($entry, Version::major($version) > Version::major($this->currentVersion));
+                // Danach neu einplanen (App::upgrade). Auch beim Zurückrollen auf eine ältere Version, die
+                // diese Einstellung nicht kennt: Kommt später wieder diese Version, plant sie neu ein.
+                $this->settings->delete(App::PLAN_SETTING);
                 $this->target->install($zip, $version);
             } finally {
                 @unlink($zip);

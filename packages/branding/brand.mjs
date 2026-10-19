@@ -128,6 +128,10 @@ async function images(logoInput, outDir, publicDir, warnings) {
   const trimmed = transparentEdge ? await sharp(full).trim({ threshold: 1 }).png().toBuffer().catch(() => full) : full;
   const logo = await sharp(trimmed).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
   writeFileSync(join(outDir, 'logo.png'), logo);
+  // Für die Kopfzeile (48 px hoch): Variante in dreifacher Größe für scharfe Darstellung auf
+  // Handys, als WebP statt des 512-px-PNG (Issue #18, Punkt 10).
+  const small = await sharp(logo).resize(432, 144, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 90, alphaQuality: 100 }).toBuffer();
+  writeFileSync(join(outDir, 'logo-small.webp'), small);
 
   const icon = async (size, inner, file) => {
     const content = await sharp(logo).resize(inner, inner, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } }).toBuffer();

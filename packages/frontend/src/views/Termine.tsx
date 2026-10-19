@@ -15,7 +15,7 @@ async function loadEvents(): Promise<EventLike[]> {
 }
 
 export default function Termine() {
-  const { data, error, loading, reload } = useAsync(loadEvents);
+  const { data, error, loading, reload } = useAsync(loadEvents, [], 'termine');
   const [open, setOpen] = useState<string | null>(null);
 
   const groups = useMemo(() => {

@@ -27,6 +27,8 @@ final class SettingsPage
         add_action('admin_notices', [self::class, 'permalinkNotice']);
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
         add_action('admin_post_kompanie_app_gallery_sync', static fn () => self::syncGallery(Plugin::app()));
+        // Beim Öffnen der Einstellungsseite die Planung prüfen (falls WP-Cron-Einträge verloren gingen).
+        add_action('load-settings_page_' . self::PAGE, static fn () => Plugin::app()->scheduleTasks());
     }
 
     /** Ohne „schöne“ Permalinks läuft die App unter ?kompanie_app=…; /app/ ist einprägsamer. */
@@ -226,6 +228,7 @@ final class SettingsPage
         $app->settings->set('calendar_ids', isset($_POST['calendar_ids']) ? sanitize_text_field(wp_unslash($_POST['calendar_ids'])) : '');
         $app->settings->set('google_api_key', isset($_POST['google_api_key']) ? sanitize_text_field(wp_unslash($_POST['google_api_key'])) : '');
         $app->calendar()->clearCache();
+        $app->scheduleTasks();
         self::back('Gespeichert.', false, 'kalender', ['kompanie_test' => 1]);
     }
 

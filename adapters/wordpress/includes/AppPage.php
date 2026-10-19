@@ -80,7 +80,7 @@ final class AppPage
         $c = $app->config;
         $icons = KOMPANIE_APP_URL . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
-        header('Cache-Control: public, max-age=3600');
+        header('Cache-Control: public, max-age=86400');
         echo wp_json_encode([
             'name' => $c->name(),
             'short_name' => $c->shortName(),
@@ -132,6 +132,16 @@ final class AppPage
     {
         $user = $app->authContext->currentUser();
         $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
+        if (isset($res['placeholder'])) {
+            // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
+            status_header($res['status']);
+            nocache_headers();
+            header('Content-Type: image/svg+xml');
+            header('X-Content-Type-Options: nosniff');
+            header('Retry-After: ' . (int) ($res['retryAfter'] ?? 30));
+            echo $res['placeholder']; // phpcs:ignore WordPress.Security.EscapeOutput -- festes SVG ohne Eingaben
+            return;
+        }
         if ($res['status'] !== 200) {
             status_header($res['status']);
             return;

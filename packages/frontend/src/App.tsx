@@ -1,22 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
-import logoUrl from './generated/logo.png';
+import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
-import { ErrorBoundary } from './ui';
+import { ErrorBoundary, lazyView, Loading } from './ui';
 import { navigate, useRoute } from './router';
 import Anmelden from './views/Anmelden';
-import Einrichtung from './views/Einrichtung';
-import Einstellungen from './views/Einstellungen';
 import Galerie from './views/Galerie';
-import Installieren from './views/Installieren';
-import Konto from './views/Konto';
 import Meins from './views/Meins';
 import News from './views/News';
 import Termine from './views/Termine';
-import TermineVerwalten from './views/TermineVerwalten';
-import Verwaltung from './views/Verwaltung';
+
+// Selten gebraucht: erst bei Bedarf laden (der Service Worker speichert sie trotzdem vorab).
+const Einrichtung = lazyView(() => import('./views/Einrichtung'));
+const Einstellungen = lazyView(() => import('./views/Einstellungen'));
+const Installieren = lazyView(() => import('./views/Installieren'));
+const Konto = lazyView(() => import('./views/Konto'));
+const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
+const Verwaltung = lazyView(() => import('./views/Verwaltung'));
 
 type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
 type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung';
@@ -243,6 +245,7 @@ export default function App() {
 
       <main className="content">
         <ErrorBoundary key={rawPath.join('/')}>
+        <Suspense fallback={<Loading />}>
         {config.setupPending && tab !== 'einrichtung' && (
           <div className="card setup-hint">
             <p>
@@ -266,6 +269,7 @@ export default function App() {
         {tab === 'anmelden' && <Anmelden />}
         {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
         {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
+        </Suspense>
         </ErrorBoundary>
       </main>
 

@@ -1,16 +1,39 @@
-import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import type { MemberSummary } from './api';
 
-/** Lädt Daten asynchron; reload() lädt neu. */
-export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
-  const [data, setData] = useState<T | null>(null);
+/** Zuletzt geladene Daten je Schlüssel (nur im Speicher; beim Abmelden geleert). */
+const asyncCache = new Map<string, unknown>();
+
+export function clearAsyncCache() {
+  asyncCache.clear();
+}
+
+/**
+ * Lädt Daten asynchron; reload() lädt neu.
+ * Mit `key` zeigt die Ansicht beim nächsten Öffnen sofort die zuletzt geladenen Daten und
+ * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs).
+ */
+export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
+  const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
+  const cached = () => (cacheKey !== null && asyncCache.has(cacheKey) ? (asyncCache.get(cacheKey) as T) : null);
+  const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
+  const setData = useCallback(
+    (d: T | null) => {
+      if (cacheKey !== null && d !== null) asyncCache.set(cacheKey, d);
+      setDataState(d);
+    },
+    [cacheKey],
+  );
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    const hit = cached();
+    if (hit !== null) setDataState(hit);
     fn()
       .then((d) => {
         if (alive) {
@@ -141,4 +164,42 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
       this.props.children
     );
   }
+}
+
+const CHUNK_RELOAD = 'kompanie-chunk-reload';
+
+/**
+ * Selten gebrauchte Ansicht erst bei Bedarf laden (kleinerer App-Start).
+ * Nach einem Update kann ein Programmteil der alten Version fehlen: Dann lädt die App einmal neu
+ * und holt die aktuelle Version. Schlägt es danach wieder fehl (z. B. offline), zeigt die
+ * ErrorBoundary eine Meldung.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function lazyView<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    load().then(
+      (mod) => {
+        try {
+          sessionStorage.removeItem(CHUNK_RELOAD);
+        } catch {
+          // ohne sessionStorage: nichts zu merken
+        }
+        return mod;
+      },
+      (err: unknown) => {
+        let again = true;
+        try {
+          again = sessionStorage.getItem(CHUNK_RELOAD) === null;
+          sessionStorage.setItem(CHUNK_RELOAD, '1');
+        } catch {
+          again = false;
+        }
+        if (again && navigator.onLine) {
+          window.location.reload();
+          return new Promise<never>(() => undefined);
+        }
+        throw err;
+      },
+    ),
+  );
 }
