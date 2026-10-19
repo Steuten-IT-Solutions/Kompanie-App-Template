@@ -96,13 +96,16 @@ final class PseudoScheduler implements Scheduler
 
     /**
      * Liest den nächsten Lauf aus der Tabelle und merkt ihn in den Einstellungen
-     * (geschrieben wird nur, wenn er sich geändert hat).
+     * (geschrieben wird nur, wenn er sich geändert hat). Verglichen wird mit dem Wert in der
+     * Datenbank, nicht mit dem beim Start dieses Aufrufs geladenen: Ein anderer Aufruf (z. B. der
+     * Cron) kann ihn inzwischen geändert haben.
      */
     public function refresh(): ?int
     {
         $min = $this->db->scalar('SELECT MIN(next_run) FROM {tasks}');
         $next = $min === null ? null : (int) $min;
-        $stored = $this->settings->get(self::NEXT_SETTING);
+        $raw = $this->db->scalar('SELECT value FROM {settings} WHERE name = ?', [self::NEXT_SETTING]);
+        $stored = is_string($raw) ? json_decode($raw, true) : null;
         if (!is_array($stored) || !array_key_exists('at', $stored) || $stored['at'] !== $next) {
             $this->settings->set(self::NEXT_SETTING, ['at' => $next]);
         }

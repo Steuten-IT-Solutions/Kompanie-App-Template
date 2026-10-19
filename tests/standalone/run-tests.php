@@ -294,7 +294,16 @@ try {
             $ran = (int) $kernel->db()->scalar("SELECT next_run FROM {tasks} WHERE name = 'testaufgabe'") > time();
         }
         $c->ok($ran, 'Die Aufgabe läuft trotzdem (im aufgerufenen Prozess)');
-        usleep(500000); // den aufgerufenen Prozess zu Ende laufen lassen (er merkt sich den nächsten Lauf)
+        // Warten, bis der aufgerufene Prozess fertig ist: Zuletzt merkt er sich den nächsten Lauf.
+        // Sonst übernimmt er womöglich die fällige Aufgabe des nächsten Abschnitts (8 Worker).
+        for ($i = 0; $i < 50; $i++) {
+            $next = json_decode((string) $kernel->db()->scalar('SELECT value FROM {settings} WHERE name = ?', [KompanieApp\Standalone\PseudoScheduler::NEXT_SETTING]), true);
+            if (is_array($next) && (int) ($next['at'] ?? 0) > time()) {
+                break;
+            }
+            usleep(100000);
+        }
+        usleep(200000);
         $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
 
         // Selbstaufruf schlägt fehl: zählen, seltener versuchen, auf der Statusseite melden.
