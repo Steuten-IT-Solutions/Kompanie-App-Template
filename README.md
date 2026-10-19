@@ -48,6 +48,7 @@ tests/                Tests der Adapter, des Release-Ablaufs, des Installers und
 ```bash
 scripts/check-core-boundary.sh   # Kern enthält keine WordPress-Aufrufe
 scripts/check-neutral.sh         # keine Namen oder Motive einer bestimmten Kompanie
+npm run format:check             # Formatierung von TypeScript, JavaScript und CSS (Prettier; npm run format korrigiert)
 ```
 
 ```bash

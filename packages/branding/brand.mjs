@@ -22,9 +22,24 @@ const repoRoot = resolve(here, '../..');
 
 const FONTS = {
   System: [],
-  Oswald: ['@fontsource/oswald/latin-500.css', '@fontsource/oswald/latin-600.css', '@fontsource/oswald/latin-700.css', '@fontsource/oswald/latin-ext-500.css', '@fontsource/oswald/latin-ext-600.css', '@fontsource/oswald/latin-ext-700.css'],
-  'Roboto Slab': ['@fontsource/roboto-slab/latin-500.css', '@fontsource/roboto-slab/latin-700.css', '@fontsource/roboto-slab/latin-ext-700.css'],
-  'Source Sans 3': ['@fontsource/source-sans-3/latin-600.css', '@fontsource/source-sans-3/latin-700.css', '@fontsource/source-sans-3/latin-ext-700.css'],
+  Oswald: [
+    '@fontsource/oswald/latin-500.css',
+    '@fontsource/oswald/latin-600.css',
+    '@fontsource/oswald/latin-700.css',
+    '@fontsource/oswald/latin-ext-500.css',
+    '@fontsource/oswald/latin-ext-600.css',
+    '@fontsource/oswald/latin-ext-700.css',
+  ],
+  'Roboto Slab': [
+    '@fontsource/roboto-slab/latin-500.css',
+    '@fontsource/roboto-slab/latin-700.css',
+    '@fontsource/roboto-slab/latin-ext-700.css',
+  ],
+  'Source Sans 3': [
+    '@fontsource/source-sans-3/latin-600.css',
+    '@fontsource/source-sans-3/latin-700.css',
+    '@fontsource/source-sans-3/latin-ext-700.css',
+  ],
 };
 const FONT_STACK = {
   System: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
@@ -123,18 +138,33 @@ async function images(logoInput, outDir, publicDir, warnings) {
   // Nur durchsichtigen Rand entfernen. Eine vollflächige Hintergrundfarbe gehört zum Logo
   // (trim() würde sonst die Farbe des Pixels oben links als Rand wegschneiden).
   const full = await load().png().toBuffer();
-  const { data: corner } = await sharp(full).ensureAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
+  const { data: corner } = await sharp(full)
+    .ensureAlpha()
+    .extract({ left: 0, top: 0, width: 1, height: 1 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const transparentEdge = corner[3] === 0;
-  const trimmed = transparentEdge ? await sharp(full).trim({ threshold: 1 }).png().toBuffer().catch(() => full) : full;
+  const trimmed = transparentEdge
+    ? await sharp(full)
+        .trim({ threshold: 1 })
+        .png()
+        .toBuffer()
+        .catch(() => full)
+    : full;
   const logo = await sharp(trimmed).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
   writeFileSync(join(outDir, 'logo.png'), logo);
   // Für die Kopfzeile (48 px hoch): Variante in dreifacher Größe für scharfe Darstellung auf
   // Handys, als WebP statt des 512-px-PNG (Issue #18, Punkt 10).
-  const small = await sharp(logo).resize(432, 144, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 90, alphaQuality: 100 }).toBuffer();
+  const small = await sharp(logo)
+    .resize(432, 144, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 90, alphaQuality: 100 })
+    .toBuffer();
   writeFileSync(join(outDir, 'logo-small.webp'), small);
 
   const icon = async (size, inner, file) => {
-    const content = await sharp(logo).resize(inner, inner, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } }).toBuffer();
+    const content = await sharp(logo)
+      .resize(inner, inner, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+      .toBuffer();
     await sharp({ create: { width: size, height: size, channels: 4, background: '#ffffff' } })
       .composite([{ input: content, gravity: 'center' }])
       .flatten({ background: '#ffffff' })
@@ -158,7 +188,9 @@ export async function build({ config, assets, out, publicDir }) {
   }
   const warnings = [...theme.warnings];
   if (cfg.legacyFeatures) {
-    warnings.push('„features“ in kompanie.json wird ignoriert: Welche Bereiche die App hat, schaltet der Admin in der App (Einstellungen → Bereiche). Der Eintrag kann entfernt werden.');
+    warnings.push(
+      '„features“ in kompanie.json wird ignoriert: Welche Bereiche die App hat, schaltet der Admin in der App (Einstellungen → Bereiche). Der Eintrag kann entfernt werden.',
+    );
   }
   mkdirSync(out, { recursive: true });
   mkdirSync(publicDir, { recursive: true });
@@ -188,10 +220,7 @@ export async function build({ config, assets, out, publicDir }) {
     join(out, 'brand.ts'),
     `// Automatisch erzeugt aus kompanie.json – nicht von Hand ändern.\nimport brand from './brand.json';\n\nexport default brand;\nexport type Brand = typeof brand;\n`,
   );
-  writeFileSync(
-    join(out, 'theme.css'),
-    themeCss(theme).replace(':root {\n', `:root {\n  --font-head: ${FONT_STACK[cfg.font]};\n`),
-  );
+  writeFileSync(join(out, 'theme.css'), themeCss(theme).replace(':root {\n', `:root {\n  --font-head: ${FONT_STACK[cfg.font]};\n`));
   writeFileSync(
     join(out, 'fonts.ts'),
     `// Automatisch erzeugt: Schrift „${cfg.font}“, lokal gebündelt (kein Abruf bei Google).\n` +

@@ -70,13 +70,24 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         </label>
         <label className="field">
           <span>Neues Passwort (mind. {MIN_LENGTH} Zeichen)</span>
-          <input type="password" autoComplete="new-password" minLength={MIN_LENGTH} value={next} onChange={(e) => setNext(e.target.value)} required />
+          <input
+            type="password"
+            autoComplete="new-password"
+            minLength={MIN_LENGTH}
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            required
+          />
         </label>
         <label className="field">
           <span>Neues Passwort wiederholen</span>
           <input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} required />
         </label>
-        {formError && <p className="form-error" role="alert">{formError}</p>}
+        {formError && (
+          <p className="form-error" role="alert">
+            {formError}
+          </p>
+        )}
         <button className="btn btn-block" type="submit" disabled={busy}>
           {busy ? 'Speichert …' : 'Passwort ändern'}
         </button>

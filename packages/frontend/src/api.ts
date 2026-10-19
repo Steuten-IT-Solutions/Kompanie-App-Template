@@ -403,8 +403,14 @@ export const api = {
   updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
   deleteRole: (key: Level, replacement?: Level) =>
     request<RoleAdmin[]>('DELETE', `/admin/roles/${encodeURIComponent(key)}`, undefined, replacement ? { replacement } : undefined),
-  givePoints: (data: { user_ids: number[]; points?: number; catalog_id?: number; reason?: string; date?: string; apply_factor?: boolean }) =>
-    request<PointEntry[]>('POST', '/points', data),
+  givePoints: (data: {
+    user_ids: number[];
+    points?: number;
+    catalog_id?: number;
+    reason?: string;
+    date?: string;
+    apply_factor?: boolean;
+  }) => request<PointEntry[]>('POST', '/points', data),
   deletePoints: (id: number) => request<{ deleted: boolean }>('DELETE', `/points/${id}`),
 
   givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string }) =>
@@ -419,7 +425,11 @@ export const api = {
   testCalendar: () => request<{ count: number; sample: { start: string; title: string }[] }>('POST', '/admin/calendar/test'),
   testNews: () => request<{ count: number }>('POST', '/admin/news/test'),
   syncGallery: (onlyProcess = false) =>
-    request<{ albums: number; photos: number; processed: number; pending: number; failed: number; error: string }>('POST', '/admin/gallery/sync', { only_process: onlyProcess }),
+    request<{ albums: number; photos: number; processed: number; pending: number; failed: number; error: string }>(
+      'POST',
+      '/admin/gallery/sync',
+      { only_process: onlyProcess },
+    ),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
@@ -467,7 +477,13 @@ export interface AdminStatus {
 export type NewsSourceType = 'none' | 'wordpress' | 'rss';
 
 export interface AdminSettings {
-  calendar: { source: 'ics' | 'google' | 'none'; ics_url_set: boolean; google_api_key_set: boolean; calendar_ids: string; cache_minutes: number };
+  calendar: {
+    source: 'ics' | 'google' | 'none';
+    ics_url_set: boolean;
+    google_api_key_set: boolean;
+    calendar_ids: string;
+    cache_minutes: number;
+  };
   gallery: {
     configured: boolean;
     root: string;

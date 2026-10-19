@@ -194,7 +194,12 @@ test('Abgelaufenes Token wird erneuert, ohne dass die App auffällt', async ({ p
     const cfg = window.KOMPANIE_CONFIG!;
     const send = (token: string) =>
       standalone
-        ? fetch(cfg.apiBase + 'me/password', { method: 'POST', headers: { [cfg.csrf.header]: token, 'Content-Type': 'application/json' }, body: '{}', credentials: 'same-origin' })
+        ? fetch(cfg.apiBase + 'me/password', {
+            method: 'POST',
+            headers: { [cfg.csrf.header]: token, 'Content-Type': 'application/json' },
+            body: '{}',
+            credentials: 'same-origin',
+          })
         : fetch(cfg.apiBase + 'me', { headers: { [cfg.csrf.header]: token }, credentials: 'same-origin' });
     const bad = await send('ungueltig');
     const body = await bad.json();
@@ -203,7 +208,9 @@ test('Abgelaufenes Token wird erneuert, ohne dass die App auffällt', async ({ p
     return { badStatus: bad.status, code: body.code, okStatus: ok.status };
   }, STANDALONE);
   expect(result).toEqual(
-    STANDALONE ? { badStatus: 403, code: 'csrf_invalid', okStatus: 400 } : { badStatus: 403, code: 'rest_cookie_invalid_nonce', okStatus: 200 },
+    STANDALONE
+      ? { badStatus: 403, code: 'csrf_invalid', okStatus: 400 }
+      : { badStatus: 403, code: 'rest_cookie_invalid_nonce', okStatus: 200 },
   );
 });
 
@@ -269,7 +276,9 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
   await expect(page.getByRole('link', { name: 'Auf der Webseite öffnen' })).toBeVisible();
   await shot(page, '12-gast-news');
 
-  const status = await page.evaluate(async () => (await fetch(window.KOMPANIE_CONFIG!.apiBase + 'me/points', { credentials: 'same-origin' })).status);
+  const status = await page.evaluate(
+    async () => (await fetch(window.KOMPANIE_CONFIG!.apiBase + 'me/points', { credentials: 'same-origin' })).status,
+  );
   expect(status).toBe(401);
 });
 
@@ -391,7 +400,10 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(3);
   await expect(page.locator('.photo-lock')).toHaveCount(1);
-  const internSrc = await page.locator('.photo', { has: page.locator('.photo-lock') }).locator('img').getAttribute('src');
+  const internSrc = await page
+    .locator('.photo', { has: page.locator('.photo-lock') })
+    .locator('img')
+    .getAttribute('src');
   expect(internSrc).toContain('/app/foto/');
   const asMember = await page.request.get(internSrc!);
   expect(asMember.status()).toBe(200);
@@ -475,7 +487,9 @@ test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ p
   await expect(STANDALONE ? page.getByLabel('Angemeldet bleiben') : page.locator('#rememberme')).toBeChecked();
   await fillLogin(page, 'mitglied1', PASSWORD);
   await expect(page.locator('.topbar-account')).toHaveText('Konto');
-  const cookie = (await page.context().cookies()).find((c) => (STANDALONE ? c.name === 'kompanie_session' : c.name.startsWith('wordpress_logged_in_')));
+  const cookie = (await page.context().cookies()).find((c) =>
+    STANDALONE ? c.name === 'kompanie_session' : c.name.startsWith('wordpress_logged_in_'),
+  );
   expect(cookie).toBeDefined();
   const days = (cookie!.expires - Date.now() / 1000) / 86400;
   expect(days).toBeGreaterThan(390);
@@ -493,7 +507,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Kalender für Mitglieder' })).toBeVisible();
   // Kalender (und bei der eigenständigen Version Neuigkeiten) lassen sich überspringen.
-  while (await page.getByRole('heading', { name: 'Fast fertig' }).count() === 0) {
+  while ((await page.getByRole('heading', { name: 'Fast fertig' }).count()) === 0) {
     await expect(page.getByRole('heading', { name: 'Galerie aus Google Drive' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   }
@@ -550,7 +564,10 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
 
   await expect(status.locator('.status-item.status-warn', { hasText: 'Datensicherung' })).toBeVisible();
   const backup = page.locator('.settings-section', { hasText: 'Datensicherung' });
-  const [download] = await Promise.all([page.waitForEvent('download'), backup.getByRole('button', { name: 'Sicherung herunterladen' }).click()]);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    backup.getByRole('button', { name: 'Sicherung herunterladen' }).click(),
+  ]);
   expect(download.suggestedFilename()).toMatch(/^sicherung-\d{4}-\d{2}-\d{2}\.json$/);
   const data = JSON.parse(await (await import('node:fs/promises')).readFile((await download.path())!, 'utf8'));
   expect(data.format).toBe('kompanie-app-backup');

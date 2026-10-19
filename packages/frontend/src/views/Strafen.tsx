@@ -31,7 +31,11 @@ export default function Strafen({ me }: { me: Me }) {
 
   return (
     <div>
-      <StatCard label={`Offen: ${brand.labels.sections.penalties}`} value={formatEuro(me.open_cents)} tone={me.open_cents > 0 ? 'warn' : 'good'} />
+      <StatCard
+        label={`Offen: ${brand.labels.sections.penalties}`}
+        value={formatEuro(me.open_cents)}
+        tone={me.open_cents > 0 ? 'warn' : 'good'}
+      />
       {penalties.length === 0 && <Empty>Keine Einträge – vorbildlich!</Empty>}
       {open.length > 0 && (
         <>

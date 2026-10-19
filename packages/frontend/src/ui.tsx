@@ -101,18 +101,12 @@ export function MemberPicker({
   note?: (m: MemberSummary) => string | null;
 }) {
   const [query, setQuery] = useState('');
-  const filtered = useMemo(
-    () => members.filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())),
-    [members, query],
-  );
-  const toggle = (id: number) =>
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const filtered = useMemo(() => members.filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())), [members, query]);
+  const toggle = (id: number) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   const allFilteredSelected = filtered.length > 0 && filtered.every((m) => selected.includes(m.id));
   const toggleAll = () => {
     const ids = filtered.map((m) => m.id);
-    onChange(
-      allFilteredSelected ? selected.filter((id) => !ids.includes(id)) : Array.from(new Set([...selected, ...ids])),
-    );
+    onChange(allFilteredSelected ? selected.filter((id) => !ids.includes(id)) : Array.from(new Set([...selected, ...ids])));
   };
 
   return (

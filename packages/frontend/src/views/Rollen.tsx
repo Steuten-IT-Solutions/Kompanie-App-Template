@@ -41,7 +41,8 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
     <section className="card settings-section" id="einstellungen-rollen">
       <h3>Rollen</h3>
       <p className="small muted">
-        Jede Person hat eine Rolle. Hier legst du fest, welche Rollen es gibt und was sie dürfen. {config?.features.points && 'Der Punktefaktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder.'}
+        Jede Person hat eine Rolle. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
+        {config?.features.points && 'Der Punktefaktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder.'}
       </p>
       <ul className="card-list role-list">
         {roles.map((r) =>
@@ -54,7 +55,9 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
               <div className="row-main">
                 <div className="row-title">
                   {r.label}
-                  {config?.features.points && r.points_factor !== 1 && <span className="badge badge-role">{factorText(r.points_factor)}</span>}
+                  {config?.features.points && r.points_factor !== 1 && (
+                    <span className="badge badge-role">{factorText(r.points_factor)}</span>
+                  )}
                 </div>
                 <div className="row-sub">
                   {r.users === 1 ? '1 Person' : `${r.users} Personen`}
@@ -132,7 +135,10 @@ function RoleForm({
 
   function remove() {
     if (!role) return;
-    const others = role.users > 0 ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} die Rolle „${roles.find((r) => r.key === replacement)?.label}“.` : '';
+    const others =
+      role.users > 0
+        ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
+        : '';
     if (!window.confirm(`Rolle „${role.label}“ löschen?${others}`)) return;
     void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), 'Rolle gelöscht');
   }

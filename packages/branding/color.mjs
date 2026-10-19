@@ -9,7 +9,10 @@ export function hexToRgb(hex) {
 }
 
 export function rgbToHex([r, g, b]) {
-  const c = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+  const c = (v) =>
+    Math.round(Math.min(255, Math.max(0, v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
