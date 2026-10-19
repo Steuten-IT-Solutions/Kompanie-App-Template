@@ -29,6 +29,8 @@ const CAPABILITIES = ['member', 'manage_points', 'manage_penalties', 'manage_eve
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
 const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties'];
+/** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
+const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
 const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'rolle.guest', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
@@ -78,6 +80,12 @@ function load(string $dir): array
                 $errors[] = "$slug.md: „{$required}“ fehlt im Kopfbereich";
             }
         }
+        // Ohne [ ] wäre es ein Text und die Seite stünde für alle offen: lieber als Fehler melden.
+        foreach (['rechte', 'bereiche'] as $listKey) {
+            if (array_key_exists($listKey, $meta) && !is_array($meta[$listKey])) {
+                $errors[] = "$slug.md: „{$listKey}“ muss eine Liste in [ ] sein, z. B. {$listKey}: [member]";
+            }
+        }
         $rechte = is_array($meta['rechte'] ?? null) ? $meta['rechte'] : [];
         $bereiche = is_array($meta['bereiche'] ?? null) ? $meta['bereiche'] : [];
         foreach (array_diff($rechte, CAPABILITIES) as $c) {
@@ -110,7 +118,14 @@ function load(string $dir): array
         foreach ($links[1] as $target) {
             if (!isset($pages[$target])) {
                 $errors[] = "$slug.md: Verweis auf fehlende Seite „{$target}“";
+            } elseif (!reachable($p, $pages[$target])) {
+                $errors[] = "$slug.md: Verweis auf „{$target}“, die nicht jeder sieht, der diese Seite sieht (Rechte, Bereiche oder Variante)";
             }
+        }
+    }
+    foreach (RIGHTS_WITH_PAGE as $cap) {
+        if (!array_filter($pages, static fn (array $p): bool => $p['rechte'] === [$cap])) {
+            $errors[] = "Für das Recht „{$cap}“ fehlt eine eigene Handbuchseite (rechte: [{$cap}])";
         }
     }
     foreach (FEATURES_WITH_ROLE as $feature => $cap) {
@@ -119,6 +134,18 @@ function load(string $dir): array
         }
     }
     return [$pages, $errors];
+}
+
+/**
+ * Sieht jeder, der $from sieht, auch $to? Admins (manage_settings) haben alle Rechte. Bereiche und
+ * Variante des Ziels dürfen nicht enger sein.
+ */
+function reachable(array $from, array $to): bool
+{
+    $held = in_array('manage_settings', $from['rechte'], true) ? CAPABILITIES : $from['rechte'];
+    return array_diff($to['rechte'], $held) === []
+        && array_diff($to['bereiche'], $from['bereiche']) === []
+        && ($to['variante'] === '' || $to['variante'] === $from['variante']);
 }
 
 /** Gruppe für die Übersicht. */

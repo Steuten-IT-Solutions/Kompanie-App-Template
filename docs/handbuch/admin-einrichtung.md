@@ -10,11 +10,11 @@ Eine neue Installation hat keine Bereiche. Wähle, was eure Kompanie nutzt: {ber
 
 Bereiche mit eigenen Aufgaben bringen beim Einschalten eine **Standardrolle** mit, z. B. „{bereich.points} verwalten“ (siehe [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder)).
 
-## Kalender
+## {bereich.calendar}
 Für den Bereich {bereich.calendar}: in Google Kalender beim Kalender der Kompanie unter **Einstellungen → Kalender integrieren** die **geheime Adresse im iCal-Format** kopieren und einfügen. **Kalender testen** zeigt die ersten Termine.
 
-## Galerie
+## {bereich.gallery}
 Für den Bereich {bereich.gallery}: Die App zeigt Fotos aus einem Google-Drive-Ordner. Ordnerstruktur: Galerie-Ordner → Jahr → Album → Bilder; Bilder im Unterordner `intern` eines Albums sehen nur Mitglieder. Die Einrichtung erklärt Schritt für Schritt, wie der Ordner freigegeben wird.
 
-## Neuigkeiten
+## {bereich.news}
 Mit WordPress kommen sie aus den Beiträgen der Webseite. Ohne WordPress gebt ihr die Adresse einer Webseite oder eines Feeds an.

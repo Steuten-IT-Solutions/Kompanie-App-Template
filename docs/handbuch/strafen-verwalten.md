@@ -8,7 +8,7 @@ Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Rec
 
 ## Eintrag anlegen
 1. **Verwaltung → {bereich.penalties} +** öffnen.
-2. Betrag (z. B. 2,50) und Grund eintragen, Mitglieder ankreuzen und speichern.
+2. Betrag (z. B. 2,50, höchstens 1.000 € je Eintrag), Grund und Datum (heute vorausgewählt) eintragen, Mitglieder ankreuzen und **Eintragen** tippen.
 
 ## Bezahlt markieren
 Unter **Verwaltung → Mitglieder** das Mitglied öffnen und beim Eintrag **Bezahlt** tippen. Versehentlich markiert? **Doch offen** setzt ihn zurück.

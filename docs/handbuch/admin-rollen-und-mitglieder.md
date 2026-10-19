@@ -18,10 +18,7 @@ Schaltest du einen Bereich mit eigenen Aufgaben ein, kommt seine Rolle dazu: „
 ## Eigene Rollen
 Mit **+ Neue Rolle** legst du weitere Rollen an, z. B. eine Leitung, die {bereich.points}, {bereich.penalties} und {bereich.events} verwaltet. Für jede Rolle wählst du die Rechte und, falls ihr {bereich.points} nutzt, einen **Punktefaktor** (z. B. 0,5 für junge Mitglieder).
 
-> Einstellungen, Updates und Datensicherung bleiben immer den Admins vorbehalten. Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten.
+> Einstellungen, Updates und Datensicherung bleiben immer den Admins vorbehalten. Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die nicht mehr Rechte haben als er.
 
-## Mitglieder anlegen
-Unter **Verwaltung → Mitglieder → + Mitglied anlegen**: Name eintragen, die App schlägt den Benutzernamen vor und erzeugt ein Startpasswort. Das Passwort wird nur einmal angezeigt; gib es dem Mitglied weiter. Ein neues Startpasswort gibt es im Mitglied unter **Neues Startpasswort**.
-
-## Rolle ändern
-Im Mitglied unter **Rolle in der App** die Rolle auswählen. Die eigene Rolle ändert niemand selbst; der letzte {rolle.admin} kann nicht herabgestuft werden.
+## Mitglieder und ihre Rollen
+Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben).

@@ -647,37 +647,40 @@ test('Service Worker: Programmdateien vorab gespeichert, alte Speicher gelöscht
 });
 
 test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Bezeichnungen, auch offline', async ({ page }) => {
+  // Einträge der Seitenliste (Titel stehen teils auch in Hinweisen der App)
+  const item = (title: string) => page.locator('.row-title', { hasText: title });
   // Gast: nur Seiten für alle
   await page.context().clearCookies();
   await page.goto('/app/');
   await page.getByRole('button', { name: 'Hilfe' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Hilfe');
-  await expect(page.getByText('Die App aufs Handy holen')).toBeVisible();
+  await expect(item('Die App aufs Handy holen')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toHaveCount(0);
-  await expect(page.getByText('Meine Punkte und Strafen')).toHaveCount(0);
+  await expect(item('Meine Punkte')).toHaveCount(0);
 
   // Mitglied: dazu die Seiten für Mitglieder; Bezeichnung „Kasse“ statt „Strafen“
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Hilfe' }).click();
-  await page.getByText('Meine Punkte und Strafen').click();
-  await expect(page.locator('.hilfe-text h2', { hasText: 'Kasse' })).toBeVisible();
+  await expect(item('Meine Punkte')).toBeVisible();
+  await item('Meine Kasse').click();
+  await expect(page.locator('.news-headline')).toHaveText('Meine Kasse');
   await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toHaveCount(0);
-  await expect(page.getByText('Punkte vergeben')).toHaveCount(0);
+  await expect(item('Punkte vergeben')).toHaveCount(0);
 
   // Admin: Seiten für Admins, nur die Installation der eigenen Variante; Suche
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Hilfe' }).click();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toBeVisible();
-  await expect(page.getByText(STANDALONE ? 'Installation ohne WordPress' : 'Installation mit WordPress')).toBeVisible();
-  await expect(page.getByText(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
+  await expect(item(STANDALONE ? 'Installation ohne WordPress' : 'Installation mit WordPress')).toBeVisible();
+  await expect(item(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('Startpasswort');
-  await expect(page.getByText('Rollen und Mitglieder')).toBeVisible();
-  await expect(page.getByText('Häufige Probleme')).toHaveCount(0);
+  await expect(item('Mitglieder anlegen')).toBeVisible();
+  await expect(item('Häufige Probleme')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('');
-  await page.getByText('Häufige Probleme').click();
-  await page.locator('.hilfe-text a', { hasText: 'Cronjob' }).click(); // Verweis auf eine andere Seite
-  await expect(page.locator('.news-headline')).toHaveText('Installation ohne WordPress');
+  await item('Rollen und Mitglieder').click();
+  await page.locator('.hilfe-text a', { hasText: 'Rollen vergeben' }).click(); // Verweis auf eine andere Seite
+  await expect(page.locator('.news-headline')).toHaveText('Rollen vergeben');
   await shot(page, '21-hilfe');
 
   // Offline: Hilfe kommt aus dem Speicher des Service Workers

@@ -18,6 +18,15 @@ interface Seite {
 const GRUPPEN = ['Für alle', 'Für Mitglieder', 'Für Aufgaben in der Verwaltung', 'Für Admins'];
 
 const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/** Text einer Seite für die Suche: ohne Tags, Zeichen wie & und " wieder als Zeichen. */
+const plain = (html: string) =>
+  html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, '&');
 
 /** Bezeichnungen der Kompanie für die Platzhalter im Handbuch (scripts/handbuch.php). */
 function labels(): Record<string, string> {
@@ -76,7 +85,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
 
   const q = suche.trim().toLowerCase();
   const treffer = q
-    ? seiten.filter((s) => (fill(s.titel, map, false) + ' ' + fill(s.html, map, false).replace(/<[^>]+>/g, ' ')).toLowerCase().includes(q))
+    ? seiten.filter((s) => (fill(s.titel, map, false) + ' ' + plain(fill(s.html, map, false))).toLowerCase().includes(q))
     : seiten;
 
   return (

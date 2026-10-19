@@ -14,12 +14,14 @@ php scripts/handbuch.php --check > /dev/null && ok "Alle Seiten in docs/handbuch
 # Fehler werden erkannt
 cp -R docs/handbuch "$T/src"
 printf -- '---\ntitel: Kaputt\nreihenfolge: 1\nrechte: [darf_alles]\nbereiche: [inventar]\n---\nText {bereich.unbekannt} und [weiter](seite:gibt-es-nicht).\n' > "$T/src/kaputt.md"
-rm "$T/src/strafen-verwalten.md"
+printf -- '---\ntitel: Offen\nreihenfolge: 2\nrechte: manage_settings\nbereiche: events\n---\nText.\n' > "$T/src/offen.md"
+printf -- '---\ntitel: Für alle\nreihenfolge: 3\nrechte: []\n---\nSiehe [Installation](seite:admin-installation-eigenstaendig).\n' > "$T/src/verweis.md"
+rm "$T/src/strafen-verwalten.md" "$T/src/rollen-vergeben.md"
 OUT="$(php scripts/handbuch.php --check --src="$T/src" 2>&1 || true)"
-for want in 'unbekanntes Recht „darf_alles“' 'unbekannter Bereich „inventar“' 'unbekannter Platzhalter {bereich.unbekannt}' 'Verweis auf fehlende Seite „gibt-es-nicht“' 'Bereich „penalties“ hat eigene Rechte'; do
+for want in 'unbekanntes Recht „darf_alles“' 'unbekannter Bereich „inventar“' 'unbekannter Platzhalter {bereich.unbekannt}' 'Verweis auf fehlende Seite „gibt-es-nicht“' 'Bereich „penalties“ hat eigene Rechte' 'offen.md: „rechte“ muss eine Liste in [ ] sein' 'offen.md: „bereiche“ muss eine Liste in [ ] sein' 'verweis.md: Verweis auf „admin-installation-eigenstaendig“, die nicht jeder sieht' 'Für das Recht „promote_users“ fehlt eine eigene Handbuchseite'; do
   grep -qF "$want" <<< "$OUT" || fail "Fehler nicht erkannt: $want – $OUT"
 done
-ok "Unbekannte Rechte, Bereiche, Platzhalter, tote Verweise und Bereiche ohne Seite werden gemeldet"
+ok "Unbekannte Rechte, Bereiche, Platzhalter, Listen ohne [ ], tote oder nicht sichtbare Verweise und Rechte ohne Seite werden gemeldet"
 if php scripts/handbuch.php --app="$T/x.json" --src="$T/src" 2> /dev/null; then fail "Fehlerhaftes Handbuch ausgegeben"; fi
 ok "Fehlerhaftes Handbuch wird nicht ausgegeben"
 
@@ -30,7 +32,7 @@ $d = json_decode(file_get_contents($argv[1]), true);
 $s = array_column($d["seiten"], null, "slug");
 $ok = isset($s["punkte-vergeben"]) && $s["punkte-vergeben"]["rechte"] === ["manage_points"] && $s["punkte-vergeben"]["bereiche"] === ["points"]
   && $s["admin-installation-wordpress"]["variante"] === "wordpress" && $s["app-installieren"]["gruppe"] === "Für alle"
-  && str_contains($s["punkte-vergeben"]["titel"], "{bereich.points}") && str_contains($s["haeufige-probleme"]["html"], "href=\"#/hilfe/admin-installation-eigenstaendig\"");
+  && str_contains($s["punkte-vergeben"]["titel"], "{bereich.points}") && str_contains($s["admin-rollen-und-mitglieder"]["html"], "href=\"#/hilfe/mitglieder-anlegen\"");
 exit($ok ? 0 : 1);' "$T/handbuch.json" && ok "App: Seiten mit Rechten, Bereichen, Variante, Gruppe; Platzhalter bleiben; Verweise auf #/hilfe/…" || fail "App-Ausgabe: $(head -c 400 "$T/handbuch.json")"
 
 # Webseite mit Bezeichnungen der Kompanie, alles maskiert

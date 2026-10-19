@@ -7,11 +7,11 @@ bereiche: [points]
 Wer die Rolle „{bereich.points} verwalten“ oder eine Rolle mit diesem Recht hat, findet unten den Tab **Verwaltung**.
 
 ## Vorlagen im Katalog
-Unter **Verwaltung → Katalog** legst du häufige Anlässe mit ihrer Punktzahl an, z. B. „Teilnahme am Sommerfest – 5“. Beim Vergeben genügt dann ein Tipp auf die Vorlage. Nicht mehr benötigte Vorlagen lassen sich **deaktivieren**.
+Unter **Verwaltung → Katalog** legst du häufige Anlässe mit ihrer Punktzahl an, z. B. „Teilnahme am Sommerfest – 5“. Beim Vergeben wählst du sie dann unter **Vorlage aus dem Katalog** aus. Nicht mehr benötigte Vorlagen lassen sich **deaktivieren**.
 
 ## Punkte vergeben
 1. **Verwaltung → {bereich.points} +** öffnen.
-2. Eine Vorlage wählen oder Punktzahl und Grund selbst eintragen; das Datum ist heute vorausgewählt.
+2. Eine Vorlage wählen oder Punktzahl und Grund selbst eintragen; das Datum ist heute vorausgewählt. Die Punktzahl ist eine ganze Zahl außer 0; Abzüge gehen mit einer negativen Zahl.
 3. Ein oder mehrere Mitglieder ankreuzen (die Suche hilft bei vielen Namen) und **{bereich.points} vergeben** tippen.
 
 ## Punktefaktor
