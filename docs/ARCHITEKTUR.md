@@ -166,7 +166,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 
 **Pseudo-Cron (eigenständige Version).** Der nächste Fälligkeitszeitpunkt steht in der Einstellung `tasks_next_run`; die Einstellungen lädt jede Anfrage ohnehin mit einer Abfrage. Eine normale Anfrage liest deshalb die Tabelle `tasks` nicht und schreibt nichts. Ist etwas fällig:
 - Mit PHP-FPM oder LiteSpeed schließt der Server die Antwort ab (`fastcgi_finish_request`) und arbeitet im selben Prozess weiter.
-- Sonst ruft er die eigene Cron-Adresse auf, **ohne auf die Antwort zu warten**: Verbindung aufbauen (Zeitgrenze 100 ms, bei https auch für TLS), Anfrage schreiben, schließen. Nur an die fest eingetragene Adresse, der Schlüssel geht im Header. Die Cron-Adresse schickt ihr „OK“ mit `Content-Length` und `Connection: close`, bevor sie arbeitet.
+- Sonst ruft er die eigene Cron-Adresse auf, **ohne auf die Antwort zu warten**: Verbindung aufbauen (Zeitgrenze 250 ms, bei https auch für TLS), Anfrage schreiben, schließen. Nur an die fest eingetragene Adresse, der Schlüssel geht im Header. Die Cron-Adresse schickt ihr „OK“ mit `Content-Length` und `Connection: close`, bevor sie arbeitet.
 - Höchstens ein Versuch pro Minute. Kommt ein Selbstaufruf nicht an (keine Verbindung, oder er vermerkt sich nicht innerhalb einer Minute in `cron_runs`), zählt das als Fehlschlag (`cron_spawn`); danach wird es seltener versucht (1, 2, 4 … bis 60 Minuten). Ab drei Fehlschlägen in Folge zeigt die Statusseite Rot und empfiehlt einen Cronjob mit der Cron-Adresse. Läuft ein Cronjob beim Hoster (Cron-Adresse oder `bin/kompanie.php cron`), zeigt sie Grün.
 
 ### Rechte und Rollen

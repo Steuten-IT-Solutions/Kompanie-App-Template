@@ -44,7 +44,7 @@ final class Kernel
     public const CRON_SPAWN_SETTING = 'cron_spawn';
 
     /** Zeitgrenze (Sekunden) beim Selbstaufruf für den Verbindungsaufbau, bei https auch für TLS. */
-    private const SPAWN_TIMEOUT = 0.1;
+    private const SPAWN_TIMEOUT = 0.25;
     /** Längste Pause zwischen zwei Versuchen, wenn der Selbstaufruf fehlschlägt. */
     private const SPAWN_MAX_BACKOFF = 3600;
 
