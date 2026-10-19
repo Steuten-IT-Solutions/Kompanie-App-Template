@@ -181,11 +181,15 @@ self.addEventListener('notificationclick', (event) => {
   const route = String((event.notification.data && event.notification.data.route) || '').replace(/^[#/]+/, '');
   const target = self.registration.scope + '#/' + route;
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    // Nur Fenster, die dieser Service Worker steuert: Nur die lassen sich per navigate() umleiten.
+    self.clients.matchAll({ type: 'window' }).then((list) => {
       // Ein offenes Fenster der App nach vorn holen, sonst ein neues öffnen.
       const open = list.find((c) => c.url.startsWith(self.registration.scope));
-      if (open) return open.focus().then((c) => (c || open).navigate(target));
-      return self.clients.openWindow(target);
+      if (!open) return self.clients.openWindow(target);
+      return open
+        .focus()
+        .then((c) => (c || open).navigate(target))
+        .catch(() => self.clients.openWindow(target));
     }),
   );
 });

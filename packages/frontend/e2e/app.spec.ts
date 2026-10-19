@@ -355,6 +355,25 @@ test.describe('Android', () => {
     await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
     await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
     await shot(page, '13-benachrichtigungen-gast');
+    // Der Service Worker zeigt eine Nachricht an (über das DevTools-Protokoll zugestellt, ohne Push-Dienst).
+    await page.context().grantPermissions(['notifications']);
+    const cdp = await page.context().newCDPSession(page);
+    const regs: string[] = [];
+    cdp.on('ServiceWorker.workerRegistrationUpdated', (e) => regs.push(...e.registrations.map((r) => r.registrationId)));
+    await cdp.send('ServiceWorker.enable');
+    await expect.poll(() => regs.length).toBeGreaterThan(0);
+    await cdp.send('ServiceWorker.deliverPushMessage', {
+      origin: new URL(page.url()).origin,
+      registrationId: regs[0],
+      data: JSON.stringify({ title: 'Neuer Termin', body: 'Sommerfest', route: 'termine', tag: 'termin-1' }),
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(async () =>
+          (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => [n.title, n.body, n.tag, n.data.route, n.icon]),
+        ),
+      )
+      .toEqual([['Neuer Termin', 'Sommerfest', 'termin-1', 'termine', expect.stringMatching(/icons\/icon-192\.png$/)]]);
     // Der Server kennt das Abo samt Auswahl (auch nach dem Neuladen).
     await page.reload();
     await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
