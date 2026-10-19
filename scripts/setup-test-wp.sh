@@ -53,7 +53,6 @@ for u in Verwalter Mitglied1 Mitglied2; do
   $WP user get "$login" >/dev/null 2>&1 || \
     $WP user create "$login" "$login@example.com" --user_pass=test1234 --role=kompanie_member --display_name="$u" >/dev/null
 done
-$WP user add-role verwalter kompanie_manager >/dev/null
 
 # Beispieltermine als iCal-Feed (ersetzt im Test den Google Kalender).
 Y=$(date +%Y); N=$((Y + 1))

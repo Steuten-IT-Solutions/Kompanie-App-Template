@@ -57,13 +57,22 @@ $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $app->roles()->delete($kasseKey, null);
 
 // Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
+// Die früheren WP-Rollen gibt es hier nur, wenn die Installation sie hatte; für den Test anlegen.
+Roles::install(['member' => 'Mitglied', 'organizer' => 'Verwalter', 'manager' => 'Leitung']);
+$known = static fn (string $role): bool => $app->roles()->exists($role);
 $legacy = wp_insert_user(['user_login' => 'kpwp_alt', 'user_pass' => wp_generate_password(), 'role' => Roles::ROLE_ORGANIZER]);
 clean_user_cache($legacy);
-$c->ok($app->users->find($legacy)?->role === 'organizer', 'Früher WP-Rolle kompanie_organizer: gilt bis zur Übernahme (Rechte, wenn die Installation die Rolle hatte)');
+// Diese Installation ist nach #28 eingerichtet (keine App-Rolle „organizer“): gilt als Mitglied.
+$c->ok($app->users->find($legacy)?->role === 'member', 'Frühere WP-Rolle ohne App-Rolle (neue Installation): gilt als Mitglied');
 $listed = array_map(static fn (KompanieApp\Core\Auth\User $u): int => $u->id, $app->users->list(false));
 $c->ok(in_array($legacy, $listed, true), 'Konto mit früherer WP-Rolle steht in der Mitgliederliste');
-$c->ok(Roles::migrateUsers() >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'organizer', 'Übernahme: frühere WP-Rolle → Meta');
-$c->ok(Roles::migrateUsers() === 0, 'Übernahme nur einmal');
+$c->ok(Roles::migrateUsers($known) >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'member', 'Übernahme: unbekannte frühere Rolle → Mitglied');
+$c->ok(Roles::migrateUsers($known) === 0, 'Übernahme nur einmal');
+wp_delete_user($legacy);
+// Ältere Installation, deren App die Rolle noch hat: die Rolle bleibt.
+$legacy = wp_insert_user(['user_login' => 'kpwp_alt2', 'user_pass' => wp_generate_password(), 'role' => Roles::ROLE_ORGANIZER]);
+clean_user_cache($legacy);
+$c->ok(Roles::migrateUsers(static fn (string $role): bool => true) >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'organizer', 'Übernahme bei älterer Installation: frühere WP-Rolle → Meta');
 wp_delete_user($legacy);
 
 // Bezeichnungen der früheren WP-Rollen folgen kompanie.json.
