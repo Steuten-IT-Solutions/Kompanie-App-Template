@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
@@ -43,9 +44,10 @@ final class MemberService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function list(bool $includeGuests): array
+    public function list(bool $includeGuests, ?User $viewer = null): array
     {
         $totals = $this->scores->totalsByUser();
+        [$points, $penalties] = self::visibleParts($viewer);
         $out = [];
         foreach ($this->users->list($includeGuests) as $u) {
             if (!$includeGuests && !$u->isMember()) {
@@ -55,29 +57,41 @@ final class MemberService
                 'id' => $u->id,
                 'name' => $u->name,
                 'level' => $u->role,
-                'points' => $totals[$u->id]['points'] ?? 0,
-                'open_cents' => $totals[$u->id]['open_cents'] ?? 0,
+                'points' => $points ? ($totals[$u->id]['points'] ?? 0) : null,
+                'open_cents' => $penalties ? ($totals[$u->id]['open_cents'] ?? 0) : null,
             ];
         }
         return $out;
     }
 
     /** @return array<string, mixed> */
-    public function detail(int $id): array
+    public function detail(int $id, ?User $viewer = null): array
     {
         $u = $this->users->find($id);
         if (!$u) {
             throw ApiError::notFound('Mitglied nicht gefunden.');
         }
+        [$points, $penalties] = self::visibleParts($viewer);
         return [
             'id' => $u->id,
             'name' => $u->name,
             'level' => $u->role,
-            'points' => $this->scores->pointsTotal($u->id),
-            'open_cents' => $this->scores->openCents($u->id),
-            'point_list' => $this->scores->pointsFor($u->id),
-            'penalties' => $this->scores->penaltiesFor($u->id),
+            'points' => $points ? $this->scores->pointsTotal($u->id) : null,
+            'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
+            'point_list' => $points ? $this->scores->pointsFor($u->id) : [],
+            'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
         ];
+    }
+
+    /**
+     * Wer nur Punkte (bzw. nur Strafen) vergibt, sieht in der Verwaltung nur diese Daten der Mitglieder.
+     * Ohne Betrachter (intern): alles.
+     *
+     * @return array{0: bool, 1: bool} Punkte, Strafen
+     */
+    private static function visibleParts(?User $viewer): array
+    {
+        return $viewer === null ? [true, true] : [$viewer->can(Capability::ManagePoints), $viewer->can(Capability::ManagePenalties)];
     }
 
     /** @return array{id: int, level: string} */
@@ -175,6 +189,10 @@ final class MemberService
         }
         if ($target->isAdmin() && !$actor->isAdmin()) {
             throw ApiError::forbidden('Nur Admins dürfen Passwörter von Admins zurücksetzen.');
+        }
+        // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen.
+        if ($this->roles !== null && !$this->roles->canHandle($actor, $target->role)) {
+            throw ApiError::forbidden('Das Passwort dieser Person darfst du nicht zurücksetzen.');
         }
         $password = Passwords::readable(12);
         try {

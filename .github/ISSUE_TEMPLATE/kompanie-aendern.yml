@@ -44,15 +44,10 @@ body:
       label: Willkommenstext für Gäste
       description: „-“ entfernt ihn.
   - type: input
-    id: manager
+    id: member
     attributes:
-      label: Bezeichnung für die Leitung
-      description: Vergibt Punkte und Strafen; „-“ setzt „Leitung“. Gilt nur für neue Installationen; bestehende benennen Rollen in der App (Einstellungen → Rollen).
-  - type: input
-    id: organizer
-    attributes:
-      label: Bezeichnung für Verwalter (Termine und Dokumente)
-      description: „-“ setzt „Verwalter“. Gilt nur für neue Installationen (siehe oben).
+      label: Bezeichnung für Mitglieder
+      description: „-“ setzt „Mitglied“. Gilt nur für neue Installationen; bestehende benennen Rollen in der App (Einstellungen → Rollen).
   - type: input
     id: penalties
     attributes:

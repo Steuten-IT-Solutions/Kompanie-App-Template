@@ -36,32 +36,33 @@ echo "== Gemeinsames API-Szenario ==\n";
 echo "\n== WordPress ==\n";
 $c->section('Rollen und Rechte');
 $member = $d->createUser('kpwp_mitglied', 'member');
-$organizer = $d->createUser('kpwp_verwalter', 'organizer');
-$manager = $d->createUser('kpwp_leitung', 'manager');
+$organizer = $d->createUser('kpwp_verwalter', 'events'); // Standardrolle „Termine verwalten“
+$manager = $d->createUser('kpwp_leitung', 'points');      // Standardrolle „Punkte verwalten“
 $admin = $d->createUser('kpwp_admin', 'admin');
 $caps = static fn (int $id): array => array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, $app->users->find($id)?->capabilities ?? []);
 $c->ok($caps($member) === ['member'], 'Mitglied: nur Mitgliederbereich');
-$c->ok(array_diff(['member', 'manage_events', 'manage_documents'], $caps($organizer)) === [] && !in_array('manage', $caps($organizer), true), 'Verwalter: Termine, Dokumente und Mitglied, keine Punkte/Strafen');
-$c->ok($app->users->find($organizer)?->role === KompanieApp\Core\Auth\Roles::ORGANIZER && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::ROLE_META, true) === 'organizer', 'Rolle steht im User-Meta');
-$c->ok(array_diff(['member', 'manage', 'manage_events', 'manage_documents'], $caps($manager)) === [], 'Leitung: Verwalten, Termine, Dokumente und Mitglied');
+$c->ok($caps($organizer) === ['member', 'manage_events'], 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
+$c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
+$c->ok($caps($manager) === ['member', 'manage_points'], 'Punkte verwalten: Punkte und Mitglied');
+$c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
 // Eigene Rolle aus der App wirkt auch in WordPress.
-$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => ['member', 'manage']]);
+$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => ['member', 'manage_penalties']]);
 $kasseKey = (string) array_search('Kpwp Kasse', array_column($app->roles()->all(), 'label', 'key'), true);
 $app->users->setRole($member, $kasseKey);
 clean_user_cache($member);
-$c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage', $caps($member), true) && !in_array('manage_events', $caps($member), true), 'Eigene Rolle: Rechte aus der App');
+$c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage_penalties', $caps($member), true) && !in_array('manage_points', $caps($member), true), 'Eigene Rolle: Rechte aus der App');
 $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $app->roles()->delete($kasseKey, null);
 
 // Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
 $legacy = wp_insert_user(['user_login' => 'kpwp_alt', 'user_pass' => wp_generate_password(), 'role' => Roles::ROLE_ORGANIZER]);
 clean_user_cache($legacy);
-$c->ok($app->users->find($legacy)?->role === 'organizer', 'Früher WP-Rolle kompanie_organizer: gilt bis zur Übernahme');
+$c->ok($app->users->find($legacy)?->role === 'organizer', 'Früher WP-Rolle kompanie_organizer: gilt bis zur Übernahme (Rechte, wenn die Installation die Rolle hatte)');
 $listed = array_map(static fn (KompanieApp\Core\Auth\User $u): int => $u->id, $app->users->list(false));
 $c->ok(in_array($legacy, $listed, true), 'Konto mit früherer WP-Rolle steht in der Mitgliederliste');
-$c->ok(Roles::migrateUsers() >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::ROLE_META, true) === 'organizer', 'Übernahme: frühere WP-Rolle → Meta');
+$c->ok(Roles::migrateUsers() >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'organizer', 'Übernahme: frühere WP-Rolle → Meta');
 $c->ok(Roles::migrateUsers() === 0, 'Übernahme nur einmal');
 wp_delete_user($legacy);
 
@@ -75,6 +76,14 @@ $c->ok(wp_roles()->role_names[Roles::ROLE_MANAGER] === 'Spieß' && get_option($w
 $app->users->setRole($member, KompanieApp\Core\Auth\Roles::GUEST);
 clean_user_cache($member);
 $c->ok(['subscriber'] === array_values(get_userdata($member)->roles) && $app->users->find($member)?->role === 'guest', 'Zurück zum Gast: Konto behält Rolle Abonnent');
+// Die Rolle gilt je Website (Multisite): ein Meta ohne Präfix der Website zählt nicht.
+update_user_meta($member, KompanieApp\WordPress\WpUsers::ROLE_META, 'points');
+clean_user_cache($member);
+$c->ok($app->users->find($member)?->role === 'guest', 'Rolle einer anderen Website (ohne Präfix) gilt nicht');
+delete_user_meta($member, KompanieApp\WordPress\WpUsers::ROLE_META);
+update_user_option($member, KompanieApp\WordPress\WpUsers::ROLE_META, 'admin', false);
+clean_user_cache($member);
+$c->ok($app->users->find($member)?->role === 'guest', 'Admin nie über die Benutzer-Option');
 $editor = wp_insert_user(['user_login' => 'kpwp_redakteur', 'user_pass' => wp_generate_password(), 'role' => 'editor']);
 $app->users->setRole($editor, KompanieApp\Core\Auth\Roles::MEMBER);
 clean_user_cache($editor);
@@ -85,7 +94,7 @@ $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $c->section('Benutzer anlegen');
 $d->actAs($admin);
 [$s, $u] = $d->request('POST', '/users', ['name' => 'Kpwp Neu', 'email' => 'kpwp-neu@example.com']);
-$c->ok($s === 201 && get_user_meta($u['id'], KompanieApp\WordPress\WpUsers::ROLE_META, true) === 'member' && array_values(get_userdata($u['id'])->roles) === ['subscriber'], 'Neues Konto bekommt die Rolle Mitglied (Meta, WP-Rolle Abonnent)');
+$c->ok($s === 201 && get_user_meta($u['id'], KompanieApp\WordPress\WpUsers::metaKey(), true) === 'member' && array_values(get_userdata($u['id'])->roles) === [Roles::ROLE_MEMBER], 'Neues Konto bekommt die Rolle Mitglied');
 $c->ok($d->request('POST', '/users', ['name' => 'X', 'email' => 'kpwp-neu@example.com'])[0] === 400, 'Vergebene E-Mail → 400');
 $c->ok(wp_authenticate($u['username'], $u['password']) instanceof WP_User, 'Anmeldung mit Startpasswort bei WordPress');
 wp_delete_user($u['id']);

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 /**
- * Frühere WP-Rollen der App (vor Issue #28). Heute steht die Rolle im User-Meta (WpUsers::ROLE_META),
- * ihre Rechte kommen aus der App (Einstellungen → Rollen). Die WP-Rollen bleiben angelegt, damit
- * Konten bis zur Übernahme (migrateUsers) und nach einem Zurückrollen ihre Rechte behalten.
+ * Frühere WP-Rollen der App (vor Issue #28). Heute steht die Rolle in einer Benutzer-Option
+ * (WpUsers::ROLE_META), ihre Rechte kommen aus der App (Einstellungen → Rollen). Die WP-Rollen bleiben
+ * angelegt und werden für Mitglied, Verwalter und Leitung weiter vergeben, damit Konten bis zur
+ * Übernahme (migrateUsers) und nach einem Zurückrollen ihre Rechte behalten.
  *
  * - Admin     = WordPress-Administrator, darf alles.
  * - Leitung   = Rolle kompanie_manager (Punkte/Strafen verwalten + alles von Verwalter).
@@ -94,10 +95,10 @@ final class Roles
     {
         $users = get_users([
             'role__in' => [self::ROLE_MEMBER, self::ROLE_ORGANIZER, self::ROLE_MANAGER],
-            'meta_query' => [['key' => WpUsers::ROLE_META, 'compare' => 'NOT EXISTS']],
+            'meta_query' => [['key' => WpUsers::metaKey(), 'compare' => 'NOT EXISTS']],
         ]);
         foreach ($users as $u) {
-            update_user_meta((int) $u->ID, WpUsers::ROLE_META, WpUsers::legacyRole($u));
+            update_user_option((int) $u->ID, WpUsers::ROLE_META, WpUsers::legacyRole($u), false);
         }
         return count($users);
     }

@@ -8,11 +8,12 @@ const sec = brand.labels.sections;
 /** Rechte, die der Admin einer Rolle geben kann (Einstellungen bleiben den Admins vorbehalten). */
 const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'member', label: 'Mitgliederbereich: eigene Punkte und Strafen, interner Kalender, interne Galerie' },
-  { key: 'manage', label: `${sec.points} und ${sec.penalties} vergeben, Katalog pflegen` },
+  { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen` },
+  { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
   { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
   { key: 'manage_documents', label: 'Dokumente pflegen und alle Dokumente sehen' },
-  { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen' },
-  { key: 'promote_users', label: 'Rollen vergeben (nur Rollen ohne weitergehende Rechte)' },
+  { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
+  { key: 'promote_users', label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)' },
 ];
 
 const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
@@ -142,7 +143,13 @@ function RoleForm({
         <input type="text" maxLength={30} value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
       </label>
       {fixed ? (
-        <p className="small muted">{role?.key === 'admin' ? 'Admins dürfen alles; das lässt sich nicht ändern.' : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}</p>
+        <p className="small muted">
+          {role?.key === 'admin'
+            ? 'Admins dürfen alles; das lässt sich nicht ändern.'
+            : role?.key === 'member'
+              ? 'Rolle neuer Konten mit dem Mitgliederbereich; die Rechte lassen sich nicht ändern.'
+              : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
+        </p>
       ) : (
         <>
           <fieldset className="feature-list">

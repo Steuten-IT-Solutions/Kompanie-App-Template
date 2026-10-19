@@ -77,6 +77,13 @@ final class ApiScenario
         $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
+
+        // Standardrollen der Bereiche (Issue #28): Termine, Punkte und Strafen bringen je eine mit.
+        $roles = array_column((array) $this->req('GET', '/admin/roles')[1], 'capabilities', 'key');
+        $c->ok(($roles['events'] ?? null) === ['member', 'manage_events'] && ($roles['points'] ?? null) === ['member', 'manage_points'] && ($roles['penalties'] ?? null) === ['member', 'manage_penalties'], 'Standardrollen der eingeschalteten Bereiche');
+        // Für die folgenden Abschnitte: eine Leitung wie früher (Punkte, Strafen, Termine).
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']]);
+        $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/events')[0] === 200, 'Eingeschalteter Bereich wieder erreichbar');
     }
@@ -84,7 +91,7 @@ final class ApiScenario
     private function scores(): void
     {
         $c = $this->c;
-        $this->spiess = $this->user('kptest_spiess', 'manager');
+        $this->spiess = $this->user('kptest_spiess', $this->leitung);
         $this->m1 = $this->user('kptest_mitglied1', 'member');
         $this->m2 = $this->user('kptest_mitglied2', 'member');
         [$m1, $m2] = [$this->m1, $this->m2];
@@ -107,7 +114,7 @@ final class ApiScenario
         $c->section('Leitung vergibt Punkte und Strafen');
         $this->d->actAs($this->spiess);
         [$s, $d] = $this->req('GET', '/me');
-        $c->ok($s === 200 && $d['level'] === 'manager', 'GET /me als Leitung → level manager');
+        $c->ok($s === 200 && $d['level'] === $this->leitung, 'GET /me als Leitung → ihre Rolle');
 
         [$s, $cat] = $this->req('POST', '/catalog', ['title' => 'Teilnahme Sommerfest', 'points' => 5]);
         $c->ok($s === 201 && $cat['points'] === 5, 'Katalogeintrag anlegen');
@@ -177,6 +184,8 @@ final class ApiScenario
     }
 
     private int $spiess = 0;
+    /** Schlüssel der Rolle „Kptest Leitung“ (in features() angelegt) */
+    private string $leitung = '';
     private int $m1 = 0;
     private int $m2 = 0;
     private int $catalogId = 0;
@@ -247,11 +256,11 @@ final class ApiScenario
         $c = $this->c;
         $c->section('Rollen: Gast, Mitglied, Verwalter, Leitung, Admin');
         $gast = $this->user('kptest_gast', 'guest');
-        $verwalter = $this->user('kptest_verwalter', 'organizer');
+        $verwalter = $this->user('kptest_verwalter', 'events');
         $admin = $this->user('kptest_admin2', 'admin');
         $m2 = $this->m2;
 
-        // [Methode, Pfad, Inhalt, erwarteter Status je Rolle: anonym, Gast, Mitglied, Verwalter (organizer), Leitung (manager), Admin]
+        // [Methode, Pfad, Inhalt, erwarteter Status je Rolle: anonym, Gast, Mitglied, Termine verwalten, Leitung (eigene Rolle), Admin]
         $matrix = [
             ['GET', '/config', [], [200, 200, 200, 200, 200, 200]],
             ['GET', '/events', [], [200, 200, 200, 200, 200, 200]],
@@ -280,6 +289,18 @@ final class ApiScenario
             $c->ok($got === $expected, sprintf('%s %s → %s', $method, $path, implode('/', $got)));
         }
 
+        // Punkte und Strafen sind getrennte Rechte; die Mitgliederliste zeigt nur die eigenen Daten.
+        $pw = $this->user('kptest_punktewart', 'points');
+        $kw = $this->user('kptest_kassenwart', 'penalties');
+        $this->d->actAs($pw);
+        $c->ok($this->req('POST', '/points', ['user_ids' => []])[0] === 400 && $this->req('POST', '/penalties', ['user_ids' => []])[0] === 403, '„Punkte verwalten“: Punkte ja, Strafen nein');
+        $row = array_column((array) $this->req('GET', '/members')[1], null, 'id')[$this->m1] ?? [];
+        $c->ok(array_key_exists('points', $row) && $row['points'] !== null && $row['open_cents'] === null, '„Punkte verwalten“ sieht keine offenen Beträge');
+        $this->d->actAs($kw);
+        $c->ok($this->req('POST', '/penalties', ['user_ids' => []])[0] === 400 && $this->req('POST', '/points', ['user_ids' => []])[0] === 403 && $this->req('POST', '/catalog', ['title' => ''])[0] === 403, '„Strafen verwalten“: Strafen ja, Punkte und Katalog nein');
+        $detail = $this->req('GET', '/members/' . $this->m1)[1];
+        $c->ok(array_key_exists('points', (array) $detail) && $detail['points'] === null && ($detail['point_list'] ?? [1]) === [] && is_array($detail['penalties'] ?? null), '„Strafen verwalten“ sieht keine Punkte');
+
         $this->d->actAs($gast);
         [, $d] = $this->req('GET', '/me');
         $c->ok($d['level'] === 'guest', 'GET /me als Gast-Konto → level guest');
@@ -287,7 +308,7 @@ final class ApiScenario
         $this->d->actAs($verwalter);
         [, $d] = $this->req('GET', '/config');
         $caps = (array) ($d['user']['capabilities'] ?? []);
-        $c->ok(($d['user']['level'] ?? '') === 'organizer' && in_array('manage_events', $caps, true) && in_array('manage_documents', $caps, true) && !in_array('manage', $caps, true), 'GET /config als Verwalter → organizer mit Terminen und Dokumenten, ohne Punkte/Strafen');
+        $c->ok(($d['user']['level'] ?? '') === 'events' && in_array('manage_events', $caps, true) && !in_array('manage_points', $caps, true) && !in_array('manage_penalties', $caps, true), 'GET /config mit „Termine verwalten“ → Termine, ohne Punkte/Strafen');
         [$s, $ev] = $this->req('POST', '/events', ['title' => 'Kptest Verwalter-Termin', 'start_date' => '2099-05-01']);
         $c->ok($s === 201, 'Verwalter legt öffentlichen Termin an');
         if (isset($ev['id'])) {
@@ -295,7 +316,7 @@ final class ApiScenario
         }
         $this->d->actAs($this->spiess);
         [, $d] = $this->req('GET', '/config');
-        $c->ok(in_array('manage_events', (array) ($d['user']['capabilities'] ?? []), true), 'Leitung darf jetzt auch öffentliche Termine pflegen');
+        $c->ok(in_array('manage_events', (array) ($d['user']['capabilities'] ?? []), true), 'Leitung darf öffentliche Termine pflegen');
 
         $this->d->actAs($this->spiess);
         [, $members] = $this->req('GET', '/members');
@@ -311,10 +332,11 @@ final class ApiScenario
 
         [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'member']);
         $c->ok($s === 200 && $d['level'] === 'member', 'Admin macht Gast zum Mitglied');
-        [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'organizer']);
-        $c->ok($s === 200 && $d['level'] === 'organizer', 'Admin macht Mitglied zum Verwalter (organizer)');
-        [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'manager']);
-        $c->ok($s === 200 && $d['level'] === 'manager', 'Admin macht Verwalter zur Leitung (manager)');
+        [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'events']);
+        $c->ok($s === 200 && $d['level'] === 'events', 'Admin gibt die Standardrolle „Termine verwalten“');
+        [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => $this->leitung]);
+        $c->ok($s === 200 && $d['level'] === $this->leitung, 'Admin gibt eine eigene Rolle');
+        $c->ok($this->req('PATCH', "/members/$gast/role", ['level' => 'manager'])[0] === 400, 'Frühere Vorlage „manager“ gibt es in neuen Installationen nicht → 400');
         [$s, $d] = $this->req('PATCH', "/members/$gast/role", ['level' => 'guest']);
         $c->ok($s === 200 && $d['level'] === 'guest', 'Zurück zum Gast');
         $c->ok($this->req('PATCH', "/members/$admin/role", ['level' => 'guest'])[0] === 400, 'Eigene Rolle nicht änderbar → 400');

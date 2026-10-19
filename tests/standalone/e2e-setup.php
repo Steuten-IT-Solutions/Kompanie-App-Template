@@ -35,13 +35,16 @@ Setup::install($kernel, ['driver' => 'sqlite'], $base, 'rewrite');
 $users = $kernel->users();
 $demo = getenv('KOMPANIE_DEMO') === '1';
 $admin = $users->add($demo ? 'Alex Admin' : 'Admin', 'admin', 'admin@example.org', 'admin', Roles::ADMIN);
-$manager = $users->add($demo ? 'Vera Verwalter' : 'Verwalter', 'verwalter', '', 'test1234', Roles::MANAGER);
+$manager = $users->add($demo ? 'Vera Verwalter' : 'Verwalter', 'verwalter', '', 'test1234', Roles::MEMBER);
 $m1 = $users->add($demo ? 'Max Muster' : 'Mitglied1', 'mitglied1', '', 'test1234', Roles::MEMBER);
 $m2 = $users->add($demo ? 'Erika Beispiel' : 'Mitglied2', 'mitglied2', '', 'test1234', Roles::MEMBER);
 
 $app = $kernel->app();
 // Alle Bereiche an (eine neue Installation hat keine; sonst wählt sie der Admin in der Einrichtung).
 $app->features()->update(array_fill_keys(KompanieApp\Core\Domain\Features::keys(), true));
+// Eigene Rolle wie die Leitung einer Kompanie (Punkte, Kasse, Termine), z. B. „Spieß“.
+$spiess = $app->roles()->create(['label' => 'Spieß', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']]);
+$users->setRole($manager, $spiess['key']);
 $app->settings->set('calendar_ics_url', 'https://kalender.test/test.ics');
 $app->settings->set('news_source', 'rss');
 $app->settings->set('news_url', 'https://news.test/feed');

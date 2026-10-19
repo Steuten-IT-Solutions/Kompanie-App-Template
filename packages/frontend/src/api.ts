@@ -5,7 +5,15 @@ import brand from './generated/brand';
 
 /** Schlüssel einer Rolle: guest, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
-export type Capability = 'member' | 'manage' | 'manage_events' | 'manage_documents' | 'create_users' | 'promote_users' | 'manage_settings';
+export type Capability =
+  | 'member'
+  | 'manage_points'
+  | 'manage_penalties'
+  | 'manage_events'
+  | 'manage_documents'
+  | 'create_users'
+  | 'promote_users'
+  | 'manage_settings';
 export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties';
 
 export interface AppUser {
@@ -219,8 +227,9 @@ export interface MemberSummary {
   id: number;
   name: string;
   level: Level;
-  points: number;
-  open_cents: number;
+  /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
+  points: number | null;
+  open_cents: number | null;
 }
 
 export interface MemberDetail extends MemberSummary {

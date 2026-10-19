@@ -26,16 +26,18 @@ final class Features
      * - description: ein Satz, wofür der Bereich da ist
      * - requires: Bereiche, ohne die dieser nicht eingeschaltet werden kann
      * - setup: Abschnitt in den Einstellungen, falls der Bereich eingerichtet werden muss
+     * - role: Rechte der Standardrolle, die der Bereich beim Einschalten mitbringt („<Bereich> verwalten“);
+     *   null, wenn er keine eigenen Rechte braucht
      *
-     * @var array<string, array{label: string, description: string, requires: string[], setup: string|null}>
+     * @var array<string, array{label: string, description: string, requires: string[], setup: string|null, role: string[]|null}>
      */
     public const DEFINITIONS = [
-        'events' => ['label' => 'Termine', 'description' => 'Öffentliche Termine, die auch Gäste ohne Anmeldung sehen.', 'requires' => [], 'setup' => null],
-        'calendar' => ['label' => 'Kalender', 'description' => 'Alle Termine aus Google Kalender für angemeldete Mitglieder.', 'requires' => [], 'setup' => 'kalender'],
-        'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie, z. B. aus den Beiträgen der Webseite.', 'requires' => [], 'setup' => 'news'],
-        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive, mit internen Bildern nur für Mitglieder.', 'requires' => [], 'setup' => 'galerie'],
-        'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null],
-        'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null],
+        'events' => ['label' => 'Termine', 'description' => 'Öffentliche Termine, die auch Gäste ohne Anmeldung sehen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_events']],
+        'calendar' => ['label' => 'Kalender', 'description' => 'Alle Termine aus Google Kalender für angemeldete Mitglieder.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
+        'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie, z. B. aus den Beiträgen der Webseite.', 'requires' => [], 'setup' => 'news', 'role' => null],
+        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive, mit internen Bildern nur für Mitglieder.', 'requires' => [], 'setup' => 'galerie', 'role' => null],
+        'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
+        'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
     ];
 
     /** @var array<string, bool>|null */
@@ -144,8 +146,23 @@ final class Features
                 }
             }
         }
+        $before = $this->all();
         $this->save($next);
+        // Standardrollen der Bereiche (Issue #28): beim Einschalten anlegen, beim Ausschalten entfernen,
+        // wenn niemand sie hat.
+        foreach ($next as $key => $on) {
+            $caps = self::DEFINITIONS[$key]['role'];
+            if ($caps !== null && $on !== ($before[$key] ?? false)) {
+                $this->app->roles()->featureChanged($key, $on, $this->roleLabel($key), $caps);
+            }
+        }
         return $next;
+    }
+
+    /** Name der Standardrolle eines Bereichs, z. B. „Punkte verwalten“ (mit der Bezeichnung aus kompanie.json). */
+    public function roleLabel(string $feature): string
+    {
+        return $this->app->config->sectionLabel($feature, self::DEFINITIONS[$feature]['label']) . ' verwalten';
     }
 
     /**

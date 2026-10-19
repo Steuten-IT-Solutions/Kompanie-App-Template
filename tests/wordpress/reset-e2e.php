@@ -18,7 +18,13 @@ foreach (['points', 'penalties', 'point_catalog', 'events'] as $table) {
 foreach (get_users(['search' => 'neue.testperson*', 'search_columns' => ['user_login']]) as $u) {
     wp_delete_user($u->ID);
 }
-foreach (['verwalter' => 'manager', 'mitglied1' => 'member', 'mitglied2' => 'member'] as $login => $level) {
+// Rolle „Spieß“ der Testperson verwalter (legt scripts/setup-test-wp.sh an; hier für den Fall, dass ein Test sie gelöscht hat).
+$roles = KompanieApp\WordPress\Plugin::app()->roles();
+$spiess = array_search('Spieß', array_column($roles->all(), 'label', 'key'), true);
+if ($spiess === false) {
+    $spiess = $roles->create(['label' => 'Spieß', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']])['key'];
+}
+foreach (['verwalter' => (string) $spiess, 'mitglied1' => 'member', 'mitglied2' => 'member'] as $login => $level) {
     $u = get_user_by('login', $login);
     if ($u) {
         wp_set_password('test1234', $u->ID);

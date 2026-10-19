@@ -13,13 +13,26 @@ use KompanieApp\Core\Port\UserDirectory;
 /**
  * WordPress-Benutzer als Benutzerverzeichnis der App.
  *
- * Die Rolle in der App steht im User-Meta ROLE_META (Schlüssel aus Domain\RoleService), die Rechte
- * dazu kommen aus der App. Admin ist, wer WordPress-Administrator ist. Ältere Installationen hatten
+ * Die Rolle in der App steht in der Benutzer-Option ROLE_META (je Website, auch bei Multisite;
+ * Schlüssel aus Domain\RoleService), die Rechte dazu kommen aus der App. Admin ist, wer WordPress-Administrator ist. Ältere Installationen hatten
  * die Rolle als WP-Rolle (kompanie_member/_organizer/_manager); solange das Meta fehlt, gilt diese.
  */
 final class WpUsers implements UserDirectory, AuthContext
 {
     public const ROLE_META = 'kompanie_app_role';
+
+    /** Schlüssel in usermeta: mit dem Präfix der Website (wie update_user_option ohne global). */
+    public static function metaKey(): string
+    {
+        global $wpdb;
+        return $wpdb->get_blog_prefix() . self::ROLE_META;
+    }
+
+    /**
+     * Frühere WP-Rolle zu einer Rolle der App: Wird der Programmcode auf eine Version vor Issue #28
+     * zurückgerollt, behalten Mitglieder, Verwalter und Leitung so ihre Rechte.
+     */
+    private const LEGACY_WP_ROLES = [AppRoles::MEMBER => Roles::ROLE_MEMBER, AppRoles::ORGANIZER => Roles::ROLE_ORGANIZER, AppRoles::MANAGER => Roles::ROLE_MANAGER];
 
     /**
      * @param (\Closure(string): array<int, Capability>)|null $capabilities Rechte je Rolle (Domain\RoleService)
@@ -50,7 +63,7 @@ final class WpUsers implements UserDirectory, AuthContext
         if (!$includeGuests) {
             // Nur Konten mit einer Rolle in der App: neues Meta, alte WP-Rollen (noch nicht übernommen)
             // oder Administratoren. Ob die Rolle Mitglied ist, prüft der Kern.
-            $args['meta_query'] = [['key' => self::ROLE_META, 'compare' => 'EXISTS']];
+            $args['meta_query'] = [['key' => self::metaKey(), 'compare' => 'EXISTS']];
             $ids = get_users(['meta_query' => $args['meta_query'], 'fields' => 'ID']);
             $legacy = get_users(['role__in' => [Roles::ROLE_MEMBER, Roles::ROLE_ORGANIZER, Roles::ROLE_MANAGER, 'administrator'], 'fields' => 'ID']);
             $ids = array_values(array_unique(array_map('intval', array_merge($ids, $legacy))));
@@ -75,12 +88,12 @@ final class WpUsers implements UserDirectory, AuthContext
             'nickname' => $name,
             'first_name' => $parts[0],
             'last_name' => $parts[1] ?? '',
-            'role' => 'subscriber',
+            'role' => Roles::ROLE_MEMBER,
         ]);
         if (is_wp_error($id)) {
             throw new \DomainException($id->get_error_message());
         }
-        update_user_meta((int) $id, self::ROLE_META, AppRoles::MEMBER);
+        update_user_option((int) $id, self::ROLE_META, AppRoles::MEMBER, false);
         return (int) $id;
     }
 
@@ -103,11 +116,13 @@ final class WpUsers implements UserDirectory, AuthContext
         if ($role === AppRoles::ADMIN || in_array('administrator', (array) $user->roles, true)) {
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
         }
-        update_user_meta($id, self::ROLE_META, $role);
-        // Die früheren WP-Rollen der App gelten nicht mehr, sobald das Meta gesetzt ist.
+        update_user_option($id, self::ROLE_META, $role, false);
         $user->remove_role(Roles::ROLE_MANAGER);
         $user->remove_role(Roles::ROLE_ORGANIZER);
         $user->remove_role(Roles::ROLE_MEMBER);
+        if (isset(self::LEGACY_WP_ROLES[$role])) {
+            $user->add_role(self::LEGACY_WP_ROLES[$role]);
+        }
         // Ein Konto ohne jede Rolle kann sich nicht sinnvoll anmelden.
         if (empty($user->roles)) {
             $user->add_role('subscriber');
@@ -153,8 +168,9 @@ final class WpUsers implements UserDirectory, AuthContext
         if (in_array('administrator', (array) $u->roles, true) || is_super_admin((int) $u->ID)) {
             return AppRoles::ADMIN;
         }
-        $meta = get_user_meta((int) $u->ID, self::ROLE_META, true);
-        if (is_string($meta) && $meta !== '') {
+        $meta = get_user_meta((int) $u->ID, self::metaKey(), true);
+        // admin nur über WordPress, nie über das Meta.
+        if (is_string($meta) && $meta !== '' && $meta !== AppRoles::ADMIN) {
             return $meta;
         }
         return self::legacyRole($u);

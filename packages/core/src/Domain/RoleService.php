@@ -15,8 +15,10 @@ use KompanieApp\Core\Port\UserDirectory;
 /**
  * Rollen der App: Bezeichnung, Rechte und Punktefaktor – die einzige Stelle, die das sagt (Issue #28).
  *
- * Der Admin legt Rollen in der App an (Einstellungen → Rollen). Eine neue Installation startet mit
- * den Vorlagen aus Auth\Roles und den Bezeichnungen aus kompanie.json; danach gilt allein die App.
+ * Der Admin legt Rollen in der App an (Einstellungen → Rollen). Fest sind Gast, Mitglied und Admin
+ * (Bezeichnungen bei der Ersteinrichtung aus kompanie.json, danach in der App). Schaltet der Admin einen
+ * Bereich ein, der Rechte braucht, kommt dessen Standardrolle dazu (Domain\Features, z. B. „Punkte
+ * verwalten“); schaltet er ihn aus, verschwindet sie wieder, wenn ihr niemand zugeordnet ist.
  * Gespeichert als eine Einstellung: Die Einstellungen lädt jede Anfrage ohnehin auf einmal, die Rechte
  * eines Benutzers kosten so keine eigene Abfrage.
  *
@@ -26,6 +28,8 @@ use KompanieApp\Core\Port\UserDirectory;
 final class RoleService
 {
     public const SETTING = 'roles';
+    /** Zuletzt vergebene Nummer eigener Rollen (r1, r2, …); Schlüssel gelöschter Rollen werden nie wieder vergeben. */
+    public const SEQ_SETTING = 'roles_seq';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
@@ -132,18 +136,70 @@ final class RoleService
                 'points_factor' => $r['points_factor'],
                 'users' => $counts[$key] ?? 0,
                 'system' => Roles::isSystem($key),
-                'deletable' => !Roles::isSystem($key) && $key !== Roles::MEMBER,
+                'deletable' => !Roles::isSystem($key),
             ];
         }
         return $out;
     }
 
-    /** Einmalig: die Vorlagen speichern, damit spätere Änderungen an kompanie.json nichts mehr verschieben. */
-    public function initialize(): void
+    /**
+     * Einmalig: die festen Rollen speichern, damit spätere Änderungen an kompanie.json nichts mehr
+     * verschieben. Installationen von vor dieser Version behalten zusätzlich ihre früheren festen Rollen
+     * (Verwalter, Leitung), damit niemand Rechte verliert.
+     */
+    public function initialize(bool $existingInstallation): void
     {
-        if (!is_array($this->settings->get(self::SETTING))) {
-            $this->save($this->templates());
+        if (is_array($this->settings->get(self::SETTING))) {
+            return;
         }
+        $roles = $this->templates();
+        if ($existingInstallation) {
+            $admin = $roles[Roles::ADMIN];
+            unset($roles[Roles::ADMIN]);
+            foreach (Roles::LEGACY as $key => $caps) {
+                $roles[$key] = ['key' => $key, 'label' => $this->config->roleLabel($key), 'capabilities' => $caps, 'points_factor' => 1.0];
+            }
+            $roles[Roles::ADMIN] = $admin;
+        }
+        $this->save($roles);
+    }
+
+    /**
+     * Ein Bereich wurde ein- oder ausgeschaltet (Domain\Features). Eingeschaltet: Standardrolle anlegen,
+     * wenn es sie noch nicht gibt. Ausgeschaltet: entfernen, wenn ihr niemand zugeordnet ist.
+     *
+     * @param string[] $capabilities
+     */
+    public function featureChanged(string $key, bool $on, string $label, array $capabilities): void
+    {
+        $roles = $this->all();
+        if ($on) {
+            if (isset($roles[$key])) {
+                return;
+            }
+            // Name schon vergeben (z. B. selbst angelegt): nicht doppelt anlegen.
+            foreach ($roles as $r) {
+                if (mb_strtolower($r['label']) === mb_strtolower($label)) {
+                    return;
+                }
+            }
+            $admin = $roles[Roles::ADMIN];
+            unset($roles[Roles::ADMIN]);
+            $roles[$key] = ['key' => $key, 'label' => $label, 'capabilities' => $capabilities, 'points_factor' => 1.0];
+            $roles[Roles::ADMIN] = $admin;
+            $this->save($roles);
+            return;
+        }
+        if (!isset($roles[$key]) || Roles::isSystem($key)) {
+            return;
+        }
+        foreach ($this->users->list(true) as $u) {
+            if ($u->role === $key) {
+                return;
+            }
+        }
+        unset($roles[$key]);
+        $this->save($roles);
     }
 
     /**
@@ -174,7 +230,7 @@ final class RoleService
     }
 
     /**
-     * Nur mitgeschickte Felder ändern. guest und admin: nur die Bezeichnung.
+     * Nur mitgeschickte Felder ändern. Gast und Admin: nur die Bezeichnung; Mitglied: Bezeichnung und Punktefaktor.
      *
      * @param array<string, mixed> $in label, capabilities, points_factor
      * @return array{key: string, label: string, capabilities: string[], points_factor: float}
@@ -192,12 +248,12 @@ final class RoleService
         $fixed = Roles::isSystem($key);
         if (array_key_exists('capabilities', $in)) {
             if ($fixed) {
-                throw ApiError::invalid('Die Rechte von Gast und Admin lassen sich nicht ändern.');
+                throw ApiError::invalid('Die Rechte von Gast, Mitglied und Admin lassen sich nicht ändern.');
             }
             $role['capabilities'] = self::validCapabilities($in['capabilities']);
         }
         if (array_key_exists('points_factor', $in)) {
-            if ($fixed) {
+            if ($key === Roles::GUEST || $key === Roles::ADMIN) {
                 throw ApiError::invalid('Gast und Admin haben keinen eigenen Punktefaktor.');
             }
             $role['points_factor'] = self::validFactor($in['points_factor']);
@@ -216,7 +272,7 @@ final class RoleService
         if (!isset($roles[$key])) {
             throw ApiError::notFound('Rolle nicht gefunden.');
         }
-        if (Roles::isSystem($key) || $key === Roles::MEMBER) {
+        if (Roles::isSystem($key)) {
             throw ApiError::invalid('Diese Rolle lässt sich nicht löschen.');
         }
         $assigned = array_filter($this->users->list(true), static fn (User $u): bool => $u->role === $key);
@@ -231,7 +287,8 @@ final class RoleService
                 try {
                     $this->users->setRole($u->id, $replacement);
                 } catch (\DomainException $e) {
-                    throw ApiError::invalid($u->name . ': ' . $e->getMessage());
+                    // Nicht abbrechen: Der Schlüssel wird nie wieder vergeben, die Person hat danach keine Rechte.
+                    error_log('Kompanie-App: Rolle von ' . $u->name . ' nicht geändert: ' . $e->getMessage());
                 }
             }
         }
@@ -240,8 +297,9 @@ final class RoleService
     }
 
     /**
-     * Darf $actor einer Person diese Rolle geben bzw. ihre Rolle ändern? Admins immer; wer sonst Rollen
-     * vergeben darf, nur Rollen, deren Rechte er selbst hat (keine Rechte weitergeben, die man nicht hat).
+     * Darf $actor einer Person diese Rolle geben bzw. ihre Rolle ändern (oder ihr Passwort zurücksetzen)?
+     * Admins immer. Sonst nur Rollen, deren Rechte er selbst hat, und keine Rollen, die Konten anlegen
+     * oder Rollen vergeben dürfen: Diese Rechte weitergeben bleibt den Admins vorbehalten.
      */
     public function canHandle(User $actor, string $key): bool
     {
@@ -252,7 +310,7 @@ final class RoleService
             return false;
         }
         foreach ($this->capabilities($key) as $cap) {
-            if (!$actor->can($cap)) {
+            if (!$actor->can($cap) || $cap === Capability::PromoteUsers || $cap === Capability::CreateUsers) {
                 return false;
             }
         }
@@ -290,29 +348,42 @@ final class RoleService
                 continue;
             }
             $key = $r['key'];
+            $caps = array_values(array_filter((array) ($r['capabilities'] ?? []), 'is_string'));
+            // Früher ein Recht „manage“ für Punkte und Strafen zusammen.
+            if (in_array('manage', $caps, true)) {
+                $caps = array_values(array_unique(array_merge(array_diff($caps, ['manage']), ['manage_points', 'manage_penalties'])));
+            }
             $out[$key] = [
                 'key' => $key,
                 'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->config->roleLabel($key),
-                'capabilities' => Roles::isSystem($key) ? [] : array_values(array_filter((array) ($r['capabilities'] ?? []), 'is_string')),
-                'points_factor' => Roles::isSystem($key) ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
+                'capabilities' => Roles::isSystem($key) ? Roles::TEMPLATES[$key] : $caps,
+                'points_factor' => $key === Roles::GUEST || $key === Roles::ADMIN ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
             ];
         }
-        $guest = $out[Roles::GUEST] ?? ['key' => Roles::GUEST, 'label' => $this->config->roleLabel(Roles::GUEST), 'capabilities' => [], 'points_factor' => 1.0];
-        $admin = $out[Roles::ADMIN] ?? ['key' => Roles::ADMIN, 'label' => $this->config->roleLabel(Roles::ADMIN), 'capabilities' => [], 'points_factor' => 1.0];
-        unset($out[Roles::GUEST], $out[Roles::ADMIN]);
-        return [Roles::GUEST => $guest] + $out + [Roles::ADMIN => $admin];
+        $fixed = [];
+        foreach (Roles::TEMPLATES as $key => $caps) {
+            $fixed[$key] = $out[$key] ?? ['key' => $key, 'label' => $this->config->roleLabel($key), 'capabilities' => $caps, 'points_factor' => 1.0];
+            unset($out[$key]);
+        }
+        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::MEMBER => $fixed[Roles::MEMBER]] + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
     }
 
-    /** Fester, kurzer Schlüssel für neue Rollen (r1, r2, …); die Bezeichnung lässt sich jederzeit ändern. */
+    /**
+     * Fester, kurzer Schlüssel für neue Rollen (r1, r2, …); die Bezeichnung lässt sich jederzeit ändern.
+     * Nie den Schlüssel einer gelöschten Rolle: Wer ihn noch trägt (z. B. aus einer alten Sicherung),
+     * bekäme sonst unbemerkt die Rechte der neuen Rolle.
+     */
     private function newKey(): string
     {
-        $roles = $this->all();
-        for ($n = 1; ; $n++) {
-            $key = 'r' . $n;
-            if (!isset($roles[$key])) {
-                return $key;
+        $n = max(0, (int) $this->settings->get(self::SEQ_SETTING, 0));
+        foreach (array_keys($this->all()) as $key) {
+            if (preg_match('/^r(\d+)$/', (string) $key, $m)) {
+                $n = max($n, (int) $m[1]);
             }
         }
+        $n++;
+        $this->settings->set(self::SEQ_SETTING, $n);
+        return 'r' . $n;
     }
 
     private function validLabel(mixed $raw, ?string $key): string

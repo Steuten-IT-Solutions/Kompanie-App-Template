@@ -111,7 +111,7 @@ final class App
             $migrated = true;
         }
         $this->features()->initialize($existing);
-        $this->roles()->initialize();
+        $this->roles()->initialize($existing);
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.

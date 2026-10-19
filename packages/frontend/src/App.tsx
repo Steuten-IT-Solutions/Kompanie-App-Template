@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { api, ApiError, can, config, CONFIG_CHANGED, isMember, roleInfo, toLogin } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -35,14 +35,12 @@ const ALIASES: Record<string, string[]> = {
 const features = config?.features;
 const sec = brand.labels.sections;
 
-// Als Funktion: Die Bezeichnung der Rollen kann sich in den Einstellungen ändern (CONFIG_CHANGED).
 const tabLabels = (): Record<Tab, string> => ({
   termine: sec.events,
   news: sec.news,
   galerie: sec.gallery,
   meins: 'Meins',
-  // Bezeichnung der Rolle manager (z. B. „Spieß“), solange es sie gibt; sonst „Verwaltung“
-  verwaltung: roleInfo('manager')?.label ?? 'Verwaltung',
+  verwaltung: 'Verwaltung',
 });
 
 const titles = (): Record<View, string> => ({
@@ -165,7 +163,7 @@ export default function App() {
     galerie: !!features?.gallery,
     meins: isMember() && !!(features?.points || features?.penalties),
     // Die Verwaltung beginnt mit der Mitgliederliste; die braucht das Recht manage.
-    verwaltung: can('manage'),
+    verwaltung: (!!features?.points && can('manage_points')) || (!!features?.penalties && can('manage_penalties')),
     konto: !!user,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',

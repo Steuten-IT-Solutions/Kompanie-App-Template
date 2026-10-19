@@ -23,7 +23,7 @@ final class CustomRolesTest extends TestCase
     protected function setUp(): void
     {
         $this->users = new FakeUsers();
-        $this->app = TestApp::create(TestApp::connection(), $this->users, ['labels' => ['roles' => ['manager' => 'Spieß']]]);
+        $this->app = TestApp::create(TestApp::connection(), $this->users, ['labels' => ['roles' => ['member' => 'Kamerad']]]);
         $this->users->current = $this->users->add('admin', Roles::ADMIN);
     }
 
@@ -41,25 +41,27 @@ final class CustomRolesTest extends TestCase
 
     public function testTemplatesWithLabelsFromKompanieJson(): void
     {
+        // Feste Rollen und die Standardrollen der eingeschalteten Bereiche (TestApp schaltet alle ein).
         $roles = $this->call('GET', '/admin/roles')->data;
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_column($roles, 'key'));
-        $this->assertSame(['Gast', 'Mitglied', 'Verwalter', 'Spieß', 'Admin'], array_column($roles, 'label'));
-        $this->assertSame(1, $roles[4]['users'], 'ein Admin');
-        $this->assertTrue($roles[0]['system'] && $roles[4]['system']);
+        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'events', 'points', 'penalties', Roles::ADMIN], array_column($roles, 'key'));
+        $this->assertSame(['Gast', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Admin'], array_column($roles, 'label'));
+        $this->assertSame(1, $roles[5]['users'], 'ein Admin');
+        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[5]['system']);
         $this->assertFalse($roles[1]['deletable'], 'Mitglied ist die Rolle neuer Konten');
-        $this->assertSame('Spieß', array_column($this->app->api()->config()['roles'], 'label', 'key')[Roles::MANAGER]);
-        // kompanie.json gilt nur für die Vorlagen beim ersten Start.
-        $again = TestApp::create(TestApp::connection(), settings: new MemorySettings([RoleService::SETTING => $this->app->settings->get(RoleService::SETTING)]), config: ['labels' => ['roles' => ['manager' => 'Hauptmann']]]);
-        $this->assertSame('Spieß', $again->roles()->label(Roles::MANAGER));
+        $this->assertTrue($roles[3]['deletable']);
+        $this->assertSame('Kamerad', array_column($this->app->api()->config()['roles'], 'label', 'key')[Roles::MEMBER]);
+        // kompanie.json gilt nur für die festen Rollen beim ersten Start.
+        $again = TestApp::create(TestApp::connection(), settings: new MemorySettings([RoleService::SETTING => $this->app->settings->get(RoleService::SETTING)]), config: ['labels' => ['roles' => ['member' => 'Mitglied']]]);
+        $this->assertSame('Kamerad', $again->roles()->label(Roles::MEMBER));
     }
 
     public function testCreateAssignAndRightsApplyImmediately(): void
     {
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Kassenwart', 'capabilities' => ['member', 'manage']]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Kassenwart', 'capabilities' => ['member', 'manage_points', 'manage_penalties']]);
         $this->assertSame(201, $res->status);
         $role = $this->byLabel()['Kassenwart'];
         $this->assertSame('r1', $role['key']);
-        $this->assertEqualsCanonicalizing(['member', 'manage'], $role['capabilities']);
+        $this->assertEqualsCanonicalizing(['member', 'manage_points', 'manage_penalties'], $role['capabilities']);
 
         $kasse = $this->users->add('kasse', Roles::MEMBER);
         $this->assertSame(200, $this->call('PATCH', "/members/$kasse/role", ['level' => 'r1'])->status);
@@ -78,9 +80,10 @@ final class CustomRolesTest extends TestCase
     public function testValidation(): void
     {
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => ''])->status, 'ohne Namen');
-        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'mitglied'])->status, 'Name schon vergeben');
+        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'kamerad'])->status, 'Name schon vergeben (Groß- und Kleinschreibung egal)');
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['manage_settings']])->status, 'Einstellungen nur für Admins');
-        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['manage']])->status, 'Verwalten ohne Mitgliederbereich');
+        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['manage_points']])->status, 'Verwalten ohne Mitgliederbereich');
+        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['member', 'manage']])->status, 'früheres Recht manage nicht mehr vergebbar');
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'points_factor' => 'halb'])->status);
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'points_factor' => 11])->status);
         $this->assertSame(400, $this->call('PATCH', '/admin/roles/admin', ['capabilities' => ['member']])->status, 'Admin fest');
@@ -88,6 +91,7 @@ final class CustomRolesTest extends TestCase
         $this->assertSame(200, $this->call('PATCH', '/admin/roles/guest', ['label' => 'Besucher'])->status, 'umbenennen geht');
         $this->assertSame(404, $this->call('PATCH', '/admin/roles/r9', ['label' => 'Y'])->status);
         $this->assertSame(400, $this->call('DELETE', '/admin/roles/member')->status);
+        $this->assertSame(400, $this->call('PATCH', '/admin/roles/member', ['capabilities' => []])->status, 'Mitglied fest');
         $this->assertSame(400, $this->call('DELETE', '/admin/roles/admin')->status);
     }
 
@@ -111,20 +115,9 @@ final class CustomRolesTest extends TestCase
         $this->assertSame(200, $this->call('DELETE', '/admin/roles/r1', [], ['replacement' => 'member'])->status);
         $this->assertSame(Roles::MEMBER, $this->users->find($u)?->role);
         $this->assertArrayNotHasKey('Fahnenträger', $this->byLabel());
-    }
-
-    public function testNoRightsBeyondOwn(): void
-    {
-        // Wer Rollen vergeben darf, aber kein Admin ist, vergibt nur Rollen mit Rechten, die er selbst hat.
-        $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => ['member', 'promote_users']]);
-        $this->call('POST', '/admin/roles', ['label' => 'Kassenwart', 'capabilities' => ['member', 'manage']]);
-        $schrift = $this->users->add('schrift', 'r1');
-        $m = $this->users->add('m', Roles::MEMBER);
-        $this->users->current = $schrift;
-        $this->assertSame(403, $this->call('PATCH', "/members/$m/role", ['level' => 'r2'])->status, 'Kassenwart hat Rechte, die er nicht hat');
-        $this->assertSame(403, $this->call('PATCH', "/members/$m/role", ['level' => 'admin'])->status);
-        $this->assertSame(200, $this->call('PATCH', "/members/$m/role", ['level' => 'r1'])->status, 'eigene Rechte darf er weitergeben');
-        $this->assertSame(400, $this->call('PATCH', "/members/$m/role", ['level' => 'unbekannt'])->status);
+        // Der Schlüssel einer gelöschten Rolle wird nie wieder vergeben.
+        $this->call('POST', '/admin/roles', ['label' => 'Neu', 'capabilities' => ['member']]);
+        $this->assertSame('r2', $this->byLabel()['Neu']['key']);
     }
 
     public function testPointsFactorAtBooking(): void

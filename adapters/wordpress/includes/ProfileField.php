@@ -21,7 +21,8 @@ final class ProfileField
 
     private static function render(App $app, \WP_User $user): void
     {
-        if (!current_user_can('promote_users')) {
+        // Die eigene Rolle ändert niemand selbst (wie in der App).
+        if (!current_user_can('promote_users') || (int) $user->ID === get_current_user_id()) {
             return;
         }
         $c = $app->config;
@@ -50,7 +51,7 @@ final class ProfileField
 
     private static function save(App $app, int $userId): void
     {
-        if (!current_user_can('promote_users') || !current_user_can('edit_user', $userId)) {
+        if (!current_user_can('promote_users') || !current_user_can('edit_user', $userId) || $userId === get_current_user_id()) {
             return;
         }
         $nonce = isset($_POST['kompanie_app_level_nonce']) ? sanitize_key(wp_unslash($_POST['kompanie_app_level_nonce'])) : '';
@@ -58,7 +59,11 @@ final class ProfileField
             return;
         }
         $level = sanitize_key(wp_unslash($_POST['kompanie_app_level']));
-        if ($level !== Roles::ADMIN && $app->roles()->exists($level)) {
+        $actor = $app->authContext->currentUser();
+        $target = $app->users->find($userId);
+        // Wie in der App: keine Rechte weitergeben, die man selbst nicht hat (WP-Administratoren dürfen alles).
+        if ($level !== Roles::ADMIN && $app->roles()->exists($level) && $actor !== null && $target !== null
+            && $app->roles()->canHandle($actor, $level) && $app->roles()->canHandle($actor, $target->role)) {
             try {
                 $app->users->setRole($userId, $level);
             } catch (\DomainException) {

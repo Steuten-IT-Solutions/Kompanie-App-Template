@@ -5,25 +5,27 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Auth;
 
 /**
- * Feste Rollen-Schlüssel und die Vorlagen, mit denen eine Installation startet.
+ * Feste Rollen und die Rollen älterer Installationen.
  *
  * Welche Rollen es gibt und welche Rechte sie haben, entscheidet der Admin der Kompanie in der App
- * (Domain\RoleService). Fest sind nur guest (keine Rechte) und admin (alle Rechte); member ist die
- * Rolle neuer Konten und lässt sich deshalb nicht löschen.
+ * (Domain\RoleService). Fest sind guest (keine Rechte), member (Mitgliederbereich, Rolle neuer Konten)
+ * und admin (alle Rechte); sie lassen sich nur umbenennen. Weitere Standardrollen bringen die Bereiche
+ * mit, wenn der Admin sie einschaltet (Domain\Features, z. B. „Punkte verwalten“).
  */
 final class Roles
 {
     public const GUEST = 'guest';
     public const MEMBER = 'member';
+    public const ADMIN = 'admin';
+    /** Vorlagen bis Issue #28; nur noch in Installationen, die sie schon hatten (LEGACY). */
     public const ORGANIZER = 'organizer';
     public const MANAGER = 'manager';
-    public const ADMIN = 'admin';
 
     /** Längster Schlüssel (Spalte users.level der eigenständigen Version: varchar(10)). */
     public const KEY_MAX = 10;
 
     /**
-     * Vorlagen in der Reihenfolge der Anzeige: Schlüssel => Rechte. Die Bezeichnungen kommen bei der
+     * Feste Rollen in der Reihenfolge der Anzeige: Schlüssel => Rechte. Die Bezeichnungen kommen bei der
      * Ersteinrichtung aus kompanie.json (labels.roles).
      *
      * @var array<string, string[]>
@@ -31,9 +33,18 @@ final class Roles
     public const TEMPLATES = [
         self::GUEST => [],
         self::MEMBER => ['member'],
-        self::ORGANIZER => ['member', 'manage_events', 'manage_documents'],
-        self::MANAGER => ['member', 'manage_events', 'manage_documents', 'manage'],
         self::ADMIN => [],
+    ];
+
+    /**
+     * Rollen, die Installationen vor Issue #28 fest hatten. Wer auf diese Version wechselt, behält sie
+     * (mit ihren Bezeichnungen aus kompanie.json), damit niemand Rechte verliert.
+     *
+     * @var array<string, string[]>
+     */
+    public const LEGACY = [
+        self::ORGANIZER => ['member', 'manage_events', 'manage_documents'],
+        self::MANAGER => ['member', 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties'],
     ];
 
     /**
@@ -42,7 +53,8 @@ final class Roles
      */
     public const GRANTABLE = [
         Capability::Member,
-        Capability::Manage,
+        Capability::ManagePoints,
+        Capability::ManagePenalties,
         Capability::ManageEvents,
         Capability::ManageDocuments,
         Capability::CreateUsers,
@@ -50,8 +62,8 @@ final class Roles
     ];
 
     /**
-     * Rechte nach den Vorlagen, ohne die Einstellungen der Installation (für Adapter, solange die App
-     * noch nicht steht, und für Tests).
+     * Rechte nach den festen und früheren Rollen, ohne die Einstellungen der Installation (für Adapter,
+     * solange die App noch nicht steht, und für Tests).
      *
      * @return Capability[]
      */
@@ -60,12 +72,13 @@ final class Roles
         if ($key === self::ADMIN) {
             return Capability::cases();
         }
-        return array_values(array_filter(array_map(static fn (string $c): ?Capability => Capability::tryFrom($c), self::TEMPLATES[$key] ?? [])));
+        $caps = self::TEMPLATES[$key] ?? self::LEGACY[$key] ?? [];
+        return array_values(array_filter(array_map(static fn (string $c): ?Capability => Capability::tryFrom($c), $caps)));
     }
 
     /** Fest: Rechte nicht änderbar, nicht löschbar (umbenennen geht). */
     public static function isSystem(string $key): bool
     {
-        return $key === self::GUEST || $key === self::ADMIN;
+        return isset(self::TEMPLATES[$key]);
     }
 }
