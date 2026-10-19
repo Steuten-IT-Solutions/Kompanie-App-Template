@@ -51,6 +51,8 @@ $app->drive()->saveServiceAccount((string) json_encode(['client_email' => 'test@
 $app->gallery()->setRoot('TESTROOT');
 $app->gallery()->sync();
 $app->gallery()->processPending(60);
+// Wie nach dem Speichern in den Einstellungen: Aufgaben einplanen (Galerie, Kalender).
+$app->scheduleTasks();
 
 if ($demo) {
     $day = static fn (int $n): string => date('Y-m-d', time() + $n * 86400);
