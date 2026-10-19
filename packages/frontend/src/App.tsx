@@ -24,7 +24,19 @@ const Hilfe = lazyView(() => import('./views/Hilfe'));
 type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
 type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
 
-const VIEWS: View[] = ['termine', 'news', 'galerie', 'meins', 'verwaltung', 'konto', 'installieren', 'anmelden', 'einstellungen', 'einrichtung', 'hilfe'];
+const VIEWS: View[] = [
+  'termine',
+  'news',
+  'galerie',
+  'meins',
+  'verwaltung',
+  'konto',
+  'installieren',
+  'anmelden',
+  'einstellungen',
+  'einrichtung',
+  'hilfe',
+];
 
 /** Ältere Links weiter unterstützen. */
 const ALIASES: Record<string, string[]> = {
@@ -60,9 +72,11 @@ function Icon({ name }: { name: Tab }) {
   const paths: Record<Tab, string> = {
     termine: 'M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9z',
     news: 'M4 4h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2V4zm15 4h1a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0V8h2zM7 7v4h7V7H7zm0 6v1.5h7V13H7zm0 3v1.5h7V16H7z',
-    galerie: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
+    galerie:
+      'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
     meins: 'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z',
-    verwaltung: 'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm-4 9.5c.8-1.6 2.3-2.5 4-2.5s3.2.9 4 2.5',
+    verwaltung:
+      'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm-4 9.5c.8-1.6 2.3-2.5 4-2.5s3.2.9 4 2.5',
   };
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
@@ -261,32 +275,36 @@ export default function App() {
 
       <main className="content">
         <ErrorBoundary key={rawPath.join('/')}>
-        <Suspense fallback={<Loading />}>
-        {config.setupPending && tab !== 'einrichtung' && (
-          <div className="card setup-hint">
-            <p>
-              <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und
-              sie verbinden – dauert ein paar Minuten.
-            </p>
-            <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
-              Einrichtung starten
-            </button>
-          </div>
-        )}
-        {!user && brand.guestWelcome && tab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
-        {tab === 'termine' &&
-          (path[1] === 'verwalten' && features?.events && can('manage_events') ? <TermineVerwalten onToast={showToast} /> : <Termine />)}
-        {tab === 'news' && <News id={newsId} />}
-        {tab === 'galerie' && <Galerie albumId={albumId} />}
-        {tab === 'meins' && <Meins sub={path[1]} />}
-        {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
-        {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
-        {tab === 'installieren' && <Installieren onToast={showToast} />}
-        {tab === 'anmelden' && <Anmelden />}
-        {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
-        {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
-        {tab === 'hilfe' && <Hilfe slug={path[1]} />}
-        </Suspense>
+          <Suspense fallback={<Loading />}>
+            {config.setupPending && tab !== 'einrichtung' && (
+              <div className="card setup-hint">
+                <p>
+                  <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und sie
+                  verbinden – dauert ein paar Minuten.
+                </p>
+                <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
+                  Einrichtung starten
+                </button>
+              </div>
+            )}
+            {!user && brand.guestWelcome && tab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
+            {tab === 'termine' &&
+              (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
+                <TermineVerwalten onToast={showToast} />
+              ) : (
+                <Termine />
+              ))}
+            {tab === 'news' && <News id={newsId} />}
+            {tab === 'galerie' && <Galerie albumId={albumId} />}
+            {tab === 'meins' && <Meins sub={path[1]} />}
+            {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
+            {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
+            {tab === 'installieren' && <Installieren onToast={showToast} />}
+            {tab === 'anmelden' && <Anmelden />}
+            {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
+            {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
+            {tab === 'hilfe' && <Hilfe slug={path[1]} />}
+          </Suspense>
         </ErrorBoundary>
       </main>
 

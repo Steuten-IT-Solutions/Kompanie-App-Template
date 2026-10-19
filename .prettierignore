@@ -1,0 +1,13 @@
+# Erzeugtes, Abhängigkeiten und Testumgebungen
+node_modules/
+vendor/
+dist/
+.wp-test/
+.wt-*/
+packages/frontend/src/generated/
+packages/frontend/public/icons/
+packages/frontend/test-results/
+packages/frontend/playwright-report/
+adapters/wordpress/app/
+adapters/standalone/app/
+adapters/standalone/sw.js

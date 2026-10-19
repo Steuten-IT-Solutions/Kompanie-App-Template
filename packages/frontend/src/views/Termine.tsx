@@ -32,11 +32,12 @@ export default function Termine() {
     return Array.from(map.values());
   }, [data]);
 
-  const manage = can('manage_events') && config?.features.events ? (
-    <button className="btn btn-secondary btn-block manage-events" onClick={() => navigate('termine/verwalten')}>
-      Öffentliche Termine verwalten
-    </button>
-  ) : null;
+  const manage =
+    can('manage_events') && config?.features.events ? (
+      <button className="btn btn-secondary btn-block manage-events" onClick={() => navigate('termine/verwalten')}>
+        Öffentliche Termine verwalten
+      </button>
+    ) : null;
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;

@@ -121,7 +121,11 @@ function Bereiche({ onToast, refresh, onSaved }: { onToast: (msg: string) => voi
 
   async function toggle(key: Feature, on: boolean) {
     const name = list.find((f) => f.key === key)?.label ?? key;
-    if (!on && !window.confirm(`„${name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.`)) return;
+    if (
+      !on &&
+      !window.confirm(`„${name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.`)
+    )
+      return;
     setBusy(true);
     setSaveError(null);
     try {
@@ -141,7 +145,9 @@ function Bereiche({ onToast, refresh, onSaved }: { onToast: (msg: string) => voi
   return (
     <section className="card settings-section" id="einstellungen-bereiche">
       <h3>Bereiche</h3>
-      <p className="small muted">Welche Bereiche die App für alle hat. Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.</p>
+      <p className="small muted">
+        Welche Bereiche die App für alle hat. Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.
+      </p>
       <FeatureSwitches list={list} value={value} onChange={toggle} disabled={busy} onSetup={scrollToSetup} />
       {saveError && (
         <p className="form-error" role="alert">
@@ -154,7 +160,21 @@ function Bereiche({ onToast, refresh, onSaved }: { onToast: (msg: string) => voi
 
 export type SectionProps = { settings: AdminSettings; onSaved: (s: AdminSettings) => void; onToast: (msg: string) => void };
 
-function Section({ id, title, children, onSubmit, busy, error }: { id?: string; title: string; children: ReactNode; onSubmit: (e: FormEvent) => void; busy: boolean; error: string | null }) {
+function Section({
+  id,
+  title,
+  children,
+  onSubmit,
+  busy,
+  error,
+}: {
+  id?: string;
+  title: string;
+  children: ReactNode;
+  onSubmit: (e: FormEvent) => void;
+  busy: boolean;
+  error: string | null;
+}) {
   return (
     <form className="form card settings-section" id={id ? `einstellungen-${id}` : undefined} onSubmit={onSubmit}>
       <h3>{title}</h3>
@@ -197,7 +217,11 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
   const c = settings.calendar;
-  const status = { ics: '✓ Eingerichtet über die geheime iCal-Adresse.', google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).', none: 'Noch kein Kalender eingerichtet.' }[c.source];
+  const status = {
+    ics: '✓ Eingerichtet über die geheime iCal-Adresse.',
+    google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).',
+    none: 'Noch kein Kalender eingerichtet.',
+  }[c.source];
 
   async function test() {
     setTesting(true);
@@ -205,7 +229,11 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
     setError(null);
     try {
       const r = await api.testCalendar();
-      setResult(r.count === 0 ? 'Verbindung klappt, aber es gibt keine kommenden Termine.' : `${r.count} Termine gefunden, z. B. „${r.sample[0].title}“.`);
+      setResult(
+        r.count === 0
+          ? 'Verbindung klappt, aber es gibt keine kommenden Termine.'
+          : `${r.count} Termine gefunden, z. B. „${r.sample[0].title}“.`,
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -232,7 +260,14 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       <p className="small">{status}</p>
       <label className="field">
         <span>{c.source === 'none' ? 'Geheime iCal-Adresse' : 'Neue iCal-Adresse (ersetzt die bisherige Einrichtung)'}</span>
-        <input type="url" inputMode="url" autoComplete="off" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" value={url} onChange={(e) => setUrl(e.target.value)} />
+        <input
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
       </label>
       {c.source !== 'none' && (
         <div className="button-row">
@@ -242,7 +277,9 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
           <button
             type="button"
             className="btn btn-link"
-            onClick={() => window.confirm('Kalender wirklich entfernen?') && save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' })}
+            onClick={() =>
+              window.confirm('Kalender wirklich entfernen?') && save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' })
+            }
           >
             Entfernen
           </button>
@@ -306,8 +343,8 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       }}
     >
       <p className="muted small">
-        Den Galerie-Ordner in Google Drive für das Dienstkonto freigeben (Betrachter) und hier den Link zum Ordner eintragen.
-        Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im Unterordner <em>intern</em> sehen nur Mitglieder.
+        Den Galerie-Ordner in Google Drive für das Dienstkonto freigeben (Betrachter) und hier den Link zum Ordner eintragen. Darin je Jahr
+        ein Ordner, darin je Album ein Ordner; Bilder im Unterordner <em>intern</em> sehen nur Mitglieder.
       </p>
       {g.service_account_email && (
         <div className="small">
@@ -316,7 +353,11 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
             <button type="button" className="btn btn-link" onClick={() => setReplaceKey(!replaceKey)}>
               {replaceKey ? 'Schlüssel behalten' : 'Schlüssel ersetzen'}
             </button>
-            <button type="button" className="btn btn-link" onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}>
+            <button
+              type="button"
+              className="btn btn-link"
+              onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}
+            >
               Schlüssel entfernen
             </button>
           </div>
@@ -325,12 +366,24 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       {showKeyField && (
         <label className="field">
           <span>{g.service_account_email ? 'Neuer Schlüssel des Dienstkontos (JSON)' : 'Schlüssel des Dienstkontos (JSON)'}</span>
-          <textarea rows={4} spellCheck={false} value={key} onChange={(e) => setKey(e.target.value)} placeholder='{"type": "service_account", …}' />
+          <textarea
+            rows={4}
+            spellCheck={false}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder='{"type": "service_account", …}'
+          />
         </label>
       )}
       <label className="field">
         <span>Link zum Galerie-Ordner</span>
-        <input type="text" autoComplete="off" placeholder="https://drive.google.com/drive/folders/…" value={root} onChange={(e) => setRoot(e.target.value)} />
+        <input
+          type="text"
+          autoComplete="off"
+          placeholder="https://drive.google.com/drive/folders/…"
+          value={root}
+          onChange={(e) => setRoot(e.target.value)}
+        />
       </label>
       {g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
       {g.configured && (
@@ -394,7 +447,14 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
       {source !== 'none' && (
         <label className="field">
           <span>{source === 'wordpress' ? 'Adresse der Webseite' : 'Adresse des Feeds'}</span>
-          <input type="url" inputMode="url" required placeholder={source === 'wordpress' ? 'https://www.beispiel.de' : 'https://www.beispiel.de/feed'} value={url} onChange={(e) => setUrl(e.target.value)} />
+          <input
+            type="url"
+            inputMode="url"
+            required
+            placeholder={source === 'wordpress' ? 'https://www.beispiel.de' : 'https://www.beispiel.de/feed'}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
         </label>
       )}
       {n.source !== 'none' &&

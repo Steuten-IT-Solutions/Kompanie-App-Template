@@ -68,10 +68,7 @@ function Members() {
   const [showGuests, setShowGuests] = useState(false);
   const { data, error, loading, reload } = useAsync(() => api.members(showGuests), [showGuests]);
   const [query, setQuery] = useState('');
-  const list = useMemo(
-    () => (data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())),
-    [data, query],
-  );
+  const list = useMemo(() => (data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())), [data, query]);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -108,7 +105,9 @@ function Members() {
             <div className="row-main">
               <div className="row-title">
                 {m.name}{' '}
-                {m.level !== 'member' && <span className={`badge ${m.level === 'guest' ? 'badge-level-guest' : 'badge-role'}`}>{caps(levelLabel(m.level))}</span>}
+                {m.level !== 'member' && (
+                  <span className={`badge ${m.level === 'guest' ? 'badge-level-guest' : 'badge-role'}`}>{caps(levelLabel(m.level))}</span>
+                )}
               </div>
               <div className="row-sub">
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
@@ -116,7 +115,9 @@ function Members() {
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
-            <span className="chevron" aria-hidden="true">›</span>
+            <span className="chevron" aria-hidden="true">
+              ›
+            </span>
           </li>
         ))}
         {list.length === 0 && <Empty>Niemand gefunden.</Empty>}
@@ -285,7 +286,10 @@ function RoleControl({
   }
   async function change(next: Level) {
     if (next === level) return;
-    if (next === 'admin' && !window.confirm(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`)) {
+    if (
+      next === 'admin' &&
+      !window.confirm(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`)
+    ) {
       return;
     }
     setBusy(true);
@@ -326,7 +330,11 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
   const [busy, setBusy] = useState(false);
   if (!can('create_users') || id === config?.user?.id || level === 'guest') return null;
   async function reset() {
-    if (!window.confirm(`Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`)) {
+    if (
+      !window.confirm(
+        `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -402,8 +410,7 @@ function NewMember() {
       <div className="card created">
         <h2>{created.name} ist angelegt</h2>
         <p className="muted">
-          Das Startpasswort wird <strong>nur jetzt</strong> angezeigt. Bitte notieren oder kopieren und persönlich
-          weitergeben.
+          Das Startpasswort wird <strong>nur jetzt</strong> angezeigt. Bitte notieren oder kopieren und persönlich weitergeben.
         </p>
         <dl className="credentials">
           <dt>App</dt>
@@ -444,7 +451,14 @@ function NewMember() {
       </button>
       <label className="field">
         <span>Name</span>
-        <input type="text" autoComplete="off" placeholder="Vorname Nachname" value={name} onChange={(e) => setName(e.target.value)} required />
+        <input
+          type="text"
+          autoComplete="off"
+          placeholder="Vorname Nachname"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
       </label>
       <label className="field">
         <span>Benutzername (optional)</span>
@@ -462,7 +476,11 @@ function NewMember() {
         <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
       <p className="muted small">Das neue Konto bekommt die Rolle „{levelLabel('member')}“ und ein zufälliges Startpasswort.</p>
-      {formError && <p className="form-error" role="alert">{formError}</p>}
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
       <button className="btn btn-block" type="submit" disabled={busy}>
         {busy ? 'Legt an …' : 'Mitglied anlegen'}
       </button>
@@ -569,7 +587,8 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
           <span>
             Punktefaktor der Rolle anwenden
             <span className="small muted feature-desc">
-              {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen anderen Faktor als 1
+              {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen
+              anderen Faktor als 1
               {Number(points) && applyFactor
                 ? `, z. B. ×${roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member').toLocaleString('de-DE')} → ${(Number(points) * roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member')).toLocaleString('de-DE')} ${sec.points}`
                 : ''}
@@ -578,7 +597,11 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
           </span>
         </label>
       )}
-      {formError && <p className="form-error" role="alert">{formError}</p>}
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
       <button className="btn btn-block" type="submit" disabled={busy}>
         {busy ? 'Speichert …' : `${sec.points} vergeben`}
       </button>
@@ -634,13 +657,24 @@ function GivePenalty({ preselect, onToast }: { preselect: number[]; onToast: (ms
       </div>
       <label className="field">
         <span>Grund</span>
-        <input type="text" maxLength={255} placeholder="z. B. Zu spät gekommen" value={reason} onChange={(e) => setReason(e.target.value)} required />
+        <input
+          type="text"
+          maxLength={255}
+          placeholder="z. B. Zu spät gekommen"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          required
+        />
       </label>
       <div className="field">
         <span>Mitglieder</span>
         <MemberPicker members={data ?? []} selected={selected} onChange={setSelected} />
       </div>
-      {formError && <p className="form-error" role="alert">{formError}</p>}
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
       <button className="btn btn-warn btn-block" type="submit" disabled={busy}>
         {busy ? 'Speichert …' : 'Eintragen'}
       </button>

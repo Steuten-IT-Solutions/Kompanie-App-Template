@@ -90,7 +90,14 @@ export default function Hilfe({ slug }: { slug?: string }) {
 
   return (
     <div className="hilfe">
-      <input type="search" className="search" placeholder="Hilfe durchsuchen …" aria-label="Hilfe durchsuchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
+      <input
+        type="search"
+        className="search"
+        placeholder="Hilfe durchsuchen …"
+        aria-label="Hilfe durchsuchen"
+        value={suche}
+        onChange={(e) => setSuche(e.target.value)}
+      />
       {treffer.length === 0 && <Empty>Nichts gefunden.</Empty>}
       {GRUPPEN.map((g) => {
         const liste = treffer.filter((s) => s.gruppe === g);

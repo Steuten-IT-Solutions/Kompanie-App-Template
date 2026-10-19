@@ -36,8 +36,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const set = (key: keyof EventInput) => (e: { target: { value: string } }) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key: keyof EventInput) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   function startEdit(ev: PublicEvent | null) {
     setFormError(null);

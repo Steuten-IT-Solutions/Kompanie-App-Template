@@ -6,7 +6,10 @@ function esc(s: string): string {
 }
 
 function utcStamp(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  return d
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '');
 }
 
 /** Erzeugt eine .ics-Datei für einen Termin, damit er in den eigenen Kalender übernommen werden kann. */

@@ -89,9 +89,14 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
       {step === 'bereiche' && (
         <section className="card settings-section">
           <h3>Willkommen!</h3>
-          <p>Die App läuft. Wähle zuerst, welche Bereiche eure Kompanie nutzen möchte. Danach verbinden wir die gewählten Bereiche, z. B. mit dem Kalender oder den Fotos.</p>
+          <p>
+            Die App läuft. Wähle zuerst, welche Bereiche eure Kompanie nutzen möchte. Danach verbinden wir die gewählten Bereiche, z. B. mit
+            dem Kalender oder den Fotos.
+          </p>
           <FeatureSwitches list={list} value={value} disabled={busy} onChange={(key, on) => setChosen({ ...value, [key]: on })} />
-          <p className="muted small">Die Auswahl lässt sich jederzeit unter Einstellungen → Bereiche ändern. Die folgenden Schritte lassen sich überspringen.</p>
+          <p className="muted small">
+            Die Auswahl lässt sich jederzeit unter Einstellungen → Bereiche ändern. Die folgenden Schritte lassen sich überspringen.
+          </p>
           {!Object.values(value).some(Boolean) && <p className="small">Ohne Bereich zeigt die App nur die Installationsanleitung.</p>}
           {error && (
             <p className="form-error" role="alert">
@@ -110,9 +115,8 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
         <section className="card settings-section">
           <h3>Fast fertig</h3>
           <p className="small">
-            Updates kommen automatisch; bei Datenbank-Änderungen werden die Daten vorher gesichert. Den Zustand der App, Updates und
-            die Datensicherung findest du unter{' '}
-            <strong>Konto → Einstellungen</strong>.
+            Updates kommen automatisch; bei Datenbank-Änderungen werden die Daten vorher gesichert. Den Zustand der App, Updates und die
+            Datensicherung findest du unter <strong>Konto → Einstellungen</strong>.
           </p>
           {reportsAvailable && (
             <label className="toggle">

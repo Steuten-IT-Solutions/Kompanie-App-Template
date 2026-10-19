@@ -109,6 +109,9 @@ jobs:
       - name: Abhängigkeiten
         run: npm ci --no-audit --no-fund
 
+      - name: Formatierung (Prettier)
+        run: npm run format:check
+
       - name: Formulare „Neue Kompanie“ / „Kompanie ändern“ (Issue → kompanie.json)
         run: tests/formular/run-tests.sh
 

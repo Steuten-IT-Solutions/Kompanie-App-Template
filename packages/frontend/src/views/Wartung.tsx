@@ -112,7 +112,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               <>
                 <p className="form-error small">
                   Diese Version wurde zurückgezogen.{' '}
-                  {u.autoAllowed ? `Version ${u.fallback} wird beim nächsten Abgleich automatisch eingespielt.` : `Bitte auf Version ${u.fallback} wechseln.`}
+                  {u.autoAllowed
+                    ? `Version ${u.fallback} wird beim nächsten Abgleich automatisch eingespielt.`
+                    : `Bitte auf Version ${u.fallback} wechseln.`}
                 </p>
                 <button type="button" className="btn btn-block" disabled={!!busy} onClick={() => install(u.fallback!)}>
                   {busy === 'install' ? 'Wird eingespielt …' : `Jetzt auf ${u.fallback} wechseln`}
@@ -120,12 +122,16 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               </>
             ) : (
               <p className="form-error small">
-                Diese Version wurde zurückgezogen, aber es gibt noch keine geprüfte Version zum Wechseln. Bitte bei den Betreuern der
-                App melden.
+                Diese Version wurde zurückgezogen, aber es gibt noch keine geprüfte Version zum Wechseln. Bitte bei den Betreuern der App
+                melden.
               </p>
             ))}
           {u.error && <p className="form-error small">Letzte Prüfung: {u.error}</p>}
-          {u.last && !u.last.ok && <p className="form-error small">Letztes Update auf {u.last.to} hat nicht geklappt: {u.last.error}</p>}
+          {u.last && !u.last.ok && (
+            <p className="form-error small">
+              Letztes Update auf {u.last.to} hat nicht geklappt: {u.last.error}
+            </p>
+          )}
           {u.available && u.latest ? (
             <>
               <p className="small">
@@ -148,8 +154,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             <div className="small">
               <p>
                 Neue Hauptversion <strong>{u.majorVersion}</strong> verfügbar. Sie wird nicht automatisch eingespielt; vorher bitte die
-                Hinweise zur Version lesen. Vor dem Update werden die Daten automatisch gesichert. Zurück auf die bisherige
-                Hauptversion geht es danach nicht per Klick, sondern nur mit unserer Hilfe.
+                Hinweise zur Version lesen. Vor dem Update werden die Daten automatisch gesichert. Zurück auf die bisherige Hauptversion
+                geht es danach nicht per Klick, sondern nur mit unserer Hilfe.
               </p>
               <button
                 type="button"
@@ -162,7 +168,12 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             </div>
           )}
           <div className="button-row">
-            <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={() => run('check', async () => setU(await api.checkUpdates()))}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!!busy}
+              onClick={() => run('check', async () => setU(await api.checkUpdates()))}
+            >
               {busy === 'check' ? 'Prüft …' : 'Nach Updates suchen'}
             </button>
             <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={onChanged}>
@@ -180,8 +191,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
           </label>
           {!u.autoAllowed && (
             <p className="muted small">
-              Automatische Updates sind in dieser Installation gesperrt (z. B. in den Einstellungen von WordPress). Neue Versionen
-              bitte hier von Hand einspielen.
+              Automatische Updates sind in dieser Installation gesperrt (z. B. in den Einstellungen von WordPress). Neue Versionen bitte
+              hier von Hand einspielen.
             </p>
           )}
           {olderVersions.length > 0 && (
@@ -294,7 +305,12 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    if (!window.confirm(`Alle Daten der App durch die Sicherung „${file.name}“ ersetzen? Das lässt sich nur mit einer anderen Sicherung rückgängig machen.`)) return;
+    if (
+      !window.confirm(
+        `Alle Daten der App durch die Sicherung „${file.name}“ ersetzen? Das lässt sich nur mit einer anderen Sicherung rückgängig machen.`,
+      )
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
@@ -313,9 +329,10 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       <h3 id="backup-title">Datensicherung</h3>
       <p className="muted small">
         Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis und Einstellungen
-        {config?.variant === 'standalone' ? ', die Konten (Passwörter als Prüfwerte, aus denen sich einfache Passwörter erraten lassen)' : ''} und
-        Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen sichert die App
-        automatisch.
+        {config?.variant === 'standalone'
+          ? ', die Konten (Passwörter als Prüfwerte, aus denen sich einfache Passwörter erraten lassen)'
+          : ''}{' '}
+        und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen sichert die App automatisch.
       </p>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>

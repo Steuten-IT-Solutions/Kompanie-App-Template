@@ -45,7 +45,14 @@ export default function Anmelden() {
       </label>
       <label className="field">
         <span>Passwort</span>
-        <input type="password" name="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <input
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
       </label>
       <label className="toggle">
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
