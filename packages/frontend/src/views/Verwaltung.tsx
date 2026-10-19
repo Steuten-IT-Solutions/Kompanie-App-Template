@@ -305,6 +305,11 @@ function RoleControl({
     <label className="field role-control">
       <span className="field-label">Rolle in der App</span>
       <select value={level} disabled={busy} onChange={(e) => change(e.target.value)}>
+        {!levels.includes(level) && (
+          <option value={level} disabled>
+            Unbekannte Rolle – bitte wählen
+          </option>
+        )}
         {levels.map((l) => (
           <option key={l} value={l}>
             {levelLabel(l)}

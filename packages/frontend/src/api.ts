@@ -99,6 +99,17 @@ export const levelLabel = (level: Level): string =>
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
 
+/** Nach dem Schalten von Bereichen: Standardrollen können dazugekommen oder weggefallen sein. */
+export async function refreshRoles(): Promise<RoleAdmin[] | null> {
+  try {
+    const list = await api.roles();
+    applyRoles(list);
+    return list;
+  } catch {
+    return null; // z. B. offline; beim nächsten Laden stimmt es wieder
+  }
+}
+
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;

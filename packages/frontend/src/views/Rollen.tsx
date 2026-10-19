@@ -22,8 +22,8 @@ const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
  * Einstellungen → Rollen (Issue #28): Rollen anlegen, umbenennen, Rechte und Punktefaktor festlegen,
  * löschen. Gast und Admin sind fest (nur umbenennen), Mitglied ist die Rolle neuer Konten.
  */
-export default function Rollen({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.roles(), []);
+export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string) => void; refresh?: number }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.roles(), [refresh]);
   const [editing, setEditing] = useState<Level | 'neu' | null>(null);
 
   if (loading && !data) return <Loading />;
@@ -125,7 +125,8 @@ function RoleForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const data = fixed ? { label } : { label, capabilities, ...(config?.features.points ? { points_factor: factor } : {}) };
+    const withFactor = config?.features.points && (!fixed || role?.key === 'member');
+    const data = { label, ...(fixed ? {} : { capabilities }), ...(withFactor ? { points_factor: factor } : {}) };
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
   }
 
@@ -151,23 +152,21 @@ function RoleForm({
               : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
         </p>
       ) : (
-        <>
-          <fieldset className="feature-list">
-            <legend className="field-label">Rechte</legend>
-            {CAPABILITIES.map((c) => (
-              <label key={c.key} className="toggle feature-toggle">
-                <input type="checkbox" checked={capabilities.includes(c.key)} onChange={(e) => toggle(c.key, e.target.checked)} />
-                <span>{c.label}</span>
-              </label>
-            ))}
-          </fieldset>
-          {config?.features.points && (
-            <label className="field">
-              <span>Punktefaktor (z. B. 0,5 für halbe Punkte)</span>
-              <input type="text" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} />
+        <fieldset className="feature-list">
+          <legend className="field-label">Rechte</legend>
+          {CAPABILITIES.map((c) => (
+            <label key={c.key} className="toggle feature-toggle">
+              <input type="checkbox" checked={capabilities.includes(c.key)} onChange={(e) => toggle(c.key, e.target.checked)} />
+              <span>{c.label}</span>
             </label>
-          )}
-        </>
+          ))}
+        </fieldset>
+      )}
+      {config?.features.points && (!fixed || role?.key === 'member') && (
+        <label className="field">
+          <span>Punktefaktor (z. B. 0,5 für halbe Punkte)</span>
+          <input type="text" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} />
+        </label>
       )}
       {role?.deletable && role.users > 0 && (
         <label className="field">

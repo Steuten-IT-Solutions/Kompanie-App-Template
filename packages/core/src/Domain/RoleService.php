@@ -172,6 +172,7 @@ final class RoleService
      */
     public function featureChanged(string $key, bool $on, string $label, array $capabilities): void
     {
+        $label = mb_substr($label, 0, self::LABEL_MAX);
         $roles = $this->all();
         if ($on) {
             if (isset($roles[$key])) {
@@ -212,12 +213,11 @@ final class RoleService
         if (count($roles) >= self::MAX_ROLES) {
             throw ApiError::invalid(sprintf('Mehr als %d Rollen sind nicht möglich.', self::MAX_ROLES));
         }
-        $role = [
-            'key' => $this->newKey(),
-            'label' => $this->validLabel($in['label'] ?? null, null),
-            'capabilities' => self::validCapabilities($in['capabilities'] ?? []),
-            'points_factor' => array_key_exists('points_factor', $in) ? self::validFactor($in['points_factor']) : 1.0,
-        ];
+        $label = $this->validLabel($in['label'] ?? null, null);
+        $capabilities = self::validCapabilities($in['capabilities'] ?? []);
+        $factor = array_key_exists('points_factor', $in) ? self::validFactor($in['points_factor']) : 1.0;
+        // Schlüssel erst nach der Prüfung vergeben (sonst verbrauchten ungültige Anfragen Nummern).
+        $role = ['key' => $this->newKey(), 'label' => $label, 'capabilities' => $capabilities, 'points_factor' => $factor];
         // Neue Rollen vor admin einordnen.
         $admin = $roles[Roles::ADMIN] ?? null;
         unset($roles[Roles::ADMIN]);

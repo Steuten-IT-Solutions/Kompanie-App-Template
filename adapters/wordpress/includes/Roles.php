@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\Auth\Roles as AppRolesKeys;
+
 /**
  * Frühere WP-Rollen der App (vor Issue #28). Heute steht die Rolle in einer Benutzer-Option
  * (WpUsers::ROLE_META), ihre Rechte kommen aus der App (Einstellungen → Rollen). Die WP-Rollen bleiben
@@ -35,9 +37,16 @@ final class Roles
      *
      * @param array{member: string, organizer: string, manager: string} $labels
      */
-    public static function install(array $labels): void
+    public static function install(array $labels, bool $organizer = true, bool $manager = true): void
     {
-        $roles = [self::ROLE_MEMBER => $labels['member'], self::ROLE_ORGANIZER => $labels['organizer'], self::ROLE_MANAGER => $labels['manager']];
+        $roles = [self::ROLE_MEMBER => $labels['member']];
+        // Verwalter/Leitung nur in Installationen, die diese Rollen der App noch haben; vorhandene bleiben.
+        if ($organizer || get_role(self::ROLE_ORGANIZER)) {
+            $roles[self::ROLE_ORGANIZER] = $labels['organizer'];
+        }
+        if ($manager || get_role(self::ROLE_MANAGER)) {
+            $roles[self::ROLE_MANAGER] = $labels['manager'];
+        }
         foreach ($roles as $roleName => $label) {
             if (!get_role($roleName)) {
                 add_role($roleName, $label, ['read' => true]);
@@ -91,14 +100,16 @@ final class Roles
      *
      * @return int Anzahl übernommener Konten
      */
-    public static function migrateUsers(): int
+    /** @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? Sonst wird es Mitglied. */
+    public static function migrateUsers(?\Closure $known = null): int
     {
         $users = get_users([
             'role__in' => [self::ROLE_MEMBER, self::ROLE_ORGANIZER, self::ROLE_MANAGER],
             'meta_query' => [['key' => WpUsers::metaKey(), 'compare' => 'NOT EXISTS']],
         ]);
         foreach ($users as $u) {
-            update_user_option((int) $u->ID, WpUsers::ROLE_META, WpUsers::legacyRole($u), false);
+            $role = WpUsers::legacyRole($u);
+            update_user_option((int) $u->ID, WpUsers::ROLE_META, $known === null || $known($role) ? $role : AppRolesKeys::MEMBER, false);
         }
         return count($users);
     }

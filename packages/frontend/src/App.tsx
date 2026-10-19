@@ -162,8 +162,13 @@ export default function App() {
     news: !!features?.news,
     galerie: !!features?.gallery,
     meins: isMember() && !!(features?.points || features?.penalties),
-    // Die Verwaltung beginnt mit der Mitgliederliste; die braucht das Recht manage.
-    verwaltung: (!!features?.points && can('manage_points')) || (!!features?.penalties && can('manage_penalties')),
+    // Die Verwaltung beginnt mit der Mitgliederliste: für alle, die Punkte oder Strafen vergeben,
+    // Mitglieder anlegen oder Rollen vergeben (auch wenn Punkte und Strafen aus sind).
+    verwaltung:
+      (!!features?.points && can('manage_points')) ||
+      (!!features?.penalties && can('manage_penalties')) ||
+      can('create_users') ||
+      can('promote_users'),
     konto: !!user,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',

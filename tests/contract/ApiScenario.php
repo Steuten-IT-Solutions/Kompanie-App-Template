@@ -82,8 +82,13 @@ final class ApiScenario
         $roles = array_column((array) $this->req('GET', '/admin/roles')[1], 'capabilities', 'key');
         $c->ok(($roles['events'] ?? null) === ['member', 'manage_events'] && ($roles['points'] ?? null) === ['member', 'manage_points'] && ($roles['penalties'] ?? null) === ['member', 'manage_penalties'], 'Standardrollen der eingeschalteten Bereiche');
         // Für die folgenden Abschnitte: eine Leitung wie früher (Punkte, Strafen, Termine).
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']]);
-        $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
+        // Bei wiederholten Läufen auf derselben Installation gibt es sie schon (Namen sind eindeutig).
+        $this->leitung = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Leitung'] ?? '');
+        if ($this->leitung === '') {
+            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']]);
+            $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
+        }
+        $c->ok($this->leitung !== '', 'Rolle „Kptest Leitung“ vorhanden');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/events')[0] === 200, 'Eingeschalteter Bereich wieder erreichbar');
     }

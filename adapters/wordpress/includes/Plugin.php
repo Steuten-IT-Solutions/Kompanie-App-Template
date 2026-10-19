@@ -20,7 +20,10 @@ final class Plugin
             global $wpdb;
             $env = new WpEnvironment();
             // Rechte je Rolle aus der App (Einstellungen → Rollen); erst beim ersten Benutzer abgefragt.
-            $users = new WpUsers(static fn (string $role): array => self::app()->roles()->capabilities($role));
+            $users = new WpUsers(
+                static fn (string $role): array => self::app()->roles()->capabilities($role),
+                static fn (string $role): bool => self::app()->roles()->exists($role),
+            );
             $settings = new WpSettings();
             $uploads = wp_upload_dir(null, false);
             $db = new WpdbConnection($wpdb, $wpdb->prefix . 'kompanie_');
@@ -102,8 +105,13 @@ final class Plugin
         $app = self::app();
         $app->upgrade();
         if (get_option(WpSettings::PREFIX . 'roles_version') !== KOMPANIE_APP_VERSION) {
-            Roles::install(['member' => $app->config->roleLabel('member'), 'organizer' => $app->config->roleLabel('organizer'), 'manager' => $app->config->roleLabel('manager')]);
-            Roles::migrateUsers();
+            // Frühere WP-Rollen Verwalter/Leitung nur, wo die App diese Rollen noch hat (ältere Installationen).
+            Roles::install(
+                ['member' => $app->roles()->label('member'), 'organizer' => $app->roles()->label('organizer'), 'manager' => $app->roles()->label('manager')],
+                $app->roles()->exists('organizer'),
+                $app->roles()->exists('manager'),
+            );
+            Roles::migrateUsers(static fn (string $role): bool => $app->roles()->exists($role));
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
             self::autoloadOptions();
         }

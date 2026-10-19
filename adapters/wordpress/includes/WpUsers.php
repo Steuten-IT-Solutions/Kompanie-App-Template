@@ -36,8 +36,9 @@ final class WpUsers implements UserDirectory, AuthContext
 
     /**
      * @param (\Closure(string): array<int, Capability>)|null $capabilities Rechte je Rolle (Domain\RoleService)
+     * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? (für frühere WP-Rollen)
      */
-    public function __construct(private readonly ?\Closure $capabilities = null)
+    public function __construct(private readonly ?\Closure $capabilities = null, private readonly ?\Closure $known = null)
     {
     }
 
@@ -108,13 +109,13 @@ final class WpUsers implements UserDirectory, AuthContext
         if (!$user || $this->find($id) === null) {
             throw new \DomainException('Benutzer nicht gefunden.');
         }
-        // Zusätzlich die Regeln von WordPress (z. B. Super-Admins, Multisite) für den, der
-        // gerade handelt. Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
-        if (get_current_user_id() !== 0 && !current_user_can('promote_user', $id)) {
-            throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
-        }
-        if ($role === AppRoles::ADMIN || in_array('administrator', (array) $user->roles, true)) {
+        if ($role === AppRoles::ADMIN || in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        // Wer handelt, braucht das Recht in WordPress oder über seine Rolle in der App (der Kern hat die
+        // Regeln der App schon geprüft). Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
+        if (!$this->actorMay('promote_user', $id, Capability::PromoteUsers)) {
+            throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }
         update_user_option($id, self::ROLE_META, $role, false);
         $user->remove_role(Roles::ROLE_MANAGER);
@@ -144,8 +145,15 @@ final class WpUsers implements UserDirectory, AuthContext
     public function setPassword(int $id, string $password): void
     {
         $actor = get_current_user_id();
-        if ($actor !== 0 && $actor !== $id && (!current_user_can('edit_user', $id) || $this->find($id) === null)) {
-            throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
+        $target = get_userdata($id);
+        if ($actor !== 0 && $actor !== $id) {
+            // Wer die Webseite bearbeiten darf (Redakteure, Administratoren), dessen Passwort nur mit dem Recht
+            // aus WordPress; sonst genügt das Recht „Mitglieder anlegen“ der Rolle in der App.
+            $websiteUser = $target && (user_can($target, 'edit_posts') || is_super_admin($id));
+            $may = $websiteUser ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+            if (!$may || $this->find($id) === null) {
+                throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
+            }
         }
         wp_set_password($password, $id);
         \WP_Session_Tokens::get_instance($id)->destroy_all();
@@ -162,11 +170,26 @@ final class WpUsers implements UserDirectory, AuthContext
         return (bool) email_exists($email);
     }
 
-    /** Rolle in der App: Administrator, sonst das Meta, sonst die frühere WP-Rolle. */
+    /** Darf der angemeldete Benutzer das: in WordPress (z. B. promote_user) oder über seine Rolle in der App? */
+    private function actorMay(string $wpCap, int $id, Capability $appCap): bool
+    {
+        if (get_current_user_id() === 0 || current_user_can($wpCap, $id)) {
+            return true;
+        }
+        return (bool) $this->currentUser()?->can($appCap);
+    }
+
+    /**
+     * Rolle in der App: Administrator, sonst das Meta, sonst die frühere WP-Rolle. Bei Multisite nur
+     * für Mitglieder dieser Website (wer entfernt wurde, behält sonst die gespeicherte Rolle).
+     */
     public static function role(\WP_User $u): string
     {
         if (in_array('administrator', (array) $u->roles, true) || is_super_admin((int) $u->ID)) {
             return AppRoles::ADMIN;
+        }
+        if (is_multisite() && !is_user_member_of_blog((int) $u->ID)) {
+            return AppRoles::GUEST;
         }
         $meta = get_user_meta((int) $u->ID, self::metaKey(), true);
         // admin nur über WordPress, nie über das Meta.
@@ -174,6 +197,12 @@ final class WpUsers implements UserDirectory, AuthContext
             return $meta;
         }
         return self::legacyRole($u);
+    }
+
+    private static function hasNoMeta(\WP_User $u): bool
+    {
+        $meta = get_user_meta((int) $u->ID, self::metaKey(), true);
+        return !is_string($meta) || $meta === '';
     }
 
     /** Rolle nach den früheren WP-Rollen der App (vor Issue #28). */
@@ -191,6 +220,11 @@ final class WpUsers implements UserDirectory, AuthContext
     private function toUser(\WP_User $u): User
     {
         $role = self::role($u);
+        // Frühere WP-Rolle (Verwalter/Leitung), die es in dieser Installation nicht gibt (neu eingerichtet):
+        // wie Mitglied statt ganz ohne Rechte.
+        if ($this->known !== null && !($this->known)($role) && self::hasNoMeta($u) && $role !== AppRoles::GUEST) {
+            $role = AppRoles::MEMBER;
+        }
         $caps = $this->capabilities !== null ? ($this->capabilities)($role) : AppRoles::templateCapabilities($role);
         // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter.
         $wp = ['create_users' => Capability::CreateUsers, 'promote_users' => Capability::PromoteUsers, 'manage_options' => Capability::ManageSettings];

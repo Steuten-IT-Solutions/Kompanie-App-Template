@@ -146,8 +146,9 @@ final class Api
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
-        // Mitgliederliste: wer Punkte oder Strafen vergibt (sieht nur die Daten seines Bereichs)
-        $manage = [Cap::ManagePoints, Cap::ManagePenalties];
+        // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
+        // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
+        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::CreateUsers, Cap::PromoteUsers];
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [

@@ -40,6 +40,10 @@ final class ProfileField
                 }
             }
             echo '<select name="kompanie_app_level" id="kompanie_app_level">';
+            if (!isset($options[$level])) {
+                // Rolle, die es in der App nicht (mehr) gibt: nicht stillschweigend die erste Option speichern.
+                echo '<option value="" selected disabled>Unbekannte Rolle – bitte wählen</option>';
+            }
             foreach ($options as $value => $label) {
                 printf('<option value="%s"%s>%s</option>', esc_attr($value), selected($level, $value, false), esc_html($label));
             }

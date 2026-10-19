@@ -227,7 +227,6 @@ final class ScoreService
     /* ---------------------------------------------------------------- */
 
     /** @return int[] */
-    /** @return int[] */
     private function memberIds(mixed $raw): array
     {
         return array_keys($this->members($raw));

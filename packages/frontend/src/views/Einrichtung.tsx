@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, applyFeatures, config, type AdminSettings, type Feature } from '../api';
+import { api, applyFeatures, config, refreshRoles, type AdminSettings, type Feature } from '../api';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { Calendar, FeatureSwitches, Gallery, News } from './Einstellungen';
@@ -54,6 +54,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
       features.setData(saved);
       setChosen(null);
       applyFeatures(saved);
+      await refreshRoles();
       setIndex(1);
     } catch (err) {
       setError((err as Error).message);
