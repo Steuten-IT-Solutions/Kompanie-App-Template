@@ -7,6 +7,7 @@
  * gebauten Stand (packages/frontend/src/generated) bzw. aus site/brand/ einer früheren Seite.
  * Die Dateien werden unter site/brand/ abgelegt, damit spätere Änderungen (Freigeben,
  * Zurückziehen) die Seite ohne neuen Build erzeugen können.
+ * Erzeugt dazu das Handbuch unter site/handbuch/ (scripts/handbuch.php) mit den Bezeichnungen der Kompanie.
  * Verlinkt die Pakete der Version im Kanal stable. updates.json wird mit TrustedKeys bzw. dem
  * Schlüssel aus KOMPANIE_SIGNING_KEY geprüft. Ohne --updates entsteht eine Vorschau ohne Download.
  */
@@ -168,10 +169,18 @@ footer { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
   </div>
   {$gallery}
   <p class="muted">Updates kommen danach automatisch. {$version}</p>
+  <p><a href="handbuch/index.html">Handbuch: Installation, Einrichtung und Hilfe für alle Rollen</a></p>
 </main>
 <footer class="wrap">Diese Seite wurde automatisch erstellt.</footer>
 </body>
 </html>
 HTML;
 file_put_contents($out . '/index.html', $html);
+// Handbuch mit dem eben geprüften Branding (site/brand/).
+$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($root . '/scripts/handbuch.php') . ' --site=' . escapeshellarg($out . '/handbuch') . ' --brand=' . escapeshellarg($out . '/brand');
+passthru($cmd, $code);
+if ($code !== 0) {
+    fwrite(STDERR, "Fehler: Handbuch nicht erzeugt.\n");
+    exit(1);
+}
 echo "Download-Seite: $out/index.html" . ($stable ? " (Version {$stable['version']})" : ' (noch ohne Download)') . "\n";

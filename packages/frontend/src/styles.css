@@ -64,6 +64,12 @@ button, input, select { font: inherit; color: inherit; }
   padding: 6px 14px; border: 1px solid var(--on-primary-soft); border-radius: 999px;
 }
 .topbar .topbar-account.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.topbar .topbar-help {
+  color: var(--on-primary); font-weight: 700; font-size: 1rem; line-height: 1;
+  width: 32px; height: 32px; min-height: 0; padding: 0; margin-right: 8px; flex: none;
+  border: 1px solid var(--on-primary-soft); border-radius: 50%;
+}
+.topbar .topbar-help.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 .content { max-width: 640px; margin: 0 auto; padding: 18px 16px 24px; }
 
@@ -445,3 +451,11 @@ fieldset.feature-list legend { padding: 0; margin-bottom: 4px; }
 .role-list .role-item .row-title .badge { vertical-align: 1px; }
 .role-form { margin: 4px 0 12px; }
 .picker-list .badge { margin-left: 6px; }
+
+/* Hilfe (Handbuch) */
+.hilfe-text h2 { font-family: var(--font-head); font-size: 1.15rem; margin: 22px 0 6px; color: var(--primary-text); }
+.hilfe-text h3 { font-size: 1rem; margin: 18px 0 4px; }
+.hilfe-text ol, .hilfe-text ul { padding-left: 1.3em; }
+.hilfe-text li { margin: 4px 0; }
+.hilfe-text .hinweis { background: var(--card); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 6px; }
+.hilfe-web { margin-top: 18px; }
