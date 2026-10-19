@@ -58,9 +58,24 @@ Datenverzeichnis (`vor-import-….json`).
 
 Ein Cronjob ist **nicht nötig**: Nach Seitenaufrufen erledigt der Server fällige Aufgaben selbst, nachdem
 die Antwort verschickt ist (PHP-FPM, LiteSpeed) oder über einen Aufruf der eigenen, fest eingetragenen
-Adresse im Hintergrund (höchstens einmal pro Minute). Zuverlässiger wird es
-mit einem stündlichen Cronjob beim Hoster: `php /pfad/bin/kompanie.php cron` oder ein Abruf der Cron-Adresse
-(`php bin/kompanie.php status` zeigt sie an).
+Adresse im Hintergrund, auf den der Besucher nicht wartet (höchstens einmal pro Minute; schlägt er
+wiederholt fehl, seltener, und die Statusseite meldet es). Ob etwas fällig ist, steht in den
+Einstellungen; normale Seitenaufrufe lesen und schreiben die Aufgaben nicht.
+
+**Empfohlen** ist trotzdem ein Cronjob beim Hoster, alle 15 Minuten: `php /pfad/bin/kompanie.php cron` oder
+ein Abruf der Cron-Adresse (`php bin/kompanie.php status` und die Statusseite der App zeigen sie an).
+Dann laufen Galerie, Kalender und Updates auch, wenn die App selten aufgerufen wird.
+
+## Zwischenspeicher und Komprimierung
+
+Auf Apache und LiteSpeed regeln `app/.htaccess` und `app/assets/.htaccess` das selbst: Die gehashten Dateien
+unter `app/assets/` bleiben ein Jahr im Browser, Icons und Manifest einen Tag; Text wird komprimiert
+(`mod_deflate`, falls vorhanden). Auf **nginx** bitte entsprechend einstellen, z. B.:
+
+```nginx
+location ~ /app/assets/ { add_header Cache-Control "public, max-age=31536000, immutable"; }
+gzip on; gzip_types text/css application/javascript application/json application/manifest+json image/svg+xml;
+```
 
 ## Updates
 

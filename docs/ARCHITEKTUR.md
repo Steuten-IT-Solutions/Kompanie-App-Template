@@ -160,7 +160,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `NewsSource` | Neuigkeiten | eigene Beiträge | fremde WordPress-Seite, RSS oder keine |
 | `Clock` | Zeit und Zeitzone | `wp_timezone` | Europe/Berlin |
 
-**Lange Aufgaben in Häppchen.** Auf Webspace bricht PHP oft nach 30 Sekunden ab. Der Galerie-Abgleich arbeitet mit einem Zeitbudget pro Aufruf und setzt beim nächsten fort. Der Pseudo-Cron läuft nach dem Absenden der Antwort, wo der Server das unterstützt, damit Besucher nicht warten. **Ein Cronjob beim Hoster ist nicht nötig**, macht den Abgleich aber zuverlässiger; der Assistent bietet ihn nur als Zusatz an.
+**Lange Aufgaben in Häppchen.** Auf Webspace bricht PHP oft nach 30 Sekunden ab. Der Galerie-Abgleich arbeitet mit einem Zeitbudget pro Aufruf und setzt beim nächsten fort. **Ein Cronjob beim Hoster ist nicht nötig**, macht die Aufgaben aber zuverlässiger; der Assistent bietet ihn nur als Zusatz an, die Statusseite empfiehlt ihn mit der passenden Adresse.
+
+**Aufgaben (Scheduler).** Wiederkehrend sind: Galerie-Abgleich (`gallery_sync`, stündlich), Aufbereitung ausstehender Galeriebilder (`gallery_process`), Kalender erneuern (`calendar_refresh`, stündlich), Update-Prüfung, Statusmeldung. Eingeplant bzw. ausgeplant wird **nicht bei jeder Anfrage**, sondern beim Speichern von Einstellungen (Bereiche, Kalender, Galerie, Updates), im Cron-Lauf, nach einem Update oder einer Migration (`App::upgrade()` vergleicht die Version mit der Einstellung `tasks_planned`) und nach dem Wiederherstellen einer Sicherung. WordPress plant außerdem beim Aktivieren und beim Öffnen der Einstellungsseite, nicht mehr auf `init`. `Scheduler::runSoon()` lässt eine Aufgabe bald laufen (z. B. weitere Bilder aufbereiten).
+
+**Pseudo-Cron (eigenständige Version).** Der nächste Fälligkeitszeitpunkt steht in der Einstellung `tasks_next_run`; die Einstellungen lädt jede Anfrage ohnehin mit einer Abfrage. Eine normale Anfrage liest deshalb die Tabelle `tasks` nicht und schreibt nichts. Ist etwas fällig:
+- Mit PHP-FPM oder LiteSpeed schließt der Server die Antwort ab (`fastcgi_finish_request`) und arbeitet im selben Prozess weiter.
+- Sonst ruft er die eigene Cron-Adresse auf, **ohne auf die Antwort zu warten**: Verbindung aufbauen (Zeitgrenze 100 ms, bei https auch für TLS), Anfrage schreiben, schließen. Nur an die fest eingetragene Adresse, der Schlüssel geht im Header. Die Cron-Adresse schickt ihr „OK“ mit `Content-Length` und `Connection: close`, bevor sie arbeitet.
+- Höchstens ein Versuch pro Minute. Kommt ein Selbstaufruf nicht an (keine Verbindung, oder er vermerkt sich nicht innerhalb einer Minute in `cron_runs`), zählt das als Fehlschlag (`cron_spawn`); danach wird es seltener versucht (1, 2, 4 … bis 60 Minuten). Ab drei Fehlschlägen in Folge zeigt die Statusseite Rot und empfiehlt einen Cronjob mit der Cron-Adresse. Läuft ein Cronjob beim Hoster (Cron-Adresse oder `bin/kompanie.php cron`), zeigt sie Grün.
 
 ### Rechte und Rollen
 
@@ -215,6 +222,8 @@ Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy n
 
 Standard ist die **geheime iCal-Adresse** des Google Kalenders. Das ist ein Link zum Einfügen, ohne Google Cloud. Google-Kalender-ID mit API-Key bleibt als Option.
 
+**Zwischenspeicher:** Die letzte gute Fassung bleibt 30 Tage erhalten, mit „frisch bis“ (Einstellung `calendar_cache_minutes`, Standard 15). Ist sie veraltet, erneuert sie höchstens eine Anfrage je 30 Sekunden (Sperre über `Cache::increment`); alle anderen bekommen sofort die alte Fassung, bei einer Störung auch diese. Ein Fehler wird 60 Sekunden gemerkt; ohne alte Fassung antwortet `/calendar` in dieser Zeit sofort mit 502 statt bis zum Timeout (15 s) zu warten. Die Aufgabe `calendar_refresh` erneuert den Kalender stündlich im Hintergrund. cURL fordert komprimierte Antworten an; mehrere Google-Kalender werden gleichzeitig abgerufen (`ExtendedHttpClient::requestAll`, `curl_multi`; im WordPress-Adapter nacheinander).
+
 ### Galerie
 
 Gesucht ist ein Weg, bei dem die Kompanie kein Google-Cloud-Projekt braucht. Zwei Varianten, die Entscheidung fällt nach einem **Test-Prototyp** (Testfälle: [Offene Punkte, Abschnitt 5](OFFENE-PUNKTE.md#5-galerie-test-mit-google-verbinden)):
@@ -232,6 +241,8 @@ Gesucht ist ein Weg, bei dem die Kompanie kein Google-Cloud-Projekt braucht. Zwe
 - Der Server der Kompanie erzeugt sein Schlüsselpaar selbst. Nur der **öffentliche** Schlüssel wird beim Dienstkonto hinterlegt. Der private Schlüssel verlässt den Server nie.
 - Die Kompanie gibt ihren Galerie-Ordner für die angezeigte E-Mail-Adresse frei. Der Assistent prüft live, ob die Freigabe da ist.
 - *Zu prüfen:* Neuere Google-Cloud-Organisationen sperren das Hochladen von Schlüsseln teilweise per Voreinstellung. Ein Administrator kann diese Sperre aufheben.
+
+**Abgleich und Aufbereitung:** Der Abgleich lädt die vorhandenen Bilder je Album mit einer Abfrage und schreibt nur, was sich geändert hat (Name, Inhalt/md5, intern, Album; bei Alben Jahr, Titel, Sortierdatum), je Album in einer Transaktion. Ein Abgleich ohne Änderungen schreibt außer dem Status (Zeitpunkt des Abgleichs) nichts. Bilder werden **nur im Hintergrund** aufbereitet (`gallery_sync` und `gallery_process`, immer nur ein Prozess gleichzeitig per Dateisperre); das Original lädt cURL direkt in eine Datei. Ein noch nicht fertiges Bild liefert `/foto/<id>/<größe>` als grauen SVG-Platzhalter mit **202** und `Retry-After: 30`, ohne Zwischenspeichern, und stößt die Aufbereitung an (höchstens einmal pro Minute). Solange Bilder ausstehen, läuft `gallery_process` gleich wieder.
 
 Verworfen: ein **gemeinsames Dienstkonto für alle** (ein kompromittierter Server könnte die Ordner aller Kompanien lesen) und ein **zentraler Galerie-Dienst** bei uns (wir würden die internen Fotos aller Kompanien verarbeiten; das bedeutet Auftragsverarbeitung und eigenen Betrieb).
 
@@ -369,6 +380,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 - **Datenbank:** SQLite (legt der Installer an) oder MySQL/MariaDB.
 - **Sicherheit:** Begrenzung fehlgeschlagener Anmeldungen, geschützte Dateien und Datenbank außerhalb des Web-Verzeichnisses oder gesperrt **und** geprüft, Sicherheits-Header.
 - **Läuft auf** Apache, nginx und LiteSpeed, im Hauptverzeichnis oder Unterordner, mit oder ohne URL-Umschreibung.
+- **Zwischenspeicher und Komprimierung** (beide Adapter, Apache/LiteSpeed): `app/assets/.htaccess` lässt die gehashten JS/CSS-Dateien ein Jahr unverändert im Browser (`immutable`), `app/.htaccess` komprimiert Text-Dateien (`mod_deflate`) und cacht Icons und Manifest einen Tag. Die Vorlagen liegen in `adapters/shared/`; `scripts/package.php` und `scripts/build-frontend.sh` legen sie ab (nie aus dem Build-Ergebnis). Auf nginx muss der Hoster das selbst einstellen.
 - **Einstellungen in der App** für Admins: Kalender, Galerie, Quelle der Neuigkeiten (fremde WordPress-Seite oder RSS/Atom-Feed). Geheime Werte zeigt die App nie wieder an.
 - **Datensicherung** im gemeinsamen Export-Format, in der App und über `bin/kompanie.php export`/`import`.
 - **Updates** durch Tausch der Programmdateien (mit Rücktausch bei Fehlern), auch über `bin/kompanie.php update-check`/`update`/`rollback`.
