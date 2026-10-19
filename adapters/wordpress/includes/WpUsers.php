@@ -21,6 +21,14 @@ final class WpUsers implements UserDirectory, AuthContext
 {
     public const ROLE_META = 'kompanie_app_role';
 
+    /**
+     * Markiert Konten der Kompanie (je Website): von der App angelegt, aus früheren WP-Rollen übernommen
+     * oder von jemandem mit dem WP-Recht zugeordnet. Nur deren Passwort setzt auch zurück, wer das
+     * Recht „Mitglieder anlegen“ nur über seine Rolle in der App hat; sonst könnte er ein beliebiges
+     * Konto der Webseite erst zum Mitglied machen und dann übernehmen.
+     */
+    public const ACCOUNT_META = 'kompanie_app_account';
+
     /** Schlüssel in usermeta: mit dem Präfix der Website (wie update_user_option ohne global). */
     public static function metaKey(): string
     {
@@ -102,6 +110,7 @@ final class WpUsers implements UserDirectory, AuthContext
             throw new \DomainException($id->get_error_message());
         }
         update_user_option((int) $id, self::ROLE_META, AppRoles::MEMBER, false);
+        update_user_option((int) $id, self::ACCOUNT_META, '1', false);
         return (int) $id;
     }
 
@@ -125,6 +134,9 @@ final class WpUsers implements UserDirectory, AuthContext
             throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }
         update_user_option($id, self::ROLE_META, $role, false);
+        if (get_current_user_id() === 0 || current_user_can('promote_user', $id)) {
+            update_user_option($id, self::ACCOUNT_META, '1', false);
+        }
         $user->remove_role(Roles::ROLE_MANAGER);
         $user->remove_role(Roles::ROLE_ORGANIZER);
         $user->remove_role(Roles::ROLE_MEMBER);
@@ -155,10 +167,11 @@ final class WpUsers implements UserDirectory, AuthContext
         $target = get_userdata($id);
         if ($actor !== 0 && $actor !== $id) {
             // Wer die Webseite bearbeiten oder Benutzer verwalten darf (Redakteure, Administratoren, eigene
-            // WP-Rollen), dessen Passwort nur mit dem Recht aus WordPress; sonst genügt das Recht
-            // „Mitglieder anlegen“ der Rolle in der App.
+            // WP-Rollen) oder kein Konto der Kompanie ist (ACCOUNT_META), dessen Passwort nur mit dem Recht
+            // aus WordPress; sonst genügt das Recht „Mitglieder anlegen“ der Rolle in der App.
             $websiteUser = $target && (is_super_admin($id) || array_filter(self::WEBSITE_CAPS, static fn (string $cap): bool => user_can($target, $cap)) !== []);
-            $may = $websiteUser ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+            $appAccount = get_user_option(self::ACCOUNT_META, $id) === '1';
+            $may = $websiteUser || !$appAccount ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
             if (!$may || $this->find($id) === null) {
                 throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
             }

@@ -117,6 +117,7 @@ final class Roles
             $seen[$id] = true;
             $role = WpUsers::legacyRole($u);
             update_user_option($id, WpUsers::ROLE_META, $known === null || $known($role) ? $role : AppRolesKeys::MEMBER, false);
+            update_user_option($id, WpUsers::ACCOUNT_META, '1', false);
             $count++;
         }
         return $count;

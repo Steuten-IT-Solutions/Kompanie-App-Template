@@ -192,7 +192,7 @@ final class MemberService
         }
         // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen,
         // oder (bei WordPress) das Konto einer Person, die gar nicht zur Kompanie gehört (Gast).
-        if (!$actor->isAdmin() && $target->role === Roles::GUEST) {
+        if (!$actor->isAdmin() && !$target->isMember()) {
             throw ApiError::forbidden('Passwörter von Gästen setzen nur Admins zurück.');
         }
         if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {

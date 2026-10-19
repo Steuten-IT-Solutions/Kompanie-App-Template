@@ -108,8 +108,16 @@ $refused = static function (int $id) use ($app): bool {
 };
 $c->ok($refused($webUser), 'Passwort eines Benutzers mit WP-Benutzerrechten nur mit WP-Recht');
 $c->ok(!$refused($plain), 'Passwort eines Mitglieds mit dem App-Recht „Mitglieder anlegen“');
+// Konto der Webseite (z. B. Kunde, Forum), das erst über die App zum Mitglied gemacht wird: nicht übernehmbar.
 wp_set_current_user(0);
-foreach ([$pfleger, $webUser, $plain] as $id) {
+$app->roles()->update($pflegeKey, ['capabilities' => ['member', 'create_users', 'promote_users']]);
+$fremd = wp_insert_user(['user_login' => 'kpwp_fremd', 'user_pass' => wp_generate_password(), 'role' => 'subscriber']);
+wp_set_current_user($pfleger);
+$app->users->setRole($fremd, 'member');
+clean_user_cache($fremd);
+$c->ok($app->users->find($fremd)?->role === 'member' && $refused($fremd), 'Fremdes Konto erst zum Mitglied gemacht: Passwort nur mit WP-Recht');
+wp_set_current_user(0);
+foreach ([$pfleger, $webUser, $plain, $fremd] as $id) {
     wp_delete_user($id);
 }
 $app->roles()->delete($pflegeKey, 'member');
