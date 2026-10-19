@@ -36,7 +36,7 @@ export default function News({ id }: { id?: string }) {
 function NewsList() {
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<NewsItem[]>([]);
-  const { data, error, loading, reload } = useAsync(() => api.news(page), [page]);
+  const { data, error, loading, reload } = useAsync(() => api.news(page), [page], 'news');
 
   useEffect(() => {
     if (data) setItems((prev) => (page === 1 ? data.items : [...prev, ...data.items]));
@@ -70,7 +70,7 @@ function NewsList() {
 }
 
 function NewsDetail({ id }: { id: string }) {
-  const { data, error, loading, reload } = useAsync(() => api.newsItem(id), [id]);
+  const { data, error, loading, reload } = useAsync(() => api.newsItem(id), [id], 'news-item');
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;

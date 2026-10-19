@@ -8,7 +8,7 @@ export default function Galerie({ albumId }: { albumId?: number }) {
 }
 
 function Overview() {
-  const { data, error, loading, reload } = useAsync(api.gallery);
+  const { data, error, loading, reload } = useAsync(api.gallery, [], 'galerie');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
@@ -40,7 +40,7 @@ function Overview() {
 }
 
 function Album({ id }: { id: number }) {
-  const { data, error, loading, reload } = useAsync(() => api.galleryAlbum(id), [id]);
+  const { data, error, loading, reload } = useAsync(() => api.galleryAlbum(id), [id], 'galerie-album');
   const [open, setOpen] = useState<number | null>(null);
 
   if (loading && !data) return <Loading />;

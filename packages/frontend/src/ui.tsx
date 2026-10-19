@@ -1,16 +1,39 @@
 import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { MemberSummary } from './api';
 
-/** Lädt Daten asynchron; reload() lädt neu. */
-export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
-  const [data, setData] = useState<T | null>(null);
+/** Zuletzt geladene Daten je Schlüssel (nur im Speicher; beim Abmelden geleert). */
+const asyncCache = new Map<string, unknown>();
+
+export function clearAsyncCache() {
+  asyncCache.clear();
+}
+
+/**
+ * Lädt Daten asynchron; reload() lädt neu.
+ * Mit `key` zeigt die Ansicht beim nächsten Öffnen sofort die zuletzt geladenen Daten und
+ * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs).
+ */
+export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
+  const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
+  const cached = () => (cacheKey !== null && asyncCache.has(cacheKey) ? (asyncCache.get(cacheKey) as T) : null);
+  const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
 
+  const setData = useCallback(
+    (d: T | null) => {
+      if (cacheKey !== null && d !== null) asyncCache.set(cacheKey, d);
+      setDataState(d);
+    },
+    [cacheKey],
+  );
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    const hit = cached();
+    if (hit !== null) setDataState(hit);
     fn()
       .then((d) => {
         if (alive) {

@@ -1,11 +1,13 @@
-import { config } from '../api';
+import { api, config } from '../api';
 import brand from '../generated/brand';
 import { navigate } from '../router';
+import { ErrorBox, Loading, useAsync } from '../ui';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 
-/** „Meins“: eigene Punkte und Strafen, umschaltbar. */
+/** „Meins“: eigene Punkte und Strafen, umschaltbar. Die Summen (/me) lädt Meins einmal für beide. */
 export default function Meins({ sub }: { sub?: string }) {
+  const me = useAsync(api.me, [], 'me');
   const parts = (
     [
       ['punkte', brand.labels.sections.points, config?.features.points],
@@ -29,7 +31,15 @@ export default function Meins({ sub }: { sub?: string }) {
           ))}
         </nav>
       )}
-      {active === 'punkte' ? <Punkte /> : active === 'strafen' ? <Strafen /> : null}
+      {me.loading && !me.data ? (
+        <Loading />
+      ) : me.error && !me.data ? (
+        <ErrorBox message={me.error} onRetry={me.reload} />
+      ) : active === 'punkte' ? (
+        <Punkte me={me.data!} />
+      ) : active === 'strafen' ? (
+        <Strafen me={me.data!} />
+      ) : null}
     </div>
   );
 }
