@@ -23,10 +23,11 @@ use KompanieApp\Core\Storage\GalleryRepository;
  * abgelegt: öffentliche Bilder liefert der Webserver direkt aus, interne nur
  * die App nach Prüfung der Mitgliedschaft.
  *
- * Aufbereitet wird nur im Hintergrund (Aufgaben TASK und PROCESS_TASK), nie während einer
- * Anfrage: Ein Album-Raster würde sonst viele gleichzeitige Downloads und Bildberechnungen
+ * Aufbereitet wird im Hintergrund (Aufgaben TASK und PROCESS_TASK), nie beim Abruf eines
+ * Bildes: Ein Album-Raster würde sonst viele gleichzeitige Downloads und Bildberechnungen
  * auslösen. Noch nicht fertige Bilder liefert die App als Platzhalter (202 mit Retry-After)
- * und stößt die Aufbereitung an.
+ * und stößt die Aufbereitung an. Nur der Abgleich von Hand (Einstellungen) bereitet auch
+ * direkt auf, mit Zeitbudget.
  */
 final class GalleryService
 {
