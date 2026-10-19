@@ -1,10 +1,11 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, applyFeatures, type AdminSettings, type Feature, type FeatureInfo, type NewsSourceType } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Rollen from './Rollen';
 import Wartung from './Wartung';
 
 /**
- * Einstellungen für Admins (beide Varianten): Bereiche, Zustand, Updates und Datensicherung, dann Kalender,
+ * Einstellungen für Admins (beide Varianten): Bereiche, Rollen, Zustand, Updates und Datensicherung, dann Kalender,
  * Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
  * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
  */
@@ -14,6 +15,7 @@ export default function Einstellungen({ onToast }: { onToast: (msg: string) => v
   return (
     <div className="settings">
       <Bereiche onToast={onToast} refresh={setupSaved} />
+      <Rollen onToast={onToast} />
       <Wartung onToast={onToast} />
       <Verbindungen onToast={onToast} onSetupSaved={() => setSetupSaved((n) => n + 1)} />
     </div>

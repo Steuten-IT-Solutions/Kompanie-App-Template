@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 /**
- * Rollen und Rechte der App in WordPress.
+ * Frühere WP-Rollen der App (vor Issue #28). Heute steht die Rolle im User-Meta (WpUsers::ROLE_META),
+ * ihre Rechte kommen aus der App (Einstellungen → Rollen). Die WP-Rollen bleiben angelegt, damit
+ * Konten bis zur Übernahme (migrateUsers) und nach einem Zurückrollen ihre Rechte behalten.
  *
  * - Admin     = WordPress-Administrator, darf alles.
  * - Leitung   = Rolle kompanie_manager (Punkte/Strafen verwalten + alles von Verwalter).
@@ -80,5 +82,23 @@ final class Roles
         if ($changed && $wpRoles->use_db) {
             update_option($wpRoles->role_key, $wpRoles->roles);
         }
+    }
+
+    /**
+     * Einmalig nach dem Update auf Issue #28: Wer noch eine frühere WP-Rolle der App hat und kein
+     * Meta, bekommt die gleichnamige Rolle als Meta. Die WP-Rollen bleiben als Rückfall erhalten.
+     *
+     * @return int Anzahl übernommener Konten
+     */
+    public static function migrateUsers(): int
+    {
+        $users = get_users([
+            'role__in' => [self::ROLE_MEMBER, self::ROLE_ORGANIZER, self::ROLE_MANAGER],
+            'meta_query' => [['key' => WpUsers::ROLE_META, 'compare' => 'NOT EXISTS']],
+        ]);
+        foreach ($users as $u) {
+            update_user_meta((int) $u->ID, WpUsers::ROLE_META, WpUsers::legacyRole($u));
+        }
+        return count($users);
     }
 }

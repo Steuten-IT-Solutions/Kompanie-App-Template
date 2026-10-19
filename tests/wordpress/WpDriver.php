@@ -5,7 +5,6 @@
 
 namespace KompanieApp\Contract;
 
-use KompanieApp\Core\Auth\Level;
 use KompanieApp\WordPress\Plugin;
 use KompanieApp\WordPress\Roles;
 
@@ -42,7 +41,7 @@ final class WpDriver implements ApiDriver
             // Testaufbau, nicht Teil des Szenarios: ohne handelnden Benutzer.
             $acting = get_current_user_id();
             wp_set_current_user(0);
-            Plugin::app()->users->setLevel($id, Level::from($level));
+            Plugin::app()->users->setRole($id, $level);
             wp_set_current_user($acting);
         }
         clean_user_cache($id);

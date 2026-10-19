@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Standalone;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\Sql\Connection;
@@ -12,14 +12,21 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /** Benutzer der eigenständigen Version in der Tabelle users. */
 final class PdoUsers implements UserDirectory
 {
-    public function __construct(private readonly Connection $db, private readonly ?Sessions $sessions = null)
-    {
+    /**
+     * @param (\Closure(string): array<int, \KompanieApp\Core\Auth\Capability>)|null $capabilities Rechte je Rolle
+     *        (Domain\RoleService der App); ohne: die Vorlagen
+     */
+    public function __construct(
+        private readonly Connection $db,
+        private readonly ?Sessions $sessions = null,
+        private readonly ?\Closure $capabilities = null,
+    ) {
     }
 
     public function find(int $id): ?User
     {
         $row = $id > 0 ? $this->db->selectOne('SELECT * FROM {users} WHERE id = ?', [$id]) : null;
-        return $row ? self::toUser($row) : null;
+        return $row ? $this->toUser($row) : null;
     }
 
     /** @return array<string, mixed>|null Zeile für die Anmeldung (Benutzername oder E-Mail). */
@@ -36,15 +43,15 @@ final class PdoUsers implements UserDirectory
     public function list(bool $includeGuests): array
     {
         $where = $includeGuests ? '' : "WHERE level <> 'guest'";
-        return array_map([self::class, 'toUser'], $this->db->select("SELECT * FROM {users} $where ORDER BY name ASC, id ASC"));
+        return array_map([$this, 'toUser'], $this->db->select("SELECT * FROM {users} $where ORDER BY name ASC, id ASC"));
     }
 
     public function create(string $name, string $login, string $email, string $password): int
     {
-        return $this->add($name, $login, $email, $password, Level::Member);
+        return $this->add($name, $login, $email, $password, Roles::MEMBER);
     }
 
-    public function add(string $name, string $login, string $email, string $password, Level $level): int
+    public function add(string $name, string $login, string $email, string $password, string $role): int
     {
         $now = gmdate('Y-m-d H:i:s');
         return $this->db->insert('users', [
@@ -52,7 +59,7 @@ final class PdoUsers implements UserDirectory
             'email' => $email,
             'name' => $name,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-            'level' => $level->value,
+            'level' => $role,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -63,9 +70,9 @@ final class PdoUsers implements UserDirectory
         return true;
     }
 
-    public function setLevel(int $id, Level $level): void
+    public function setRole(int $id, string $role): void
     {
-        $this->db->update('users', ['level' => $level->value, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+        $this->db->update('users', ['level' => $role, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
     }
 
     public function countAdmins(): int
@@ -114,9 +121,10 @@ final class PdoUsers implements UserDirectory
     }
 
     /** @param array<string, mixed> $row */
-    public static function toUser(array $row): User
+    public function toUser(array $row): User
     {
-        $level = Level::tryFrom((string) $row['level']) ?? Level::Guest;
-        return new User((int) $row['id'], (string) $row['name'], (string) $row['login'], $level, $level->capabilities());
+        $role = (string) $row['level'];
+        $caps = $this->capabilities !== null ? ($this->capabilities)($role) : Roles::templateCapabilities($role);
+        return new User((int) $row['id'], (string) $row['name'], (string) $row['login'], $role, $caps);
     }
 }

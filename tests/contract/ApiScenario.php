@@ -26,6 +26,7 @@ final class ApiScenario
             $this->createUsers();
             $this->password();
             $this->roles();
+            $this->customRoles();
             $this->events();
             $this->config();
         } finally {
@@ -330,6 +331,39 @@ final class ApiScenario
             $c->ok($s === 400 && $d['level'] === 'admin', 'WordPress: Admins sind in der App nicht herabstufbar');
             $c->ok($this->req('PATCH', "/members/$gast/role", ['level' => 'admin'])[0] === 400, 'WordPress: keine Admins in der App ernennen');
         }
+    }
+
+    /** Rollen frei anlegen (Issue #28): Rechte wirken sofort, Punktefaktor beim Buchen, Löschen mit Ersatz. */
+    private function customRoles(): void
+    {
+        $c = $this->c;
+        $c->section('Eigene Rollen und Punktefaktor');
+        $admin = $this->user('kptest_rollen_admin', 'admin');
+        $m = $this->user('kptest_rollen_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/admin/roles')[0] === 403, 'GET /admin/roles als Mitglied → 403');
+
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
+        $role = array_column((array) $d, null, 'label')['Kptest Jugend'] ?? [];
+        $c->ok($s === 201 && ($role['points_factor'] ?? null) == 0.5, 'Rolle „Jugend“ mit Faktor 0,5 angelegt');
+        $key = (string) ($role['key'] ?? '');
+        [$s, $d] = $this->req('PATCH', "/members/$m/role", ['level' => $key]);
+        $c->ok($s === 200 && ($d['level'] ?? '') === $key, 'Rolle zugewiesen');
+        [, $d] = $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 5, 'reason' => 'Kptest Faktor']);
+        $c->ok(($d[0]['points'] ?? null) == 2.5 && ($d[0]['factor'] ?? null) == 0.5, 'Punkte mit Faktor gebucht: 5 × 0,5 = 2,5');
+        $members = array_column((array) $this->req('GET', '/members')[1], 'points', 'id');
+        $c->ok(($members[$m] ?? null) == 2.5, 'Summe mit Faktor (beide Datenbanken)');
+
+        [$s] = $this->req('PATCH', '/admin/roles/' . $key, ['capabilities' => []]);
+        $this->d->actAs($m);
+        $c->ok($s === 200 && $this->req('GET', '/me/points')[0] === 403, 'Rechte entzogen → wirkt sofort');
+
+        $this->d->actAs($admin);
+        $c->ok($this->req('DELETE', '/admin/roles/' . $key)[0] === 400, 'Löschen ohne Ersatz, obwohl zugeordnet → 400');
+        [$s] = $this->req('DELETE', '/admin/roles/' . $key, [], ['replacement' => 'member']);
+        $this->d->actAs($m);
+        $c->ok($s === 200 && $this->req('GET', '/me')[1]['level'] === 'member', 'Gelöscht, Person ist wieder Mitglied');
     }
 
     private function events(): void

@@ -331,6 +331,40 @@ test('Admin macht ein Mitglied zum Verwalter: Termine pflegen ja, Punkte und Str
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
 });
 
+test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  const rollen = page.locator('#einstellungen-rollen');
+  await expect(rollen.locator('.row-title', { hasText: MANAGER })).toBeVisible();
+  await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
+  await rollen.getByLabel('Name der Rolle').fill('Kassenwart');
+  await rollen.getByLabel(/^Punkte und Kasse vergeben/).check();
+  await rollen.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
+  await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toContainText('0 Personen');
+  await shot(page, '20-rollen');
+
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  // Sechs Rollen: Auswahlliste statt Knopfreihe.
+  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Kassenwart' });
+  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Kassenwart');
+
+  await login(page, 'mitglied2');
+  await expect(page.getByRole('button', { name: MANAGER })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toHaveCount(0);
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await rollen.getByRole('button', { name: 'Kassenwart bearbeiten' }).click();
+  page.once('dialog', (d) => d.accept());
+  await rollen.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
+  await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
+});
+
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/galerie');

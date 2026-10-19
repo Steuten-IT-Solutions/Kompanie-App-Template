@@ -11,6 +11,7 @@ use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\MemberService;
+use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
 use KompanieApp\Core\Domain\StatusService;
@@ -110,6 +111,7 @@ final class App
             $migrated = true;
         }
         $this->features()->initialize($existing);
+        $this->roles()->initialize();
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
@@ -204,12 +206,18 @@ final class App
             $this->users,
             new UserNames($this->users),
             $this->time(),
+            $this->roles(),
         ));
     }
 
     public function members(): MemberService
     {
-        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache));
+        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache, $this->roles()));
+    }
+
+    public function roles(): RoleService
+    {
+        return $this->service(RoleService::class, fn () => new RoleService($this->settings, $this->config, $this->users));
     }
 
     public function calendar(): CalendarService

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\Auth\Capability;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Tests\Support\FakeUsers;
@@ -15,16 +15,16 @@ use PHPUnit\Framework\TestCase;
 /** Rolle „Verwalter“ (organizer) zwischen Mitglied und Leitung (Issue #3). */
 final class RolesTest extends TestCase
 {
-    public function testLevelsBuildOnEachOther(): void
+    public function testTemplatesBuildOnEachOther(): void
     {
-        $order = [Level::Guest, Level::Member, Level::Organizer, Level::Manager, Level::Admin];
+        $order = [Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN];
         for ($i = 1; $i < count($order); $i++) {
-            $lower = $order[$i - 1]->capabilities();
-            $higher = $order[$i]->capabilities();
-            $this->assertSame([], array_udiff($lower, $higher, static fn (Capability $a, Capability $b): int => strcmp($a->value, $b->value)), $order[$i]->value . ' hat alle Rechte von ' . $order[$i - 1]->value);
+            $lower = Roles::templateCapabilities($order[$i - 1]);
+            $higher = Roles::templateCapabilities($order[$i]);
+            $this->assertSame([], array_udiff($lower, $higher, static fn (Capability $a, Capability $b): int => strcmp($a->value, $b->value)), $order[$i] . ' hat alle Rechte von ' . $order[$i - 1]);
         }
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::ManageEvents, Capability::ManageDocuments], Level::Organizer->capabilities());
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::ManageEvents, Capability::ManageDocuments, Capability::Manage], Level::Manager->capabilities());
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::ManageEvents, Capability::ManageDocuments], Roles::templateCapabilities(Roles::ORGANIZER));
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::ManageEvents, Capability::ManageDocuments, Capability::Manage], Roles::templateCapabilities(Roles::MANAGER));
     }
 
     public function testDefaultLabelsAndOwnLabels(): void
@@ -41,8 +41,8 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $member = $users->add('mitglied', Level::Member);
-        $users->current = $users->add('verwalter', Level::Organizer);
+        $member = $users->add('mitglied', Roles::MEMBER);
+        $users->current = $users->add('verwalter', Roles::ORGANIZER);
         $h = static fn (string $m, string $p, array $body = []) => $app->api()->handle(new Request($m, $p, [], $body));
 
         $created = $h('POST', '/events', ['title' => 'Schützenfest', 'start_date' => '2099-07-01']);
@@ -68,7 +68,7 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $users->current = $users->add('leitung', Level::Manager);
+        $users->current = $users->add('leitung', Roles::MANAGER);
         $res = $app->api()->handle(new Request('POST', '/events', [], ['title' => 'Königsschießen', 'start_date' => '2099-08-01']));
         $this->assertSame(201, $res->status);
     }
@@ -77,7 +77,7 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $users->current = $users->add('mitglied', Level::Member);
+        $users->current = $users->add('mitglied', Roles::MEMBER);
         $this->assertSame(403, $app->api()->handle(new Request('POST', '/events', [], ['title' => 'x', 'start_date' => '2099-01-01']))->status);
     }
 
@@ -85,14 +85,14 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $member = $users->add('mitglied', Level::Member);
-        $users->current = $users->add('admin', Level::Admin);
+        $member = $users->add('mitglied', Roles::MEMBER);
+        $users->current = $users->add('admin', Roles::ADMIN);
         $role = static fn (mixed $level) => $app->api()->handle(new Request('PATCH', "/members/$member/role", [], ['level' => $level]));
 
         $res = $role('organizer');
         $this->assertSame(200, $res->status);
         $this->assertSame('organizer', $res->data['level']);
-        $this->assertSame(Level::Organizer, $users->find($member)?->level);
+        $this->assertSame(Roles::ORGANIZER, $users->find($member)?->role);
         $this->assertSame('member', $role('member')->data['level']);
         $this->assertSame(400, $role('verwalter')->status, 'unbekannte Rolle');
     }

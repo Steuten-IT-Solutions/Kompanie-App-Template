@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\Authenticator;
@@ -19,6 +19,7 @@ final class MemberService
         private readonly ScoreService $scores,
         private readonly Authenticator $auth,
         private readonly ?Cache $cache = null,
+        private readonly ?RoleService $roles = null,
     ) {
     }
 
@@ -31,7 +32,7 @@ final class MemberService
         return [
             'id' => $user->id,
             'name' => $user->name,
-            'level' => $user->level->value,
+            'level' => $user->role,
             'points' => $this->scores->pointsTotal($user->id),
             'open_cents' => $this->scores->openCents($user->id),
         ];
@@ -53,7 +54,7 @@ final class MemberService
             $out[] = [
                 'id' => $u->id,
                 'name' => $u->name,
-                'level' => $u->level->value,
+                'level' => $u->role,
                 'points' => $totals[$u->id]['points'] ?? 0,
                 'open_cents' => $totals[$u->id]['open_cents'] ?? 0,
             ];
@@ -71,7 +72,7 @@ final class MemberService
         return [
             'id' => $u->id,
             'name' => $u->name,
-            'level' => $u->level->value,
+            'level' => $u->role,
             'points' => $this->scores->pointsTotal($u->id),
             'open_cents' => $this->scores->openCents($u->id),
             'point_list' => $this->scores->pointsFor($u->id),
@@ -89,23 +90,28 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Benutzer nicht gefunden.');
         }
-        $new = is_string($level) ? Level::tryFrom($level) : null;
-        if ($new === null) {
+        $new = is_string($level) ? $level : '';
+        $known = $this->roles !== null ? $this->roles->exists($new) : isset(Roles::TEMPLATES[$new]);
+        if (!$known) {
             throw ApiError::invalid('Ungültige Rolle.');
         }
-        if (($new === Level::Admin || $target->level === Level::Admin) && !$this->users->canAssignAdmin()) {
+        if (($new === Roles::ADMIN || $target->isAdmin()) && !$this->users->canAssignAdmin()) {
             throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
         }
-        if ($target->level === Level::Admin && $new !== Level::Admin && $this->users->countAdmins() <= 1) {
+        // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
+        if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandle($actor, $target->role))) {
+            throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
+        }
+        if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
             throw ApiError::invalid('Der letzte Admin kann nicht herabgestuft werden.');
         }
         try {
-            $this->users->setLevel($id, $new);
+            $this->users->setRole($id, $new);
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
         $after = $this->users->find($id);
-        return ['id' => $id, 'level' => ($after?->level ?? $new)->value];
+        return ['id' => $id, 'level' => $after?->role ?? $new];
     }
 
     /**
@@ -167,7 +173,7 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Mitglied nicht gefunden.');
         }
-        if ($target->level === Level::Admin && $actor->level !== Level::Admin) {
+        if ($target->isAdmin() && !$actor->isAdmin()) {
             throw ApiError::forbidden('Nur Admins dürfen Passwörter von Admins zurücksetzen.');
         }
         $password = Passwords::readable(12);

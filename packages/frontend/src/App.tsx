@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, isMember, roleInfo, toLogin } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -35,16 +35,18 @@ const ALIASES: Record<string, string[]> = {
 const features = config?.features;
 const sec = brand.labels.sections;
 
-const TAB_LABELS: Record<Tab, string> = {
+// Als Funktion: Die Bezeichnung der Rollen kann sich in den Einstellungen ändern (CONFIG_CHANGED).
+const tabLabels = (): Record<Tab, string> => ({
   termine: sec.events,
   news: sec.news,
   galerie: sec.gallery,
   meins: 'Meins',
-  verwaltung: brand.labels.roles.manager,
-};
+  // Bezeichnung der Rolle manager (z. B. „Spieß“), solange es sie gibt; sonst „Verwaltung“
+  verwaltung: roleInfo('manager')?.label ?? 'Verwaltung',
+});
 
-const TITLES: Record<View, string> = {
-  ...TAB_LABELS,
+const titles = (): Record<View, string> => ({
+  ...tabLabels(),
   // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
   news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
   konto: 'Mein Konto',
@@ -52,7 +54,7 @@ const TITLES: Record<View, string> = {
   anmelden: 'Anmelden',
   einstellungen: 'Einstellungen',
   einrichtung: 'Einrichtung',
-};
+});
 
 function Icon({ name }: { name: Tab }) {
   const paths: Record<Tab, string> = {
@@ -220,7 +222,7 @@ export default function App() {
       <header className="topbar">
         <img src={logoUrl} alt="" className="logo" />
         <div className="topbar-text">
-          <div className="topbar-title">{caps(TITLES[tab])}</div>
+          <div className="topbar-title">{caps(titles()[tab])}</div>
           <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
         </div>
         {user ? (
@@ -285,12 +287,12 @@ export default function App() {
             <button
               key={t}
               className={tab === t ? 'active' : ''}
-              aria-label={TAB_LABELS[t]}
+              aria-label={tabLabels()[t]}
               onClick={() => navigate(t)}
               aria-current={tab === t ? 'page' : undefined}
             >
               <Icon name={t} />
-              <span>{caps(TAB_LABELS[t])}</span>
+              <span>{caps(tabLabels()[t])}</span>
             </button>
           ))}
         </nav>

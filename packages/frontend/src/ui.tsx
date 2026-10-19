@@ -92,10 +92,13 @@ export function MemberPicker({
   members,
   selected,
   onChange,
+  note,
 }: {
   members: MemberSummary[];
   selected: number[];
   onChange: (ids: number[]) => void;
+  /** kurzer Zusatz hinter dem Namen, z. B. der Punktefaktor „×0,5“ */
+  note?: (m: MemberSummary) => string | null;
 }) {
   const [query, setQuery] = useState('');
   const filtered = useMemo(
@@ -132,6 +135,7 @@ export function MemberPicker({
             <label>
               <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggle(m.id)} />
               <span>{m.name}</span>
+              {note?.(m) && <span className="badge badge-role">{note(m)}</span>}
             </label>
           </li>
         ))}

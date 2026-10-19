@@ -13,7 +13,7 @@ require $root . '/autoload.php';
 require __DIR__ . '/MockHttp.php';
 
 use KompanieApp\Contract\MockHttp;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Standalone\HttpContext;
 use KompanieApp\Standalone\Kernel;
 use KompanieApp\Standalone\Setup;
@@ -34,10 +34,10 @@ $kernel = new Kernel($root, new HttpContext([], ['HTTP_HOST' => $u['host'] . (is
 Setup::install($kernel, ['driver' => 'sqlite'], $base, 'rewrite');
 $users = $kernel->users();
 $demo = getenv('KOMPANIE_DEMO') === '1';
-$admin = $users->add($demo ? 'Alex Admin' : 'Admin', 'admin', 'admin@example.org', 'admin', Level::Admin);
-$manager = $users->add($demo ? 'Vera Verwalter' : 'Verwalter', 'verwalter', '', 'test1234', Level::Manager);
-$m1 = $users->add($demo ? 'Max Muster' : 'Mitglied1', 'mitglied1', '', 'test1234', Level::Member);
-$m2 = $users->add($demo ? 'Erika Beispiel' : 'Mitglied2', 'mitglied2', '', 'test1234', Level::Member);
+$admin = $users->add($demo ? 'Alex Admin' : 'Admin', 'admin', 'admin@example.org', 'admin', Roles::ADMIN);
+$manager = $users->add($demo ? 'Vera Verwalter' : 'Verwalter', 'verwalter', '', 'test1234', Roles::MANAGER);
+$m1 = $users->add($demo ? 'Max Muster' : 'Mitglied1', 'mitglied1', '', 'test1234', Roles::MEMBER);
+$m2 = $users->add($demo ? 'Erika Beispiel' : 'Mitglied2', 'mitglied2', '', 'test1234', Roles::MEMBER);
 
 $app = $kernel->app();
 // Alle Bereiche an (eine neue Installation hat keine; sonst wählt sie der Admin in der Einrichtung).

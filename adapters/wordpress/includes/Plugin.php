@@ -19,7 +19,8 @@ final class Plugin
         if (self::$app === null) {
             global $wpdb;
             $env = new WpEnvironment();
-            $users = new WpUsers();
+            // Rechte je Rolle aus der App (Einstellungen → Rollen); erst beim ersten Benutzer abgefragt.
+            $users = new WpUsers(static fn (string $role): array => self::app()->roles()->capabilities($role));
             $settings = new WpSettings();
             $uploads = wp_upload_dir(null, false);
             $db = new WpdbConnection($wpdb, $wpdb->prefix . 'kompanie_');
@@ -102,6 +103,7 @@ final class Plugin
         $app->upgrade();
         if (get_option(WpSettings::PREFIX . 'roles_version') !== KOMPANIE_APP_VERSION) {
             Roles::install(['member' => $app->config->roleLabel('member'), 'organizer' => $app->config->roleLabel('organizer'), 'manager' => $app->config->roleLabel('manager')]);
+            Roles::migrateUsers();
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
             self::autoloadOptions();
         }

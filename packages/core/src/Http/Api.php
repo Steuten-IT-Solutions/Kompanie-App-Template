@@ -126,6 +126,8 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
+            // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
+            'roles' => $a->roles()->publicList(),
             'user' => $a->authContext->currentUser()?->toArray(),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
@@ -212,6 +214,21 @@ final class Api
             // Einstellungen (Admins)
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
+            // Rollen (Issue #28): nur Admins (manage_settings lässt sich keiner anderen Rolle geben)
+            new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $a->roles()->describe(), null, $denySettings),
+            new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->create($r->body);
+                return Response::created($a->roles()->describe());
+            }, null, $denySettings),
+            new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->update((string) $r->params['key'], $r->body);
+                return $a->roles()->describe();
+            }, null, $denySettings),
+            new Route('DELETE', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $replacement = $r->query['replacement'] ?? null;
+                $a->roles()->delete((string) $r->params['key'], is_string($replacement) ? $replacement : null);
+                return $a->roles()->describe();
+            }, null, $denySettings),
             new Route('GET', '/admin/features', Cap::ManageSettings, fn () => $a->features()->describe(), null, $denySettings),
             new Route('PUT', '/admin/features', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->features()->update($r->body);

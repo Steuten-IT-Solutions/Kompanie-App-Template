@@ -178,20 +178,28 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_events` | öffentliche Termine pflegen |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (die Dokumente selbst kommen mit #2) |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
-| `promote_users` | Rollen vergeben |
+| `promote_users` | Rollen vergeben (nur Rollen ohne weitergehende Rechte, siehe unten) |
 | `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |
 
-Rollen in Stufen; jede hat die Rechte der darunter. Die Bezeichnungen kommen aus `kompanie.json` (Standard in Klammern).
+**Rollen legt der Admin der Kompanie in der App an** (*Einstellungen → Rollen*, Issue #28; `Domain\RoleService`). Jede Person hat genau **eine** Rolle. Eine Rolle hat einen Namen, Rechte aus der Tabelle oben und einen **Punktefaktor**.
 
-| Rolle | Rechte |
-|---|---|
-| `guest` (Gast) | nur öffentliche Inhalte |
-| `member` (Mitglied) | `member` |
-| `organizer` (Verwalter) | dazu `manage_events`, `manage_documents`, aber keine Punkte oder Strafen |
-| `manager` (Leitung) | dazu `manage` |
-| `admin` (Admin) | alle |
+- **Vorlagen:** Eine neue Installation startet mit diesen Rollen; die Namen kommen einmalig aus `kompanie.json` (`labels.roles`), danach gilt die App.
 
-Bis zur Version mit `organizer` hieß `manager` standardmäßig „Verwalter“ und durfte keine öffentlichen Termine pflegen. Kompanien mit eigener Bezeichnung (z. B. „Spieß“) merken von der Umbenennung nichts.
+  | Rolle | Rechte |
+  |---|---|
+  | `guest` (Gast) | nur öffentliche Inhalte – **fest** |
+  | `member` (Mitglied) | `member` – Rolle neuer Konten, nicht löschbar |
+  | `organizer` (Verwalter) | dazu `manage_events`, `manage_documents` |
+  | `manager` (Leitung) | dazu `manage` |
+  | `admin` (Admin) | alle – **fest** |
+
+- **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (höchstens 10 Zeichen, Spalte `users.level`); der Name lässt sich jederzeit ändern. Gast und Admin lassen sich nur umbenennen.
+- **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Rollen mit Rechten brauchen `member`.
+- **Keine Rechte weitergeben, die man nicht hat:** Wer Rollen vergeben darf, ohne Admin zu sein, vergibt und ändert nur Rollen, deren Rechte er selbst hat.
+- **Löschen:** Sind einer Rolle noch Personen zugeordnet, wählt der Admin eine Ersatzrolle.
+- **Gespeichert** als Einstellung `roles` (die Einstellungen lädt jede Anfrage ohnehin auf einmal; die Rechte eines Benutzers kosten keine eigene Abfrage). Ändert der Admin Rechte, gilt das sofort.
+- **Punktefaktor** (z. B. 0,5 für junge Mitglieder, in Lank „Jungmariner“): gilt **beim Buchen** und wird mit dem Eintrag gespeichert (`points.factor`); es zählt `points × factor` mit zwei Nachkommastellen. Eine spätere Änderung der Rolle ändert alte Einträge nicht. Beim Buchen zeigt die App den Faktor je Person und lässt ihn übergehen (`apply_factor: false`).
+- Bis zur Version mit `organizer` hieß `manager` standardmäßig „Verwalter“. Kompanien mit eigener Bezeichnung (z. B. „Spieß“) merken davon nichts.
 
 - **WordPress:** Admin ist, wer WP-Administrator ist. Admin-Rechte werden nur im WP-Backend vergeben.
 - **Standalone:** Admins können andere zu Admins machen. Der **letzte Admin kann nicht herabgestuft** werden, niemand ändert seine eigene Rolle.
@@ -365,7 +373,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 ### WordPress-Plugin (`adapters/wordpress`)
 
 - Liefert die App unter `/app/` aus, inkl. geschützter Galeriebilder unter `/app/foto/…`.
-- Zusätzliche WP-Rollen `kompanie_member`, `kompanie_organizer` und `kompanie_manager` (Bezeichnungen aus `kompanie.json`, werden bei jedem Update angeglichen), Einstellung im Benutzerprofil.
+- Die Rolle in der App steht im User-Meta `kompanie_app_role`, die Rechte dazu kommen aus der App; Auswahl auch im Benutzerprofil des WP-Backends. Die früheren WP-Rollen `kompanie_member`, `kompanie_organizer` und `kompanie_manager` bleiben angelegt: Bis zur einmaligen Übernahme nach dem Update (`Roles::migrateUsers`) und nach einem Zurückrollen gelten sie weiter.
 - Einstellungsseite im WP-Admin (Kalender, Galerie); Assistent, Statusseite, Updates und Datensicherung für WordPress-Administratoren in der App.
 - **Updates** über den Upgrader von WordPress mit dem geprüften Paket (Sicherung des Plugin-Ordners ab WordPress 6.3); verlangt WordPress FTP-Zugangsdaten, erklärt die App den Ausweg.
 - **Datensicherung** der App-Daten und Einstellungen; Wiederherstellen nur auf derselben Website (die Benutzer sind WordPress-Konten).

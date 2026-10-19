@@ -6,9 +6,14 @@ namespace KompanieApp\Core\Storage;
 
 use KompanieApp\Core\Storage\Sql\Connection;
 
-/** Punkte-Einträge. Stornierte Einträge bleiben erhalten (deleted_at). */
+/**
+ * Punkte-Einträge. Stornierte Einträge bleiben erhalten (deleted_at).
+ * Es zählt points × factor (Punktefaktor der Rolle beim Buchen, z. B. 0,5); Summen mit zwei Nachkommastellen.
+ */
 final class PointRepository
 {
+    private const SUM = 'COALESCE(SUM(points * factor), 0)';
+
     public function __construct(private readonly Connection $db)
     {
     }
@@ -22,12 +27,12 @@ final class PointRepository
         );
     }
 
-    public function total(int $userId): int
+    public function total(int $userId): float
     {
-        return (int) $this->db->scalar(
-            'SELECT COALESCE(SUM(points), 0) FROM {points} WHERE user_id = ? AND deleted_at IS NULL',
+        return round((float) $this->db->scalar(
+            'SELECT ' . self::SUM . ' FROM {points} WHERE user_id = ? AND deleted_at IS NULL',
             [$userId],
-        );
+        ), 2);
     }
 
     /** @return array<string, mixed>|null auch stornierte */
@@ -37,17 +42,18 @@ final class PointRepository
     }
 
     /**
-     * @param int[] $userIds
+     * @param array<int, float> $factors Benutzer-ID => Punktefaktor
      * @return int[] IDs der neuen Einträge
      */
-    public function add(array $userIds, int $points, string $reason, ?int $catalogId, string $date, int $by, string $now): array
+    public function add(array $factors, int $points, string $reason, ?int $catalogId, string $date, int $by, string $now): array
     {
-        return $this->db->transaction(function () use ($userIds, $points, $reason, $catalogId, $date, $by, $now): array {
+        return $this->db->transaction(function () use ($factors, $points, $reason, $catalogId, $date, $by, $now): array {
             $ids = [];
-            foreach ($userIds as $userId) {
+            foreach ($factors as $userId => $factor) {
                 $ids[] = $this->db->insert('points', [
                     'user_id' => $userId,
                     'points' => $points,
+                    'factor' => $factor,
                     'reason' => $reason,
                     'catalog_id' => $catalogId,
                     'entry_date' => $date,
@@ -64,12 +70,12 @@ final class PointRepository
         return $this->db->update('points', ['deleted_at' => $now, 'deleted_by' => $by], ['id' => $id]) > 0;
     }
 
-    /** @return array<int, int> Summe je Benutzer */
+    /** @return array<int, float> Summe je Benutzer */
     public function totals(): array
     {
         $out = [];
-        foreach ($this->db->select('SELECT user_id, SUM(points) AS total FROM {points} WHERE deleted_at IS NULL GROUP BY user_id') as $r) {
-            $out[(int) $r['user_id']] = (int) $r['total'];
+        foreach ($this->db->select('SELECT user_id, ' . self::SUM . ' AS total FROM {points} WHERE deleted_at IS NULL GROUP BY user_id') as $r) {
+            $out[(int) $r['user_id']] = round((float) $r['total'], 2);
         }
         return $out;
     }

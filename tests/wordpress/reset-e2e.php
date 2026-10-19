@@ -22,7 +22,7 @@ foreach (['verwalter' => 'manager', 'mitglied1' => 'member', 'mitglied2' => 'mem
     $u = get_user_by('login', $login);
     if ($u) {
         wp_set_password('test1234', $u->ID);
-        KompanieApp\WordPress\Plugin::app()->users->setLevel($u->ID, KompanieApp\Core\Auth\Level::from($level));
+        KompanieApp\WordPress\Plugin::app()->users->setRole($u->ID, $level);
     }
 }
 // Zähler (z. B. Passwortänderungen je 15 Minuten) und den Einrichtungsassistenten zurücksetzen.

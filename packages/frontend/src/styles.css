@@ -438,3 +438,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .feature-toggle strong { display: block; color: var(--ink); }
 .feature-desc { display: block; margin-top: 2px; }
 .btn-inline { padding: 0; min-height: 0; font-size: inherit; vertical-align: baseline; }
+
+/* Rollen (Einstellungen) */
+fieldset.feature-list { border: 0; padding: 0; margin: 8px 0; }
+fieldset.feature-list legend { padding: 0; margin-bottom: 4px; }
+.role-list .role-item .row-title .badge { vertical-align: 1px; }
+.role-form { margin: 4px 0 12px; }
+.picker-list .badge { margin-left: 6px; }

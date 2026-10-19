@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Port;
 
-use KompanieApp\Core\Auth\Level;
 use KompanieApp\Core\Auth\User;
 
 /**
@@ -31,8 +30,12 @@ interface UserDirectory
     /** Ob in dieser Umgebung Admins in der App ernannt werden können (nur Standalone). */
     public function canAssignAdmin(): bool;
 
-    /** @throws \DomainException wenn die Rolle so nicht gesetzt werden kann */
-    public function setLevel(int $id, Level $level): void;
+    /**
+     * Rolle setzen (Schlüssel aus Domain\RoleService; geprüft hat der Kern).
+     *
+     * @throws \DomainException wenn die Rolle so nicht gesetzt werden kann
+     */
+    public function setRole(int $id, string $role): void;
 
     public function countAdmins(): int;
 

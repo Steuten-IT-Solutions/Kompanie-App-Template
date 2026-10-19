@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Tests;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Http\Request;
@@ -56,13 +56,13 @@ final class FeaturesTest extends TestCase
         $h = static fn (string $m, array $body = []) => $app->api()->handle(new Request($m, '/admin/features', [], $body));
 
         $this->assertSame(401, $h('GET')->status);
-        foreach ([Level::Manager, Level::Organizer, Level::Member, Level::Guest] as $level) {
-            $users->current = $users->add('u-' . $level->value, $level);
-            $this->assertSame(403, $h('GET')->status, $level->value);
-            $this->assertSame(403, $h('PUT', ['news' => true])->status, $level->value);
+        foreach ([Roles::MANAGER, Roles::ORGANIZER, Roles::MEMBER, Roles::GUEST] as $level) {
+            $users->current = $users->add('u-' . $level, $level);
+            $this->assertSame(403, $h('GET')->status, $level);
+            $this->assertSame(403, $h('PUT', ['news' => true])->status, $level);
         }
 
-        $users->current = $users->add('admin', Level::Admin);
+        $users->current = $users->add('admin', Roles::ADMIN);
         $list = $h('GET')->data;
         $this->assertSame(Features::keys(), array_column($list, 'key'));
         $byKey = array_column($list, null, 'key');
@@ -88,7 +88,7 @@ final class FeaturesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $users->current = $users->add('admin', Level::Admin);
+        $users->current = $users->add('admin', Roles::ADMIN);
         $created = $app->api()->handle(new Request('POST', '/events', [], ['title' => 'Schützenfest', 'start_date' => '2099-07-01']));
         $this->assertSame(201, $created->status);
 

@@ -464,9 +464,7 @@ paths:
               type: object
               required: [level]
               properties:
-                level:
-                  type: string
-                  enum: [guest, member, organizer, manager, admin]
+                level: { $ref: '#/components/schemas/Level' }
       responses:
         '200':
           description: OK
@@ -553,6 +551,10 @@ paths:
                 catalog_id: { type: integer }
                 reason: { type: string, description: 'Ohne Angabe: Titel des Katalogeintrags.' }
                 date: { type: string, format: date }
+                apply_factor:
+                  type: boolean
+                  default: true
+                  description: Punktefaktor der Rolle anwenden (z. B. 0,5). false bucht für alle mit Faktor 1.
       responses:
         '201':
           description: Angelegt (ein Eintrag pro Mitglied)
@@ -641,6 +643,82 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /admin/roles:
+    get:
+      tags: [Einstellungen]
+      summary: Rollen mit Rechten, Punktefaktor und Anzahl der Personen
+      description: |
+        Jede Person hat genau eine Rolle. Neue Installationen starten mit Gast, Mitglied, Verwalter, Leitung und Admin
+        (Bezeichnungen aus `kompanie.json`); danach legt der Admin Rollen hier an. Gast und Admin sind fest (nur umbenennen),
+        Mitglied ist die Rolle neuer Konten und lässt sich nicht löschen. Wer Rollen vergeben darf, ohne Admin zu sein,
+        vergibt nur Rollen, deren Rechte er selbst hat.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAdmin' } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Einstellungen]
+      summary: Rolle anlegen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleInput' }
+      responses:
+        '201':
+          description: Neuer Stand aller Rollen
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAdmin' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/roles/{key}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { $ref: '#/components/schemas/Level' } }
+    patch:
+      tags: [Einstellungen]
+      summary: Rolle umbenennen, Rechte oder Punktefaktor ändern (nur mitgeschickte Felder)
+      description: Bei guest und admin nur die Bezeichnung. Ein geänderter Faktor gilt für künftige Buchungen.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleInput' }
+      responses:
+        '200':
+          description: Neuer Stand aller Rollen
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAdmin' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Einstellungen]
+      summary: Rolle löschen
+      description: Sind der Rolle noch Personen zugeordnet, bekommen sie `replacement`; ohne Angabe → 400.
+      x-capability: manage_settings
+      parameters:
+        - { name: replacement, in: query, required: false, schema: { $ref: '#/components/schemas/Level' } }
+      responses:
+        '200':
+          description: Neuer Stand aller Rollen
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAdmin' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /admin/features:
     get:
       tags: [Einstellungen]
@@ -1116,8 +1194,43 @@ components:
 
     Level:
       type: string
-      enum: [admin, manager, organizer, member, guest]
-      description: Rolle in der App. Die Anzeigenamen stehen in `kompanie.json` (`roleLabels`).
+      maxLength: 10
+      description: |
+        Schlüssel der Rolle. Fest sind `guest` (keine Rechte) und `admin` (alle Rechte); Vorlagen bei der Ersteinrichtung
+        sind `member`, `organizer` und `manager`; eigene Rollen heißen `r1`, `r2`, … Bezeichnungen und Punktefaktor stehen in
+        `/config` (`roles`), Rechte unter `/admin/roles`.
+
+    RoleInfo:
+      type: object
+      required: [key, label, points_factor]
+      properties:
+        key: { $ref: '#/components/schemas/Level' }
+        label: { type: string }
+        points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5' }
+
+    RoleAdmin:
+      allOf:
+        - $ref: '#/components/schemas/RoleInfo'
+        - type: object
+          required: [capabilities, users, system, deletable]
+          properties:
+            capabilities:
+              type: array
+              items: { type: string, enum: [member, manage, manage_events, manage_documents, create_users, promote_users, manage_settings] }
+              description: 'Bei admin alle Rechte; vergebbar sind alle außer manage_settings.'
+            users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
+            system: { type: boolean, description: 'guest und admin: Rechte fest, nicht löschbar' }
+            deletable: { type: boolean, description: 'false für guest, admin und member (Rolle neuer Konten)' }
+
+    RoleInput:
+      type: object
+      properties:
+        label: { type: string, maxLength: 30 }
+        capabilities:
+          type: array
+          items: { type: string, enum: [member, manage, manage_events, manage_documents, create_users, promote_users] }
+          description: 'Mit Rechten muss member dabei sein.'
+        points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
     AppUser:
       type: object
@@ -1200,6 +1313,10 @@ components:
               enum: [form, redirect]
             loginUrl: { type: [string, 'null'], description: Nur bei `redirect` }
             logoutUrl: { type: [string, 'null'], description: Nur bei `redirect` und Anmeldung }
+        roles:
+          type: array
+          description: Rollen der Installation in der Reihenfolge der Anzeige (Bezeichnungen, Punktefaktor).
+          items: { $ref: '#/components/schemas/RoleInfo' }
         features:
           type: object
           description: Bereiche, die der Admin eingeschaltet hat **und** die auf dem Server eingerichtet sind.
@@ -1222,7 +1339,7 @@ components:
         id: { type: integer }
         name: { type: string }
         level: { $ref: '#/components/schemas/Level' }
-        points: { type: integer }
+        points: { type: number, description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen' }
         open_cents: { type: integer }
 
     PointEntry:
@@ -1230,7 +1347,9 @@ components:
       properties:
         id: { type: integer }
         user_id: { type: integer }
-        points: { type: integer }
+        points: { type: number, description: 'Was zählt: base_points × factor (höchstens zwei Nachkommastellen)' }
+        base_points: { type: integer, description: Gebuchte Punktzahl }
+        factor: { type: number, description: Punktefaktor der Rolle beim Buchen }
         reason: { type: string }
         catalog_id: { type: [integer, 'null'] }
         date: { type: string, format: date }
@@ -1362,7 +1481,7 @@ components:
         id: { type: integer }
         name: { type: string }
         level: { $ref: '#/components/schemas/Level' }
-        points: { type: integer }
+        points: { type: number, description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen' }
         open_cents: { type: integer }
 
     MemberDetail:

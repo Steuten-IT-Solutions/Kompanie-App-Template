@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Tests\Support;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\AuthContext;
@@ -17,17 +17,20 @@ use KompanieApp\Core\Port\UserDirectory;
  */
 final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 {
-    /** @var array<int, array{name: string, login: string, email: string, level: Level, password: string}> */
+    /** @var array<int, array{name: string, login: string, email: string, level: string, password: string}> */
     public array $users = [];
     public ?int $current = null;
     public int $passwordChanges = 0;
     private int $next = 1;
 
+    /** @var (\Closure(string): array<int, \KompanieApp\Core\Auth\Capability>)|null Rechte je Rolle (setzt TestApp: die der App) */
+    public ?\Closure $capabilities = null;
+
     public function __construct(public bool $adminsAssignable = true)
     {
     }
 
-    public function add(string $login, Level $level, string $password = 'geheim123'): int
+    public function add(string $login, string $level, string $password = 'geheim123'): int
     {
         $id = $this->next++;
         $this->users[$id] = ['name' => ucfirst($login), 'login' => $login, 'email' => '', 'level' => $level, 'password' => password_hash($password, PASSWORD_DEFAULT)];
@@ -37,7 +40,8 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     public function find(int $id): ?User
     {
         $u = $this->users[$id] ?? null;
-        return $u ? new User($id, $u['name'], $u['login'], $u['level'], $u['level']->capabilities()) : null;
+        $caps = $u === null ? [] : ($this->capabilities !== null ? ($this->capabilities)($u['level']) : Roles::templateCapabilities($u['level']));
+        return $u ? new User($id, $u['name'], $u['login'], $u['level'], $caps) : null;
     }
 
     public function list(bool $includeGuests): array
@@ -55,7 +59,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 
     public function create(string $name, string $login, string $email, string $password): int
     {
-        $id = $this->add($login, Level::Member, $password);
+        $id = $this->add($login, Roles::MEMBER, $password);
         $this->users[$id]['name'] = $name;
         $this->users[$id]['email'] = $email;
         return $id;
@@ -66,14 +70,14 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $this->adminsAssignable;
     }
 
-    public function setLevel(int $id, Level $level): void
+    public function setRole(int $id, string $role): void
     {
-        $this->users[$id]['level'] = $level;
+        $this->users[$id]['level'] = $role;
     }
 
     public function countAdmins(): int
     {
-        return count(array_filter($this->users, static fn (array $u): bool => $u['level'] === Level::Admin));
+        return count(array_filter($this->users, static fn (array $u): bool => $u['level'] === Roles::ADMIN));
     }
 
     public function verifyPassword(int $id, string $password): bool

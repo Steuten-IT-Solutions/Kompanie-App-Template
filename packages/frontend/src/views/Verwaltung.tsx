@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, can, config, levelLabel, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
+import { api, can, config, levelLabel, roleFactor, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
 import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
@@ -104,7 +104,7 @@ function Members() {
             <div className="row-main">
               <div className="row-title">
                 {m.name}{' '}
-                {m.level !== 'member' && <span className={`badge badge-level-${m.level}`}>{caps(levelLabel(m.level))}</span>}
+                {m.level !== 'member' && <span className={`badge ${m.level === 'guest' ? 'badge-level-guest' : 'badge-role'}`}>{caps(levelLabel(m.level))}</span>}
               </div>
               <div className="row-sub">
                 {config?.features.points && `${m.points.toLocaleString('de-DE')} ${sec.points}`}
@@ -295,7 +295,22 @@ function RoleControl({
       setBusy(false);
     }
   }
-  const levels: Level[] = adminsHere ? ['guest', 'member', 'organizer', 'manager', 'admin'] : ['guest', 'member', 'organizer', 'manager'];
+  // Rollen der Installation (Einstellungen → Rollen); Admin nur, wo Admins in der App ernannt werden.
+  const levels: Level[] = (config?.roles ?? []).map((r) => r.key).filter((k) => k !== 'admin' || adminsHere);
+  if (levels.length > 5) {
+    return (
+      <label className="field role-control">
+        <span className="field-label">Rolle in der App</span>
+        <select value={level} disabled={busy} onChange={(e) => change(e.target.value)}>
+          {levels.map((l) => (
+            <option key={l} value={l}>
+              {levelLabel(l)}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
   return (
     <div className="role-control">
       <span className="field-label">Rolle in der App</span>
@@ -482,10 +497,17 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [applyFactor, setApplyFactor] = useState(true);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [members, catalog] = data as [MemberSummary[], CatalogItem[]];
+  // Punktefaktor der Rolle (z. B. 0,5 für junge Mitglieder): gilt beim Buchen, lässt sich übergehen.
+  const withFactor = selected.filter((id) => roleFactor(members.find((m) => m.id === id)?.level ?? 'member') !== 1);
+  const factorNote = (m: MemberSummary) => {
+    const f = roleFactor(m.level);
+    return f !== 1 ? `×${f.toLocaleString('de-DE')}` : null;
+  };
 
   function chooseCatalog(id: string) {
     setCatalogId(id);
@@ -510,6 +532,7 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
         points: n,
         reason: reason.trim(),
         date,
+        apply_factor: applyFactor,
         ...(catalogId ? { catalog_id: Number(catalogId) } : {}),
       });
       onToast(`${formatPoints(n)} ${sec.points} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
@@ -550,8 +573,23 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
       </label>
       <div className="field">
         <span>Mitglieder</span>
-        <MemberPicker members={members} selected={selected} onChange={setSelected} />
+        <MemberPicker members={members} selected={selected} onChange={setSelected} note={factorNote} />
       </div>
+      {withFactor.length > 0 && (
+        <label className="toggle">
+          <input type="checkbox" checked={applyFactor} onChange={(e) => setApplyFactor(e.target.checked)} />
+          <span>
+            Punktefaktor der Rolle anwenden
+            <span className="small muted feature-desc">
+              {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen anderen Faktor als 1
+              {Number(points) && applyFactor
+                ? `, z. B. ×${roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member').toLocaleString('de-DE')} → ${(Number(points) * roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member')).toLocaleString('de-DE')} ${sec.points}`
+                : ''}
+              .
+            </span>
+          </span>
+        </label>
+      )}
       {formError && <p className="form-error" role="alert">{formError}</p>}
       <button className="btn btn-block" type="submit" disabled={busy}>
         {busy ? 'Speichert …' : `${sec.points} vergeben`}

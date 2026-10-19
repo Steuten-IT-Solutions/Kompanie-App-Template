@@ -5,14 +5,29 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\Auth\Capability;
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles as AppRoles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\UserDirectory;
 
-/** WordPress-Benutzer als Benutzerverzeichnis der App. */
+/**
+ * WordPress-Benutzer als Benutzerverzeichnis der App.
+ *
+ * Die Rolle in der App steht im User-Meta ROLE_META (Schlüssel aus Domain\RoleService), die Rechte
+ * dazu kommen aus der App. Admin ist, wer WordPress-Administrator ist. Ältere Installationen hatten
+ * die Rolle als WP-Rolle (kompanie_member/_organizer/_manager); solange das Meta fehlt, gilt diese.
+ */
 final class WpUsers implements UserDirectory, AuthContext
 {
+    public const ROLE_META = 'kompanie_app_role';
+
+    /**
+     * @param (\Closure(string): array<int, Capability>)|null $capabilities Rechte je Rolle (Domain\RoleService)
+     */
+    public function __construct(private readonly ?\Closure $capabilities = null)
+    {
+    }
+
     public function currentUser(): ?User
     {
         $u = wp_get_current_user();
@@ -33,7 +48,17 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         $args = ['orderby' => 'display_name', 'order' => 'ASC'];
         if (!$includeGuests) {
-            $args['capability'] = Roles::CAP_MEMBER;
+            // Nur Konten mit einer Rolle in der App: neues Meta, alte WP-Rollen (noch nicht übernommen)
+            // oder Administratoren. Ob die Rolle Mitglied ist, prüft der Kern.
+            $args['meta_query'] = [['key' => self::ROLE_META, 'compare' => 'EXISTS']];
+            $ids = get_users(['meta_query' => $args['meta_query'], 'fields' => 'ID']);
+            $legacy = get_users(['role__in' => [Roles::ROLE_MEMBER, Roles::ROLE_ORGANIZER, Roles::ROLE_MANAGER, 'administrator'], 'fields' => 'ID']);
+            $ids = array_values(array_unique(array_map('intval', array_merge($ids, $legacy))));
+            if ($ids === []) {
+                return [];
+            }
+            unset($args['meta_query']);
+            $args['include'] = $ids;
         }
         $args = apply_filters('kompanie_app_members_query_args', $args);
         return array_map(fn (\WP_User $u): User => $this->toUser($u), get_users($args));
@@ -50,11 +75,12 @@ final class WpUsers implements UserDirectory, AuthContext
             'nickname' => $name,
             'first_name' => $parts[0],
             'last_name' => $parts[1] ?? '',
-            'role' => Roles::ROLE_MEMBER,
+            'role' => 'subscriber',
         ]);
         if (is_wp_error($id)) {
             throw new \DomainException($id->get_error_message());
         }
+        update_user_meta((int) $id, self::ROLE_META, AppRoles::MEMBER);
         return (int) $id;
     }
 
@@ -63,7 +89,7 @@ final class WpUsers implements UserDirectory, AuthContext
         return false;
     }
 
-    public function setLevel(int $id, Level $level): void
+    public function setRole(int $id, string $role): void
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
@@ -74,19 +100,14 @@ final class WpUsers implements UserDirectory, AuthContext
         if (get_current_user_id() !== 0 && !current_user_can('promote_user', $id)) {
             throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }
-        if ($level === Level::Admin || in_array('administrator', (array) $user->roles, true)) {
+        if ($role === AppRoles::ADMIN || in_array('administrator', (array) $user->roles, true)) {
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
         }
+        update_user_meta($id, self::ROLE_META, $role);
+        // Die früheren WP-Rollen der App gelten nicht mehr, sobald das Meta gesetzt ist.
         $user->remove_role(Roles::ROLE_MANAGER);
         $user->remove_role(Roles::ROLE_ORGANIZER);
         $user->remove_role(Roles::ROLE_MEMBER);
-        if ($level === Level::Manager) {
-            $user->add_role(Roles::ROLE_MANAGER);
-        } elseif ($level === Level::Organizer) {
-            $user->add_role(Roles::ROLE_ORGANIZER);
-        } elseif ($level === Level::Member) {
-            $user->add_role(Roles::ROLE_MEMBER);
-        }
         // Ein Konto ohne jede Rolle kann sich nicht sinnvoll anmelden.
         if (empty($user->roles)) {
             $user->add_role('subscriber');
@@ -126,37 +147,42 @@ final class WpUsers implements UserDirectory, AuthContext
         return (bool) email_exists($email);
     }
 
-    public static function level(\WP_User $u): Level
+    /** Rolle in der App: Administrator, sonst das Meta, sonst die frühere WP-Rolle. */
+    public static function role(\WP_User $u): string
     {
         if (in_array('administrator', (array) $u->roles, true) || is_super_admin((int) $u->ID)) {
-            return Level::Admin;
+            return AppRoles::ADMIN;
         }
-        if (user_can($u, Roles::CAP_MANAGE)) {
-            return Level::Manager;
+        $meta = get_user_meta((int) $u->ID, self::ROLE_META, true);
+        if (is_string($meta) && $meta !== '') {
+            return $meta;
         }
-        if (user_can($u, Roles::CAP_EVENTS)) {
-            return Level::Organizer;
-        }
-        return user_can($u, Roles::CAP_MEMBER) ? Level::Member : Level::Guest;
+        return self::legacyRole($u);
+    }
+
+    /** Rolle nach den früheren WP-Rollen der App (vor Issue #28). */
+    public static function legacyRole(\WP_User $u): string
+    {
+        $roles = (array) $u->roles;
+        return match (true) {
+            in_array(Roles::ROLE_MANAGER, $roles, true) => AppRoles::MANAGER,
+            in_array(Roles::ROLE_ORGANIZER, $roles, true) => AppRoles::ORGANIZER,
+            in_array(Roles::ROLE_MEMBER, $roles, true) => AppRoles::MEMBER,
+            default => AppRoles::GUEST,
+        };
     }
 
     private function toUser(\WP_User $u): User
     {
-        $map = [
-            Roles::CAP_MEMBER => Capability::Member,
-            Roles::CAP_MANAGE => Capability::Manage,
-            Roles::CAP_EVENTS => Capability::ManageEvents,
-            Roles::CAP_DOCUMENTS => Capability::ManageDocuments,
-            'create_users' => Capability::CreateUsers,
-            'promote_users' => Capability::PromoteUsers,
-            'manage_options' => Capability::ManageSettings,
-        ];
-        $caps = [];
-        foreach ($map as $wpCap => $cap) {
-            if (user_can($u, $wpCap)) {
+        $role = self::role($u);
+        $caps = $this->capabilities !== null ? ($this->capabilities)($role) : AppRoles::templateCapabilities($role);
+        // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter.
+        $wp = ['create_users' => Capability::CreateUsers, 'promote_users' => Capability::PromoteUsers, 'manage_options' => Capability::ManageSettings];
+        foreach ($wp as $wpCap => $cap) {
+            if (!in_array($cap, $caps, true) && user_can($u, $wpCap)) {
                 $caps[] = $cap;
             }
         }
-        return new User((int) $u->ID, (string) $u->display_name, (string) $u->user_login, self::level($u), $caps);
+        return new User((int) $u->ID, (string) $u->display_name, (string) $u->user_login, $role, $caps);
     }
 }

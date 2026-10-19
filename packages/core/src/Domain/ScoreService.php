@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\CatalogRepository;
@@ -27,7 +28,15 @@ final class ScoreService
         private readonly UserDirectory $users,
         private readonly UserNames $names,
         private readonly Time $time,
+        private readonly ?RoleService $roles = null,
     ) {
+    }
+
+    /** Punkte für die API: ganze Zahl, wenn möglich, sonst mit höchstens zwei Nachkommastellen. */
+    public static function pointsValue(float|int $v): int|float
+    {
+        $v = round((float) $v, 2);
+        return floor($v) === $v ? (int) $v : $v;
     }
 
     /* ---------------------------------------------------------------- */
@@ -40,18 +49,26 @@ final class ScoreService
         return array_map([$this, 'formatPoints'], $this->points->forUser($userId));
     }
 
-    public function pointsTotal(int $userId): int
+    public function pointsTotal(int $userId): int|float
     {
-        return $this->points->total($userId);
+        return self::pointsValue($this->points->total($userId));
     }
 
     /**
-     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date
+     * Der Punktefaktor kommt aus der Rolle der Person (Issue #28) und wird mit dem Eintrag gespeichert.
+     * apply_factor = false bucht für alle mit Faktor 1 (die Leitung kann den Faktor so übergehen).
+     *
+     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor
      * @return array<int, array<string, mixed>>
      */
     public function givePoints(array $in, int $by): array
     {
-        $userIds = $this->memberIds($in['user_ids'] ?? null);
+        $users = $this->members($in['user_ids'] ?? null);
+        $applyFactor = !array_key_exists('apply_factor', $in) || Input::bool($in['apply_factor']);
+        $factors = [];
+        foreach ($users as $id => $user) {
+            $factors[$id] = $applyFactor && $this->roles !== null ? $this->roles->pointsFactor($user->role) : 1.0;
+        }
         $date = Input::date($in['date'] ?? null, $this->time->today());
 
         $catalogId = Input::integer($in['catalog_id'] ?? null) ?: null;
@@ -74,7 +91,7 @@ final class ScoreService
             throw ApiError::invalid('Bitte einen Grund angeben.');
         }
 
-        $ids = $this->points->add($userIds, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc());
+        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc());
         return array_map(fn (int $id): array => $this->formatPoints((array) $this->points->find($id)), $ids);
     }
 
@@ -149,7 +166,7 @@ final class ScoreService
     {
         $out = [];
         foreach ($this->points->totals() as $uid => $total) {
-            $out[$uid]['points'] = $total;
+            $out[$uid]['points'] = self::pointsValue($total);
         }
         foreach ($this->penalties->openTotals() as $uid => $total) {
             $out[$uid]['open_cents'] = $total;
@@ -210,7 +227,18 @@ final class ScoreService
     /* ---------------------------------------------------------------- */
 
     /** @return int[] */
+    /** @return int[] */
     private function memberIds(mixed $raw): array
+    {
+        return array_keys($this->members($raw));
+    }
+
+    /**
+     * Ausgewählte Mitglieder prüfen (keine Gäste).
+     *
+     * @return array<int, User> ID => Benutzer
+     */
+    private function members(mixed $raw): array
     {
         if (!is_array($raw) || $raw === []) {
             throw ApiError::invalid('Bitte mindestens ein Mitglied auswählen.');
@@ -223,6 +251,7 @@ final class ScoreService
             }
             $ids[$id] = $id;
         }
+        $users = [];
         foreach ($ids as $id) {
             $user = $this->users->find($id);
             if (!$user) {
@@ -231,8 +260,9 @@ final class ScoreService
             if (!$user->isMember()) {
                 throw ApiError::invalid('Gäste können keine Punkte oder Strafen bekommen.');
             }
+            $users[$id] = $user;
         }
-        return array_values($ids);
+        return $users;
     }
 
     /** Reihenfolge im Katalog; begrenzt, damit sie in jede Datenbankspalte passt. */
@@ -256,7 +286,10 @@ final class ScoreService
         return [
             'id' => (int) $r['id'],
             'user_id' => (int) $r['user_id'],
-            'points' => (int) $r['points'],
+            // was zählt (Punkte × Faktor); dazu die gebuchte Punktzahl und der Faktor der Rolle
+            'points' => self::pointsValue((int) $r['points'] * (float) ($r['factor'] ?? 1)),
+            'base_points' => (int) $r['points'],
+            'factor' => (float) ($r['factor'] ?? 1),
             'reason' => (string) $r['reason'],
             'catalog_id' => $r['catalog_id'] ? (int) $r['catalog_id'] : null,
             'date' => (string) $r['entry_date'],

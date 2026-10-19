@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Standalone;
 
-use KompanieApp\Core\Auth\Level;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\Passwords;
 use KompanieApp\Core\Domain\Text;
 
@@ -122,7 +122,7 @@ final class Setup
             throw new \RuntimeException(sprintf('Das Passwort muss mindestens %d Zeichen lang sein.', Passwords::MIN_LENGTH));
         }
         $password ??= Passwords::readable(12);
-        $id = $users->add($name, $login, $email, $password, Level::Admin);
+        $id = $users->add($name, $login, $email, $password, Roles::ADMIN);
         return ['id' => $id, 'login' => $login, 'password' => $password];
     }
 }

@@ -39,43 +39,53 @@ $member = $d->createUser('kpwp_mitglied', 'member');
 $organizer = $d->createUser('kpwp_verwalter', 'organizer');
 $manager = $d->createUser('kpwp_leitung', 'manager');
 $admin = $d->createUser('kpwp_admin', 'admin');
-$c->ok(user_can($member, Roles::CAP_MEMBER) && !user_can($member, Roles::CAP_MANAGE) && !user_can($member, Roles::CAP_EVENTS), 'Mitglied: Recht kompanie_member');
-$c->ok(user_can($organizer, Roles::CAP_MEMBER) && user_can($organizer, Roles::CAP_EVENTS) && user_can($organizer, Roles::CAP_DOCUMENTS) && !user_can($organizer, Roles::CAP_MANAGE), 'Verwalter: Termine, Dokumente und Mitglied, keine Punkte/Strafen');
-$c->ok(KompanieApp\WordPress\WpUsers::level(get_userdata($organizer)) === KompanieApp\Core\Auth\Level::Organizer, 'Verwalter: Stufe organizer');
-$c->ok(user_can($manager, Roles::CAP_MANAGE) && user_can($manager, Roles::CAP_MEMBER) && user_can($manager, Roles::CAP_EVENTS) && user_can($manager, Roles::CAP_DOCUMENTS), 'Leitung: Verwalten, Termine, Dokumente und Mitglied');
-$c->ok(user_can($admin, Roles::CAP_EVENTS) && user_can($admin, Roles::CAP_MANAGE) && user_can($admin, Roles::CAP_DOCUMENTS), 'Administrator: alle App-Rechte');
-$app->users->setLevel($organizer, KompanieApp\Core\Auth\Level::Manager);
-clean_user_cache($organizer);
-$c->ok(!in_array(Roles::ROLE_ORGANIZER, get_userdata($organizer)->roles, true) && in_array(Roles::ROLE_MANAGER, get_userdata($organizer)->roles, true), 'Verwalter → Leitung: alte Rolle entfernt');
-$app->users->setLevel($organizer, KompanieApp\Core\Auth\Level::Organizer);
-clean_user_cache($organizer);
+$caps = static fn (int $id): array => array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, $app->users->find($id)?->capabilities ?? []);
+$c->ok($caps($member) === ['member'], 'Mitglied: nur Mitgliederbereich');
+$c->ok(array_diff(['member', 'manage_events', 'manage_documents'], $caps($organizer)) === [] && !in_array('manage', $caps($organizer), true), 'Verwalter: Termine, Dokumente und Mitglied, keine Punkte/Strafen');
+$c->ok($app->users->find($organizer)?->role === KompanieApp\Core\Auth\Roles::ORGANIZER && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::ROLE_META, true) === 'organizer', 'Rolle steht im User-Meta');
+$c->ok(array_diff(['member', 'manage', 'manage_events', 'manage_documents'], $caps($manager)) === [], 'Leitung: Verwalten, Termine, Dokumente und Mitglied');
+$c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
-// Update einer bestehenden Installation: kompanie_manager hieß „Verwalter“ und hatte keine Termine; kompanie_organizer fehlte.
-get_role(Roles::ROLE_MANAGER)->remove_cap(Roles::CAP_EVENTS);
-get_role(Roles::ROLE_MANAGER)->remove_cap(Roles::CAP_DOCUMENTS);
-remove_role(Roles::ROLE_ORGANIZER);
+// Eigene Rolle aus der App wirkt auch in WordPress.
+$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => ['member', 'manage']]);
+$kasseKey = (string) array_search('Kpwp Kasse', array_column($app->roles()->all(), 'label', 'key'), true);
+$app->users->setRole($member, $kasseKey);
+clean_user_cache($member);
+$c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage', $caps($member), true) && !in_array('manage_events', $caps($member), true), 'Eigene Rolle: Rechte aus der App');
+$app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
+$app->roles()->delete($kasseKey, null);
+
+// Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
+$legacy = wp_insert_user(['user_login' => 'kpwp_alt', 'user_pass' => wp_generate_password(), 'role' => Roles::ROLE_ORGANIZER]);
+clean_user_cache($legacy);
+$c->ok($app->users->find($legacy)?->role === 'organizer', 'Früher WP-Rolle kompanie_organizer: gilt bis zur Übernahme');
+$listed = array_map(static fn (KompanieApp\Core\Auth\User $u): int => $u->id, $app->users->list(false));
+$c->ok(in_array($legacy, $listed, true), 'Konto mit früherer WP-Rolle steht in der Mitgliederliste');
+$c->ok(Roles::migrateUsers() >= 1 && get_user_meta($legacy, KompanieApp\WordPress\WpUsers::ROLE_META, true) === 'organizer', 'Übernahme: frühere WP-Rolle → Meta');
+$c->ok(Roles::migrateUsers() === 0, 'Übernahme nur einmal');
+wp_delete_user($legacy);
+
+// Bezeichnungen der früheren WP-Rollen folgen kompanie.json.
 $wpRoles = wp_roles();
 $wpRoles->roles[Roles::ROLE_MANAGER]['name'] = 'Verwalter';
 update_option($wpRoles->role_key, $wpRoles->roles);
 Roles::install(['member' => 'Mitglied', 'organizer' => 'Verwalter', 'manager' => 'Spieß']);
-$c->ok(get_role(Roles::ROLE_MANAGER)->has_cap(Roles::CAP_EVENTS) && get_role(Roles::ROLE_MANAGER)->has_cap(Roles::CAP_DOCUMENTS), 'Update: kompanie_manager bekommt Termine und Dokumente');
-$c->ok(get_role(Roles::ROLE_ORGANIZER) !== null && get_role(Roles::ROLE_ORGANIZER)->has_cap(Roles::CAP_EVENTS), 'Update: kompanie_organizer wird angelegt');
-$c->ok(wp_roles()->role_names[Roles::ROLE_MANAGER] === 'Spieß' && wp_roles()->role_names[Roles::ROLE_ORGANIZER] === 'Verwalter', 'Update: Bezeichnungen der Rollen aus kompanie.json');
-$c->ok(get_option($wpRoles->role_key)[Roles::ROLE_MANAGER]['name'] === 'Spieß', 'Update: Bezeichnung gespeichert');
-$app->users->setLevel($member, KompanieApp\Core\Auth\Level::Guest);
+$c->ok(wp_roles()->role_names[Roles::ROLE_MANAGER] === 'Spieß' && get_option($wpRoles->role_key)[Roles::ROLE_MANAGER]['name'] === 'Spieß', 'Update: Bezeichnungen der WP-Rollen aus kompanie.json');
+
+$app->users->setRole($member, KompanieApp\Core\Auth\Roles::GUEST);
 clean_user_cache($member);
-$c->ok(['subscriber'] === array_values(get_userdata($member)->roles), 'Zurück zum Gast: Konto behält Rolle Abonnent');
+$c->ok(['subscriber'] === array_values(get_userdata($member)->roles) && $app->users->find($member)?->role === 'guest', 'Zurück zum Gast: Konto behält Rolle Abonnent');
 $editor = wp_insert_user(['user_login' => 'kpwp_redakteur', 'user_pass' => wp_generate_password(), 'role' => 'editor']);
-$app->users->setLevel($editor, KompanieApp\Core\Auth\Level::Member);
+$app->users->setRole($editor, KompanieApp\Core\Auth\Roles::MEMBER);
 clean_user_cache($editor);
-$c->ok(in_array('editor', get_userdata($editor)->roles, true) && in_array(Roles::ROLE_MEMBER, get_userdata($editor)->roles, true), 'Mitgliedsrolle zusätzlich zur Webseiten-Rolle');
+$c->ok(in_array('editor', get_userdata($editor)->roles, true) && $app->users->find($editor)?->role === 'member', 'Mitgliedsrolle zusätzlich zur Webseiten-Rolle');
 wp_delete_user($editor);
-$app->users->setLevel($member, KompanieApp\Core\Auth\Level::Member);
+$app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 
 $c->section('Benutzer anlegen');
 $d->actAs($admin);
 [$s, $u] = $d->request('POST', '/users', ['name' => 'Kpwp Neu', 'email' => 'kpwp-neu@example.com']);
-$c->ok($s === 201 && array_values(get_userdata($u['id'])->roles) === [Roles::ROLE_MEMBER], 'Neues Konto bekommt die Rolle Mitglied');
+$c->ok($s === 201 && get_user_meta($u['id'], KompanieApp\WordPress\WpUsers::ROLE_META, true) === 'member' && array_values(get_userdata($u['id'])->roles) === ['subscriber'], 'Neues Konto bekommt die Rolle Mitglied (Meta, WP-Rolle Abonnent)');
 $c->ok($d->request('POST', '/users', ['name' => 'X', 'email' => 'kpwp-neu@example.com'])[0] === 400, 'Vergebene E-Mail → 400');
 $c->ok(wp_authenticate($u['username'], $u['password']) instanceof WP_User, 'Anmeldung mit Startpasswort bei WordPress');
 wp_delete_user($u['id']);
