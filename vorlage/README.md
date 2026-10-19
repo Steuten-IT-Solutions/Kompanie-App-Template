@@ -17,6 +17,9 @@ Hier wird nur eingetragen, was die Kompanie ausmacht.
 | `assets/logo.png` | Logo (oder `.svg`, `.jpg`, `.jpeg`, `.webp`) |
 | `legal/` | geplant: `impressum.md`, `datenschutz.md` (wartet auf die rechtliche Prüfung; wird noch nicht verwendet) |
 
+Welche **Bereiche** die App hat (Termine, Kalender, News, Galerie, Punkte, Strafen), steht nicht hier: Das wählt der
+Admin der Kompanie in der App, bei der Ersteinrichtung und später unter *Einstellungen → Bereiche*.
+
 ## Ändern
 
 Am einfachsten über das Formular **„Kompanie ändern“** im Kern-Repo (es öffnet hier einen Pull Request). Oder direkt hier:

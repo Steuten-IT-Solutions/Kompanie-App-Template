@@ -9,25 +9,31 @@ import Wartung from './Wartung';
  * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
  */
 export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
+  // Nach dem Speichern von Kalender, Galerie oder News: „eingerichtet?“ der Bereiche neu laden.
+  const [setupSaved, setSetupSaved] = useState(0);
   return (
     <div className="settings">
-      <Bereiche onToast={onToast} />
+      <Bereiche onToast={onToast} refresh={setupSaved} />
       <Wartung onToast={onToast} />
-      <Verbindungen onToast={onToast} />
+      <Verbindungen onToast={onToast} onSetupSaved={() => setSetupSaved((n) => n + 1)} />
     </div>
   );
 }
 
-function Verbindungen({ onToast }: { onToast: (msg: string) => void }) {
+function Verbindungen({ onToast, onSetupSaved }: { onToast: (msg: string) => void; onSetupSaved: () => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
+  const onSaved = (n: AdminSettings) => {
+    setData(n);
+    onSetupSaved();
+  };
   return (
     <>
-      <Calendar settings={s} onSaved={setData} onToast={onToast} />
-      <Gallery settings={s} onSaved={setData} onToast={onToast} />
-      {s.news && <News settings={s} onSaved={setData} onToast={onToast} />}
+      <Calendar settings={s} onSaved={onSaved} onToast={onToast} />
+      <Gallery settings={s} onSaved={onSaved} onToast={onToast} />
+      {s.news && <News settings={s} onSaved={onSaved} onToast={onToast} />}
     </>
   );
 }
@@ -89,9 +95,19 @@ export function FeatureSwitches({
   );
 }
 
-/** Einstellungen → Bereiche: Jeder Schalter speichert sofort; beim Ausschalten wird nachgefragt. */
-function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.features(), []);
+/**
+ * Einstellungen → Bereiche: Jeder Schalter speichert sofort; beim Ausschalten wird nachgefragt.
+ * Jeder geladene Stand geht auch an die App (Tabs), z. B. wenn ein Bereich gerade eingerichtet wurde.
+ */
+function Bereiche({ onToast, refresh }: { onToast: (msg: string) => void; refresh: number }) {
+  const { data, error, loading, reload, setData } = useAsync(
+    () =>
+      api.features().then((list) => {
+        applyFeatures(list);
+        return list;
+      }),
+    [refresh],
+  );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
