@@ -114,6 +114,13 @@ function load(string $dir): array
     }
     uasort($pages, static fn (array $a, array $b): int => [$a['reihenfolge'], $a['slug']] <=> [$b['reihenfolge'], $b['slug']]);
     foreach ($pages as $slug => $p) {
+        // Jeder Verweis seite:… muss ein gültiger Seitenname sein (sonst entstünde ein toter oder fremder Link).
+        preg_match_all('/\]\(seite:([^)]*)\)/', $p['markdown'], $all);
+        foreach ($all[1] as $target) {
+            if (!preg_match('/^[a-z0-9-]+$/', $target)) {
+                $errors[] = "$slug.md: ungültiger Verweis seite:{$target}";
+            }
+        }
         preg_match_all('/\]\(seite:([a-z0-9-]+)\)/', $p['markdown'], $links);
         foreach ($links[1] as $target) {
             if (!isset($pages[$target])) {

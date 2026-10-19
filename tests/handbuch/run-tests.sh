@@ -15,10 +15,10 @@ php scripts/handbuch.php --check > /dev/null && ok "Alle Seiten in docs/handbuch
 cp -R docs/handbuch "$T/src"
 printf -- '---\ntitel: Kaputt\nreihenfolge: 1\nrechte: [darf_alles]\nbereiche: [inventar]\n---\nText {bereich.unbekannt} und [weiter](seite:gibt-es-nicht).\n' > "$T/src/kaputt.md"
 printf -- '---\ntitel: Offen\nreihenfolge: 2\nrechte: manage_settings\nbereiche: events\n---\nText.\n' > "$T/src/offen.md"
-printf -- '---\ntitel: Für alle\nreihenfolge: 3\nrechte: []\n---\nSiehe [Installation](seite:admin-installation-eigenstaendig).\n' > "$T/src/verweis.md"
+printf -- '---\ntitel: Für alle\nreihenfolge: 3\nrechte: []\n---\nSiehe [Installation](seite:admin-installation-eigenstaendig) und [x](seite:javascript:alert).\n' > "$T/src/verweis.md"
 rm "$T/src/strafen-verwalten.md" "$T/src/rollen-vergeben.md"
 OUT="$(php scripts/handbuch.php --check --src="$T/src" 2>&1 || true)"
-for want in 'unbekanntes Recht „darf_alles“' 'unbekannter Bereich „inventar“' 'unbekannter Platzhalter {bereich.unbekannt}' 'Verweis auf fehlende Seite „gibt-es-nicht“' 'Bereich „penalties“ hat eigene Rechte' 'offen.md: „rechte“ muss eine Liste in [ ] sein' 'offen.md: „bereiche“ muss eine Liste in [ ] sein' 'verweis.md: Verweis auf „admin-installation-eigenstaendig“, die nicht jeder sieht' 'Für das Recht „promote_users“ fehlt eine eigene Handbuchseite'; do
+for want in 'unbekanntes Recht „darf_alles“' 'unbekannter Bereich „inventar“' 'unbekannter Platzhalter {bereich.unbekannt}' 'Verweis auf fehlende Seite „gibt-es-nicht“' 'Bereich „penalties“ hat eigene Rechte' 'offen.md: „rechte“ muss eine Liste in [ ] sein' 'offen.md: „bereiche“ muss eine Liste in [ ] sein' 'verweis.md: Verweis auf „admin-installation-eigenstaendig“, die nicht jeder sieht' 'Für das Recht „promote_users“ fehlt eine eigene Handbuchseite' 'verweis.md: ungültiger Verweis seite:javascript:alert'; do
   grep -qF "$want" <<< "$OUT" || fail "Fehler nicht erkannt: $want – $OUT"
 done
 ok "Unbekannte Rechte, Bereiche, Platzhalter, Listen ohne [ ], tote oder nicht sichtbare Verweise und Rechte ohne Seite werden gemeldet"

@@ -4,7 +4,7 @@ reihenfolge: 55
 rechte: [manage_penalties]
 bereiche: [penalties]
 ---
-Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Recht hat, findet unten den Tab **Verwaltung**.
+Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt).
 
 ## Eintrag anlegen
 1. **Verwaltung → {bereich.penalties} +** öffnen.

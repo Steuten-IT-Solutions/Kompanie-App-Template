@@ -25,7 +25,7 @@ const plain = (html: string) =>
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
+    .replace(/&#0?39;|&apos;/g, "'")
     .replace(/&amp;/g, '&');
 
 /** Bezeichnungen der Kompanie für die Platzhalter im Handbuch (scripts/handbuch.php). */

@@ -8,7 +8,7 @@ Ohne Anmeldung siehst du alles, was öffentlich ist, z. B. die öffentlichen {be
 ## Anmelden
 1. Oben rechts auf **Anmelden** tippen.
 2. Benutzernamen (oder E-Mail-Adresse) und Passwort eingeben. Beides bekommst du von der Kompanie.
-3. **Angemeldet bleiben** ist vorausgewählt: Dann bleibst du auf diesem Gerät rund ein Jahr angemeldet (400 Tage), sonst zwei Tage.
+3. **Angemeldet bleiben** ist vorausgewählt: Dann bleibst du auf diesem Gerät rund ein Jahr angemeldet (400 Tage), sonst bis du den Browser schließt, höchstens zwei Tage.
 
 ## Passwort ändern
 Unter **Konto → Passwort ändern** das aktuelle und das neue Passwort eingeben (mindestens 8 Zeichen). Du bleibst auf diesem Gerät angemeldet, alle anderen Geräte werden abgemeldet.
