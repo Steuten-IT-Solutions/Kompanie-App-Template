@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Port\Cache;
+use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
@@ -167,12 +168,28 @@ final class DriveClient
     public function download(string $fileId): string
     {
         $token = $this->accessToken();
-        $res = $this->http->request('GET', self::FILES_URL . '/' . rawurlencode($fileId) . '?alt=media&supportsAllDrives=true', ['Authorization' => 'Bearer ' . $token], null, 90);
-        if ($res['status'] !== 200) {
-            throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $res['status']);
-        }
+        $url = self::FILES_URL . '/' . rawurlencode($fileId) . '?alt=media&supportsAllDrives=true';
+        $headers = ['Authorization' => 'Bearer ' . $token];
         $tmp = $this->files->tempFile();
-        file_put_contents($tmp, $res['body']);
+        try {
+            if ($this->http instanceof ExtendedHttpClient) {
+                // Direkt in die Datei: Fotos mit vielen MB nicht ganz im Arbeitsspeicher halten.
+                $status = $this->http->download($url, $tmp, $headers, 90)['status'];
+            } else {
+                $res = $this->http->request('GET', $url, $headers, null, 90);
+                $status = $res['status'];
+                if ($status === 200) {
+                    file_put_contents($tmp, $res['body']);
+                }
+            }
+        } catch (\RuntimeException $e) {
+            @unlink($tmp);
+            throw $e;
+        }
+        if ($status !== 200) {
+            @unlink($tmp);
+            throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $status);
+        }
         return $tmp;
     }
 
