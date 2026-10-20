@@ -6,7 +6,7 @@
 # die freigegebene; ohne solche Version ändert sich nichts. VERSION ist dann leer.
 #
 # Umgebung: REPO, ACTION (promote|withdraw|promote-checked), VERSION, GH_TOKEN, KOMPANIE_SIGNING_KEY,
-#   optional GIT_REMOTE, GH und STABLE_CORE_FILE (für Tests).
+#   optional STABLE_CORE_VALUE (statt der Datei STABLE_CORE), GIT_REMOTE, GH und STABLE_CORE_FILE (für Tests).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 : "${REPO:?}" "${ACTION:?}" "${KOMPANIE_SIGNING_KEY:?}"
@@ -16,7 +16,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 GH="${GH:-gh}"
 if [ "$ACTION" = promote-checked ]; then
-  STABLE_CORE="$(cat "${STABLE_CORE_FILE:-$ROOT/STABLE_CORE}" 2> /dev/null || true)"
+  # Geprüfter Programmcode: aus STABLE_CORE_VALUE („Version freigeben“) oder der Datei STABLE_CORE
+  STABLE_CORE="${STABLE_CORE_VALUE:-$(cat "${STABLE_CORE_FILE:-$ROOT/STABLE_CORE}" 2> /dev/null || true)}"
   if [ -z "${STABLE_CORE//[[:space:]]/}" ]; then
     echo "STABLE_CORE ist leer: Es ist noch kein Programmcode als geprüft eingetragen." >&2
     exit 1
