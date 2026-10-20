@@ -20,6 +20,7 @@ use KompanieApp\Core\Domain\SettingsService;
 use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
+use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
@@ -191,6 +192,11 @@ final class App
     {
         $this->noteTaskRun();
         try {
+            // Wartungsmodus (Issue #42): alles außer Updates und Statusmeldungen wartet; die Push-Warteschlange
+            // bleibt liegen und wird nach dem Ende verschickt.
+            if (!MaintenanceService::runsDuringMaintenance($task) && $this->maintenance()->active()) {
+                return;
+            }
             if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
                 if ((string) ($this->gallery()->status()['error'] ?? '') !== '') {
@@ -380,6 +386,11 @@ final class App
     public function drive(): DriveClient
     {
         return $this->service(DriveClient::class, fn () => new DriveClient($this->settings, $this->http, $this->cache, $this->files, $this->time()));
+    }
+
+    public function maintenance(): MaintenanceService
+    {
+        return $this->service(MaintenanceService::class, fn () => new MaintenanceService($this));
     }
 
     public function settingsService(): SettingsService

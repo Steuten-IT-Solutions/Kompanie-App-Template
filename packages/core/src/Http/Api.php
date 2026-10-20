@@ -29,6 +29,8 @@ final class Api
     public const NEWS_PER_PAGE = 10;
     /** Der Einrichtungsassistent wurde abgeschlossen oder übersprungen. */
     public const SETUP_SETTING = 'setup_done';
+    /** Bleiben im Wartungsmodus für alle erreichbar: Konfiguration (zeigt die Wartung an) und Anmeldung für Admins. */
+    private const MAINTENANCE_OPEN = ['/config', '/auth/login', '/auth/logout', '/auth/csrf'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -67,6 +69,10 @@ final class Api
         try {
             if ($route->feature !== null && !$this->app->features()->enabled($route->feature)) {
                 throw new ApiError(403, 'feature_disabled', 'Dieser Bereich ist ausgeschaltet.');
+            }
+            // Wartungsmodus (Issue #42): vor allen Routen; Laufzeit-Konfiguration und Anmeldung bleiben erreichbar.
+            if (!in_array($route->path, self::MAINTENANCE_OPEN, true) && $this->app->maintenance()->blocks($this->app->authContext->currentUser())) {
+                throw $this->app->maintenance()->error();
             }
             $this->authorize($route);
             $result = ($route->handler)($request);
@@ -246,8 +252,18 @@ final class Api
             'roles' => $a->roles()->publicList(),
             'user' => $a->authContext->currentUser()?->toArray(),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
+            'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
         ];
+    }
+
+    /**
+     * @param array{on: bool, reason: string, since: int, by: int} $state
+     * @return array{on: bool, reason: string, since: int}
+     */
+    private static function maintenanceInfo(array $state): array
+    {
+        return ['on' => $state['on'], 'reason' => $state['reason'], 'since' => $state['since']];
     }
 
     /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */
@@ -472,6 +488,8 @@ final class Api
             new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
 
             // Einstellungen (Admins)
+            new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
+            new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung
             new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),

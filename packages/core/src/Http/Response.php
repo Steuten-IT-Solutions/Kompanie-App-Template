@@ -21,6 +21,6 @@ final class Response
 
     public static function error(ApiError $e): self
     {
-        return new self(['code' => $e->errorCode, 'message' => $e->getMessage()], $e->status);
+        return new self(['code' => $e->errorCode, 'message' => $e->getMessage()] + $e->extra, $e->status);
     }
 }

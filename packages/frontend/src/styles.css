@@ -1924,3 +1924,38 @@ fieldset.feature-list legend {
   margin-top: 10px;
   border-color: var(--danger);
 }
+
+/* Wartungsmodus (Issue #42) */
+.maintenance-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding-top: 48px;
+  text-align: center;
+}
+.maintenance-logo {
+  width: 96px;
+  height: auto;
+}
+.maintenance-reason {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.maintenance-page .maintenance-reason {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+}
+.maintenance-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.9rem;
+}
+.maintenance-banner .btn {
+  flex-shrink: 0;
+}

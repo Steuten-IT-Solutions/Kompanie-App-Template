@@ -422,8 +422,13 @@ final class Kernel
     {
         $app = $this->app();
         $user = $app->authContext->currentUser();
-        $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
         $this->securityHeaders();
+        if ($app->maintenance()->blocks($user)) {
+            http_response_code(503);
+            header('Cache-Control: no-store');
+            return;
+        }
+        $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
         if (isset($res['placeholder'])) {
             // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
             http_response_code($res['status']);

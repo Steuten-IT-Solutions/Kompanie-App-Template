@@ -134,6 +134,11 @@ final class AppPage
     private static function sendPhoto(App $app, int $id, string $size): void
     {
         $user = $app->authContext->currentUser();
+        if ($app->maintenance()->blocks($user)) {
+            status_header(503);
+            nocache_headers();
+            return;
+        }
         $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
         if (isset($res['placeholder'])) {
             // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.

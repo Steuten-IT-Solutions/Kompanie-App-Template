@@ -1106,3 +1106,53 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
 });
+
+test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wartungsseite, danach wieder normal', async ({
+  page,
+  browser,
+}) => {
+  // Mitglied hat die App offen; seine Termine liegen im Speicher des Service Workers.
+  const member = await browser.newPage();
+  await login(member, 'mitglied1');
+  await expect(member.getByText('Vereinsabend')).toBeVisible();
+  const storedApi = () =>
+    member.evaluate(async () => {
+      const urls: string[] = [];
+      for (const name of await caches.keys()) {
+        if (name.startsWith('kompanie-data')) for (const req of await (await caches.open(name)).keys()) urls.push(req.url);
+      }
+      return urls.length;
+    });
+  await expect.poll(storedApi).toBeGreaterThan(0);
+  const before = await storedApi();
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  const card = page.locator('.settings-section', { hasText: 'Wartungsmodus' });
+  await card.getByLabel(/Begründung/).fill('Umstellung auf die neue App,\nbis ca. 18 Uhr');
+  await expect(card.getByText('43/500 Zeichen')).toBeVisible();
+  page.once('dialog', (d) => d.accept());
+  await card.getByRole('button', { name: 'Wartungsmodus einschalten' }).click();
+  await expect(page.locator('.maintenance-banner')).toContainText('Wartungsmodus aktiv – nur Admins können die App nutzen.');
+  await expect(page.locator('.maintenance-banner')).toContainText('bis ca. 18 Uhr');
+  await shot(page, '31-wartungsmodus-admin');
+
+  // Das Mitglied öffnet die App erneut: nur die Wartungsseite, die gespeicherten Daten bleiben.
+  await member.reload();
+  await expect(member.locator('.maintenance-page')).toContainText('Die App wird gerade gewartet. Bitte versuche es später noch einmal.');
+  await expect(member.locator('.maintenance-reason')).toHaveText('Umstellung auf die neue App,\nbis ca. 18 Uhr');
+  await expect(member.locator('.tabbar')).toHaveCount(0);
+  await member.getByRole('button', { name: 'Erneut versuchen' }).click();
+  await expect(member.getByText('Die Wartung läuft noch.')).toBeVisible();
+  expect(await storedApi()).toBeGreaterThanOrEqual(before);
+  await shot(member, '32-wartungsmodus-mitglied');
+
+  // Admin beendet über das Banner; das Mitglied ist nach „Erneut versuchen“ wieder in der App.
+  await page.locator('.maintenance-banner').getByRole('button', { name: 'Beenden' }).click();
+  await expect(page.locator('.maintenance-banner')).toHaveCount(0);
+  await member.getByRole('button', { name: 'Erneut versuchen' }).click();
+  await expect(member.getByText('Vereinsabend')).toBeVisible();
+  await expect(member.locator('.maintenance-page')).toHaveCount(0);
+  await member.close();
+});

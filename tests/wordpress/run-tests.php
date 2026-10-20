@@ -345,6 +345,21 @@ $cache = new KompanieApp\WordPress\WpCache();
 $key = 'test_' . wp_generate_password(6, false);
 $c->ok($cache->increment($key, 900) === 1 && $cache->increment($key, 900) === 2 && $cache->increment($key . 'x', 900) === 1, 'Zähler im Cache zählt atomar je Schlüssel');
 
+$c->section('Wartungsmodus');
+wp_set_current_user($admin);
+$app->maintenance()->set(true, 'Umstellung', $app->users->find($admin));
+$c->ok(rest_do_request(new WP_REST_Request('GET', '/kompanie-app/v1/me'))->get_status() === 200, 'WP-Administrator arbeitet normal');
+wp_set_current_user($member);
+$res = rest_do_request(new WP_REST_Request('GET', '/kompanie-app/v1/me'));
+$c->ok($res->get_status() === 503 && ($res->get_data()['code'] ?? '') === 'maintenance' && ($res->get_data()['reason'] ?? '') === 'Umstellung', 'Mitglied → 503 maintenance mit Begründung');
+$c->ok(rest_do_request(new WP_REST_Request('GET', '/kompanie-app/v1/config'))->get_status() === 200, '/config bleibt erreichbar');
+$c->ok(str_contains(do_shortcode('[kompanie_termine]'), 'class="ka'), 'Shortcodes der Webseite zeigen weiter an (Entscheidung im Issue)');
+wp_set_current_user($admin);
+$app->maintenance()->set(false, null, $app->users->find($admin));
+wp_set_current_user($member);
+$c->ok(rest_do_request(new WP_REST_Request('GET', '/kompanie-app/v1/me'))->get_status() === 200, 'Danach wieder normal');
+wp_set_current_user(0);
+
 $c->section('Alias-Namensraum (Übernahme einer früheren App)');
 KompanieApp\WordPress\RestBridge::register($app, 'kpwp-alt/v1');
 $res = rest_do_request(new WP_REST_Request('GET', '/kpwp-alt/v1/config'));
