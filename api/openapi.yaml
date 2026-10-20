@@ -727,6 +727,134 @@ paths:
                         name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
 
+  /titles:
+    get:
+      tags: [Verwaltung]
+      summary: Titelliste (Ehrentitel und Ämter, Issue #22)
+      x-capability: manage_titles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Title' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Titel anlegen (kommt ans Ende der Liste)
+      x-capability: manage_titles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60, description: Eindeutig ohne Groß-/Kleinschreibung }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Title' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /titles/order:
+    put:
+      tags: [Verwaltung]
+      summary: Reihenfolge der Titel
+      x-capability: manage_titles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Neue Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Title' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /titles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Titel umbenennen oder (de)aktivieren
+      x-capability: manage_titles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 60 }
+                active: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Title' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Titel löschen (zugewiesene nur umbenennen oder deaktivieren → 400)
+      x-capability: manage_titles
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/titles:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: Titel eines Mitglieds ersetzen
+      description: |
+        Nur Mitglieder. Neu vergeben werden nur aktive Titel; deaktivierte, die das Mitglied schon hat, darf es
+        behalten. Neu verliehene Titel lösen eine Benachrichtigung (Art `titles`) aus, entfernte nicht.
+      x-capability: manage_titles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title_ids]
+              properties:
+                title_ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Neue Titel des Mitglieds
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  titles: { type: array, items: { $ref: '#/components/schemas/TitleRef' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /catalog:
     get:
       tags: [Verwaltung]
@@ -801,7 +929,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
-      x-capability: 'manage_points, manage_penalties, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
+      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
       parameters:
         - name: all
           in: query
@@ -827,7 +955,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
-      x-capability: 'manage_points, manage_penalties, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
+      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
       responses:
         '200':
           description: OK
@@ -1628,7 +1756,7 @@ components:
   schemas:
     PushType:
       type: string
-      enum: [penalties, points, events, reminder, news]
+      enum: [penalties, points, ranks, titles, events, reminder, news]
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -1655,7 +1783,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -1739,7 +1867,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_events, manage_documents, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_events, manage_documents, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
             system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
@@ -1751,7 +1879,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_events, manage_documents, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_events, manage_documents, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
@@ -1767,7 +1895,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_events, manage_documents, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_events, manage_documents, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte; member bringt calendar mit.'
 
     UpdateStatus:
@@ -1853,6 +1981,7 @@ components:
             points: { type: boolean }
             penalties: { type: boolean }
             ranks: { type: boolean }
+            titles: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -1872,6 +2001,10 @@ components:
           oneOf:
             - $ref: '#/components/schemas/RankRef'
             - type: 'null'
+        titles:
+          description: Eigene Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
+          type: array
+          items: { $ref: '#/components/schemas/TitleRef' }
 
     PointEntry:
       type: object
@@ -2016,6 +2149,10 @@ components:
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
         rank_title: { type: [string, 'null'], description: 'Dienstgrad (nur mit Bereich Dienstgrade und Recht manage_ranks)' }
+        titles:
+          description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
+          type: array
+          items: { $ref: '#/components/schemas/TitleRef' }
 
     MemberDetail:
       allOf:
@@ -2032,6 +2169,10 @@ components:
             rank_history:
               type: array
               items: { $ref: '#/components/schemas/RankHistoryEntry' }
+            titles:
+              description: Titel (nur mit Bereich Titel und Recht manage_titles)
+              type: array
+              items: { $ref: '#/components/schemas/TitleRef' }
 
     Rank:
       type: object
@@ -2043,6 +2184,23 @@ components:
         min_points: { type: [integer, 'null'], description: 'Punkteschwelle; null = ohne. Für Mitglieder nur mit dem Bereich Punkte' }
         active: { type: boolean }
         assigned: { type: integer, description: 'Wie oft vergeben (nur mit all=1)' }
+
+    Title:
+      type: object
+      required: [id, title, sort, active, assigned]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 60 }
+        sort: { type: integer, description: Reihenfolge der Anzeige }
+        active: { type: boolean, description: 'Deaktivierte werden nicht mehr neu vergeben; wer sie hat, behält sie' }
+        assigned: { type: integer, description: Wie vielen Mitgliedern zugewiesen }
+
+    TitleRef:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: integer }
+        title: { type: string }
 
     RankRef:
       type: object

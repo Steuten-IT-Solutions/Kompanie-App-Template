@@ -132,6 +132,13 @@ final class TitleServiceTest extends TestCase
         $t = $this->titles('Ehrenmitglied');
         $guest = $this->users->add('gast', Roles::GUEST);
         $this->assertSame(400, $this->call('PUT', "/members/$guest/titles", ['title_ids' => [$t['Ehrenmitglied']]])->status);
+        // Mitglied wird Gast: behält den Titel, bis er entfernt wird; dann lässt sich der Titel löschen.
+        $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$t['Ehrenmitglied']]]);
+        $this->users->setRole($this->m, Roles::GUEST);
+        $this->assertSame(['Ehrenmitglied'], array_column($this->call('GET', "/members/{$this->m}")->data['titles'], 'title'));
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => []])->status);
+        $this->assertSame(200, $this->call('DELETE', "/titles/{$t['Ehrenmitglied']}")->status);
+        $t = $this->titles('Ehrenmitglied');
         $this->assertSame(404, $this->call('PUT', '/members/999/titles', ['title_ids' => []])->status);
 
         $this->app->features()->update(['titles' => false]);

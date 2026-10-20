@@ -228,6 +228,22 @@ final class RankServiceTest extends TestCase
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status);
     }
 
+    public function testFormerMemberCanOnlyLoseTheRank(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10]]);
+        $this->points($this->m, 20, '2026-01-01');
+        $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']]);
+        $this->users->setRole($this->m, Roles::GUEST);
+        $this->assertSame(400, $this->call('DELETE', "/ranks/{$r['Gefreiter']}")->status, 'noch vergeben');
+        // Über der Schwelle: Mitglieder würden nicht degradiert, frühere Mitglieder verlieren den Dienstgrad trotzdem.
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(200, $this->call('DELETE', "/ranks/{$r['Gefreiter']}")->status);
+        [$again] = array_values($this->ranks([['Gefreiter', 10]]));
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $again])->status, 'Gäste bekommen keinen');
+    }
+
     public function testSameDayEntriesAndNullDatesInOverview(): void
     {
         $this->setUpApp(['ranks' => true, 'points' => true]);

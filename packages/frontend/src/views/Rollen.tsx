@@ -12,6 +12,7 @@ const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen` },
   { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
   { key: 'manage_ranks', label: `${sec.ranks} pflegen, befördern und degradieren` },
+  { key: 'manage_titles', label: `${sec.titles} pflegen und vergeben` },
   { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
   { key: 'manage_documents', label: 'Dokumente pflegen und alle Dokumente sehen' },
   { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },

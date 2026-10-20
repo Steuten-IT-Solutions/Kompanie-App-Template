@@ -178,6 +178,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Ohne Punkte:** frei befördern und degradieren. **Mit Punkten** (Lank #16, für alle, auch Admins): befördern erst ab der Schwelle des Ziels, degradieren nur unter der Schwelle des aktuellen; Dienstgrade ohne Schwelle frei. Gesetzte Schwellen aktiver Dienstgrade müssen mit `sort` streng steigen. Nächster Dienstgrad, fehlende Punkte, erreichbarer Dienstgrad und „Schwelle erreicht seit“ werden berechnet (Beförderungsübersicht in einem Durchlauf über alle Buchungen).
 - Anlegen eines Mitglieds mit Anfangspunkten (`manage_points`) und Dienstgrad (`manage_ranks`): alles wird vor dem Anlegen des Kontos geprüft.
 
+### Titel (Issue #22)
+
+- Bereich `titles`: Ehrentitel und Ämter, unabhängig von Dienstgrad und Punkten; Recht `manage_titles` für Liste und Zuweisung.
+- Tabellen `titles` (`title`, `sort`, `active`) und `member_titles` (mehrere je Benutzer). Wie in Lank (`wp_mkl_titles`, Meta `mkl_title_id`), damit die Lanker Daten übernommen werden können.
+- Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren; deaktivierte werden nicht neu vergeben, bleiben aber bei ihren Trägern. Neu verliehene Titel lösen eine Benachrichtigung (Art `titles`) aus.
+- Die Mitgliederliste holt alle Titel in zwei Abfragen (`TitleService::byUser`).
+- Wird ein Konto gelöscht (WordPress `deleted_user`), entfernt `App::userDeleted` seine Push-Abos und seine Zuweisungen (Dienstgrad, Titel); Buchungen und Verläufe bleiben.
+
 ### Rechte und Rollen
 
 | Recht | Bedeutung |
@@ -187,6 +195,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_points` | Punkte vergeben und stornieren, Katalog pflegen |
 | `manage_penalties` | Strafen vergeben, als bezahlt markieren, stornieren |
 | `manage_ranks` | Dienstgradliste pflegen, befördern und degradieren |
+| `manage_titles` | Titelliste pflegen und Titel vergeben |
 | `manage_events` | öffentliche Termine pflegen |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (die Dokumente selbst kommen mit #2) |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
@@ -212,6 +221,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Punkte | Punkte verwalten | `member`, `manage_points` |
   | Strafen | Strafen verwalten | `member`, `manage_penalties` |
   | Dienstgrade | Dienstgrade verwalten | `member`, `manage_ranks` |
+  | Titel | Titel verwalten | `member`, `manage_titles` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.

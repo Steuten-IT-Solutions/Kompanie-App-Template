@@ -1549,3 +1549,30 @@ fieldset.feature-list legend {
 .rank-list li.current {
   font-weight: 700;
 }
+
+/* Titel (Ehrentitel und Ämter) */
+.title-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.badge-title {
+  background: transparent;
+  color: var(--primary-text);
+  border: 1px solid currentColor;
+}
+.my-titles {
+  margin: 0 0 12px;
+}
+.my-titles .title-badges {
+  margin-left: 0;
+}
+.my-titles .badge-title {
+  font-size: 0.85rem;
+  padding: 2px 11px;
+}
+.member-titles .toggle {
+  display: flex;
+}

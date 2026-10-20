@@ -14,6 +14,7 @@ use KompanieApp\Core\Storage\TitleRepository;
  * - Unabhängig von Dienstgrad und Punkten; sie werden zusätzlich zum Dienstgrad angezeigt.
  * - Die Liste pflegen und Titel zuweisen darf, wer „Titel verwalten“ darf.
  * - Ein Mitglied kann mehrere Titel haben; angezeigt in der Reihenfolge der Liste.
+ * - Nur Mitglieder bekommen Titel; wer keines mehr ist, behält sie, bis sie entfernt werden.
  * - Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren. Deaktivierte Titel werden nicht
  *   mehr neu vergeben; wer sie hat, behält sie.
  *
@@ -156,9 +157,6 @@ final class TitleService
     public function assign(int $userId, mixed $titleIds): array
     {
         $user = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        if (!$user->isMember()) {
-            throw ApiError::invalid(sprintf('%s haben nur Mitglieder.', $this->app->config->sectionLabel('titles', 'Titel')));
-        }
         if (!is_array($titleIds)) {
             throw ApiError::invalid('Bitte die Titel als Liste angeben.');
         }
@@ -173,6 +171,10 @@ final class TitleService
             $id = Input::integer($raw);
             if ($id === null || !isset($titles[$id])) {
                 throw ApiError::invalid('Unbekannter Titel.');
+            }
+            // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann Titel nur verlieren.
+            if (!$user->isMember() && !in_array($id, $current, true)) {
+                throw ApiError::invalid(sprintf('%s haben nur Mitglieder.', $this->app->config->sectionLabel('titles', 'Titel')));
             }
             if (!$titles[$id]['active'] && !in_array($id, $current, true)) {
                 throw ApiError::invalid(sprintf('Der Titel „%s“ ist deaktiviert und wird nicht mehr vergeben.', $titles[$id]['title']));
