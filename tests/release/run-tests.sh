@@ -159,6 +159,17 @@ if pub "$SHA3" > "$T/nolist.log" 2>&1; then fail "Neue Liste trotz vorhandener R
 grep -q "keine Update-Liste" "$T/nolist.log" && ok "Fehlende Liste bei vorhandenen Releases: Abbruch" || fail "Fehlende Liste: $(cat "$T/nolist.log")"
 git --git-dir="$T/remote.git" fetch --quiet "$T/remote-sicherung.git" gh-pages:gh-pages
 
+# Geprüfte Version freigeben (promote-checked): nur mit passendem STABLE_CORE, sonst ändert sich nichts
+checked() { env REPO=org/kompanie-test ACTION=promote-checked VERSION= STABLE_CORE_FILE="$T/STABLE_CORE" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh; }
+: > "$T/STABLE_CORE"
+if checked > "$T/checked.log" 2>&1; then fail "promote-checked ohne STABLE_CORE"; fi
+grep -q "STABLE_CORE ist leer" "$T/checked.log" && ok "promote-checked ohne STABLE_CORE: Abbruch" || fail "Leeres STABLE_CORE: $(cat "$T/checked.log")"
+echo "$CORE 0000000000000000000000000000000000000000000000000000000000000000" > "$T/STABLE_CORE"
+grep -q "keine geprüfte Version" <<< "$(checked)" && [ -f "$T/releases/v$CORE.2/PRERELEASE" ] && ok "promote-checked mit anderem Programmcode: nichts freigegeben" || fail "Fremder Code freigegeben"
+echo "$CORE $(php scripts/package.php --code-hash)" > "$T/STABLE_CORE"
+grep -q "gebe $CORE.2 frei" <<< "$(checked)" && pages && [ ! -f "$T/releases/v$CORE.2/PRERELEASE" ] && grep -q "\"stable\": \"$CORE.2\"" <<< "$(list)" \
+  && ok "promote-checked gibt die neueste geprüfte Version frei" || fail "promote-checked: $(list | grep -A3 channels)"
+grep -q "keine geprüfte Version" <<< "$(checked)" && ok "promote-checked ein zweites Mal: nichts mehr zu tun" || fail "promote-checked doppelt"
 env REPO=org/kompanie-test ACTION=promote VERSION="$CORE.2" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > /dev/null && [ ! -f "$T/releases/v$CORE.2/PRERELEASE" ] && ok "Freigeben über control-release.sh (Release kein Vorab-Release mehr)" || fail "Freigeben"
 pages
 grep -q "releases/download/v$CORE.2/kompanie-app-wordpress.zip" "$T/pages/index.html" && ok "Download-Seite nach der Freigabe" || fail "Download-Seite nach Freigabe"

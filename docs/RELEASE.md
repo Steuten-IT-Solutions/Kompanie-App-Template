@@ -115,7 +115,11 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
    *Actions → Kompanien abgleichen → Run workflow*). Jede Änderung am Programmcode auf `main` führt so zu
    neuen Versionen für alle Kompanien, zuerst im Kanal `early`.
 4. Nach dem Test der Demo-Installation Kern-Version und `coreCode` in `STABLE_CORE` eintragen (Pull Request)
-   und je Kompanie freigeben: *Actions → Versionen steuern*, `promote`.
+   und für alle Kompanien auf einmal freigeben: *Actions → Versionen steuern*, Aktion `promote-checked`,
+   Kompanie-Repo leer. Das gibt je Kompanie die neueste Version mit genau diesem Programmcode frei (nicht
+   zurückgezogen, Kern nicht gesperrt, neuer als die freigegebene); wo es keine gibt, ändert sich nichts.
+   Danach gebaute Versionen mit diesem Code gehen ohnehin direkt nach `stable`. Einzelne Kompanie: Repo
+   angeben; eine bestimmte Version: Aktion `promote` mit Repo und Version.
 
 ## Was beim Veröffentlichen passiert
 
