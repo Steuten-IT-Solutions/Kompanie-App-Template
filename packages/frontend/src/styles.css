@@ -1914,3 +1914,13 @@ fieldset.feature-list legend {
   margin: 12px 0;
   text-decoration: none;
 }
+.credentials-text {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+.account-delete {
+  padding: 14px 16px;
+  margin-top: 10px;
+  border-color: var(--danger);
+}

@@ -15,6 +15,9 @@ use KompanieApp\Core\Port\UserDirectory;
 /** Mitglieder, Rollen und Passwörter. */
 final class MemberService
 {
+    /** WordPress speichert höchstens 100 Zeichen (user_email); vorab prüfen, damit Mehrere-Anlegen nicht mittendrin scheitert. */
+    public const EMAIL_MAX = 100;
+
     public function __construct(
         private readonly UserDirectory $users,
         private readonly ScoreService $scores,
@@ -227,7 +230,7 @@ final class MemberService
 
         $email = trim(is_string($in['email'] ?? null) ? $in['email'] : '');
         if ($email !== '') {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
                 throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
             }
             if (isset($taken['email:' . mb_strtolower($email)]) || $this->users->emailExists($email)) {
@@ -329,8 +332,9 @@ final class MemberService
             throw ApiError::invalid('Bitte einen Namen angeben.');
         }
         $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
-        if ($email !== $current['email'] && $email !== '') {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
+        if (mb_strtolower($email) !== mb_strtolower($current['email']) && $email !== '') {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
                 throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
             }
             if ($this->users->emailExists($email)) {

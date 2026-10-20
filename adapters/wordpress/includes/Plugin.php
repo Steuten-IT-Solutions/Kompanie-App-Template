@@ -7,6 +7,7 @@ namespace KompanieApp\WordPress;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Infra\LocalFileStorage;
+use KompanieApp\Core\Storage\UserData;
 
 /** Setzt den Kern mit den WordPress-Umsetzungen zusammen und meldet die Hooks an. */
 final class Plugin
@@ -14,6 +15,17 @@ final class Plugin
     private static ?App $app = null;
 
     /** Die App wird erst beim ersten Zugriff erzeugt, also wenn WordPress geladen ist. */
+    /** Daten einer Person in den Tabellen einer Seite des Netzwerks löschen (Multisite, Issue #24). */
+    private static function purgeOnBlog(int $userId, int $blogId): void
+    {
+        try {
+            global $wpdb;
+            UserData::purge(new WpdbConnection($wpdb, $wpdb->get_blog_prefix($blogId) . 'kompanie_'), $userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Daten des Kontos nicht entfernt: ' . $e->getMessage());
+        }
+    }
+
     public static function app(): App
     {
         if (self::$app === null) {
@@ -87,7 +99,15 @@ final class Plugin
         // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
         add_filter('cron_schedules', [WpScheduler::class, 'schedules']);
         add_action(WpScheduler::HOOK, static fn (string $task) => WpUpdateTarget::$installed ? null : self::app()->runTask($task));
-        // Abos und Zuweisungen (Dienstgrad, Titel) eines gelöschten Kontos entfernen.
+        // Multisite: aus einer Seite entfernt bzw. im Netzwerk gelöscht – die Daten jeder betroffenen Seite löschen
+        // (die Tabellen der App gibt es je Seite).
+        add_action('remove_user_from_blog', static fn (int $id, int $blogId) => self::purgeOnBlog($id, $blogId), 10, 2);
+        add_action('wpmu_delete_user', static function (int $id): void {
+            foreach (array_keys(get_blogs_of_user($id)) as $blogId) {
+                self::purgeOnBlog($id, (int) $blogId);
+            }
+        });
+        // Alle eigenen Daten eines gelöschten Kontos entfernen (Issue #24).
         add_action('deleted_user', static function (int $id): void {
             try {
                 self::app()->userDeleted($id);

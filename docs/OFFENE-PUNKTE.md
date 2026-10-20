@@ -150,6 +150,8 @@ App (#20) → Empfang, Verlauf und Warnungen im Cockpit (project-cockpit#12).
 
 Ziel: klären, ob die App mit der Berechtigung `drive.file` und einer Ordnerauswahl über den Google Picker dauerhaft an alle Bilder eines Ordners kommt. Nur dann gibt es „Mit Google verbinden“ ohne Googles Sicherheitsbewertung.
 
+Stand und Ergebnis: Issue #40.
+
 ### Was wir bereitstellen
 
 1. Google-Cloud-Projekt (unseres, nicht das einer Kompanie)

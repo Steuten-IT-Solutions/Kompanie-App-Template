@@ -11,14 +11,29 @@ function fit(): void {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
   // iPhone meldet screen.width immer hochkant, Android passt es an die Drehung an.
   const screenW = landscape ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  // Geteilter Bildschirm: Das Fenster ist schmaler als der Bildschirm; dann an das Fenster anpassen.
+  const targetW = Math.min(screenW, window.outerWidth || screenW);
   const layoutW = root.clientWidth;
-  if (screenW > 0 && screenW < 1024 && layoutW > screenW * 1.15) {
-    root.style.setProperty('zoom', String(layoutW / screenW));
+  if (targetW > 0 && targetW < 1024 && layoutW > targetW * 1.15) {
+    root.style.setProperty('zoom', String(layoutW / targetW));
     // vw/vh wachsen mit „zoom“ mit; die Styles teilen dadurch wieder (styles.css).
-    root.style.setProperty('--kompanie-zoom', String(layoutW / screenW));
+    root.style.setProperty('--kompanie-zoom', String(layoutW / targetW));
   }
 }
 
-fit();
-window.addEventListener('load', fit);
-window.addEventListener('resize', fit);
+/** Nur neu rechnen, wenn sich Bildschirmbreite oder Ausrichtung ändern – nicht, wenn die Tastatur die Höhe ändert
+ * (sonst spränge das Eingabefeld weg). */
+let last = '';
+function refit(): void {
+  const key = `${screen.width}x${screen.height}:${window.matchMedia?.('(orientation: landscape)').matches ? 'q' : 'h'}`;
+  if (key === last && document.readyState === 'complete') return;
+  last = key;
+  fit();
+}
+
+refit();
+window.addEventListener('load', () => {
+  last = '';
+  refit();
+});
+window.addEventListener('resize', refit);

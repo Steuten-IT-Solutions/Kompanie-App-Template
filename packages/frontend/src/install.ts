@@ -16,7 +16,9 @@ import { config } from './api';
 /** Adresse der Installationsanleitung – zum Weiterschicken per WhatsApp, E-Mail und in den Zugangsdaten. */
 export function installUrl(): string {
   const app = config?.appUrl ?? '/app/';
-  // Ohne URL-Umschreibung (…?kompanie_app=index) direkt über die Sprungmarke #/installieren.
+  // WordPress ohne URL-Umschreibung (…?kompanie_app=index): als Parameter, ohne Sprungmarke – die ginge beim Öffnen in
+  // Chrome (chromeUrl) verloren. main.tsx leitet ?kompanie_app=installieren auf die Anleitung.
+  if (/[?&]kompanie_app=/.test(app)) return app.replace(/([?&]kompanie_app=)[^&#]*/, '$1installieren');
   return app.includes('?') ? `${app}#/installieren` : `${app}installieren/`;
 }
 

@@ -47,6 +47,7 @@ use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Storage\UserData;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
@@ -289,13 +290,7 @@ final class App
      */
     public function userDeleted(int $userId): void
     {
-        $this->push()->deleteForUser($userId);
-        $this->db->execute('DELETE FROM {points} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {penalties} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {rank_history} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {attendance_entries} WHERE user_id = ?', [$userId]);
+        UserData::purge($this->db, $userId);
     }
 
     public function pushTriggers(): PushTriggers

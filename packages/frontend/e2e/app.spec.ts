@@ -179,11 +179,14 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
   await page.locator('.row', { hasText: `Jan ${id}` }).click();
-  page.on('dialog', (d) => (d.type() === 'prompt' ? d.accept(`Jan ${id}`) : d.accept()));
   await page
     .locator('.account-panel')
     .getByRole('button', { name: /Konto löschen|Aus der App entfernen/ })
     .click();
+  const confirm = page.getByRole('button', { name: /Endgültig (löschen|entfernen)/ });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('Zur Bestätigung den Namen eintippen').fill(`jan ${id}`);
+  await confirm.click();
   await expect(page.locator('.toast')).toContainText(`Jan ${id}`);
   await expect(page.locator('.row', { hasText: `Jan ${id}` })).toHaveCount(0);
 });

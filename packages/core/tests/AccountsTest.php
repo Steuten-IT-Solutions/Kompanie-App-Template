@@ -46,6 +46,8 @@ final class AccountsTest extends TestCase
         $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['username' => 'admin'])->status, 'vergeben');
         $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['username' => 'mit leerzeichen'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['username' => 'MAX'])->status, 'nur Groß-/Kleinschreibung');
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['email' => 'Max@Example.org'])->status, 'E-Mail nur Groß-/Kleinschreibung');
+        $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['email' => str_repeat('a', 95) . '@example.org'])->status, 'zu lang für WordPress');
 
         // WordPress: Benutzernamen fest.
         $this->users->adminsAssignable = false;

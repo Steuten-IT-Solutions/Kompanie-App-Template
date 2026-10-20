@@ -20,13 +20,15 @@ export function credentialsText(c: { name: string; username: string; password: s
 /** Zugangsdaten anzeigen, kopieren, teilen und als Zettel ausdrucken. */
 export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?: () => void }) {
   const [copied, setCopied] = useState(false);
+  // Ohne Zugriff auf die Zwischenablage (z. B. ohne HTTPS): Text zum Markieren zeigen (mehrzeilig, anders als prompt()).
+  const [showText, setShowText] = useState(false);
   const text = people.map(credentialsText).join('\n\n');
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
     } catch {
-      window.prompt('Zugangsdaten kopieren:', text);
+      setShowText(true);
     }
   }
   async function share() {
@@ -62,6 +64,19 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
           </section>
         ))}
       </div>
+      {showText && (
+        <label className="field no-print">
+          <span>Zugangsdaten zum Kopieren</span>
+          <textarea
+            className="credentials-text"
+            readOnly
+            rows={Math.min(12, people.length * 6)}
+            value={text}
+            onFocus={(e) => e.target.select()}
+            autoFocus
+          />
+        </label>
+      )}
       <div className="button-row no-print">
         <button className="btn" onClick={copy}>
           {copied ? 'Kopiert ✓' : 'Zugangsdaten kopieren'}
@@ -225,6 +240,13 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   );
 }
 
+/** Name ohne HTML-Entitäten (WordPress speichert z. B. „&“ als „&amp;“). */
+function plainName(s: string): string {
+  const t = document.createElement('textarea');
+  t.innerHTML = s;
+  return t.value;
+}
+
 /** Mitgliedsdetails: Name, Benutzername (nicht bei WordPress) und E-Mail ändern, Konto löschen (Issue #24). */
 export function AccountPanel({
   id,
@@ -239,6 +261,8 @@ export function AccountPanel({
 }) {
   const { data, error, loading, setData } = useAsync(() => api.account(id), [id]);
   const [editing, setEditing] = useState<AccountProfile | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const wordpress = config?.variant === 'wordpress';
@@ -271,19 +295,16 @@ export function AccountPanel({
     }
   }
 
+  // Name wie angezeigt (WordPress speichert z. B. „&“ als „&amp;“), Unicode einheitlich, ohne Leerzeichen außen.
+  const plain = (s: string) => plainName(s).normalize('NFC').trim().toLowerCase();
+  const nameMatches = plain(typed) !== '' && plain(typed) === plain(p.name);
+
   async function remove() {
-    const what = wordpress
-      ? `${p.name} aus der App entfernen? Alle Punkte, Strafen, Anwesenheiten, ${brand.labels.rank} und Titel dieser Person werden gelöscht; der Benutzer der Webseite bleibt (ohne Rolle in der App).`
-      : `Konto von ${p.name} löschen? Das Konto und alle Punkte, Strafen, Anwesenheiten, ${brand.labels.rank} und Titel dieser Person werden gelöscht.`;
-    if (!window.confirm(`${what} Das lässt sich nicht rückgängig machen.`)) return;
-    if (window.prompt(`Zur Bestätigung bitte den Namen eintippen: ${p.name}`)?.trim() !== p.name) {
-      onToast('Nicht gelöscht: Der Name stimmte nicht.');
-      return;
-    }
+    if (!nameMatches) return;
     setBusy(true);
     try {
       await api.deleteAccount(id);
-      onToast(wordpress ? `${p.name} aus der App entfernt` : `Konto von ${p.name} gelöscht`);
+      onToast(wordpress ? `${plainName(p.name)} aus der App entfernt` : `Konto von ${plainName(p.name)} gelöscht`);
       navigate('verwaltung/mitglieder');
     } catch (err) {
       onToast((err as Error).message);
@@ -344,11 +365,40 @@ export function AccountPanel({
               Angaben ändern
             </button>
             {level !== 'admin' && (
-              <button className="btn btn-danger" disabled={busy} onClick={remove}>
+              <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
                 {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
               </button>
             )}
           </div>
+          {confirming && (
+            <div className="card account-delete" role="alertdialog" aria-labelledby="account-delete-title">
+              <p id="account-delete-title">
+                <strong>{wordpress ? `${plainName(p.name)} aus der App entfernen?` : `Konto von ${plainName(p.name)} löschen?`}</strong>{' '}
+                Alle {brand.labels.sections.points}, {brand.labels.sections.penalties}, Anwesenheiten, {brand.labels.rank} und Titel dieser
+                Person werden gelöscht
+                {wordpress ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App).' : ', das Konto auch.'} Das lässt sich nicht
+                rückgängig machen.
+              </p>
+              <label className="field">
+                <span>Zur Bestätigung den Namen eintippen</span>
+                <input type="text" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+              </label>
+              <div className="button-row">
+                <button className="btn btn-danger" disabled={busy || !nameMatches} onClick={remove}>
+                  Endgültig {wordpress ? 'entfernen' : 'löschen'}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setConfirming(false);
+                    setTyped('');
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </section>
