@@ -114,8 +114,8 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
 3. Innerhalb von 30 Minuten baut „Kompanien abgleichen“ für jede Kompanie eine neue Version (oder sofort:
    *Actions → Kompanien abgleichen → Run workflow*). Jede Änderung am Programmcode auf `main` führt so zu
    neuen Versionen für alle Kompanien, zuerst im Kanal `early`.
-4. Nach dem Test: *Actions → Kernversion freigeben*, zur Bestätigung die Kern-Version aus `VERSION` eintragen
-   (z. B. `1.4.0`). Die Action bestimmt den Programmcode von `main` (Kern-Version und `coreCode`), gibt bei allen
+4. Nach dem Test: *Actions → Kernversion freigeben → Run workflow* (ohne Eingaben; freigegeben wird der aktuelle
+   Stand von `main`, also direkt nach dem Test starten). Die Action bestimmt den Programmcode von `main` (Kern-Version und `coreCode`), gibt bei allen
    Kompanien die neueste Version mit genau diesem Code frei (nicht zurückgezogen, Kern nicht gesperrt, neuer als die
    freigegebene), trägt den Code in `STABLE_CORE` auf `main` ein und startet „Kompanien abgleichen“: Kompanien ohne
    Version mit diesem Code bekommen sie dabei gebaut und direkt als `stable` veröffentlicht. Lässt der Branch-Schutz

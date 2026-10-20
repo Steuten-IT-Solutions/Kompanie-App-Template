@@ -1,4 +1,5 @@
 # Eine Kern-Version für alle Kompanien freigeben (nach dem Test auf einer Installation):
+# Ohne Eingaben: freigegeben wird immer der aktuelle Stand von main.
 # 1. Programmcode des Kerns auf main bestimmen (Kern-Version aus VERSION, Prüfsumme wie beim Veröffentlichen).
 # 2. Bei jeder Kompanie (Topic kompanie-app) die neueste Version mit genau diesem Programmcode freigeben;
 #    Kompanien ohne solche Version bleiben vorerst unverändert.
@@ -9,11 +10,6 @@ name: Kernversion freigeben
 
 on:
   workflow_dispatch:
-    inputs:
-      kern:
-        description: Kern-Version zur Bestätigung, z. B. 0.1.0 (muss der Datei VERSION auf main entsprechen)
-        type: string
-        required: true
 
 permissions:
   contents: read
@@ -40,13 +36,11 @@ jobs:
           extensions: sodium, mbstring
           tools: none
 
-      - name: Programmcode des Kerns bestimmen
+      - name: Programmcode des Kerns bestimmen (aktueller Stand von main)
         id: code
-        env:
-          KERN: ${{ inputs.kern }}
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          [ "$KERN" = "$VERSION" ] || { echo "::error::Auf main ist Kern-Version $VERSION, eingegeben wurde „$KERN“. Bitte die Kern-Version aus der Datei VERSION eintragen."; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || { echo "::error::Ungültige Kern-Version in VERSION: $VERSION"; exit 1; }
           STABLE="$VERSION $(php scripts/package.php --code-hash)"
           echo "Programmcode: $STABLE (main, $(git rev-parse --short HEAD))"
           echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
