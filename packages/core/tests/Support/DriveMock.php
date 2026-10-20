@@ -8,7 +8,8 @@ use KompanieApp\Core\Domain\DriveClient;
 
 /**
  * Simuliertes Google Drive: Token-Endpunkt (mit Prüfung der JWT-Signatur),
- * files.list mit Paging und Bild-Download (erzeugtes JPEG).
+ * files.list mit Paging und Bild-Download (erzeugtes JPEG). Dazu die Termine der
+ * Google Calendar API (events.list) für den Kalender über denselben Zugang.
  */
 final class DriveMock
 {
@@ -16,6 +17,14 @@ final class DriveMock
     public array $tree;
     public int $tokens = 0;
     public bool $jwtValid = false;
+    /** Berechtigungen im JWT der letzten Token-Anfrage des Dienstkontos. */
+    public string $jwtScope = '';
+    /** @var array<int, array<string, mixed>> Termine, die events.list liefert */
+    public array $calendarItems = [];
+    /** Antwort von events.list (z. B. 404, wenn der Kalender nicht freigegeben ist). */
+    public int $calendarStatus = 200;
+    /** @var array<int, array{url: string, headers: array<string, string>}> Anfragen an die Calendar API */
+    public array $calendarRequests = [];
     /** @var array<string, mixed>|null Formular der letzten Token-Anfrage per Refresh-Token (OAuth) */
     public ?array $refreshForm = null;
     /** Refresh-Token, das der Token-Endpunkt annimmt (sonst invalid_grant). */
@@ -93,10 +102,20 @@ final class DriveMock
                 $parts = explode('.', (string) ($form['assertion'] ?? ''));
                 $sig = base64_decode(strtr($parts[2] ?? '', '-_', '+/'));
                 $claim = json_decode((string) base64_decode(strtr($parts[1] ?? '', '-_', '+/')), true);
+                $this->jwtScope = (string) ($claim['scope'] ?? '');
                 $this->jwtValid = openssl_verify($parts[0] . '.' . $parts[1], $sig, $this->publicKey, OPENSSL_ALGO_SHA256) === 1
                     && ($claim['iss'] ?? '') === 'galerie@test.iam.gserviceaccount.com'
-                    && ($claim['scope'] ?? '') === DriveClient::SCOPE;
+                    && $this->jwtScope === DriveClient::scopes();
                 return ['status' => 200, 'body' => (string) json_encode(['access_token' => 'TOKEN123', 'expires_in' => 3600])];
+            }
+            if (str_starts_with($url, 'https://www.googleapis.com/calendar/v3/')) {
+                $this->calendarRequests[] = ['url' => $url, 'headers' => $headers];
+                if (($headers['Authorization'] ?? '') !== 'Bearer TOKEN123') {
+                    return ['status' => 401, 'body' => '{"error":{"message":"Request is missing required authentication credential."}}'];
+                }
+                return $this->calendarStatus === 200
+                    ? ['status' => 200, 'body' => (string) json_encode(['items' => $this->calendarItems])]
+                    : ['status' => $this->calendarStatus, 'body' => '{"error":{"message":"Not Found"}}'];
             }
             if (!str_starts_with($url, DriveClient::FILES_URL)) {
                 return ['status' => 404, 'body' => ''];

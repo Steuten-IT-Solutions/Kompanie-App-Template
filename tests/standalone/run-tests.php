@@ -489,6 +489,15 @@ try {
     $c->ok(json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'calendar_ics_url'")) === 'https://calendar.example.org/geheim/basic.ics', 'webcal:// wird als https:// gespeichert');
     $c->ok($d->request('PATCH', '/admin/settings', ['news_source' => 'none', 'calendar_ics_url' => ''])[1]['calendar']['source'] === 'none', 'Einstellungen lassen sich wieder leeren');
     $c->ok($d->request('POST', '/admin/gallery/sync')[0] === 503, 'Abgleich ohne Galerie → 503 not_configured');
+    // Kalender-IDs ohne API-Schlüssel: gelesen über den Google-Zugang der Galerie, wenn er den Kalender lesen darf.
+    $store = $kernel->app()->settings;
+    $store->set('drive_oauth', ['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'R', 'scope' => 'https://www.googleapis.com/auth/drive.readonly']);
+    $set = $d->request('PATCH', '/admin/settings', ['calendar_ids' => 'kompanie@group.calendar.google.com'])[1];
+    $c->ok($set['calendar']['source'] === 'none' && $set['calendar']['connection_needs_calendar_access'] === true && $set['gallery']['calendar_access'] === false, 'Verbindung ohne Kalender-Berechtigung: keine Quelle, Hinweis „neu verbinden“');
+    $store->set('drive_oauth', ['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'R', 'scope' => 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/calendar.readonly']);
+    $set = $d->request('GET', '/admin/settings')[1];
+    $c->ok($set['calendar']['source'] === 'google_connection' && $set['calendar']['connection_needs_calendar_access'] === false && $set['gallery']['calendar_access'] === true, 'Verbindung mit Kalender-Berechtigung: Quelle google_connection');
+    $c->ok($d->request('PATCH', '/admin/settings', ['drive_oauth' => '', 'calendar_ids' => ''])[1]['calendar']['source'] === 'none', 'Verbindung getrennt, Kalender-IDs geleert');
     $settings = $kernel->app()->settings;
     $settings->set('kptest_frisch', ['a']);
     $kernel->db()->execute("UPDATE {settings} SET value = ? WHERE name = 'kptest_frisch'", [json_encode(['a', 'b'])]); // wie eine andere Anfrage

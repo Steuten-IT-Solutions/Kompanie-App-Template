@@ -397,6 +397,43 @@ $app->calendar()->clearCache();
 remove_filter('pre_http_request', $icsFilter, 10);
 $c->ok($s === 200 && in_array('Vereinsabend', array_column($cal, 'title'), true), 'Kalender aus iCal-Link der Test-Instanz');
 
+// Kalender-IDs über den Google-Zugang der Galerie (Dienstkonto der Test-Instanz): Bearer-Token, kein API-Schlüssel.
+$calendarRequests = [];
+$googleCalFilter = static function ($pre, $args, $url) use (&$calendarRequests) {
+    if (!str_starts_with((string) $url, 'https://www.googleapis.com/calendar/v3/')) {
+        return $pre;
+    }
+    $calendarRequests[] = ['url' => (string) $url, 'auth' => (string) ($args['headers']['Authorization'] ?? '')];
+    $item = ['id' => 'g1', 'summary' => 'Probe über Google', 'start' => ['dateTime' => gmdate('Y-m-d', time() + 5 * 86400) . 'T18:00:00Z'], 'end' => ['dateTime' => gmdate('Y-m-d', time() + 5 * 86400) . 'T20:00:00Z']];
+    return ['headers' => [], 'body' => (string) wp_json_encode(['items' => [$item]]), 'response' => ['code' => 200, 'message' => 'OK'], 'cookies' => [], 'filename' => null];
+};
+add_filter('pre_http_request', $googleCalFilter, 10, 3);
+$app->settings->set('calendar_ids', 'kompanie@group.calendar.google.com');
+$app->calendar()->clearCache();
+[$s, $cal] = $d->request('GET', '/calendar');
+$c->ok($app->calendar()->source() === 'google_connection' && $s === 200 && in_array('Probe über Google', array_column($cal, 'title'), true), 'Kalender-IDs über den Google-Zugang der Galerie');
+$c->ok(count($calendarRequests) === 1 && $calendarRequests[0]['auth'] === 'Bearer TEST' && !str_contains($calendarRequests[0]['url'], 'key='), 'Abruf mit Bearer-Token, ohne API-Schlüssel');
+if (!function_exists('submit_button')) {
+    require_once ABSPATH . 'wp-admin/includes/template.php';
+}
+$renderSettings = static function () use ($app, $admin, $member): string {
+    wp_set_current_user($admin);
+    ob_start();
+    (new ReflectionMethod(KompanieApp\WordPress\SettingsPage::class, 'render'))->invoke(null, $app);
+    wp_set_current_user($member);
+    return (string) ob_get_clean();
+};
+$page = $renderSettings();
+$c->ok(str_contains($page, 'Kalender-IDs über den Google-Zugang der Galerie'), 'Einstellungsseite nennt die Quelle');
+$app->settings->set('drive_oauth', ['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'R', 'scope' => 'https://www.googleapis.com/auth/drive.readonly']);
+$app->calendar()->clearCache();
+$page = $renderSettings();
+$c->ok($app->calendar()->source() === 'ics' && str_contains($page, 'muss sie neu verbunden werden'), 'Verbindung ohne Kalender-Berechtigung: iCal-Link und Hinweis „neu verbinden“');
+remove_filter('pre_http_request', $googleCalFilter, 10);
+$app->settings->delete('drive_oauth');
+$app->settings->set('calendar_ids', '');
+$app->calendar()->clearCache();
+
 $c->section('HTTP: mehrere Anfragen gleichzeitig, Download in eine Datei');
 $http = new KompanieApp\WordPress\WpHttpClient();
 $echoDir = sys_get_temp_dir() . '/kompanie-http-' . bin2hex(random_bytes(4));

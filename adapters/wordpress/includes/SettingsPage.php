@@ -140,7 +140,22 @@ final class SettingsPage
             <hr />
             <h2 id="kalender">Kalender</h2>
             <p>Am einfachsten: In Google Kalender unter <em>Einstellungen → Kalender → Kalender integrieren</em> die
-               <strong>„Privatadresse im iCal-Format“</strong> kopieren und hier einfügen.</p>
+               <strong>„Privatadresse im iCal-Format“</strong> kopieren und hier einfügen.
+               Ein privater Kalender geht auch über seine Kalender-ID und den Google-Zugang der <a href="#galerie">Galerie</a>
+               (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist).
+               Reihenfolge: API-Schlüssel, dann Google-Zugang der Galerie, dann iCal-Link.</p>
+            <?php
+            $calendarSource = [
+                'google' => 'Google-API mit eigenem API-Schlüssel',
+                'google_connection' => 'Kalender-IDs über den Google-Zugang der Galerie',
+                'ics' => 'iCal-Link',
+            ][$app->calendar()->source()] ?? '';
+            ?>
+            <p>Genutzt wird: <strong><?php echo esc_html($calendarSource !== '' ? $calendarSource : 'noch keine Quelle'); ?></strong></p>
+            <?php if ($app->calendar()->connectionNeedsCalendarAccess()) : ?>
+                <div class="notice notice-info inline"><p>Die Google-Verbindung der Galerie darf den Kalender nicht lesen (beim Verbinden nicht erlaubt).
+                    Für die Kalender-IDs muss sie neu verbunden werden, mit Erlaubnis für den Kalender.</p></div>
+            <?php endif; ?>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_calendar" />
                 <?php wp_nonce_field('kompanie_app_calendar'); ?>
@@ -152,7 +167,7 @@ final class SettingsPage
                     <tr>
                         <th scope="row"><label for="calendar_ids">Oder: Google-Kalender-IDs</label></th>
                         <td><input type="text" class="regular-text" id="calendar_ids" name="calendar_ids" value="<?php echo esc_attr((string) $s->get('calendar_ids', '')); ?>" />
-                        <p class="description">Nur für öffentliche Kalender, mit API-Schlüssel. Mehrere durch Komma trennen.</p></td>
+                        <p class="description">Mit API-Schlüssel (nur öffentliche Kalender) oder über den Google-Zugang der Galerie (auch private). Mehrere durch Komma trennen.</p></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="google_api_key">Google-API-Schlüssel</label></th>
@@ -178,10 +193,12 @@ final class SettingsPage
                         <td>
                             <?php if ($app->drive()->oauth() !== null) : ?>
                                 <p>Verbunden mit Google<?php echo $app->drive()->oauthEmail() !== '' ? ' als <code>' . esc_html($app->drive()->oauthEmail()) . '</code>' : ''; ?>;
-                                   diese Verbindung wird für den Abgleich genutzt. Trennen lässt sie sich in der App unter <em>Einstellungen → Galerie</em>.</p>
+                                   diese Verbindung wird für den Abgleich genutzt. Trennen lässt sie sich in der App unter <em>Einstellungen → Galerie</em>.
+                                   <?php echo $app->drive()->calendarAccess() ? 'Sie darf auch den Kalender lesen.' : 'Den Kalender darf sie nicht lesen.'; ?></p>
                             <?php endif; ?>
                             <?php if ($email !== '') : ?>
-                                <p>Hinterlegt. Gib den Galerie-Ordner in Google Drive für <code><?php echo esc_html($email); ?></code> frei (Rolle „Betrachter“).</p>
+                                <p>Hinterlegt. Gib den Galerie-Ordner in Google Drive für <code><?php echo esc_html($email); ?></code> frei (Rolle „Betrachter“).
+                                   Für Termine über die Kalender-IDs den Kalender ebenfalls für diese Adresse freigeben („Alle Termindetails sehen“).</p>
                             <?php endif; ?>
                             <textarea id="drive_sa" name="drive_sa" rows="4" class="large-text code" placeholder="<?php echo esc_attr($email !== '' ? 'Nur ausfüllen, um den Schlüssel zu ersetzen' : 'Inhalt der JSON-Datei hier einfügen'); ?>"></textarea>
                         </td>
