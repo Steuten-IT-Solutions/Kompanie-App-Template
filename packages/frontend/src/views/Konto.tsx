@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, can, config, levelLabel } from '../api';
 import { isStandalone } from '../install';
-import { canPostBoard } from '../board';
+import { canManagePolls, canPostBoard } from '../board';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 
@@ -58,6 +58,16 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           <p className="muted small">Dringende Nachrichten für alle Mitglieder und Anwärter, 24 Stunden oben auf jeder Seite.</p>
           <button className="btn btn-secondary btn-block board-konto" onClick={() => navigate('brett')}>
             Nachricht schreiben
+          </button>
+        </div>
+      )}
+
+      {canManagePolls() && (
+        <div className="card account-card">
+          <h3>{brand.labels.sections.polls}</h3>
+          <p className="muted small">Umfragen für alle Mitglieder anlegen, ändern, beenden und auswerten.</p>
+          <button className="btn btn-secondary btn-block polls-konto" onClick={() => navigate('umfragen/verwalten')}>
+            Umfrage anlegen
           </button>
         </div>
       )}

@@ -14,6 +14,7 @@ use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\MemberService;
+use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
@@ -71,6 +72,7 @@ final class App
         PushService::TASK_SEND => 3600,
         PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
         BoardService::TASK => 3600,
+        PollService::TASK => 3600,
     ];
 
     /**
@@ -171,6 +173,8 @@ final class App
                 && ($this->features()->enabled('calendar') || $this->features()->enabled('news') || $this->features()->enabled('events')),
             // Schwarzes Brett: abgelaufene Nachrichten stündlich löschen (die API liefert sie ohnehin nicht mehr).
             BoardService::TASK => $this->features()->enabled('board'),
+            // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
+            PollService::TASK => $this->features()->enabled('polls'),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -222,6 +226,8 @@ final class App
                 $this->pushTriggers()->watch();
             } elseif ($task === BoardService::TASK) {
                 $this->board()->cleanup();
+            } elseif ($task === PollService::TASK && $this->features()->enabled('polls')) {
+                $this->polls()->remind();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -299,11 +305,12 @@ final class App
      * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
      * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
-     * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“).
+     * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
+     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben.
      */
     public function userDeleted(int $userId): void
     {
-        UserData::purge($this->db, $userId);
+        UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
     }
 
     public function pushTriggers(): PushTriggers
@@ -373,6 +380,11 @@ final class App
     public function board(): BoardService
     {
         return $this->service(BoardService::class, fn () => new BoardService($this));
+    }
+
+    public function polls(): PollService
+    {
+        return $this->service(PollService::class, fn () => new PollService($this));
     }
 
     public function titles(): TitleService

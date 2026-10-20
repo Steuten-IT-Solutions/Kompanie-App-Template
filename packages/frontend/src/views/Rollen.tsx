@@ -17,6 +17,7 @@ const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
   { key: 'manage_documents', label: 'Dokumente pflegen und alle Dokumente sehen' },
   { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben` },
+  { key: 'manage_polls', label: `${sec.polls}: anlegen, beenden und alle Ergebnisse sehen` },
   { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
   { key: 'promote_users', label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)' },
 ];

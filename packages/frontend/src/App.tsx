@@ -5,7 +5,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import BoardBanner from './BoardBanner';
-import { boardVisible, canPostBoard } from './board';
+import { boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
 import { MaintenanceBanner, MaintenancePage } from './maintenance';
 import { forgetPushOnLogout } from './push';
@@ -28,9 +28,20 @@ const Benachrichtigungen = lazyView(() => import('./views/Benachrichtigungen'));
 const Dokumente = lazyView(() => import('./views/Dokumente'));
 const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
 const Brett = lazyView(() => import('./views/Brett'));
+const Umfragen = lazyView(() => import('./views/Umfragen'));
 
 type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'meins' | 'verwaltung';
-type View = Tab | 'brett' | 'konto' | 'benachrichtigungen' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
+type View =
+  | Tab
+  | 'brett'
+  | 'umfragen'
+  | 'konto'
+  | 'benachrichtigungen'
+  | 'installieren'
+  | 'anmelden'
+  | 'einstellungen'
+  | 'einrichtung'
+  | 'hilfe';
 
 const VIEWS: View[] = [
   'termine',
@@ -40,6 +51,7 @@ const VIEWS: View[] = [
   'meins',
   'verwaltung',
   'brett',
+  'umfragen',
   'konto',
   'benachrichtigungen',
   'installieren',
@@ -73,6 +85,7 @@ const titles = (): Record<View, string> => ({
   // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
   news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
   brett: sec.board,
+  umfragen: sec.polls,
   konto: 'Mein Konto',
   benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
@@ -211,6 +224,8 @@ export default function App() {
       can('promote_users'),
     // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
     brett: boardVisible() || canPostBoard(),
+    // Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; laufende stehen am Brett.
+    umfragen: pollsVisible() || canManagePolls(),
     konto: !!user,
     benachrichtigungen: true,
     installieren: true,
@@ -345,6 +360,7 @@ export default function App() {
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {tab === 'brett' && <Brett onToast={showToast} />}
+            {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
             {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}

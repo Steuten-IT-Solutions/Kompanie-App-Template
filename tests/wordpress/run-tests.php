@@ -268,6 +268,14 @@ $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
 $db->insert('board_messages', ['body' => 'Kpwp abgelaufen', 'author_id' => 1, 'created_at' => $past(90000), 'updated_at' => $past(90000), 'expires_at' => $past(3600)]);
 do_action($hook, $boardTask);
 $c->ok((int) $db->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpwp abgelaufen']) === 0, 'Aufgabe über den Hook löscht abgelaufene Nachrichten');
+// Umfragen (Issue #4): Erinnerung stündlich über WP-Cron; der Hook vermerkt fällige Umfragen als erinnert (einmal).
+$pollTask = \KompanieApp\Core\Domain\PollService::TASK;
+$c->ok(wp_get_schedule($hook, [$pollTask]) === 'hourly', 'Umfragen: Erinnerung stündlich über WP-Cron');
+$future = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() + $s);
+$pollId = $db->insert('polls', ['title' => 'Kpwp Umfrage', 'description' => '', 'type' => 'text', 'anonymous' => 0, 'results' => 'after_vote', 'ends_at' => $future(3600), 'closed_at' => null, 'reminded_at' => null, 'created_by' => 1, 'created_at' => $past(60), 'updated_at' => $past(60)]);
+do_action($hook, $pollTask);
+$c->ok($db->scalar('SELECT reminded_at FROM {polls} WHERE id = ?', [$pollId]) !== null, 'Aufgabe über den Hook erinnert an bald endende Umfragen');
+$db->execute('DELETE FROM {polls} WHERE id = ?', [$pollId]);
 
 $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);

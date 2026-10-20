@@ -18,8 +18,8 @@ use KompanieApp\Core\Storage\BoardRepository;
  * - Jede Nachricht gilt genau LIFETIME Sekunden ab dem Schreiben; Ändern verlängert nicht. Danach liefert die API sie
  *   nicht mehr, die Aufgabe board_cleanup löscht sie (kein Verlauf).
  * - Beim Schreiben bekommen alle Empfänger eine Benachrichtigung (PushTriggers::boardPosted), beim Ändern nicht.
- * - Die Liste besteht aus Einträgen mit kind (heute nur „message“), damit später weitere Arten dazukommen können
- *   (z. B. laufende Umfragen).
+ * - Die Liste besteht aus Einträgen mit kind: „message“ und für Mitglieder „poll“ (laufende Umfragen, Issue #4,
+ *   PollService::boardItems); Clients überspringen unbekannte Arten.
  *
  * @phpstan-import-type BoardMessage from BoardRepository
  * @phpstan-type BoardItem array{kind: string, id: int, text: string, author_name: string|null, created_at: string|null, updated_at: string|null, expires_at: string|null}
@@ -51,11 +51,17 @@ final class BoardService
         return $user !== null && ($user->isMember() || $user->can(Capability::Calendar));
     }
 
-    /** @return array{items: list<BoardItem>} gültige Einträge, neueste zuerst */
-    public function list(): array
+    /**
+     * Gültige Nachrichten, neueste zuerst; danach für Mitglieder die laufenden Umfragen (Issue #4, kind „poll“, mit
+     * has_voted), sofern der Bereich Umfragen an ist.
+     *
+     * @return array{items: list<array<string, mixed>>}
+     */
+    public function list(?User $viewer = null): array
     {
         $names = new UserNames($this->app->users);
-        return ['items' => array_map(fn (array $m): array => $this->format($m, $names), $this->repository()->active($this->app->time()->nowUtc()))];
+        $messages = array_map(fn (array $m): array => $this->format($m, $names), $this->repository()->active($this->app->time()->nowUtc()));
+        return ['items' => [...$messages, ...$this->app->polls()->boardItems($viewer)]];
     }
 
     /** @return BoardItem */

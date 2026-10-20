@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, type BoardItem } from '../api';
-import { BOARD_TEXT_MAX, boardLoaded, canPostBoard, refreshBoard, useBoard } from '../board';
-import { BoardMeta, BoardText } from '../BoardBanner';
+import { api, type BoardMessage, type BoardPoll } from '../api';
+import { BOARD_TEXT_MAX, boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
+import { BoardMeta, BoardText, pollEndText } from '../BoardBanner';
+import brand from '../generated/brand';
+import { navigate } from '../router';
 import { formatShortTime } from '../format';
 import { Empty, ErrorBox, Loading } from '../ui';
 
@@ -57,7 +59,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
-function Entry({ item, onToast }: { item: BoardItem; onToast: (msg: string) => void }) {
+function Entry({ item, onToast }: { item: BoardMessage; onToast: (msg: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,12 +130,34 @@ function Entry({ item, onToast }: { item: BoardItem; onToast: (msg: string) => v
   );
 }
 
-/** Seite #/brett: alle gültigen Nachrichten (auch ausgeblendete); mit post_board schreiben, ändern, löschen. */
+/** Laufende Umfrage am Brett (Issue #4): mit Status „beantwortet“ bzw. „offen“. */
+function PollEntry({ poll }: { poll: BoardPoll }) {
+  return (
+    <article className="card board-card board-poll-card">
+      <span className="board-meta">
+        {brand.labels.sections.polls} · {pollEndText(poll)}
+      </span>
+      <p className="board-text">{poll.title}</p>
+      <div className="button-row">
+        <span className={`badge ${poll.has_voted ? 'badge-paid' : 'badge-open'}`}>{poll.has_voted ? 'beantwortet' : 'offen'}</span>
+        <button className="btn btn-secondary" onClick={() => navigate(`umfragen/${poll.id}`)}>
+          {poll.has_voted ? 'Antwort ansehen' : 'Teilnehmen'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * Seite #/brett: alle gültigen Nachrichten (auch ausgeblendete); mit post_board schreiben, ändern, löschen. Darunter für
+ * Mitglieder alle laufenden Umfragen mit Status und der Weg zu den beendeten (Issue #4).
+ */
 export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
   const { items } = useBoard();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const messages = items.filter((i) => i.kind === 'message');
+  const messages = items.filter((i): i is BoardMessage => i.kind === 'message');
+  const polls = items.filter((i): i is BoardPoll => i.kind === 'poll');
 
   const load = () => {
     setLoading(true);
@@ -160,6 +184,26 @@ export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
             <Entry key={`${item.id}-${item.updated_at}`} item={item} onToast={onToast} />
           ))}
         </>
+      )}
+      {(pollsVisible() || canManagePolls()) && boardLoaded() && (
+        <section className="board-polls">
+          <h2 className="board-page-title">Laufende {brand.labels.sections.polls}</h2>
+          {polls.length === 0 ? (
+            <p className="muted small">Zurzeit läuft keine Umfrage.</p>
+          ) : (
+            polls.map((p) => <PollEntry key={p.id} poll={p} />)
+          )}
+          <div className="button-row">
+            <button className="btn btn-link board-polls-ended" onClick={() => navigate('umfragen')}>
+              Beendete {brand.labels.sections.polls}
+            </button>
+            {canManagePolls() && (
+              <button className="btn btn-secondary board-polls-manage" onClick={() => navigate('umfragen/verwalten')}>
+                {brand.labels.sections.polls} verwalten
+              </button>
+            )}
+          </div>
+        </section>
       )}
     </div>
   );

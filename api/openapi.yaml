@@ -39,6 +39,7 @@ tags:
   - name: Galerie
   - name: Verwaltung
   - name: Schwarzes Brett
+  - name: Umfragen
   - name: Einstellungen
   - name: Wartung
 
@@ -1000,8 +1001,9 @@ paths:
         Für Mitglieder und Anwärter (Recht `member` oder `calendar`) sowie für alle mit `post_board`. Nur Einträge, deren
         `expires_at` noch nicht erreicht ist; abgelaufene löscht die Hintergrundaufgabe `board_cleanup` (kein Verlauf).
         Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
-        Heute gibt es nur `kind: message`; später können weitere Arten dazukommen (z. B. laufende Umfragen) –
-        Clients überspringen unbekannte.
+        Erst die Nachrichten (`kind: message`), neueste zuerst; danach für Mitglieder (Recht `member`) mit eingeschaltetem
+        Bereich Umfragen jede laufende Umfrage (`kind: poll`, Issue #4) mit `has_voted`. Später können weitere Arten
+        dazukommen – Clients überspringen unbekannte.
       x-capability: 'member, calendar oder post_board'
       responses:
         '200':
@@ -1012,7 +1014,12 @@ paths:
                 type: object
                 required: [items]
                 properties:
-                  items: { type: array, items: { $ref: '#/components/schemas/BoardItem' } }
+                  items:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/BoardItem'
+                        - $ref: '#/components/schemas/BoardPollItem'
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
     post:
@@ -1075,6 +1082,165 @@ paths:
                 type: object
                 properties:
                   deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /polls:
+    get:
+      tags: [Umfragen]
+      summary: Alle Umfragen (laufende und beendete), neueste zuerst (Issue #4)
+      description: |
+        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `manage_polls`. Je Umfrage `has_voted`, die eigene
+        Antwort (`my_answer`) und die Ergebnisse (`results_data`), soweit sie für dieses Konto sichtbar sind:
+        `after_vote` – wer geantwortet hat, nach dem Ende alle Mitglieder; `after_end` – alle Mitglieder nach dem Ende;
+        `managers` – nur `manage_polls`. Wer `manage_polls` hat, sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
+        Freitext nur bei namentlichen Umfragen; bei anonymen nie Namen oder Benutzer-IDs (Freitexte alphabetisch).
+      x-capability: 'member oder manage_polls'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Poll' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Umfragen]
+      summary: Umfrage anlegen
+      description: |
+        Alle Mitglieder außer dem, der sie anlegt, bekommen eine Benachrichtigung (Art `polls`, TTL höchstens bis zum Ende).
+        Endet die Umfrage in weniger als 24 Stunden, gibt es keine zusätzliche Erinnerung.
+      x-capability: manage_polls
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PollInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /polls/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Umfragen]
+      summary: Eine Umfrage (wie in der Liste)
+      x-capability: 'member oder manage_polls'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Umfragen]
+      summary: Laufende Umfrage ändern
+      description: |
+        Jede und jeder mit `manage_polls`. Nur genannte Felder ändern sich. Frage, Beschreibung und Ende jederzeit, solange
+        die Umfrage läuft; `type`, `options`, `anonymous` und `results` nur bis zur ersten Antwort (danach → 400, außer
+        der Wert bleibt gleich). Beendete Umfragen → 400 (wieder öffnen geht nicht). `updated_at` wechselt nur bei einer
+        echten Änderung (am Brett ausgeblendete Umfragen erscheinen dann wieder). Ein neues Ende mehr als 24 Stunden in
+        der Zukunft macht eine neue Erinnerung möglich. Keine Benachrichtigung.
+      x-capability: manage_polls
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PollPatch' }
+      responses:
+        '200':
+          description: Geändert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Umfragen]
+      summary: Umfrage mit allen Antworten löschen
+      x-capability: manage_polls
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /polls/{id}/close:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Umfragen]
+      summary: Umfrage vorzeitig beenden
+      description: Setzt `closed_at`; danach keine Antworten mehr. Schon beendet → 400.
+      x-capability: manage_polls
+      responses:
+        '200':
+          description: Beendet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /polls/{id}/vote:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Umfragen]
+      summary: Eigene Antwort abgeben oder ändern
+      description: |
+        Nur solange die Umfrage läuft (sonst 400). Einfachauswahl: `option_ids` mit genau einer ID; Mehrfachauswahl:
+        mindestens eine; Freitext: `text` (1–1000 Zeichen). Möglichkeiten einer anderen Umfrage → 400. Bei anonymen
+        Umfragen liegt die Antwort unter einem Pseudonym und wird niemandem mit Namen gezeigt.
+      x-capability: member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PollVote' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Umfragen]
+      summary: Eigene Antwort zurückziehen
+      description: Nur solange die Umfrage läuft (sonst 400).
+      x-capability: member
+      responses:
+        '200':
+          description: Zurückgezogen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Poll' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -2424,10 +2590,113 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         expires_at: { type: string, format: date-time, description: Genau 24 Stunden nach created_at }
+    BoardPollItem:
+      type: object
+      description: Laufende Umfrage am Schwarzen Brett (Issue #4), nur für Mitglieder
+      required: [kind, id, title, type, ends_at, expires_at, has_voted, created_at, updated_at]
+      properties:
+        kind: { type: string, enum: [poll] }
+        id: { type: integer }
+        title: { type: string }
+        type: { type: string, enum: [single, multiple, text] }
+        ends_at: { type: [string, 'null'], format: date-time, description: 'null = läuft, bis sie vorzeitig beendet wird' }
+        expires_at: { type: [string, 'null'], format: date-time, description: Wie ends_at (danach blendet die App den Eintrag aus) }
+        has_voted: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, description: 'Wechselt bei jeder Änderung (Ausblenden je Gerät gilt bis dahin)' }
+    PollInput:
+      type: object
+      required: [title, type]
+      properties:
+        title: { type: string, maxLength: 150, description: Die Frage }
+        description: { type: string, maxLength: 1000, description: Optional, reiner Text mit Zeilenumbrüchen }
+        type: { type: string, enum: [single, multiple, text], description: 'Einfachauswahl, Mehrfachauswahl oder Freitext' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 20
+          items: { type: string, maxLength: 100 }
+          description: 'Nur bei single und multiple: 2–20 verschiedene Möglichkeiten (leere werden übersprungen); bei text ignoriert'
+        anonymous: { type: boolean, default: false }
+        results: { type: string, enum: [after_vote, after_end, managers], default: after_vote }
+        ends_at:
+          type: [string, 'null']
+          description: 'Optional: „JJJJ-MM-TTTHH:MM“ in der Zeitzone der Kompanie oder ISO 8601 mit Zeitzone; muss in der Zukunft liegen. Gespeichert in UTC.'
+    PollPatch:
+      type: object
+      properties:
+        title: { type: string, maxLength: 150 }
+        description: { type: string, maxLength: 1000 }
+        type: { type: string, enum: [single, multiple, text] }
+        options: { type: array, items: { type: string, maxLength: 100 } }
+        anonymous: { type: boolean }
+        results: { type: string, enum: [after_vote, after_end, managers] }
+        ends_at: { type: [string, 'null'] }
+    PollVote:
+      type: object
+      properties:
+        option_ids: { type: array, items: { type: integer }, description: 'single: genau eine, multiple: mindestens eine' }
+        text: { type: string, maxLength: 1000, description: Nur bei Freitext }
+    Poll:
+      type: object
+      required: [id, title, description, type, anonymous, results, status, ends_at, closed_at, created_at, updated_at, created_by_name, options, locked, has_voted, my_answer, results_visible, results_data]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        type: { type: string, enum: [single, multiple, text] }
+        anonymous: { type: boolean }
+        results: { type: string, enum: [after_vote, after_end, managers], description: Wer die Ergebnisse sieht }
+        status: { type: string, enum: [running, ended] }
+        ends_at: { type: [string, 'null'], format: date-time }
+        closed_at: { type: [string, 'null'], format: date-time, description: Vorzeitig beendet }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        created_by_name: { type: [string, 'null'] }
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              title: { type: string }
+        locked: { type: boolean, description: 'Es gibt Antworten: Art, Möglichkeiten, Anonymität und Sichtbarkeit fest' }
+        has_voted: { type: boolean }
+        my_answer:
+          type: [object, 'null']
+          description: Nur die eigene Antwort (auch bei anonymen Umfragen, nur für einen selbst)
+          properties:
+            option_ids: { type: array, items: { type: integer } }
+            text: { type: [string, 'null'] }
+        results_visible: { type: boolean }
+        results_data:
+          type: [object, 'null']
+          description: null, solange die Ergebnisse für dieses Konto nicht sichtbar sind
+          properties:
+            voters: { type: integer, description: Zahl der Teilnehmenden }
+            options:
+              type: array
+              description: Bei single und multiple
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  count: { type: integer }
+                  percent: { type: integer, description: 'Anteil der Teilnehmenden, gerundet (bei multiple zusammen über 100)' }
+                  names: { type: array, items: { type: string }, description: Nur bei namentlichen Umfragen }
+            texts:
+              type: array
+              description: Bei text
+              items:
+                type: object
+                properties:
+                  text: { type: string }
+                  name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, penalties, points, ranks, titles, events, reminder, news]
-      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht.'
+      enum: [board, polls, penalties, points, ranks, titles, events, reminder, news]
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -2454,7 +2723,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -2568,7 +2837,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
             system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
@@ -2580,7 +2849,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
@@ -2596,7 +2865,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte; member bringt calendar mit.'
 
     UpdateStatus:
@@ -2687,6 +2956,7 @@ components:
             attendance: { type: boolean }
             documents: { type: boolean }
             board: { type: boolean }
+            polls: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'

@@ -1,4 +1,5 @@
-// Schwarzes Brett (Issue #5): zuletzt geladene Einträge, Ablauf und „auf diesem Gerät ausgeblendet“.
+// Schwarzes Brett (Issue #5): zuletzt geladene Einträge (Nachrichten und für Mitglieder laufende Umfragen, Issue #4),
+// Ablauf und „auf diesem Gerät ausgeblendet“.
 //
 // Die App lädt das Brett beim Öffnen, wenn sie wieder in den Vordergrund kommt und wenn eine Benachrichtigung
 // angetippt wird (Ziel #/brett). Ohne Netz liefert der Service Worker die zuletzt geladene Antwort; abgelaufene
@@ -25,6 +26,16 @@ export function canPostBoard(): boolean {
   return !!config?.features.board && can('post_board');
 }
 
+/** Umfragen (Issue #4): Mitglieder nehmen teil (wie PollService::isParticipant im Kern). */
+export function pollsVisible(): boolean {
+  return !!config?.features.polls && can('member');
+}
+
+/** Umfragen anlegen, ändern, beenden, löschen. */
+export function canManagePolls(): boolean {
+  return !!config?.features.polls && can('manage_polls');
+}
+
 /**
  * Lädt das Brett neu; ohne Verbindung (und ohne gespeicherte Antwort) bleibt der letzte Stand. Gibt die Fehlermeldung
  * zurück oder null.
@@ -43,9 +54,12 @@ export async function refreshBoard(): Promise<string | null> {
 /** Wurde das Brett schon einmal geladen? */
 export const boardLoaded = (): boolean => items !== null;
 
-const isValid = (item: BoardItem, now: number): boolean => Date.parse(item.expires_at) > now;
+const isValid = (item: BoardItem, now: number): boolean => item.expires_at === null || Date.parse(item.expires_at) > now;
 
-/** Kennung für „ausgeblendet“: Nach einer Änderung (neues updated_at) erscheint der Eintrag wieder. */
+/**
+ * Kennung für „ausgeblendet“: Nach einer Änderung (neues updated_at) erscheint der Eintrag wieder – bei Umfragen z. B.
+ * nach einer neuen Frage oder einem neuen Ende.
+ */
 const dismissKey = (item: BoardItem): string => `${item.kind}:${item.id}@${item.updated_at}`;
 
 function readDismissed(): string[] {
@@ -99,7 +113,8 @@ export function useBoard(): { items: BoardItem[]; dismissed: (item: BoardItem) =
   const now = Date.now();
   const valid = (items ?? []).filter((i) => isValid(i, now));
   // Neu zeichnen, sobald der nächste Eintrag abläuft.
-  const nextAt = valid.length > 0 ? Math.min(...valid.map((i) => Date.parse(i.expires_at))) : null;
+  const ends = valid.flatMap((i) => (i.expires_at === null ? [] : [Date.parse(i.expires_at)]));
+  const nextAt = ends.length > 0 ? Math.min(...ends) : null;
   useEffect(() => {
     if (nextAt === null) return;
     const t = setTimeout(() => setTick((v) => v + 1), Math.min(Math.max(0, nextAt - Date.now()) + 50, 2 ** 31 - 1));

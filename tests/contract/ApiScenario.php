@@ -33,6 +33,7 @@ final class ApiScenario
             $this->attendance();
             $this->documents();
             $this->board();
+            $this->polls();
             $this->accounts();
             $this->events();
             $this->push();
@@ -82,7 +83,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -687,12 +688,88 @@ final class ApiScenario
         $this->d->actAs($admin);
         [$s, $edited] = $this->req('PATCH', "/board/$id", ['text' => "Kptest Brett $sfx geändert"]);
         $c->ok($s === 200 && ($edited['expires_at'] ?? null) === ($item['expires_at'] ?? '') && ($edited['text'] ?? '') === "Kptest Brett $sfx geändert", 'Ändern: Ablaufzeit bleibt');
-        $this->req('PUT', '/admin/features', ['board' => false]);
+        // Umfragen brauchen das Schwarze Brett: beide zusammen aus- und wieder einschalten.
+        $c->ok($this->req('PUT', '/admin/features', ['board' => false])[0] === 400, 'Brett aus, solange Umfragen an sind → 400');
+        $this->req('PUT', '/admin/features', ['board' => false, 'polls' => false]);
         [$s, $d] = $this->req('GET', '/board');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
-        $this->req('PUT', '/admin/features', ['board' => true]);
+        $this->req('PUT', '/admin/features', ['board' => true, 'polls' => true]);
         $c->ok($this->req('DELETE', "/board/$id")[0] === 200, 'Vorzeitig löschen');
         $c->ok($this->req('DELETE', "/board/$id")[0] === 404, 'Gelöschte Nachricht → 404');
+    }
+
+    /**
+     * Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; Prüfung, Sichtbarkeit, Anonymität, fest nach der
+     * ersten Antwort, Ende, Konto löschen entfernt die Antworten, am Brett nur laufende.
+     */
+    private function polls(): void
+    {
+        $c = $this->c;
+        $c->section('Umfragen');
+        $admin = $this->user('kptest_umfrage_admin', 'admin');
+        $m = $this->user('kptest_umfrage_m', 'member');
+        $m2 = $this->user('kptest_umfrage_m2', 'member');
+        $cand = $this->user('kptest_umfrage_anw', 'candidate');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/polls')[0] === 401, 'GET /polls ohne Anmeldung → 401');
+        $this->d->actAs($cand);
+        $c->ok($this->req('GET', '/polls')[0] === 403, 'Anwärter: GET /polls → 403');
+        $this->d->actAs($m);
+        $c->ok($this->req('POST', '/polls', ['title' => 'x', 'type' => 'text'])[0] === 403, 'Mitglied legt keine Umfrage an → 403');
+        $this->d->actAs($admin);
+        $c->ok($this->req('POST', '/polls', ['title' => 'Kptest', 'type' => 'single', 'options' => ['nur eine']])[0] === 400, 'Eine Möglichkeit → 400');
+        $c->ok($this->req('POST', '/polls', ['title' => 'Kptest', 'type' => 'single', 'options' => ['A', 'B'], 'ends_at' => '2000-01-01T10:00'])[0] === 400, 'Ende in der Vergangenheit → 400');
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        $end = gmdate('Y-m-d\TH:i:s\Z', time() + 3 * 86400);
+        [$s, $poll] = $this->req('POST', '/polls', ['title' => "Kptest Umfrage $sfx", 'type' => 'single', 'options' => ['Ja', 'Nein'], 'anonymous' => true, 'results' => 'after_vote', 'ends_at' => $end]);
+        $id = (int) ($poll['id'] ?? 0);
+        $opts = array_column((array) ($poll['options'] ?? []), 'id', 'title');
+        $c->ok($s === 201 && ($poll['status'] ?? '') === 'running' && ($poll['anonymous'] ?? null) === true && count($opts) === 2, 'Anonyme Umfrage anlegen');
+        $c->ok(($poll['ends_at'] ?? null) !== null && (int) strtotime((string) $poll['ends_at']) === (int) strtotime($end), 'Ende in UTC');
+
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', '/board');
+        $item = array_values(array_filter((array) ($d['items'] ?? []), static fn (mixed $i): bool => is_array($i) && ($i['kind'] ?? '') === 'poll' && ($i['id'] ?? 0) === $id))[0] ?? null;
+        $c->ok($s === 200 && is_array($item) && ($item['has_voted'] ?? null) === false, 'Laufende Umfrage steht am Brett (noch nicht beantwortet)');
+        [$s, $d] = $this->req('GET', "/polls/$id");
+        $c->ok($s === 200 && ($d['results_visible'] ?? null) === false, 'after_vote: vor der Antwort keine Ergebnisse');
+        $c->ok($this->req('PUT', "/polls/$id/vote", ['option_ids' => [$opts['Ja'] ?? 0, $opts['Nein'] ?? 0]])[0] === 400, 'Zwei Antworten bei Einfachauswahl → 400');
+        $c->ok($this->req('PUT', "/polls/$id/vote", ['option_ids' => [999999]])[0] === 400, 'Fremde Möglichkeit → 400');
+        [$s, $d] = $this->req('PUT', "/polls/$id/vote", ['option_ids' => [$opts['Ja'] ?? 0]]);
+        $c->ok($s === 200 && ($d['has_voted'] ?? null) === true && ($d['results_visible'] ?? null) === true, 'Antworten, danach Ergebnisse sichtbar');
+        [$s, $d] = $this->req('PUT', "/polls/$id/vote", ['option_ids' => [$opts['Nein'] ?? 0]]);
+        $this->d->actAs($m2);
+        $this->req('PUT', "/polls/$id/vote", ['option_ids' => [$opts['Nein'] ?? 0]]);
+        [$s, $d] = $this->req('GET', "/polls/$id");
+        $counts = array_column((array) ($d['results_data']['options'] ?? []), 'count', 'title');
+        $c->ok($counts === ['Ja' => 0, 'Nein' => 2] && ($d['results_data']['voters'] ?? 0) === 2, 'Antwort geändert: Summen stimmen');
+        $json = (string) json_encode([$d, $this->req('GET', '/polls')[1]]);
+        $c->ok(!str_contains($json, 'kptest_umfrage') && !str_contains($json, '"names"') && !str_contains($json, '"user_id"'), 'Anonym: keine Namen oder IDs in den Antworten');
+
+        $this->d->actAs($admin);
+        $c->ok($this->req('PATCH', "/polls/$id", ['anonymous' => false])[0] === 400, 'Anonymität nach der ersten Antwort ändern → 400');
+        $c->ok($this->req('PATCH', "/polls/$id", ['results' => 'managers'])[0] === 400, 'Sichtbarkeit nach der ersten Antwort ändern → 400');
+
+        // Konto gelöscht: auch die anonyme Antwort verschwindet (über das Pseudonym).
+        $c->ok($this->req('DELETE', "/members/$m2")[0] === 200, 'Konto der zweiten Person aus der App entfernen');
+        [$s, $d] = $this->req('GET', "/polls/$id");
+        $c->ok(($d['results_data']['voters'] ?? null) === 1 && array_column((array) ($d['results_data']['options'] ?? []), 'count', 'title') === ['Ja' => 0, 'Nein' => 1], 'Konto gelöscht: Teilnahme und Antwort entfernt');
+
+        [$s, $d] = $this->req('POST', "/polls/$id/close");
+        $c->ok($s === 200 && ($d['status'] ?? '') === 'ended', 'Vorzeitig beenden');
+        $this->d->actAs($m);
+        $c->ok($this->req('PUT', "/polls/$id/vote", ['option_ids' => [$opts['Ja'] ?? 0]])[0] === 400, 'Nach dem Ende ändern → 400');
+        $c->ok($this->req('DELETE', "/polls/$id/vote")[0] === 400, 'Nach dem Ende zurückziehen → 400');
+        [$s, $d] = $this->req('GET', '/board');
+        $c->ok(!in_array($id, array_column(array_filter((array) ($d['items'] ?? []), static fn (mixed $i): bool => is_array($i) && ($i['kind'] ?? '') === 'poll'), 'id'), true), 'Beendete Umfrage nicht mehr am Brett');
+
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['polls' => false]);
+        [$s, $d] = $this->req('GET', '/polls');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['polls' => true]);
+        $c->ok($this->req('DELETE', "/polls/$id")[0] === 200, 'Umfrage löschen');
+        $c->ok($this->req('GET', "/polls/$id")[0] === 404, 'Gelöschte Umfrage → 404');
     }
 
     /** Konten verwalten (Issue #24): mehrere anlegen, Angaben ändern, aus der App entfernen mit allen eigenen Daten. */

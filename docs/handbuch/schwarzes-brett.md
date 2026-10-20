@@ -18,3 +18,6 @@ Mit **×** blendest du eine Nachricht auf diesem Gerät aus; sie bleibt auf der 
 Bei jeder neuen Nachricht kommt eine Benachrichtigung, wenn du sie für das Gerät eingeschaltet hast (Art **{bereich.board}: dringende Nachrichten**, siehe [Benachrichtigungen](seite:benachrichtigungen)). Ein Tipp darauf öffnet das Brett. Wird eine Nachricht nur geändert, kommt keine neue Benachrichtigung.
 
 Die Nachrichten sind reiner Text; Links darin lassen sich nicht antippen. Kopiere sie bei Bedarf.
+
+## Umfragen
+Ist der Bereich **{bereich.polls}** eingeschaltet, stehen für {rolle.member} auch die laufenden Umfragen am Brett. Im Banner erscheinen nur die, auf die du noch nicht geantwortet hast; mehr dazu auf der Hilfeseite **{bereich.polls}**.
