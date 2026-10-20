@@ -93,7 +93,7 @@ final class WpUsers implements UserDirectory, AuthContext
         return array_map(fn (\WP_User $u): User => $this->toUser($u), get_users($args));
     }
 
-    public function create(string $name, string $login, string $email, string $password): int
+    public function create(string $name, string $login, string $email, string $password, string $role = AppRoles::MEMBER): int
     {
         $parts = preg_split('/\s+/', $name, 2) ?: [$name];
         $id = wp_insert_user([
@@ -104,12 +104,13 @@ final class WpUsers implements UserDirectory, AuthContext
             'nickname' => $name,
             'first_name' => $parts[0],
             'last_name' => $parts[1] ?? '',
-            'role' => Roles::ROLE_MEMBER,
+            // Die frühere WP-Rolle nur für Mitglieder (Rückfall bei einem Zurückrollen); Anwärter sind Abonnenten.
+            'role' => $role === AppRoles::MEMBER ? Roles::ROLE_MEMBER : 'subscriber',
         ]);
         if (is_wp_error($id)) {
             throw new \DomainException($id->get_error_message());
         }
-        update_user_option((int) $id, self::ROLE_META, AppRoles::MEMBER, false);
+        update_user_option((int) $id, self::ROLE_META, $role, false);
         update_user_option((int) $id, self::ACCOUNT_META, '1', false);
         return (int) $id;
     }
@@ -130,7 +131,9 @@ final class WpUsers implements UserDirectory, AuthContext
         }
         // Wer handelt, braucht das Recht in WordPress oder über seine Rolle in der App (der Kern hat die
         // Regeln der App schon geprüft). Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
-        if (!$this->actorMay('promote_user', $id, Capability::PromoteUsers)) {
+        // Anwärter zum Mitglied machen darf auch, wer Konten anlegen darf (Issue #23).
+        $promotion = $role === AppRoles::MEMBER && $this->find($id)?->role === AppRoles::CANDIDATE && $this->currentUser()?->can(Capability::CreateUsers);
+        if (!$promotion && !$this->actorMay('promote_user', $id, Capability::PromoteUsers)) {
             throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }
         update_user_option($id, self::ROLE_META, $role, false);

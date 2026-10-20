@@ -46,9 +46,9 @@ final class PdoUsers implements UserDirectory
         return array_map([$this, 'toUser'], $this->db->select("SELECT * FROM {users} $where ORDER BY name ASC, id ASC"));
     }
 
-    public function create(string $name, string $login, string $email, string $password): int
+    public function create(string $name, string $login, string $email, string $password, string $role = Roles::MEMBER): int
     {
-        return $this->add($name, $login, $email, $password, Roles::MEMBER);
+        return $this->add($name, $login, $email, $password, $role);
     }
 
     public function add(string $name, string $login, string $email, string $password, string $role): int

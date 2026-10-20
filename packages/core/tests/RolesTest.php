@@ -19,8 +19,9 @@ final class RolesTest extends TestCase
     public function testNewInstallationHasOnlyFixedRoles(): void
     {
         $app = TestApp::create(TestApp::connection(), features: false);
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ADMIN], array_keys($app->roles()->all()));
-        $this->assertEqualsCanonicalizing([Capability::Member], $app->roles()->capabilities(Roles::MEMBER));
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, Roles::ADMIN], array_keys($app->roles()->all()));
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar], $app->roles()->capabilities(Roles::MEMBER), 'Mitgliederbereich mit Kalender');
+        $this->assertSame([Capability::Calendar], $app->roles()->capabilities(Roles::CANDIDATE), 'Anwärter: nur Kalender');
         $this->assertSame([], $app->roles()->capabilities(Roles::ORGANIZER), 'frühere Vorlage gibt es nicht');
     }
 
@@ -30,18 +31,18 @@ final class RolesTest extends TestCase
         $app = TestApp::create(TestApp::connection(), $users, ['labels' => ['sections' => ['penalties' => 'Kasse']]], features: false);
         $app->features()->update(['points' => true, 'penalties' => true, 'calendar' => true]);
         $roles = $app->roles()->all();
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'points', 'penalties', Roles::ADMIN], array_keys($roles), 'Kalender braucht keine Rechte');
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'points', 'penalties', Roles::ADMIN], array_keys($roles), 'Kalender braucht keine Rechte');
         $this->assertSame('Punkte verwalten', $roles['points']['label']);
         $this->assertSame('Kasse verwalten', $roles['penalties']['label'], 'mit der Bezeichnung aus kompanie.json');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::ManagePenalties], $app->roles()->capabilities('penalties'));
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ManagePenalties], $app->roles()->capabilities('penalties'));
 
         // Ausschalten: Rolle verschwindet, wenn niemand sie hat; sonst bleibt sie.
         $users->add('kasse', 'penalties');
         $app->features()->update(['points' => false, 'penalties' => false]);
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'penalties', Roles::ADMIN], array_keys($app->roles()->all()));
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'penalties', Roles::ADMIN], array_keys($app->roles()->all()));
         // Wieder einschalten: keine zweite Rolle.
         $app->features()->update(['penalties' => true]);
-        $this->assertCount(4, $app->roles()->all());
+        $this->assertCount(5, $app->roles()->all());
     }
 
     public function testOwnRoleWithSameNameIsNotDuplicated(): void
@@ -61,10 +62,10 @@ final class RolesTest extends TestCase
         $settings->delete(RoleService::SETTING);
         $app = TestApp::create($db, config: ['labels' => ['roles' => ['manager' => 'Spieß']]], settings: $settings, features: false);
         $roles = $app->roles()->all();
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_keys($roles));
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_keys($roles));
         $this->assertSame('Spieß', $roles[Roles::MANAGER]['label']);
         $this->assertEqualsCanonicalizing(
-            [Capability::Member, Capability::ManageEvents, Capability::ManageDocuments, Capability::ManagePoints, Capability::ManagePenalties],
+            [Capability::Member, Capability::Calendar, Capability::ManageEvents, Capability::ManageDocuments, Capability::ManagePoints, Capability::ManagePenalties],
             $app->roles()->capabilities(Roles::MANAGER),
         );
         // Bestehende Installationen bekommen beim Einschalten neue Standardrollen, behalten aber ihre.
@@ -77,8 +78,8 @@ final class RolesTest extends TestCase
     {
         $settings = new MemorySettings([RoleService::SETTING => [['key' => 'r1', 'label' => 'Kasse', 'capabilities' => ['member', 'manage']]]]);
         $app = TestApp::create(TestApp::connection(), settings: $settings, features: false);
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::ManagePoints, Capability::ManagePenalties], $app->roles()->capabilities('r1'));
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($app->roles()->all()), 'feste Rollen ergänzt');
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ManagePoints, Capability::ManagePenalties], $app->roles()->capabilities('r1'));
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($app->roles()->all()), 'feste Rollen ergänzt');
     }
 
     public function testMemberIsFixedButCanBeRenamed(): void

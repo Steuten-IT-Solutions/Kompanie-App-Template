@@ -197,6 +197,7 @@ final class Api
         $P = Route::PUBLIC;
         $L = Route::LOGIN;
         $denyMember = 'Dieser Bereich ist nur für Mitglieder.';
+        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Anwärter.';
         $denyManage = 'Dafür fehlen dir die Rechte.';
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
@@ -253,7 +254,7 @@ final class Api
                 $a->push()->sendTest($a->push()->own(null, $r->input('endpoint'), $r->input('auth')));
                 return ['sent' => true];
             }),
-            new Route('GET', '/calendar', Cap::Member, fn () => $a->calendar()->events(), 'calendar', $denyMember),
+            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->calendar()->events(), 'calendar', $denyCalendar),
 
             // Öffentliche Termine
             new Route('GET', '/events', $P, fn () => $a->events()->upcoming(), 'events'),
@@ -293,9 +294,10 @@ final class Api
             new Route('PATCH', '/catalog/{id}', Cap::ManagePoints, fn (Request $r) => $a->scores()->updateCatalogItem($r->id(), $r->body), 'points', $denyManage),
 
             // Mitglieder
-            new Route('GET', '/members', $manage, fn (Request $r) => $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user()), null, $denyManage),
+            new Route('GET', '/members', $manage, fn (Request $r) => $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates')), null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user()), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
+            new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, fn (Request $r) => Response::created($a->members()->create($r->body)), null, $denyUsers),
 

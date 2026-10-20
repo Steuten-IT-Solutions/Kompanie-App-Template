@@ -202,7 +202,8 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Strafen | Strafen verwalten | `member`, `manage_penalties` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
-- **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Rollen mit Rechten brauchen `member`.
+- **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.
+- **Anwärter** (Issue #23): feste Rolle `candidate` mit nur `calendar`. `member` schließt `calendar` ein (wirksame Rechte, nicht gespeichert). Wer Konten anlegen darf (`create_users`), legt Konten als Mitglied oder Anwärter an und nimmt Anwärter als Mitglied auf (`POST /members/{id}/promote`, nur `candidate` → `member`); andere Rollenwechsel bleiben bei `promote_users`. Bei WordPress steht auch diese Rolle in der Benutzer-Option; eine eigene WP-Rolle gibt es nicht.
 - **Keine Rechte weitergeben, die man nicht hat:** Wer Rollen vergeben darf, ohne Admin zu sein, vergibt und ändert nur Rollen, deren Rechte er selbst hat und die weder Konten anlegen noch Rollen vergeben dürfen. Dieselbe Regel gilt für das Zurücksetzen von Passwörtern (sonst ließe sich ein Konto mit mehr Rechten übernehmen).
 - **Verwaltung:** Wer nur Punkte (bzw. nur Strafen) vergibt, sieht in der Mitgliederliste nur diese Daten.
 - **Löschen:** Sind einer Rolle noch Personen zugeordnet, wählt der Admin eine Ersatzrolle.

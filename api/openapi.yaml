@@ -388,12 +388,12 @@ paths:
   /calendar:
     get:
       tags: [Termine]
-      summary: Alle Termine aus Google Kalender / iCal (nur Mitglieder)
+      summary: Alle Termine aus Google Kalender / iCal (Mitglieder und Anwärter)
       description: |
         Der Server hält die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
         im Hintergrund. Ist sie veraltet und der Kalender gerade nicht erreichbar, kommt die alte Fassung
         mit 200. 502 nur, wenn es noch keine Fassung gibt; ein solcher Fehler wird etwa 60 Sekunden gemerkt.
-      x-capability: member
+      x-capability: calendar
       responses:
         '200':
           description: OK
@@ -624,6 +624,10 @@ paths:
           in: query
           description: Auch Gast-Konten (nur mit Recht `promote_users`).
           schema: { type: string, enum: ['1'] }
+        - name: candidates
+          in: query
+          description: Auch Anwärter (Rolle `candidate`).
+          schema: { type: string, enum: ['1'] }
       responses:
         '200':
           description: OK
@@ -684,6 +688,28 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/promote:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Anwärter als Mitglied aufnehmen
+      description: Nur von `candidate` zu `member`; andere Rollenwechsel gehen über `/members/{id}/role`.
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/password:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -693,8 +719,8 @@ paths:
       description: |
         Neu gegenüber der ersten Umsetzung. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
-        werden abgemeldet. Wer kein Admin ist, darf das nur bei Mitgliedern, deren Rechte er selbst hat
-        (ohne create_users und promote_users), nicht bei Gästen und Admins.
+        werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern und Mitgliedern, deren Rechte er selbst
+        hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
       x-capability: create_users
       responses:
         '200':
@@ -713,7 +739,7 @@ paths:
   /users:
     post:
       tags: [Verwaltung]
-      summary: Mitglied anlegen
+      summary: Mitglied oder Anwärter anlegen
       description: Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt.
       x-capability: create_users
       requestBody:
@@ -727,6 +753,7 @@ paths:
                 name: { type: string }
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
+                level: { type: string, enum: [member, candidate], default: member }
       responses:
         '201':
           description: Angelegt
@@ -1505,8 +1532,8 @@ components:
       type: string
       maxLength: 10
       description: |
-        Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `member` (Mitgliederbereich, Rolle neuer Konten) und `admin`
-        (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
+        Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `candidate` (Anwärter: nur interner Kalender), `member`
+        (Mitgliederbereich mit Kalender, Rolle neuer Konten) und `admin` (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
         `r1`, `r2`, …; ältere Installationen haben außerdem `organizer` und `manager`. Bezeichnungen und Punktefaktor stehen in
         `/config` (`roles`), Rechte unter `/admin/roles`.
 
@@ -1526,11 +1553,11 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users, manage_settings] }
-              description: 'Bei admin alle Rechte; vergebbar sind alle außer manage_settings.'
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users, manage_settings] }
+              description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
-            system: { type: boolean, description: 'guest, member und admin: Rechte fest, nicht löschbar' }
-            deletable: { type: boolean, description: 'false für guest, member und admin' }
+            system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
+            deletable: { type: boolean, description: 'false für guest, candidate, member und admin' }
 
     RoleInput:
       type: object
@@ -1538,8 +1565,8 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users] }
-          description: 'Mit Rechten muss member dabei sein.'
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users] }
+          description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
     AppUser:
@@ -1554,7 +1581,8 @@ components:
           type: array
           items:
             type: string
-            enum: [member, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users, manage_settings]
+          description: 'Wirksame Rechte; member bringt calendar mit.'
 
     UpdateStatus:
       type: object
@@ -1814,4 +1842,5 @@ components:
         name: { type: string }
         username: { type: string }
         email: { type: string }
+        level: { type: string, enum: [member, candidate] }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort }

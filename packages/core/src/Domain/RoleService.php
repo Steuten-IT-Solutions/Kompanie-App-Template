@@ -76,17 +76,24 @@ final class RoleService
      */
     public function capabilities(string $key): array
     {
+        return $key === Roles::ADMIN ? Capability::cases() : Roles::withImplied($this->granted($key));
+    }
+
+    /**
+     * Die der Rolle ausdrücklich gegebenen Rechte (ohne den im Mitgliederbereich enthaltenen Kalender), wie sie
+     * Einstellungen → Rollen zeigt.
+     *
+     * @return Capability[]
+     */
+    private function granted(string $key): array
+    {
         if ($key === Roles::ADMIN) {
             return Capability::cases();
         }
-        $role = $this->find($key);
-        if ($role === null) {
-            return [];
-        }
         $out = [];
-        foreach ($role['capabilities'] as $c) {
+        foreach ($this->find($key)['capabilities'] ?? [] as $c) {
             $cap = Capability::tryFrom($c);
-            if ($cap !== null && in_array($cap, Roles::GRANTABLE, true)) {
+            if ($cap !== null && in_array($cap, Roles::GRANTABLE, true) && !in_array($cap, $out, true)) {
                 $out[] = $cap;
             }
         }
@@ -132,7 +139,7 @@ final class RoleService
             $out[] = [
                 'key' => $key,
                 'label' => $r['label'],
-                'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->capabilities($key)),
+                'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->granted($key)),
                 'points_factor' => $r['points_factor'],
                 'users' => $counts[$key] ?? 0,
                 'system' => Roles::isSystem($key),
@@ -385,7 +392,8 @@ final class RoleService
             $fixed[$key] = $out[$key] ?? ['key' => $key, 'label' => $this->config->roleLabel($key), 'capabilities' => $caps, 'points_factor' => 1.0];
             unset($out[$key]);
         }
-        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::MEMBER => $fixed[Roles::MEMBER]] + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
+        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::CANDIDATE => $fixed[Roles::CANDIDATE], Roles::MEMBER => $fixed[Roles::MEMBER]]
+            + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
     }
 
     /**
@@ -437,9 +445,14 @@ final class RoleService
             }
             $out[$cap->value] = $cap->value;
         }
-        // Verwalten setzt den Mitgliederbereich voraus (sonst sähe die Person ihre Mitglieder nicht).
-        if ($out !== [] && !isset($out[Capability::Member->value])) {
+        // Verwalten setzt den Mitgliederbereich voraus (sonst sähe die Person ihre Mitglieder nicht); nur den
+        // internen Kalender gibt es auch ohne (wie bei Anwärtern).
+        if (array_diff(array_keys($out), [Capability::Calendar->value]) !== [] && !isset($out[Capability::Member->value])) {
             throw ApiError::invalid('Rollen mit Rechten brauchen auch den Mitgliederbereich.');
+        }
+        // Der Mitgliederbereich schließt den Kalender ein: nicht doppelt speichern.
+        if (isset($out[Capability::Member->value])) {
+            unset($out[Capability::Calendar->value]);
         }
         return array_values($out);
     }

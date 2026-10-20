@@ -41,10 +41,10 @@ $organizer = $d->createUser('kpwp_verwalter', 'events'); // Standardrolle „Ter
 $manager = $d->createUser('kpwp_leitung', 'points');      // Standardrolle „Punkte verwalten“
 $admin = $d->createUser('kpwp_admin', 'admin');
 $caps = static fn (int $id): array => array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, $app->users->find($id)?->capabilities ?? []);
-$c->ok($caps($member) === ['member'], 'Mitglied: nur Mitgliederbereich');
-$c->ok($caps($organizer) === ['member', 'manage_events'], 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
+$c->ok($caps($member) === ['member', 'calendar'], 'Mitglied: nur Mitgliederbereich (mit Kalender)');
+$c->ok($caps($organizer) === ['member', 'manage_events', 'calendar'], 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
 $c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
-$c->ok($caps($manager) === ['member', 'manage_points'], 'Punkte verwalten: Punkte und Mitglied');
+$c->ok($caps($manager) === ['member', 'manage_points', 'calendar'], 'Punkte verwalten: Punkte und Mitglied');
 $c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
