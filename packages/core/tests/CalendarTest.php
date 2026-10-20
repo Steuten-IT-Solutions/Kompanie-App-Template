@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\CalendarService;
+use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Port\ExtendedHttpClient;
+use KompanieApp\Core\Tests\Support\DriveMock;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
@@ -358,5 +361,223 @@ final class CalendarTest extends TestCase
         $this->assertCount(2, $app->calendar()->events());
         $this->assertCount(2, $http->batches);
         $this->assertIsString($app->cache->get(CalendarService::ERROR_KEY));
+    }
+    /* Google-Zugang der Galerie als Kalenderquelle */
+
+    private const OAUTH_DRIVE_ONLY = ['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'REFRESH1', 'email' => 'galerie@example.org', 'scope' => DriveClient::SCOPE];
+
+    /** @return array<string, mixed> OAuth-Verbindung wie aus der Übernahme, mit Kalender-Berechtigung */
+    private static function oauthWithCalendar(): array
+    {
+        return ['scope' => DriveClient::SCOPE . ' ' . DriveClient::CALENDAR_SCOPE] + self::OAUTH_DRIVE_ONLY;
+    }
+
+    /** App mit simuliertem Google (DriveMock) und iCal-Adresse https://example.org/k.ics */
+    private function googleApp(DriveMock $google, MemorySettings $settings): App
+    {
+        $inner = $google->http()->handler;
+        $http = new FakeHttpClient(fn (string $m, string $url, array $h, ?string $b): array => str_starts_with($url, 'https://example.org/k.ics')
+            ? ['status' => 200, 'body' => $this->ics()]
+            : $inner($m, $url, $h, $b));
+        return TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function googleItems(): array
+    {
+        return [
+            ['id' => 'g1', 'summary' => 'Probe', 'start' => ['dateTime' => '2030-05-01T19:00:00Z'], 'end' => ['dateTime' => '2030-05-01T21:00:00Z']],
+            ['id' => 'g2', 'summary' => 'Privat', 'visibility' => 'private', 'start' => ['date' => '2030-05-02'], 'end' => ['date' => '2030-05-03']],
+        ];
+    }
+
+    public function testDriveClientCalendarAccess(): void
+    {
+        $google = new DriveMock();
+        $app = $this->googleApp($google, new MemorySettings());
+        $drive = $app->drive();
+        $this->assertFalse($drive->calendarAccess(), 'ohne Zugang');
+        $drive->saveServiceAccount($google->serviceAccountJson());
+        $this->assertTrue($drive->calendarAccess(), 'Dienstkonto fragt den Kalender immer mit an');
+
+        $drive->saveOAuth(['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'REFRESH1']);
+        $this->assertSame('', $drive->oauth()['scope'] ?? null, 'Verbindung ohne gespeicherte Berechtigungen');
+        $this->assertFalse($drive->calendarAccess(), 'OAuth geht dem Dienstkonto vor; ohne calendar.readonly kein Kalender');
+        $drive->saveOAuth(self::OAUTH_DRIVE_ONLY);
+        $this->assertFalse($drive->calendarAccess());
+        $drive->saveOAuth(['scope' => ' ' . DriveClient::CALENDAR_SCOPE . '.foo  ' . DriveClient::SCOPE . ' '] + self::OAUTH_DRIVE_ONLY);
+        $this->assertFalse($drive->calendarAccess(), 'nur genau calendar.readonly');
+        $drive->saveOAuth(['scope' => DriveClient::CALENDAR_SCOPE . '   ' . DriveClient::SCOPE] + self::OAUTH_DRIVE_ONLY);
+        $this->assertTrue($drive->calendarAccess(), 'durch Leerzeichen getrennt, wie Google es liefert');
+        $this->assertSame(DriveClient::CALENDAR_SCOPE . '   ' . DriveClient::SCOPE, $drive->oauth()['scope'] ?? null, 'unverändert gespeichert');
+        $drive->removeOAuth();
+        $this->assertTrue($drive->calendarAccess(), 'nach dem Trennen wieder das Dienstkonto');
+    }
+
+    public function testServiceAccountTokenHasBothScopesAndIsCachedPerScope(): void
+    {
+        $google = new DriveMock();
+        $app = $this->googleApp($google, new MemorySettings());
+        $app->drive()->saveServiceAccount($google->serviceAccountJson());
+        // Token von vor der Kalender-Erweiterung (Zwischenspeicher nur mit der E-Mail-Adresse): nicht weiterverwenden.
+        $app->cache->set('drive_token', ['email' => 'galerie@test.iam.gserviceaccount.com', 'token' => 'ALT'], 3600);
+        $this->assertSame('TOKEN123', $app->drive()->accessToken());
+        $this->assertTrue($google->jwtValid);
+        $this->assertSame(DriveClient::SCOPE . ' ' . DriveClient::CALENDAR_SCOPE, $google->jwtScope, 'JWT mit Drive und Kalender');
+        $this->assertSame('TOKEN123', $app->drive()->accessToken());
+        $this->assertSame(1, $google->tokens, 'danach aus dem Zwischenspeicher');
+    }
+
+    public function testSourceOrder(): void
+    {
+        $google = new DriveMock();
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com', 'google_api_key' => 'KEY', 'calendar_ics_url' => 'https://example.org/k.ics']);
+        $app = $this->googleApp($google, $settings);
+        $cal = $app->calendar();
+        $app->drive()->saveServiceAccount($google->serviceAccountJson());
+        $this->assertSame('google', $cal->source(), '1. eigener API-Schlüssel');
+        $settings->set('google_api_key', '');
+        $this->assertSame('google_connection', $cal->source(), '2. Google-Zugang der Galerie');
+        $app->drive()->saveOAuth(self::OAUTH_DRIVE_ONLY);
+        $this->assertSame('ics', $cal->source(), '3. iCal, wenn die Verbindung den Kalender nicht lesen darf');
+        $this->assertTrue($cal->connectionNeedsCalendarAccess());
+        $settings->set('calendar_ids', '');
+        $this->assertFalse($cal->connectionNeedsCalendarAccess(), 'ohne Kalender-IDs kein Hinweis');
+        $settings->set('calendar_ics_url', '');
+        $this->assertSame('none', $cal->source());
+        $settings->set('calendar_ids', 'a@group.calendar.google.com');
+        $this->assertSame('none', $cal->source(), 'Kalender-IDs allein reichen ohne Zugang mit Kalender-Berechtigung nicht');
+    }
+
+    public function testGoogleConnectionWithOAuthUsesBearerToken(): void
+    {
+        $google = new DriveMock();
+        $google->calendarItems = self::googleItems();
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com', 'calendar_ics_url' => 'https://example.org/k.ics']);
+        $app = $this->googleApp($google, $settings);
+        $app->drive()->saveOAuth(self::oauthWithCalendar());
+        $this->assertSame('google_connection', $app->calendar()->source());
+        $this->assertSame(['Probe'], array_column($app->calendar()->events(), 'title'), 'private Termine ausgeblendet, iCal nicht genutzt');
+        $this->assertCount(1, $google->calendarRequests);
+        $req = $google->calendarRequests[0];
+        $this->assertSame('Bearer TOKEN123', $req['headers']['Authorization'] ?? null);
+        $this->assertStringNotContainsString('key=', $req['url'], 'kein API-Schlüssel in der Adresse');
+        $this->assertStringContainsString('a%40group.calendar.google.com/events', $req['url']);
+        $this->assertStringContainsString('singleEvents=true', $req['url']);
+        $this->assertSame('refresh_token', $google->refreshForm['grant_type'] ?? null, 'Token über die OAuth-Verbindung');
+
+        $s = $app->settingsService()->get();
+        $this->assertSame('google_connection', $s['calendar']['source']);
+        $this->assertFalse($s['calendar']['connection_needs_calendar_access']);
+        $this->assertTrue($s['gallery']['calendar_access']);
+    }
+
+    public function testGoogleConnectionWithServiceAccountPagingAndParallel(): void
+    {
+        $google = new DriveMock();
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com, b@group.calendar.google.com']);
+        $inner = $google->http()->handler;
+        $http = new FakeHttpClient(static function (string $m, string $url, array $h, ?string $b) use ($inner): array {
+            if (!str_starts_with($url, 'https://www.googleapis.com/calendar/v3/')) {
+                return $inner($m, $url, $h, $b);
+            }
+            if (($h['Authorization'] ?? '') !== 'Bearer TOKEN123' || str_contains($url, 'key=')) {
+                return ['status' => 401, 'body' => '{}'];
+            }
+            $cal = str_contains($url, 'b%40') ? 'b' : 'a';
+            $page = str_contains($url, 'pageToken=') ? 1 : 0;
+            $item = ['id' => $cal . $page, 'summary' => "Termin $cal$page", 'start' => ['date' => '2030-05-0' . ($page + 1)], 'end' => ['date' => '2030-05-0' . ($page + 2)]];
+            return ['status' => 200, 'body' => (string) json_encode(['items' => [$item]] + ($page === 0 && $cal === 'a' ? ['nextPageToken' => 'P2'] : []))];
+        });
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings);
+        $app->drive()->saveServiceAccount($google->serviceAccountJson());
+        $this->assertEqualsCanonicalizing(['Termin a0', 'Termin a1', 'Termin b0'], array_column($app->calendar()->events(), 'title'), 'mit Weiterblättern, Token auch auf Seite 2');
+        $this->assertCount(1, $http->batches, 'beide Kalender über requestAll');
+        $this->assertCount(2, $http->batches[0]);
+    }
+
+    public function testGoogleConnectionErrorHints(): void
+    {
+        $google = new DriveMock();
+        $google->calendarStatus = 404;
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com']);
+        $app = $this->googleApp($google, $settings);
+        $app->drive()->saveServiceAccount($google->serviceAccountJson());
+        try {
+            $app->calendar()->events();
+            $this->fail('Fehler erwartet');
+        } catch (ApiError $e) {
+            $this->assertSame(502, $e->status);
+            $this->assertStringContainsString('Not Found', $e->getMessage());
+            $this->assertStringContainsString('für galerie@test.iam.gserviceaccount.com freigegeben', $e->getMessage());
+            $this->assertStringContainsString('Google Calendar API', $e->getMessage());
+        }
+
+        $google->calendarStatus = 403;
+        $app->drive()->saveOAuth(self::oauthWithCalendar());
+        $app->calendar()->clearCache();
+        try {
+            $app->calendar()->events();
+            $this->fail('Fehler erwartet');
+        } catch (ApiError $e) {
+            $this->assertStringContainsString('Kann das verbundene Google-Konto (galerie@example.org) den Kalender sehen', $e->getMessage());
+        }
+
+        // Verbindung abgelaufen: Meldung des Token-Endpunkts.
+        $google->validRefreshToken = 'anderes';
+        $app->cache->delete('drive_token');
+        $app->calendar()->clearCache();
+        try {
+            $app->calendar()->events();
+            $this->fail('Fehler erwartet');
+        } catch (ApiError $e) {
+            $this->assertSame(502, $e->status);
+            $this->assertStringContainsString('abgelaufen oder wurde widerrufen', $e->getMessage());
+        }
+
+        // Eigener API-Schlüssel: kein Hinweis auf den Google-Zugang.
+        $settings->set('google_api_key', 'KEY');
+        $app->calendar()->clearCache();
+        try {
+            $app->calendar()->events();
+            $this->fail('Fehler erwartet');
+        } catch (ApiError $e) {
+            $this->assertStringNotContainsString('Calendar API', $e->getMessage());
+        }
+    }
+
+    public function testOAuthWithoutCalendarScopeFallsBackToIcsWithHint(): void
+    {
+        $google = new DriveMock();
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com', 'calendar_ics_url' => 'https://example.org/k.ics']);
+        $app = $this->googleApp($google, $settings);
+        $app->drive()->saveServiceAccount($google->serviceAccountJson());
+        $app->drive()->saveOAuth(self::OAUTH_DRIVE_ONLY);
+        $this->assertSame('ics', $app->calendar()->source());
+        $this->assertCount(2, $app->calendar()->events(), 'Termine aus der iCal-Adresse');
+        $this->assertSame([], $google->calendarRequests);
+
+        $s = $app->settingsService()->get();
+        $this->assertTrue($s['calendar']['connection_needs_calendar_access']);
+        $this->assertFalse($s['gallery']['calendar_access']);
+        $item = array_values(array_filter($app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'calendar'))[0];
+        $this->assertSame('ok', $item['level']);
+        $this->assertStringContainsString('über die iCal-Adresse', $item['text']);
+        $this->assertStringContainsString('neu verbunden', $item['text']);
+
+        // Ohne iCal-Adresse: nicht eingerichtet, gelber Hinweis.
+        $app->settingsService()->update(['calendar_ics_url' => '', 'calendar_ids' => 'a@group.calendar.google.com']);
+        $item = array_values(array_filter($app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'calendar'))[0];
+        $this->assertSame('warn', $item['level']);
+        $this->assertFalse($app->calendar()->isConfigured());
+
+        // Trennen: Das Dienstkonto liest den Kalender; der Zwischenspeicher wird geleert.
+        $google->calendarItems = self::googleItems();
+        $s = $app->settingsService()->update(['drive_oauth' => '']);
+        $this->assertSame('google_connection', $s['calendar']['source']);
+        $this->assertSame(['Probe'], array_column($app->calendar()->events(), 'title'));
+        $item = array_values(array_filter($app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'calendar'))[0];
+        $this->assertSame('ok', $item['level']);
+        $this->assertStringContainsString('über den Google-Zugang der Galerie', $item['text']);
     }
 }

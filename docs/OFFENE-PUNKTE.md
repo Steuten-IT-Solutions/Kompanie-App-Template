@@ -197,6 +197,8 @@ Eine kleine Testseite (PHP + Picker) auf einem Testserver:
 - **T4 oder T5 nicht bestanden:** Ersatzlösung „Ordner freigeben“ an ein Dienstkonto je Kompanie (siehe [Architektur, Abschnitt 9](ARCHITEKTUR.md#9-google-galerie-und-kalender)). Dafür testen wir dann: Dienstkonto anlegen, öffentlichen Schlüssel hochladen (ob die Organisationsrichtlinien das erlauben), Freigabe prüfen.
 - **T7 nicht bestanden:** klären, ob das nur am Status „Testing“ liegt, bevor wir verwerfen.
 
+Für den Kalender gilt bei jedem künftigen Weg „Mit Google verbinden“: zusätzlich `calendar.readonly` anfragen und die von Google erlaubten Berechtigungen (`scope` aus der Token-Antwort) in `drive_oauth` speichern; daran erkennt `DriveClient::calendarAccess()`, ob der Kalender über die Verbindung gelesen werden darf (siehe [Architektur, Abschnitt 9](ARCHITEKTUR.md#kalender)). `calendar.readonly` ist bei Google „sensitive“ und braucht damit die (vereinfachte) Prüfung der App.
+
 ---
 
 ## 6. Branches und PHP-Version

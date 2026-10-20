@@ -2467,7 +2467,7 @@ paths:
               properties:
                 calendar_ics_url: { type: string, description: 'Geheime iCal-Adresse; webcal:// wird als https:// gespeichert' }
                 google_api_key: { type: string }
-                calendar_ids: { type: string, description: Kommagetrennte Kalender-IDs (nur mit API-Schlüssel) }
+                calendar_ids: { type: string, description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang der Galerie' }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
                 drive_oauth: { type: string, enum: [''], description: Leer trennt eine bestehende OAuth-Verbindung zu Google (etwa aus einer Übernahme) }
@@ -3203,7 +3203,16 @@ components:
         calendar:
           type: object
           properties:
-            source: { type: string, enum: [ics, google, none] }
+            source:
+              type: string
+              enum: [ics, google, google_connection, none]
+              description: >-
+                Genutzte Quelle, in dieser Reihenfolge: `google` (Kalender-IDs mit eigenem API-Schlüssel),
+                `google_connection` (Kalender-IDs über den Google-Zugang der Galerie: OAuth-Verbindung mit
+                `calendar.readonly` oder Dienstkonto), `ics` (geheime iCal-Adresse), sonst `none`.
+            connection_needs_calendar_access:
+              type: boolean
+              description: Kalender-IDs ohne API-Schlüssel eingetragen, aber die OAuth-Verbindung darf den Kalender nicht lesen (neu verbinden nötig)
             ics_url_set: { type: boolean }
             google_api_key_set: { type: boolean }
             calendar_ids: { type: string }
@@ -3216,6 +3225,7 @@ components:
             service_account_email: { type: string }
             oauth_connected: { type: boolean, description: Bestehende OAuth-Verbindung zu Google (geht dem Dienstkonto vor) }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
+            calendar_access: { type: boolean, description: 'Darf der Google-Zugang auch den Kalender lesen? OAuth nur mit erlaubtem calendar.readonly; Dienstkonto immer (Kalender muss freigegeben sein)' }
             status:
               type: object
               description: Stand des letzten Abgleichs (albums, photos, new, pending, last_sync, error)
