@@ -32,6 +32,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /api/v1/…                API              (index.php?r=/api/v1/…)
  *   /manifest.webmanifest    Manifest         (index.php?r=/manifest.webmanifest)
  *   /foto/<id>/<größe>       Galeriebild      (index.php?r=/foto/…)
+ *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  */
 final class Kernel
@@ -314,6 +315,8 @@ final class Kernel
             $this->sendServiceWorker();
         } elseif (preg_match('#^/foto/(\d+)/(thumb|large)$#', $path, $m)) {
             $this->sendPhoto((int) $m[1], $m[2]);
+        } elseif (preg_match('#^/dokument/(\d+)$#', $path, $m)) {
+            $this->sendDocument((int) $m[1]);
         } elseif ($path === '/cron') {
             $this->sendCron();
             return;
@@ -439,6 +442,24 @@ final class Kernel
         // Siehe WordPress-Adapter: Bilder können später nach „intern“ verschoben werden.
         header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
         readfile($res['file']);
+    }
+
+    /** Dokument (Issue #2): PDFs und Bilder inline, Office-Dateien als Download. */
+    private function sendDocument(int $id): void
+    {
+        $app = $this->app();
+        $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id);
+        $this->securityHeaders();
+        header('Cache-Control: private, no-cache');
+        if ($res['status'] !== 200 || !isset($res['path'], $res['mime'], $res['disposition'])) {
+            http_response_code($res['status']);
+            return;
+        }
+        header('Content-Type: ' . $res['mime']);
+        header('Content-Length: ' . filesize($res['path']));
+        header('Content-Disposition: ' . $res['disposition']);
+        header('X-Robots-Tag: noindex');
+        readfile($res['path']);
     }
 
     private function sendCron(): void

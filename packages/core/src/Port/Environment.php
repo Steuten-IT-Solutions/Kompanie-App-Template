@@ -30,4 +30,10 @@ interface Environment
 
     /** Adresse, über die ein geschütztes oder noch nicht erzeugtes Galeriebild ausgeliefert wird. */
     public function photoUrl(int $id, string $size): string;
+
+    /**
+     * Adresse, über die ein Dokument nach Prüfung der Anmeldung ausgeliefert wird (Issue #2). Liegt im Bereich des
+     * Service Workers; die Fassung (?v=…) gehört dazu, damit eine neue Fassung eine neue Adresse hat.
+     */
+    public function documentUrl(int $id, string $version): string;
 }

@@ -31,6 +31,7 @@ final class ApiScenario
             $this->ranks();
             $this->titles();
             $this->attendance();
+            $this->documents();
             $this->events();
             $this->push();
             $this->config();
@@ -79,7 +80,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -590,6 +591,37 @@ final class ApiScenario
         $c->ok(in_array($id, array_column((array) ($mine['entries'] ?? []), 'list_id'), true), 'Eigene Anwesenheit');
         $this->d->actAs($admin);
         $c->ok($this->req('DELETE', "/attendance/$id")[0] === 200, 'Liste löschen');
+    }
+
+    /** Dokumente (Issue #2): Hochladen (Base64), Prüfung der Signatur, Sichtbarkeit, Kategorien, Rechte. */
+    private function documents(): void
+    {
+        $c = $this->c;
+        $c->section('Dokumente');
+        $admin = $this->user('kptest_dok_admin', 'admin');
+        $m = $this->user('kptest_dok_m', 'member');
+        $pdf = base64_encode("%PDF-1.4\n%%EOF\n");
+        $this->d->actAs($m);
+        $c->ok($this->req('POST', '/documents', ['title' => 'Kptest', 'date' => '2026-10-01', 'file' => ['name' => 'a.pdf', 'data' => $pdf]])[0] === 403, 'Mitglied lädt nicht hoch → 403');
+        $this->d->actAs($admin);
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [, $cat] = $this->req('POST', '/document-categories', ['title' => "Kptest Protokolle $sfx"]);
+        [$s, $a] = $this->req('POST', '/documents', ['title' => "Kptest Satzung $sfx", 'date' => '2026-10-01', 'category_id' => $cat['id'] ?? null, 'file' => ['name' => 'satzung.pdf', 'data' => $pdf]]);
+        $c->ok($s === 201 && ($a['kind'] ?? '') === 'pdf' && str_contains((string) ($a['url'] ?? ''), 'dokument'), 'PDF hochladen');
+        [, $b] = $this->req('POST', '/documents', ['title' => "Kptest Kasse $sfx", 'date' => '2026-10-01', 'visibility' => 'managers', 'file' => ['name' => 'kasse.pdf', 'data' => $pdf]]);
+        $c->ok($this->req('POST', '/documents', ['title' => 'Kptest', 'date' => '2026-10-01', 'file' => ['name' => 'a.png', 'data' => $pdf]])[0] === 400, 'Falsche Signatur → 400');
+        $this->d->actAs($m);
+        $titles = array_column((array) ($this->req('GET', '/documents')[1]['documents'] ?? []), 'title');
+        $c->ok(in_array("Kptest Satzung $sfx", $titles, true) && !in_array("Kptest Kasse $sfx", $titles, true), 'Mitglied sieht nur Dokumente für alle');
+        $this->d->actAs($admin);
+        $this->req('DELETE', '/document-categories/' . ($cat['id'] ?? 0));
+        $list = array_column((array) ($this->req('GET', '/documents')[1]['documents'] ?? []), null, 'id');
+        $c->ok(array_key_exists((int) ($a['id'] ?? 0), $list) && $list[(int) ($a['id'] ?? 0)]['category_id'] === null, 'Kategorie gelöscht → Dokument ohne Kategorie');
+        $ok = true;
+        foreach ([$a, $b] as $doc) {
+            $ok = $this->req('DELETE', '/documents/' . ($doc['id'] ?? 0))[0] === 200 && $ok;
+        }
+        $c->ok($ok, 'Dokumente löschen');
     }
 
     private function events(): void

@@ -60,6 +60,7 @@ const DEFAULTS = {
     ranks: 'Dienstgrade',
     titles: 'Titel',
     attendance: 'Anwesenheit',
+    documents: 'Dokumente',
   },
   rank: 'Dienstgrad',
 };

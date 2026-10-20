@@ -317,8 +317,10 @@ update_option('permalink_structure', '');
 $env = new KompanieApp\WordPress\WpEnvironment();
 $c->ok(str_contains($env->appUrl('csrf'), 'kompanie_app=csrf') && str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto%2F3%2Fthumb') || str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto/3/thumb'), 'Einfache Permalinks: App-Adressen über Parameter');
 $c->ok(str_contains($env->serviceWorkerUrl(), 'kompanie_app=sw.js'), 'Einfache Permalinks: Service Worker über Parameter (nicht /sw.js)');
+$c->ok((bool) preg_match('#kompanie_app=dokument(/|%2F)7&v=abc$#', $env->documentUrl(7, 'abc')), 'Einfache Permalinks: Dokument-Adresse mit &v=');
 update_option('permalink_structure', $structure);
 $c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
+$c->ok(str_ends_with($env->documentUrl(7, 'abc'), '/app/dokument/7?v=abc'), 'Schöne Permalinks: /app/dokument/7?v=…');
 // Deaktivieren entfernt die /app/-Regeln.
 global $wp_rewrite;
 KompanieApp\WordPress\AppPage::addRewriteRules();

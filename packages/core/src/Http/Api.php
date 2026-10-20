@@ -335,6 +335,23 @@ final class Api
             }, 'titles', $denyRights),
             new Route('PUT', '/members/{id}/titles', Cap::ManageTitles, fn (Request $r) => ['titles' => $a->titles()->assign($r->id(), $r->input('title_ids'))], 'titles', $denyRights),
 
+            // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
+            new Route('GET', '/documents', Cap::Member, fn () => $a->documents()->list($this->user()), 'documents', $denyMember),
+            new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),
+            new Route('PATCH', '/documents/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->update($r->id(), $r->body), 'documents', $denyRights),
+            new Route('POST', '/documents/{id}/file', Cap::ManageDocuments, fn (Request $r) => $a->documents()->replaceFile($r->id(), $r->input('file'), $this->user()->id), 'documents', $denyRights),
+            new Route('DELETE', '/documents/{id}', Cap::ManageDocuments, function (Request $r) use ($a) {
+                $a->documents()->delete($r->id());
+                return ['deleted' => true];
+            }, 'documents', $denyRights),
+            new Route('POST', '/document-categories', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->createCategory($r->input('title'))), 'documents', $denyRights),
+            new Route('PUT', '/document-categories/order', Cap::ManageDocuments, fn (Request $r) => $a->documents()->reorderCategories($r->input('ids')), 'documents', $denyRights),
+            new Route('PATCH', '/document-categories/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->renameCategory($r->id(), $r->input('title')), 'documents', $denyRights),
+            new Route('DELETE', '/document-categories/{id}', Cap::ManageDocuments, function (Request $r) use ($a) {
+                $a->documents()->deleteCategory($r->id());
+                return ['deleted' => true];
+            }, 'documents', $denyRights),
+
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
             new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
             new Route('PUT', '/attendance', Cap::ManageAttendance, function (Request $r) use ($a) {
