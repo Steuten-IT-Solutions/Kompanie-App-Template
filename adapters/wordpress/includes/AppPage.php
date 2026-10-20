@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Http\FileCache;
 
 /**
  * Liefert die PWA unter /app/ aus.
@@ -136,13 +137,13 @@ final class AppPage
 
     private static function sendPhoto(App $app, int $id, string $size): void
     {
-        $user = $app->authContext->currentUser();
-        if ($app->maintenance()->blocks($user)) {
+        // Das Konto nur, wenn nötig (Wartungsmodus, interne Bilder).
+        if ($app->maintenance()->active() && $app->maintenance()->blocks($app->authContext->currentUser())) {
             status_header(503);
             nocache_headers();
             return;
         }
-        $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
+        $res = self::photoResponse($app, $id, $size);
         if (isset($res['placeholder'])) {
             // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
             status_header($res['status']);
@@ -157,13 +158,54 @@ final class AppPage
             status_header($res['status']);
             return;
         }
-        header('Content-Type: image/jpeg');
-        header('Content-Length: ' . filesize($res['file']));
         header('X-Content-Type-Options: nosniff');
         // Über diese Adresse kommen auch noch nicht aufbereitete öffentliche Bilder; ein Bild kann
         // später nach „intern“ verschoben werden. Deshalb hier nie dauerhaft öffentlich speichern lassen.
         header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
+        if (self::notModified($res['etag'] ?? null)) {
+            return;
+        }
+        header('Content-Type: image/jpeg');
+        header('Content-Length: ' . filesize($res['file']));
         readfile($res['file']);
+    }
+
+    /**
+     * Galeriebild: Rechte, Datei und ETag aus dem Kern (Konto nur bei internen Bildern).
+     *
+     * @return array{status: int, file?: string, etag?: string|null, intern?: bool, placeholder?: string, retryAfter?: int}
+     */
+    public static function photoResponse(App $app, int $id, string $size): array
+    {
+        return $app->gallery()->deliverPhoto($id, $size, static function () use ($app): array {
+            $user = $app->authContext->currentUser();
+            return [(bool) $user?->isMember(), $user !== null];
+        });
+    }
+
+    /** Wert von If-None-Match der laufenden Anfrage oder null. */
+    public static function ifNoneMatch(): ?string
+    {
+        return isset($_SERVER['HTTP_IF_NONE_MATCH']) && is_string($_SERVER['HTTP_IF_NONE_MATCH'])
+            ? sanitize_text_field(wp_unslash($_SERVER['HTTP_IF_NONE_MATCH']))
+            : null;
+    }
+
+    /**
+     * Bedingter Abruf: ETag setzen und bei passendem If-None-Match mit 304 ohne Inhalt antworten.
+     * Erst aufrufen, wenn die Rechte geprüft sind und Cache-Control gesetzt ist.
+     */
+    private static function notModified(?string $etag): bool
+    {
+        if ($etag === null) {
+            return false;
+        }
+        header('ETag: ' . $etag);
+        if (!FileCache::matches($etag, self::ifNoneMatch())) {
+            return false;
+        }
+        status_header(304);
+        return true;
     }
 
     /** Dokument (Issue #2): PDFs und Bilder inline, Office-Dateien als Download. */
@@ -182,13 +224,16 @@ final class AppPage
             status_header($res['status']);
             return;
         }
-        header('Content-Type: ' . $res['mime']);
-        header('Content-Length: ' . filesize($res['path']));
-        header('Content-Disposition: ' . $res['disposition']);
         // Privat und jedes Mal prüfen; offline hält der Service Worker die Datei (die Adresse wechselt mit der Fassung).
         header('Cache-Control: private, no-cache');
         header('X-Content-Type-Options: nosniff');
         header('X-Robots-Tag: noindex');
+        if (self::notModified($res['etag'] ?? null)) {
+            return;
+        }
+        header('Content-Type: ' . $res['mime']);
+        header('Content-Length: ' . filesize($res['path']));
+        header('Content-Disposition: ' . $res['disposition']);
         readfile($res['path']);
     }
 
@@ -218,6 +263,10 @@ final class AppPage
         status_header($res['status']);
         foreach ($res['headers'] as $name => $value) {
             header($name . ': ' . $value);
+        }
+        if ($res['status'] === 200 && FileCache::matches($res['headers']['ETag'] ?? null, self::ifNoneMatch())) {
+            status_header(304);
+            return;
         }
         if ($res['status'] === 200 && isset($res['path'])) {
             header('Content-Length: ' . filesize($res['path']));

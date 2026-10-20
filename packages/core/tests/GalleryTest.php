@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Tests;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\GalleryService;
+use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
@@ -155,6 +156,32 @@ final class GalleryTest extends TestCase
         $this->assertSame(200, $ok['status']);
         $this->assertSame("\xFF\xD8", substr((string) file_get_contents($ok['file']), 0, 2));
         $this->assertSame(404, $gallery->photoForDelivery(99999, 'thumb', true, true)['status']);
+        // ETag aus Schlüssel, Größe und Änderungszeit: gleich bei gleicher Datei, anders je Größe und nach Änderung.
+        $etag = (string) ($ok['etag'] ?? '');
+        $this->assertMatchesRegularExpression('/^"[a-f0-9]{32}"$/', $etag);
+        $this->assertSame($etag, $gallery->photoForDelivery($intern['id'], 'thumb', true, true)['etag'] ?? null);
+        $this->assertNotSame($etag, $gallery->photoForDelivery($intern['id'], 'large', true, true)['etag'] ?? null);
+        $this->assertTrue(FileCache::matches($etag, $etag));
+        $this->assertTrue(FileCache::matches($etag, 'W/' . $etag . ', "anders"'), 'Liste und schwacher Vergleich');
+        $this->assertTrue(FileCache::matches($etag, '*'));
+        $this->assertFalse(FileCache::matches($etag, '"anders"'));
+        $this->assertFalse(FileCache::matches($etag, null));
+        $this->assertFalse(FileCache::matches(null, $etag));
+        touch((string) $ok['file'], time() + 5);
+        clearstatcache();
+        $this->assertNotSame($etag, $gallery->photoForDelivery($intern['id'], 'thumb', true, true)['etag'] ?? null, 'neue Datei, neuer ETag');
+        // Wer anfragt, wird nur bei internen Bildern ermittelt (öffentliche brauchen weder Sitzung noch Konto).
+        $asked = 0;
+        $access = static function () use (&$asked): array {
+            $asked++;
+            return [false, false];
+        };
+        $publicPhoto = $this->app->db->selectOne('SELECT id FROM {photos} WHERE is_intern = 0 ORDER BY id LIMIT 1');
+        $this->assertNotNull($publicPhoto);
+        $this->assertSame(200, $gallery->deliverPhoto((int) $publicPhoto['id'], 'thumb', $access)['status']);
+        $this->assertSame(0, $asked, 'öffentliches Bild: niemand ermittelt');
+        $this->assertSame(401, $gallery->deliverPhoto($intern['id'], 'thumb', $access)['status']);
+        $this->assertSame(1, $asked);
         $this->assertSame(404, $gallery->photoForDelivery($intern['id'], 'riesig', true, true)['status']);
         // Fehlgeschlagene Bilder lösen beim Abruf keinen neuen Download aus.
         $this->app->db->execute("UPDATE {photos} SET status = 'error' WHERE id = ?", [$intern['id']]);

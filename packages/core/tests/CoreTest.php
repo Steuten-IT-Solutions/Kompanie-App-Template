@@ -12,6 +12,7 @@ use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Storage\Sql\Migrations;
 use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Storage\Sql\PdoConnection;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\MemorySettings;
 use KompanieApp\Core\Tests\Support\TestApp;
@@ -19,6 +20,22 @@ use PHPUnit\Framework\TestCase;
 
 final class CoreTest extends TestCase
 {
+    public function testSqliteConnectionUsesWalWithSynchronousNormal(): void
+    {
+        $file = sys_get_temp_dir() . '/kompanie-pragma-' . bin2hex(random_bytes(4)) . '.sqlite';
+        try {
+            $db = PdoConnection::sqlite($file);
+            $this->assertSame('wal', strtolower((string) $db->scalar('PRAGMA journal_mode')));
+            $this->assertSame(1, (int) $db->scalar('PRAGMA synchronous'), 'NORMAL (1) statt FULL (2)');
+            $this->assertSame(10000, (int) $db->scalar('PRAGMA busy_timeout'));
+            $this->assertSame(1, (int) $db->scalar('PRAGMA foreign_keys'));
+        } finally {
+            foreach (['', '-wal', '-shm'] as $suffix) {
+                @unlink($file . $suffix);
+            }
+        }
+    }
+
     public function testTextAndInput(): void
     {
         $this->assertSame('Hallo Welt', Text::line("  <b>Hallo</b>\n  Welt\x07 "));

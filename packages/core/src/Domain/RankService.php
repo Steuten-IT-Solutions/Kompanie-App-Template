@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Storage\RankRepository;
 
 /**
@@ -277,6 +278,10 @@ final class RankService
         ];
         if ($svg) {
             $headers['Content-Security-Policy'] = self::SVG_CSP;
+        }
+        $etag = FileCache::etag(basename($path), $path);
+        if ($etag !== null) {
+            $headers['ETag'] = $etag;
         }
         return ['status' => 200, 'headers' => $headers, 'path' => $path];
     }

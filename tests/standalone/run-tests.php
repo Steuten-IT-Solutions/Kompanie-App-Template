@@ -279,6 +279,24 @@ try {
     $c->ok((int) $localNow->format('G') >= 7 ? $claimed === $localNow->format('Y-m-d') : $claimed === null, 'Cron benachrichtigt über heutige Geburtstage erst ab 7 Uhr (Ortszeit ' . $localNow->format('H:i') . ')');
     $kdb->execute('DELETE FROM {birthdays} WHERE user_id = ?', [$max]);
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 404, 'Unbekanntes Foto → 404');
+
+    $c->section('Geschützte Fotos: ETag und 304');
+    $albumId = $kdb->insert('albums', ['drive_id' => 'etag-album', 'year' => '2026', 'title' => 'ETag', 'sort_date' => '2026-01-01', 'synced_at' => gmdate('Y-m-d H:i:s')]);
+    $photoRow = ['album_id' => $albumId, 'drive_file_id' => 'etag-foto', 'name' => 'etag.jpg', 'is_intern' => 1, 'width' => 4, 'height' => 3, 'file_key' => 'etag' . bin2hex(random_bytes(4)), 'status' => 'ready'];
+    $photoId = $kdb->insert('photos', $photoRow);
+    $im = imagecreatetruecolor(4, 3);
+    imagejpeg($im, $kernel->app()->gallery()->path($photoRow, 'thumb'));
+    $photoUrl = $base . 'index.php?r=/foto/' . $photoId . '/thumb';
+    $annaCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)];
+    $first = $d->send('GET', $photoUrl, $annaCookie, null);
+    $etag = (string) ($first[2]['etag'] ?? '');
+    $c->ok($first[0] === 200 && preg_match('/^"[a-f0-9]{32}"$/', $etag) === 1 && ($first[2]['cache-control'] ?? '') === 'private, max-age=86400', 'Internes Foto: 200 mit ETag und privatem Cache');
+    $again = $d->send('GET', $photoUrl, $annaCookie + ['If-None-Match' => $etag], null);
+    $c->ok($again[0] === 304 && ($again[2]['etag'] ?? '') === $etag && ($again[2]['cache-control'] ?? '') === 'private, max-age=86400' && !isset($again[2]['content-length']) , 'Gleicher ETag (If-None-Match) → 304 ohne Inhalt');
+    $c->ok($d->send('GET', $photoUrl, ['If-None-Match' => $etag], null)[0] === 401, 'Ohne Anmeldung trotz passendem ETag → 401 (Rechte vor 304)');
+    $c->ok($d->send('GET', $photoUrl, $annaCookie + ['If-None-Match' => '"anders"'], null)[0] === 200, 'Anderer ETag → 200');
+    $kdb->execute('DELETE FROM {photos} WHERE id = ?', [$photoId]);
+    $kdb->execute('DELETE FROM {albums} WHERE id = ?', [$albumId]);
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');
 
@@ -296,6 +314,7 @@ try {
     $c->ok($svgRes[0] === 200 && ($svgRes[2]['content-type'] ?? '') === 'image/svg+xml' && ($svgRes[2]['x-content-type-options'] ?? '') === 'nosniff'
         && ($svgRes[2]['content-security-policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'SVG: image/svg+xml mit strenger CSP und nosniff');
     $c->ok(str_starts_with((string) ($svgRes[2]['cache-control'] ?? ''), 'private'), 'Abzeichen: Cache-Control private');
+    $c->ok($d->send('GET', $badgeUrl, $cookie + ['If-None-Match' => (string) ($svgRes[2]['etag'] ?? '-')], null)[0] === 304, 'Abzeichen: passender ETag → 304');
     $svgBody = (string) file_get_contents($badgeUrl, false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]]));
     $c->ok(str_contains($svgBody, '<circle') && !str_contains($svgBody, 'script') && !str_contains($svgBody, 'onload'), 'Ausgeliefert wird das bereinigte SVG');
     $guestId = $users->add('Gina Gast', 'gina', 'gina@example.org', 'gina-passwort', Roles::GUEST);

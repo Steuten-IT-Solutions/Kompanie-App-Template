@@ -64,6 +64,7 @@ installer "$T/i1.html" --data-urlencode "url=$APPURL" --data-urlencode "name=Ers
   --data-urlencode "password=geheim-12345" --data-urlencode "password2=geheim-12345" --data-urlencode "db=sqlite"
 grep -q "Die App ist eingerichtet" "$T/i1.html" || { sed 's/<[^>]*>/ /g' "$T/i1.html" | tr -s ' ' | head -c 600; fail "Installer"; }
 [ ! -f "$T/www/install.php" ] && ok "install.php richtet die App ein und löscht sich selbst" || fail "install.php noch da"
+grep -q "Cronjob.*cron.*key=" "$T/i1.html" && ok "Installer empfiehlt einen Cronjob mit der Cron-Adresse" || fail "Kein Hinweis auf einen Cronjob"
 [ "$(version)" = "$CORE.1" ] && ok "Installierte Version $CORE.1 läuft" || fail "Version: $(version)"
 if [ -f "$T/www/data-dir.php" ]; then
   ok "Datenverzeichnis wäre erreichbar gewesen (kein .htaccess): nach außerhalb verlegt"

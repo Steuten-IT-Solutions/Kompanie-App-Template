@@ -277,6 +277,7 @@ final class RankBadgeTest extends TestCase
         $this->assertSame('nosniff', $res['headers']['X-Content-Type-Options']);
         $this->assertSame("default-src 'none'; style-src 'unsafe-inline'; sandbox", $res['headers']['Content-Security-Policy']);
         $this->assertSame('private, max-age=31536000, immutable', $res['headers']['Cache-Control']);
+        $this->assertMatchesRegularExpression('/^"[a-f0-9]{32}"$/', $res['headers']['ETag'] ?? '', 'ETag für bedingte Abrufe (304)');
         $this->assertStringNotContainsString('script', (string) file_get_contents((string) ($res['path'] ?? '')));
         $this->assertSame($res['path'], $ranks->badgeForDelivery($member, $svgRank, $v, '256')['path'] ?? null, 'SVG: dieselbe Datei für alle Größen');
         $this->assertSame('private, no-cache', $ranks->badgeForDelivery($member, $svgRank, 'alt', '128')['headers']['Cache-Control'], 'veraltete Fassung nicht lange speichern');

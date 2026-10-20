@@ -102,6 +102,7 @@ final class DocumentServiceTest extends TestCase
         $this->assertSame(200, $res['status']);
         $this->assertSame(self::PDF, file_get_contents((string) ($res['path'] ?? '')));
         $this->assertStringStartsWith('inline; filename="Satzung.pdf"', (string) ($res['disposition'] ?? ''));
+        $this->assertMatchesRegularExpression('/^"[a-f0-9]{32}"$/', (string) ($res['etag'] ?? ''), 'ETag für bedingte Abrufe (304)');
         $this->assertSame(404, $docs->forDelivery($member, $intern['id'])['status'], 'eingeschränkt: wie nicht vorhanden');
         $this->assertSame(401, $docs->forDelivery(null, $public['id'])['status']);
         $this->assertSame(403, $docs->forDelivery($this->users->find($guest), $public['id'])['status']);

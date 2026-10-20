@@ -606,8 +606,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ki_checks_ok($checks)) {
 
         $kernel = new KompanieApp\Standalone\Kernel(KI_DIR, $http);
         KompanieApp\Standalone\Setup::createAdmin($kernel, $name, $login, $email, $password);
+        // Empfehlung: Cronjob beim Hoster (ohne läuft der Pseudo-Cron nach Besuchen, siehe Kernel::afterResponse).
+        $cron = '';
+        try {
+            $cron = '<p class="hint">Empfohlen: Die App erledigt Hintergrundaufgaben (Galerie, Kalender, Updates) auch ohne weiteres Zutun. Zuverlässiger geht es mit einem Cronjob im Kundenmenü des Hosters, der alle 15 Minuten diese Adresse aufruft: <code>'
+                . ki_h($kernel->cronUrl()) . '</code> (steht auch unter Einstellungen → Zustand der App).</p>';
+        } catch (Exception $e) {
+            // nur ein Hinweis
+        } catch (Error $e) {
+            // nur ein Hinweis
+        }
         $deleted = ki_self_delete();
         ki_page('Fertig', '<div class="card"><h2>Die App ist eingerichtet</h2><p>Version ' . ki_h($entry['version']) . '. Jetzt mit dem eben angelegten Admin-Konto anmelden; danach führt die App durch die restliche Einrichtung (Bereiche wählen, dann z. B. Kalender, Galerie, Neuigkeiten).</p>'
+            . $cron
             . ($deleted ? '<p class="hint">Der Installer hat sich selbst gelöscht.</p>' : '<p class="bad">Bitte die Datei install.php jetzt im Dateimanager löschen.</p>')
             . '<a class="btn" href="' . ki_h($base) . '">Zur App</a></div>');
     } catch (Exception $e) {

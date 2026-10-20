@@ -7,6 +7,7 @@ namespace KompanieApp\Standalone;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
 use KompanieApp\Core\Infra\CurlHttpClient;
@@ -424,14 +425,17 @@ final class Kernel
     private function sendPhoto(int $id, string $size): void
     {
         $app = $this->app();
-        $user = $app->authContext->currentUser();
         $this->securityHeaders();
-        if ($app->maintenance()->blocks($user)) {
+        // Sitzung und Konto nur, wenn nötig (Wartungsmodus, interne Bilder): öffentliche Bilder ohne diese Abfragen.
+        if ($app->maintenance()->active() && $app->maintenance()->blocks($app->authContext->currentUser())) {
             http_response_code(503);
             header('Cache-Control: no-store');
             return;
         }
-        $res = $app->gallery()->photoForDelivery($id, $size, (bool) $user?->isMember(), $user !== null);
+        $res = $app->gallery()->deliverPhoto($id, $size, static function () use ($app): array {
+            $user = $app->authContext->currentUser();
+            return [(bool) $user?->isMember(), $user !== null];
+        });
         if (isset($res['placeholder'])) {
             // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
             http_response_code($res['status']);
@@ -445,11 +449,31 @@ final class Kernel
             http_response_code($res['status']);
             return;
         }
-        header('Content-Type: image/jpeg');
-        header('Content-Length: ' . filesize($res['file']));
         // Siehe WordPress-Adapter: Bilder können später nach „intern“ verschoben werden.
         header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
+        if ($this->notModified($res['etag'] ?? null)) {
+            return;
+        }
+        header('Content-Type: image/jpeg');
+        header('Content-Length: ' . filesize($res['file']));
         readfile($res['file']);
+    }
+
+    /**
+     * Bedingter Abruf: ETag setzen und bei passendem If-None-Match mit 304 ohne Inhalt antworten.
+     * Erst aufrufen, wenn die Rechte geprüft sind und Cache-Control gesetzt ist.
+     */
+    private function notModified(?string $etag): bool
+    {
+        if ($etag === null) {
+            return false;
+        }
+        header('ETag: ' . $etag);
+        if (!FileCache::matches($etag, $this->http->header('If-None-Match'))) {
+            return false;
+        }
+        http_response_code(304);
+        return true;
     }
 
     /** Dokument (Issue #2): PDFs und Bilder inline, Office-Dateien als Download. */
@@ -463,10 +487,13 @@ final class Kernel
             http_response_code($res['status']);
             return;
         }
+        header('X-Robots-Tag: noindex');
+        if ($this->notModified($res['etag'] ?? null)) {
+            return;
+        }
         header('Content-Type: ' . $res['mime']);
         header('Content-Length: ' . filesize($res['path']));
         header('Content-Disposition: ' . $res['disposition']);
-        header('X-Robots-Tag: noindex');
         readfile($res['path']);
     }
 
@@ -481,6 +508,10 @@ final class Kernel
         http_response_code($res['status']);
         foreach ($res['headers'] as $name => $value) {
             header($name . ': ' . $value);
+        }
+        if ($res['status'] === 200 && FileCache::matches($res['headers']['ETag'] ?? null, $this->http->header('If-None-Match'))) {
+            http_response_code(304);
+            return;
         }
         if ($res['status'] === 200 && isset($res['path'])) {
             header('Content-Length: ' . filesize($res['path']));

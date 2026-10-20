@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\Environment;
 use KompanieApp\Core\Port\FileStorage;
@@ -400,17 +401,36 @@ final class GalleryService
      * Platzhalter (SVG im Seitenverhältnis des Fotos) und Retry-After; die Aufbereitung läuft im
      * Hintergrund (und wird hier angestoßen).
      *
-     * @return array{status: int, file?: string, intern?: bool, placeholder?: string, retryAfter?: int}
+     * @return array{status: int, file?: string, etag?: string|null, intern?: bool, placeholder?: string, retryAfter?: int}
      */
     public function photoForDelivery(int $id, string $size, bool $member, bool $loggedIn): array
     {
+        return $this->deliverPhoto($id, $size, static fn (): array => [$member, $loggedIn]);
+    }
+
+    /**
+     * Wie photoForDelivery, für die Adapter: Wer anfragt, wird nur bei internen Bildern ermittelt
+     * (Sitzung und Konto kosten Abfragen; öffentliche Bilder brauchen sie nicht). Fertige Bilder
+     * bekommen einen ETag (FileCache), damit der Browser mit If-None-Match nachfragen kann (304).
+     *
+     * @param \Closure(): array{0: bool, 1: bool} $access [Mitglied, angemeldet]
+     * @return array{status: int, file?: string, etag?: string|null, intern?: bool, placeholder?: string, retryAfter?: int}
+     */
+    public function deliverPhoto(int $id, string $size, \Closure $access): array
+    {
+        if (!isset(self::SIZES[$size])) {
+            return ['status' => 404];
+        }
         $photo = $this->repo->photo($id);
-        if (!$photo || !isset(self::SIZES[$size])) {
+        if (!$photo) {
             return ['status' => 404];
         }
         $intern = (bool) (int) $photo['is_intern'];
-        if ($intern && !$member) {
-            return ['status' => $loggedIn ? 403 : 401];
+        if ($intern) {
+            [$member, $loggedIn] = $access();
+            if (!$member) {
+                return ['status' => $loggedIn ? 403 : 401];
+            }
         }
         $file = $this->path($photo, $size);
         // Fehlgeschlagene Bilder nicht bei jedem Aufruf erneut aus Drive laden lassen
@@ -428,7 +448,7 @@ final class GalleryService
             $this->nudge();
             return ['status' => 202, 'placeholder' => self::placeholder((int) $photo['width'], (int) $photo['height']), 'retryAfter' => self::RETRY_AFTER, 'intern' => $intern];
         }
-        return ['status' => 200, 'file' => $file, 'intern' => $intern];
+        return ['status' => 200, 'file' => $file, 'etag' => FileCache::etag(self::relativePath($photo, $size), $file), 'intern' => $intern];
     }
 
     /** Aufbereitung im Hintergrund anstoßen, höchstens einmal pro Minute (nicht bei jedem Bild des Rasters). */
