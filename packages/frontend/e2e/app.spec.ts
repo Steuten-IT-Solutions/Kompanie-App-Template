@@ -19,6 +19,13 @@ async function adminMenu(page: Page, name: string) {
   await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
 }
 
+/** Bereich unter „Meins“ wählen (Burger-Menü). */
+async function meinsMenu(page: Page, name: string) {
+  const nav = page.locator('.meins-menu');
+  await nav.locator('.admin-menu-toggle').click();
+  await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
+}
+
 /** Seite eines Mitglieds in der Verwaltung wählen (zweites Menü unter dem Namen). */
 async function memberMenu(page: Page, name: string) {
   const nav = page.locator('.member-menu');
@@ -258,7 +265,7 @@ test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
   await expect(page.getByText('Teilnahme Sommerfest')).toBeVisible();
   await shot(page, '2-punkte');
 
-  await page.locator('.segmented').getByRole('button', { name: 'Kasse' }).click();
+  await meinsMenu(page, 'Kasse');
   await expect(page.locator('.stat-value')).toContainText('2,50');
   await expect(page.getByText('Zu spät gekommen')).toBeVisible();
   await expect(page.getByText('Handy klingelt <10 min')).toBeVisible();
@@ -268,7 +275,7 @@ test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
 test('Mitglied 2 sieht keine fremden Einträge und keine Verwaltungsdaten', async ({ page }) => {
   await login(page, 'mitglied2');
   await page.getByRole('button', { name: 'Meins' }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Kasse' }).click();
+  await meinsMenu(page, 'Kasse');
   await expect(page.locator('.stat-value')).toContainText('0,00');
   await expect(page.getByText('Zu spät gekommen')).toHaveCount(0);
 
@@ -582,8 +589,8 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
 
 test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Einstellungen');
   await page
     .locator('.settings-link')
     .filter({ has: page.getByText('Rollen', { exact: true }) })
@@ -610,8 +617,8 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toHaveCount(0);
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Einstellungen');
   await page
     .locator('.settings-link')
     .filter({ has: page.getByText('Rollen', { exact: true }) })
@@ -835,8 +842,8 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
 
 test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Einstellungen');
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
   await page
     .locator('.settings-link')
@@ -1076,8 +1083,8 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
 
 test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Einstellungen');
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
   const open = async (title: string) => {
     await page.goto('/app/#/einstellungen');
@@ -1220,7 +1227,7 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrad' }).click();
+  await meinsMenu(page, 'Dienstgrad');
   await expect(page.locator('.rank-card-title')).toHaveText('Gefreiter');
   await expect(page.locator('.rank-progress')).toContainText('bis „Unteroffizier“');
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
@@ -1265,7 +1272,7 @@ test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in �
   await login(page, 'mitglied2');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrad' }).click();
+  await meinsMenu(page, 'Dienstgrad');
   const loaded = (alt: string, scope: string) =>
     page.evaluate(
       ([a, s]) => {
@@ -1347,7 +1354,7 @@ test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht
 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Anwesenheit' }).click();
+  await meinsMenu(page, 'Anwesenheit');
   await expect(page.locator('.my-attendance .row', { hasText: title })).toContainText('anwesend');
 });
 
@@ -1820,8 +1827,8 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   const before = await storedApi();
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Einstellungen');
   await page
     .locator('.settings-link')
     .filter({ has: page.getByText('Wartungsmodus', { exact: true }) })

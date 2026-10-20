@@ -3,7 +3,7 @@ titel: Wartungsmodus
 reihenfolge: 145
 rechte: [manage_settings]
 ---
-Der Wartungsmodus sperrt die App für alle außer {rolle.admin}s, z. B. während einer Datenübernahme oder größerer Korrekturen. Du schaltest ihn unter **Konto → Einstellungen → Wartungsmodus** ein und wieder aus. Mit WordPress geht das auch im WP-Admin unter *Einstellungen*, auf der Seite der App, falls die App selbst nicht erreichbar ist.
+Der Wartungsmodus sperrt die App für alle außer {rolle.admin}s, z. B. während einer Datenübernahme oder größerer Korrekturen. Du schaltest ihn unter **Verwaltung → Einstellungen → Wartungsmodus** ein und wieder aus. Mit WordPress geht das auch im WP-Admin unter *Einstellungen*, auf der Seite der App, falls die App selbst nicht erreichbar ist.
 
 ## Einschalten
 Trag bei Bedarf eine **Begründung** ein, z. B. „Umstellung auf die neue App, bis ca. 18 Uhr“ (höchstens 500 Zeichen), und tippe auf **Wartungsmodus einschalten**. Die Begründung kannst du auch während der Wartung ändern.
