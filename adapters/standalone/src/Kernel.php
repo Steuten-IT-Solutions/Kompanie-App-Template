@@ -419,6 +419,11 @@ final class Kernel
         header('Content-Type: application/javascript; charset=utf-8');
         header('Cache-Control: no-cache');
         header('Service-Worker-Allowed: ' . $this->http->basePath);
+        // Der Browser prüft sw.js bei jedem Start der App: mit ETag meist nur 304 ohne Inhalt (Issue #18).
+        if ($this->notModified(FileCache::etag('sw.js', $file))) {
+            return;
+        }
+        header('Content-Length: ' . filesize($file));
         readfile($file);
     }
 
@@ -480,13 +485,15 @@ final class Kernel
     private function sendDocument(int $id): void
     {
         $app = $this->app();
-        $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id);
+        $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id, is_string($_GET['v'] ?? null) ? $_GET['v'] : null);
         $this->securityHeaders();
         header('Cache-Control: private, no-cache');
         if ($res['status'] !== 200 || !isset($res['path'], $res['mime'], $res['disposition'])) {
             http_response_code($res['status']);
             return;
         }
+        // Aktuelle Fassung: ein Jahr (die Adresse wechselt mit jeder neuen Fassung), sonst jedes Mal prüfen.
+        header('Cache-Control: ' . ($res['cache_control'] ?? 'private, no-cache'));
         header('X-Robots-Tag: noindex');
         if ($this->notModified($res['etag'] ?? null)) {
             return;

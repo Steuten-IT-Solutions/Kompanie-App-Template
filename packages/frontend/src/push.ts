@@ -6,6 +6,7 @@
 
 import { api, config, type PushDevice } from './api';
 import { detectPlatform, isStandalone } from './install';
+import { pushCheckDone, pushCheckDue, pushFingerprint } from './pushCheck';
 
 export type PushSupport = 'ok' | 'unsupported' | 'ios-install';
 
@@ -125,12 +126,17 @@ export async function forgetPushOnLogout(): Promise<(ok: boolean) => Promise<voi
 
 /**
  * Beim Start der App: Hat dieses Gerät ein Abo, fragt die App den Server danach. Gehört es einem Konto, das hier
- * nicht mehr angemeldet ist (Sitzung abgelaufen, anderswo abgemeldet), gibt der Server es dabei frei.
+ * nicht mehr angemeldet ist (Sitzung abgelaufen, anderswo abgemeldet), gibt der Server es dabei frei. Nicht bei
+ * jedem Start (Issue #18): nur nach einer Änderung von Push-Adresse oder Konto, sonst einmal je Woche (pushCheck.ts).
  */
 export async function checkPushOnStart(): Promise<void> {
   try {
     const device = await currentDevice();
-    if (device) await api.pushStatus(device);
+    if (!device) return;
+    const fingerprint = pushFingerprint(device.endpoint, config?.user?.id ?? null);
+    if (!pushCheckDue(fingerprint)) return;
+    await api.pushStatus(device);
+    pushCheckDone(fingerprint);
   } catch {
     // offline o. ä.: beim nächsten Start
   }

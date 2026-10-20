@@ -29,6 +29,18 @@ final class PdoUsers implements UserDirectory
         return $row ? $this->toUser($row) : null;
     }
 
+    public function findMany(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        $out = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            foreach ($this->db->select('SELECT * FROM {users} WHERE id IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ')', $chunk) as $row) {
+                $out[(int) $row['id']] = $this->toUser($row);
+            }
+        }
+        return $out;
+    }
+
     /** @return array<string, mixed>|null Zeile für die Anmeldung (Benutzername oder E-Mail). */
     public function findForLogin(string $loginOrEmail): ?array
     {

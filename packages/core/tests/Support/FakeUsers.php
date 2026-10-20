@@ -21,6 +21,8 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     public array $users = [];
     public ?int $current = null;
     public int $passwordChanges = 0;
+    /** Zahl der Einzelabfragen (find) und Sammelabfragen (findMany, list): wie Datenbankabfragen der Adapter. */
+    public int $lookups = 0;
     private int $next = 1;
 
     /** @var (\Closure(string): array<int, \KompanieApp\Core\Auth\Capability>)|null Rechte je Rolle (setzt TestApp: die der App) */
@@ -39,6 +41,25 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 
     public function find(int $id): ?User
     {
+        $this->lookups++;
+        return $this->user($id);
+    }
+
+    public function findMany(array $ids): array
+    {
+        $this->lookups++;
+        $out = [];
+        foreach ($ids as $id) {
+            $u = $this->user((int) $id);
+            if ($u !== null) {
+                $out[$u->id] = $u;
+            }
+        }
+        return $out;
+    }
+
+    private function user(int $id): ?User
+    {
         $u = $this->users[$id] ?? null;
         $caps = $u === null ? [] : ($this->capabilities !== null ? ($this->capabilities)($u['level']) : Roles::templateCapabilities($u['level']));
         return $u ? new User($id, $u['name'], $u['login'], $u['level'], $caps) : null;
@@ -46,9 +67,10 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 
     public function list(bool $includeGuests): array
     {
+        $this->lookups++;
         $out = [];
         foreach (array_keys($this->users) as $id) {
-            $u = $this->find($id);
+            $u = $this->user($id);
             if ($includeGuests || $u->role !== Roles::GUEST) {
                 $out[] = $u;
             }
@@ -112,7 +134,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 
     public function currentUser(): ?User
     {
-        return $this->current ? $this->find($this->current) : null;
+        return $this->current ? $this->user($this->current) : null;
     }
 
     public function mode(): string
@@ -150,7 +172,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         foreach ($this->users as $id => $u) {
             if ($u['login'] === $username && $this->verifyPassword($id, $password)) {
                 $this->current = $id;
-                return $this->find($id);
+                return $this->user($id);
             }
         }
         throw ApiError::invalid('Benutzername oder Passwort ist falsch.');

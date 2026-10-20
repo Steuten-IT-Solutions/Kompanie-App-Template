@@ -32,6 +32,25 @@ final class PushRepository
         return array_map(self::format(...), array_values($this->db->select('SELECT * FROM {push_subscriptions} WHERE user_id = ? ORDER BY id ASC', [$userId])));
     }
 
+    /**
+     * Abos mehrerer Konten mit einer Abfrage.
+     *
+     * @param list<int> $userIds
+     * @return array<int, list<Subscription>> Benutzer-ID => Abos, älteste zuerst
+     */
+    public function forUsers(array $userIds): array
+    {
+        $out = [];
+        foreach (array_chunk(array_values(array_unique($userIds)), 500) as $chunk) {
+            $rows = $this->db->select('SELECT * FROM {push_subscriptions} WHERE user_id IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ') ORDER BY id ASC', $chunk);
+            foreach ($rows as $row) {
+                $sub = self::format($row);
+                $out[$sub['user_id']][] = $sub;
+            }
+        }
+        return $out;
+    }
+
     /** @return list<Subscription> */
     public function all(): array
     {
@@ -109,7 +128,15 @@ final class PushRepository
 
     public function markSent(int $id, string $now): void
     {
-        $this->db->execute('UPDATE {push_subscriptions} SET last_sent_at = ? WHERE id = ?', [$now, $id]);
+        $this->markSentMany([$id], $now);
+    }
+
+    /** @param list<int> $ids Abos, an die gerade zugestellt wurde (eine Abfrage für alle) */
+    public function markSentMany(array $ids, string $now): void
+    {
+        foreach (array_chunk(array_values(array_unique($ids)), 200) as $chunk) {
+            $this->db->execute('UPDATE {push_subscriptions} SET last_sent_at = ? WHERE id IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ')', [$now, ...$chunk]);
+        }
     }
 
     /**

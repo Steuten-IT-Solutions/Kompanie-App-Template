@@ -1940,8 +1940,9 @@ fieldset.feature-list legend {
   border-radius: 4px;
   box-shadow: var(--shadow);
 }
-.pdf-progress {
-  text-align: center;
+/* Platzhalter einer Seite, bis sie gezeichnet ist (Seitenverhältnis aus der Größe der Zeichenfläche). */
+.pdf-page.pdf-pending {
+  opacity: 0.6;
 }
 /* Schmale Handys (z. B. 360 px): sechs Tabs ohne Umbruch. */
 @media (max-width: 380px) {

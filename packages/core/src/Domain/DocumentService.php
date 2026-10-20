@@ -87,9 +87,13 @@ final class DocumentService
     /**
      * Für die Auslieferung über documentUrl(): prüft Anmeldung und Sichtbarkeit.
      *
-     * @return array{status: int, path?: string, etag?: string|null, mime?: string, disposition?: string}
+     * Die Adresse wechselt mit jeder Fassung (?v=, Issue #18): Passt $version zur aktuellen Fassung, darf der Browser die
+     * Datei ein Jahr behalten, ohne nachzufragen (privat, wie Abzeichen). Ohne oder mit veralteter Fassung (alte
+     * Adresse, liefert schon die neue Datei) wird jedes Mal geprüft; dank ETag meist nur 304.
+     *
+     * @return array{status: int, path?: string, etag?: string|null, mime?: string, disposition?: string, cache_control?: string}
      */
-    public function forDelivery(?User $user, int $id): array
+    public function forDelivery(?User $user, int $id, ?string $version = null): array
     {
         if (!$this->app->features()->enabled('documents')) {
             return ['status' => 404];
@@ -117,8 +121,10 @@ final class DocumentService
         return [
             'status' => 200,
             'path' => $path,
-            // Die Adresse bleibt je Fassung gleich, wird aber jedes Mal geprüft (no-cache): mit ETag meist nur 304.
             'etag' => FileCache::etag($doc['file'], $path),
+            // Bewusst nicht lange im HTTP-Cache des Browsers: Den leert das Abmelden nicht, und auf geteilten Geräten bliebe
+            // ein geschütztes Dokument sonst ohne Rechteprüfung abrufbar. Die Prüfung per ETag/304 kostet keine Übertragung.
+            'cache_control' => 'private, no-cache',
             'mime' => $mime,
             'disposition' => $mode . '; filename="' . self::asciiName($doc['title']) . '.' . $doc['ext'] . '"; filename*=UTF-8\'\'' . rawurlencode($name),
         ];

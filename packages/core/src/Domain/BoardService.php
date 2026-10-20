@@ -59,8 +59,9 @@ final class BoardService
      */
     public function list(?User $viewer = null): array
     {
-        $names = new UserNames($this->app->users);
-        $messages = array_map(fn (array $m): array => $this->format($m, $names), $this->repository()->active($this->app->time()->nowUtc()));
+        $active = $this->repository()->active($this->app->time()->nowUtc());
+        $names = (new UserNames($this->app->users))->prime(array_column($active, 'author_id'));
+        $messages = array_map(fn (array $m): array => $this->format($m, $names), $active);
         return ['items' => [...$messages, ...$this->app->polls()->boardItems($viewer)]];
     }
 

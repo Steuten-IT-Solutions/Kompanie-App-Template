@@ -96,9 +96,11 @@ final class MaintenanceService
     public function log(): array
     {
         $log = $this->app->settings->get(self::LOG_SETTING);
+        $log = is_array($log) ? $log : [];
+        $names = (new UserNames($this->app->users))->prime(array_column($log, 'by'));
         $out = [];
-        foreach (array_reverse(is_array($log) ? $log : []) as $e) {
-            $out[] = ['at' => (int) $e['at'], 'by' => (int) $e['by'], 'by_name' => (string) (new UserNames($this->app->users))->name((int) $e['by']), 'on' => (bool) $e['on'], 'reason' => (string) $e['reason']];
+        foreach (array_reverse($log) as $e) {
+            $out[] = ['at' => (int) $e['at'], 'by' => (int) $e['by'], 'by_name' => (string) $names->name((int) $e['by']), 'on' => (bool) $e['on'], 'reason' => (string) $e['reason']];
         }
         return $out;
     }

@@ -72,9 +72,30 @@ final class WpUsers implements UserDirectory, AuthContext
         return $this->toUser($u);
     }
 
+    public function findMany(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        // Benutzer und Benutzer-Optionen mit zwei Abfragen in den Objekt-Cache holen; sonst kosten get_userdata()
+        // und die Rechte (get_user_meta) je Konto eigene Abfragen.
+        cache_users($ids);
+        $out = [];
+        foreach ($ids as $id) {
+            $user = $this->find($id);
+            if ($user !== null) {
+                $out[$id] = $user;
+            }
+        }
+        return $out;
+    }
+
     public function list(bool $includeGuests): array
     {
-        $args = ['orderby' => 'display_name', 'order' => 'ASC'];
+        // all_with_meta: WordPress lädt die Benutzer-Optionen aller Treffer vorab (cache_users), statt beim Lesen
+        // der Rechte und der Rolle in der App je Konto eine Abfrage zu stellen.
+        $args = ['orderby' => 'display_name', 'order' => 'ASC', 'fields' => 'all_with_meta'];
         if (!$includeGuests) {
             // Nur Konten mit einer Rolle in der App: neues Meta, alte WP-Rollen (noch nicht übernommen)
             // oder Administratoren. Ob die Rolle Mitglied ist, prüft der Kern.
@@ -90,7 +111,7 @@ final class WpUsers implements UserDirectory, AuthContext
             $args['include'] = $ids;
         }
         $args = apply_filters('kompanie_app_members_query_args', $args);
-        return array_map(fn (\WP_User $u): User => $this->toUser($u), get_users($args));
+        return array_values(array_map(fn (\WP_User $u): User => $this->toUser($u), get_users($args)));
     }
 
     public function create(string $name, string $login, string $email, string $password, string $role = AppRoles::MEMBER): int

@@ -1243,6 +1243,61 @@ test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gem
   }
 });
 
+test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({ page }) => {
+  const id = Date.now().toString(36);
+  // Zehn A4-Seiten mit je einer Zeile Text
+  const objs = ['<</Type/Catalog/Pages 2 0 R>>', '', '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>'];
+  const kids: number[] = [];
+  for (let p = 1; p <= 10; p++) {
+    const text = `BT /F1 24 Tf 72 720 Td (Seite ${p}) Tj ET`;
+    objs.push(`<</Length ${text.length}>>stream\n${text}\nendstream`);
+    objs.push(`<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Resources<</Font<</F1 3 0 R>>>>/Contents ${objs.length} 0 R>>`);
+    kids.push(objs.length);
+  }
+  objs[1] = `<</Type/Pages/Kids[${kids.map((k) => `${k} 0 R`).join(' ')}]/Count 10>>`;
+  const pdf = Buffer.from(
+    `%PDF-1.4\n${objs.map((o, i) => `${i + 1} 0 obj${o}endobj\n`).join('')}trailer<</Root 1 0 R>>\n%%EOF\n`,
+    'latin1',
+  );
+  // Bildformat der gezeichneten Seiten mitschreiben (Blob-Adressen lassen sich wegen der CSP nicht abrufen)
+  await page.addInitScript(() => {
+    const types: string[] = [];
+    (window as unknown as { pdfImageTypes: string[] }).pdfImageTypes = types;
+    const toBlob = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+      types.push(String(type));
+      return toBlob.call(this, callback, type, quality);
+    };
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
+  await page.getByLabel('Datei').setInputFiles({ name: 'lang.pdf', mimeType: 'application/pdf', buffer: pdf });
+  await page.getByLabel('Titel').fill(`Langes Dokument ${id}`);
+  await page.getByRole('button', { name: 'Hochladen' }).click();
+  await expect(page.locator('.toast')).toHaveText(`„Langes Dokument ${id}“ hochgeladen`);
+  await page.getByRole('button', { name: '‹ Alle Dokumente' }).click();
+
+  const doc = page.locator('.doc-card', { hasText: `Langes Dokument ${id}` });
+  await expect(doc).toBeAttached();
+  const toggle = page.locator('.doc-group', { has: doc }).locator('.doc-group-toggle');
+  if ((await toggle.count()) > 0 && (await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+  await doc.getByRole('button', { name: 'Öffnen' }).click();
+  const first = page.getByAltText(`Langes Dokument ${id}, Seite 1 von 10`);
+  await expect(first).toBeVisible();
+  // Weit unten: noch nicht gezeichnet, nur der Platzhalter im Seitenverhältnis der Seite
+  const last = page.getByRole('img', { name: `Langes Dokument ${id}, Seite 10 von 10 wird aufbereitet` });
+  await expect(last).toBeAttached();
+  const box = await last.boundingBox();
+  expect(box && Math.abs(box.height / box.width - 842 / 595)).toBeLessThan(0.05);
+  expect(await page.locator('img.pdf-page').count()).toBeLessThan(10);
+  expect(new Set(await page.evaluate(() => (window as unknown as { pdfImageTypes: string[] }).pdfImageTypes))).toEqual(
+    new Set(['image/jpeg']),
+  );
+  await last.scrollIntoViewIfNeeded();
+  await expect(page.getByAltText(`Langes Dokument ${id}, Seite 10 von 10`)).toBeVisible();
+});
+
 test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ page }) => {
   const title = `Ehrenmitglied ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);

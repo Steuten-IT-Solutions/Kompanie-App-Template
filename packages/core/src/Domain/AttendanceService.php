@@ -232,7 +232,7 @@ final class AttendanceService
         foreach ($rows as $r) {
             $counts[$r['status']] = ($counts[$r['status']] ?? 0) + 1;
         }
-        $names = new UserNames($this->app->users);
+        $names = (new UserNames($this->app->users))->prime(array_column($rows, 'updated_by'));
         return [
             'entries' => array_map(static fn (array $r): array => [
                 'list_id' => $r['list_id'],

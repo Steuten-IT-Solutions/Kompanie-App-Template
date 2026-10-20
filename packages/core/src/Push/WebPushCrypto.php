@@ -97,11 +97,7 @@ final class WebPushCrypto
      */
     public static function vapidToken(string $endpoint, string $privatePem, string $subject, int $now): string
     {
-        $parts = parse_url($endpoint);
-        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
-            throw new \RuntimeException('Ungültige Push-Adresse.');
-        }
-        $aud = $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
+        $aud = self::audience($endpoint);
         $input = self::b64uEncode((string) json_encode(['typ' => 'JWT', 'alg' => 'ES256']))
             . '.' . self::b64uEncode((string) json_encode(['aud' => $aud, 'exp' => $now + 12 * 3600, 'sub' => $subject], JSON_UNESCAPED_SLASHES));
         $key = openssl_pkey_get_private($privatePem);
@@ -109,6 +105,16 @@ final class WebPushCrypto
             throw new \RuntimeException('VAPID-Token ließ sich nicht signieren.');
         }
         return $input . '.' . self::b64uEncode(self::derToRaw((string) $der));
+    }
+
+    /** Audience des VAPID-Tokens: Ursprung des Endpoints (Schema, Host, Port), also der Push-Dienst. */
+    public static function audience(string $endpoint): string
+    {
+        $parts = parse_url($endpoint);
+        if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            throw new \RuntimeException('Ungültige Push-Adresse.');
+        }
+        return $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
     }
 
     /** ECDSA-Signatur von DER (SEQUENCE aus r und s) nach roh r || s (je 32 Byte). */

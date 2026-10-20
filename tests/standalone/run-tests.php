@@ -233,6 +233,12 @@ try {
     $c->ok(($man['start_url'] ?? '') === $base && ($man['icons'][0]['src'] ?? '') === $base . 'app/icons/icon-192.png', 'Manifest mit Start-Adresse und Icons');
     $sw = $d->send('GET', $base . 'sw.js', [], null);
     $c->ok($sw[0] === 200 && str_contains((string) ($sw[2]['content-type'] ?? ''), 'javascript'), 'sw.js liegt neben index.php (Bereich: ganze App)');
+    // Ohne statische Auslieferung (Weg über index.php): ETag, bei passendem If-None-Match 304 (Issue #18).
+    $swPhp = $d->send('GET', $base . 'index.php?r=/sw.js', [], null);
+    $swEtag = (string) ($swPhp[2]['etag'] ?? '');
+    $c->ok($swPhp[0] === 200 && $swEtag !== '' && ($swPhp[2]['cache-control'] ?? '') === 'no-cache' && isset($swPhp[2]['service-worker-allowed']), 'sw.js über index.php: mit ETag, no-cache');
+    $swAgain = $d->send('GET', $base . 'index.php?r=/sw.js', ['If-None-Match' => $swEtag], null);
+    $c->ok($swAgain[0] === 304 && !isset($swAgain[2]['content-length']), 'sw.js über index.php: passender ETag → 304 ohne Inhalt');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron&key=falsch', [], null)[0] === 403, 'Cron mit falschem Schlüssel → 403');
     $c->ok($d->send('GET', $kernel->cronUrl(), [], null)[0] === 200, 'Cron mit Schlüssel → 200');
     // Schwarzes Brett (Issue #5): Der Cron führt das Aufräumen aus und löscht abgelaufene Nachrichten.
@@ -329,6 +335,17 @@ try {
     $c->ok($pngRes[0] === 200 && ($pngRes[2]['content-type'] ?? '') === 'image/png' && !isset($pngRes[2]['content-security-policy']) && ($pngSize[0] ?? 0) === 64 && ($pngSize[1] ?? 0) === 32, 'PNG-Abzeichen: image/png, s=64 liefert 64 Pixel');
     $old = $d->send('GET', $badgeUrl, $cookie, null);
     $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
+
+    $c->section('Dokumente: Fassung in der Adresse, Prüfung per ETag');
+    [$s, $upDoc] = $d->request('POST', '/documents', ['title' => 'Kpsa Satzung', 'date' => '2026-10-01', 'file' => ['name' => 'satzung.pdf', 'data' => base64_encode("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")]]);
+    $docUrl = (string) ($upDoc['url'] ?? '');
+    $docRes = $d->send('GET', $docUrl, $cookie, null);
+    $c->ok($s === 201 && str_contains($docUrl, '&v=' . ($upDoc['version'] ?? '-')) && $docRes[0] === 200 && ($docRes[2]['cache-control'] ?? '') === 'private, no-cache', 'Aktuelle Fassung: private, no-cache (Abmelden leert den HTTP-Cache nicht)');
+    $docAgain = $d->send('GET', $docUrl, $cookie + ['If-None-Match' => (string) ($docRes[2]['etag'] ?? '-')], null);
+    $c->ok($docAgain[0] === 304 && ($docAgain[2]['cache-control'] ?? '') === 'private, no-cache', 'Dokument: passender ETag → 304 (wie bisher)');
+    $c->ok(($d->send('GET', preg_replace('/&v=[^&]*/', '&v=alt', $docUrl), $cookie, null)[2]['cache-control'] ?? '') === 'private, no-cache', 'Veraltete Fassung in der Adresse: jedes Mal prüfen');
+    $d->request('DELETE', '/documents/' . ($upDoc['id'] ?? 0));
+
     $bad = $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $json, '{kaputt');
     $c->ok($bad[0] === 400 && $bad[1]['code'] === 'invalid', 'Ungültiges JSON → 400');
 
@@ -431,6 +448,18 @@ try {
         [$k] = $counted();
         $cron = array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'cron'))[0] ?? [];
         $c->ok(($cron['level'] ?? '') === 'ok' && str_contains($cron['text'] ?? '', 'Cronjob beim Hoster'), 'Mit Cronjob des Hosters: Statusseite grün');
+
+        // Issue #18: Listen laden Konten gemeinsam, nicht mit einer Abfrage je Konto.
+        [$k, $pdo] = $counted();
+        $ids = array_map(static fn (KompanieApp\Core\Auth\User $u): int => $u->id, $k->users()->list(true));
+        $pdo->log = [];
+        $many = $k->users()->findMany([...$ids, ...$ids, 999999]);
+        $found = array_keys($many);
+        sort($found);
+        sort($ids);
+        $c->ok(count($pdo->log) === 1 && $found === $ids, sprintf('Mehrere Konten mit einer Abfrage (%d Konten, %d Abfrage)', count($ids), count($pdo->log)));
+        $pdo->log = [];
+        $c->ok($k->users()->findMany([]) === [] && $pdo->log === [], 'Keine Konten: keine Abfrage');
     }
     $redirect = $d->send('GET', $base, ['Host' => "localhost:$port"], null);
     $c->ok($redirect[0] === 302 && ($redirect[2]['location'] ?? '') === $base, 'Andere Schreibweise der Adresse wird (vorläufig) auf die eingetragene umgeleitet');

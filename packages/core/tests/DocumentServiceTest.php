@@ -103,6 +103,10 @@ final class DocumentServiceTest extends TestCase
         $this->assertSame(self::PDF, file_get_contents((string) ($res['path'] ?? '')));
         $this->assertStringStartsWith('inline; filename="Satzung.pdf"', (string) ($res['disposition'] ?? ''));
         $this->assertMatchesRegularExpression('/^"[a-f0-9]{32}"$/', (string) ($res['etag'] ?? ''), 'ETag für bedingte Abrufe (304)');
+        // Issue #18: Auch die aktuelle Fassung bleibt nicht lange im HTTP-Cache (Abmelden leert ihn nicht); ETag/304 genügt.
+        $this->assertSame('private, no-cache', $res['cache_control'] ?? null, 'ohne Fassung: jedes Mal prüfen');
+        $this->assertStringContainsString('v=' . $public['version'], $public['url']);
+        $this->assertSame('private, no-cache', $docs->forDelivery($member, $public['id'], $public['version'])['cache_control'] ?? null, 'aktuelle Fassung: ebenfalls prüfen');
         $this->assertSame(404, $docs->forDelivery($member, $intern['id'])['status'], 'eingeschränkt: wie nicht vorhanden');
         $this->assertSame(401, $docs->forDelivery(null, $public['id'])['status']);
         $this->assertSame(403, $docs->forDelivery($this->users->find($guest), $public['id'])['status']);

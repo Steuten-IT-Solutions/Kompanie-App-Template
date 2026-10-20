@@ -277,6 +277,41 @@ unset($_SERVER['HTTP_IF_NONE_MATCH']);
 $c->ok(KompanieApp\WordPress\AppPage::photoResponse($app, $public['id'] ?? 0, 'thumb')['status'] === 200, 'Öffentliches Bild über /app/foto/');
 wp_set_current_user(0);
 
+$c->section('Konten ohne Abfrage je Konto (Issue #18)');
+$extra = [];
+$queries = static function (callable $fn) use (&$extra): int {
+    global $wpdb;
+    foreach ($extra as $id) {
+        clean_user_cache($id); // wie in einer neuen Anfrage
+    }
+    $before = $wpdb->num_queries;
+    $fn();
+    return $wpdb->num_queries - $before;
+};
+$measure = static function () use ($app, $queries, &$extra): array {
+    return [
+        'list' => $queries(static fn () => $app->users->list(false)),
+        'findMany' => $queries(static fn () => $app->users->findMany($extra)),
+        'members' => $queries(static fn () => $app->members()->list(false)),
+        'titles' => $queries(static fn () => $app->titles()->list()),
+    ];
+};
+for ($i = 0; $i < 5; $i++) {
+    $extra[] = $d->createUser("kpwp_viele$i", 'member');
+}
+$few = $measure();
+for ($i = 5; $i < 20; $i++) {
+    $extra[] = $d->createUser("kpwp_viele$i", 'member');
+}
+$many = $measure();
+$c->ok(count($app->users->findMany($extra)) === 20, 'Mehrere Konten auf einmal gefunden');
+foreach ($few as $what => $n) {
+    $c->ok($many[$what] === $n, sprintf('%s: gleich viele Abfragen mit 5 und 20 weiteren Konten (%d / %d)', $what, $n, $many[$what]));
+}
+foreach ($extra as $id) {
+    wp_delete_user($id);
+}
+
 $c->section('Einstellungen ohne unnötige Abfragen');
 $wpSettings = new KompanieApp\WordPress\WpSettings();
 $wpdb = $GLOBALS['wpdb'];

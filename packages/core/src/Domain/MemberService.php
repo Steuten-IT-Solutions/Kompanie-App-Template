@@ -58,12 +58,10 @@ final class MemberService
         // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
         $users = $this->users->list($includeGuests);
         $seen = array_map(static fn (User $u): int => $u->id, $users);
-        foreach (array_diff(array_unique($alsoIds), $seen) as $id) {
-            $u = $this->users->find($id);
-            if ($u !== null) {
-                $users[] = $u;
-                usort($users, static fn (User $a, User $b): int => strcasecmp($a->name, $b->name));
-            }
+        $extra = $this->users->findMany(array_values(array_diff(array_unique($alsoIds), $seen)));
+        if ($extra !== []) {
+            array_push($users, ...array_values($extra));
+            usort($users, static fn (User $a, User $b): int => strcasecmp($a->name, $b->name));
         }
         foreach ($users as $u) {
             if (!$includeGuests && !$u->isMember() && !($includeCandidates && self::calendarOnly($u)) && !in_array($u->id, $alsoIds, true)) {
