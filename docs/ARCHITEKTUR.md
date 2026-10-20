@@ -314,6 +314,8 @@ Gesucht ist ein Weg, bei dem die Kompanie kein Google-Cloud-Projekt braucht. Zwe
 
 **Abgleich und Aufbereitung:** Der Abgleich lädt die vorhandenen Bilder je Album mit einer Abfrage und schreibt nur, was sich geändert hat (Name, Inhalt/md5, intern, Album; bei Alben Jahr, Titel, Sortierdatum), je Album in einer Transaktion. Ein Abgleich ohne Änderungen schreibt außer dem Status (Zeitpunkt des Abgleichs) nichts. Bilder werden **im Hintergrund** aufbereitet (`gallery_sync` und `gallery_process`; außerdem beim Abgleich von Hand in den Einstellungen, mit Zeitbudget), nie beim Abruf eines Bildes, und immer nur von einem Prozess gleichzeitig (Dateisperre); das Original lädt cURL direkt in eine Datei. Ein noch nicht fertiges Bild liefert `/foto/<id>/<größe>` als grauen SVG-Platzhalter mit **202** und `Retry-After: 30`, ohne Zwischenspeichern, und stößt die Aufbereitung an (höchstens einmal pro Minute). Solange Bilder ausstehen, läuft `gallery_process` gleich wieder.
 
+**Bestehende OAuth-Verbindung (Übernahme):** Bringt eine Kompanie aus ihrer früheren App eine Verbindung mit (Client-ID, Client-Secret, Refresh-Token), speichert die Übernahme sie in `drive_oauth`. Sie geht dem Dienstkonto vor; der Token wird per `grant_type=refresh_token` erneuert. Neu verbinden lässt sich so nicht (das bleibt dem Galerie-Test vorbehalten), nur trennen: in der App unter *Einstellungen → Galerie* (`PUT /admin/settings` mit `drive_oauth: ""`). Läuft die Verbindung ab oder wird sie widerrufen, meldet der Abgleich das verständlich; dann hilft ein Dienstkonto.
+
 Verworfen: ein **gemeinsames Dienstkonto für alle** (ein kompromittierter Server könnte die Ordner aller Kompanien lesen) und ein **zentraler Galerie-Dienst** bei uns (wir würden die internen Fotos aller Kompanien verarbeiten; das bedeutet Auftragsverarbeitung und eigenen Betrieb).
 
 ## 10. Kompanie-Konfiguration und automatisches Branding
@@ -459,13 +461,22 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 
 ## 15. Umstellung der ersten Kompanie (Lank)
 
-Wird **getrennt geplant**. Bis dahin gilt: **Neue Funktionen werden im Kern gebaut**; im Lank-Repo nur noch Fehlerkorrekturen, die auch in den Kern übernommen werden.
+Geplant in Issue #25. Lank läuft danach auf dem WordPress-Plugin des Kerns; ihr Design kommt aus ihrem Kompanie-Repo.
 
-Festgehalten für die Planung:
+**Grundsatz: kopieren, nicht zerstören.** Ein eigenes **Übernahme-Plugin** im bisherigen Lank-Repo (Ordner `uebernahme/`) kopiert die Daten des alten Plugins in die Tabellen und Einstellungen des Kerns. Die alten Tabellen, Optionen und User-Meta bleiben unverändert; so lässt sich in den ersten Tagen auf das alte Plugin zurückschalten. Lank-spezifischer Code gehört nicht in den Kern (Neutralitätsprüfung); er wird nach der Aufräumfrist mit dem Übernahme-Plugin gelöscht.
 
-- Lank nutzt das WordPress-Plugin des Kerns. Ihr eigenes Design kommt über ihr Kompanie-Repo: Farben, Logo, Begrüßung, Rollenbezeichnungen.
-- MySQL-Konnektor mit einstellbarem Tabellenpräfix, erste Migration = Schema Version 3: Tabellen `wp_mkl_*` und Galerie-Dateien bleiben.
-- Offene Punkte: API-Namensraum und installierte PWAs mit altem Service Worker, bisherige Rollen und Optionen, Shortcodes `[mkl_termine]`/`[mkl_galerie]` als Alias, Kalender über das Plugin „Private Google Calendars“, bestehende Anmeldungen sollen erhalten bleiben.
+- **IDs bleiben gleich:** Die Übernahme schreibt mit den bisherigen IDs in die leeren Tabellen des Kerns. Dadurch bleiben Konten, Verweise (Punkte → Anwesenheitsliste, Dokument → Kategorie) und Adressen (`/app/dokument/<id>`, `/app/foto/<id>/<größe>`) gültig; ein wiederholter Lauf erkennt Übernommenes an der ID und legt nichts doppelt an.
+- **Konten:** WordPress-Benutzer bleiben, die Rolle in der App kommt in die Benutzer-Option des Kerns. Anmeldungen bleiben erhalten, weil beide die Sitzung von WordPress nutzen (400 Tage, siehe Abschnitt 14).
+- **Installierte Apps:** Adresse, Bereich und Service Worker bleiben unter `/app/`; das Manifest hat wie bisher keine `id`. Der neue Service Worker löscht beim Aktivieren die Caches des alten.
+- **Push:** Der VAPID-Schlüssel und die Abos werden übernommen, sonst müssten alle Geräte neu zustimmen. Die Nutzlast enthält neben `route` auch `url`, damit ein noch nicht ausgetauschter alter Service Worker Nachrichten richtig öffnet.
+
+**Erweiterungspunkte im Kern** (neutral, auch für andere Übernahmen):
+
+- `RestBridge::register($app, '<namensraum>')` registriert die Routen des Kerns zusätzlich unter einem früheren Namensraum.
+- Bestehende OAuth-Verbindung zu Google Drive (`DriveClient::saveOAuth`, Abschnitt 9).
+- Shortcode-Aliase legt das Übernahme-Plugin selbst an (`add_shortcode`, Weiterleitung auf `kompanie_termine`/`kompanie_galerie`).
+
+Ablauf, Probelauf, Bericht und Rückfallplan beschreibt das Übernahme-Plugin in seinem README.
 
 ## 16. Tests
 

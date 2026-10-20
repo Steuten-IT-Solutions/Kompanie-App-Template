@@ -152,6 +152,10 @@ final class SettingsPage
                     <tr>
                         <th scope="row"><label for="drive_sa">Google-Zugang (JSON-Schlüssel)</label></th>
                         <td>
+                            <?php if ($app->drive()->oauth() !== null) : ?>
+                                <p>Verbunden mit Google<?php echo $app->drive()->oauthEmail() !== '' ? ' als <code>' . esc_html($app->drive()->oauthEmail()) . '</code>' : ''; ?>;
+                                   diese Verbindung wird für den Abgleich genutzt. Trennen lässt sie sich in der App unter <em>Einstellungen → Galerie</em>.</p>
+                            <?php endif; ?>
                             <?php if ($email !== '') : ?>
                                 <p>Hinterlegt. Gib den Galerie-Ordner in Google Drive für <code><?php echo esc_html($email); ?></code> frei (Rolle „Betrachter“).</p>
                             <?php endif; ?>

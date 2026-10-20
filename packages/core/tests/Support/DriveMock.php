@@ -16,6 +16,10 @@ final class DriveMock
     public array $tree;
     public int $tokens = 0;
     public bool $jwtValid = false;
+    /** @var array<string, mixed>|null Formular der letzten Token-Anfrage per Refresh-Token (OAuth) */
+    public ?array $refreshForm = null;
+    /** Refresh-Token, das der Token-Endpunkt annimmt (sonst invalid_grant). */
+    public string $validRefreshToken = 'REFRESH1';
     public bool $paged = false;
     public int $downloads = 0;
     public string $privateKey = '';
@@ -78,6 +82,12 @@ final class DriveMock
             if (str_starts_with($url, DriveClient::TOKEN_URI)) {
                 $this->tokens++;
                 parse_str((string) $body, $form);
+                if (($form['grant_type'] ?? '') === 'refresh_token') {
+                    $this->refreshForm = $form;
+                    return ($form['refresh_token'] ?? '') === $this->validRefreshToken
+                        ? ['status' => 200, 'body' => (string) json_encode(['access_token' => 'TOKEN123', 'expires_in' => 3600])]
+                        : ['status' => 400, 'body' => '{"error":"invalid_grant","error_description":"Token has been expired or revoked."}'];
+                }
                 $parts = explode('.', (string) ($form['assertion'] ?? ''));
                 $sig = base64_decode(strtr($parts[2] ?? '', '-_', '+/'));
                 $claim = json_decode((string) base64_decode(strtr($parts[1] ?? '', '-_', '+/')), true);

@@ -336,6 +336,7 @@ final class PushServiceTest extends TestCase
         $this->assertMatchesRegularExpression('/^vapid t=[^.]+\.[^.]+\.[^,]+, k=[A-Za-z0-9_-]{87}$/', $sent[0]['headers']['Authorization']);
         $msg = self::decrypt((string) $sent[0]['body'], $a);
         $this->assertSame('meins/strafen', $msg['route']);
+        $this->assertSame('https://example.org/app/#/meins/strafen', $msg['url'], 'für Service Worker einer früheren App');
         $this->assertSame('2,50 € – Zu spät', $msg['body'], 'Details eingeschaltet');
         $this->assertSame(0, $p->repository()->counts()['queued']);
 

@@ -15,7 +15,11 @@ use KompanieApp\Core\Http\Route;
  */
 final class RestBridge
 {
-    public static function register(App $app): void
+    /**
+     * @param string $namespace Namensraum; ein anderer als der eigene dient als Alias, etwa für die Adressen einer
+     *                          früheren App nach einer Übernahme (noch geladene alte Fassungen laufen nicht ins Leere).
+     */
+    public static function register(App $app, string $namespace = WpEnvironment::NAMESPACE): void
     {
         $api = $app->api();
         $byPath = [];
@@ -31,7 +35,7 @@ final class RestBridge
                     'permission_callback' => '__return_true',
                 ];
             }
-            register_rest_route(WpEnvironment::NAMESPACE, self::wpPattern($path), $endpoints);
+            register_rest_route($namespace, self::wpPattern($path), $endpoints);
         }
     }
 

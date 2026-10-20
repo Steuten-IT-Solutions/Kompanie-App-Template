@@ -38,6 +38,8 @@ final class SettingsService
                 'configured' => $a->gallery()->isConfigured(),
                 'root' => $a->gallery()->root(),
                 'service_account_email' => $a->drive()->clientEmail(),
+                'oauth_connected' => $a->drive()->oauth() !== null,
+                'oauth_email' => $a->drive()->oauthEmail(),
                 'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending()]),
             ],
             'news' => null,
@@ -105,6 +107,9 @@ final class SettingsService
                 throw ApiError::invalid($e->getMessage());
             }
         }
+        if (array_key_exists('drive_oauth', $in) && $in['drive_oauth'] !== '') {
+            throw ApiError::invalid('Eine Verbindung zu Google lässt sich hier nur trennen (leerer Wert).');
+        }
         $root = null;
         if (array_key_exists('gallery_root', $in)) {
             $root = DriveClient::parseFolderId($in['gallery_root']);
@@ -134,6 +139,9 @@ final class SettingsService
         }
         if (array_key_exists('drive_service_account', $in)) {
             $serviceAccount === null ? $a->drive()->removeServiceAccount() : $a->drive()->saveServiceAccount((string) json_encode($serviceAccount));
+        }
+        if (array_key_exists('drive_oauth', $in)) {
+            $a->drive()->removeOAuth();
         }
         if ($root !== null) {
             $before = $a->gallery()->root();

@@ -406,6 +406,32 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
         Den Galerie-Ordner in Google Drive für das Dienstkonto freigeben (Betrachter) und hier den Link zum Ordner eintragen. Darin je Jahr
         ein Ordner, darin je Album ein Ordner; Bilder im Unterordner <em>intern</em> sehen nur Mitglieder.
       </p>
+      {g.oauth_connected && (
+        <div className="small">
+          Verbunden mit Google
+          {g.oauth_email ? (
+            <>
+              {' '}
+              als <code>{g.oauth_email}</code>
+            </>
+          ) : (
+            ''
+          )}
+          . Diese Verbindung wird für den Abgleich genutzt
+          {g.service_account_email ? ', das Dienstkonto erst nach dem Trennen' : ''}.
+          <div className="button-row">
+            <button
+              type="button"
+              className="btn btn-link"
+              onClick={() =>
+                window.confirm('Verbindung zu Google trennen? Danach braucht der Abgleich ein Dienstkonto.') && save({ drive_oauth: '' })
+              }
+            >
+              Verbindung trennen
+            </button>
+          </div>
+        </div>
+      )}
       {g.service_account_email && (
         <div className="small">
           Dienstkonto: <code>{g.service_account_email}</code>
