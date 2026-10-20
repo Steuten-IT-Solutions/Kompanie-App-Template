@@ -12,7 +12,7 @@ Unter **Verwaltung → {bereich.ranks}** legst du die {bereich.ranks} an, vom ni
 Zu jedem {begriff.rank} kannst du ein Abzeichen (Bild) hinterlegen, siehe [Abzeichen für {bereich.ranks}](seite:dienstgrade-abzeichen).
 
 ## Befördern und degradieren
-Im Mitglied (**Verwaltung → Mitglieder**) unter **{begriff.rank}** den neuen {begriff.rank} wählen, optional eine Begründung eintragen und **{begriff.rank} ändern** tippen. Jede Änderung steht im Verlauf des Mitglieds, mit Datum, Begründung und wer sie vorgenommen hat. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seinen {begriff.rank}; du kannst ihn dort jederzeit auf „Kein {begriff.rank}“ setzen.
+Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{begriff.rank}**) den neuen {begriff.rank} wählen, optional eine Begründung eintragen und **{begriff.rank} ändern** tippen. Jede Änderung steht im Verlauf des Mitglieds, mit Datum, Begründung und wer sie vorgenommen hat. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seinen {begriff.rank}; du kannst ihn dort jederzeit auf „Kein {begriff.rank}“ setzen.
 
 ## Zusammen mit {bereich.points}
 Ist auch {bereich.points} eingeschaltet, kann jeder {begriff.rank} eine **Punkteschwelle** haben. Die Schwellen müssen mit der Reihenfolge steigen. Dann gilt für alle, auch für Admins:

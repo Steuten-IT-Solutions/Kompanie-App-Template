@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { can, config } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
@@ -39,29 +39,75 @@ export function adminTabs(): AdminTab[] {
   ).filter((t) => t.on);
 }
 
-/** Reiterleiste der Verwaltung, auch über Schwarzem Brett, Umfragen und Inventar. Wischt seitlich, der aktive Reiter
- * bleibt sichtbar. */
-export function AdminNav({ active }: { active: string }) {
-  const tabs = adminTabs();
-  const navRef = useRef<HTMLElement>(null);
+export type MenuItem = { id: string; label: string; onSelect: () => void };
+
+/**
+ * Aufklappmenü (Burger-Menü): Der Knopf zeigt den aktuellen Eintrag, ein Tipp klappt die Liste aller Einträge auf.
+ * Schließt bei Auswahl, Escape oder Tipp daneben. Für die Verwaltung und für die Seiten eines Mitglieds.
+ */
+export function MenuNav({
+  label,
+  items,
+  active,
+  className = '',
+}: {
+  label: string;
+  items: MenuItem[];
+  active: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  const listId = `menu-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   useEffect(() => {
-    const nav = navRef.current;
-    const button = nav?.querySelector<HTMLElement>('button.active');
-    if (nav && button) nav.scrollLeft = Math.max(0, button.offsetLeft - (nav.clientWidth - button.offsetWidth) / 2);
-  }, [active]);
-  if (tabs.length < 2) return null;
+    if (!open) return;
+    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  if (items.length < 2) return null;
+  const current = items.find((t) => t.id === active) ?? items[0];
   return (
-    <nav className="segmented" aria-label="Verwaltung" ref={navRef}>
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          className={active === t.id ? 'active' : ''}
-          onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
-          aria-current={active === t.id ? 'page' : undefined}
-        >
-          {t.label}
-        </button>
-      ))}
+    <nav className={`admin-menu ${className}`.trim()} aria-label={label} ref={ref}>
+      <button type="button" className="admin-menu-toggle" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)}>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor" />
+        </svg>
+        <span className="admin-menu-current">{current.label}</span>
+        <span className="admin-menu-chevron" aria-hidden="true">
+          {open ? '▴' : '▾'}
+        </span>
+      </button>
+      {open && (
+        <ul id={listId} className="card admin-menu-list">
+          {items.map((t) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                className={t.id === current.id ? 'active' : ''}
+                aria-current={t.id === current.id ? 'page' : undefined}
+                onClick={() => {
+                  setOpen(false);
+                  t.onSelect();
+                }}
+              >
+                {t.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </nav>
   );
+}
+
+/** Menü der Verwaltung, auch über Schwarzem Brett, Umfragen und Inventar. */
+export function AdminNav({ active }: { active: string }) {
+  const items = adminTabs().map((t) => ({ id: t.id, label: t.label, onSelect: () => navigate(t.route ?? `verwaltung/${t.id}`) }));
+  return <MenuNav label="Verwaltung" items={items} active={active} />;
 }

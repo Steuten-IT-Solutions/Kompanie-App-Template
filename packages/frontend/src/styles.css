@@ -1489,6 +1489,76 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* Menü der Verwaltung (Burger-Menü) */
+.admin-menu {
+  position: relative;
+  margin-bottom: 18px;
+}
+.admin-menu-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+}
+.admin-menu-toggle svg {
+  flex: none;
+  color: var(--accent-text);
+}
+.admin-menu-current {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-menu-chevron {
+  color: var(--muted);
+}
+.admin-menu-list {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--primary-ink) 30%, transparent);
+}
+.admin-menu-list button {
+  display: block;
+  width: 100%;
+  padding: 12px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.admin-menu-list button.active {
+  background: var(--primary);
+  color: var(--accent-on-primary);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 /* Übersicht der Einstellungen: je Seite eine Zeile */
 .settings-link {
   width: 100%;

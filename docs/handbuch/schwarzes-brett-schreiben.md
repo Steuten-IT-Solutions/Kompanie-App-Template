@@ -4,11 +4,11 @@ reihenfolge: 63
 rechte: [post_board]
 bereiche: [board]
 ---
-Wer ans {bereich.board} schreiben darf (Rolle „{bereich.board} verwalten“ oder eine Rolle mit diesem Recht), findet es unter **Verwaltung** → **{bereich.board}** (Reiter oben). Steht schon eine Nachricht am Brett, führt auch **Brett öffnen und bearbeiten** im Banner dorthin.
+Wer ans {bereich.board} schreiben darf (Rolle „{bereich.board} verwalten“ oder eine Rolle mit diesem Recht), findet es unter **Verwaltung** → **{bereich.board}** (Menü oben). Steht schon eine Nachricht am Brett, führt auch **Brett öffnen und bearbeiten** im Banner dorthin.
 
 ## Schreiben
 Text eingeben (höchstens 500 Zeichen, Zeilenumbrüche bleiben erhalten) und **Veröffentlichen** tippen. Die App fragt noch einmal nach, denn dann geht es sofort los:
-- Alle {rolle.member} und {rolle.candidate} bekommen eine Benachrichtigung (außer dir selbst), sofern sie Benachrichtigungen für das {bereich.board} eingeschaltet haben.
+- Mit dem Haken **Benachrichtigung senden** (standardmäßig gesetzt) bekommen alle {rolle.member} und {rolle.candidate} eine Benachrichtigung (außer dir selbst), sofern sie Benachrichtigungen für das {bereich.board} eingeschaltet haben. Ohne Haken erscheint die Nachricht nur in der App.
 - Die Nachricht steht 24 Stunden als Banner oben auf jeder Seite und wird danach gelöscht.
 
 Nimm das {bereich.board} nur für Dringendes. Es gibt nur reinen Text: keine Formatierung, keine Bilder, Links lassen sich nicht antippen.

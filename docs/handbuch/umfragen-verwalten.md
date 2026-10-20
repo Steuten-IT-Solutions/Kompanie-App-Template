@@ -4,7 +4,7 @@ reihenfolge: 64
 rechte: [manage_polls]
 bereiche: [polls]
 ---
-Wer Umfragen verwalten darf (Rolle „{bereich.polls} verwalten“ oder eine Rolle mit diesem Recht), findet sie unter **Verwaltung** → **{bereich.polls}** (Reiter oben); auf der Seite des {bereich.board} führt **{bereich.polls} verwalten** dorthin.
+Wer Umfragen verwalten darf (Rolle „{bereich.polls} verwalten“ oder eine Rolle mit diesem Recht), findet sie unter **Verwaltung** → **{bereich.polls}** (Menü oben); auf der Seite des {bereich.board} führt **{bereich.polls} verwalten** dorthin.
 
 ## Anlegen
 - **Frage** (höchstens 150 Zeichen) und optional eine **Beschreibung**.

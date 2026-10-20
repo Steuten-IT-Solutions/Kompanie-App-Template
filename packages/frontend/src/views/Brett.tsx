@@ -18,6 +18,7 @@ function Counter({ text }: { text: string }) {
 /** Neue Nachricht: mit Hinweis auf Benachrichtigung und 24 Stunden, Bestätigung vor dem Senden. */
 function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
   const [text, setText] = useState('');
+  const [push, setPush] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,11 +26,15 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     e.preventDefault();
     setError(null);
     if (text.trim() === '') return setError('Bitte einen Text eingeben.');
-    if (!window.confirm('Nachricht jetzt veröffentlichen? Alle Mitglieder und Anwärter werden sofort benachrichtigt.')) return;
+    const question = push
+      ? 'Nachricht jetzt veröffentlichen? Alle Mitglieder und Anwärter werden sofort benachrichtigt.'
+      : 'Nachricht jetzt veröffentlichen? Es wird keine Benachrichtigung gesendet.';
+    if (!window.confirm(question)) return;
     setBusy(true);
     try {
-      await api.postBoard(text);
+      await api.postBoard(text, push);
       setText('');
+      setPush(true);
       onToast('Nachricht veröffentlicht');
       await refreshBoard();
     } catch (err) {
@@ -47,9 +52,15 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         <textarea rows={4} maxLength={BOARD_TEXT_MAX} value={text} onChange={(e) => setText(e.target.value)} />
         <Counter text={text} />
       </label>
+      <label className="toggle">
+        <input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
+        <span>Benachrichtigung senden</span>
+      </label>
       <p className="muted small">
-        Alle Mitglieder und Anwärter bekommen sofort eine Benachrichtigung. Die Nachricht steht 24 Stunden oben auf jeder Seite der App und
-        verschwindet dann von selbst. Nur für Dringendes, nur reiner Text.
+        {push
+          ? 'Alle Mitglieder und Anwärter bekommen sofort eine Benachrichtigung.'
+          : 'Ohne Benachrichtigung: Die Nachricht erscheint nur in der App.'}{' '}
+        Die Nachricht steht 24 Stunden oben auf jeder Seite der App und verschwindet dann von selbst. Nur für Dringendes, nur reiner Text.
       </p>
       {error && <p className="form-error small">{error}</p>}
       <button className="btn btn-block" type="submit" disabled={busy || text.trim() === ''}>

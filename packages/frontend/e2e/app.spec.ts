@@ -11,6 +11,20 @@ const ADMIN_PASSWORD = process.env.KOMPANIE_ADMIN_PASSWORD ?? 'admin';
 const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 /** Tab für Punkte und Strafen */
 const MANAGER = 'Verwaltung';
+
+/** Menü der Verwaltung (Burger-Menü) aufklappen und einen Bereich wählen. */
+async function adminMenu(page: Page, name: string) {
+  const nav = page.getByRole('navigation', { name: 'Verwaltung' });
+  await nav.locator('.admin-menu-toggle').click();
+  await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
+}
+
+/** Seite eines Mitglieds in der Verwaltung wählen (zweites Menü unter dem Namen). */
+async function memberMenu(page: Page, name: string) {
+  const nav = page.locator('.member-menu');
+  await nav.locator('.admin-menu-toggle').click();
+  await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
+}
 /** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
 const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
@@ -91,13 +105,13 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await shot(page, '5-verwaltung-mitglieder');
 
-  await page.getByRole('button', { name: 'Punktekatalog' }).click();
+  await adminMenu(page, 'Punktekatalog');
   await page.getByPlaceholder('z. B. Teilnahme am Sommerfest').fill('Teilnahme Sommerfest');
   await page.locator('.field.narrow input').fill('5');
   await page.getByRole('button', { name: 'Hinzufügen' }).click();
   await expect(page.locator('.toast')).toHaveText('Vorlage angelegt');
 
-  await page.getByRole('button', { name: 'Punkte +' }).click();
+  await adminMenu(page, 'Punkte +');
   await page.locator('select').selectOption({ label: 'Teilnahme Sommerfest (+5)' });
   await page.getByLabel('Mitglied1').check();
   await page.getByLabel('Mitglied2').check();
@@ -105,7 +119,7 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await page.getByRole('button', { name: 'Punkte vergeben' }).click();
   await expect(page.locator('.toast')).toHaveText('+5 Punkte an 2 Mitglieder vergeben');
 
-  await page.getByRole('button', { name: 'Kasse +' }).click();
+  await adminMenu(page, 'Kasse +');
   await page.getByPlaceholder('2,50').fill('2,50');
   await page.getByPlaceholder('z. B. Zu spät gekommen').fill('Zu spät gekommen');
   await page.getByLabel('Mitglied1').check();
@@ -118,11 +132,13 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await page.getByRole('button', { name: 'Eintragen' }).click();
   await expect(page.locator('.toast')).toContainText('5,00');
 
-  await page.getByRole('button', { name: 'Mitglieder' }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await memberMenu(page, 'Kasse');
   await page.locator('.row', { hasText: 'Handy klingelt <10 min' }).getByRole('button', { name: 'Bezahlt' }).click();
   await expect(page.locator('.toast')).toHaveText('Als bezahlt markiert');
+  await memberMenu(page, 'Übersicht');
   await expect(page.locator('.stat', { hasText: 'Offen' }).locator('.stat-value')).toContainText('2,50');
   await shot(page, '7-verwaltung-mitglied');
 });
@@ -142,6 +158,7 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
 
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   await page.locator('.row', { hasText: 'Neue Testperson' }).first().click();
+  await memberMenu(page, 'Konto und Rolle');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Neues Startpasswort erzeugen/ }).click();
   const fresh = (await page.getByTestId('reset-password').textContent())!.trim();
@@ -170,6 +187,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   await page.locator('.row', { hasText: `Ida ${id}` }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await page.getByRole('button', { name: 'Angaben ändern' }).click();
   await page.locator('.account-edit').getByLabel('Name', { exact: true }).fill(`Ida Neu ${id}`);
   await page.locator('.account-edit').getByLabel('E-Mail (optional)').fill(`ida-${id}@example.org`);
@@ -179,6 +197,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
   await page.locator('.row', { hasText: `Jan ${id}` }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await page
     .locator('.account-panel')
     .getByRole('button', { name: /Konto löschen|Aus der App entfernen/ })
@@ -212,6 +231,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await expect(page.getByLabel('Auch Anwärter anzeigen')).toBeChecked();
   await page.locator('.row', { hasText: name }).click();
+  await memberMenu(page, 'Konto und Rolle');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();
   await expect(page.locator('.toast')).toHaveText(`${name} ist jetzt Mitglied`);
@@ -227,6 +247,7 @@ test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async 
   await expect(page.locator('.stat').first()).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Mitglied anlegen' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await expect(page.getByRole('button', { name: /Neues Startpasswort/ })).toHaveCount(0);
 });
 
@@ -517,6 +538,7 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
   if (!STANDALONE) await expect(page.locator('.role-control option', { hasText: 'Admin' })).toHaveCount(0); // WordPress: Admins im Backend
   await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Gast' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Gast');
@@ -530,6 +552,7 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
 });
@@ -538,6 +561,7 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Termine verwalten');
 
@@ -551,6 +575,7 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
 });
@@ -576,6 +601,7 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
   await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Kassenwart' });
   await expect(page.locator('.toast')).toHaveText('Rolle geändert: Kassenwart');
 
@@ -1153,7 +1179,7 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
 test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht Stand und Verlauf', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrade' }).click();
+  await adminMenu(page, 'Dienstgrade');
   for (const [title, min] of [
     ['Gefreiter', '10'],
     ['Unteroffizier', '1000'],
@@ -1163,10 +1189,12 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
     await page.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.row', { hasText: title })).toBeVisible();
   }
-  await expect(page.locator('.segmented').getByRole('button', { name: 'Beförderungen' })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Verwaltung' }).locator('.admin-menu-toggle').click();
+  await expect(page.locator('.admin-menu-list').getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
 
   // Punkte für mitglied2 buchen, dann befördern.
-  await page.locator('.segmented').getByRole('button', { name: 'Mitglieder' }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   const id = Number(page.url().split('/').pop());
   await page.evaluate(async (userId) => {
@@ -1212,7 +1240,7 @@ test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in �
   );
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrade' }).click();
+  await adminMenu(page, 'Dienstgrade');
   for (const [title, file] of [
     ['Gefreiter', { name: 'gefreiter.png', mimeType: 'image/png', buffer: png }],
     ['Unteroffizier', { name: 'uffz.svg', mimeType: 'image/svg+xml', buffer: svg }],
@@ -1300,7 +1328,7 @@ test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht
   const title = `Übung ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Anwesenheit' }).click();
+  await adminMenu(page, 'Anwesenheit');
   await page.locator('.free-event').getByLabel('Titel').fill(title);
   await page.getByRole('button', { name: 'Liste anlegen' }).click();
   await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
@@ -1431,13 +1459,14 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   const title = `Ehrenmitglied ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Titel' }).click();
+  await adminMenu(page, 'Titel');
   await page.getByLabel('Bezeichnung').fill(title);
   await page.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.title-list .row', { hasText: title })).toContainText('nicht vergeben');
 
-  await page.locator('.segmented').getByRole('button', { name: 'Mitglieder' }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Titel');
   await page.locator('.member-titles').getByLabel(title).check();
   await page.getByRole('button', { name: 'Titel speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Titel gespeichert');
@@ -1445,7 +1474,7 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-title')).toContainText(title);
 
   // Vergeben: nicht löschen, nur umbenennen oder deaktivieren.
-  await page.locator('.segmented').getByRole('button', { name: 'Titel' }).click();
+  await adminMenu(page, 'Titel');
   const row = page.locator('.title-list .row', { hasText: title });
   await expect(row).toContainText('1× vergeben');
   await expect(row.getByRole('button', { name: 'Löschen' })).toHaveCount(0);
@@ -1469,13 +1498,18 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await admin.getByRole('button', { name: 'Konto' }).click();
   await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
   await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await admin.locator('.segmented').getByRole('button', { name: 'Schwarzes Brett' }).click();
+  await adminMenu(admin, 'Schwarzes Brett');
   await expect(admin.locator('.tabbar button.active')).toHaveText(MANAGER);
   await expect(admin.locator('.topbar-title')).toHaveText('Schwarzes Brett');
   const form = admin.locator('.board-form');
   await form.getByLabel('Text').fill(`${first}\nHalle gesperrt.`);
   await expect(form.getByText(`${first.length + 16}/500 Zeichen`)).toBeVisible();
   await expect(form).toContainText('sofort eine Benachrichtigung');
+  // Haken „Benachrichtigung senden“: standardmäßig an, abwählbar
+  await expect(form.getByLabel('Benachrichtigung senden')).toBeChecked();
+  await form.getByLabel('Benachrichtigung senden').uncheck();
+  await expect(form).toContainText('Ohne Benachrichtigung');
+  await form.getByLabel('Benachrichtigung senden').check();
   await form.getByRole('button', { name: 'Veröffentlichen' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht veröffentlicht');
   await expect(admin.locator('.board-card', { hasText: first })).toContainText('Halle gesperrt.');
@@ -1557,7 +1591,7 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
   admin.on('dialog', (d) => d.accept());
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await admin.locator('.segmented').getByRole('button', { name: 'Umfragen' }).click();
+  await adminMenu(admin, 'Umfragen');
   await expect(admin.locator('.topbar-title')).toHaveText('Umfragen');
   const form = admin.locator('.poll-form');
   await form.getByLabel('Frage', { exact: true }).fill(title);
@@ -1694,7 +1728,7 @@ test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle S
   // Admin (hat manage_inventory) öffnet es über „Verwaltung“.
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page.locator('.segmented').getByRole('button', { name: 'Inventar' }).click();
+  await adminMenu(page, 'Inventar');
   await expect(page.locator('.topbar-title')).toHaveText('Inventar');
   await page.getByRole('button', { name: '+ Eintrag anlegen' }).click();
   const form = page.locator('.inventory-form');

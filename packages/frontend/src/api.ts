@@ -886,7 +886,7 @@ export const api = {
 
   // Schwarzes Brett (Issue #5)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
-  postBoard: (text: string) => request<BoardMessage>('POST', '/board', { text }),
+  postBoard: (text: string, push = true) => request<BoardMessage>('POST', '/board', { text, push }),
   updateBoard: (id: number, text: string) => request<BoardMessage>('PATCH', `/board/${id}`, { text }),
   polls: () => request<Poll[]>('GET', '/polls'),
   poll: (id: number) => request<Poll>('GET', `/polls/${id}`),
