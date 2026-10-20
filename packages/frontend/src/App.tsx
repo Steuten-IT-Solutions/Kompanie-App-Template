@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin, type Capability } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -322,7 +322,12 @@ export default function App() {
         <button
           className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
           onClick={() => {
-            const slug = helpSlug([tab, ...path.slice(1)], { boardWriter: canPostBoard(), meinsFirst: meinsFirst() });
+            const slug = helpSlug([tab, ...path.slice(1)], {
+              boardWriter: canPostBoard(),
+              meinsFirst: meinsFirst(),
+              can: (c) => can(c as Capability),
+              features: config?.features ?? {},
+            });
             navigate(slug ? `hilfe/${slug}` : 'hilfe');
           }}
           aria-label="Hilfe"
