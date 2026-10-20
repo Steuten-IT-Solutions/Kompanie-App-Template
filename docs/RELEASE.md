@@ -114,12 +114,12 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
 3. Innerhalb von 30 Minuten baut „Kompanien abgleichen“ für jede Kompanie eine neue Version (oder sofort:
    *Actions → Kompanien abgleichen → Run workflow*). Jede Änderung am Programmcode auf `main` führt so zu
    neuen Versionen für alle Kompanien, zuerst im Kanal `early`.
-4. Nach dem Test: *Actions → Version freigeben*, die getestete Version (z. B. `1.4.0.3`) und das Kompanie-Repo,
-   auf dem sie getestet wurde, eintragen. Die Action liest Kern-Version und `coreCode` aus deren signierter
-   `release.json`, gibt bei allen Kompanien die neueste Version mit genau diesem Programmcode frei (nicht
-   zurückgezogen, Kern nicht gesperrt, neuer als die freigegebene; sonst bleibt die Kompanie unverändert) und
-   trägt den Code in `STABLE_CORE` auf `main` ein (spätere Versionen mit diesem Code gehen direkt nach `stable`).
-   Lässt der Branch-Schutz das nicht zu, meldet sie es als Warnung; dann `STABLE_CORE` per Pull Request eintragen.
+4. Nach dem Test: *Actions → Kernversion freigeben*, zur Bestätigung die Kern-Version aus `VERSION` eintragen
+   (z. B. `1.4.0`). Die Action bestimmt den Programmcode von `main` (Kern-Version und `coreCode`), gibt bei allen
+   Kompanien die neueste Version mit genau diesem Code frei (nicht zurückgezogen, Kern nicht gesperrt, neuer als die
+   freigegebene), trägt den Code in `STABLE_CORE` auf `main` ein und startet „Kompanien abgleichen“: Kompanien ohne
+   Version mit diesem Code bekommen sie dabei gebaut und direkt als `stable` veröffentlicht. Lässt der Branch-Schutz
+   das Eintragen nicht zu, meldet sie es als Warnung; dann `STABLE_CORE` per Pull Request eintragen.
    Einzelne Kompanie oder bestimmte Version: *Actions → Versionen steuern* (`promote`, `withdraw`,
    `promote-checked` mit der Datei `STABLE_CORE`).
 

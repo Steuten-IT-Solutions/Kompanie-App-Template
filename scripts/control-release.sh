@@ -16,7 +16,7 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 GH="${GH:-gh}"
 if [ "$ACTION" = promote-checked ]; then
-  # Geprüfter Programmcode: aus STABLE_CORE_VALUE („Version freigeben“) oder der Datei STABLE_CORE
+  # Geprüfter Programmcode: aus STABLE_CORE_VALUE („Kernversion freigeben“) oder der Datei STABLE_CORE
   STABLE_CORE="${STABLE_CORE_VALUE:-$(cat "${STABLE_CORE_FILE:-$ROOT/STABLE_CORE}" 2> /dev/null || true)}"
   if [ -z "${STABLE_CORE//[[:space:]]/}" ]; then
     echo "STABLE_CORE ist leer: Es ist noch kein Programmcode als geprüft eingetragen." >&2
