@@ -156,8 +156,7 @@ final class UpdateList
         if ($core === '' || in_array($core, $this->data['blockedCores'], true)) {
             return 'early';
         }
-        $checked = preg_split('/\s+/', trim($stableCore)) ?: [];
-        if (count($checked) === 2 && $checked[0] === $core && $code !== '' && hash_equals($checked[1], $code)) {
+        if (self::isChecked($core, $code, $stableCore)) {
             return 'stable';
         }
         $stable = $this->channel('stable');
@@ -171,6 +170,33 @@ final class UpdateList
         }
         $commit = (string) ($release['coreCommit'] ?? '');
         return $commit !== '' && ($entry['coreCommit'] ?? '') === $commit ? 'stable' : 'early';
+    }
+
+    /**
+     * Freizugebende Version mit geprüftem Programmcode (Aktion „promote-checked“ in „Versionen steuern“): die neueste
+     * nicht zurückgezogene Version, deren Kern-Version und Code-Prüfsumme in STABLE_CORE stehen, deren Kern-Version
+     * nicht gesperrt ist und die neuer ist als die freigegebene. Sonst null (nichts zu tun).
+     */
+    public function checkedCandidate(string $stableCore): ?string
+    {
+        $stable = $this->channel('stable');
+        foreach ($this->available() as $e) {
+            $core = (string) ($e['coreVersion'] ?? '');
+            if ($stable !== null && Version::compare($e['version'], $stable) <= 0) {
+                return null;
+            }
+            if (!in_array($core, $this->data['blockedCores'], true) && self::isChecked($core, (string) ($e['coreCode'] ?? ''), $stableCore)) {
+                return $e['version'];
+            }
+        }
+        return null;
+    }
+
+    /** Steht genau dieser Programmcode als geprüft in STABLE_CORE („Kern-Version Code-Prüfsumme“)? */
+    private static function isChecked(string $core, string $code, string $stableCore): bool
+    {
+        $checked = preg_split('/\s+/', trim($stableCore)) ?: [];
+        return count($checked) === 2 && $core !== '' && $checked[0] === $core && $code !== '' && hash_equals($checked[1], $code);
     }
 
     /**

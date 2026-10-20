@@ -111,6 +111,21 @@ final class UpdateTest extends TestCase
         $this->assertSame('early', UpdateList::create('org/k', 'K')->channelFor(['coreVersion' => '1.0.0', 'coreCode' => 'c1'], '1.0.0'), 'STABLE_CORE ohne Prüfsumme gilt nicht');
         $this->assertSame('early', $list2->channelFor(['coreVersion' => '1.0.0']), 'ohne Code und Commit nie direkt stable');
 
+        // Geprüfte Version für alle freigeben (promote-checked): neueste mit geprüftem Code, neuer als stable
+        $list3 = UpdateList::create('org/k', 'K');
+        $list3->addRelease(['kompanie' => 'org/k', 'coreCode' => 'c1'] + $this->release('1.0.0.1'), $base('1.0.0.1'), 'stable');
+        $list3->addRelease(['kompanie' => 'org/k', 'coreCode' => 'c2'] + $this->release('1.0.1.2', '1.0.1'), $base('1.0.1.2'));
+        $list3->addRelease(['kompanie' => 'org/k', 'coreCode' => 'c2'] + $this->release('1.0.1.3', '1.0.1'), $base('1.0.1.3'));
+        $list3->addRelease(['kompanie' => 'org/k', 'coreCode' => 'c3'] + $this->release('1.0.2.4', '1.0.2'), $base('1.0.2.4'));
+        $this->assertSame('1.0.1.3', $list3->checkedCandidate('1.0.1 c2'), 'neueste mit geprüftem Code, auch wenn danach ungeprüfte kommen');
+        $this->assertNull($list3->checkedCandidate(''), 'ohne STABLE_CORE nichts');
+        $this->assertNull($list3->checkedCandidate('1.0.1 c9'), 'Code seit dem Test geändert');
+        $this->assertNull($list3->checkedCandidate('1.0.0 c1'), 'geprüfte Version ist schon stable');
+        $list3->promote('1.0.1.3');
+        $this->assertNull($list3->checkedCandidate('1.0.1 c2'), 'nach dem Freigeben nichts mehr zu tun');
+        $list3->withdraw('1.0.2.4');
+        $this->assertNull($list3->checkedCandidate('1.0.2 c3'), 'zurückgezogen bzw. Kern gesperrt');
+
         // Versionsnummern: fortlaufend je Kern-Version; Serien-Nummer mindestens die aktuelle Zeit
         $this->assertSame('1.0.0.2', $list2->nextVersion('1.0.0'));
         $this->assertSame('1.1.0.1', $list2->nextVersion('1.1.0'));

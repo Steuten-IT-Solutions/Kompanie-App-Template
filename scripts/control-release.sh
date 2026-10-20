@@ -2,18 +2,37 @@
 # Gibt eine Version einer Kompanie für alle frei (promote) oder zieht sie zurück (withdraw)
 # (aus .github/workflows/release-control.yml). Ändert die signierte Update-Liste und die
 # Download-Seite auf gh-pages des Kompanie-Repos.
+# promote-checked: gibt die neueste Version mit geprüftem Programmcode (Datei STABLE_CORE) frei, die neuer ist als
+# die freigegebene; ohne solche Version ändert sich nichts. VERSION ist dann leer.
 #
-# Umgebung: REPO, ACTION (promote|withdraw), VERSION, GH_TOKEN, KOMPANIE_SIGNING_KEY,
-#   optional GIT_REMOTE und GH (für Tests).
+# Umgebung: REPO, ACTION (promote|withdraw|promote-checked), VERSION, GH_TOKEN, KOMPANIE_SIGNING_KEY,
+#   optional GIT_REMOTE, GH und STABLE_CORE_FILE (für Tests).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-: "${REPO:?}" "${ACTION:?}" "${VERSION:?}" "${KOMPANIE_SIGNING_KEY:?}"
-[[ "$ACTION" == promote || "$ACTION" == withdraw ]] || { echo "Unbekannte Aktion: $ACTION" >&2; exit 1; }
-[[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(\.[0-9]{1,6})?$ ]] || { echo "Ungültige Version: $VERSION" >&2; exit 1; }
+: "${REPO:?}" "${ACTION:?}" "${KOMPANIE_SIGNING_KEY:?}"
+[[ "$ACTION" == promote || "$ACTION" == withdraw || "$ACTION" == promote-checked ]] || { echo "Unbekannte Aktion: $ACTION" >&2; exit 1; }
 REMOTE="${GIT_REMOTE:-https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 GH="${GH:-gh}"
+if [ "$ACTION" = promote-checked ]; then
+  STABLE_CORE="$(cat "${STABLE_CORE_FILE:-$ROOT/STABLE_CORE}" 2> /dev/null || true)"
+  if [ -z "${STABLE_CORE//[[:space:]]/}" ]; then
+    echo "STABLE_CORE ist leer: Es ist noch kein Programmcode als geprüft eingetragen." >&2
+    exit 1
+  fi
+  git clone --quiet --depth 1 --branch gh-pages "$REMOTE" "$WORK/list"
+  VERSION="$(php "$ROOT/scripts/updates.php" --list="$WORK/list/updates.json" --kompanie="$REPO" --checked-version --stable-core="$STABLE_CORE")"
+  rm -rf "$WORK/list"
+  if [ -z "$VERSION" ]; then
+    echo "$REPO: keine geprüfte Version freizugeben."
+    exit 0
+  fi
+  echo "$REPO: gebe $VERSION frei (geprüfter Programmcode)."
+  ACTION=promote
+fi
+: "${VERSION:?}"
+[[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(\.[0-9]{1,6})?$ ]] || { echo "Ungültige Version: $VERSION" >&2; exit 1; }
 # Freigeben nur, was öffentlich ist (kein Entwurf eines abgebrochenen Laufs)
 if [ "$ACTION" = promote ]; then
   DRAFT="$($GH release view "v$VERSION" --repo "$REPO" --json isDraft --jq .isDraft)" || { echo "Release v$VERSION nicht abfragbar." >&2; exit 1; }

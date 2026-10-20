@@ -5,6 +5,8 @@
  *   php scripts/updates.php --list=updates.json --add=release.json --base-url=https://…/download/v1.2.3.4/ [--channel=early|stable|auto]
  *   php scripts/updates.php --list=updates.json --promote=1.2.3.4
  *   php scripts/updates.php --list=updates.json --withdraw=1.2.3.4
+ *   php scripts/updates.php --list=updates.json --checked-version --stable-core="$(cat STABLE_CORE)"
+ *       gibt die Version aus, die „promote-checked“ freigeben würde (geprüfter Code, neuer als stable), sonst nichts
  *   php scripts/updates.php --list=updates.json --show
  *   php scripts/updates.php --list=updates.json --next-version=1.2.3      nächste freie Versionsnummer
  *   php scripts/updates.php --list=updates.json --find=<Commit des Kompanie-Repos> --core-code=<Prüfsumme> --config-hash=<Prüfsumme>
@@ -27,7 +29,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:', 'config-hash:']);
+$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:', 'config-hash:', 'checked-version']);
 $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
@@ -59,6 +61,13 @@ try {
         $fail("$file gibt es nicht.");
     }
 
+    if (isset($opt['checked-version'])) {
+        $v = $list->checkedCandidate((string) ($opt['stable-core'] ?? ''));
+        if ($v !== null) {
+            echo $v, "\n";
+        }
+        exit(0);
+    }
     if (isset($opt['next-version'])) {
         echo $list->nextVersion((string) $opt['next-version']), "\n";
         exit(0);
