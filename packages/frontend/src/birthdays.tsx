@@ -1,19 +1,18 @@
-// Geburtstage (Issue #1): anstehende bei den Terminen, die ganze Liste unter #/termine/geburtstage, der eigene unter
-// „Mein Konto“, die Pflege in den Mitgliedsdetails (wer Mitglieder anlegen darf).
+// Geburtstage (Issue #1): die ganze Liste unter #/termine/geburtstage, der eigene unter „Mein Konto“, die Pflege in
+// den Mitgliedsdetails (wer Mitglieder anlegen darf). Erst bei Bedarf geladen; die anstehenden bei den Terminen stehen
+// in upcomingBirthdays.tsx.
 
 import { useState, type FormEvent } from 'react';
 import { api, can, config, type Birthday, type BirthdayEntry } from './api';
+import { BirthdayRow } from './upcomingBirthdays';
 import brand from './generated/brand';
 import { formatMonth, parseLocalDate } from './format';
 import { navigate } from './router';
 import { Empty, ErrorBox, Loading, useAsync } from './ui';
 
-const sec = brand.labels.sections;
+export { birthdaysVisible } from './upcomingBirthdays';
 
-/** Wer Geburtstage sieht und seinen eintragen kann: Bereich an, Mitglieder (wie BirthdayService::isMember im Kern). */
-export function birthdaysVisible(): boolean {
-  return !!config?.features.birthdays && can('member');
-}
+const sec = brand.labels.sections;
 
 /** Das Datum anderer pflegen: wer Mitglieder anlegen darf. */
 export function canSetBirthdays(): boolean {
@@ -112,62 +111,8 @@ export function BirthdayFields({
   );
 }
 
-const weekdayDate = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
-
-function whenText(b: BirthdayEntry): string {
-  if (b.days_until === 1) return 'Morgen';
-  return weekdayDate.format(parseLocalDate(b.date));
-}
-
-function BirthdayRow({ b }: { b: BirthdayEntry }) {
-  const date = parseLocalDate(b.date);
-  return (
-    <li className={`card birthday-item ${b.today ? 'birthday-today' : ''}`}>
-      <div className="date-badge" aria-hidden="true">
-        <span className="day">{date.getDate()}</span>
-        <span className="mon">{date.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}</span>
-      </div>
-      <div className="birthday-main">
-        <div className="birthday-name">{b.name}</div>
-        <div className="birthday-when">
-          {whenText(b)}
-          {b.age !== null && ` · wird ${b.age}`}
-        </div>
-      </div>
-      {b.today && <span className="badge birthday-badge">Heute</span>}
-    </li>
-  );
-}
-
-/**
- * Karte „Anstehende Geburtstage“ oben bei den Termine: heute und die nächsten 7 Tage, heute hervorgehoben. Ohne
- * anstehende erscheint sie nicht (außer mit `always`, wenn es sonst nichts zu sehen gibt).
- */
-export function UpcomingBirthdays({ always = false }: { always?: boolean }) {
-  const { data, error } = useAsync(() => api.birthdays(7), [], 'geburtstage-anstehend');
-  if (!data) return error && always ? <ErrorBox message={error} /> : null;
-  if (data.length === 0 && !always) return null;
-  return (
-    <section className="card birthdays-upcoming" aria-label={`Anstehende ${sec.birthdays}`}>
-      <h2 className="birthdays-title">Anstehende {sec.birthdays}</h2>
-      {data.length === 0 ? (
-        <p className="muted small">In den nächsten 7 Tagen hat niemand Geburtstag.</p>
-      ) : (
-        <ul className="card-list birthday-list">
-          {data.map((b) => (
-            <BirthdayRow key={b.user_id} b={b} />
-          ))}
-        </ul>
-      )}
-      <button className="btn btn-link birthdays-all" onClick={() => navigate('termine/geburtstage')}>
-        Alle {sec.birthdays}
-      </button>
-    </section>
-  );
-}
-
 /** Alle sichtbaren Geburtstage, ab heute nach Monaten gruppiert (#/termine/geburtstage). */
-export function BirthdayPage() {
+export default function BirthdayPage() {
   const { data, error, loading, reload } = useAsync(() => api.birthdays(), [], 'geburtstage');
   const back = (
     <button className="btn btn-link back" onClick={() => navigate('termine')}>

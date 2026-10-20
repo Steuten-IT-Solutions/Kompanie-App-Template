@@ -1,11 +1,15 @@
 /* Service Worker der App (Bereich: Adresse der App).
  *
- * - Programmdateien (Hash-Dateinamen) → beim Installieren vorab gespeichert (Liste setzt der Build
- *   ein), danach zuerst aus dem Speicher. Jeder Build hat einen eigenen Speicher; beim Aktivieren
- *   werden die der alten Versionen gelöscht.
- * - App-Seite → zuerst aus dem Netz, aber höchstens 3 Sekunden warten, wenn eine gespeicherte
- *   Fassung da ist (schlechtes Mobilnetz); ohne Netz die letzte Version.
- * - API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version (höchstens DATA_MAX Einträge).
+ * - Programmdateien (Hash-Dateinamen, auch die erst bei Bedarf geladenen Teile) und Icons → beim Installieren
+ *   vorab gespeichert (Liste setzt der Build ein), danach zuerst aus dem Speicher. Jeder Build hat einen eigenen
+ *   Speicher; unveränderte Dateien übernimmt er aus dem der vorigen Version, statt sie neu zu laden. Beim Aktivieren
+ *   werden die Speicher der alten Versionen gelöscht.
+ * - App-Seite → beim Installieren gespeichert (passt so nach einem Update zu den neuen Programmdateien und ist schon
+ *   nach dem ersten Besuch offline da); beim Öffnen zuerst aus dem Netz, aber höchstens NAVIGATION_TIMEOUT_MS warten,
+ *   wenn eine gespeicherte Fassung da ist (schlechtes Mobilnetz); ohne Netz die gespeicherte. Nur HTML gilt als
+ *   App-Seite (nicht z. B. ein direkt geöffnetes Foto).
+ * - API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version (höchstens DATA_MAX Einträge, die ältesten
+ *   fallen zuerst heraus; die App-Seite zählt nicht mit).
  * - Dokumente (<App>/dokument/<id>?v=<Fassung>, Issue #2) → zuerst aus dem Speicher: Die Adresse wechselt mit
  *   jeder neuen Fassung. Was einmal geöffnet wurde, ist so offline verfügbar; gespeichert wird je Dokument nur die
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
@@ -28,10 +32,13 @@ const BADGES_CACHE = 'kompanie-badges-v1';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
-const NAVIGATION_TIMEOUT_MS = 3000;
+const NAVIGATION_TIMEOUT_MS = 2500;
 const DATA_MAX = 100;
 
-/** Programmdateien dieses Builds vorab speichern; einzelne Fehler verhindern das Update nicht. */
+/**
+ * Programmdateien dieses Builds vorab speichern. Dateien mit gleichem Namen (Hash) sind unverändert: aus dem Speicher
+ * der vorigen Version übernehmen. Einzelne Fehler verhindern das Update nicht.
+ */
 async function precache() {
   if (ASSETS === '' || PRECACHE.length === 0) return;
   const cache = await caches.open(STATIC_CACHE);
@@ -39,21 +46,29 @@ async function precache() {
     PRECACHE.map(async (path) => {
       const url = ASSETS + path;
       if (await cache.match(url)) return;
+      const previous = path.startsWith('assets/') ? await caches.match(url) : undefined;
+      if (previous) return cache.put(url, previous);
       const res = await fetch(url);
       if (cacheable(res)) await cache.put(url, res);
     }),
   );
 }
 
-/** Daten-Speicher begrenzen: die ältesten Einträge zuerst löschen (Reihenfolge des Speicherns). */
+/** App-Seite in der aktuellen Fassung speichern (mit Anmeldung, wie beim Öffnen). */
+async function precachePage() {
+  const res = await fetch(self.registration.scope, { credentials: 'same-origin', cache: 'no-store' });
+  if (isPage(res)) await store(self.registration.scope, res);
+}
+
+/** Daten-Speicher begrenzen: die ältesten Einträge zuerst löschen (Reihenfolge des Speicherns); die App-Seite bleibt. */
 async function trimData() {
   const cache = await caches.open(DATA_CACHE);
-  const keys = await cache.keys();
+  const keys = (await cache.keys()).filter((k) => k.url !== self.registration.scope);
   await Promise.all(keys.slice(0, Math.max(0, keys.length - DATA_MAX)).map((k) => cache.delete(k)));
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(precache().then(() => self.skipWaiting()));
+  event.waitUntil(Promise.allSettled([precache(), precachePage()]).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -69,8 +84,11 @@ self.addEventListener('activate', (event) => {
 });
 
 function isStatic(url) {
-  // Nur Programmdateien mit Hash im Namen; Icons (feste Namen) ändern sich mit dem Logo.
-  return ASSETS !== '' && url.href.startsWith(ASSETS + 'assets/') && /\.(js|css|png|svg|woff2?|webp|jpg)$/.test(url.pathname);
+  if (ASSETS === '' || !url.href.startsWith(ASSETS)) return false;
+  // Programmdateien mit Hash im Namen; Icons (feste Namen) nur aus der Liste dieses Builds (ein neues Logo ist ein
+  // neuer Build mit eigenem Speicher).
+  const path = url.href.slice(ASSETS.length);
+  return (path.startsWith('assets/') && /\.(js|css|png|svg|woff2?|webp|jpg)$/.test(url.pathname)) || PRECACHE.includes(path);
 }
 
 function isApi(url) {
@@ -151,6 +169,11 @@ function cacheable(res) {
   return res && res.ok && !res.redirected && res.type === 'basic';
 }
 
+/** Als App-Seite speichern nur HTML (eine direkt geöffnete Adresse in der App kann auch ein Bild sein). */
+function isPage(res) {
+  return cacheable(res) && (res.headers.get('Content-Type') || '').includes('text/html');
+}
+
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
@@ -179,7 +202,7 @@ async function store(key, res) {
 async function networkFirst(request, fallbackUrl, timeoutMs, event) {
   const key = fallbackUrl || request;
   const network = fetch(request).then((res) => {
-    if (cacheable(res)) {
+    if (fallbackUrl ? isPage(res) : cacheable(res)) {
       const saving = store(key, res.clone());
       try {
         if (event) event.waitUntil(saving);

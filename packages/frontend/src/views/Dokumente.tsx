@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, can, type DocumentInfo, type DocVisibility } from '../api';
 import brand from '../generated/brand';
 import {
@@ -15,9 +15,9 @@ import { formatBytes, formatDate } from '../format';
 import { detectPlatform } from '../install';
 import { pruneDocumentCache, whenControlled } from '../offline';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 
-const PdfViewer = lazy(() => import('./PdfViewer'));
+const PdfViewer = lazyView(() => import('./PdfViewer'));
 
 /** Zuletzt angezeigtes Dokument: Seine Kategorie ist beim Zurückkehren zur Liste aufgeklappt. */
 let lastOpened: number | null = null;

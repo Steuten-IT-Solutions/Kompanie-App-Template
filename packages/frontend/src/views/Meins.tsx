@@ -6,7 +6,7 @@ import Dienstgrad from './Dienstgrad';
 import MeineAnwesenheit from './MeineAnwesenheit';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
-import { TitleBadges } from './TitelVerwalten';
+import { TitleBadges } from '../TitleBadges';
 
 /**
  * „Meins“: eigene Titel oben, darunter Punkte, Strafen und Dienstgrad, umschaltbar. Die Summen (/me) lädt Meins einmal

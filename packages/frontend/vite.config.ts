@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
@@ -27,6 +27,9 @@ function brandHtml(): Plugin {
 
 // Liste der Programmdateien und eine Build-Kennung in den Service Worker einsetzen (Vorab-Speicher).
 // public/sw.js wird unverändert nach dist/ kopiert; danach ersetzt dieser Schritt die Platzhalter.
+// Dazu die Icons, die die App-Seite und die Benachrichtigungen nutzen (feste Namen: ihr Inhalt geht in die Kennung ein).
+const PRECACHE_ICONS = ['icons/favicon-32.png', 'icons/apple-touch-icon.png', 'icons/icon-192.png'];
+
 function precacheList(): Plugin {
   let files: string[] = [];
   let outDir = 'dist';
@@ -44,11 +47,14 @@ function precacheList(): Plugin {
     },
     closeBundle() {
       const file = join(outDir, 'sw.js');
-      const build = createHash('sha256').update(files.join('\n')).digest('hex').slice(0, 12);
+      const hash = createHash('sha256').update(files.join('\n'));
+      const icons = PRECACHE_ICONS.filter((icon) => existsSync(join(outDir, icon)));
+      for (const icon of icons) hash.update(icon).update(readFileSync(join(outDir, icon)));
+      const build = hash.digest('hex').slice(0, 12);
       const sw = readFileSync(file, 'utf8');
       const out = sw
         .replace("const BUILD = 'dev';", () => `const BUILD = '${build}';`)
-        .replace('const PRECACHE = [];', () => `const PRECACHE = ${JSON.stringify(files)};`);
+        .replace('const PRECACHE = [];', () => `const PRECACHE = ${JSON.stringify([...files, ...icons])};`);
       if (out === sw) throw new Error('sw.js: Platzhalter für den Vorab-Speicher nicht gefunden.');
       writeFileSync(file, out);
     },

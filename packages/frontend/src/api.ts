@@ -1,6 +1,7 @@
 // Zugriff auf die API der Kompanie-App (siehe api/openapi.yaml), unabhängig davon,
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
+import { dataCache } from './dataCache';
 import brand from './generated/brand';
 
 /** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
@@ -538,6 +539,10 @@ export type AttendanceStatus = 'present' | 'excused' | 'absent';
 export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'anwesend', excused: 'entschuldigt', absent: 'fehlt' };
 export type AttendanceCounts = Record<AttendanceStatus, number>;
 
+/** „3 anwesend · 1 entschuldigt · 0 fehlt“ */
+export const countsText = (c: AttendanceCounts): string =>
+  (['present', 'excused', 'absent'] as AttendanceStatus[]).map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`).join(' · ');
+
 export interface AttendanceSummary {
   id: number;
   source: 'calendar' | 'free';
@@ -762,6 +767,9 @@ async function requestFull<T>(
   } catch {
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
+  // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
+  // Ausnahme: die Abfrage des Push-Status beim Start, ein POST ohne Änderung an den angezeigten Daten.
+  if (method !== 'GET' && !path.endsWith('/push/status')) dataCache.clear();
 
   const data = await res.json().catch(() => null);
 

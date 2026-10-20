@@ -5,20 +5,6 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 const sec = brand.labels.sections;
 
-/** Titel als kleine Abzeichen, z. B. in „Meins“ und in der Mitgliederliste. */
-export function TitleBadges({ titles }: { titles?: TitleRef[] }) {
-  if (!titles || titles.length === 0) return null;
-  return (
-    <span className="title-badges">
-      {titles.map((t) => (
-        <span key={t.id} className="badge badge-title">
-          {t.title}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 /**
  * Verwaltung → Titel: anlegen, umbenennen, Reihenfolge der Anzeige, deaktivieren, löschen.
  * Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren.

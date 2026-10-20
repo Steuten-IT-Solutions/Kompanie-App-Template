@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api, can, config, type CalendarEvent } from '../api';
 import GuestPushButton from '../GuestPushButton';
-import { birthdaysVisible, UpcomingBirthdays } from '../birthdays';
+import { birthdaysVisible, UpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';

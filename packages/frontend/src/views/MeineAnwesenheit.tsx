@@ -1,7 +1,6 @@
-import { api, ATTENDANCE_LABELS } from '../api';
+import { api, ATTENDANCE_LABELS, countsText } from '../api';
 import { formatDate } from '../format';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-import { countsText } from './Anwesenheit';
 
 /** Meins → Anwesenheit: eigene Einträge, die jüngsten Termine zuerst. */
 export default function MeineAnwesenheit() {
