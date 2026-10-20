@@ -255,7 +255,7 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
     return (
       <div>
         <button className="btn btn-link back" onClick={() => navigate('dokumente')}>
-          ‹ Alle Dokumente
+          ‹ Alle {brand.labels.sections.documents}
         </button>
         <h2 className="member-name">{open.title}</h2>
         <p className="muted small doc-stand">Stand: {formatDate(open.date)}</p>

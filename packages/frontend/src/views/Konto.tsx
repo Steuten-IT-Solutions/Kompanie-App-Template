@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { api, can, config, levelLabel } from '../api';
+import brand from '../generated/brand';
+import { api, can, config, levelLabel, newsTitle } from '../api';
 import { isStandalone } from '../install';
 import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import { navigate } from '../router';
@@ -46,7 +47,9 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       {can('manage_settings') && (
         <div className="card account-card">
           <h3>Einstellungen</h3>
-          <p className="muted small">Zustand der App, Updates, Datensicherung, Kalender, Galerie und Neuigkeiten.</p>
+          <p className="muted small">
+            Zustand der App, Updates, Datensicherung, Kalender, {brand.labels.sections.gallery} und {newsTitle()}.
+          </p>
           <button className="btn btn-secondary btn-block" onClick={() => navigate('einstellungen')}>
             Einstellungen öffnen
           </button>

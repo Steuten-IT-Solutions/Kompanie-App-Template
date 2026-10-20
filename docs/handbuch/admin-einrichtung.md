@@ -7,7 +7,7 @@ Nach der Installation führt die App jeden {rolle.admin} durch die Einrichtung, 
 
 ## Ablauf der Einrichtung
 1. **Bereiche wählen** (siehe unten), dann **Weiter**. Diesen Schritt kannst du nicht überspringen.
-2. Nur für die gewählten Bereiche: **Google-Zugang** und **Kalender für Mitglieder** (bei {bereich.calendar}), **Galerie aus Google Drive** (bei {bereich.gallery}) und **Neuigkeiten** (bei {bereich.news}, nur ohne WordPress). Mit **Weiter** überspringst du einen Schritt, mit **Zurück** gehst du einen zurück.
+2. Nur für die gewählten Bereiche: **Google-Zugang** und **Kalender für Mitglieder** (bei {bereich.calendar}), **{bereich.gallery} aus Google Drive** (bei {bereich.gallery}) und **Neuigkeiten** (bei {bereich.news}, nur ohne WordPress). Mit **Weiter** überspringst du einen Schritt, mit **Zurück** gehst du einen zurück.
 3. **Fast fertig:** Falls angeboten, kannst du hier die Statusmeldungen an die Betreuer der App erlauben (siehe [Zustand und Statusmeldungen](seite:admin-zustand)). Dann **Einrichtung abschließen**. Die App öffnet die Verwaltung; als Nächstes legst du die Mitglieder an (siehe [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder)).
 
 ## Bereiche wählen
@@ -37,7 +37,7 @@ Mit WordPress gibt es im WP-Admin zusätzlich die Felder „Kalender-Link (iCal)
 ## {bereich.gallery}
 Die App zeigt Fotos aus einem Google-Drive-Ordner. Aufbau: Galerie-Ordner → je Jahr ein Ordner → je Album ein Ordner → Bilder. Bilder im Unterordner `intern` eines Albums sehen nur Mitglieder. Gelesen wird über den Google-Zugang (siehe oben); mit einem Dienstkonto gibst du den Ordner vorher in Google Drive für dessen E-Mail-Adresse frei (Betrachter).
 
-Unter **Konto → Einstellungen → Galerie**, Abschnitt **Galerie aus Google Drive**, bei **Link zum Galerie-Ordner** den Link zum Ordner eintragen und **Speichern**. Danach erscheint **Jetzt abgleichen**: Die App liest die Alben und bereitet die Bilder auf und zeigt dabei den Fortschritt. Was dann noch fehlt, erledigt sie stündlich im Hintergrund; neue Bilder kommen ebenso stündlich dazu. Ging beim letzten Abgleich etwas schief, steht die Meldung über dem Knopf.
+Unter **Konto → Einstellungen → Galerie**, Abschnitt **{bereich.gallery} aus Google Drive**, bei **Link zum Galerie-Ordner** den Link zum Ordner eintragen und **Speichern**. Danach erscheint **Jetzt abgleichen**: Die App liest die Alben und bereitet die Bilder auf und zeigt dabei den Fortschritt. Was dann noch fehlt, erledigt sie stündlich im Hintergrund; neue Bilder kommen ebenso stündlich dazu. Ging beim letzten Abgleich etwas schief, steht die Meldung über dem Knopf.
 
 Mit WordPress heißen die Felder im WP-Admin „Galerie-Ordner“ und **Galerie speichern**.
 

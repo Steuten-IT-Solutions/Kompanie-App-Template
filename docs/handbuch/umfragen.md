@@ -7,7 +7,7 @@ bereiche: [polls]
 Mit **{bereich.polls}** fragt die {kompanie.name} alle {rolle.member} nach ihrer Meinung, z. B. „Grillfest am Samstag oder Sonntag?“. Jede Umfrage hat genau eine Frage: mit einer Antwort, mit mehreren Antworten oder mit freiem Text. {rolle.candidate} nehmen nicht teil.
 
 ## Wo du Umfragen findest
-Laufende Umfragen stehen am **{bereich.board}**. Solange du noch nicht geantwortet hast, erscheint eine neue Umfrage auch im Banner oben auf jeder Seite; **Teilnehmen** öffnet sie. Mit **×** blendest du sie auf diesem Gerät aus. Wird die Umfrage danach geändert (z. B. ein neues Ende), erscheint sie wieder.
+Laufende Umfragen stehen am **{bereich.board}** (siehe [{bereich.board}](seite:schwarzes-brett)). Solange du noch nicht geantwortet hast, erscheint eine neue Umfrage auch im Banner oben auf jeder Seite; **Teilnehmen** öffnet sie. Mit **×** blendest du sie auf diesem Gerät aus. Wird die Umfrage danach geändert (z. B. ein neues Ende), erscheint sie wieder.
 
 Auf der Seite des Bretts stehen alle laufenden Umfragen mit dem Hinweis **offen** oder **beantwortet** und den Knöpfen **Teilnehmen** bzw. **Antwort ansehen**. **Beendete {bereich.polls}** öffnet die Liste aller Umfragen: oben die laufenden, darunter die beendeten, mit Ergebnis, sobald es für dich sichtbar ist.
 

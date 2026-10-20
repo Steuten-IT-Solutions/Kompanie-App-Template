@@ -7,7 +7,7 @@ bereiche: [ranks]
 Wer die Rolle „{bereich.ranks} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Die einzelnen Seiten wählst du dort im Menü oben.
 
 ## Liste pflegen
-Unter **Verwaltung → {bereich.ranks}** legst du die {bereich.ranks} an, vom niedrigsten zum höchsten: Bezeichnung (und optional eine Punkteschwelle) eintragen und **Anlegen** tippen. Neue {bereich.ranks} kommen ans obere Ende. Mit **niedriger** und **höher** änderst du die Reihenfolge, mit **Ändern** Bezeichnung und Punkteschwelle.
+Unter **Verwaltung → {bereich.ranks}** legst du die {bereich.ranks} an, vom niedrigsten zum höchsten: Bezeichnung (und optional eine {bereich.points}schwelle) eintragen und **Anlegen** tippen. Neue {bereich.ranks} kommen ans obere Ende. Mit **niedriger** und **höher** änderst du die Reihenfolge, mit **Ändern** Bezeichnung und {bereich.points}schwelle.
 
 Ein {begriff.rank}, den niemand hat, lässt sich **löschen**. Ein {begriff.rank}, den jemand hat, lässt sich nur **deaktivieren**: Er wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
 
@@ -20,7 +20,7 @@ Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{beg
 Einen {begriff.rank} bekommen nur Mitglieder. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seinen {begriff.rank}; du kannst ihn dort jederzeit auf „Kein {begriff.rank}“ setzen.
 
 ## Zusammen mit {bereich.points}
-Jeder {begriff.rank} kann eine **Punkteschwelle** haben (eine ganze Zahl ab 0, leer = ohne). Sie wirkt nur, wenn auch {bereich.points} eingeschaltet ist. Die Schwellen müssen mit der Reihenfolge steigen. Dann gilt für alle, auch für {rolle.admin}s:
+Jeder {begriff.rank} kann eine **{bereich.points}schwelle** haben (eine ganze Zahl ab 0, leer = ohne). Sie wirkt nur, wenn auch {bereich.points} eingeschaltet ist. Die Schwellen müssen mit der Reihenfolge steigen. Dann gilt für alle, auch für {rolle.admin}s:
 - **Befördern** erst, wenn die {bereich.points} des Mitglieds die Schwelle des neuen {begriff.rank}s erreichen. Mehrere {bereich.ranks} auf einmal zu überspringen ist erlaubt.
 - **Degradieren** nur, wenn die {bereich.points} unter der Schwelle des aktuellen {begriff.rank}s liegen, also nachdem {bereich.points} abgezogen wurden.
 - Für {bereich.ranks} ohne Schwelle gelten diese Regeln nicht; trage die Schwellen nach, wenn ihr sie nutzen wollt.

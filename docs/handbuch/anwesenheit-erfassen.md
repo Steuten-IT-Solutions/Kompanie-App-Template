@@ -19,7 +19,7 @@ Eine Liste, die nicht mehr gebraucht wird, entfernst du unten mit **Liste lösch
 
 ## {bereich.points} und {bereich.penalties} aus der Liste
 Darfst du zusätzlich {bereich.points} bzw. {bereich.penalties} vergeben, stehen unter der Liste zwei Knöpfe. Ungespeicherte Änderungen werden dabei zuerst gespeichert.
-- **Punkte für … Anwesende:** öffnet das Formular für {bereich.points} mit allen Anwesenden, die für diese Liste noch keine {bereich.points} haben; Grund und Datum sind aus der Liste übernommen. Wer schon welche hat, ist in der Liste mit „Punkte gebucht“ markiert und bekommt sie kein zweites Mal. Der Punktefaktor der Rolle gilt wie immer.
+- **{bereich.points} für … Anwesende:** öffnet das Formular für {bereich.points} mit allen Anwesenden, die für diese Liste noch keine {bereich.points} haben; Grund und Datum sind aus der Liste übernommen. Wer schon welche hat, ist in der Liste mit „{bereich.points} gebucht“ markiert und bekommt sie kein zweites Mal. Der {bereich.points}faktor der Rolle gilt wie immer.
 - **Eintrag für … Fehlende:** öffnet das Formular für {bereich.penalties} mit allen, die gefehlt haben (Grund „Gefehlt: …“). Anders als bei {bereich.points} merkt sich die Liste hier nicht, wer schon einen Eintrag hat; buche also nicht zweimal.
 
 {bereich.points} und {bereich.penalties} gibt es nur für Mitglieder, nicht für {rolle.candidate}. Die Auswahl lässt sich vor dem Buchen noch ändern.

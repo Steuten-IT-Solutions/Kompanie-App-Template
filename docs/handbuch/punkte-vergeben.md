@@ -16,8 +16,8 @@ Unter **Verwaltung → {bereich.points}katalog** legst du häufige Anlässe mit 
 
 {bereich.points} gibt es nur für Mitglieder, nicht für {rolle.candidate} oder Gäste. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn er {bereich.points} erhält oder ihm welche abgezogen werden.
 
-## Punktefaktor
-Manche Rollen haben einen Punktefaktor, z. B. ×0,5 für junge Mitglieder; den legt ein {rolle.admin} unter **Konto → Einstellungen → Rollen** fest. Hat eine Rolle einen anderen Faktor als 1, steht er beim Namen, z. B. „×0,5“. Er gilt beim Vergeben und wird mit dem Eintrag gespeichert. Ist so jemand angekreuzt, erscheint **Punktefaktor der Rolle anwenden**; ohne Häkchen zählt der Eintrag für alle voll.
+## {bereich.points}faktor
+Manche Rollen haben einen {bereich.points}faktor, z. B. ×0,5 für junge Mitglieder; den legt ein {rolle.admin} unter **Konto → Einstellungen → Rollen** fest. Hat eine Rolle einen anderen Faktor als 1, steht er beim Namen, z. B. „×0,5“. Er gilt beim Vergeben und wird mit dem Eintrag gespeichert. Ist so jemand angekreuzt, erscheint **{bereich.points}faktor der Rolle anwenden**; ohne Häkchen zählt der Eintrag für alle voll.
 
 ## Stornieren
 Unter **Verwaltung → Mitglieder** das Mitglied öffnen, im Menü unter dem Namen **{bereich.points}** wählen und beim Eintrag auf **Stornieren** tippen. Der Eintrag zählt dann nicht mehr; gespeichert bleibt, wer ihn angelegt und storniert hat.

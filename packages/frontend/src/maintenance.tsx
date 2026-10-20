@@ -83,7 +83,7 @@ export function MaintenanceBanner({ reason, onToast }: { reason: string; onToast
   );
 }
 
-/** Schalter unter Einstellungen → Wartung: ein- und ausschalten, Begründung bearbeiten, Protokoll. */
+/** Schalter unter Einstellungen → Wartungsmodus: ein- und ausschalten, Begründung bearbeiten, Protokoll. */
 export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.maintenance(), []);
   const [reason, setReason] = useState<string | null>(null);

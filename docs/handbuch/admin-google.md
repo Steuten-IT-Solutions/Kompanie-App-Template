@@ -1,5 +1,5 @@
 ---
-titel: Google einrichten (Galerie und Kalender)
+titel: "Google einrichten ({bereich.gallery} und Kalender)"
 reihenfolge: 115
 rechte: [manage_settings]
 ---
@@ -7,7 +7,7 @@ Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender
 
 > Für den {bereich.calendar} allein brauchst du das nicht: Die **geheime Adresse im iCal-Format** geht ohne Google Cloud (siehe [Ersteinrichtung](seite:admin-einrichtung)).
 
-Den Google-Zugang findest du in der App unter **Konto → Einstellungen → Google-Zugang** (oben rechts **Konto**, dann **Einstellungen öffnen**). {bereich.calendar} und {bereich.gallery} haben dort je eine eigene Seite (**Kalender** und **Galerie**). Mit WordPress gibt es den Google-Zugang auch im WP-Admin unter *Einstellungen* auf der Seite der App.
+Den Google-Zugang findest du in der App unter **Konto → Einstellungen → Google-Zugang** (oben rechts **Konto**, dann **Einstellungen öffnen**). {bereich.calendar} und {bereich.gallery} haben dort je eine eigene Seite (**Kalender** und **{bereich.gallery}**). Mit WordPress gibt es den Google-Zugang auch im WP-Admin unter *Einstellungen* auf der Seite der App.
 
 ## 1. Projekt anlegen
 1. [console.cloud.google.com](https://console.cloud.google.com/) öffnen und mit dem Google-Konto der Kompanie anmelden. Beim ersten Mal die Nutzungsbedingungen bestätigen.
@@ -49,7 +49,7 @@ Steht stattdessen, dass es den Kalender noch nicht lesen darf, wurde das Häkche
 Meldet die App einen Fehler, steht die Ursache dabei. Häufig: Die Weiterleitungs-URI bei Google weicht ab (genau die Adresse aus der App eintragen), der Clientschlüssel stimmt nicht, das Häkchen für Google Drive fehlte oder die Anmeldung wurde abgebrochen. Die Client-ID muss auf `.apps.googleusercontent.com` enden.
 
 ## 6. {bereich.gallery} und {bereich.calendar} eintragen
-- **{bereich.gallery}:** Unter **Konto → Einstellungen → Galerie** im Abschnitt **Galerie aus Google Drive** bei **Link zum Galerie-Ordner** den Link des Ordners aus Google Drive eintragen (z. B. `https://drive.google.com/drive/folders/…`), **Speichern**, dann **Jetzt abgleichen**. Danach gleicht die App den Ordner stündlich im Hintergrund ab; neue Bilder erscheinen spätestens nach dem nächsten Abgleich. Mit WordPress heißen Feld und Knopf im WP-Admin „Galerie-Ordner“ und **Galerie speichern**.
+- **{bereich.gallery}:** Unter **Konto → Einstellungen → Galerie** im Abschnitt **{bereich.gallery} aus Google Drive** bei **Link zum Galerie-Ordner** den Link des Ordners aus Google Drive eintragen (z. B. `https://drive.google.com/drive/folders/…`), **Speichern**, dann **Jetzt abgleichen**. Danach gleicht die App den Ordner stündlich im Hintergrund ab; neue Bilder erscheinen spätestens nach dem nächsten Abgleich. Mit WordPress heißen Feld und Knopf im WP-Admin „Galerie-Ordner“ und **Galerie speichern**.
 - **{bereich.calendar}:** Unter **Konto → Einstellungen → Kalender** im Abschnitt **Kalender für Mitglieder** bei **Google-Kalender-IDs** die Kalender-ID eintragen (Google Kalender → beim Kalender **⋮ → Einstellungen und Freigabe** → **Kalender integrieren** → „Kalender-ID“; beim Hauptkalender eines Kontos ist das dessen E-Mail-Adresse; mehrere durch Komma trennen), **Speichern**, dann **Kalender testen**. Mit WordPress gibt es dafür im WP-Admin auch das Feld **„Oder: Google-Kalender-IDs“** und **Speichern und testen**. Das verbundene Google-Konto muss den Kalender sehen können.
 
 Mehr zu beiden Seiten (Reihenfolge der Quellen, iCal-Adresse, Abgleich): [Ersteinrichtung und Bereiche](seite:admin-einrichtung).

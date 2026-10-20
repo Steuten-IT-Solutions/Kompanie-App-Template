@@ -12,7 +12,7 @@ Solange der Modus an ist:
 - Alle anderen sehen nur eine **Wartungsseite** mit der Begründung und **Erneut versuchen**. Daten, die schon offline auf dem Handy liegen, bleiben dort gespeichert. Wer nicht angemeldet ist, findet dort **Anmelden (Admins)**.
 - Du selbst arbeitest normal; ein rotes Banner oben erinnert dich daran, dass die Wartung läuft.
 - Hintergrundaufgaben wie der Abgleich von {bereich.calendar} und {bereich.gallery} pausieren. Updates und Statusmeldungen laufen weiter. Benachrichtigungen, die in dieser Zeit entstehen, gehen erst nach dem Ende raus.
-- Die übrige Webseite bleibt erreichbar, auch die Terminliste und die Galerie, falls die App sie dort anzeigt.
+- Die übrige Webseite bleibt erreichbar, auch die Terminliste und die {bereich.gallery}, falls die App sie dort anzeigt.
 
 ## Beenden
 Tippe im roten Banner auf **Beenden** oder unter **Wartungsmodus** auf **Wartungsmodus beenden**. Die anderen sehen die App wieder, sobald sie auf **Erneut versuchen** tippen oder die App neu öffnen. Wer den Modus wann ein- oder ausgeschaltet hat, steht unter **Verlauf** (die letzten 20 Änderungen).

@@ -16,7 +16,7 @@ Ihr braucht nur Webspace mit PHP (ab Version 8.1). Eine Datenbank müsst ihr nic
 Läuft auf dem Webspace schon WordPress, richtet der Installer nichts ein und empfiehlt das Plugin. Ladet ihr `install.php` später erneut hoch, bietet er nach Anmeldung eines {rolle.admin} **Aktualisieren / Reparieren** an: Die aktuelle Version wird neu eingespielt, die Daten bleiben erhalten.
 
 ## Cronjob (empfohlen)
-Die App erledigt Hintergrundaufgaben (z. B. Galerie, Kalender, Updates) auch ohne Cronjob. Zuverlässiger geht es mit einem Cronjob im Kundenmenü des Hosters, der alle 15 Minuten die Cron-Adresse aufruft. Die Adresse zeigt der Installer am Ende an; sie steht auch unter **Konto → Einstellungen → Zustand und Updates** beim Punkt **Hintergrundaufgaben**.
+Die App erledigt Hintergrundaufgaben (z. B. {bereich.gallery}, Kalender, Updates) auch ohne Cronjob. Zuverlässiger geht es mit einem Cronjob im Kundenmenü des Hosters, der alle 15 Minuten die Cron-Adresse aufruft. Die Adresse zeigt der Installer am Ende an; sie steht auch unter **Konto → Einstellungen → Zustand und Updates** beim Punkt **Hintergrundaufgaben**.
 
 Ohne Cronjob erledigt die App fällige Aufgaben nach einem Besuch, ohne den Besucher warten zu lassen. Klappt das auf eurem Webspace nicht, zeigt die Ampel bei **Hintergrundaufgaben** das gelb oder rot an und nennt die Adresse für den Cronjob (siehe [Zustand und Statusmeldungen](seite:admin-zustand)). Läuft ein Cronjob, steht dort, wann er zuletzt lief.
 

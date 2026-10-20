@@ -7,12 +7,12 @@ bereiche: [documents]
 Unter **{bereich.documents}** findest du Dateien wie Satzung, Protokolle oder Formulare.
 
 ## Finden
-Die {bereich.documents} sind nach Kategorien geordnet; was keiner Kategorie angehört, steht zuletzt unter „Weitere Dokumente“. Beim Öffnen sind alle Kategorien eingeklappt; ein Tipp auf den Namen klappt sie auf oder zu. In Klammern steht, wie viele {bereich.documents} darin liegen. Bei jedem Dokument stehen der Stand (Datum), die Art der Datei und ihre Größe.
+Die {bereich.documents} sind nach Kategorien geordnet; was keiner Kategorie angehört, steht zuletzt unter „Weitere {bereich.documents}“. Beim Öffnen sind alle Kategorien eingeklappt; ein Tipp auf den Namen klappt sie auf oder zu. In Klammern steht, wie viele {bereich.documents} darin liegen. Bei jedem Dokument stehen der Stand (Datum), die Art der Datei und ihre Größe.
 
 Oben wählst du die **Sortierung** innerhalb der Kategorien: **Stand neu → alt** (vorgewählt), **Stand alt → neu**, **Name A–Z** oder **Name Z–A**. Dein Gerät merkt sich die Wahl.
 
 ## Öffnen und herunterladen
-- **Öffnen** zeigt PDFs und Bilder direkt in der App. Mit **‹ Alle Dokumente** kommst du zurück; die Kategorie bleibt aufgeklappt.
+- **Öffnen** zeigt PDFs und Bilder direkt in der App. Mit **‹ Alle {bereich.documents}** kommst du zurück; die Kategorie bleibt aufgeklappt.
 - **Herunterladen** speichert die Datei. Andere Dateien, z. B. Word, Excel oder PowerPoint, gibt es nur zum Herunterladen. Auf dem iPhone öffnet sich dafür das Teilen-Menü („In Dateien sichern“).
 
 ## Offline

@@ -18,7 +18,7 @@ Im Mitglied unter **Konto und Rolle** ein neues Startpasswort erzeugen, siehe [M
 Neue Bilder bereitet die App beim ersten Abruf und im Hintergrund auf. Bei vielen neuen Bildern zeigt sie für einige kurz einen grauen Platzhalter und lädt sie dann von selbst nach. Ohne WordPress geht das zügiger mit einem Cronjob beim Hoster (die Adresse steht in der Zeile **Hintergrundaufgaben** der Ampel); mit WordPress hilft es, wenn die Webseite regelmäßig aufgerufen wird.
 
 ## Die {bereich.gallery} gleicht nicht mehr ab
-Unter **Einstellungen → Galerie** steht der Fehler des letzten Abgleichs; mit **Jetzt abgleichen** versuchst du es sofort. Häufige Ursachen:
+Unter **Konto → Einstellungen → {bereich.gallery}** steht der Fehler des letzten Abgleichs; mit **Jetzt abgleichen** versuchst du es sofort. Häufige Ursachen:
 - Der Ordner in Google Drive ist für das verbundene Google-Konto bzw. das Dienstkonto nicht mehr sichtbar, z. B. weil die Freigabe entfernt wurde.
 - Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Dann unter **Einstellungen → Google-Zugang** auf **Verbindung trennen** tippen und neu mit Google verbinden. Läuft sie immer wieder nach 7 Tagen ab, ist das Google-Projekt noch im Status „Testen“, siehe [Google einrichten](seite:admin-google).
 
@@ -29,7 +29,7 @@ Unter **Einstellungen → Kalender** mit **Kalender testen** prüfen, ob er erre
 Die Zeile **Push-Benachrichtigungen** der Ampel zeigt, ob der Server Benachrichtigungen senden kann. Fehlt etwas, kann das nur der Hoster nachrüsten. Liegt es am Gerät (abgelehnte Nachfrage, iPhone ohne installierte App), hilft [Benachrichtigungen](seite:benachrichtigungen).
 
 ## Updates kommen nicht an
-Unter **Einstellungen → Zustand und Updates** steht unter **Updates**, was zuletzt passiert ist und warum eine neue Version nicht eingespielt werden kann. Häufig:
+Unter **Konto → Einstellungen → Zustand und Updates** steht unter **Updates**, was zuletzt passiert ist und warum eine neue Version nicht eingespielt werden kann. Häufig:
 - **Automatische Updates sind gesperrt** (mit WordPress z. B. in den Einstellungen der Webseite): Neue Versionen hier von Hand einspielen.
 - **WordPress fragt nach FTP-Zugangsdaten**: WordPress darf die Plugin-Dateien nicht selbst schreiben. Der Hoster muss die Dateirechte anpassen, oder du lädst das Update von Hand hoch.
 - **Zu alte PHP- oder WordPress-Version**: PHP lässt sich meist im Kundenmenü des Hosters umstellen; WordPress zuerst aktualisieren.

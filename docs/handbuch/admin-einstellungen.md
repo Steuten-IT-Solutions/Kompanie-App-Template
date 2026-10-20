@@ -10,7 +10,7 @@ Die Einstellungen erreichst du über **Konto → Einstellungen öffnen**. Die Ü
 - **Rollen**: wer was in der App darf. Siehe [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
 - **Google-Zugang**: die Verbindung zu Google für {bereich.gallery} und {bereich.calendar}. Siehe [Google einrichten](seite:admin-google).
 - **Kalender**: woher der {bereich.calendar} kommt (Google Kalender oder geheime iCal-Adresse). Siehe [Ersteinrichtung und Bereiche](seite:admin-einrichtung).
-- **Galerie**: der Google-Drive-Ordner mit den Fotoalben. Siehe [Ersteinrichtung und Bereiche](seite:admin-einrichtung).
+- **{bereich.gallery}**: der Google-Drive-Ordner mit den Fotoalben. Siehe [Ersteinrichtung und Bereiche](seite:admin-einrichtung).
 - **Neuigkeiten**: woher die {bereich.news} kommen. Die Seite gibt es nur ohne WordPress; mit WordPress kommen die {bereich.news} immer aus den Beiträgen der Webseite.
 - **Benachrichtigungen**: siehe unten.
 - **Zustand und Updates**: Ampel je Bereich, installierte Version und Updates. Siehe [Zustand und Statusmeldungen](seite:admin-zustand) und [Updates und Datensicherung](seite:admin-updates-und-sicherung).

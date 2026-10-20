@@ -1,19 +1,31 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { api, applyFeatures, refreshRoles, type AdminSettings, type Feature, type FeatureInfo, type NewsSourceType } from '../api';
+import brand from '../generated/brand';
+import {
+  api,
+  applyFeatures,
+  newsTitle,
+  refreshRoles,
+  type AdminSettings,
+  type Feature,
+  type FeatureInfo,
+  type NewsSourceType,
+} from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
 
+const sec = brand.labels.sections;
+
 /** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
 const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
-  { id: 'google', title: 'Google-Zugang', text: 'Verbindung zu Google für Galerie und Kalender.' },
+  { id: 'google', title: 'Google-Zugang', text: `Verbindung zu Google für ${sec.gallery} und Kalender.` },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
-  { id: 'galerie', title: 'Galerie', text: 'Fotoalben aus einem Ordner in Google Drive.' },
-  { id: 'news', title: 'Neuigkeiten', text: 'Woher die Neuigkeiten kommen.' },
+  { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
+  { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
@@ -704,7 +716,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   return (
     <Section
       id="galerie"
-      title="Galerie aus Google Drive"
+      title={`${sec.gallery} aus Google Drive`}
       busy={busy}
       error={error}
       onSubmit={(e) => {
@@ -779,7 +791,7 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
   return (
     <Section
       id="news"
-      title="Neuigkeiten"
+      title={newsTitle()}
       busy={busy}
       error={error}
       onSubmit={(e) => {
