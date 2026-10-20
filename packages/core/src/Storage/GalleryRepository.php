@@ -18,15 +18,35 @@ final class GalleryRepository
     }
 
     /**
+     * Alle Alben mit einer Abfrage, für den Abgleich.
+     *
+     * @return array<string, array<string, mixed>> Drive-ID => Zeile
+     */
+    public function albumsByDriveId(): array
+    {
+        $out = [];
+        foreach ($this->db->select('SELECT * FROM {albums}') as $row) {
+            $out[(string) $row['drive_id']] = $row;
+        }
+        return $out;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function albumByDriveId(string $driveId): ?array
+    {
+        return $this->db->selectOne('SELECT * FROM {albums} WHERE drive_id = ?', [$driveId]);
+    }
+
+    /**
      * Legt ein Album an oder aktualisiert es, aber nur, wenn sich etwas geändert hat
      * ($always: Felder, die allein keinen Schreibzugriff auslösen, z. B. synced_at).
      *
+     * @param array<string, mixed>|null $row vorhandene Zeile (albumsByDriveId), null = neu
      * @param array<string, mixed> $data
      * @param array<string, mixed> $always
      */
-    public function upsertAlbum(string $driveId, array $data, array $always = []): int
+    public function saveAlbum(string $driveId, ?array $row, array $data, array $always = []): int
     {
-        $row = $this->db->selectOne('SELECT * FROM {albums} WHERE drive_id = ?', [$driveId]);
         if ($row !== null) {
             if (self::changed($row, $data)) {
                 $this->db->update('albums', $data + $always, ['id' => (int) $row['id']]);
@@ -117,26 +137,23 @@ final class GalleryRepository
         $this->db->execute('DELETE FROM {photos} WHERE id = ?', [$id]);
     }
 
-    /**
-     * Erst zählen, dann löschen: Ohne Treffer bleibt der Abgleich ohne Schreibzugriff
-     * (in SQLite bräuchte auch ein DELETE ohne Treffer die Schreibsperre).
-     *
-     * @param int[] $keep
-     */
-    public function deleteAlbumsExcept(array $keep): void
+    /** @param int[] $ids Alben, die es in Drive nicht mehr gibt */
+    public function deleteAlbums(array $ids): void
     {
-        $where = $keep === [] ? '' : ' WHERE id NOT IN (' . implode(', ', array_map('intval', $keep)) . ')';
-        if ((int) $this->db->scalar('SELECT COUNT(*) FROM {albums}' . $where) > 0) {
-            $this->db->execute('DELETE FROM {albums}' . $where);
+        if ($ids !== []) {
+            $this->db->execute('DELETE FROM {albums} WHERE id IN (' . implode(', ', array_map('intval', $ids)) . ')');
         }
+    }
+
+    /** Wie viele fehlgeschlagene Bilder retryFailed erneut vormerken würde. */
+    public function countRetryable(int $max): int
+    {
+        return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ? AND attempts < ?', [self::FAILED, $max]);
     }
 
     /** Fehlgeschlagene Bilder für einen neuen Versuch vormerken, solange es weniger als $max Versuche waren. */
     public function retryFailed(int $max): int
     {
-        if ((int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ? AND attempts < ?', [self::FAILED, $max]) === 0) {
-            return 0;
-        }
         return $this->db->execute('UPDATE {photos} SET status = ? WHERE status = ? AND attempts < ?', [self::PENDING, self::FAILED, $max]);
     }
 
@@ -160,28 +177,32 @@ final class GalleryRepository
         );
     }
 
-    /** @return array<int, array<string, mixed>> Alben mit Anzahl sichtbarer Bilder */
+    /**
+     * Alben mit Anzahl sichtbarer Bilder und Titelbild, in einer Abfrage (keine je Album).
+     * Titelbild: öffentlich vor intern, fertige zuerst, dann nach Aufnahmezeit und Name.
+     * Ohne Fensterfunktionen (ältere MySQL-Versionen): Die ID kommt aus einer Unterabfrage je
+     * Zeile, die Spalten des Titelbilds aus einem Join darauf.
+     *
+     * @return array<int, array<string, mixed>> mit cover_id, cover_file_key, cover_is_intern,
+     *         cover_album_id, cover_status (NULL ohne Titelbild)
+     */
     public function albumSummaries(bool $member): array
     {
         $vis = $member ? '' : ' AND p.is_intern = 0';
+        $coverVis = $member ? '' : ' AND c.is_intern = 0';
         return $this->db->select(
-            "SELECT a.id, a.year, a.title, a.sort_date, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt
-             FROM {albums} a JOIN {photos} p ON p.album_id = a.id
-             WHERE p.status <> ?$vis
-             GROUP BY a.id, a.year, a.title, a.sort_date
-             ORDER BY a.year DESC, a.sort_date DESC",
-            [self::FAILED],
-        );
-    }
-
-    /** @return array<string, mixed>|null Titelbild: öffentlich vor intern, fertige zuerst */
-    public function cover(int $albumId, bool $member): ?array
-    {
-        $vis = $member ? '' : ' AND p.is_intern = 0';
-        return $this->db->selectOne(
-            "SELECT * FROM {photos} p WHERE p.album_id = ? AND p.status <> ?$vis
-             ORDER BY p.is_intern ASC, (p.status = 'ready') DESC, p.taken_at ASC, p.name ASC LIMIT 1",
-            [$albumId, self::FAILED],
+            "SELECT s.*, ph.file_key AS cover_file_key, ph.is_intern AS cover_is_intern, ph.album_id AS cover_album_id, ph.status AS cover_status
+             FROM (
+                SELECT a.id, a.year, a.title, a.sort_date, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt,
+                    (SELECT c.id FROM {photos} c WHERE c.album_id = a.id AND c.status <> ?$coverVis
+                     ORDER BY c.is_intern ASC, (c.status = 'ready') DESC, c.taken_at ASC, c.name ASC LIMIT 1) AS cover_id
+                FROM {albums} a JOIN {photos} p ON p.album_id = a.id
+                WHERE p.status <> ?$vis
+                GROUP BY a.id, a.year, a.title, a.sort_date
+             ) s
+             LEFT JOIN {photos} ph ON ph.id = s.cover_id
+             ORDER BY s.year DESC, s.sort_date DESC",
+            [self::FAILED, self::FAILED],
         );
     }
 

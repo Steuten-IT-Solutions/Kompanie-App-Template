@@ -24,11 +24,16 @@ use KompanieApp\Core\Storage\GalleryRepository;
  * abgelegt: öffentliche Bilder liefert der Webserver direkt aus, interne nur
  * die App nach Prüfung der Mitgliedschaft.
  *
- * Aufbereitet wird im Hintergrund (Aufgaben TASK und PROCESS_TASK), nie beim Abruf eines
- * Bildes: Ein Album-Raster würde sonst viele gleichzeitige Downloads und Bildberechnungen
- * auslösen. Noch nicht fertige Bilder liefert die App als Platzhalter (202 mit Retry-After)
- * und stößt die Aufbereitung an. Nur der Abgleich von Hand (Einstellungen) bereitet auch
- * direkt auf, mit Zeitbudget.
+ * Aufbereitet wird im Hintergrund (Aufgaben TASK und PROCESS_TASK, außerdem beim Abgleich von
+ * Hand mit Zeitbudget) und, damit neue Bilder sofort erscheinen, auch beim Abruf eines noch nicht
+ * fertigen Bildes. Damit ein Album-Raster nicht viele gleichzeitige Downloads und Bildberechnungen
+ * auslöst, gilt dabei:
+ *  - Sperre je Bild (flock): Vorschau und Großansicht desselben Bildes werden nicht doppelt erzeugt;
+ *    wer auf ein gerade entstehendes Bild trifft, wartet darauf (höchstens WAIT_SECONDS).
+ *  - Höchstens REQUEST_SLOTS Anfragen erzeugen gleichzeitig. Alle weiteren bekommen sofort einen
+ *    Platzhalter (202 mit Retry-After) und stoßen die Aufbereitung im Hintergrund an. Ein 202 statt
+ *    503, weil nichts kaputt ist; das Original statt des Platzhalters ginge nicht, es liegt nur in Drive.
+ * Die Aufbereitung im Hintergrund belegt keinen dieser Plätze (sie läuft ohnehin nur einmal gleichzeitig).
  */
 final class GalleryService
 {
@@ -38,11 +43,20 @@ final class GalleryService
     /** Nur aufbereiten (ohne Abgleich mit Drive); läuft bei ausstehenden Bildern bald wieder. */
     public const PROCESS_TASK = 'gallery_process';
     /** Nach so vielen Sekunden soll der Browser ein noch nicht fertiges Bild erneut laden. */
-    public const RETRY_AFTER = 30;
+    public const RETRY_AFTER = 10;
+    /** Höchstens so viele Anfragen erzeugen gleichzeitig Bilder (Download und Bildberechnung kosten Speicher und Prozesse). */
+    public const REQUEST_SLOTS = 2;
+    /** So lange wartet ein Prozess höchstens, während ein anderer dasselbe Bild erzeugt. */
+    public const WAIT_SECONDS = 20;
+    /** Sperren je Bild: feste Zahl an Dateien (Bild-ID modulo Anzahl), keine Datei je Bild. */
+    private const IMAGE_LOCKS = 64;
     public const INTERN_FOLDER = 'intern';
     public const SIZES = ['thumb' => 400, 'large' => 1600];
     /** So oft wird ein Bild aufbereitet, bevor es als dauerhaft fehlerhaft gilt. */
     public const MAX_ATTEMPTS = 5;
+
+    /** Wartezeit auf die Sperre eines Bildes in Sekunden (Tests setzen 0). */
+    public int $waitSeconds = self::WAIT_SECONDS;
 
     public function __construct(
         private readonly GalleryRepository $repo,
@@ -131,6 +145,8 @@ final class GalleryService
             $seenAlbums = [];
             $seenPhotos = [];
             $stats = ['albums' => 0, 'photos' => 0, 'new' => 0];
+            // Alle Alben mit einer Abfrage statt einer je Album.
+            $albumRows = $this->repo->albumsByDriveId();
 
             foreach (array_filter($this->drive->listChildren($root), [DriveClient::class, 'isFolder']) as $year) {
                 foreach (array_filter($this->drive->listChildren($year['id']), [DriveClient::class, 'isFolder']) as $album) {
@@ -144,25 +160,40 @@ final class GalleryService
                             }
                         }
                     }
+                    // Dieselbe Datei kann zweimal kommen (mehrere Ordner in Drive): nur einmal anlegen.
+                    $unique = [];
+                    foreach ($images as $image) {
+                        $unique[(string) $image[0]['id']] ??= $image;
+                    }
+                    $images = array_values($unique);
                     if ($images === []) {
                         continue;
                     }
-                    // Je Album eine Transaktion (ein Commit statt einem je Bild) und eine Abfrage für
-                    // die vorhandenen Bilder; geschrieben wird nur, was sich geändert hat. Die
-                    // Anfragen an Drive liegen außerhalb, damit die Datenbank nicht lange gesperrt ist.
-                    $this->repo->transaction(function () use ($album, $year, $images, &$seenAlbums, &$seenPhotos, &$stats): void {
-                        $albumId = $this->upsertAlbum($album, (string) $year['name'], $images);
+                    $albumRow = $albumRows[(string) $album['id']] ?? null;
+                    $albumData = $this->albumData($album, (string) $year['name'], $images);
+                    // Eine Abfrage für die vorhandenen Bilder des Albums (auch aus anderen Alben verschobene).
+                    $existing = $this->repo->photosByDriveIds(array_keys($unique));
+                    $plans = $albumRow !== null ? $this->planPhotos((int) $albumRow['id'], $images, $existing) : null;
+                    if ($albumRow !== null && $plans !== null && !GalleryRepository::changed($albumRow, $albumData) && !self::hasWrites($plans)) {
+                        // Nichts geändert: keine Transaktion (in SQLite holt sie die Schreibsperre).
+                        $seenAlbums[] = (int) $albumRow['id'];
+                        $stats['albums']++;
+                        foreach ($plans as $plan) {
+                            $seenPhotos[] = (int) $plan['row']['id'];
+                            $stats['photos']++;
+                        }
+                        continue;
+                    }
+                    // Je Album eine Transaktion (ein Commit statt einem je Bild); geschrieben wird nur, was sich
+                    // geändert hat. Die Anfragen an Drive liegen außerhalb, damit die Datenbank nicht lange gesperrt ist.
+                    // In der Transaktion neu gelesen: Ein gleichzeitiger zweiter Abgleich soll nichts doppelt anlegen.
+                    $this->repo->transaction(function () use ($album, $albumData, $images, $unique, &$seenAlbums, &$seenPhotos, &$stats): void {
+                        $albumRow = $this->repo->albumByDriveId((string) $album['id']);
+                        $albumId = $this->repo->saveAlbum((string) $album['id'], $albumRow, $albumData, ['synced_at' => $this->time->nowUtc()]);
                         $seenAlbums[] = $albumId;
                         $stats['albums']++;
-                        $existing = $this->repo->photosByDriveIds(array_map(static fn (array $i): string => (string) $i[0]['id'], $images));
-                        $done = [];
-                        foreach ($images as [$file, $intern]) {
-                            // Dieselbe Datei kann zweimal kommen (mehrere Ordner in Drive): nur einmal anlegen.
-                            if (isset($done[(string) $file['id']])) {
-                                continue;
-                            }
-                            $done[(string) $file['id']] = true;
-                            [$photoId, $isNew] = $this->upsertPhoto($albumId, $file, $intern, $existing[(string) $file['id']] ?? null);
+                        foreach ($this->planPhotos($albumId, $images, $this->repo->photosByDriveIds(array_keys($unique))) as $plan) {
+                            [$photoId, $isNew] = $this->applyPlan($plan);
                             $seenPhotos[] = $photoId;
                             $stats['photos']++;
                             $stats['new'] += $isNew ? 1 : 0;
@@ -174,16 +205,20 @@ final class GalleryService
             throw $this->fail($e->getMessage());
         }
 
+        // Aufräumen nur, wenn es etwas zu tun gibt: Ein Abgleich ohne Änderungen braucht keine Transaktion.
         $gone = $this->repo->photosExcept($seenPhotos);
-        $this->repo->transaction(function () use ($gone, $seenAlbums): void {
-            // Was in Drive nicht mehr vorhanden ist, verschwindet samt Dateien.
-            foreach ($gone as $photo) {
-                $this->repo->deletePhoto((int) $photo['id']);
-            }
-            $this->repo->deleteAlbumsExcept($seenAlbums);
-            // Vorübergehende Fehler (Zeitüberschreitung, Störung bei Google) beim nächsten Mal erneut versuchen.
-            $this->repo->retryFailed(self::MAX_ATTEMPTS);
-        });
+        $staleAlbums = array_values(array_diff(array_map(static fn (array $a): int => (int) $a['id'], $albumRows), $seenAlbums));
+        if ($gone !== [] || $staleAlbums !== [] || $this->repo->countRetryable(self::MAX_ATTEMPTS) > 0) {
+            $this->repo->transaction(function () use ($gone, $staleAlbums): void {
+                // Was in Drive nicht mehr vorhanden ist, verschwindet samt Dateien.
+                foreach ($gone as $photo) {
+                    $this->repo->deletePhoto((int) $photo['id']);
+                }
+                $this->repo->deleteAlbums($staleAlbums);
+                // Vorübergehende Fehler (Zeitüberschreitung, Störung bei Google) beim nächsten Mal erneut versuchen.
+                $this->repo->retryFailed(self::MAX_ATTEMPTS);
+            });
+        }
         foreach ($gone as $photo) {
             $this->deleteFiles($photo);
         }
@@ -213,7 +248,12 @@ final class GalleryService
         return $ts ? gmdate('Y-m-d H:i:s', $ts) : null;
     }
 
-    private function upsertAlbum(array $folder, string $year, array $images): int
+    /**
+     * Felder eines Albums aus Drive; synced_at allein ist keine Änderung (siehe saveAlbum).
+     *
+     * @return array{year: string, title: string, sort_date: string}
+     */
+    private function albumData(array $folder, string $year, array $images): array
     {
         $dates = [];
         foreach ($images as [$file]) {
@@ -223,52 +263,86 @@ final class GalleryService
             }
         }
         $sort = $dates ? min($dates) : self::driveTime($folder['createdTime'] ?? '');
-        $now = $this->time->nowUtc();
-        // synced_at allein ist keine Änderung: Ohne Änderung wird das Album nicht geschrieben.
-        return $this->repo->upsertAlbum((string) $folder['id'], [
+        return [
             'year' => mb_substr(trim($year), 0, 20),
             'title' => mb_substr(trim((string) $folder['name']), 0, 191),
-            'sort_date' => $sort ?: $now,
-        ], ['synced_at' => $now]);
+            'sort_date' => $sort ?: $this->time->nowUtc(),
+        ];
     }
 
     /**
-     * @param array<string, mixed>|null $row vorhandene Zeile zu dieser Drive-Datei
+     * Was je Bild eines Albums zu schreiben ist, ohne zu schreiben.
+     *
+     * @param array<int, array{0: array<string, mixed>, 1: int}> $images Drive-Datei und intern (0/1)
+     * @param array<string, array<string, mixed>> $existing vorhandene Zeilen nach Drive-ID
+     * @return array<int, array{row: array<string, mixed>|null, data: array<string, mixed>|null, renew: bool}>
+     *         row null: neu anlegen (data); data null: unverändert; renew: Inhalt neu, Dateien löschen
+     */
+    private function planPhotos(int $albumId, array $images, array $existing): array
+    {
+        $plans = [];
+        foreach ($images as [$f, $intern]) {
+            $row = $existing[(string) $f['id']] ?? null;
+            $meta = $f['imageMediaMetadata'] ?? [];
+            $md5 = (string) ($f['md5Checksum'] ?? md5($f['id'] . ($f['modifiedTime'] ?? '')));
+            $data = [
+                'album_id' => $albumId,
+                'name' => mb_substr((string) $f['name'], 0, 255),
+                'is_intern' => $intern,
+                'taken_at' => self::driveTime($meta['time'] ?? ''),
+            ];
+            // Maße aus Drive nur für neue oder geänderte Bilder (bzw. solange keine bekannt sind):
+            // Nach dem Aufbereiten stehen dort die Maße der Großansicht.
+            $size = ['width' => (int) ($meta['width'] ?? 0), 'height' => (int) ($meta['height'] ?? 0)];
+            if (!$row) {
+                $plans[] = ['row' => null, 'renew' => false, 'data' => $data + $size + [
+                    'drive_file_id' => (string) $f['id'],
+                    'md5' => $md5,
+                    'status' => GalleryRepository::PENDING,
+                    'error' => '',
+                ]];
+                continue;
+            }
+            // Neuer Inhalt oder zwischen „intern“ und öffentlich bzw. in ein anderes Album verschoben: neu erzeugen.
+            $renew = $row['md5'] !== $md5 || (int) $row['is_intern'] !== $intern || (int) $row['album_id'] !== $albumId;
+            if ($renew) {
+                $data += $size + ['md5' => $md5, 'status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
+            } elseif ((int) $row['width'] === 0 && $size['width'] > 0) {
+                $data += $size;
+            }
+            // Nur schreiben, wenn sich etwas geändert hat (sonst bei 2.000 Bildern 2.000 UPDATEs pro Stunde).
+            $plans[] = ['row' => $row, 'renew' => $renew, 'data' => $renew || GalleryRepository::changed($row, $data) ? $data : null];
+        }
+        return $plans;
+    }
+
+    /** @param array<int, array{row: array<string, mixed>|null, data: array<string, mixed>|null, renew: bool}> $plans */
+    private static function hasWrites(array $plans): bool
+    {
+        foreach ($plans as $plan) {
+            if ($plan['data'] !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param array{row: array<string, mixed>|null, data: array<string, mixed>|null, renew: bool} $plan
      * @return array{0: int, 1: bool} ID und ob neu
      */
-    private function upsertPhoto(int $albumId, array $f, int $intern, ?array $row): array
+    private function applyPlan(array $plan): array
     {
-        $meta = $f['imageMediaMetadata'] ?? [];
-        $md5 = $f['md5Checksum'] ?? md5($f['id'] . ($f['modifiedTime'] ?? ''));
-        $data = [
-            'album_id' => $albumId,
-            'name' => mb_substr((string) $f['name'], 0, 255),
-            'is_intern' => $intern,
-            'taken_at' => self::driveTime($meta['time'] ?? ''),
-        ];
-        // Maße aus Drive nur für neue oder geänderte Bilder (bzw. solange keine bekannt sind):
-        // Nach dem Aufbereiten stehen dort die Maße der Großansicht.
-        $size = ['width' => (int) ($meta['width'] ?? 0), 'height' => (int) ($meta['height'] ?? 0)];
-        if (!$row) {
-            $id = $this->repo->insertPhoto($data + $size + [
-                'drive_file_id' => (string) $f['id'],
-                'md5' => (string) $md5,
-                'file_key' => bin2hex(random_bytes(16)),
-                'status' => GalleryRepository::PENDING,
-                'error' => '',
-            ]);
-            return [$id, true];
+        $row = $plan['row'];
+        if ($row === null) {
+            return [$this->repo->insertPhoto((array) $plan['data'] + ['file_key' => bin2hex(random_bytes(16))]), true];
         }
-        // Neuer Inhalt oder zwischen „intern“ und öffentlich verschoben: neu erzeugen.
-        if ($row['md5'] !== $md5 || (int) $row['is_intern'] !== $intern || (int) $row['album_id'] !== $albumId) {
+        if ($plan['renew']) {
             $this->deleteFiles($row);
-            $data += $size + ['md5' => (string) $md5, 'file_key' => bin2hex(random_bytes(16)), 'status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
-        } elseif ((int) $row['width'] === 0 && $size['width'] > 0) {
-            $data += $size;
+            $plan['data'] = (array) $plan['data'] + ['file_key' => bin2hex(random_bytes(16))];
         }
-        // Nur schreiben, wenn sich etwas geändert hat (sonst bei 2.000 Bildern 2.000 UPDATEs pro Stunde).
-        if (GalleryRepository::changed($row, $data)) {
-            $this->repo->updatePhoto((int) $row['id'], $data);
+        if ($plan['data'] !== null) {
+            $this->repo->updatePhoto((int) $row['id'], $plan['data']);
         }
         return [(int) $row['id'], false];
     }
@@ -286,7 +360,8 @@ final class GalleryService
     /**
      * Erzeugt Bilder, bis das Zeitbudget aufgebraucht ist. Neueste Alben zuerst.
      * Es bereitet immer nur ein Prozess auf (Sperre); ein zweiter gibt sofort 0 zurück,
-     * statt dieselben Bilder noch einmal zu laden.
+     * statt dieselben Bilder noch einmal zu laden. Erzeugt gerade eine Anfrage ein Bild
+     * (Sperre je Bild), wartet die Aufbereitung darauf und nimmt danach das nächste.
      */
     public function processPending(int $budgetSeconds = 20): int
     {
@@ -303,8 +378,20 @@ final class GalleryService
                 if (!$row) {
                     break;
                 }
-                $this->generate($row);
-                $done++;
+                $imageLock = $this->lockFile(self::imageLockName((int) $row['id']), $this->waitSeconds);
+                if ($imageLock === null) {
+                    break; // Eine Anfrage hängt an diesem Bild fest: beim nächsten Lauf weiter.
+                }
+                try {
+                    // Inzwischen von einer Anfrage erzeugt? Dann nicht noch einmal.
+                    $row = $this->repo->photo((int) $row['id']);
+                    if ($row && $row['status'] === GalleryRepository::PENDING) {
+                        $this->generate($row);
+                        $done++;
+                    }
+                } finally {
+                    self::unlock($imageLock);
+                }
             }
             $status = $this->status();
             $pending = $this->repo->countPending();
@@ -397,9 +484,10 @@ final class GalleryService
     /**
      * Ein Bild für die Auslieferung über die App (interne oder noch nicht erzeugte).
      *
-     * Noch nicht aufbereitete Bilder werden hier nicht erzeugt: Die Antwort ist 202 mit einem
-     * Platzhalter (SVG im Seitenverhältnis des Fotos) und Retry-After; die Aufbereitung läuft im
-     * Hintergrund (und wird hier angestoßen).
+     * Noch nicht aufbereitete Bilder werden hier erzeugt (beide Größen), mit Sperre je Bild und
+     * höchstens REQUEST_SLOTS gleichzeitig. Ist kein Platz frei, ist die Antwort 202 mit einem
+     * Platzhalter (SVG im Seitenverhältnis des Fotos) und Retry-After; dann übernimmt die
+     * Aufbereitung im Hintergrund (sie wird hier angestoßen).
      *
      * @return array{status: int, file?: string, etag?: string|null, intern?: bool, placeholder?: string, retryAfter?: int}
      */
@@ -440,15 +528,112 @@ final class GalleryService
             return ['status' => 404];
         }
         if ($photo['status'] === GalleryRepository::READY && !is_file($file)) {
-            // Datei fehlt (z. B. gelöscht): neu aufbereiten lassen.
+            // Datei fehlt (z. B. gelöscht): neu aufbereiten.
             $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::PENDING, 'attempts' => 0]);
             $photo['status'] = GalleryRepository::PENDING;
+            $photo['attempts'] = 0;
         }
         if ($photo['status'] !== GalleryRepository::READY) {
-            $this->nudge();
-            return ['status' => 202, 'placeholder' => self::placeholder((int) $photo['width'], (int) $photo['height']), 'retryAfter' => self::RETRY_AFTER, 'intern' => $intern];
+            $now = $this->generateNow($photo);
+            if ($now === null) {
+                $this->nudge();
+                return ['status' => 202, 'placeholder' => self::placeholder((int) $photo['width'], (int) $photo['height']), 'retryAfter' => self::RETRY_AFTER, 'intern' => $intern];
+            }
+            if ($now['status'] !== GalleryRepository::READY) {
+                return ['status' => 404]; // Erzeugung gescheitert (Fehler steht am Bild)
+            }
+            $photo = $now;
+            $file = $this->path($photo, $size);
         }
         return ['status' => 200, 'file' => $file, 'etag' => FileCache::etag(self::relativePath($photo, $size), $file), 'intern' => $intern];
+    }
+
+    /**
+     * Ein noch nicht fertiges Bild während der Anfrage erzeugen.
+     *
+     * @param array<string, mixed> $photo
+     * @return array<string, mixed>|null aktuelle Zeile (fertig oder fehlgeschlagen); null, wenn es jetzt
+     *         nicht geht (kein Platz frei, Bild wird zu lange von einem anderen Prozess erzeugt, keine Sperre möglich)
+     */
+    private function generateNow(array $photo): ?array
+    {
+        $id = (int) $photo['id'];
+        // Erst die Sperre des Bildes, dann einen Platz: Wer nur auf ein Bild wartet, belegt keinen.
+        $imageLock = $this->lockFile(self::imageLockName($id), $this->waitSeconds);
+        if (!is_resource($imageLock)) {
+            return null;
+        }
+        try {
+            $row = $this->repo->photo($id);
+            if (!$row || $row['status'] !== GalleryRepository::PENDING) {
+                return $row; // inzwischen erzeugt (oder fehlgeschlagen)
+            }
+            $slot = $this->requestSlot();
+            if ($slot === null) {
+                return null;
+            }
+            try {
+                $this->generate($row);
+            } finally {
+                self::unlock($slot);
+            }
+            return $this->repo->photo($id);
+        } finally {
+            self::unlock($imageLock);
+        }
+    }
+
+    /** @return resource|null einer der REQUEST_SLOTS Plätze zum Erzeugen; null, wenn alle belegt sind */
+    private function requestSlot()
+    {
+        for ($i = 0; $i < self::REQUEST_SLOTS; $i++) {
+            $slot = $this->lockFile('.erzeugen-' . $i . '.lock', 0);
+            if (is_resource($slot)) {
+                return $slot;
+            }
+        }
+        return null;
+    }
+
+    private static function imageLockName(int $id): string
+    {
+        return '.bild-' . ($id % self::IMAGE_LOCKS) . '.lock';
+    }
+
+    /**
+     * Exklusive Dateisperre im geschützten Verzeichnis, mit Wartezeit.
+     *
+     * @return resource|false|null die gesperrte Datei; null, wenn sie nach $waitSeconds noch belegt ist;
+     *         false, wenn sich die Datei nicht anlegen lässt (dann geht es ohne Sperre weiter oder gar nicht)
+     */
+    private function lockFile(string $name, int $waitSeconds)
+    {
+        try {
+            $fp = @fopen($this->files->path($name, false), 'c');
+        } catch (\RuntimeException) {
+            return false;
+        }
+        if ($fp === false) {
+            return false;
+        }
+        $until = microtime(true) + $waitSeconds;
+        while (!flock($fp, LOCK_EX | LOCK_NB)) {
+            if (microtime(true) >= $until) {
+                fclose($fp);
+                return null;
+            }
+            usleep(100000);
+        }
+        return $fp;
+    }
+
+    /** @param resource|false $fp */
+    private static function unlock($fp): void
+    {
+        if (is_resource($fp)) {
+            flock($fp, LOCK_UN);
+            fclose($fp);
+        }
     }
 
     /** Aufbereitung im Hintergrund anstoßen, höchstens einmal pro Minute (nicht bei jedem Bild des Rasters). */
@@ -478,8 +663,11 @@ final class GalleryService
     public function overview(bool $member): array
     {
         $years = [];
+        // Eine Abfrage für alle Alben samt Titelbild (keine je Album).
         foreach ($this->repo->albumSummaries($member) as $r) {
-            $cover = $this->repo->cover((int) $r['id'], $member);
+            $cover = $r['cover_id'] !== null
+                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status']]
+                : null;
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],
                 'title' => (string) $r['title'],
@@ -519,7 +707,7 @@ final class GalleryService
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
                 'name' => (string) $ph['name'],
-                // noch nicht aufbereitet: Die Adressen liefern vorerst einen Platzhalter (202)
+                // noch nicht aufbereitet: Die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter (202)
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ], $photos),
         ];

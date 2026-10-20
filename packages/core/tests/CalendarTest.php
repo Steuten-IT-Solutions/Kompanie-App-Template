@@ -334,4 +334,29 @@ final class CalendarTest extends TestCase
         $this->assertCount(2, $http->batches[0]);
         $this->assertSame(['Termin b', 'Termin a'], array_column($events, 'title'), 'zusammengeführt und nach Beginn sortiert');
     }
+
+    public function testSeveralGoogleCalendarsInOneBatchWithFake(): void
+    {
+        $down = false;
+        $http = new FakeHttpClient(static function (string $m, string $url) use (&$down): array {
+            if ($down && str_contains($url, 'b%40')) {
+                throw new \RuntimeException('Zeitüberschreitung');
+            }
+            $id = str_contains($url, 'b%40') ? 'b' : 'a';
+            return ['status' => 200, 'body' => (string) json_encode(['items' => [['id' => $id, 'summary' => 'Termin ' . $id, 'start' => ['date' => '2030-05-01'], 'end' => ['date' => '2030-05-02']]]])];
+        });
+        $clock = new FixedClock(new \DateTimeImmutable());
+        $settings = new MemorySettings(['calendar_ids' => 'a@group.calendar.google.com, b@group.calendar.google.com', 'google_api_key' => 'KEY']);
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings, $clock);
+        $this->assertEqualsCanonicalizing(['Termin a', 'Termin b'], array_column($app->calendar()->events(), 'title'));
+        $this->assertCount(1, $http->batches, 'beide Kalender über requestAll');
+        $this->assertCount(2, $http->batches[0]);
+
+        // Ein Kalender gestört: Rückfall auf die alte Fassung (beider Kalender), Fehler gemerkt.
+        $down = true;
+        $clock->at = $clock->now()->modify('+20 minutes');
+        $this->assertCount(2, $app->calendar()->events());
+        $this->assertCount(2, $http->batches);
+        $this->assertIsString($app->cache->get(CalendarService::ERROR_KEY));
+    }
 }

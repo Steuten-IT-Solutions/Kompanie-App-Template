@@ -8,7 +8,8 @@ namespace KompanieApp\Core\Port;
  * Zusatz für HttpClient: mehrere Anfragen gleichzeitig (z. B. mehrere Google-Kalender) und
  * Downloads direkt in eine Datei (große Fotos, ohne sie ganz im Arbeitsspeicher zu halten).
  * Optional: Wer den HttpClient nutzt, prüft mit instanceof und fragt sonst nacheinander bzw.
- * in den Speicher. Standalone: cURL. WordPress: nicht umgesetzt.
+ * in den Speicher. Standalone: cURL (curl_multi). WordPress: WpOrg\Requests (request_multiple,
+ * stream). Ohne eigene Möglichkeiten: Infra\SequentialHttp (nacheinander).
  */
 interface ExtendedHttpClient extends HttpClient
 {

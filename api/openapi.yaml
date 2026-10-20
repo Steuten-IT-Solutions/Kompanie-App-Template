@@ -3508,10 +3508,12 @@ components:
           type: string
           description: |
             Adresse des Vorschaubilds. Öffentliche fertige Bilder als statische Datei, sonst über die App
-            (`…/foto/<id>/thumb`, außerhalb der API). Dort antwortet der Server für Bilder, die noch nicht
-            aufbereitet sind, mit **202**, einem grauen SVG-Platzhalter im Seitenverhältnis des Fotos,
-            `Cache-Control: no-store` und `Retry-After` (Sekunden); die Aufbereitung läuft im Hintergrund.
-            Fertige Bilder: 200 mit JPEG. Interne Bilder ohne Mitgliedschaft: 401/403.
+            (`…/foto/<id>/thumb`, außerhalb der API). Bilder, die noch nicht aufbereitet sind, erzeugt der
+            Server dort während der Anfrage (beide Größen; höchstens zwei Anfragen gleichzeitig, je Bild nur
+            eine). Ist gerade kein Platz frei, antwortet er mit **202**, einem grauen SVG-Platzhalter im
+            Seitenverhältnis des Fotos, `Cache-Control: no-store` und `Retry-After` (Sekunden); dann läuft
+            die Aufbereitung im Hintergrund. Fertige Bilder: 200 mit JPEG. Interne Bilder ohne
+            Mitgliedschaft: 401/403. Scheitert die Aufbereitung: 404.
         large: { type: string, description: Adresse der Großansicht (Verhalten wie thumb) }
         width: { type: integer }
         height: { type: integer }
@@ -3519,7 +3521,7 @@ components:
         name: { type: string }
         ready:
           type: boolean
-          description: false, solange das Bild noch aufbereitet wird (die Adressen liefern dann den Platzhalter). Die App lädt das Album dann alle 30 s neu.
+          description: false, solange das Bild noch aufbereitet wird (die Adressen erzeugen das Bild oder liefern den Platzhalter). Die App lädt das Album dann alle 10 s neu.
 
     GalleryAlbum:
       type: object

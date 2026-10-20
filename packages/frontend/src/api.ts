@@ -270,7 +270,7 @@ export interface GalleryPhoto {
   height: number;
   intern: boolean;
   name: string;
-  /** false: noch nicht aufbereitet, die Adressen liefern vorerst einen Platzhalter */
+  /** false: noch nicht aufbereitet; die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter */
   ready: boolean;
 }
 

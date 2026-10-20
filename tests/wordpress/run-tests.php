@@ -248,7 +248,19 @@ $c->ok($res['status'] === 200 && "\xFF\xD8" === substr((string) file_get_content
 $db = $app->db;
 $db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['pending', $intern['id'] ?? 0]);
 $pending = $gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', true, true);
-$c->ok($pending['status'] === 202 && str_starts_with($pending['placeholder'] ?? '', '<svg') && ($pending['retryAfter'] ?? 0) > 0, 'Noch nicht aufbereitetes Bild: 202 mit Platzhalter, ohne Erzeugung während der Anfrage');
+$c->ok($pending['status'] === 200 && "\xFF\xD8" === substr((string) file_get_contents((string) ($pending['file'] ?? '')), 0, 2) && $db->scalar('SELECT status FROM {photos} WHERE id = ?', [$intern['id'] ?? 0]) === 'ready', 'Noch nicht aufbereitetes Bild: während der Anfrage erzeugt (Download über WpHttpClient::download)');
+$slots = [];
+for ($i = 0; $i < KompanieApp\Core\Domain\GalleryService::REQUEST_SLOTS; $i++) {
+    $slots[$i] = fopen($app->files->path('.erzeugen-' . $i . '.lock', false), 'c');
+    flock($slots[$i], LOCK_EX);
+}
+$db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['pending', $intern['id'] ?? 0]);
+$pending = $gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', true, true);
+$c->ok($pending['status'] === 202 && str_starts_with($pending['placeholder'] ?? '', '<svg') && ($pending['retryAfter'] ?? 0) > 0, 'Alle Plätze zum Erzeugen belegt: 202 mit Platzhalter');
+foreach ($slots as $slot) {
+    flock($slot, LOCK_UN);
+    fclose($slot);
+}
 $db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['ready', $intern['id'] ?? 0]);
 // ETag und 304 (Issue #18): Rechte vor dem Vergleich, Konto nur bei internen Bildern.
 wp_set_current_user(0);
@@ -349,6 +361,53 @@ $app->calendar()->clearCache();
 [$s, $cal] = $d->request('GET', '/calendar');
 remove_filter('pre_http_request', $icsFilter, 10);
 $c->ok($s === 200 && in_array('Vereinsabend', array_column($cal, 'title'), true), 'Kalender aus iCal-Link der Test-Instanz');
+
+$c->section('HTTP: mehrere Anfragen gleichzeitig, Download in eine Datei');
+$http = new KompanieApp\WordPress\WpHttpClient();
+$echoDir = sys_get_temp_dir() . '/kompanie-http-' . bin2hex(random_bytes(4));
+mkdir($echoDir);
+file_put_contents($echoDir . '/index.php', '<?php usleep(700000); header("X-Echo: " . ($_SERVER["HTTP_X_TEST"] ?? "")); echo $_SERVER["REQUEST_METHOD"] . " " . $_SERVER["REQUEST_URI"];');
+// Zwei Server, damit sie die Anfragen sicher gleichzeitig beantworten (php -S arbeitet sonst ggf. nacheinander).
+$port = 18000 + random_int(0, 998);
+$servers = [];
+foreach ([$port, $port + 1] as $p) {
+    $servers[] = proc_open(['php', '-S', '127.0.0.1:' . $p, '-t', $echoDir], [['pipe', 'r'], ['file', '/dev/null', 'w'], ['file', '/dev/null', 'w']], $pipes);
+    for ($i = 0; $i < 50 && !@fsockopen('127.0.0.1', $p); $i++) {
+        usleep(100000);
+    }
+}
+$base = 'http://127.0.0.1:' . $port;
+$base2 = 'http://127.0.0.1:' . ($port + 1);
+$start = microtime(true);
+$all = $http->requestAll([
+    'a' => ['method' => 'GET', 'url' => $base . '/a', 'headers' => ['X-Test' => 'eins']],
+    'b' => ['method' => 'POST', 'url' => $base2 . '/b', 'body' => 'x=1'],
+    'c' => ['method' => 'GET', 'url' => 'ftp://example.org/c'],
+], 10);
+$elapsed = microtime(true) - $start;
+$c->ok(array_keys($all) === ['a', 'b', 'c'] && is_array($all['a']) && $all['a']['status'] === 200 && $all['a']['body'] === 'GET /a' && is_array($all['b']) && $all['b']['body'] === 'POST /b', 'requestAll: Antworten je Schlüssel, in der übergebenen Reihenfolge');
+$c->ok(is_array($all['a']) && ($all['a']['headers']['x-echo'] ?? '') === 'eins', 'Kopfzeilen der Antwort (klein geschrieben)');
+$c->ok($all['c'] instanceof \RuntimeException, 'Ungültige Adresse: Fehler nur für diese Anfrage');
+$c->ok($elapsed < 1.3, sprintf('Gleichzeitig abgerufen (%.2f s für zwei Anfragen à 0,7 s)', $elapsed));
+$single = $http->request('GET', $base . '/einzeln', ['X-Test' => 'zwei']);
+$c->ok($single['body'] === 'GET /einzeln' && ($single['headers']['x-echo'] ?? '') === 'zwei', 'request: Kopfzeilen der Antwort');
+$file = $echoDir . '/download.bin';
+$dl = $http->download($base . '/datei', $file);
+$c->ok($dl['status'] === 200 && file_get_contents($file) === 'GET /datei', 'download: direkt in die Datei');
+$mock = static fn ($pre, $args, $url) => str_starts_with((string) $url, 'https://mock.invalid/')
+    ? ['headers' => ['X-Mock' => '1'], 'body' => 'gefiltert ' . $args['method'], 'response' => ['code' => 201, 'message' => 'Created'], 'cookies' => [], 'filename' => null]
+    : $pre;
+add_filter('pre_http_request', $mock, 10, 3);
+$all = $http->requestAll(['x' => ['method' => 'GET', 'url' => 'https://mock.invalid/x'], 'y' => ['method' => 'GET', 'url' => $base . '/y']], 10);
+$c->ok(is_array($all['x']) && $all['x']['status'] === 201 && $all['x']['body'] === 'gefiltert GET' && is_array($all['y']) && $all['y']['body'] === 'GET /y', 'requestAll beachtet pre_http_request (Filter antwortet, der Rest geht übers Netz)');
+$dl = $http->download('https://mock.invalid/datei', $file . '2');
+$c->ok($dl['status'] === 201 && file_get_contents($file . '2') === 'gefiltert GET', 'download: Antwort eines Filters landet in der Datei');
+remove_filter('pre_http_request', $mock, 10);
+foreach ($servers as $server) {
+    proc_terminate($server);
+    proc_close($server);
+}
+exec('rm -rf ' . escapeshellarg($echoDir));
 
 $c->section('Befunde aus dem Review');
 $wpSettings = new KompanieApp\WordPress\WpSettings();
