@@ -438,7 +438,7 @@ test.describe('Android', () => {
         });
         return (await res.json()).subscription;
       }, device);
-    await expect.poll(status).toEqual({ types: ['penalties', 'points', 'ranks', 'events', 'reminder', 'news'], details: true });
+    await expect.poll(status).toEqual({ types: ['penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -963,4 +963,32 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.locator('.stat-value')).toHaveText('Gefreiter');
   await expect(page.locator('.rank-progress')).toContainText('bis „Unteroffizier“');
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
+});
+
+test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ page }) => {
+  const title = `Ehrenmitglied ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Titel' }).click();
+  await page.getByLabel('Bezeichnung').fill(title);
+  await page.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.title-list .row', { hasText: title })).toContainText('nicht vergeben');
+
+  await page.locator('.segmented').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await page.locator('.member-titles').getByLabel(title).check();
+  await page.getByRole('button', { name: 'Titel speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Titel gespeichert');
+  await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
+  await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-title')).toContainText(title);
+
+  // Vergeben: nicht löschen, nur umbenennen oder deaktivieren.
+  await page.locator('.segmented').getByRole('button', { name: 'Titel' }).click();
+  const row = page.locator('.title-list .row', { hasText: title });
+  await expect(row).toContainText('1× vergeben');
+  await expect(row.getByRole('button', { name: 'Löschen' })).toHaveCount(0);
+
+  await login(page, 'mitglied2');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page.locator('.my-titles')).toContainText(title);
 });

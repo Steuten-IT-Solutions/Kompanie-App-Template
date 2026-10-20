@@ -128,6 +128,12 @@ final class Api
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
     }
 
+    /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    private function showTitles(): bool
+    {
+        return $this->app->features()->enabled('titles') && $this->can(Cap::ManageTitles);
+    }
+
     private function authorize(Route $route): void
     {
         if ($route->access === Route::PUBLIC) {
@@ -208,10 +214,10 @@ final class Api
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
-        $denyRanks = 'Dafür fehlen dir die Rechte.';
+        $denyRights = 'Dafür fehlen dir die Rechte.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
-        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::CreateUsers, Cap::PromoteUsers];
+        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [
@@ -233,7 +239,8 @@ final class Api
 
             // Eigene Daten
             new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
-                + ($a->features()->enabled('ranks') && $this->user()->isMember() ? ['rank' => $a->ranks()->status($this->user()->id)['rank']] : [])),
+                + ($a->features()->enabled('ranks') && $this->user()->isMember() ? ['rank' => $a->ranks()->status($this->user()->id)['rank']] : [])
+                + ($a->features()->enabled('titles') && $this->user()->isMember() ? ['titles' => $a->titles()->of($this->user()->id)] : [])),
             // Dienstgrade (Issue #9): eigener Stand und Verlauf, die Liste mit Schwellen (mit Punkten)
             new Route('GET', '/me/rank', Cap::Member, fn () => $a->ranks()->status($this->user()->id)
                 + ['ranks' => $a->ranks()->list(false), 'history' => $a->ranks()->history($this->user()->id)], 'ranks', $denyMember),
@@ -306,27 +313,48 @@ final class Api
 
             // Dienstgrade: Liste für Mitglieder, Pflege, Befördern und Degradieren, Beförderungsübersicht
             new Route('GET', '/ranks', Cap::Member, fn (Request $r) => $a->ranks()->list($r->queryFlag('all') && $this->can(Cap::ManageRanks)), 'ranks', $denyMember),
-            new Route('POST', '/ranks', Cap::ManageRanks, fn (Request $r) => Response::created($a->ranks()->create($r->body)), 'ranks', $denyRanks),
-            new Route('PUT', '/ranks/order', Cap::ManageRanks, fn (Request $r) => $a->ranks()->reorder($r->input('ids')), 'ranks', $denyRanks),
-            new Route('PATCH', '/ranks/{id}', Cap::ManageRanks, fn (Request $r) => $a->ranks()->update($r->id(), $r->body), 'ranks', $denyRanks),
+            new Route('POST', '/ranks', Cap::ManageRanks, fn (Request $r) => Response::created($a->ranks()->create($r->body)), 'ranks', $denyRights),
+            new Route('PUT', '/ranks/order', Cap::ManageRanks, fn (Request $r) => $a->ranks()->reorder($r->input('ids')), 'ranks', $denyRights),
+            new Route('PATCH', '/ranks/{id}', Cap::ManageRanks, fn (Request $r) => $a->ranks()->update($r->id(), $r->body), 'ranks', $denyRights),
             new Route('DELETE', '/ranks/{id}', Cap::ManageRanks, function (Request $r) use ($a) {
                 $a->ranks()->delete($r->id());
                 return ['deleted' => true];
-            }, 'ranks', $denyRanks),
-            new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason')), 'ranks', $denyRanks),
-            new Route('GET', '/promotions', Cap::ManageRanks, fn () => $a->ranks()->promotions(), 'ranks', $denyRanks),
+            }, 'ranks', $denyRights),
+            new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason')), 'ranks', $denyRights),
+            new Route('GET', '/promotions', Cap::ManageRanks, fn () => $a->ranks()->promotions(), 'ranks', $denyRights),
+
+            // Titel (Issue #22): Pflege der Liste und Zuweisung
+            new Route('GET', '/titles', Cap::ManageTitles, fn () => $a->titles()->list(), 'titles', $denyRights),
+            new Route('POST', '/titles', Cap::ManageTitles, fn (Request $r) => Response::created($a->titles()->create($r->body)), 'titles', $denyRights),
+            new Route('PUT', '/titles/order', Cap::ManageTitles, fn (Request $r) => $a->titles()->reorder($r->input('ids')), 'titles', $denyRights),
+            new Route('PATCH', '/titles/{id}', Cap::ManageTitles, fn (Request $r) => $a->titles()->update($r->id(), $r->body), 'titles', $denyRights),
+            new Route('DELETE', '/titles/{id}', Cap::ManageTitles, function (Request $r) use ($a) {
+                $a->titles()->delete($r->id());
+                return ['deleted' => true];
+            }, 'titles', $denyRights),
+            new Route('PUT', '/members/{id}/titles', Cap::ManageTitles, fn (Request $r) => ['titles' => $a->titles()->assign($r->id(), $r->input('title_ids'))], 'titles', $denyRights),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {
-                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'));
-                if (!$this->showRanks()) {
-                    return $list;
+                // Wer Dienstgrade bzw. Titel verwaltet, sieht auch frühere Mitglieder, die noch welche haben.
+                $holders = array_merge(
+                    $this->showRanks() ? array_keys($a->ranks()->repository()->assignments()) : [],
+                    $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
+                );
+                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
+                if ($this->showRanks()) {
+                    $rankTitles = $a->ranks()->titles();
+                    $list = array_map(static fn (array $m): array => $m + ['rank_title' => $rankTitles[$m['id']] ?? null], $list);
                 }
-                $titles = $a->ranks()->titles();
-                return array_map(static fn (array $m): array => $m + ['rank_title' => $titles[$m['id']] ?? null], $list);
+                if ($this->showTitles()) {
+                    $titles = $a->titles()->byUser();
+                    $list = array_map(static fn (array $m): array => $m + ['titles' => $titles[$m['id']] ?? []], $list);
+                }
+                return $list;
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
-                + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : []), null, $denyManage),
+                + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
+                + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : []), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),

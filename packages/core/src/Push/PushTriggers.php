@@ -16,7 +16,8 @@ use KompanieApp\Core\Domain\RankService;
  * - interner Kalender neu oder geändert (Abgleich mit dem letzten Stand; beim ersten Lauf nur merken): an
  *   Mitglieder mit Kalender, damit nichts doppelt kommt;
  * - neue Neuigkeiten (Abgleich mit dem letzten Stand): an alle Abonnenten;
- * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit.
+ * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
+ * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied.
  */
 final class PushTriggers
 {
@@ -43,6 +44,18 @@ final class PushTriggers
         $title = $entry['kind'] === RankService::KIND_PROMOTION ? 'Beförderung' : $label . ' geändert';
         $body = $entry['to_title'] !== '' ? sprintf('Dein %s: %s', $label, $entry['to_title']) : sprintf('Du hast keinen %s mehr.', $label);
         $this->push->notifyUser($userId, PushService::TYPE_RANKS, PushService::message($title, $body, 'meins/dienstgrad', 'dienstgrad'));
+    }
+
+    /** @param list<string> $titles neu verliehene Titel (TitleService::assign) */
+    public function titlesAdded(int $userId, array $titles): void
+    {
+        if ($titles === []) {
+            return;
+        }
+        $body = count($titles) === 1
+            ? sprintf('Dir wurde der Titel „%s“ verliehen.', $titles[0])
+            : sprintf('Dir wurden die Titel %s verliehen.', implode(', ', array_map(static fn (string $t): string => '„' . $t . '“', $titles)));
+        $this->push->notifyUser($userId, PushService::TYPE_TITLES, PushService::message('Neuer Titel', $body, 'meins', 'titel'));
     }
 
     /** @param array<int, array<string, mixed>> $rows Strafen (ScoreService::givePenalty) */

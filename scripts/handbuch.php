@@ -19,23 +19,23 @@
  *   ---
  *   Markdown: ## und ### Überschriften, Absätze, Listen (- oder 1.), **fett**, *kursiv*, `Code`,
  *   [Text](https://…), [Text](seite:name) für eine andere Handbuchseite, > Hinweis.
- *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks}, {begriff.rank},
+ *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks|titles}, {begriff.rank},
  *   {rolle.guest|candidate|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
  */
 
 declare(strict_types=1);
 
-const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_events', 'manage_documents', 'create_users', 'promote_users', 'manage_settings'];
-const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks'];
+const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_events', 'manage_documents', 'create_users', 'promote_users', 'manage_settings'];
+const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
-const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks'];
+const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles'];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
 const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
-const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'begriff.rank', 'rolle.guest', 'rolle.candidate', 'rolle.member', 'rolle.admin'];
+const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'begriff.rank', 'rolle.guest', 'rolle.candidate', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
     'bereich.events' => 'Termine', 'bereich.calendar' => 'Kalender', 'bereich.news' => 'News', 'bereich.gallery' => 'Galerie',
-    'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'begriff.rank' => 'Dienstgrad',
+    'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'bereich.titles' => 'Titel', 'begriff.rank' => 'Dienstgrad',
     'rolle.guest' => 'Gast', 'rolle.candidate' => 'Anwärter', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
 ];
 

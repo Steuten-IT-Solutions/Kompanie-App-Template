@@ -39,6 +39,7 @@ final class Features
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
         'ranks' => ['label' => 'Dienstgrade', 'description' => 'Dienstgrade der Mitglieder mit Verlauf; zusammen mit Punkten mit Punkteschwellen und Beförderungsübersicht.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_ranks']],
+        'titles' => ['label' => 'Titel', 'description' => 'Ehrentitel und Ämter der Mitglieder, z. B. Ehrenmitglied, unabhängig von Dienstgrad und Punkten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_titles']],
     ];
 
     /** @var array<string, bool>|null */
@@ -187,8 +188,8 @@ final class Features
         }
         $state = [];
         foreach (self::keys() as $key) {
-            // Dienstgrade gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && $key !== 'ranks' && $this->app->config->legacyFeature($key);
+            // Dienstgrade und Titel gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

@@ -11,7 +11,7 @@ namespace KompanieApp\Core\Config;
 final class KompanieConfig
 {
     private const ROLE_LABELS = ['guest' => 'Gast', 'candidate' => 'Anwärter', 'member' => 'Mitglied', 'organizer' => 'Verwalter', 'manager' => 'Leitung', 'admin' => 'Admin'];
-    private const SECTION_LABELS = ['events' => 'Termine', 'news' => 'News', 'gallery' => 'Galerie', 'points' => 'Punkte', 'penalties' => 'Strafen', 'ranks' => 'Dienstgrade'];
+    private const SECTION_LABELS = ['events' => 'Termine', 'news' => 'News', 'gallery' => 'Galerie', 'points' => 'Punkte', 'penalties' => 'Strafen', 'ranks' => 'Dienstgrade', 'titles' => 'Titel'];
 
     /** @param array<string, mixed> $data */
     public function __construct(private readonly array $data)

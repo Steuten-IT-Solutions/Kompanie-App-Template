@@ -48,6 +48,7 @@ final class PushService
     public const TYPE_PENALTIES = 'penalties';
     public const TYPE_POINTS = 'points';
     public const TYPE_RANKS = 'ranks';
+    public const TYPE_TITLES = 'titles';
     public const TYPE_EVENTS = 'events';
     public const TYPE_REMINDER = 'reminder';
     public const TYPE_NEWS = 'news';
@@ -133,6 +134,7 @@ final class PushService
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'members' => true],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'members' => true],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'members' => true],
+            self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'members' => true],
             self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'members' => false],
             self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'members' => false],
             self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'members' => false],

@@ -1,12 +1,16 @@
 import { api, config } from '../api';
 import brand from '../generated/brand';
 import { navigate } from '../router';
-import { ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
+import { TitleBadges } from './TitelVerwalten';
 
-/** „Meins“: eigene Punkte, Strafen und Dienstgrad, umschaltbar. Die Summen (/me) lädt Meins einmal für beide. */
+/**
+ * „Meins“: eigene Titel oben, darunter Punkte, Strafen und Dienstgrad, umschaltbar. Die Summen (/me) lädt Meins einmal
+ * für alle.
+ */
 export default function Meins({ sub }: { sub?: string }) {
   const me = useAsync(api.me, [], 'me');
   const parts = (
@@ -17,8 +21,15 @@ export default function Meins({ sub }: { sub?: string }) {
     ] as const
   ).filter(([, , on]) => on);
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
+  const titles = me.data?.titles ?? [];
   return (
     <div>
+      {titles.length > 0 && (
+        <p className="my-titles" aria-label={brand.labels.sections.titles}>
+          <TitleBadges titles={titles} />
+        </p>
+      )}
+      {parts.length === 0 && me.data && titles.length === 0 && <Empty>Du hast zurzeit keine {brand.labels.sections.titles}.</Empty>}
       {parts.length > 1 && (
         <nav className="segmented" aria-label="Meine Daten">
           {parts.map(([id, label]) => (

@@ -51,7 +51,15 @@ const FONT_STACK = {
 const DEFAULTS = {
   greeting: 'Hallo, {name}',
   roles: { guest: 'Gast', candidate: 'Anwärter', member: 'Mitglied', organizer: 'Verwalter', manager: 'Leitung', admin: 'Admin' },
-  sections: { events: 'Termine', news: 'News', gallery: 'Galerie', points: 'Punkte', penalties: 'Strafen', ranks: 'Dienstgrade' },
+  sections: {
+    events: 'Termine',
+    news: 'News',
+    gallery: 'Galerie',
+    points: 'Punkte',
+    penalties: 'Strafen',
+    ranks: 'Dienstgrade',
+    titles: 'Titel',
+  },
   rank: 'Dienstgrad',
 };
 

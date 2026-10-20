@@ -11,12 +11,13 @@ export type Capability =
   | 'manage_points'
   | 'manage_penalties'
   | 'manage_ranks'
+  | 'manage_titles'
   | 'manage_events'
   | 'manage_documents'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
-export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks';
+export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks' | 'titles';
 
 export interface AppUser {
   id: number;
@@ -134,6 +135,8 @@ export interface Me {
   open_cents: number;
   /** Eigener Dienstgrad (mit Bereich Dienstgrade) */
   rank?: RankRef | null;
+  /** Eigene Titel (mit Bereich Titel), in der Reihenfolge der Titelliste */
+  titles?: TitleRef[];
 }
 
 export interface PointEntry {
@@ -248,6 +251,8 @@ export interface MemberSummary {
   member: boolean;
   /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
   rank_title?: string | null;
+  /** Titel (nur mit Bereich und Recht „Titel verwalten“) */
+  titles?: TitleRef[];
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
@@ -270,6 +275,21 @@ export interface Rank {
   active: boolean;
   /** Wie viele Mitglieder ihn haben (nur in der Pflege) */
   assigned?: number;
+}
+
+export interface Title {
+  id: number;
+  title: string;
+  sort: number;
+  /** Deaktivierte werden nicht mehr neu vergeben; wer sie hat, behält sie. */
+  active: boolean;
+  /** Wie vielen Mitgliedern zugewiesen */
+  assigned: number;
+}
+
+export interface TitleRef {
+  id: number;
+  title: string;
 }
 
 export interface RankRef {
@@ -484,6 +504,14 @@ export const api = {
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   myRank: () => request<RankStatus & { ranks: Rank[]; history: RankHistoryEntry[] }>('GET', '/me/rank'),
 
+  // Titel (Issue #22)
+  titles: () => request<Title[]>('GET', '/titles'),
+  createTitle: (title: string) => request<Title>('POST', '/titles', { title }),
+  updateTitle: (id: number, data: { title?: string; active?: boolean }) => request<Title>('PATCH', `/titles/${id}`, data),
+  deleteTitle: (id: number) => request<{ deleted: boolean }>('DELETE', `/titles/${id}`),
+  reorderTitles: (ids: number[]) => request<Title[]>('PUT', '/titles/order', { ids }),
+  setMemberTitles: (id: number, title_ids: number[]) => request<{ titles: TitleRef[] }>('PUT', `/members/${id}/titles`, { title_ids }),
+
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),
   updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
@@ -556,7 +584,7 @@ export const api = {
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
 
-export type PushType = 'penalties' | 'points' | 'events' | 'reminder' | 'news';
+export type PushType = 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {

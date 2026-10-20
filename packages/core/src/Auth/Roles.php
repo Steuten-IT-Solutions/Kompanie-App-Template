@@ -60,6 +60,7 @@ final class Roles
         Capability::ManagePoints,
         Capability::ManagePenalties,
         Capability::ManageRanks,
+        Capability::ManageTitles,
         Capability::ManageEvents,
         Capability::ManageDocuments,
         Capability::CreateUsers,

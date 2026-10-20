@@ -274,12 +274,15 @@ export function Promotions() {
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
 export function MemberRank({
   id,
+  member,
   status,
   history,
   onChanged,
   onToast,
 }: {
   id: number;
+  /** Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren. */
+  member: boolean;
   status: RankStatus;
   history: RankHistoryEntry[];
   onChanged: () => void;
@@ -296,10 +299,10 @@ export function MemberRank({
   const currentIndex = list.findIndex((r) => r.id === status.rank?.id);
   const total = status.points ?? 0;
   const currentMin = list[currentIndex]?.min_points ?? null;
-  const canDemote = !points || currentMin === null || total < currentMin;
+  const canDemote = !member || !points || currentMin === null || total < currentMin;
   // Mit Punkten nur Ziele anbieten, die die Regeln erlauben (der Server prüft trotzdem).
   const options = list.filter((r, i) => {
-    if (r.id === status.rank?.id || !r.active) return false;
+    if (!member || r.id === status.rank?.id || !r.active) return false;
     const up = currentIndex === -1 || i > currentIndex;
     if (!points) return true;
     return up ? r.min_points === null || total >= r.min_points : canDemote;

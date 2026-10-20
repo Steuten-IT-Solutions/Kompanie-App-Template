@@ -29,6 +29,7 @@ final class ApiScenario
             $this->customRoles();
             $this->candidates();
             $this->ranks();
+            $this->titles();
             $this->events();
             $this->push();
             $this->config();
@@ -77,7 +78,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -517,6 +518,48 @@ final class ApiScenario
         foreach ([$a, $b] as $r) {
             $this->req('PATCH', '/ranks/' . ($r['id'] ?? 0), ['active' => false]);
         }
+    }
+
+    /** Titel (Issue #22): mehrere je Mitglied, Löschschutz, Rechte, Anzeige. */
+    private function titles(): void
+    {
+        $c = $this->c;
+        $c->section('Titel');
+        $admin = $this->user('kptest_titel_admin', 'admin');
+        $m = $this->user('kptest_titel_m', 'member');
+        $guest = $this->user('kptest_titel_gast', 'guest');
+        $this->d->actAs($admin);
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [$s, $a] = $this->req('POST', '/titles', ['title' => "Kptest Ehrenmitglied $sfx"]);
+        [, $b] = $this->req('POST', '/titles', ['title' => "Kptest Vorsitz $sfx"]);
+        $c->ok($s === 201 && ($a['assigned'] ?? null) === 0, 'Titel anlegen');
+        $c->ok($this->req('POST', '/titles', ['title' => "kptest ehrenmitglied $sfx"])[0] === 400, 'Doppelter Titel → 400');
+
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/titles')[0] === 403, 'Mitglied: GET /titles → 403');
+        $c->ok($this->req('PUT', "/members/$m/titles", ['title_ids' => [$a['id'] ?? 0]])[0] === 403, 'Mitglied vergibt keine Titel → 403');
+        $this->d->actAs($this->spiess);
+        $c->ok($this->req('GET', '/titles')[0] === 403, 'Ohne „Titel verwalten“ → 403');
+
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', "/members/$m/titles", ['title_ids' => [$b['id'] ?? 0, $a['id'] ?? 0]]);
+        $c->ok($s === 200 && array_column((array) ($d['titles'] ?? []), 'id') === [$a['id'] ?? -1, $b['id'] ?? -1], 'Mehrere Titel, in der Reihenfolge der Liste');
+        $c->ok($this->req('PUT', "/members/$guest/titles", ['title_ids' => [$a['id'] ?? 0]])[0] === 400, 'Gast bekommt keinen Titel → 400');
+        $c->ok($this->req('DELETE', '/titles/' . ($a['id'] ?? 0))[0] === 400, 'Zugewiesenen Titel löschen → 400');
+        $c->ok($this->req('PATCH', '/titles/' . ($a['id'] ?? 0), ['title' => "Kptest Ehrenkamerad $sfx"])[0] === 200, 'Zugewiesenen Titel umbenennen');
+        $list = array_column((array) $this->req('GET', '/members')[1], null, 'id');
+        $c->ok(array_column((array) ($list[$m]['titles'] ?? []), 'title') === ["Kptest Ehrenkamerad $sfx", "Kptest Vorsitz $sfx"], 'Titel in der Mitgliederliste');
+        $c->ok(count((array) ($this->req('GET', "/members/$m")[1]['titles'] ?? [])) === 2, 'Titel in den Mitgliedsdetails');
+        $this->d->actAs($m);
+        $c->ok(count((array) ($this->req('GET', '/me')[1]['titles'] ?? [])) === 2, 'Eigene Titel in GET /me');
+
+        $this->d->actAs($admin);
+        $this->req('PUT', "/members/$m/titles", ['title_ids' => []]);
+        $ok = true;
+        foreach ([$a, $b] as $t) {
+            $ok = $this->req('DELETE', '/titles/' . ($t['id'] ?? 0))[0] === 200 && $ok;
+        }
+        $c->ok($ok, 'Nicht mehr zugewiesene Titel löschen');
     }
 
     private function events(): void

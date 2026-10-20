@@ -321,6 +321,40 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {rank_history}_user_id ON {rank_history} (user_id)',
                 ],
             ],
+            // Titel (Issue #22): Ehrentitel und Ämter, unabhängig von Dienstgrad und Punkten; mehrere je Mitglied.
+            6 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {titles} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(60) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  active tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {member_titles} (
+  user_id bigint(20) unsigned NOT NULL,
+  title_id bigint(20) unsigned NOT NULL,
+  assigned_at datetime NOT NULL,
+  PRIMARY KEY (user_id, title_id),
+  KEY title_id (title_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {titles} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1
+)',
+                    'CREATE TABLE IF NOT EXISTS {member_titles} (
+  user_id INTEGER NOT NULL,
+  title_id INTEGER NOT NULL,
+  assigned_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, title_id)
+)',
+                    'CREATE INDEX IF NOT EXISTS {member_titles}_title_id ON {member_titles} (title_id)',
+                ],
+            ],
         ];
     }
 

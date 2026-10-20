@@ -6,8 +6,9 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { PenaltyRow } from './Strafen';
+import { MemberTitles, TitleBadges, TitleList } from './TitelVerwalten';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen';
+type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel';
 
 const sec = brand.labels.sections;
 
@@ -15,6 +16,7 @@ const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
+const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | undefined, path[1]];
@@ -30,6 +32,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
       { id: 'katalog', label: 'Katalog', on: points },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && ranksUsePoints() },
+      { id: 'titel', label: sec.titles, on: canTitles() },
     ] as { id: Sub; label: string; on: boolean }[]
   ).filter((t) => t.on);
   const active: Sub = tabs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
@@ -62,6 +65,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <RankList onToast={onToast} />
       ) : active === 'befoerderungen' ? (
         <Promotions />
+      ) : active === 'titel' ? (
+        <TitleList onToast={onToast} />
       ) : (
         <Members />
       )}
@@ -127,6 +132,7 @@ function Members() {
                 {m.level !== 'member' && (
                   <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
                 )}
+                <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
                 {m.rank_title !== undefined && `${m.rank_title ?? `Kein ${brand.labels.rank}`}${canPoints() ? ' · ' : ''}`}
@@ -210,7 +216,13 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
         </div>
       )}
 
-      {m.rank && m.member && <MemberRank id={m.id} status={m.rank} history={m.rank_history ?? []} onChanged={reload} onToast={onToast} />}
+      {m.titles && (m.member || m.titles.length > 0) && (
+        <MemberTitles key={m.id} id={m.id} member={m.member} titles={m.titles} onChanged={reload} onToast={onToast} />
+      )}
+
+      {m.rank && (m.member || m.rank.rank) && (
+        <MemberRank id={m.id} member={m.member} status={m.rank} history={m.rank_history ?? []} onChanged={reload} onToast={onToast} />
+      )}
 
       {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
       {!canPenalties() ? null : m.penalties.length === 0 ? (

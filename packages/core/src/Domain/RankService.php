@@ -60,6 +60,9 @@ final class RankService
      */
     public function list(bool $all): array
     {
+        if ($all) {
+            $this->forgetUnknownUsers();
+        }
         $points = $this->usesPoints();
         return array_map(fn (array $r): array => [
             'id' => $r['id'],
@@ -117,6 +120,7 @@ final class RankService
     {
         $repo = $this->repository();
         $repo->find($id) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel()));
+        $this->forgetUnknownUsers();
         if ($repo->assignedCount($id) > 0) {
             throw ApiError::invalid(sprintf('Dieser %s ist vergeben und lässt sich nur deaktivieren.', $this->app->config->rankLabel()));
         }
@@ -253,7 +257,8 @@ final class RankService
     public function change(User $actor, int $userId, mixed $rankId, mixed $reason): array
     {
         $user = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        if (!$user->isMember()) {
+        // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann den Dienstgrad nur verlieren.
+        if (!$user->isMember() && $rankId !== null && $rankId !== '' && $rankId !== 0) {
             throw ApiError::invalid(sprintf('Einen %s haben nur Mitglieder.', $this->app->config->rankLabel()));
         }
         $repo = $this->repository();
@@ -264,7 +269,8 @@ final class RankService
             throw ApiError::invalid(sprintf('Das ist schon der %s dieser Person.', $this->app->config->rankLabel()));
         }
         $total = $this->usesPoints() ? $this->app->scores()->pointsTotal($userId) : null;
-        $kind = $this->checkChange($ranks, $current, $target, $total === null ? null : (float) $total);
+        // Punkteregeln nur für Mitglieder; frühere Mitglieder verlieren den Dienstgrad ohne Prüfung.
+        $kind = $user->isMember() ? $this->checkChange($ranks, $current, $target, $total === null ? null : (float) $total) : self::KIND_DEMOTION;
         $entry = [
             'from_rank_id' => $current['id'] ?? null,
             'to_rank_id' => $target['id'] ?? null,
@@ -449,6 +455,19 @@ final class RankService
                 ));
             }
             $prev = $r;
+        }
+    }
+
+    /**
+     * Zuweisungen an Konten, die es nicht mehr gibt (z. B. bei WordPress gelöscht, während das Plugin aus war), entfernen:
+     * Sie ließen sich nirgends lösen und blockierten das Löschen des Dienstgrads.
+     */
+    private function forgetUnknownUsers(): void
+    {
+        foreach (array_keys($this->repository()->assignments()) as $userId) {
+            if ($this->app->users->find($userId) === null) {
+                $this->app->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
+            }
         }
     }
 
