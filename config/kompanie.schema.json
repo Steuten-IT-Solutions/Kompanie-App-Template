@@ -157,6 +157,13 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "documents": {
+              "type": "string",
+              "default": "Dokumente",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },

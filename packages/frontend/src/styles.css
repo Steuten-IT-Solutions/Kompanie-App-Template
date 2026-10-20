@@ -1760,3 +1760,105 @@ fieldset.feature-list legend {
   align-items: center;
   gap: 10px;
 }
+
+/* Dokumente (Issue #2): Kategorien einklappbar, Kopf in der Optik von .section-title. */
+.doc-card {
+  padding: 14px 16px 2px;
+}
+.doc-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.doc-icon {
+  flex: none;
+  color: var(--primary-text);
+  padding-top: 2px;
+}
+.doc-icon-image,
+.doc-icon-file {
+  color: var(--accent-dark);
+}
+.doc-offline {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--good);
+  font-weight: 650;
+}
+.doc-stand {
+  margin-bottom: 12px;
+}
+.doc-sort {
+  margin: 0 0 6px;
+}
+.doc-group + .doc-group {
+  margin-top: 6px;
+}
+.doc-group-title {
+  margin: 10px 2px;
+}
+.doc-group-toggle {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  text-align: center;
+}
+.doc-group-arrow {
+  flex: none;
+  display: inline-block;
+  font-size: 1.3rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.doc-group-toggle[aria-expanded='true'] .doc-group-arrow {
+  transform: rotate(90deg);
+}
+.doc-group-body {
+  margin-bottom: 18px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-group-arrow {
+    transition: none;
+  }
+}
+.button-row.single {
+  grid-template-columns: 1fr;
+}
+.doc-edit {
+  padding: 14px 16px;
+}
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pdf-page {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+}
+.pdf-progress {
+  text-align: center;
+}
+/* Schmale Handys (z. B. 360 px): sechs Tabs ohne Umbruch. */
+@media (max-width: 380px) {
+  .tabbar button {
+    letter-spacing: 0.02em;
+  }
+}

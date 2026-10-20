@@ -6,6 +6,9 @@
  * - App-Seite → zuerst aus dem Netz, aber höchstens 3 Sekunden warten, wenn eine gespeicherte
  *   Fassung da ist (schlechtes Mobilnetz); ohne Netz die letzte Version.
  * - API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version (höchstens DATA_MAX Einträge).
+ * - Dokumente (<App>/dokument/<id>?v=<Fassung>, Issue #2) → zuerst aus dem Speicher: Die Adresse wechselt mit
+ *   jeder neuen Fassung. Was einmal geöffnet wurde, ist so offline verfügbar; gespeichert wird je Dokument nur die
+ *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
  * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
@@ -18,6 +21,7 @@ const PRECACHE = [];
 const STATIC_CACHE = 'kompanie-static-' + BUILD;
 // v2: v1 konnte Antworten von /admin/ enthalten (z. B. eine Datensicherung); beim Aktivieren gelöscht.
 const DATA_CACHE = 'kompanie-data-v2';
+const DOCS_CACHE = 'kompanie-docs-v1';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
@@ -53,7 +57,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => ![STATIC_CACHE, DATA_CACHE].includes(k)).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE].includes(k)).map((k) => caches.delete(k))))
       .then(() => trimData())
       .then(() => self.clients.claim()),
   );
@@ -77,6 +81,32 @@ function isAdmin(url) {
     // unvollständig kodiert: wie angegeben prüfen
   }
   return href.includes('/admin/');
+}
+
+/** Kennung eines Dokuments aus seiner Adresse: <App>/dokument/<id>, ?kompanie_app=dokument/<id> oder ?r=/dokument/<id> */
+function documentId(url) {
+  const scope = new URL(self.registration.scope);
+  if (url.pathname.startsWith(scope.pathname)) {
+    const m = url.pathname.slice(scope.pathname.length).match(/^dokument\/(\d+)\/?$/);
+    if (m) return m[1];
+  }
+  const param = url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '';
+  const m = param.match(/^\/?dokument\/(\d+)$/);
+  return m ? m[1] : null;
+}
+
+/** Dokumente: gespeicherte Fassung, sonst laden und ältere Fassungen desselben Dokuments ersetzen. */
+async function documentFirst(request, id) {
+  const cache = await caches.open(DOCS_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const res = await fetch(request);
+  if (cacheable(res)) {
+    const keys = await cache.keys();
+    await Promise.all(keys.filter((k) => documentId(new URL(k.url)) === id).map((k) => cache.delete(k)));
+    await cache.put(request, res.clone());
+  }
+  return res;
 }
 
 function cacheable(res) {
@@ -144,7 +174,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (isStatic(url)) {
+  const doc = documentId(url);
+  if (doc !== null) {
+    // Direkt aufgerufen (neuer Tab, Download-Link): durchreichen, nicht als App-Seite speichern.
+    if (request.mode !== 'navigate') event.respondWith(documentFirst(request, doc));
+  } else if (isStatic(url)) {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === 'navigate' && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {
     event.respondWith(networkFirst(request, self.registration.scope, NAVIGATION_TIMEOUT_MS, event));

@@ -7,6 +7,7 @@ namespace KompanieApp\Core;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\CalendarService;
+use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
@@ -346,6 +347,11 @@ final class App
     public function ranks(): RankService
     {
         return $this->service(RankService::class, fn () => new RankService($this));
+    }
+
+    public function documents(): DocumentService
+    {
+        return $this->service(DocumentService::class, fn () => new DocumentService($this));
     }
 
     public function attendance(): AttendanceService

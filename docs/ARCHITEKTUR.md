@@ -186,6 +186,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Die Mitgliederliste holt alle Titel in zwei Abfragen (`TitleService::byUser`).
 - Wird ein Konto gelöscht (WordPress `deleted_user`), entfernt `App::userDeleted` seine Push-Abos und seine Zuweisungen (Dienstgrad, Titel) und Anwesenheitseinträge; Buchungen und Verläufe bleiben.
 
+### Dokumente (Issue #2)
+
+- Bereich `documents` (eigener Tab), Recht `manage_documents`. Tabellen `doc_categories` (`title`, `sort`) und `documents` (`title`, `category_id`, `doc_date` = Stand, `visibility` members|managers, `file`, `ext`, `size`, `version`). Wie in Lank (`wp_mkl_documents`, `wp_mkl_doc_categories`; Sichtbarkeit dort mitglieder|spiess, Dateien in `uploads/mkl-private/`).
+- Dateien liegen geschützt in der Dateiablage (`FileStorage`, privates Verzeichnis `dokumente/`, zufälliger Name) und kommen nur über `Environment::documentUrl()` (`<App>/dokument/<id>?v=<Fassung>`) nach Prüfung der Anmeldung (`DocumentService::forDelivery`), in beiden Adaptern neben den Galeriebildern. Bei nginx muss das private Verzeichnis außerhalb des Web-Verzeichnisses liegen (`.htaccess` wirkt nur unter Apache).
+- Hochladen: Base64 im JSON (beide Adapter nehmen nur JSON an, CSRF bleibt gleich). Geprüft werden Endung und Signatur; höchstens 20 MB bzw. was `post_max_size` und `memory_limit` zulassen (`DocumentService::maxBytes`, die App bekommt die Grenze mitgeliefert).
+- Eine neue Fassung ersetzt die Datei und ändert `version`, damit die Adresse; der Service Worker hält Dokumente zuerst aus dem Speicher (`kompanie-docs-v1`, je Dokument nur die aktuelle Fassung). PDFs zeigt pdf.js an (eigenes, nachgeladenes Modul; der Worker heißt `.js`, siehe `vite.config.ts`).
+- Sortierung und Einklappen passieren in der App; die API liefert eine feste Reihenfolge (Titel).
+
 ### Anwesenheit (Issue #21)
 
 - Bereich `attendance`, Recht `manage_attendance`. Tabellen `attendance_lists` (`source` calendar|free, `event_key`, `title` und `event_date` als Momentaufnahme, eindeutig je `source`+`event_key`) und `attendance_entries` (`status` present|excused|absent, `updated_by`); `points.attendance_id`. Wie in Lank (`wp_mkl_attendance_lists`, `wp_mkl_attendance`, `wp_mkl_points.attendance_id`; Status dort deutsch).
@@ -206,7 +214,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_titles` | Titelliste pflegen und Titel vergeben |
 | `manage_attendance` | Anwesenheitslisten je Termin führen |
 | `manage_events` | öffentliche Termine pflegen |
-| `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (die Dokumente selbst kommen mit #2) |
+| `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
 | `promote_users` | Rollen vergeben (Einschränkungen siehe unten) |
 | `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |

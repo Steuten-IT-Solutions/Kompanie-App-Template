@@ -992,6 +992,55 @@ test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht
   await expect(page.locator('.my-attendance .row', { hasText: title })).toContainText('anwesend');
 });
 
+test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gemerkt, offline erneut öffnen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const pdf = Buffer.from(
+    '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+      '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
+  );
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
+  await page.getByLabel('Neue Kategorie').fill(`Satzungen ${id}`);
+  await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Kategorie angelegt');
+  await page.getByLabel('Datei').setInputFiles({ name: 'satzung.pdf', mimeType: 'application/pdf', buffer: pdf });
+  await expect(page.getByLabel('Titel')).toHaveValue('satzung');
+  await page.getByLabel('Titel').fill(`Satzung ${id}`);
+  await page.getByLabel('Kategorie', { exact: true }).selectOption({ label: `Satzungen ${id}` });
+  await page.getByRole('button', { name: 'Hochladen' }).click();
+  await expect(page.locator('.toast')).toHaveText(`„Satzung ${id}“ hochgeladen`);
+
+  await login(page, 'mitglied1');
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  const group = page.locator('.doc-group', { hasText: `Satzungen ${id}` });
+  const doc = group.locator('.doc-card', { hasText: `Satzung ${id}` });
+  await expect(group.getByRole('button', { name: `Satzungen ${id} (1)` })).toHaveAttribute('aria-expanded', 'false');
+  await expect(doc).toBeHidden();
+  await group.getByRole('button', { name: `Satzungen ${id} (1)` }).click();
+  await doc.getByRole('button', { name: 'Öffnen' }).click();
+  await expect(page.getByAltText(`Satzung ${id}, Seite 1 von 1`)).toBeVisible();
+  await page.getByRole('button', { name: '‹ Alle Dokumente' }).click();
+  await expect(doc).toBeVisible();
+  await expect(doc).toContainText('Auch offline verfügbar');
+
+  // Sortierung wird auf dem Gerät gemerkt (Standard: Stand neu → alt).
+  await expect(page.getByLabel('Sortierung')).toHaveValue('date-desc');
+  await page.getByLabel('Sortierung').selectOption('name-asc');
+  await page.reload();
+  await expect(page.getByLabel('Sortierung')).toHaveValue('name-asc');
+
+  await page.context().setOffline(true);
+  try {
+    await group.getByRole('button', { name: `Satzungen ${id} (1)` }).click();
+    await doc.getByRole('button', { name: 'Öffnen' }).click();
+    await expect(page.getByAltText(`Satzung ${id}, Seite 1 von 1`)).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
+});
+
 test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ page }) => {
   const title = `Ehrenmitglied ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);

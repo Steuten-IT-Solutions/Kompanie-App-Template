@@ -42,4 +42,9 @@ final class FakeEnvironment implements Environment
     {
         return 'https://example.org/app/foto/' . $id . '/' . $size;
     }
+
+    public function documentUrl(int $id, string $version): string
+    {
+        return 'https://example.org/app/dokument/' . $id . '?v=' . $version;
+    }
 }

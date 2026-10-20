@@ -56,4 +56,10 @@ final class WpEnvironment implements Environment
     {
         return $this->appUrl('foto/' . $id . '/' . $size);
     }
+
+    public function documentUrl(int $id, string $version): string
+    {
+        $url = $this->appUrl('dokument/' . $id);
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version);
+    }
 }

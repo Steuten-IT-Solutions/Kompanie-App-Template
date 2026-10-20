@@ -69,4 +69,10 @@ final class StandaloneEnvironment implements Environment
     {
         return $this->route('foto/' . $id . '/' . $size);
     }
+
+    public function documentUrl(int $id, string $version): string
+    {
+        $url = $this->route('dokument/' . $id);
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version);
+    }
 }

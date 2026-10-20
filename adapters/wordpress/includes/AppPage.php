@@ -13,6 +13,7 @@ use KompanieApp\Core\App;
  * /app/manifest.webmanifest  → Web-App-Manifest
  * /app/sw.js                 → Service Worker (Bereich /app/)
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
+ * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -69,6 +70,8 @@ final class AppPage
             self::sendCsrf($app);
         } elseif (preg_match('#^foto/(\d+)/(thumb|large)$#', $path, $m)) {
             self::sendPhoto($app, (int) $m[1], $m[2]);
+        } elseif (preg_match('#^dokument/(\d+)/?$#', $path, $m)) {
+            self::sendDocument($app, (int) $m[1]);
         } else {
             self::sendApp($app);
         }
@@ -153,6 +156,32 @@ final class AppPage
         // später nach „intern“ verschoben werden. Deshalb hier nie dauerhaft öffentlich speichern lassen.
         header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
         readfile($res['file']);
+    }
+
+    /** Dokument (Issue #2): PDFs und Bilder inline, Office-Dateien als Download. */
+    private static function sendDocument(App $app, int $id): void
+    {
+        $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id);
+        // Nie in einen Seiten-Cache, nicht in Ausgabepuffer (Dateien bis 20 MB).
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        nocache_headers();
+        if ($res['status'] !== 200 || !isset($res['path'], $res['mime'], $res['disposition'])) {
+            status_header($res['status']);
+            return;
+        }
+        header('Content-Type: ' . $res['mime']);
+        header('Content-Length: ' . filesize($res['path']));
+        header('Content-Disposition: ' . $res['disposition']);
+        // Privat und jedes Mal prüfen; offline hält der Service Worker die Datei (die Adresse wechselt mit der Fassung).
+        header('Cache-Control: private, no-cache');
+        header('X-Content-Type-Options: nosniff');
+        header('X-Robots-Tag: noindex');
+        readfile($res['path']);
     }
 
     private static function sendApp(App $app): void

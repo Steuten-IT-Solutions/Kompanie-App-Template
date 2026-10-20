@@ -415,6 +415,56 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {points}_attendance_id ON {points} (attendance_id)',
                 ],
             ],
+            // Dokumente (Issue #2): Kategorien mit fester Reihenfolge und Dateien mit Stand und Sichtbarkeit. Die Dateien
+            // liegen geschützt in der Dateiablage (zufälliger Name in file); version wechselt mit jeder neuen Fassung.
+            8 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {doc_categories} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(191) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {documents} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(191) NOT NULL,
+  category_id bigint(20) unsigned DEFAULT NULL,
+  doc_date date NOT NULL,
+  visibility varchar(10) NOT NULL,
+  file varchar(64) NOT NULL,
+  ext varchar(5) NOT NULL,
+  size bigint(20) unsigned NOT NULL,
+  version varchar(16) NOT NULL,
+  uploaded_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY category_id (category_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {doc_categories} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE TABLE IF NOT EXISTS {documents} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  category_id INTEGER DEFAULT NULL,
+  doc_date TEXT NOT NULL,
+  visibility TEXT NOT NULL,
+  file TEXT NOT NULL,
+  ext TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  version TEXT NOT NULL,
+  uploaded_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {documents}_category_id ON {documents} (category_id)',
+                ],
+            ],
         ];
     }
 

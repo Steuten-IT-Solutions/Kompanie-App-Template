@@ -76,3 +76,10 @@ export function newsDate(iso: string): string {
   const t = iso ? Date.parse(iso) : NaN;
   return Number.isNaN(t) ? '' : newsDateFmt.format(new Date(t));
 }
+
+/** Dateigröße, z. B. „1,2 MB“. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`;
+}
