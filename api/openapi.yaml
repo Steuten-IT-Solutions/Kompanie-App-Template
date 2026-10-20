@@ -40,6 +40,7 @@ tags:
   - name: Verwaltung
   - name: Schwarzes Brett
   - name: Umfragen
+  - name: Geburtstage
   - name: Einstellungen
   - name: Wartung
 
@@ -178,6 +179,62 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Penalty' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/birthday:
+    get:
+      tags: [Geburtstage]
+      summary: Eigener Geburtstag mit Jahr und Schaltern (Issue #1)
+      x-capability: member
+      responses:
+        '200':
+          description: OK; `birthday` null, wenn keiner eingetragen ist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthdayResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Geburtstage]
+      summary: Eigenen Geburtstag eintragen oder ändern
+      description: |
+        Tag und Monat, das Jahr ist freiwillig. Gültiges Datum (29.02. nur im Schaltjahr oder ohne Jahr), Jahr ab 1900,
+        nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Nicht mitgeschickte Schalter bleiben; ein neuer Eintrag
+        ist sichtbar (`visible: true`) und ohne Alter (`show_age: false`).
+      x-capability: member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [month, day]
+              properties:
+                month: { type: integer, minimum: 1, maximum: 12 }
+                day: { type: integer, minimum: 1, maximum: 31 }
+                year: { type: [integer, 'null'], minimum: 1900, description: 'Geburtsjahr; null oder weglassen = ohne Jahr' }
+                visible: { type: boolean, description: Anderen Mitgliedern zeigen }
+                show_age: { type: boolean, description: 'Alter anzeigen (nur mit Jahr wirksam)' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthdayResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Geburtstage]
+      summary: Eigenen Geburtstag entfernen
+      x-capability: member
+      responses:
+        '200':
+          description: Entfernt (`birthday` ist null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthdayResponse' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -1085,6 +1142,34 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /birthdays:
+    get:
+      tags: [Geburtstage]
+      summary: Geburtstage der Mitglieder, ab heute sortiert (Issue #1)
+      description: |
+        Nur für Mitglieder (Recht `member`; Gäste und Anwärter → 403) und nur die Geburtstage von Mitgliedern, die
+        „Anderen Mitgliedern zeigen“ eingeschaltet haben. Sortiert nach `days_until` (heute = 0, „heute“ in der Zeitzone
+        der Kompanie), dann Name. Das Geburtsjahr steht nie in der Antwort; `age` nur mit Jahr und „Alter anzeigen“.
+        Der 29.02. gilt in Jahren ohne Schalttag am 28.02.
+      x-capability: member
+      parameters:
+        - name: days
+          in: query
+          required: false
+          description: 'Nur die nächsten N Tage (0–366), heute eingeschlossen; die App fragt `days=7` (heute und die nächsten 7 Tage).'
+          schema: { type: integer, minimum: 0, maximum: 366 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BirthdayEntry' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /polls:
     get:
       tags: [Umfragen]
@@ -1612,6 +1697,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
+      description: Mit Bereich Geburtstage und Recht `create_users` auch `birthday` (mit Jahr und den Schaltern der Person, null ohne Eintrag).
       x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
       responses:
         '200':
@@ -1627,7 +1713,7 @@ paths:
       summary: Konto löschen mit allen eigenen Daten (Issue #24)
       description: |
         Standalone: Das Konto wird gelöscht. WordPress: Der Benutzer der Webseite bleibt, verliert aber seine Rolle in der
-        App. In beiden Fällen werden Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel und Push-Abos der Person
+        App. In beiden Fällen werden Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Geburtstag und Push-Abos der Person
         gelöscht und alle Sitzungen beendet; was sie für andere eingetragen hat, bleibt. Nicht das eigene Konto, nicht der
         letzte Admin; Grenzen wie beim Passwort-Zurücksetzen.
       x-capability: create_users
@@ -1750,6 +1836,49 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/birthday:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Geburtstage]
+      summary: Geburtstag eines Mitglieds eintragen oder ändern (Issue #1)
+      description: |
+        Nur das Datum (Prüfung wie bei `PUT /me/birthday`). `visible` und `show_age` entscheidet allein die Person: Sie
+        bleiben, wie sie sind (mitgeschickte Werte werden nicht übernommen); ein neuer Eintrag ist sichtbar und ohne Alter.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [month, day]
+              properties:
+                month: { type: integer, minimum: 1, maximum: 12 }
+                day: { type: integer, minimum: 1, maximum: 31 }
+                year: { type: [integer, 'null'], minimum: 1900 }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthdayResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Geburtstage]
+      summary: Geburtstag eines Mitglieds entfernen
+      x-capability: create_users
+      responses:
+        '200':
+          description: Entfernt (`birthday` ist null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BirthdayResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /users:
     post:
       tags: [Verwaltung]
@@ -1771,6 +1900,7 @@ paths:
                 initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
                 rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
+                birthday: { $ref: '#/components/schemas/BirthdayString' }
       responses:
         '201':
           description: Angelegt
@@ -1811,6 +1941,7 @@ paths:
                       initial_points: { type: integer, minimum: 0 }
                       initial_points_date: { type: string, format: date }
                       rank_id: { type: integer }
+                      birthday: { $ref: '#/components/schemas/BirthdayString' }
       responses:
         '201':
           description: Ergebnis je Person (angelegt mit Startpasswort oder mit Grund nicht)
@@ -2695,8 +2826,8 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, polls, penalties, points, ranks, titles, events, reminder, news]
-      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort.'
+      enum: [board, polls, birthdays, penalties, points, ranks, titles, events, reminder, news]
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -2723,7 +2854,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -2957,6 +3088,7 @@ components:
             documents: { type: boolean }
             board: { type: boolean }
             polls: { type: boolean }
+            birthdays: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -3150,6 +3282,50 @@ components:
               description: Titel (nur mit Bereich Titel und Recht manage_titles)
               type: array
               items: { $ref: '#/components/schemas/TitleRef' }
+            birthday:
+              description: Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag)
+              oneOf:
+                - $ref: '#/components/schemas/Birthday'
+                - type: 'null'
+
+    Birthday:
+      type: object
+      description: Geburtstag mit Jahr und Schaltern – nur für die Person selbst und in den Mitgliedsdetails.
+      required: [month, day, year, visible, show_age]
+      properties:
+        month: { type: integer, minimum: 1, maximum: 12 }
+        day: { type: integer, minimum: 1, maximum: 31 }
+        year: { type: [integer, 'null'] }
+        visible: { type: boolean, description: Anderen Mitgliedern zeigen }
+        show_age: { type: boolean, description: Alter anzeigen }
+
+    BirthdayResponse:
+      type: object
+      required: [birthday]
+      properties:
+        birthday:
+          oneOf:
+            - $ref: '#/components/schemas/Birthday'
+            - type: 'null'
+
+    BirthdayString:
+      type: string
+      pattern: '^(\d{4}-)?\d{2}-\d{2}$'
+      description: 'Geburtstag (optional, nur mit Bereich Geburtstage, sonst 400): `JJJJ-MM-TT` oder ohne Jahr `MM-TT`. Prüfung wie bei `PUT /me/birthday`; die Schalter sind danach an (zeigen) bzw. aus (Alter), ändern kann sie nur die Person.'
+
+    BirthdayEntry:
+      type: object
+      description: Sichtbarer Geburtstag eines Mitglieds, nie mit Geburtsjahr.
+      required: [user_id, name, month, day, date, days_until, today, age]
+      properties:
+        user_id: { type: integer }
+        name: { type: string }
+        month: { type: integer }
+        day: { type: integer }
+        date: { type: string, format: date, description: 'Tag des nächsten Geburtstags (29.02. in Jahren ohne Schalttag: 28.02.)' }
+        days_until: { type: integer, minimum: 0, description: 'Tage bis dahin; 0 = heute' }
+        today: { type: boolean }
+        age: { type: [integer, 'null'], description: 'Alter, das die Person an diesem Geburtstag erreicht; nur mit Jahr und „Alter anzeigen“' }
 
     Rank:
       type: object

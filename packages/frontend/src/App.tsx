@@ -7,6 +7,7 @@ import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './ins
 import BoardBanner from './BoardBanner';
 import { boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
+import { BirthdayPage, birthdaysVisible } from './birthdays';
 import { MaintenanceBanner, MaintenancePage } from './maintenance';
 import { forgetPushOnLogout } from './push';
 import { navigate, useRoute } from './router';
@@ -207,7 +208,8 @@ export default function App() {
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
   const allowed: Record<View, boolean> = {
-    termine: !!(features?.events || (features?.calendar && can('calendar'))),
+    // Geburtstage (Issue #1) stehen bei den Terminen: für Mitglieder auch, wenn es sonst keine Termine gibt.
+    termine: !!(features?.events || (features?.calendar && can('calendar'))) || birthdaysVisible(),
     news: !!features?.news,
     galerie: !!features?.gallery,
     dokumente: isMember() && !!features?.documents,
@@ -346,6 +348,8 @@ export default function App() {
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
+              ) : path[1] === 'geburtstage' && birthdaysVisible() ? (
+                <BirthdayPage />
               ) : (
                 <Termine />
               ))}

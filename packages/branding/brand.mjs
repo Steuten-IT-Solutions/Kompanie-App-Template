@@ -63,6 +63,7 @@ const DEFAULTS = {
     documents: 'Dokumente',
     board: 'Schwarzes Brett',
     polls: 'Umfragen',
+    birthdays: 'Geburtstage',
   },
   rank: 'Dienstgrad',
 };

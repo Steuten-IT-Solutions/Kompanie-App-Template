@@ -5,6 +5,7 @@ import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
 import { Loading, useAsync } from '../ui';
+import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
@@ -99,7 +100,9 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
   );
 }
 
-const emptyRow = (): NewPerson & { points: string } => ({ name: '', username: '', email: '', points: '' });
+type Row = NewPerson & { points: string; bday: BirthdayValue };
+
+const emptyRow = (): Row => ({ name: '', username: '', email: '', points: '', bday: emptyBirthday() });
 
 /**
  * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Name, optional Benutzername, E-Mail und Anfangspunkte;
@@ -114,22 +117,25 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   const [results, setResults] = useState<BulkResult[] | null>(null);
   const points = canPoints && level === 'member';
 
-  const update = (i: number, patch: Partial<NewPerson & { points: string }>) =>
-    setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const update = (i: number, patch: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const birthdays = canSetBirthdays();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    const people = rows
-      .filter((r) => r.name.trim() !== '')
-      .map(
-        (r): NewPerson => ({
-          name: r.name.trim(),
-          ...(r.username?.trim() ? { username: r.username.trim() } : {}),
-          ...(r.email?.trim() ? { email: r.email.trim() } : {}),
-          ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
-        }),
-      );
+    const filled = rows.filter((r) => r.name.trim() !== '');
+    const people: NewPerson[] = [];
+    for (const [i, r] of filled.entries()) {
+      const bday = birthdays ? readBirthday(r.bday) : null;
+      if (typeof bday === 'string') return setFormError(`Zeile ${i + 1} (${r.name.trim()}): ${bday}`);
+      people.push({
+        name: r.name.trim(),
+        ...(r.username?.trim() ? { username: r.username.trim() } : {}),
+        ...(r.email?.trim() ? { email: r.email.trim() } : {}),
+        ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
+        ...(bday ? { birthday: birthdayString(bday) } : {}),
+      });
+    }
     if (people.length === 0) return setFormError('Bitte mindestens einen Namen eintragen.');
     setBusy(true);
     try {
@@ -210,6 +216,12 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
               <span>{brand.labels.sections.points} (Anfangsbestand, optional)</span>
               <input type="number" inputMode="numeric" min={0} value={r.points} onChange={(e) => update(i, { points: e.target.value })} />
             </label>
+          )}
+          {birthdays && (
+            <div className="bulk-birthday">
+              <span className="field-label">Geburtstag (optional)</span>
+              <BirthdayFields value={r.bday} onChange={(bday) => update(i, { bday })} />
+            </div>
           )}
         </fieldset>
       ))}

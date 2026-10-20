@@ -27,6 +27,7 @@ use KompanieApp\Core\Storage\PushRepository;
  *   Ablauf der Nachricht.
  * - Umfragen (Issue #4): neue Umfrage an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem
  *   Ende an alle Mitglieder ohne Antwort; TTL höchstens bis zum Ende.
+ * - Geburtstage (Issue #1): am Tag selbst an alle Mitglieder außer dem Geburtstagskind; TTL höchstens bis Mitternacht.
  *
  * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
  * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
@@ -50,6 +51,8 @@ final class PushService
     public const BOARD_OFFERED_SETTING = 'push_board_offered';
     /** Ebenso für die Art „Umfragen“ (Issue #4). */
     public const POLLS_OFFERED_SETTING = 'push_polls_offered';
+    /** Ebenso für die Art „Geburtstage“ (Issue #1). */
+    public const BIRTHDAYS_OFFERED_SETTING = 'push_birthdays_offered';
     public const REMINDER_DATE_SETTING = 'push_reminder_date';
     /** Uhrzeit der Erinnerung (Stunde 0–23, Zeitzone der Kompanie); Einstellung der Admins. */
     public const REMINDER_HOUR_SETTING = 'push_reminder_hour';
@@ -66,6 +69,7 @@ final class PushService
     public const TYPE_NEWS = 'news';
     public const TYPE_BOARD = 'board';
     public const TYPE_POLLS = 'polls';
+    public const TYPE_BIRTHDAYS = 'birthdays';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -149,6 +153,7 @@ final class PushService
         return [
             self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'board'],
             self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'members'],
+            self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'members'],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'members'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'members'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'members'],

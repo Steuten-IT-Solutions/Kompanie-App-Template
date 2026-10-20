@@ -34,6 +34,7 @@ final class ApiScenario
             $this->documents();
             $this->board();
             $this->polls();
+            $this->birthdays();
             $this->accounts();
             $this->events();
             $this->push();
@@ -83,7 +84,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -770,6 +771,83 @@ final class ApiScenario
         $this->req('PUT', '/admin/features', ['polls' => true]);
         $c->ok($this->req('DELETE', "/polls/$id")[0] === 200, 'Umfrage löschen');
         $c->ok($this->req('GET', "/polls/$id")[0] === 404, 'Gelöschte Umfrage → 404');
+    }
+
+    /**
+     * Geburtstage (Issue #1): eigener mit Schaltern, Pflege durch create_users (ohne die Schalter), nur Mitglieder sehen,
+     * nie das Geburtsjahr, Konto löschen entfernt den Geburtstag, Bereich aus → 403.
+     */
+    private function birthdays(): void
+    {
+        $c = $this->c;
+        $c->section('Geburtstage');
+        $admin = $this->user('kptest_geb_admin', 'admin');
+        $m = $this->user('kptest_geb_m', 'member');
+        $m2 = $this->user('kptest_geb_m2', 'member');
+        $cand = $this->user('kptest_geb_anw', 'candidate');
+        $guest = $this->user('kptest_geb_gast', 'guest');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/birthdays')[0] === 401, 'GET /birthdays ohne Anmeldung → 401');
+        $this->d->actAs($guest);
+        $c->ok($this->req('GET', '/birthdays')[0] === 403, 'Gast-Konto: GET /birthdays → 403');
+        $this->d->actAs($cand);
+        $c->ok($this->req('GET', '/birthdays')[0] === 403, 'Anwärter: GET /birthdays → 403');
+
+        $this->d->actAs($m);
+        $c->ok($this->req('PUT', '/me/birthday', ['month' => 2, 'day' => 31])[0] === 400, '31.02. → 400');
+        $c->ok($this->req('PUT', '/me/birthday', ['month' => 1, 'day' => 1, 'year' => (int) gmdate('Y') + 1])[0] === 400, 'Geburtstag in der Zukunft → 400');
+        // In drei Tagen (Serverzeit; die Zeitzone der Kompanie verschiebt das höchstens um einen Tag).
+        $in3 = time() + 3 * 86400;
+        $year = (int) gmdate('Y', $in3) - 40;
+        $month = (int) gmdate('n', $in3);
+        $day = (int) gmdate('j', $in3);
+        if ($month === 2 && $day === 29) {
+            $year = 1996;
+        }
+        [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => $month, 'day' => $day, 'year' => $year, 'show_age' => true]);
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true], 'Eigenen Geburtstag mit Jahr eintragen');
+        $this->d->actAs($m2);
+        [$s, $d] = $this->req('GET', '/birthdays', [], ['days' => '7']);
+        $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['user_id'] ?? 0) === $m))[0] ?? null;
+        $c->ok($s === 200 && is_array($entry) && in_array($entry['days_until'] ?? -1, [2, 3, 4], true) && in_array($entry['age'] ?? null, [40, 41], true), 'Anderes Mitglied sieht ihn unter den anstehenden, mit Alter');
+        $c->ok(!str_contains((string) json_encode($d), '"year"') && !str_contains((string) json_encode($d), (string) $year), 'Nie das Geburtsjahr in /birthdays');
+        $c->ok($this->req('PUT', "/members/$m/birthday", ['month' => 1, 'day' => 2])[0] === 403, 'Mitglied ändert fremden Geburtstag nicht → 403');
+
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', "/members/$m/birthday", ['month' => $month, 'day' => $day, 'visible' => false, 'show_age' => false]);
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true], 'Verwaltung ändert das Datum, die Schalter bleiben');
+        [$s, $d] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && ($d['birthday']['month'] ?? null) === $month, 'Mitgliedsdetails mit Geburtstag');
+
+        $this->d->actAs($m);
+        $this->req('PUT', '/me/birthday', ['month' => $month, 'day' => $day, 'visible' => false]);
+        $this->d->actAs($m2);
+        [, $d] = $this->req('GET', '/birthdays');
+        $c->ok(!in_array($m, array_column((array) $d, 'user_id'), true), '„Anderen Mitgliedern zeigen“ aus: nicht in der Liste');
+
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('POST', '/users', ['name' => 'Kptest Geburtstag', 'username' => 'kptest_geb_neu_' . substr(bin2hex(random_bytes(3)), 0, 6), 'birthday' => '1985-06-15']);
+        $newId = (int) ($d['id'] ?? 0);
+        if ($newId > 0) {
+            $this->users[] = $newId;
+        }
+        [, $detail] = $this->req('GET', "/members/$newId");
+        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false], 'Mitglied mit Geburtstag anlegen');
+        $c->ok($this->req('DELETE', "/members/$newId")[0] === 200, 'Konto mit Geburtstag entfernen');
+        $this->d->actAs($m2);
+        [, $d] = $this->req('GET', '/birthdays');
+        $c->ok(!in_array($newId, array_column((array) $d, 'user_id'), true), 'Konto gelöscht: Geburtstag weg');
+
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['birthdays' => false]);
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', '/me/birthday');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['birthdays' => true]);
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('DELETE', '/me/birthday');
+        $c->ok($s === 200 && array_key_exists('birthday', (array) $d) && $d['birthday'] === null, 'Eigenen Geburtstag entfernen');
     }
 
     /** Konten verwalten (Issue #24): mehrere anlegen, Angaben ändern, aus der App entfernen mit allen eigenen Daten. */

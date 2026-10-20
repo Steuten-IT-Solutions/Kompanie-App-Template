@@ -11,6 +11,7 @@ import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { MemberTitles, TitleBadges, TitleList } from './TitelVerwalten';
+import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -244,6 +245,10 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
         <MemberRank id={m.id} member={m.member} status={m.rank} history={m.rank_history ?? []} onChanged={reload} onToast={onToast} />
       )}
 
+      {m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()) && (
+        <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
+      )}
+
       {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
       {!canPenalties() ? null : m.penalties.length === 0 ? (
         <Empty>Keine Einträge.</Empty>
@@ -449,6 +454,7 @@ function NewMember() {
   const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [birthday, setBirthday] = useState(emptyBirthday());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
@@ -457,6 +463,8 @@ function NewMember() {
     e.preventDefault();
     setFormError(null);
     if (!name.trim()) return setFormError('Bitte einen Namen angeben.');
+    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
       setCreated(
@@ -467,6 +475,7 @@ function NewMember() {
           level,
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
+          ...(bday ? { birthday: birthdayString(bday) } : {}),
         }),
       );
     } catch (err) {
@@ -490,6 +499,7 @@ function NewMember() {
             setEmail('');
             setInitialPoints('');
             setRankId('');
+            setBirthday(emptyBirthday());
           }}
         >
           Weiteres Mitglied
@@ -566,6 +576,12 @@ function NewMember() {
       )}
       {extras && (canPoints() || canRanks()) && (
         <p className="muted small">Für die Übernahme bestehender Mitglieder: aktuellen Punktestand und {brand.labels.rank} eintragen.</p>
+      )}
+      {canSetBirthdays() && (
+        <fieldset className="fieldset new-member-birthday">
+          <legend>Geburtstag (optional)</legend>
+          <BirthdayFields value={birthday} onChange={setBirthday} />
+        </fieldset>
       )}
       <p className="muted small">
         Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
