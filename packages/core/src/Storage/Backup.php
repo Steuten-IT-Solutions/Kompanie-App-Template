@@ -35,7 +35,7 @@ final class Backup
         'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles'];
 
     public function __construct(private readonly Connection $db)
     {

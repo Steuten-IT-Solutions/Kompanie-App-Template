@@ -17,6 +17,8 @@ enum Capability: string
     case ManagePenalties = 'manage_penalties';
     /** Dienstgradliste pflegen, befördern und degradieren (Bereich Dienstgrade, Issue #9). */
     case ManageRanks = 'manage_ranks';
+    /** Titelliste pflegen und Titel zuweisen (Bereich Titel, Issue #22). */
+    case ManageTitles = 'manage_titles';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
     /**

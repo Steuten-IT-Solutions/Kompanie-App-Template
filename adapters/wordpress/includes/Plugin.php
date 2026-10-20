@@ -87,13 +87,13 @@ final class Plugin
         // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
         add_filter('cron_schedules', [WpScheduler::class, 'schedules']);
         add_action(WpScheduler::HOOK, static fn (string $task) => WpUpdateTarget::$installed ? null : self::app()->runTask($task));
-        // Abos eines gelöschten Kontos entfernen (Issue #19).
+        // Abos und Zuweisungen (Dienstgrad, Titel) eines gelöschten Kontos entfernen.
         add_action('deleted_user', static function (int $id): void {
             try {
-                self::app()->push()->deleteForUser($id);
+                self::app()->userDeleted($id);
             } catch (\Throwable $e) {
                 // Das Löschen des Benutzers darf daran nicht scheitern.
-                error_log('Kompanie-App: Push-Abos nicht entfernt: ' . $e->getMessage());
+                error_log('Kompanie-App: Daten des gelöschten Kontos nicht entfernt: ' . $e->getMessage());
             }
         });
         // Aufgaben werden nicht bei jedem Seitenaufruf eingeplant, sondern nach einem Update (App::upgrade),

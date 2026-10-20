@@ -15,6 +15,7 @@ use KompanieApp\Core\Domain\RankService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
+use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\UserNames;
@@ -279,6 +280,18 @@ final class App
         return $this->service(PushService::class, fn () => new PushService($this));
     }
 
+    /**
+     * Ein Konto wurde gelöscht: Push-Abos und Zuweisungen (Dienstgrad, Titel) entfernen. Buchungen und Verläufe
+     * bleiben als Geschichte erhalten. Verwaiste Zuweisungen würden sonst das Löschen eines Dienstgrads bzw. Titels
+     * blockieren.
+     */
+    public function userDeleted(int $userId): void
+    {
+        $this->push()->deleteForUser($userId);
+        $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
+        $this->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
+    }
+
     public function pushTriggers(): PushTriggers
     {
         return $this->service(PushTriggers::class, fn () => new PushTriggers($this, $this->push()));
@@ -331,6 +344,11 @@ final class App
     public function ranks(): RankService
     {
         return $this->service(RankService::class, fn () => new RankService($this));
+    }
+
+    public function titles(): TitleService
+    {
+        return $this->service(TitleService::class, fn () => new TitleService($this));
     }
 
     public function members(): MemberService
