@@ -1010,7 +1010,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await expect(page.getByText(/3 Termine gefunden/)).toBeVisible();
 
   const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
-  await cal.getByLabel('Neue iCal-Adresse (ersetzt die bisherige Einrichtung)').fill('ftp://falsch');
+  await cal.getByLabel('Neue iCal-Adresse (ersetzt die bisherige)').fill('ftp://falsch');
   await cal.getByRole('button', { name: 'Speichern' }).click();
   await expect(cal.locator('.form-error')).toBeVisible();
 
@@ -1023,6 +1023,49 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await news.getByRole('button', { name: 'Neuigkeiten testen' }).click();
   await expect(news.getByText('2 Beiträge gefunden.')).toBeVisible();
   await shot(page, '18-einstellungen');
+});
+
+test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  const google = page.locator('#einstellungen-google');
+  await expect(google.getByRole('heading', { name: 'Google-Zugang' })).toBeVisible();
+  // Über Kalender und Galerie, mit dem Dienstkonto als Alternative
+  const order = await page
+    .locator('.settings-section h3')
+    .evaluateAll((hs) => hs.map((h) => h.textContent ?? '').filter((t) => /Google-Zugang|Kalender für|Galerie aus/.test(t)));
+  expect(order[0]).toBe('Google-Zugang');
+  await expect(google.getByText('Alternative: Dienstkonto mit JSON-Schlüssel')).toBeVisible();
+  const redirect = await google.getByLabel('Weiterleitungs-URI (im OAuth-Client bei Google eintragen)').inputValue();
+  expect(redirect).toMatch(STANDALONE ? /\/google\/callback$/ : /\/wp-admin\/admin-post\.php$/);
+
+  // Google selbst: Anmeldung und Zustimmung überspringen, mit Code zurück an die Weiterleitungs-URI.
+  let authorize: URL | null = null;
+  await page.route('https://accounts.google.com/**', (route) => {
+    authorize = new URL(route.request().url());
+    const back = new URL(authorize.searchParams.get('redirect_uri')!);
+    back.searchParams.set('state', authorize.searchParams.get('state')!);
+    back.searchParams.set('code', 'TESTCODE');
+    return route.fulfill({ status: 302, headers: { Location: back.toString() } });
+  });
+  await google.getByLabel('Client-ID').fill('1-e2e.apps.googleusercontent.com');
+  await google.getByLabel('Clientschlüssel (Client-Secret)').fill('GOCSPX-e2e');
+  await google.getByRole('button', { name: 'Speichern und mit Google verbinden' }).click();
+  await expect(google.getByRole('status')).toContainText('Mit Google verbunden (kompanie@example.org)');
+  await expect(page).toHaveURL(/#\/einstellungen$/);
+  expect(authorize!.searchParams.get('redirect_uri')).toBe(redirect);
+  expect(authorize!.searchParams.get('scope')).toContain('calendar.readonly');
+  await expect(google.getByText('Es darf auch den Kalender lesen.')).toBeVisible();
+  expect(page.url()).not.toContain('google=1'); // Hinweis nur einmal
+  await expect(page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' })).toContainText(
+    'die Verbindung mit Google (kompanie@example.org)',
+  );
+  await shot(page, '18b-google-zugang');
+
+  page.once('dialog', (d) => void d.accept());
+  await google.getByRole('button', { name: 'Verbindung trennen' }).click();
+  await expect(google.getByRole('button', { name: 'Speichern und mit Google verbinden' })).toBeVisible();
+  await expect(google.getByLabel('Client-ID')).toHaveValue('1-e2e.apps.googleusercontent.com');
 });
 
 test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht Stand und Verlauf', async ({ page }) => {

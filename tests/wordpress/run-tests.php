@@ -424,15 +424,74 @@ $renderSettings = static function () use ($app, $admin, $member): string {
     return (string) ob_get_clean();
 };
 $page = $renderSettings();
-$c->ok(str_contains($page, 'Kalender-IDs über den Google-Zugang der Galerie'), 'Einstellungsseite nennt die Quelle');
+$c->ok(str_contains($page, 'Kalender-IDs über den Google-Zugang'), 'Einstellungsseite nennt die Quelle');
 $app->settings->set('drive_oauth', ['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'R', 'scope' => 'https://www.googleapis.com/auth/drive.readonly']);
 $app->calendar()->clearCache();
 $page = $renderSettings();
-$c->ok($app->calendar()->source() === 'ics' && str_contains($page, 'muss sie neu verbunden werden'), 'Verbindung ohne Kalender-Berechtigung: iCal-Link und Hinweis „neu verbinden“');
+$c->ok($app->calendar()->source() === 'ics' && str_contains($page, 'neu verbinden, dabei auch das Häkchen für den Kalender'), 'Verbindung ohne Kalender-Berechtigung: iCal-Link und Hinweis „neu verbinden“');
 remove_filter('pre_http_request', $googleCalFilter, 10);
 $app->settings->delete('drive_oauth');
 $app->settings->set('calendar_ids', '');
 $app->calendar()->clearCache();
+
+$c->section('Mit Google verbinden');
+$page = $renderSettings();
+$redirect = admin_url('admin-post.php');
+$c->ok(str_contains($page, 'id="google"') && str_contains($page, esc_attr($redirect)) && strpos($page, 'id="google"') < strpos($page, 'id="kalender"') && str_contains($page, 'Speichern und mit Google verbinden'), 'Einstellungsseite: Abschnitt Google-Zugang über dem Kalender, mit Weiterleitungs-URI');
+$c->ok(str_contains($page, 'Alternative: Dienstkonto') && strpos($page, 'id="drive_sa"') < strpos($page, 'id="kalender"'), 'Dienstkonto im Abschnitt Google-Zugang');
+$d->actAs($admin);
+[$s, $set] = $d->request('GET', '/admin/settings');
+$c->ok($s === 200 && ($set['google']['redirect_uri'] ?? '') === $redirect, 'Weiterleitungs-URI: wp-admin/admin-post.php');
+[$s, $start] = $d->request('POST', '/admin/google/connect', ['client_id' => '1-wp.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-wp']);
+parse_str((string) parse_url((string) ($start['url'] ?? ''), PHP_URL_QUERY), $q);
+$c->ok($s === 200 && ($q['redirect_uri'] ?? '') === $redirect && str_starts_with((string) ($q['state'] ?? ''), 'kompanie_app_app_'), 'REST: Admin beginnt die Verbindung (Rückkehr in die App)');
+$d->actAs($member);
+$c->ok($d->request('POST', '/admin/google/connect', ['client_id' => '1-wp.apps.googleusercontent.com', 'client_secret' => 'x'])[0] === 403, 'REST: Mitglied → 403');
+wp_set_current_user($member);
+$c->ok(KompanieApp\WordPress\SettingsPage::googleCallbackTarget($app, ['state' => (string) $q['state'], 'code' => 'WPCODE']) === null, 'Rückkehr als Mitglied: keine Verbindung (403-Seite)');
+wp_set_current_user(0);
+$c->ok(KompanieApp\WordPress\SettingsPage::googleCallbackTarget($app, ['state' => (string) $q['state'], 'code' => 'WPCODE']) === null, 'Rückkehr ohne Anmeldung: keine Verbindung');
+$googleFilter = static function ($pre, $args, $url) {
+    $res = static fn (int $code, array $body): array => ['headers' => [], 'body' => (string) wp_json_encode($body), 'response' => ['code' => $code, 'message' => ''], 'cookies' => [], 'filename' => null];
+    if (str_starts_with((string) $url, 'https://oauth2.googleapis.com/token')) {
+        parse_str((string) ($args['body'] ?? ''), $form);
+        if (($form['grant_type'] ?? '') === 'authorization_code') {
+            return ($form['code'] ?? '') === 'WPCODE' && ($form['redirect_uri'] ?? '') === admin_url('admin-post.php')
+                ? $res(200, ['access_token' => 'TEST', 'expires_in' => 3600, 'refresh_token' => 'WPREFRESH', 'scope' => 'https://www.googleapis.com/auth/drive.readonly'])
+                : $res(400, ['error' => 'invalid_grant']);
+        }
+    }
+    if (str_starts_with((string) $url, 'https://www.googleapis.com/drive/v3/about')) {
+        return $res(200, ['user' => ['emailAddress' => 'wp@example.org']]);
+    }
+    if (str_starts_with((string) $url, 'https://oauth2.googleapis.com/revoke')) {
+        $GLOBALS['kompanie_test_revoked'] = (string) ($args['body'] ?? '');
+        return $res(200, []);
+    }
+    return $pre;
+};
+add_filter('pre_http_request', $googleFilter, 20, 3);
+wp_set_current_user($admin);
+$target = KompanieApp\WordPress\SettingsPage::googleCallbackTarget($app, ['state' => (string) $q['state'], 'code' => 'WPCODE']);
+$c->ok($target === $app->env->appUrl() . (str_contains($app->env->appUrl(), '?') ? '&' : '?') . 'google=1#/einstellungen', 'Rückkehr: Weiterleitung in die Einstellungen der App');
+$c->ok($app->drive()->oauthEmail() === 'wp@example.org' && $app->drive()->calendarAccess() === false && ($app->settings->get('drive_oauth')['refresh_token'] ?? '') === 'WPREFRESH', 'Verbunden: Konto und erlaubte Berechtigungen gespeichert (nur Drive)');
+$page = $renderSettings();
+$c->ok(str_contains($page, 'wp@example.org') && str_contains($page, 'Den Kalender darf es noch nicht lesen') && str_contains($page, 'Verbindung trennen'), 'Einstellungsseite: verbunden, Hinweis zum Kalender');
+// Aus dem WP-Admin: Rückkehr auf die Einstellungsseite mit Meldung
+wp_set_current_user($admin);
+$url = KompanieApp\WordPress\SettingsPage::googleConnectUrl($app, ['client_id' => '1-wp.apps.googleusercontent.com', 'client_secret' => '']);
+parse_str((string) parse_url($url, PHP_URL_QUERY), $q2);
+$c->ok(str_starts_with((string) ($q2['state'] ?? ''), 'kompanie_app_admin_'), 'WP-Admin: Verbinden mit gespeichertem Secret');
+$target = (string) KompanieApp\WordPress\SettingsPage::googleCallbackTarget($app, ['state' => (string) $q2['state'], 'error' => 'access_denied']);
+$c->ok(str_contains($target, 'options-general.php?page=kompanie-app') && str_contains($target, 'kompanie_error=1') && str_ends_with($target, '#google'), 'WP-Admin: Abbruch zurück auf die Einstellungsseite mit Fehlermeldung');
+$c->ok(KompanieApp\WordPress\SettingsPage::googleCallbackTarget($app, ['state' => 'kompanie_app_admin_' . str_repeat('0', 48), 'code' => 'WPCODE']) !== null && str_contains((string) ($app->googleConnect()->lastResult()['message'] ?? ''), 'abgelaufen oder ungültig'), 'Falsches state abgelehnt');
+$app->googleConnect()->disconnect();
+$c->ok($app->drive()->oauth() === null && str_contains((string) ($GLOBALS['kompanie_test_revoked'] ?? ''), 'WPREFRESH'), 'Trennen widerruft bei Google');
+wp_set_current_user($member);
+remove_filter('pre_http_request', $googleFilter, 20);
+$app->settings->delete('drive_oauth');
+$app->settings->delete(KompanieApp\Core\Domain\GoogleConnect::RESULT_SETTING);
+$d->actAs(null);
 
 $c->section('HTTP: mehrere Anfragen gleichzeitig, Download in eine Datei');
 $http = new KompanieApp\WordPress\WpHttpClient();

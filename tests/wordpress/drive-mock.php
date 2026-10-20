@@ -20,7 +20,21 @@ add_filter(
 			);
 		};
 		if ( 0 === strpos( $url, 'https://oauth2.googleapis.com/token' ) ) {
+			parse_str( is_string( $args['body'] ) ? $args['body'] : http_build_query( (array) $args['body'] ), $form );
+			// „Mit Google verbinden“: Der Code TESTCODE gilt (E2E-Test mit simulierter Anmeldung bei Google).
+			if ( isset( $form['grant_type'] ) && 'authorization_code' === $form['grant_type'] ) {
+				if ( isset( $form['code'] ) && 'TESTCODE' === $form['code'] ) {
+					return $ok( array( 'access_token' => 'TEST', 'expires_in' => 3600, 'refresh_token' => 'TESTREFRESH', 'scope' => 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/calendar.readonly' ) );
+				}
+				return array( 'headers' => array(), 'body' => '{"error":"invalid_grant"}', 'response' => array( 'code' => 400, 'message' => 'Bad Request' ), 'cookies' => array(), 'filename' => null );
+			}
 			return $ok( array( 'access_token' => 'TEST', 'expires_in' => 3600 ) );
+		}
+		if ( 0 === strpos( $url, 'https://oauth2.googleapis.com/revoke' ) ) {
+			return $ok( '' );
+		}
+		if ( 0 === strpos( $url, 'https://www.googleapis.com/drive/v3/about' ) ) {
+			return $ok( array( 'user' => array( 'emailAddress' => 'kompanie@example.org' ) ) );
 		}
 		if ( 0 !== strpos( $url, 'https://www.googleapis.com/drive/v3/files' ) ) {
 			return $pre;

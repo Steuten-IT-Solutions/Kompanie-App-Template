@@ -36,6 +36,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
+ *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
 final class Kernel
 {
@@ -321,6 +322,8 @@ final class Kernel
             $this->sendDocument((int) $m[1]);
         } elseif (preg_match('#^/abzeichen/(\d+)$#', $path, $m)) {
             $this->sendBadge((int) $m[1]);
+        } elseif ($path === '/google/callback') {
+            $this->sendGoogleCallback();
         } elseif ($path === '/cron') {
             $this->sendCron();
             return;
@@ -608,6 +611,28 @@ final class Kernel
     }
 
     /** Fehler als JSON (API) oder als Text (alles andere). */
+    /**
+     * Rückkehr von Google nach „Mit Google verbinden“ (Weiterleitungs-URI, siehe StandaloneEnvironment). Der Kern prüft
+     * Admin, Sitzung und state und tauscht den Code ein; danach geht es in die App zu den Einstellungen, die das
+     * Ergebnis anzeigen. Ohne angemeldeten Admin nur eine Meldung.
+     */
+    private function sendGoogleCallback(): void
+    {
+        $app = $this->app();
+        header('Cache-Control: no-store');
+        // Code und state nicht als Referrer weitergeben.
+        header('Referrer-Policy: no-referrer');
+        $query = $_GET;
+        unset($query['r']);
+        try {
+            $app->googleConnect()->callback($query);
+        } catch (ApiError $e) {
+            $this->sendPlain($e->status, $e->getMessage());
+            return;
+        }
+        header('Location: ' . $app->googleConnect()->appReturnUrl(), true, 303);
+    }
+
     private function sendError(string $path, int $status, string $code, string $message): void
     {
         if (str_starts_with($path, '/api/')) {

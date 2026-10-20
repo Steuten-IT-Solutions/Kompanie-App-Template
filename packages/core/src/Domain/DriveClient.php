@@ -206,8 +206,18 @@ final class DriveClient
         if ($old['client_id'] !== $clientId || $old['client_secret'] !== $clientSecret) {
             $new = ['refresh_token' => '', 'email' => '', 'scope' => ''] + $new;
         }
-        $this->settings->set(self::OAUTH_SETTING, $new);
+        $this->storeOAuth($new);
         $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    /** Speichert drive_oauth immer mit denselben Feldern in derselben Reihenfolge. @param array<string, string> $o */
+    private function storeOAuth(array $o): void
+    {
+        $clean = [];
+        foreach (['client_id', 'client_secret', 'refresh_token', 'email', 'scope'] as $k) {
+            $clean[$k] = (string) ($o[$k] ?? '');
+        }
+        $this->settings->set(self::OAUTH_SETTING, $clean);
     }
 
     /**
@@ -330,12 +340,12 @@ final class DriveClient
         if (!in_array(self::SCOPE, preg_split('/\s+/', $scope) ?: [], true)) {
             throw new \RuntimeException('Der Zugriff auf Google Drive wurde nicht erlaubt. Bitte beim Verbinden das Häkchen für Google Drive setzen.');
         }
-        $this->settings->set(self::OAUTH_SETTING, ['refresh_token' => $body['refresh_token'], 'email' => '', 'scope' => $scope] + $o);
+        $this->storeOAuth(['refresh_token' => $body['refresh_token'], 'email' => '', 'scope' => $scope] + $o);
         $ttl = max(60, (int) ($body['expires_in'] ?? 3600) - 300);
         $this->cache->set(self::TOKEN_CACHE, ['email' => self::oauthOwner($body['refresh_token']), 'token' => $body['access_token']], $ttl);
         $email = $this->connectedEmail($body);
         if ($email !== '') {
-            $this->settings->set(self::OAUTH_SETTING, ['email' => $email] + $this->storedOAuth());
+            $this->storeOAuth(['email' => $email] + $this->storedOAuth());
         }
     }
 
@@ -380,7 +390,7 @@ final class DriveClient
         if ($o['client_id'] === '' && $o['client_secret'] === '') {
             $this->settings->delete(self::OAUTH_SETTING);
         } else {
-            $this->settings->set(self::OAUTH_SETTING, ['refresh_token' => '', 'email' => '', 'scope' => ''] + $o);
+            $this->storeOAuth(['refresh_token' => '', 'email' => '', 'scope' => ''] + $o);
         }
         $this->cache->delete(self::TOKEN_CACHE);
     }

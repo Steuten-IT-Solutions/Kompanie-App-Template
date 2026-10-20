@@ -8,7 +8,7 @@ Ergänzt die [Architektur](ARCHITEKTUR.md). Jeder Punkt hat einen Vorschlag, die
 | 2 | [Hilfe beim Hochladen von `install.php`](#2-hilfe-beim-hochladen-von-installphp) | Phase 5 | Anleitungen je Hoster |
 | 3 | [Rechtstexte und Datenschutz](#3-rechtstexte-und-datenschutz) | vor der ersten neuen Kompanie | rechtliche Prüfung beauftragen |
 | 4 | [Statusmeldungen](#4-statusmeldungen) | Phase 5/6 | Webspace/Subdomain für den Empfang |
-| 5 | [Galerie-Test](#5-galerie-test-mit-google-verbinden) | sofort, parallel zu Phase 1 | Google-Cloud-Projekt, Test-Konto |
+| 5 | [Google: „Mit Google verbinden“](#5-google-mit-google-verbinden-und-optional-drivefile) | umgesetzt; Test `drive.file` optional (Issue #40) | für den Test: Google-Cloud-Projekt, Test-Konto |
 | 6 | [Branches und PHP-Version](#6-branches-und-php-version) | sofort | Standard-Branch auf `main` umstellen, PHP-Version von Lank nachsehen |
 
 ---
@@ -148,37 +148,26 @@ App (#20) → Empfang, Verlauf und Warnungen im Cockpit (project-cockpit#12).
 
 ---
 
-## 5. Galerie-Test: „Mit Google verbinden“
+## 5. Google: „Mit Google verbinden“ und optional `drive.file`
 
-Ziel: klären, ob die App mit der Berechtigung `drive.file` und einer Ordnerauswahl über den Google Picker dauerhaft an alle Bilder eines Ordners kommt. Nur dann gibt es „Mit Google verbinden“ ohne Googles Sicherheitsbewertung.
+**Umgesetzt:** „Mit Google verbinden“ mit dem **eigenen OAuth-Client jeder Installation** (Client-ID und Client-Secret trägt der Admin ein), Berechtigungen `drive.readonly` und `calendar.readonly`, wie in der früheren App von Lank und dort im Betrieb erprobt: externe App „In Produktion“, nichts unter Google Auth Platform → Datenzugriff (sonst verlangt Google eine Prüfung mit Demo-Video), der Admin bestätigt die Warnung „Google hat diese App nicht überprüft“ über „Erweitert → Weiter“ und setzt beide Häkchen. Technik: [Architektur, Abschnitt 9](ARCHITEKTUR.md#galerie); Anleitung für Admins: [Handbuch, Google einrichten](handbuch/admin-google.md). Das Dienstkonto bleibt als Alternative.
 
-Stand und Ergebnis: Issue #40.
+Weil jede Kompanie ihre eigene App bei Google hat, gilt die Grenze von 100 Nutzern für nicht geprüfte Apps praktisch nicht (es verbindet sich nur ein Admin), und eine Sicherheitsbewertung ist nicht nötig. Der Preis ist der Warnbildschirm beim Verbinden und etwa 20 Minuten Einrichtung in der Google Cloud Console.
 
-### Was wir bereitstellen
+### Optional: `drive.file` mit Google Picker (Issue #40)
 
-1. Google-Cloud-Projekt (unseres, nicht das einer Kompanie)
-2. dort einschalten: **Google Drive API** und **Google Picker API**
-3. OAuth-Zustimmungsbildschirm: Typ „Extern“, Status „Testing“, Test-Google-Konto als Testnutzer eintragen
-4. OAuth-Client vom Typ **Webanwendung**, Rücksprungadresse auf die Testseite
-5. API-Schlüssel, beschränkt auf die Picker API
-6. Ein **Test-Google-Konto** mit dieser Ordnerstruktur:
-   ```
-   Galerie/
-     2025/Sommerfest/   3 Bilder
-     2025/Sommerfest/intern/   2 Bilder
-     2026/Winterball/   2 Bilder
-   ```
+Ziel wäre, den Warnbildschirm zu vermeiden: `drive.file` gilt bei Google als nicht sensibel, die App sähe nur den im Google Picker gewählten Ordner. Offen ist, ob die App damit an Dateien **in** einem gewählten Ordner kommt, in Unterordnern (Jahr → Album → `intern`) und vor allem an **später hochgeladene Bilder**. Die Berichte dazu widersprechen sich, eine offizielle Aussage von Google fehlt. Für den Kalender bliebe `calendar.readonly` („sensitive“) mit Warnbildschirm oder Prüfung; der Kalender ginge dann eher über die iCal-Adresse.
 
-Client-ID, Client-Secret und API-Schlüssel gebt ihr mir **nicht im Chat**, sondern tragt sie als Umgebungsvariablen in die Umgebung dieser Sitzung ein (Anleitung bei Bedarf).
+Für einen Test bräuchte es: ein Google-Cloud-Projekt mit **Google Drive API** und **Google Picker API**, OAuth-Zustimmungsbildschirm „Extern“ im Status „Testing“ mit einem Test-Google-Konto als Testnutzer, einen OAuth-Client vom Typ **Webanwendung**, einen auf die Picker API beschränkten API-Schlüssel und im Test-Konto diese Ordnerstruktur:
 
-### Was ich baue
+```
+Galerie/
+  2025/Sommerfest/   3 Bilder
+  2025/Sommerfest/intern/   2 Bilder
+  2026/Winterball/   2 Bilder
+```
 
-Eine kleine Testseite (PHP + Picker) auf einem Testserver:
-1. „Mit Google verbinden“ → Ordner `Galerie` auswählen
-2. Der Server liest danach **ohne** Browser, nur mit dem gespeicherten Token, rekursiv alle Ordner und Bilder.
-3. Ergebnis als Tabelle.
-
-### Testfälle
+Client-ID, Client-Secret und API-Schlüssel gehören nicht in den Chat, sondern als Umgebungsvariablen in die Umgebung der Sitzung.
 
 | Nr. | Test | Bestanden, wenn |
 |---|---|---|
@@ -189,15 +178,8 @@ Eine kleine Testseite (PHP + Picker) auf einem Testserver:
 | T5 | **Nach** dem Verbinden einen neuen Album-Ordner anlegen | gelistet |
 | T6 | Bild löschen | verschwindet aus der Liste |
 | T7 | Token nach einigen Tagen ohne Browser erneuern | funktioniert weiterhin |
-| T8 | Anmeldung über eine **feste Rücksprungseite** (GitHub Pages), die an einen anderen Server weiterleitet | funktioniert, `state` wird geprüft |
 
-### Entscheidung danach
-
-- **T1–T7 bestanden:** „Mit Google verbinden“. Danach Googles vereinfachte Prüfung beantragen. Dafür braucht es: Startseite und Datenschutzerklärung auf einer **bestätigten Domain** von uns, App-Name, Logo, Support-Adresse.
-- **T4 oder T5 nicht bestanden:** Ersatzlösung „Ordner freigeben“ an ein Dienstkonto je Kompanie (siehe [Architektur, Abschnitt 9](ARCHITEKTUR.md#9-google-galerie-und-kalender)). Dafür testen wir dann: Dienstkonto anlegen, öffentlichen Schlüssel hochladen (ob die Organisationsrichtlinien das erlauben), Freigabe prüfen.
-- **T7 nicht bestanden:** klären, ob das nur am Status „Testing“ liegt, bevor wir verwerfen.
-
-Für den Kalender gilt bei jedem künftigen Weg „Mit Google verbinden“: zusätzlich `calendar.readonly` anfragen und die von Google erlaubten Berechtigungen (`scope` aus der Token-Antwort) in `drive_oauth` speichern; daran erkennt `DriveClient::calendarAccess()`, ob der Kalender über die Verbindung gelesen werden darf (siehe [Architektur, Abschnitt 9](ARCHITEKTUR.md#kalender)). `calendar.readonly` ist bei Google „sensitive“ und braucht damit die (vereinfachte) Prüfung der App.
+**Danach:** Bestehen T1–T7, kann `drive.file` mit Picker als zusätzlicher Weg (ohne Warnbildschirm) neben dem heutigen dazukommen. Scheitern T4 oder T5, bleibt es beim heutigen Weg.
 
 ---
 

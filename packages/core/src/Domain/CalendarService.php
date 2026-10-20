@@ -15,7 +15,7 @@ use KompanieApp\Core\Port\Settings;
  *
  * Quellen, in dieser Reihenfolge:
  *  1. Google-Kalender-IDs mit eigenem API-Schlüssel (nur öffentliche Kalender), 'google'.
- *  2. Google-Kalender-IDs über den Google-Zugang der Galerie (DriveClient: OAuth-Verbindung mit
+ *  2. Google-Kalender-IDs über den Google-Zugang, gemeinsam mit der Galerie (DriveClient: OAuth-Verbindung mit
  *     calendar.readonly oder Dienstkonto), auch für private Kalender, 'google_connection'.
  *  3. Geheime iCal-Adresse (Standard in der App, ohne Google Cloud), 'ics'.
  * Bei 1. und 2. löst Google Serientermine selbst auf (singleEvents=true).
@@ -57,7 +57,7 @@ final class CalendarService
         return $this->source() !== 'none';
     }
 
-    /** 'google' (eigener API-Schlüssel), 'google_connection' (Google-Zugang der Galerie), 'ics' oder 'none' */
+    /** 'google' (eigener API-Schlüssel), 'google_connection' (Google-Zugang), 'ics' oder 'none' */
     public function source(): string
     {
         if ($this->calendarIds() !== []) {
@@ -72,7 +72,7 @@ final class CalendarService
     }
 
     /**
-     * Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung der Galerie darf den Kalender nicht lesen
+     * Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen
      * (verbunden vor der Kalender-Erweiterung oder ohne Häkchen dafür): Hinweis „neu verbinden“.
      */
     public function connectionNeedsCalendarAccess(): bool
@@ -215,7 +215,7 @@ final class CalendarService
     }
 
     /**
-     * Über den Google-Zugang der Galerie: Zugriffstoken als Bearer, ohne API-Schlüssel.
+     * Über den Google-Zugang: Zugriffstoken als Bearer, ohne API-Schlüssel.
      *
      * @return array<int, array<string, mixed>>
      */

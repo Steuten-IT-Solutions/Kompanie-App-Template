@@ -3,9 +3,11 @@ titel: Google einrichten (Galerie und Kalender)
 reihenfolge: 115
 rechte: [manage_settings]
 ---
-Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender lässt sich über denselben Zugang lesen. Dafür braucht die App einen **Google-Zugang**: ein **Dienstkonto** aus einem Projekt in der Google Cloud Console. Das ist einmalige Arbeit, etwa 15 Minuten, und kostet nichts.
+Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender lässt sich über denselben Zugang lesen. Dafür braucht die App einen **Google-Zugang**. Empfohlen ist **„Mit Google verbinden“**: Du legst einmal ein kleines Projekt in der Google Cloud Console an, trägst zwei Werte in der App ein und meldest dich bei Google an. Das dauert etwa 20 Minuten und kostet nichts. Die Alternative mit einem Dienstkonto steht unten.
 
 > Für den {bereich.calendar} allein brauchst du das nicht: Die **geheime Adresse im iCal-Format** geht ohne Google Cloud (siehe [Ersteinrichtung](seite:admin-einrichtung)).
+
+Den Google-Zugang findest du in der App unter **Konto → Einstellungen** im Abschnitt **Google-Zugang** (über {bereich.calendar} und {bereich.gallery}); mit WordPress gibt es ihn auch auf der Einstellungsseite der App im WP-Admin.
 
 ## 1. Projekt anlegen
 1. [console.cloud.google.com](https://console.cloud.google.com/) öffnen und mit dem Google-Konto der Kompanie anmelden. Beim ersten Mal die Nutzungsbedingungen bestätigen.
@@ -15,9 +17,50 @@ Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender
 ## 2. Schnittstellen aktivieren
 Im Projekt jeweils die Seite öffnen und **Aktivieren** klicken:
 - für die {bereich.gallery}: [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
-- für einen privaten Kalender über diesen Zugang: [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
+- für einen privaten Kalender: [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
 
-## 3. Dienstkonto anlegen
+## 3. Google Auth Platform einrichten
+1. [Google Auth Platform](https://console.cloud.google.com/auth/overview) öffnen und **Jetzt starten** klicken.
+2. **App-Informationen:** als **App-Name** z. B. den Namen der Kompanie und bei **E-Mail-Adresse für den Nutzersupport** deine Adresse wählen.
+3. **Zielgruppe:** **Intern** nur, wenn das Projekt zu einer Google-Organisation gehört (Google Workspace) und das verbundene Konto dazugehört. Sonst, also mit einem normalen Google-Konto, **Extern**.
+4. **Kontaktdaten:** eine E-Mail-Adresse eintragen, den Richtlinien zustimmen und **Erstellen** klicken.
+5. Nur bei **Extern:** Links **Zielgruppe** öffnen und unter „Veröffentlichungsstatus“ **App veröffentlichen** klicken und bestätigen. Der Status ist danach **In Produktion**. Bleibt die App im Status „Testen“, läuft die Verbindung nach 7 Tagen ab und die {bereich.gallery} hört auf, sich abzugleichen.
+
+> Unter **Datenzugriff** trägst du **nichts** ein. Dort eingetragene Berechtigungen verlangen eine Prüfung durch Google (mit Demo-Video). Die App fragt die beiden Lese-Berechtigungen beim Verbinden selbst an; das reicht.
+
+## 4. OAuth-Client anlegen
+1. In der App im Abschnitt **Google-Zugang** die **Weiterleitungs-URI** kopieren (Knopf **Adresse kopieren**). Sie ist für jede Installation anders: ohne WordPress endet sie auf `google/callback`, mit WordPress auf `wp-admin/admin-post.php`.
+2. In der Google Auth Platform links **Clients** öffnen → **Client erstellen**.
+3. **Anwendungstyp:** **Webanwendung**. Name z. B. „Kompanie-App“.
+4. Unter **Autorisierte Weiterleitungs-URIs** → **URI hinzufügen** die kopierte Adresse genau so einfügen (ohne Leerzeichen, mit `https://`). Dann **Erstellen**.
+5. Google zeigt **Client-ID** und **Clientschlüssel** (Client-Secret). Beide kopieren. Den Clientschlüssel zeigt Google nur jetzt einmal an; am besten gleich zusätzlich die JSON-Datei herunterladen und sicher aufbewahren. Geht er verloren, legst du beim Client einen neuen Schlüssel an.
+
+> Client-ID und Clientschlüssel gehören zusammen wie Benutzername und Passwort. Nicht weitergeben und nicht per E-Mail verschicken.
+
+## 5. Mit Google verbinden
+1. In der App im Abschnitt **Google-Zugang** die **Client-ID** und den **Clientschlüssel (Client-Secret)** eintragen und **Speichern und mit Google verbinden** klicken.
+2. Bei Google mit dem Konto anmelden, das den Galerie-Ordner und den Kalender sehen kann.
+3. Google warnt: **„Google hat diese App nicht überprüft“**. Das ist bei einer eigenen, nicht geprüften App normal. Auf **Erweitert** klicken und dann auf **Weiter zu …** (dahinter steht die Adresse eurer App).
+4. Google fragt nach den Berechtigungen: Lesen in Google Drive und Lesen in Google Kalender. **Beide Häkchen setzen** und **Weiter** klicken.
+5. Google schickt dich zurück in die App. Dort steht im Abschnitt **Google-Zugang** „Verbunden mit Google als …“ und **„Es darf auch den Kalender lesen.“**
+
+Steht stattdessen, dass es den Kalender noch nicht lesen darf, wurde das Häkchen für den Kalender nicht gesetzt: **Verbindung trennen** und noch einmal verbinden. Client-ID und Clientschlüssel bleiben dabei gespeichert; den Clientschlüssel musst du nicht neu eintragen.
+
+Meldet die App einen Fehler, steht die Ursache dabei. Häufig: Die Weiterleitungs-URI bei Google weicht ab (genau die Adresse aus der App eintragen), der Clientschlüssel stimmt nicht oder die Anmeldung wurde abgebrochen.
+
+## 6. {bereich.gallery} und {bereich.calendar} eintragen
+- **{bereich.gallery}:** Im Abschnitt **{bereich.gallery} aus Google Drive** bei **Link zum Galerie-Ordner** den Link des Ordners aus Google Drive eintragen (z. B. `https://drive.google.com/drive/folders/…`), **Speichern**, dann **Jetzt abgleichen**. Danach gleicht die App den Ordner stündlich im Hintergrund ab; neue Bilder erscheinen spätestens nach dem nächsten Abgleich. Mit WordPress heißen die Felder im WP-Admin „Galerie-Ordner“ und **Galerie speichern**.
+- **{bereich.calendar}:** Im Abschnitt **Kalender für Mitglieder** bei **Google-Kalender-IDs** die Kalender-ID eintragen (Google Kalender → beim Kalender **⋮ → Einstellungen und Freigabe** → **Kalender integrieren** → „Kalender-ID“; beim Hauptkalender eines Kontos ist das dessen E-Mail-Adresse; mehrere durch Komma trennen), **Speichern**, dann **Kalender testen**. Mit WordPress gibt es dafür im WP-Admin auch das Feld **„Oder: Google-Kalender-IDs“** und **Speichern und testen**. Das verbundene Google-Konto muss den Kalender sehen können.
+
+## Prüfen
+- **Jetzt abgleichen** zeigt, wie viele Alben und Bilder gefunden wurden.
+- **Kalender testen** zeigt die ersten Termine. Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache, z. B. Google Calendar API nicht aktiviert oder Kalender für das Konto nicht sichtbar.
+- Unter **Zustand der App** sind {bereich.gallery} und {bereich.calendar} grün.
+
+## Alternative: Dienstkonto mit JSON-Schlüssel
+Statt „Mit Google verbinden“ geht auch ein **Dienstkonto**. Es braucht keine Anmeldung bei Google, aber einen Schlüssel, den manche Google-Organisationen sperren. Schritte 1 und 2 wie oben, dann:
+
+### Dienstkonto anlegen
 1. [IAM und Verwaltung → Dienstkonten](https://console.cloud.google.com/iam-admin/serviceaccounts) öffnen → **Dienstkonto erstellen**.
 2. Einen Namen eingeben, z. B. „kompanie-app“, und **Erstellen und fortfahren** klicken. Die beiden optionalen Schritte (Rollen, Zugriff für Nutzer) überspringen und **Fertig** klicken. Rollen im Projekt braucht das Dienstkonto nicht.
 3. Das neue Dienstkonto anklicken. Seine **E-Mail-Adresse** (endet auf `…iam.gserviceaccount.com`) brauchst du gleich für die Freigaben.
@@ -25,26 +68,18 @@ Im Projekt jeweils die Seite öffnen und **Aktivieren** klicken:
 
 > Die JSON-Datei ist ein Zugangsschlüssel. Nicht weitergeben, nicht per E-Mail verschicken und nach dem Einfügen in die App vom Rechner löschen.
 
-> **„Schlüssel erstellen ist deaktiviert“?** In Organisationen von Google Workspace sperrt eine Richtlinie das oft standardmäßig. Dann den Admin der Organisation bitten, die Organisationsrichtlinie `iam.disableServiceAccountKeyCreation` („Erstellen von Dienstkontoschlüsseln deaktivieren“) für dieses Projekt aufzuheben, oder das Projekt mit einem privaten Google-Konto anlegen.
+> **„Schlüssel erstellen ist deaktiviert“?** In Organisationen von Google Workspace sperrt eine Richtlinie das oft standardmäßig. Dann den Admin der Organisation bitten, die Organisationsrichtlinie `iam.disableServiceAccountKeyCreation` („Erstellen von Dienstkontoschlüsseln deaktivieren“) für dieses Projekt aufzuheben, oder „Mit Google verbinden“ nutzen.
 
-## 4. Freigeben
+### Freigeben
 Das Dienstkonto sieht nur, was du ihm freigibst:
 - **{bereich.gallery}:** In Google Drive den Galerie-Ordner → **Freigeben** → die E-Mail-Adresse des Dienstkontos eintragen, Rolle **Betrachter**. Eine Benachrichtigung musst du nicht senden.
-- **{bereich.calendar}** (nur über diesen Zugang): In Google Kalender beim Kalender **⋮ → Einstellungen und Freigabe** → **Für bestimmte Personen oder Gruppen freigeben** → die E-Mail-Adresse des Dienstkontos, Berechtigung **Alle Termindetails sehen**. In derselben Einstellung unter **Kalender integrieren** steht die **Kalender-ID**; beim Hauptkalender eines Kontos ist das dessen E-Mail-Adresse. Gehört der Kalender zu Google Workspace, kann der Admin der Organisation das Freigeben nach außen gesperrt haben.
+- **{bereich.calendar}:** In Google Kalender beim Kalender **⋮ → Einstellungen und Freigabe** → **Für bestimmte Personen oder Gruppen freigeben** → die E-Mail-Adresse des Dienstkontos, Berechtigung **Alle Termindetails sehen**. Gehört der Kalender zu Google Workspace, kann der Admin der Organisation das Freigeben nach außen gesperrt haben.
 
-## 5. In der App eintragen
-Unter **Konto → Einstellungen**:
-- **{bereich.gallery}:** den Inhalt der JSON-Datei bei **Schlüssel des Dienstkontos (JSON)** einfügen und den **Link zum Galerie-Ordner** eintragen. Danach erscheint die E-Mail-Adresse des Dienstkontos in den Einstellungen.
-- **{bereich.calendar}:** die **Kalender-ID** eintragen, mit WordPress auf der Einstellungsseite der App im WP-Admin im Abschnitt „Kalender“, Feld **„Oder: Google-Kalender-IDs“** (mehrere durch Komma getrennt). Ohne WordPress hat die App dafür noch kein eigenes Feld; nutze dort die iCal-Adresse. Ist keine Kalender-ID eingetragen, nutzt die App die iCal-Adresse.
-
-Mit WordPress gibt es dieselben Felder auch auf der Einstellungsseite der App im WP-Admin („Google-Zugang (JSON-Schlüssel)“, „Galerie-Ordner“).
-
-## Prüfen
-- **{bereich.gallery}:** **Jetzt abgleichen** (in den Einstellungen der App, mit WordPress auch im WP-Admin). Danach gleicht die App den Ordner stündlich im Hintergrund ab; neue Bilder erscheinen spätestens nach dem nächsten Abgleich.
-- **{bereich.calendar}:** **Kalender testen** in den Einstellungen der App zeigt die ersten Termine. Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache: Kalender nicht für das Dienstkonto freigegeben oder Google Calendar API nicht aktiviert.
-- Unter **Zustand der App** sind {bereich.gallery} und {bereich.calendar} grün.
+### In der App eintragen
+Im Abschnitt **Google-Zugang** **Alternative: Dienstkonto mit JSON-Schlüssel** aufklappen, den Inhalt der JSON-Datei bei **Schlüssel des Dienstkontos (JSON)** einfügen und **Schlüssel speichern** klicken. Danach steht dort die E-Mail-Adresse des Dienstkontos. {bereich.gallery} und {bereich.calendar} trägst du wie in Schritt 6 ein.
 
 ## Gut zu wissen
-- Das Dienstkonto liest nur. Es sieht ausschließlich die Ordner und Kalender, die du ihm freigibst.
-- Freigabe zurücknehmen oder den Schlüssel in der Cloud Console löschen beendet den Zugriff sofort.
-- Wurde eine **Verbindung zu Google** aus einer früheren App übernommen, steht in den Einstellungen „Verbunden mit Google“. Sie hat Vorrang vor dem Dienstkonto, bis du sie trennst. Den Kalender liest sie nur, wenn beim Verbinden auch der Lesezugriff auf Google Kalender erlaubt wurde.
+- Der Zugang liest nur. Mit „Mit Google verbinden“ darf die App alles lesen, was das verbundene Konto in Drive und Kalender sehen kann, liest aber nur den eingetragenen Galerie-Ordner und die eingetragenen Kalender. Ein Dienstkonto sieht ausschließlich, was du ihm freigibst.
+- Besteht eine Verbindung mit Google, hat sie Vorrang vor dem Dienstkonto.
+- **Verbindung trennen** widerruft die Verbindung auch bei Google. Ebenso beendet es den Zugriff, wenn du in deinem Google-Konto unter „Sicherheit → Drittanbieter-Apps und -Dienste“ den Zugriff der App entfernst oder den Schlüssel des Dienstkontos in der Cloud Console löschst.
+- Wurde eine Verbindung zu Google aus einer früheren App übernommen, steht im Abschnitt **Google-Zugang** „Verbunden mit Google“. Sie funktioniert weiter. Darf sie den Kalender nicht lesen, trenne sie und verbinde neu; die Client-ID ist schon eingetragen. Mit WordPress bleibt die Weiterleitungs-URI dieselbe wie in der früheren App.

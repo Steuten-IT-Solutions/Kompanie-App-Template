@@ -21,7 +21,20 @@ final class MockHttp implements ExtendedHttpClient
     {
         $ok = static fn (string|array $b, string $type = 'application/json'): array => ['status' => 200, 'headers' => ['content-type' => $type], 'body' => is_string($b) ? $b : (string) json_encode($b)];
         if (str_starts_with($url, 'https://oauth2.googleapis.com/token')) {
+            parse_str((string) $body, $form);
+            // „Mit Google verbinden“: Der Code TESTCODE gilt, alles andere lehnt Google ab.
+            if (($form['grant_type'] ?? '') === 'authorization_code') {
+                return ($form['code'] ?? '') === 'TESTCODE'
+                    ? $ok(['access_token' => 'TEST', 'expires_in' => 3600, 'refresh_token' => 'TESTREFRESH', 'scope' => 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/calendar.readonly'])
+                    : ['status' => 400, 'headers' => [], 'body' => '{"error":"invalid_grant","error_description":"Bad Request"}'];
+            }
             return $ok(['access_token' => 'TEST', 'expires_in' => 3600]);
+        }
+        if (str_starts_with($url, 'https://oauth2.googleapis.com/revoke')) {
+            return $ok('');
+        }
+        if (str_starts_with($url, 'https://www.googleapis.com/drive/v3/about')) {
+            return $ok(['user' => ['emailAddress' => 'kompanie@example.org']]);
         }
         if (str_starts_with($url, 'https://kalender.test/')) {
             return $ok(self::ics(), 'text/calendar');
