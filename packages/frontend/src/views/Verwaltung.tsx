@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { api, can, config, levelLabel, roleFactor, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
 import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
@@ -38,7 +38,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
       { id: 'mitglieder', label: 'Mitglieder', on: true },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: penalties },
-      { id: 'katalog', label: 'Katalog', on: points },
+      { id: 'katalog', label: `${sec.points}katalog`, on: points },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && ranksUsePoints() },
       { id: 'titel', label: sec.titles, on: canTitles() },
@@ -46,10 +46,17 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
     ] as { id: Sub; label: string; on: boolean }[]
   ).filter((t) => t.on);
   const active: Sub = tabs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
+  // Die Reiterleiste wischt seitlich: den aktiven Reiter sichtbar halten.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const button = nav?.querySelector<HTMLElement>('button.active');
+    if (nav && button) nav.scrollLeft = Math.max(0, button.offsetLeft - (nav.clientWidth - button.offsetWidth) / 2);
+  }, [active]);
 
   return (
     <div>
-      <nav className="segmented" aria-label="Verwaltung">
+      <nav className="segmented" aria-label="Verwaltung" ref={navRef}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -62,7 +69,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         ))}
       </nav>
       {sub === 'mitglied' && arg ? (
-        <MemberDetailView id={Number(arg)} onToast={onToast} />
+        <MemberDetailView id={Number(arg)} focus={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
@@ -175,7 +182,7 @@ function Members() {
 
 /* ------------------------------------------------------------------ */
 
-function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
+function MemberDetailView({ id, focus, onToast }: { id: number; focus?: string; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => api.member(id), [id]);
   const [busy, setBusy] = useState(false);
 
@@ -243,7 +250,15 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
       )}
 
       {m.rank && (m.member || m.rank.rank) && (
-        <MemberRank id={m.id} member={m.member} status={m.rank} history={m.rank_history ?? []} onChanged={reload} onToast={onToast} />
+        <MemberRank
+          id={m.id}
+          member={m.member}
+          status={m.rank}
+          history={m.rank_history ?? []}
+          onChanged={reload}
+          onToast={onToast}
+          focus={focus === 'dienstgrad'}
+        />
       )}
 
       {m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()) && (

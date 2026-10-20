@@ -91,7 +91,7 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await shot(page, '5-verwaltung-mitglieder');
 
-  await page.getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: 'Punktekatalog' }).click();
   await page.getByPlaceholder('z. B. Teilnahme am Sommerfest').fill('Teilnahme Sommerfest');
   await page.locator('.field.narrow input').fill('5');
   await page.getByRole('button', { name: 'Hinzufügen' }).click();
@@ -596,7 +596,7 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await expect(page.locator('.album-card', { hasText: 'Vereinsabend' })).toHaveCount(0);
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(2);
-  await expect(page.locator('.photo-lock')).toHaveCount(0);
+  await expect(page.locator('.photo[data-intern]')).toHaveCount(0);
   await page.locator('.photo').first().click();
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
   await page.keyboard.press('ArrowRight');
@@ -611,11 +611,8 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await shot(page, '16-galerie-alben');
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(3);
-  await expect(page.locator('.photo-lock')).toHaveCount(1);
-  const internSrc = await page
-    .locator('.photo', { has: page.locator('.photo-lock') })
-    .locator('img')
-    .getAttribute('src');
+  await expect(page.locator('.photo[data-intern]')).toHaveCount(1);
+  const internSrc = await page.locator('.photo[data-intern] img').getAttribute('src');
   expect(internSrc).toContain('/app/foto/');
   const asMember = await page.request.get(internSrc!);
   expect(asMember.status()).toBe(200);
@@ -1096,7 +1093,11 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
       body: JSON.stringify({ user_ids: [userId], points: 12, reason: 'E2E Dienstgrad' }),
     });
   }, id);
-  await page.reload();
+  // Aus „Beförderungen“ direkt zum Dienstgrad des Mitglieds, der nächste Dienstgrad ist vorgeschlagen.
+  await page.goto('/app/#/verwaltung/befoerderungen');
+  await page.locator('.promotions .row', { hasText: 'Mitglied2' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/verwaltung/mitglied/${id}/dienstgrad$`));
+  await expect(page.getByLabel('Neuer Dienstgrad').locator('option:checked')).toHaveText('Gefreiter (ab 10)');
   await page.getByLabel('Neuer Dienstgrad').selectOption({ label: 'Gefreiter (ab 10)' });
   await page.getByLabel('Begründung (optional)').fill('Gute Arbeit');
   await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
@@ -1107,7 +1108,7 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await page.locator('.segmented').getByRole('button', { name: 'Dienstgrad' }).click();
-  await expect(page.locator('.stat-value')).toHaveText('Gefreiter');
+  await expect(page.locator('.rank-card-title')).toHaveText('Gefreiter');
   await expect(page.locator('.rank-progress')).toContainText('bis „Unteroffizier“');
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
 });

@@ -2,7 +2,7 @@ import { api, config, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatUtcDate } from '../format';
 import { RankBadge, RankLabel } from '../RankBadge';
-import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
+import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -25,45 +25,46 @@ export default function Dienstgrad() {
           <RankBadge url={d.rank.badge_url} title={d.rank.title} size="large" />
         </div>
       )}
-      <StatCard label={`Mein ${rank}`} value={d.rank?.title ?? `Kein ${rank}`} tone="good" />
-      {withPoints && next && missing !== null && (
-        <div className={`card rank-progress${next.badge_url ? ' with-badge' : ''}`}>
-          <RankBadge url={next.badge_url} title={next.title} size="medium" />
-          <div className="rank-progress-main">
-            {missing <= 0 ? (
-              <p>
-                {sec.points} für „{next.title}“ erreicht
-                {d.threshold_reached_since ? ` (seit ${formatDate(d.threshold_reached_since)})` : ''} – die Beförderung steht noch aus.
-              </p>
-            ) : (
-              <p>
-                Noch <strong>{missing.toLocaleString('de-DE')}</strong> {sec.points} bis „{next.title}“.
-              </p>
-            )}
+      <div className="card rank-card rank-progress">
+        <div className="rank-card-label">Mein {rank}</div>
+        <div className="rank-card-title">{d.rank?.title ?? `Noch kein ${rank}`}</div>
+        {withPoints && next && missing !== null && (
+          <>
             {progress !== null && (
               <progress className="progress" value={Math.round(progress * 100)} max={100} aria-label={`Fortschritt bis ${next.title}`} />
             )}
-          </div>
-        </div>
-      )}
-      {withPoints && !next && d.rank && <p className="muted small">Das ist der höchste {rank}.</p>}
-
-      <details className="card rank-list">
-        <summary>Alle {sec.ranks}</summary>
-        <ul>
-          {d.ranks.map((r) => (
-            <li key={r.id} className={r.id === d.rank?.id ? 'current' : ''}>
-              <RankLabel url={r.badge_url} title={r.title} />
-              {withPoints && r.min_points !== null && (
-                <span className="muted">
-                  {' '}
-                  · ab {r.min_points.toLocaleString('de-DE')} {sec.points}
+            <div className={`rank-next${next.badge_url ? ' with-badge' : ''}`}>
+              <RankBadge url={next.badge_url} title={next.title} size="small" />
+              {missing <= 0 ? (
+                <span>
+                  {sec.points} für „{next.title}“ erreicht
+                  {d.threshold_reached_since ? ` (seit ${formatDate(d.threshold_reached_since)})` : ''} – die Beförderung steht noch aus.
+                </span>
+              ) : (
+                <span>
+                  Noch <strong>{missing.toLocaleString('de-DE')}</strong> {sec.points} bis „{next.title}“.
                 </span>
               )}
-            </li>
-          ))}
-        </ul>
-      </details>
+            </div>
+          </>
+        )}
+        {withPoints && !next && d.rank && <div className="rank-next">Das ist der höchste {rank}.</div>}
+      </div>
+
+      <h2 className="section-title">Alle {sec.ranks}</h2>
+      <ul className="card-list rank-list">
+        {d.ranks.map((r) => (
+          <li key={r.id} className={`card row${r.id === d.rank?.id ? ' rank-mine' : ''}`}>
+            <div className="row-main">
+              <div className="row-title">
+                <RankLabel url={r.badge_url} title={r.title} />
+              </div>
+              {r.id === d.rank?.id && <div className="row-sub">Dein {rank}</div>}
+            </div>
+            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString('de-DE')}</div>}
+          </li>
+        ))}
+      </ul>
 
       <h2 className="section-title">Verlauf</h2>
       <RankHistory entries={d.history} />

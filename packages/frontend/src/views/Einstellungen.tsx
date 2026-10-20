@@ -548,7 +548,10 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       onSubmit={(e) => {
         e.preventDefault();
         const idsChanged = ids.trim() !== c.calendar_ids;
-        if (!url.trim() && !idsChanged) return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
+        if (!url.trim() && !idsChanged) {
+          if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
+          return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
+        }
         save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim() }, () => setUrl(''));
       }}
     >

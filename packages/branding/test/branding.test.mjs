@@ -66,6 +66,7 @@ test('Alle Schrift-Flächen-Paare sind lesbar (Tableiste, Umschalter, Kennzahlen
       ['accent-dark', 'card', 4.5],
       ['accent-dark', 'bg', 4.5],
       ['on-warn', 'warn-surface', 4.5],
+      ['on-danger', 'danger-surface', 4.5],
     ];
     for (const [fg, bg, min] of pairs) {
       assert.ok(contrast(l[fg], l[bg]) >= min - 1e-9, `${id}: ${fg} auf ${bg} = ${contrast(l[fg], l[bg]).toFixed(2)}`);
@@ -75,6 +76,7 @@ test('Alle Schrift-Flächen-Paare sind lesbar (Tableiste, Umschalter, Kennzahlen
     assert.ok(contrast(d['hint-strong'], d.card) >= 4.5 && contrast(d['hint-text'], d.card) >= 4.5, `${id}: Hinweis im Dunkelmodus`);
     // Dunkelmodus übernimmt warn-surface und on-warn aus dem hellen Schema.
     assert.ok(!('warn-surface' in d) && contrast(l['on-warn'], l['warn-surface']) >= 4.5, `${id}: Warnfläche im Dunkelmodus`);
+    assert.ok(!('danger-surface' in d) && !('on-danger' in d), `${id}: Wartungshinweis im Dunkelmodus wie hell`);
     const hintBg = mix(l.card, l.accent, 0.16);
     assert.ok(contrast(l['hint-strong'], hintBg) >= 4.5 && contrast(l['hint-text'], hintBg) >= 4.5, `${id}: Hinweisbanner`);
   }

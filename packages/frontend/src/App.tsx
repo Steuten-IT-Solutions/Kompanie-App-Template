@@ -247,7 +247,8 @@ export default function App() {
     einrichtung: can('manage_settings'),
     hilfe: true,
   };
-  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
+  // „Meins“ ganz rechts wie in der Lank-App, die Verwaltung davor.
+  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');

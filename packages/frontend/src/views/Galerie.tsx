@@ -80,13 +80,13 @@ function Album({ id }: { id: number }) {
       <ul className="photo-grid">
         {photos.map((p, i) => (
           <li key={p.id}>
-            <button className="photo" onClick={() => setOpen(i)} aria-label={`Bild ${i + 1} öffnen`}>
+            <button
+              className="photo"
+              onClick={() => setOpen(i)}
+              data-intern={p.intern ? '' : undefined}
+              aria-label={`Bild ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`}
+            >
               <img src={p.thumb} alt="" loading="lazy" />
-              {p.intern && (
-                <span className="photo-lock" title="Nur für Mitglieder">
-                  🔒
-                </span>
-              )}
             </button>
           </li>
         ))}

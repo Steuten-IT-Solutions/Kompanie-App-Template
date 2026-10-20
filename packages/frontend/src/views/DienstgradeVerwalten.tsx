@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, config, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
 import brand from '../generated/brand';
 import { formatDate } from '../format';
@@ -376,7 +376,7 @@ export function Promotions() {
               <li
                 key={p.user_id}
                 className={`card row clickable ${due ? 'due' : ''}`}
-                onClick={() => navigate(`verwaltung/mitglied/${p.user_id}`)}
+                onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
               >
                 <div className="row-main">
                   <div className="row-title">{p.name}</div>
@@ -411,6 +411,7 @@ export function MemberRank({
   history,
   onChanged,
   onToast,
+  focus = false,
 }: {
   id: number;
   /** Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren. */
@@ -419,6 +420,8 @@ export function MemberRank({
   history: RankHistoryEntry[];
   onChanged: () => void;
   onToast: (msg: string) => void;
+  /** Aus „Beförderungen“ geöffnet: zum Abschnitt springen und den nächsten Dienstgrad vorschlagen. */
+  focus?: boolean;
 }) {
   // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
   const ranks = useAsync(() => api.ranks(true), []);
@@ -439,6 +442,17 @@ export function MemberRank({
     if (!points) return true;
     return up ? r.min_points === null || total >= r.min_points : canDemote;
   });
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focus) sectionRef.current?.scrollIntoView({ block: 'start' });
+  }, [focus]);
+  const suggested = focus && status.next_rank && options.some((r) => r.id === status.next_rank!.id) ? status.next_rank.id : null;
+  const suggestedOnce = useRef(false);
+  useEffect(() => {
+    if (suggested === null || suggestedOnce.current) return;
+    suggestedOnce.current = true;
+    setTarget((t) => t || String(suggested));
+  }, [suggested]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -458,7 +472,7 @@ export function MemberRank({
   }
 
   return (
-    <section className="member-rank">
+    <section className="member-rank" ref={sectionRef}>
       <h3 className="section-title">{rank}</h3>
       <p className="member-rank-current">
         {status.rank && <RankBadge url={status.rank.badge_url} title={status.rank.title} size="medium" />}

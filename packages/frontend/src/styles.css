@@ -366,16 +366,22 @@ select {
     inset 0 0 0 4px color-mix(in srgb, var(--accent-light) 55%, transparent),
     var(--shadow);
 }
+/* Logo als Wasserzeichen ganz innerhalb des inneren Rahmens, hinter dem Text. */
 .stat::after {
   content: '';
   position: absolute;
-  right: -14px;
-  bottom: -18px;
-  width: 120px;
-  height: 120px;
+  z-index: 0;
+  right: 16px;
+  top: 12px;
+  bottom: 12px;
+  width: 96px;
   opacity: 0.12;
-  background: no-repeat center / contain url('./generated/logo-small.webp');
+  background: no-repeat right center / contain url('./generated/logo-small.webp');
   filter: grayscale(1) brightness(2);
+}
+.stat > * {
+  position: relative;
+  z-index: 1;
 }
 .stat-value {
   font-family: var(--font-head);
@@ -698,9 +704,11 @@ select {
 /* ------------------------------------------------------------------ */
 
 .segmented {
+  position: relative;
   display: flex;
-  /* Viele Reiter (z. B. Verwaltung mit Dienstgraden): auf schmalen Bildschirmen in zwei Zeilen statt zu breit */
-  flex-wrap: wrap;
+  /* Viele Reiter (z. B. Verwaltung mit Dienstgraden): eine Zeile, auf schmalen Bildschirmen seitlich wischen */
+  overflow-x: auto;
+  scrollbar-width: none;
   gap: 4px;
   padding: 4px;
   margin-bottom: 18px;
@@ -709,10 +717,10 @@ select {
   border-radius: 12px;
 }
 .segmented button {
-  /* gleich breit, aber nie schmaler als der Text (dann umbrechen) */
-  flex: 1 1 0;
-  min-width: min(max-content, 100%);
-  padding: 9px 4px;
+  /* füllen die Zeile, nie schmaler als der Text (sonst seitlich wischen) */
+  flex: 1 0 auto;
+  white-space: nowrap;
+  padding: 9px 10px;
   border: 0;
   border-radius: 8px;
   background: none;
@@ -989,6 +997,9 @@ button:focus-visible {
   color: var(--ink-2);
   margin-bottom: 6px;
 }
+.segmented::-webkit-scrollbar {
+  display: none;
+}
 .segmented.small {
   margin-bottom: 0;
 }
@@ -1120,7 +1131,7 @@ code {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 .album-card {
@@ -1151,6 +1162,8 @@ code {
   font-size: 1rem;
   padding: 8px 10px 0;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 .album-count {
   font-size: 0.78rem;
@@ -1167,7 +1180,7 @@ code {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
 }
 .photo {
@@ -1187,15 +1200,6 @@ code {
   height: 100%;
   object-fit: cover;
   display: block;
-}
-.photo-lock {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  font-size: 0.7rem;
-  background: color-mix(in srgb, var(--primary-ink) 80%, transparent);
-  border-radius: 999px;
-  padding: 1px 5px;
 }
 .lightbox {
   position: fixed;
@@ -1245,10 +1249,10 @@ code {
 }
 @media (min-width: 560px) {
   .album-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .photo-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -1530,25 +1534,71 @@ fieldset.feature-list legend {
   margin-top: 18px;
 }
 
-/* Dienstgrade */
-.rank-progress p {
-  margin: 0 0 10px;
+/* Dienstgrade: eigener Dienstgrad wie in der Lank-App (Karte mit Messinglinie und Fortschrittsbalken) */
+.rank-card {
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  border-left: 4px solid var(--accent);
+}
+.rank-card-label {
+  font-family: var(--font-head);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.rank-card-title {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  color: var(--accent-text);
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.rank-next {
+  font-size: 0.92rem;
+  color: var(--ink-2);
+}
+.rank-next.with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .progress {
+  display: block;
   width: 100%;
   height: 10px;
-  accent-color: var(--primary);
+  margin: 4px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+  appearance: none;
 }
-.rank-list summary {
-  cursor: pointer;
-  font-weight: 600;
+.progress::-webkit-progress-bar {
+  background: var(--line);
+  border-radius: 999px;
 }
-.rank-list ul {
-  margin: 10px 0 0;
-  padding-left: 20px;
+.progress::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--accent-dark), var(--accent));
+  border-radius: 999px;
 }
-.rank-list li.current {
-  font-weight: 700;
+.progress::-moz-progress-bar {
+  background: linear-gradient(90deg, var(--accent-dark), var(--accent));
+  border-radius: 999px;
+}
+.rank-list .row-value {
+  font-size: 1rem;
+  color: var(--ink-2);
+}
+.rank-mine {
+  border-color: var(--accent);
+}
+.rank-mine::before {
+  background: var(--accent);
+  opacity: 1;
 }
 
 /* Abzeichen der Dienstgrade (Issue #17): ohne eigenen Hintergrund, Rahmen oder Farbfilter, damit transparente
@@ -1588,17 +1638,9 @@ fieldset.feature-list legend {
   justify-content: center;
   margin: 4px 0 14px;
 }
-.rank-progress.with-badge {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.rank-progress-main {
-  flex: 1;
-  min-width: 0;
-}
-.rank-list li {
-  margin: 4px 0;
+/* Sprung aus „Beförderungen“: nicht unter der festen Kopfleiste landen. */
+.member-rank {
+  scroll-margin-top: 100px;
 }
 .member-rank-current {
   display: flex;
@@ -1944,7 +1986,24 @@ fieldset.feature-list legend {
 .pdf-page.pdf-pending {
   opacity: 0.6;
 }
-/* Schmale Handys (z. B. 360 px): sechs Tabs ohne Umbruch. */
+/* Sechs Tabs passen auch auf schmale Handys: Tabs dürfen schmaler werden als ihre Beschriftung,
+ * die Schrift wird enger, notfalls endet sie mit „…“ statt über den Rand zu laufen. */
+.tabbar button {
+  min-width: 0;
+  padding: 0 2px;
+}
+.tabbar button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tabbar button:first-child:nth-last-child(n + 6),
+.tabbar button:first-child:nth-last-child(n + 6) ~ button {
+  flex: 1 1 auto;
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+}
 @media (max-width: 380px) {
   .tabbar button {
     letter-spacing: 0.02em;
@@ -2039,12 +2098,20 @@ fieldset.feature-list legend {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: var(--danger);
-  color: #fff;
+  background: var(--danger-surface);
+  color: var(--on-danger);
+  border-bottom: 3px solid color-mix(in srgb, var(--danger-surface) 68%, black);
   font-size: 0.9rem;
+}
+.maintenance-banner > div {
+  flex: 1;
+  min-width: 0;
 }
 .maintenance-banner .btn {
   flex-shrink: 0;
+  background: var(--on-danger);
+  border-color: var(--on-danger);
+  color: var(--danger-surface);
 }
 
 /* ------------------------------------------------------------------ */
@@ -2460,11 +2527,11 @@ fieldset.feature-list legend {
 }
 .inventory-actions {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 @media (min-width: 560px) {
   .inventory-actions {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 .inventory-form {
