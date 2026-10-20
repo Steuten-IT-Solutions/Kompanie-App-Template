@@ -561,8 +561,9 @@ final class Api
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
                 + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
-                // Geburtstag mit Jahr und Schaltern (Issue #1), für alle, die Mitgliedsdetails sehen
-                + ($a->features()->enabled('birthdays') ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
+                // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
+                // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
+                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten

@@ -185,6 +185,14 @@ final class BirthdayServiceTest extends TestCase
         $this->assertSame(['month' => 7, 'day' => 8, 'year' => 1981, 'visible' => false, 'show_age' => true], $detail['birthday']);
         $this->assertNull($this->call('GET', "/members/{$this->m3}")->data['birthday']);
 
+        // Wer Mitgliedsdetails nur wegen anderer Rechte sieht (hier Punkte), bekommt kein Geburtsdatum
+        $pointsRole = $this->app->roles()->create(['label' => 'Punktewart', 'capabilities' => ['member', 'manage_points']]);
+        $pointsManager = $this->users->add('punktewart', $pointsRole['key']);
+        $res = $this->as($pointsManager)->call('GET', "/members/{$this->m}");
+        $this->assertSame(200, $res->status);
+        $this->assertArrayNotHasKey('birthday', $res->data);
+        $this->as($this->creator);
+
         $this->assertSame(['birthday' => null], $this->call('DELETE', "/members/{$this->m}/birthday")->data);
         $this->assertSame(['birthday' => null], $this->as($this->m)->call('GET', '/me/birthday')->data);
     }
