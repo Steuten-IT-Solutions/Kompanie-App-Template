@@ -318,9 +318,11 @@ $env = new KompanieApp\WordPress\WpEnvironment();
 $c->ok(str_contains($env->appUrl('csrf'), 'kompanie_app=csrf') && str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto%2F3%2Fthumb') || str_contains($env->photoUrl(3, 'thumb'), 'kompanie_app=foto/3/thumb'), 'Einfache Permalinks: App-Adressen über Parameter');
 $c->ok(str_contains($env->serviceWorkerUrl(), 'kompanie_app=sw.js'), 'Einfache Permalinks: Service Worker über Parameter (nicht /sw.js)');
 $c->ok((bool) preg_match('#kompanie_app=dokument(/|%2F)7&v=abc$#', $env->documentUrl(7, 'abc')), 'Einfache Permalinks: Dokument-Adresse mit &v=');
+$c->ok((bool) preg_match('#kompanie_app=abzeichen(/|%2F)7&v=abc&s=64$#', $env->badgeUrl(7, 'abc', 64)), 'Einfache Permalinks: Abzeichen-Adresse mit &v= und &s=');
 update_option('permalink_structure', $structure);
 $c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
 $c->ok(str_ends_with($env->documentUrl(7, 'abc'), '/app/dokument/7?v=abc'), 'Schöne Permalinks: /app/dokument/7?v=…');
+$c->ok(str_ends_with($env->badgeUrl(7, 'abc', 128), '/app/abzeichen/7?v=abc&s=128'), 'Schöne Permalinks: /app/abzeichen/7?v=…&s=…');
 // Deaktivieren entfernt die /app/-Regeln.
 global $wp_rewrite;
 KompanieApp\WordPress\AppPage::addRewriteRules();
@@ -344,6 +346,53 @@ $c->ok(!in_array($autoload('gallery_status'), ['yes', 'on', 'auto-on', 'auto'], 
 $cache = new KompanieApp\WordPress\WpCache();
 $key = 'test_' . wp_generate_password(6, false);
 $c->ok($cache->increment($key, 900) === 1 && $cache->increment($key, 900) === 2 && $cache->increment($key . 'x', 900) === 1, 'Zähler im Cache zählt atomar je Schlüssel');
+
+$c->section('Abzeichen der Dienstgrade');
+// Transparenz bleibt beim Verkleinern mit dem Bildeditor von WordPress, auch mit einem Plugin, das nach WebP umleiten will.
+add_filter('image_editor_output_format', $toWebp);
+$src = get_temp_dir() . 'ka-badge-' . wp_generate_password(6, false) . '.png';
+$im = imagecreatetruecolor(200, 100);
+imagealphablending($im, false);
+imagesavealpha($im, true);
+imagefill($im, 0, 0, (int) imagecolorallocatealpha($im, 0, 0, 0, 127));
+imagefilledrectangle($im, 50, 25, 150, 75, (int) imagecolorallocate($im, 200, 0, 0));
+imagepng($im, $src);
+$target = get_temp_dir() . 'ka-badge-out-' . wp_generate_password(6, false) . '.png';
+$size = (new KompanieApp\WordPress\WpImageResizer())->resizeToPng($src, $target, 64);
+remove_filter('image_editor_output_format', $toWebp);
+$out = is_file($target) ? imagecreatefrompng($target) : false;
+$c->ok($out !== false && getimagesize($target)['mime'] === 'image/png' && $size === ['width' => 64, 'height' => 32], 'Abzeichen: PNG in 64 Pixeln, auch mit WebP-Plugin');
+$c->ok($out !== false && imagecolorsforindex($out, imagecolorat($out, 1, 1))['alpha'] === 127 && imagecolorsforindex($out, imagecolorat($out, 32, 16))['alpha'] === 0, 'Abzeichen: transparenter Hintergrund bleibt (WordPress-Bildeditor)');
+@unlink($src);
+@unlink($target);
+wp_set_current_user($admin);
+$rank = $app->ranks()->create(['title' => 'Kpwp Abzeichen ' . wp_generate_password(4, false)]);
+$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><script>alert(1)</script><circle cx="5" cy="5" r="4"/></svg>';
+$badge = $app->ranks()->uploadBadge($rank['id'], ['name' => 'abzeichen.svg', 'data' => base64_encode($svg)]);
+parse_str((string) wp_parse_url((string) $badge['badge_url'], PHP_URL_QUERY), $q);
+$_GET['v'] = (string) ($q['v'] ?? '');
+$_GET['s'] = '128';
+wp_set_current_user(0);
+$res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
+$c->ok($res['status'] === 401 && ($res['headers']['X-Content-Type-Options'] ?? '') === 'nosniff' && !isset($res['path']), 'Abzeichen ohne Anmeldung → 401');
+wp_set_current_user($member);
+$res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
+$c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/svg+xml' && $res['headers']['X-Content-Type-Options'] === 'nosniff'
+    && ($res['headers']['Content-Security-Policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Mitglied: SVG mit strenger CSP und nosniff');
+$c->ok(str_starts_with($res['headers']['Cache-Control'], 'private') && !str_contains((string) file_get_contents((string) ($res['path'] ?? '')), 'script'), 'Privat gespeichert, ausgeliefert wird das bereinigte SVG');
+wp_set_current_user($admin);
+$im = imagecreatetruecolor(300, 300);
+ob_start();
+imagepng($im);
+$app->ranks()->uploadBadge($rank['id'], ['name' => 'abzeichen.png', 'data' => base64_encode((string) ob_get_clean())]);
+$_GET['s'] = '64';
+wp_set_current_user($member);
+$res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
+$c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/png' && !isset($res['headers']['Content-Security-Policy']) && getimagesize((string) ($res['path'] ?? ''))[0] === 64, 'PNG-Abzeichen über den Bildeditor von WordPress, s=64');
+unset($_GET['v'], $_GET['s']);
+wp_set_current_user($admin);
+$app->ranks()->removeBadge($rank['id']);
+$app->ranks()->delete($rank['id']);
 
 $c->section('Wartungsmodus');
 wp_set_current_user($admin);

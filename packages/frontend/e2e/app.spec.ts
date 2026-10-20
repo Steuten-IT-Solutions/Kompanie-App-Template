@@ -1003,6 +1003,104 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
 });
 
+test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
+  page,
+}) => {
+  // 64 × 32 Pixel, transparenter Hintergrund mit rotem Rechteck
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAR0lEQVRo3u3SMQ0AIAxFwYKQ6sD/hA6MgIgODL0T0OS/NAIA6GpUD+zM+3PAOqe0YXb/AAEEEEAAAQQQQAABBBBAAAEAADp5dzgEIAd9ksQAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const svg = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20" onload="alert(1)"><script>alert(2)</script>' +
+      '<path d="M2 18 L20 2 L38 18 Z" fill="#c8a400" stroke="#fff" stroke-width="2"/></svg>',
+  );
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrade' }).click();
+  for (const [title, file] of [
+    ['Gefreiter', { name: 'gefreiter.png', mimeType: 'image/png', buffer: png }],
+    ['Unteroffizier', { name: 'uffz.svg', mimeType: 'image/svg+xml', buffer: svg }],
+  ] as const) {
+    const row = page.locator('.row', { has: page.getByText(title, { exact: true }) });
+    const chooser = page.waitForEvent('filechooser');
+    await row.getByRole('button', { name: 'Abzeichen hochladen' }).click();
+    await (await chooser).setFiles(file);
+    await expect(page.locator('.toast')).toHaveText('Abzeichen gespeichert');
+    // Vorschau auf heller und dunkler Fläche nebeneinander
+    await expect(row.locator('.badge-preview-light img')).toHaveAttribute('alt', title);
+    await expect(row.locator('.badge-preview-dark img')).toHaveAttribute('alt', title);
+    await expect(row.getByRole('button', { name: 'Ersetzen' })).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Entfernen' })).toBeVisible();
+  }
+  await shot(page, 'abzeichen-verwalten');
+  // Das SVG hat im Browser eine PNG-Fassung für Benachrichtigungen bekommen.
+  await expect(page.locator('.row', { has: page.getByText('Unteroffizier', { exact: true }) })).not.toContainText(
+    'Ohne Bild in Benachrichtigungen',
+  );
+
+  await login(page, 'mitglied2');
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrad' }).click();
+  const loaded = (alt: string, scope: string) =>
+    page.evaluate(
+      ([a, s]) => {
+        const img = document.querySelector<HTMLImageElement>(`${s} img[alt="${a}"]`);
+        return !!img && img.complete && img.naturalWidth > 0;
+      },
+      [alt, scope],
+    );
+  const hero = page.locator('.rank-badge-hero img');
+  await expect(hero).toHaveAttribute('alt', 'Gefreiter');
+  await expect.poll(() => loaded('Gefreiter', '.rank-badge-hero')).toBe(true);
+  await expect(page.locator('.rank-progress img')).toHaveAttribute('alt', 'Unteroffizier');
+  await page.getByText('Alle Dienstgrade').click();
+  await expect(page.locator('.rank-list img[alt="Gefreiter"]')).toBeVisible();
+  await expect(page.locator('.rank-list img[alt="Unteroffizier"]')).toBeVisible();
+  await expect.poll(() => loaded('Unteroffizier', '.rank-list')).toBe(true);
+  await shot(page, 'abzeichen-meins');
+  // Ausgeliefert wird das bereinigte SVG.
+  const svgText = await page.evaluate(async () =>
+    (await fetch(document.querySelector<HTMLImageElement>('.rank-list img[alt="Unteroffizier"]')!.src)).text(),
+  );
+  expect(svgText).toContain('<path');
+  expect(svgText).not.toContain('script');
+  expect(svgText).not.toContain('onload');
+
+  // Dunkelmodus: keine eigene Fläche, kein Rahmen, kein Filter
+  await page.emulateMedia({ colorScheme: 'dark' });
+  const look = await hero.evaluate((img) => {
+    const s = getComputedStyle(img);
+    const p = getComputedStyle(img.parentElement!);
+    return [s.backgroundColor, s.backgroundImage, s.borderTopWidth, s.filter, p.backgroundColor];
+  });
+  expect(look).toEqual(['rgba(0, 0, 0, 0)', 'none', '0px', 'none', 'rgba(0, 0, 0, 0)']);
+  await shot(page, 'abzeichen-meins-dunkel');
+  await page.emulateMedia({ colorScheme: 'light' });
+
+  // Einmal geladen, auch offline da (versionierte Adressen, zuerst aus dem Speicher).
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        if (!(await caches.keys()).includes('kompanie-badges-v1')) return 0;
+        return (await (await caches.open('kompanie-badges-v1')).keys()).length;
+      }),
+    )
+    .toBeGreaterThanOrEqual(2);
+  await page.context().setOffline(true);
+  try {
+    await page.reload();
+    await expect(page.locator('.offline')).toBeVisible();
+    await expect(hero).toHaveAttribute('alt', 'Gefreiter');
+    await expect.poll(() => loaded('Gefreiter', '.rank-badge-hero')).toBe(true);
+    await page.getByText('Alle Dienstgrade').click();
+    await expect.poll(() => loaded('Unteroffizier', '.rank-list')).toBe(true);
+  } finally {
+    await page.context().setOffline(false);
+  }
+});
+
 test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht seine Anwesenheit', async ({ page }) => {
   const title = `Übung ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);

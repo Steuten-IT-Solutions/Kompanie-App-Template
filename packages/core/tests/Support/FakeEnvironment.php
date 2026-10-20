@@ -47,4 +47,9 @@ final class FakeEnvironment implements Environment
     {
         return 'https://example.org/app/dokument/' . $id . '?v=' . $version;
     }
+
+    public function badgeUrl(int $rankId, string $version, int $size): string
+    {
+        return 'https://example.org/app/abzeichen/' . $rankId . '?v=' . $version . '&s=' . $size;
+    }
 }

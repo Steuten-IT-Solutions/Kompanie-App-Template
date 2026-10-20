@@ -1,6 +1,7 @@
 import { api, config, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatUtcDate } from '../format';
+import { RankBadge, RankLabel } from '../RankBadge';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
 
 const rank = brand.labels.rank;
@@ -19,22 +20,30 @@ export default function Dienstgrad() {
 
   return (
     <div>
+      {d.rank?.badge_url && (
+        <div className="rank-badge-hero">
+          <RankBadge url={d.rank.badge_url} title={d.rank.title} size="large" />
+        </div>
+      )}
       <StatCard label={`Mein ${rank}`} value={d.rank?.title ?? `Kein ${rank}`} tone="good" />
       {withPoints && next && missing !== null && (
-        <div className="card rank-progress">
-          {missing <= 0 ? (
-            <p>
-              {sec.points} für „{next.title}“ erreicht{d.threshold_reached_since ? ` (seit ${formatDate(d.threshold_reached_since)})` : ''}{' '}
-              – die Beförderung steht noch aus.
-            </p>
-          ) : (
-            <p>
-              Noch <strong>{missing.toLocaleString('de-DE')}</strong> {sec.points} bis „{next.title}“.
-            </p>
-          )}
-          {progress !== null && (
-            <progress className="progress" value={Math.round(progress * 100)} max={100} aria-label={`Fortschritt bis ${next.title}`} />
-          )}
+        <div className={`card rank-progress${next.badge_url ? ' with-badge' : ''}`}>
+          <RankBadge url={next.badge_url} title={next.title} size="medium" />
+          <div className="rank-progress-main">
+            {missing <= 0 ? (
+              <p>
+                {sec.points} für „{next.title}“ erreicht
+                {d.threshold_reached_since ? ` (seit ${formatDate(d.threshold_reached_since)})` : ''} – die Beförderung steht noch aus.
+              </p>
+            ) : (
+              <p>
+                Noch <strong>{missing.toLocaleString('de-DE')}</strong> {sec.points} bis „{next.title}“.
+              </p>
+            )}
+            {progress !== null && (
+              <progress className="progress" value={Math.round(progress * 100)} max={100} aria-label={`Fortschritt bis ${next.title}`} />
+            )}
+          </div>
         </div>
       )}
       {withPoints && !next && d.rank && <p className="muted small">Das ist der höchste {rank}.</p>}
@@ -44,7 +53,7 @@ export default function Dienstgrad() {
         <ul>
           {d.ranks.map((r) => (
             <li key={r.id} className={r.id === d.rank?.id ? 'current' : ''}>
-              {r.title}
+              <RankLabel url={r.badge_url} title={r.title} />
               {withPoints && r.min_points !== null && (
                 <span className="muted">
                   {' '}
@@ -70,6 +79,7 @@ export function RankHistory({ entries }: { entries: RankHistoryEntry[] }) {
     <ul className="card-list">
       {entries.map((h, i) => (
         <li key={i} className="card row">
+          {h.to && <RankBadge url={h.to_badge_url} title={h.to} size="small" />}
           <div className="row-main">
             <div className="row-title">
               {KIND[h.kind]}: {h.from ?? `kein ${rank}`} → {h.to ?? `kein ${rank}`}

@@ -16,6 +16,9 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Wiederherstellen ersetzt den Inhalt der Tabellen. Spalten, die die Datenbank nicht kennt
  * (Sicherung einer neueren Version), werden ausgelassen; fehlende bekommen ihren Standardwert.
  * Galeriebilder sind nicht enthalten; sie werden nach dem Wiederherstellen neu aus Drive erzeugt.
+ * Dateien der Dokumente und Abzeichen der Dienstgrade sind ebenfalls nicht enthalten, nur ihre Zeilen (mit dem Namen
+ * der Datei); die Dateien bleiben in der geschützten Dateiablage. Fehlt ein Abzeichen nach dem Einspielen auf einem
+ * anderen Server, liefert die API badge_url = null.
  */
 final class Backup
 {

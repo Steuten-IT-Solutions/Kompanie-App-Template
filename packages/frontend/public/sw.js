@@ -9,6 +9,8 @@
  * - Dokumente (<App>/dokument/<id>?v=<Fassung>, Issue #2) → zuerst aus dem Speicher: Die Adresse wechselt mit
  *   jeder neuen Fassung. Was einmal geöffnet wurde, ist so offline verfügbar; gespeichert wird je Dokument nur die
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
+ * - Abzeichen der Dienstgrade (<App>/abzeichen/<id>?v=<Fassung>&s=<Größe>, Issue #17) → zuerst aus dem Speicher,
+ *   ebenso versioniert; je Dienstgrad und Größe nur die aktuelle Fassung. Einmal geladen, sind sie offline da.
  * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
@@ -22,6 +24,7 @@ const STATIC_CACHE = 'kompanie-static-' + BUILD;
 // v2: v1 konnte Antworten von /admin/ enthalten (z. B. eine Datensicherung); beim Aktivieren gelöscht.
 const DATA_CACHE = 'kompanie-data-v2';
 const DOCS_CACHE = 'kompanie-docs-v1';
+const BADGES_CACHE = 'kompanie-badges-v1';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
@@ -57,7 +60,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE].includes(k)).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(keys.filter((k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE].includes(k)).map((k) => caches.delete(k))),
+      )
       .then(() => trimData())
       .then(() => self.clients.claim()),
   );
@@ -104,6 +109,38 @@ async function documentFirst(request, id) {
   if (cacheable(res)) {
     const keys = await cache.keys();
     await Promise.all(keys.filter((k) => documentId(new URL(k.url)) === id).map((k) => cache.delete(k)));
+    await cache.put(request, res.clone());
+  }
+  return res;
+}
+
+/**
+ * Kennung eines Abzeichens aus seiner Adresse (Dienstgrad und Größe): <App>/abzeichen/<id>, ?kompanie_app=abzeichen/<id>
+ * oder ?r=/abzeichen/<id>
+ */
+function badgeKey(url) {
+  const scope = new URL(self.registration.scope);
+  let id = null;
+  if (url.pathname.startsWith(scope.pathname)) {
+    const m = url.pathname.slice(scope.pathname.length).match(/^abzeichen\/(\d+)\/?$/);
+    if (m) id = m[1];
+  }
+  if (id === null) {
+    const m = (url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '').match(/^\/?abzeichen\/(\d+)$/);
+    if (m) id = m[1];
+  }
+  return id === null ? null : id + ':' + (url.searchParams.get('s') || '');
+}
+
+/** Abzeichen: gespeicherte Fassung, sonst laden und ältere Fassungen desselben Abzeichens (gleiche Größe) ersetzen. */
+async function badgeFirst(request, key) {
+  const cache = await caches.open(BADGES_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const res = await fetch(request);
+  if (cacheable(res)) {
+    const keys = await cache.keys();
+    await Promise.all(keys.filter((k) => badgeKey(new URL(k.url)) === key).map((k) => cache.delete(k)));
     await cache.put(request, res.clone());
   }
   return res;
@@ -176,7 +213,10 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   const doc = documentId(url);
-  if (doc !== null) {
+  const badge = doc === null ? badgeKey(url) : null;
+  if (badge !== null) {
+    if (request.mode !== 'navigate') event.respondWith(badgeFirst(request, badge));
+  } else if (doc !== null) {
     // Direkt aufgerufen (neuer Tab, Download-Link): durchreichen, nicht als App-Seite speichern.
     if (request.mode !== 'navigate') event.respondWith(documentFirst(request, doc));
   } else if (isStatic(url)) {
@@ -188,8 +228,8 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-/* Benachrichtigungen (Web Push, Issue #19). Der Server schickt verschlüsselt {title, body, route, tag};
- * route ist ein Ziel in der App (z. B. „meins/punkte“). */
+/* Benachrichtigungen (Web Push, Issue #19). Der Server schickt verschlüsselt {title, body, route, tag, image?};
+ * route ist ein Ziel in der App (z. B. „meins/punkte“), image optional ein Bild (Abzeichen bei Beförderungen, Issue #17). */
 self.addEventListener('push', (event) => {
   let msg = {};
   try {
@@ -203,6 +243,18 @@ self.addEventListener('push', (event) => {
     data: { route: typeof msg.route === 'string' ? msg.route : '' },
   };
   if (ASSETS !== '') options.icon = ASSETS + 'icons/icon-192.png';
+  // Mit Bild (Abzeichen): als großes Bild und als Symbol; nur Adressen der eigenen Seite.
+  if (typeof msg.image === 'string' && msg.image !== '') {
+    try {
+      const image = new URL(msg.image, self.registration.scope);
+      if (image.origin === self.location.origin) {
+        options.image = image.href;
+        options.icon = image.href;
+      }
+    } catch {
+      // ungültige Adresse: ohne Bild wie bisher
+    }
+  }
   // Gleiche Kennung: Die neue Nachricht ersetzt die alte (z. B. die tägliche Erinnerung).
   if (typeof msg.tag === 'string' && msg.tag !== '') {
     options.tag = msg.tag;

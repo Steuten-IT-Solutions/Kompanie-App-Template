@@ -238,6 +238,35 @@ try {
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 404, 'Unbekanntes Foto → 404');
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');
+
+    $c->section('Abzeichen der Dienstgrade (Auslieferung)');
+    $d->actAs($anna);
+    [, $badgeRank] = $d->request('POST', '/ranks', ['title' => 'Kpsa Abzeichen ' . bin2hex(random_bytes(2))]);
+    $svgBadge = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" onload="alert(1)"><script>alert(2)</script><circle cx="5" cy="5" r="4"/></svg>';
+    [$s, $badge] = $d->request('POST', '/ranks/' . ($badgeRank['id'] ?? 0) . '/badge', ['file' => ['name' => 'abzeichen.svg', 'data' => base64_encode($svgBadge)]]);
+    $badgeUrl = (string) ($badge['badge_url'] ?? '');
+    $c->ok($s === 200 && str_starts_with($badgeUrl, $base . 'index.php?r=/abzeichen/' . ($badgeRank['id'] ?? 0) . '&v='), 'SVG-Abzeichen hochgeladen, Adresse im Bereich der App');
+    $anon = $d->send('GET', $badgeUrl, [], null);
+    $c->ok($anon[0] === 401 && ($anon[2]['x-content-type-options'] ?? '') === 'nosniff', 'Abzeichen ohne Anmeldung → 401');
+    $cookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)];
+    $svgRes = $d->send('GET', $badgeUrl, $cookie, null);
+    $c->ok($svgRes[0] === 200 && ($svgRes[2]['content-type'] ?? '') === 'image/svg+xml' && ($svgRes[2]['x-content-type-options'] ?? '') === 'nosniff'
+        && ($svgRes[2]['content-security-policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'SVG: image/svg+xml mit strenger CSP und nosniff');
+    $c->ok(str_starts_with((string) ($svgRes[2]['cache-control'] ?? ''), 'private'), 'Abzeichen: Cache-Control private');
+    $svgBody = (string) file_get_contents($badgeUrl, false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]]));
+    $c->ok(str_contains($svgBody, '<circle') && !str_contains($svgBody, 'script') && !str_contains($svgBody, 'onload'), 'Ausgeliefert wird das bereinigte SVG');
+    $guestId = $users->add('Gina Gast', 'gina', 'gina@example.org', 'gina-passwort', Roles::GUEST);
+    $c->ok($d->send('GET', $badgeUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($guestId)], null)[0] === 403, 'Abzeichen ohne Mitgliederbereich und Kalender → 403');
+    $im = imagecreatetruecolor(300, 150);
+    ob_start();
+    imagepng($im);
+    [, $pngBadge] = $d->request('POST', '/ranks/' . ($badgeRank['id'] ?? 0) . '/badge', ['file' => ['name' => 'abzeichen.png', 'data' => base64_encode((string) ob_get_clean())]]);
+    $pngUrl = str_replace('&s=128', '&s=64', (string) ($pngBadge['badge_url'] ?? ''));
+    $pngRes = $d->send('GET', $pngUrl, $cookie, null);
+    $pngSize = @getimagesizefromstring((string) file_get_contents($pngUrl, false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
+    $c->ok($pngRes[0] === 200 && ($pngRes[2]['content-type'] ?? '') === 'image/png' && !isset($pngRes[2]['content-security-policy']) && ($pngSize[0] ?? 0) === 64 && ($pngSize[1] ?? 0) === 32, 'PNG-Abzeichen: image/png, s=64 liefert 64 Pixel');
+    $old = $d->send('GET', $badgeUrl, $cookie, null);
+    $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
     $bad = $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $json, '{kaputt');
     $c->ok($bad[0] === 400 && $bad[1]['code'] === 'invalid', 'Ungültiges JSON → 400');
 
@@ -388,6 +417,7 @@ try {
     $c->ok($s === 200 && ($cfg['maintenance']['on'] ?? false) === true, '/config bleibt erreichbar und meldet die Wartung');
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 503, 'Geschützte Fotos → 503');
     $c->ok($d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null)[0] === 503, 'Dokumente → 503');
+    $c->ok($d->send('GET', $pngUrl, [], null)[0] === 503, 'Abzeichen → 503');
     $c->ok($d->send('GET', $base, [], null)[0] === 200, 'App-Seite wird weiter ausgeliefert (zeigt die Wartungsseite)');
     $d->actAs($anna);
     $c->ok($d->request('POST', '/admin/maintenance', ['on' => false])[1]['on'] === false, 'Admin beendet den Wartungsmodus');

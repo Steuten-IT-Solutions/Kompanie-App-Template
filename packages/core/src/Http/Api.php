@@ -391,6 +391,9 @@ final class Api
                 $a->ranks()->delete($r->id());
                 return ['deleted' => true];
             }, 'ranks', $denyRights),
+            // Abzeichen (Issue #17): Datei Base64 im JSON, bei SVG optional eine PNG-Fassung (png) für Benachrichtigungen
+            new Route('POST', '/ranks/{id}/badge', Cap::ManageRanks, fn (Request $r) => $a->ranks()->uploadBadge($r->id(), $r->input('file'), $r->input('png')), 'ranks', $denyRights),
+            new Route('DELETE', '/ranks/{id}/badge', Cap::ManageRanks, fn (Request $r) => $a->ranks()->removeBadge($r->id()), 'ranks', $denyRights),
             new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason')), 'ranks', $denyRights),
             new Route('GET', '/promotions', Cap::ManageRanks, fn () => $a->ranks()->promotions(), 'ranks', $denyRights),
 
@@ -446,8 +449,11 @@ final class Api
                 );
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
                 if ($this->showRanks()) {
-                    $rankTitles = $a->ranks()->titles();
-                    $list = array_map(static fn (array $m): array => $m + ['rank_title' => $rankTitles[$m['id']] ?? null], $list);
+                    $ranks = $a->ranks()->assigned();
+                    $list = array_map(static fn (array $m): array => $m + [
+                        'rank_title' => $ranks[$m['id']]['title'] ?? null,
+                        'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null,
+                    ], $list);
                 }
                 if ($this->showTitles()) {
                     $titles = $a->titles()->byUser();

@@ -5,6 +5,7 @@ import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd 
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
+import { RankLabel } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
@@ -148,7 +149,12 @@ function Members() {
                 <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
-                {m.rank_title !== undefined && `${m.rank_title ?? `Kein ${brand.labels.rank}`}${canPoints() ? ' · ' : ''}`}
+                {m.rank_title !== undefined && (
+                  <>
+                    {m.rank_title ? <RankLabel url={m.rank_badge_url} title={m.rank_title} /> : `Kein ${brand.labels.rank}`}
+                    {canPoints() ? ' · ' : ''}
+                  </>
+                )}
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
                 {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}

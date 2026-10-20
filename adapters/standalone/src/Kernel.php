@@ -33,6 +33,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /manifest.webmanifest    Manifest         (index.php?r=/manifest.webmanifest)
  *   /foto/<id>/<größe>       Galeriebild      (index.php?r=/foto/…)
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
+ *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  */
 final class Kernel
@@ -317,6 +318,8 @@ final class Kernel
             $this->sendPhoto((int) $m[1], $m[2]);
         } elseif (preg_match('#^/dokument/(\d+)$#', $path, $m)) {
             $this->sendDocument((int) $m[1]);
+        } elseif (preg_match('#^/abzeichen/(\d+)$#', $path, $m)) {
+            $this->sendBadge((int) $m[1]);
         } elseif ($path === '/cron') {
             $this->sendCron();
             return;
@@ -465,6 +468,24 @@ final class Kernel
         header('Content-Disposition: ' . $res['disposition']);
         header('X-Robots-Tag: noindex');
         readfile($res['path']);
+    }
+
+    /** Abzeichen (Issue #17): Status und Header wie im Kern festgelegt (SVG mit strenger CSP). */
+    private function sendBadge(int $id): void
+    {
+        $app = $this->app();
+        $v = is_string($_GET['v'] ?? null) ? $_GET['v'] : null;
+        $s = is_string($_GET['s'] ?? null) ? $_GET['s'] : null;
+        $res = $app->ranks()->badgeForDelivery($app->authContext->currentUser(), $id, $v, $s);
+        $this->securityHeaders();
+        http_response_code($res['status']);
+        foreach ($res['headers'] as $name => $value) {
+            header($name . ': ' . $value);
+        }
+        if ($res['status'] === 200 && isset($res['path'])) {
+            header('Content-Length: ' . filesize($res['path']));
+            readfile($res['path']);
+        }
     }
 
     private function sendCron(): void
