@@ -22,6 +22,8 @@ final class DriveMock
     public string $validRefreshToken = 'REFRESH1';
     public bool $paged = false;
     public int $downloads = 0;
+    /** Downloads scheitern (HTTP 500), z. B. bei einer Störung. */
+    public bool $downloadFails = false;
     public string $privateKey = '';
     private string $publicKey;
 
@@ -104,7 +106,7 @@ final class DriveMock
             }
             if (str_contains($url, 'alt=media')) {
                 $this->downloads++;
-                return ['status' => 200, 'body' => self::jpeg()];
+                return $this->downloadFails ? ['status' => 500, 'body' => ''] : ['status' => 200, 'body' => self::jpeg()];
             }
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
             preg_match("/'([^']+)' in parents/", (string) $q['q'], $m);

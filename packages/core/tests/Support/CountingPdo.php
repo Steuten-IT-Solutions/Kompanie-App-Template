@@ -16,6 +16,23 @@ final class CountingPdo extends \PDO
         return parent::prepare($query, $options);
     }
 
+    /** @var string[] Beginn von Transaktionen (BEGIN IMMEDIATE über exec bzw. beginTransaction), getrennt von $log */
+    public array $transactions = [];
+
+    public function exec(string $statement): int|false
+    {
+        if (preg_match('/^\s*BEGIN\b/i', $statement)) {
+            $this->transactions[] = trim($statement);
+        }
+        return parent::exec($statement);
+    }
+
+    public function beginTransaction(): bool
+    {
+        $this->transactions[] = 'BEGIN';
+        return parent::beginTransaction();
+    }
+
     /** @return string[] Abfragen, die schreiben */
     public function writes(): array
     {

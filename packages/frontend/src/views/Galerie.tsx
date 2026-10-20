@@ -39,8 +39,9 @@ function Overview() {
   );
 }
 
-/** Noch nicht aufbereitete Bilder: so oft neu laden (alle 30 s), danach erst beim nächsten Öffnen. */
-const PENDING_RETRIES = 20;
+/** Noch nicht aufbereitete Bilder: so oft neu laden (alle 10 s, wie Retry-After), danach erst beim nächsten Öffnen. */
+const PENDING_RETRIES = 60;
+const PENDING_INTERVAL = 10000;
 
 /** Adresse eines Platzhalters mit Zähler, damit der Browser das Bild neu holt statt aus dem Speicher. */
 function retryUrl(url: string, n: number): string {
@@ -53,13 +54,13 @@ function Album({ id }: { id: number }) {
   const [retry, setRetry] = useState(0);
   const pending = !!data?.photos.some((p) => !p.ready);
 
-  // Bilder werden im Hintergrund aufbereitet: nachsehen, bis alle fertig sind.
+  // Bilder entstehen beim Abruf (höchstens wenige gleichzeitig) oder im Hintergrund: nachsehen, bis alle fertig sind.
   useEffect(() => {
     if (!pending || retry >= PENDING_RETRIES) return;
     const t = setTimeout(() => {
       setRetry((n) => n + 1);
       reload();
-    }, 30000);
+    }, PENDING_INTERVAL);
     return () => clearTimeout(t);
   }, [pending, retry, reload]);
 

@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace KompanieApp\Contract;
 
-use KompanieApp\Core\Port\HttpClient;
+use KompanieApp\Core\Infra\SequentialHttp;
+use KompanieApp\Core\Port\ExtendedHttpClient;
 
 /**
  * Nur für Tests: simuliert Google Drive, einen Kalender (https://kalender.test/test.ics)
  * und einen News-Feed (https://news.test/feed), damit E2E-Tests ohne Netz laufen.
  * Inhalte wie in der WordPress-Testinstanz (scripts/setup-test-wp.sh, tests/wordpress/drive-mock.php).
+ * Mehrere Anfragen und Downloads nacheinander (SequentialHttp), damit dieselben Wege wie mit cURL laufen.
  */
-final class MockHttp implements HttpClient
+final class MockHttp implements ExtendedHttpClient
 {
+    use SequentialHttp;
+
     public function request(string $method, string $url, array $headers = [], ?string $body = null, int $timeoutSeconds = 15): array
     {
         $ok = static fn (string|array $b, string $type = 'application/json'): array => ['status' => 200, 'headers' => ['content-type' => $type], 'body' => is_string($b) ? $b : (string) json_encode($b)];

@@ -253,10 +253,15 @@ final class GalleryTest extends TestCase
         $gallery->processPending(60);
 
         $pdo->log = [];
+        $pdo->transactions = [];
         $stats = $gallery->sync();
         $this->assertSame(5, $stats['photos']);
         $this->assertSame([], $pdo->writes(), 'Abgleich ohne Änderungen schreibt nichts in die Datenbank');
+        $this->assertSame([], $pdo->transactions, 'und öffnet keine Transaktion (SQLite: keine Schreibsperre)');
         $this->assertSame(3, count(preg_grep('/FROM kompanie_photos WHERE drive_file_id IN/', $pdo->log)), 'eine Abfrage je Album für die vorhandenen Bilder');
+        $this->assertSame(['SELECT * FROM kompanie_albums'], array_values(preg_grep('/FROM kompanie_albums/', $pdo->log)), 'alle Alben mit einer Abfrage');
+        // gemessen: 3 Alben → 7 Abfragen (vorher 10 und 4 Transaktionen; bei 23 Alben 27 statt 50 und 24)
+        $this->assertCount(7, $pdo->log);
 
         // Eine Änderung: genau ein UPDATE für dieses Bild.
         $this->drive->tree['A1'][0]['name'] = 'umbenannt.jpg';
@@ -266,29 +271,107 @@ final class GalleryTest extends TestCase
         $this->assertCount(1, $updates);
         $this->assertSame([], preg_grep('/^UPDATE kompanie_albums/', $pdo->writes()), 'Album unverändert');
         $this->assertSame(0, $gallery->countPending(), 'Umbenennen allein erzeugt die Bilder nicht neu');
+        $this->assertCount(1, $pdo->transactions, 'nur das geänderte Album in einer Transaktion');
     }
 
-    public function testPhotoNotReadyIsPlaceholderAndProcessedInBackground(): void
+    public function testOverviewWithCoversInOneQuery(): void
+    {
+        $pdo = new CountingPdo('sqlite::memory:');
+        $app = TestApp::create(new PdoConnection($pdo, 'kompanie_'), $this->users, [], $this->drive->http(), $this->dir);
+        $app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery = $app->gallery();
+        $gallery->setRoot('ROOT');
+        $gallery->sync();
+        $cover = static function (array $years, string $title): ?string {
+            foreach ($years as $y) {
+                foreach ($y['albums'] as $a) {
+                    if ($a['title'] === $title) {
+                        return $a['cover'];
+                    }
+                }
+            }
+            return null;
+        };
+        $id = static fn (string $drive): int => (int) $app->db->scalar('SELECT id FROM {photos} WHERE drive_file_id = ?', [$drive]);
+
+        $pdo->log = [];
+        $member = $gallery->overview(true);
+        $this->assertCount(1, $pdo->log, 'eine Abfrage für alle Alben samt Titelbild');
+        $pdo->log = [];
+        $guest = $gallery->overview(false);
+        $this->assertCount(1, $pdo->log);
+
+        // Noch nichts fertig: öffentliches Bild vor internem, sonst nach Aufnahmezeit (a.jpg vor b.jpg).
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG1') . '/thumb', $cover($member, 'Sommerfest'));
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG1') . '/thumb', $cover($guest, 'Sommerfest'));
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG4') . '/thumb', $cover($member, 'Vereinsabend'), 'rein internes Album: internes Titelbild');
+        $this->assertNull($cover($guest, 'Vereinsabend'));
+
+        // Fertige Bilder gehen vor; öffentliche fertige als statische Datei.
+        $photo = $app->db->selectOne('SELECT * FROM {photos} WHERE drive_file_id = ?', ['IMG2']);
+        $this->assertTrue($gallery->generate($photo));
+        $url = (string) $cover($gallery->overview(false), 'Sommerfest');
+        $this->assertStringStartsWith('https://example.org/media/' . $photo['album_id'] . '/' . $photo['file_key'] . '-thumb.jpg', $url);
+        // Fehlgeschlagene Bilder sind kein Titelbild.
+        $app->db->execute("UPDATE {photos} SET status = 'error' WHERE drive_file_id IN ('IMG1', 'IMG2')");
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG3') . '/thumb', $cover($gallery->overview(true), 'Sommerfest'));
+        $this->assertNull($cover($gallery->overview(false), 'Sommerfest'), 'Gäste: Album ohne sichtbare Bilder fehlt');
+    }
+
+    public function testPhotoNotReadyIsGeneratedInRequestWithLocks(): void
     {
         $gallery = $this->app->gallery();
+        $gallery->waitSeconds = 0;
         $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
         $gallery->setRoot('ROOT');
         $this->app->scheduleTasks();
         $this->assertArrayHasKey(GalleryService::PROCESS_TASK, $this->app->scheduler->scheduled);
         $gallery->sync();
-        $id = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE is_intern = 0 ORDER BY id LIMIT 1");
+        // das Bild, das auch die Aufbereitung im Hintergrund als nächstes nähme
+        $repo = (new \ReflectionProperty($gallery, 'repo'))->getValue($gallery);
+        $id = (int) $repo->nextPending()['id'];
+        $lockFile = fn (string $name) => fopen($this->app->files->path($name, false), 'c');
 
-        $res = $gallery->photoForDelivery($id, 'thumb', false, false);
-        $this->assertSame(202, $res['status'], 'noch nicht aufbereitet');
+        // Ein anderer Prozess erzeugt gerade dieses Bild (Sperre je Bild): nicht noch einmal laden.
+        $imageLock = $lockFile('.bild-' . ($id % 64) . '.lock');
+        $this->assertTrue(flock($imageLock, LOCK_EX));
+        $res = $gallery->photoForDelivery($id, 'thumb', true, true);
+        $this->assertSame(202, $res['status'], 'Bild wird gerade erzeugt');
         $this->assertStringStartsWith('<svg', $res['placeholder']);
         $this->assertSame(GalleryService::RETRY_AFTER, $res['retryAfter']);
-        $this->assertSame(0, $this->drive->downloads, 'kein Download während der Anfrage');
+        $this->assertSame(0, $this->drive->downloads, 'kein doppelter Download');
         $this->assertSame([GalleryService::PROCESS_TASK], $this->app->scheduler->soon, 'Aufbereitung im Hintergrund angestoßen');
-        $gallery->photoForDelivery($id, 'large', false, false);
+        $this->assertSame(0, $gallery->processPending(60), 'auch der Hintergrund lädt das gesperrte Bild nicht');
+        $this->assertSame(0, $this->drive->downloads);
+        flock($imageLock, LOCK_UN);
+        fclose($imageLock);
+
+        // Alle Plätze belegt: sofort ein Platzhalter, kein Download.
+        $slots = [];
+        for ($i = 0; $i < GalleryService::REQUEST_SLOTS; $i++) {
+            $slots[$i] = $lockFile('.erzeugen-' . $i . '.lock');
+            $this->assertTrue(flock($slots[$i], LOCK_EX));
+        }
+        $this->assertSame(202, $gallery->photoForDelivery($id, 'large', true, true)['status'], 'kein Platz frei');
+        $this->assertSame(0, $this->drive->downloads);
         $this->assertCount(1, $this->app->scheduler->soon, 'höchstens einmal pro Minute angestoßen');
 
+        // Ein Platz frei: Das Bild entsteht während der Anfrage, beide Größen mit einem Download.
+        flock($slots[0], LOCK_UN);
+        $res = $gallery->photoForDelivery($id, 'large', true, true);
+        $this->assertSame(200, $res['status'], 'sofort erzeugt');
+        $this->assertSame("\xFF\xD8", substr((string) file_get_contents($res['file']), 0, 2));
+        $this->assertSame(1, $this->drive->downloads);
+        $this->assertSame('ready', $this->app->db->scalar('SELECT status FROM {photos} WHERE id = ?', [$id]));
+        $this->assertSame(200, $gallery->photoForDelivery($id, 'thumb', true, true)['status']);
+        $this->assertSame(1, $this->drive->downloads, 'Vorschau entstand mit der Großansicht');
+        foreach ($slots as $slot) {
+            flock($slot, LOCK_UN);
+            fclose($slot);
+        }
+
         // Läuft gerade eine Aufbereitung (Sperre), bereitet ein zweiter Prozess nichts auf.
-        $lock = fopen($this->app->files->path('.aufbereitung.lock', false), 'c');
+        $lock = $lockFile('.aufbereitung.lock');
         $this->assertTrue(flock($lock, LOCK_EX));
         $this->assertSame(0, $gallery->processPending(60));
         flock($lock, LOCK_UN);
@@ -298,15 +381,21 @@ final class GalleryTest extends TestCase
         $this->app->runTask(GalleryService::PROCESS_TASK);
         $this->assertSame(0, $gallery->countPending());
         $this->assertSame([], $this->app->scheduler->soon, 'nichts mehr ausstehend: kein weiterer Lauf');
-        $this->assertSame(200, $gallery->photoForDelivery($id, 'thumb', false, false)['status']);
+        $this->assertSame(5, $this->drive->downloads, 'jedes Bild einmal geladen');
 
-        // Fertig, aber die Datei fehlt: Platzhalter und neu aufbereiten lassen (nicht in der Anfrage).
+        // Fertig, aber die Datei fehlt: wird während der Anfrage neu erzeugt.
         $photo = $this->app->db->selectOne('SELECT * FROM {photos} WHERE id = ?', [$id]);
         unlink($gallery->path($photo, 'thumb'));
-        $downloads = $this->drive->downloads;
-        $this->assertSame(202, $gallery->photoForDelivery($id, 'thumb', false, false)['status']);
-        $this->assertSame('pending', $this->app->db->scalar('SELECT status FROM {photos} WHERE id = ?', [$id]));
-        $this->assertSame($downloads, $this->drive->downloads);
+        $this->assertSame(200, $gallery->photoForDelivery($id, 'thumb', true, true)['status']);
+        $this->assertSame(6, $this->drive->downloads);
+
+        // Scheitert die Erzeugung, gibt es 404 (und beim nächsten Abruf keinen neuen Download).
+        $this->app->db->execute("UPDATE {photos} SET status = 'pending' WHERE id = ?", [$id]);
+        $this->drive->downloadFails = true;
+        $this->assertSame(404, $gallery->photoForDelivery($id, 'thumb', true, true)['status']);
+        $this->assertSame(GalleryRepository::FAILED, $this->app->db->scalar('SELECT status FROM {photos} WHERE id = ?', [$id]));
+        $this->assertSame(404, $gallery->photoForDelivery($id, 'thumb', true, true)['status']);
+        $this->assertSame(7, $this->drive->downloads);
     }
 
     public function testBackgroundTaskContinuesWhilePhotosArePending(): void
