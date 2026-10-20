@@ -265,7 +265,7 @@ export interface Rank {
   id: number;
   title: string;
   sort: number;
-  /** Punkteschwelle (nur mit dem Bereich Punkte; null = ohne Schwelle) */
+  /** Punkteschwelle (null = ohne); wirkt nur mit dem Bereich Punkte, Mitglieder sehen sie nur dann */
   min_points: number | null;
   active: boolean;
   /** Wie viele Mitglieder ihn haben (nur in der Pflege) */

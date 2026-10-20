@@ -134,7 +134,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(r.id)}>
                       Ändern
                     </button>
-                    {r.assigned || !r.active ? (
+                    {(r.assigned || !r.active) && (
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
@@ -142,7 +142,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                       >
                         {r.active ? 'Deaktivieren' : 'Aktivieren'}
                       </button>
-                    ) : (
+                    )}
+                    {!r.assigned && (
                       <button
                         className="btn btn-small btn-danger"
                         disabled={busy}
@@ -365,7 +366,7 @@ export function MemberRank({
         <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
           {rank} ändern
         </button>
-        {points && options.length === 0 && (
+        {points && options.length === 0 && !(status.rank && canDemote) && (
           <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle, degradieren nur darunter.</p>
         )}
       </form>
