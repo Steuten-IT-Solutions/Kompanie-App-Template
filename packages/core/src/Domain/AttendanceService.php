@@ -74,7 +74,7 @@ final class AttendanceService
      * Termine aus dem internen Kalender der letzten Wochen bis heute zur Auswahl, die jüngsten zuerst, mit der ID einer
      * schon angelegten Liste. Ohne Bereich Kalender leer.
      *
-     * @return list<array{key: string, title: string, date: string, start: string, all_day: bool, list_id: int|null}>
+     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, list_id: int|null}>
      */
     public function events(): array
     {
@@ -91,7 +91,7 @@ final class AttendanceService
                 continue;
             }
             $key = (string) $e['id'];
-            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'all_day' => (bool) ($e['all_day'] ?? false), 'list_id' => $lists[$key] ?? null];
+            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'list_id' => $lists[$key] ?? null];
         }
         return array_reverse($out);
     }

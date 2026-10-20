@@ -965,6 +965,33 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
 });
 
+test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht seine Anwesenheit', async ({ page }) => {
+  const title = `Übung ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Anwesenheit' }).click();
+  await page.locator('.free-event').getByLabel('Titel').fill(title);
+  await page.getByRole('button', { name: 'Liste anlegen' }).click();
+  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+
+  await page.getByRole('radio', { name: 'Mitglied2: anwesend' }).check();
+  await expect(page.locator('.attendance-counts')).toContainText('1 anwesend');
+  await page.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Anwesenheit gespeichert');
+
+  await page.getByRole('button', { name: 'Punkte für 1 Anwesenden' }).click();
+  await expect(page.getByLabel('Grund')).toHaveValue(title);
+  await page.getByLabel('Punkte', { exact: true }).fill('2');
+  await page.getByRole('button', { name: 'Punkte vergeben' }).click();
+  await expect(page.locator('.attendance-list li', { hasText: 'Mitglied2' })).toContainText('Punkte gebucht');
+  await expect(page.getByRole('button', { name: 'Punkte für 0 Anwesende' })).toBeDisabled();
+
+  await login(page, 'mitglied2');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Anwesenheit' }).click();
+  await expect(page.locator('.my-attendance .row', { hasText: title })).toContainText('anwesend');
+});
+
 test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ page }) => {
   const title = `Ehrenmitglied ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
