@@ -7,6 +7,7 @@ import MeineAnwesenheit from './MeineAnwesenheit';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 import { TitleBadges } from '../TitleBadges';
+import { MenuNav } from '../adminNav';
 
 /**
  * „Meins“: eigene Titel oben, darunter Punkte, Strafen und Dienstgrad, umschaltbar. Die Summen (/me) lädt Meins einmal
@@ -32,19 +33,13 @@ export default function Meins({ sub }: { sub?: string }) {
         </p>
       )}
       {parts.length === 0 && me.data && titles.length === 0 && <Empty>Du hast zurzeit keine {brand.labels.sections.titles}.</Empty>}
-      {parts.length > 1 && (
-        <nav className="segmented" aria-label="Meine Daten">
-          {parts.map(([id, label]) => (
-            <button
-              key={id}
-              className={active === id ? 'active' : ''}
-              onClick={() => navigate(`meins/${id}`)}
-              aria-current={active === id ? 'page' : undefined}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+      {parts.length > 1 && active && (
+        <MenuNav
+          label="Meine Daten"
+          className="meins-menu"
+          active={active}
+          items={parts.map(([id, label]) => ({ id, label, onSelect: () => navigate(`meins/${id}`) }))}
+        />
       )}
       {me.loading && !me.data ? (
         <Loading />

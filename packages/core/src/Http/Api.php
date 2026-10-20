@@ -683,6 +683,9 @@ final class Api
                 if ($r->has('auto')) {
                     $a->updates()->setAuto(Input::bool($r->input('auto')));
                 }
+                if ($r->has('channel')) {
+                    $a->updates()->setChannel(is_string($r->input('channel')) ? $r->input('channel') : '');
+                }
                 if ($r->has('status_reports')) {
                     $on = Input::bool($r->input('status_reports'));
                     $a->settings->set(StatusReporter::SETTING, $on);

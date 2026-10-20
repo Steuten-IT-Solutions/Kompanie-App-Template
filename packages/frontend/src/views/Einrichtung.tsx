@@ -118,7 +118,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
           <h3>Fast fertig</h3>
           <p className="small">
             Updates kommen automatisch; bei Datenbank-Änderungen werden die Daten vorher gesichert. Den Zustand der App, Updates und die
-            Datensicherung findest du unter <strong>Konto → Einstellungen</strong>.
+            Datensicherung findest du unter <strong>Verwaltung → Einstellungen</strong>.
           </p>
           {reportsAvailable && (
             <label className="toggle">

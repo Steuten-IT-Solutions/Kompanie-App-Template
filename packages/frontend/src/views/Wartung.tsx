@@ -190,6 +190,27 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             />
             <span>Updates automatisch einspielen (empfohlen)</span>
           </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={u.channel === 'early'}
+              disabled={!!busy}
+              onChange={(e) =>
+                (!e.target.checked ||
+                  window.confirm(
+                    'Vorabversionen erhalten? Diese Installation bekommt dann jede neue Version, bevor sie für alle freigegeben ist – zum Testen, kann noch Fehler enthalten.',
+                  )) &&
+                run('channel', async () => setU(await api.updateOptions({ channel: e.target.checked ? 'early' : 'stable' })))
+              }
+            />
+            <span>Vorabversionen erhalten (zum Testen)</span>
+          </label>
+          {u.channel === 'early' && (
+            <p className="muted small">
+              Diese Installation bekommt jede neue Version, sobald sie gebaut ist, nicht erst nach der Freigabe für alle. Ausschalten: Sie
+              bleibt auf der jetzigen Version, bis eine neuere freigegeben ist.
+            </p>
+          )}
           {!u.autoAllowed && (
             <p className="muted small">
               Automatische Updates sind in dieser Installation gesperrt (z. B. in den Einstellungen von WordPress). Neue Versionen bitte

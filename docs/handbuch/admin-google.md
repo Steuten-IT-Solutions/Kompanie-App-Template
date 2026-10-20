@@ -7,7 +7,7 @@ Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender
 
 > Für den {bereich.calendar} allein brauchst du das nicht: Die **geheime Adresse im iCal-Format** geht ohne Google Cloud (siehe [Ersteinrichtung](seite:admin-einrichtung)).
 
-Den Google-Zugang findest du in der App unter **Konto → Einstellungen öffnen → Google-Zugang**; {bereich.calendar} und {bereich.gallery} haben dort je eine eigene Seite. Mit WordPress gibt es ihn auch auf der Einstellungsseite der App im WP-Admin.
+Den Google-Zugang findest du in der App unter **Verwaltung → Einstellungen → Google-Zugang**; {bereich.calendar} und {bereich.gallery} haben dort je eine eigene Seite. Mit WordPress gibt es ihn auch auf der Einstellungsseite der App im WP-Admin.
 
 ## 1. Projekt anlegen
 1. [console.cloud.google.com](https://console.cloud.google.com/) öffnen und mit dem Google-Konto der Kompanie anmelden. Beim ersten Mal die Nutzungsbedingungen bestätigen.

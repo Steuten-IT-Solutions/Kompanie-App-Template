@@ -253,8 +253,8 @@ export default function App() {
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
   const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : start;
-  // Schwarzes Brett, Umfragen und Inventar gehören für alle, die sie pflegen, zur Verwaltung (Reiter oben, Tab unten).
-  const adminView = ['brett', 'umfragen', 'inventar'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
+  // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Menü oben, Tab unten).
+  const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
   const activeTab: View = adminView ? 'verwaltung' : tab;
 
   const [toast, setToast] = useState<string | null>(null);

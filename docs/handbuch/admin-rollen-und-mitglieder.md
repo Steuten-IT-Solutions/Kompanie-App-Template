@@ -3,7 +3,7 @@ titel: Rollen und Mitglieder
 reihenfolge: 120
 rechte: [manage_settings]
 ---
-Jede Person hat genau eine Rolle. Die Rollen legst du unter **Konto → Einstellungen → Rollen** fest.
+Jede Person hat genau eine Rolle. Die Rollen legst du unter **Verwaltung → Einstellungen → Rollen** fest.
 
 ## Feste Rollen
 - **{rolle.guest}**: sieht nur öffentliche Inhalte.

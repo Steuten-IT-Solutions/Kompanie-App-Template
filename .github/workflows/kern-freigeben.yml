@@ -1,5 +1,5 @@
 # Eine Kern-Version für alle Kompanien freigeben (nach dem Test auf einer Installation):
-# Ohne Eingaben: freigegeben wird immer der aktuelle Stand von main.
+# Läuft bei jedem Push auf main (Release aus develop) und von Hand; freigegeben wird immer der Stand von main.
 # 1. Programmcode des Kerns auf main bestimmen (Kern-Version aus VERSION, Prüfsumme wie beim Veröffentlichen).
 # 2. Bei jeder Kompanie (Topic kompanie-app) die neueste Version mit genau diesem Programmcode freigeben;
 #    Kompanien ohne solche Version bleiben vorerst unverändert.
@@ -9,6 +9,9 @@
 name: Kernversion freigeben
 
 on:
+  # Jeder Merge auf main ist eine Freigabe (develop → main); von Hand als Notfall-Knopf.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
