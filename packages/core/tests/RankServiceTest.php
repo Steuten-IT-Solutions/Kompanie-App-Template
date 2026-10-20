@@ -111,8 +111,8 @@ final class RankServiceTest extends TestCase
 
         $detail = $this->call('GET', "/members/{$this->m}")->data;
         $this->assertSame('Gefreiter', $detail['rank']['rank']['title']);
-        $this->assertSame('Ehrenrang', $detail['rank']['next_rank']['title']);
-        $this->assertNull($detail['rank']['points_to_next'], 'nächster ohne Schwelle');
+        $this->assertSame('Unteroffizier', $detail['rank']['next_rank']['title'], 'Dienstgrade ohne Schwelle übersprungen');
+        $this->assertSame(37, $detail['rank']['points_to_next']);
         $this->assertSame(13, $detail['rank']['points']);
         $this->assertSame(13, $detail['rank_history'][0]['points_at_change']);
 
@@ -226,5 +226,28 @@ final class RankServiceTest extends TestCase
         $this->assertInstanceOf(User::class, $user);
         $this->assertContains('ranks', $this->app->push()->availableTypes($user));
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status);
+    }
+
+    public function testSameDayEntriesAndNullDatesInOverview(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $this->ranks([['Gefreiter', 10]]);
+        $a = $this->users->add('anna', Roles::MEMBER);
+        $this->points($a, 15, '2026-01-10');
+        // Am selben Tag erst abziehen, dann wieder gutschreiben: Am Ende des Tages nie unter der Schwelle.
+        $this->points($a, -10, '2026-02-01');
+        $this->points($a, 10, '2026-02-01');
+        $row = array_column($this->call('GET', '/promotions')->data, null, 'user_id')[$a];
+        $this->assertSame('2026-01-10', $row['threshold_reached_since']);
+    }
+
+    public function testOldBackupWithoutRankTablesEmptiesThem(): void
+    {
+        $this->setUpApp(['ranks' => true]);
+        $r = $this->ranks([['Gefreiter', null]]);
+        $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']]);
+        (new \KompanieApp\Core\Storage\Backup($this->app->db))->restore(['points' => []], \KompanieApp\Core\Storage\Backup::CORE_TABLES);
+        $this->assertSame([], $this->app->ranks()->repository()->assignments());
+        $this->assertSame([], $this->app->ranks()->repository()->all(false));
     }
 }

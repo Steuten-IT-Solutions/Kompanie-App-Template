@@ -25,6 +25,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const points = ranksUsePoints();
+  // Schwellen immer pflegbar (gespeichert und geprüft auch ohne Punkte); sie wirken nur zusammen mit Punkten.
+  const thresholdLabel = points ? 'Punkteschwelle' : `Punkteschwelle (wirkt nur mit ${sec.points})`;
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -44,9 +46,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (
-      await run(() => api.createRank({ title: title.trim(), ...(points ? { min_points: parseThreshold(min) } : {}) }), `${rank} angelegt`)
-    ) {
+    if (await run(() => api.createRank({ title: title.trim(), min_points: parseThreshold(min) }), `${rank} angelegt`)) {
       setTitle('');
       setMin('');
     }
@@ -94,7 +94,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
               <li key={r.id} className="card">
                 <RankForm
                   rank={r}
-                  points={points}
+                  thresholdLabel={thresholdLabel}
                   busy={busy}
                   onCancel={() => setEditing(null)}
                   onSave={async (data) => {
@@ -110,8 +110,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                     {!r.active && <span className="badge badge-level-guest">inaktiv</span>}
                   </div>
                   <div className="row-sub">
-                    {points && (r.min_points !== null ? `ab ${r.min_points.toLocaleString('de-DE')} ${sec.points}` : 'ohne Schwelle')}
-                    {points && ' · '}
+                    {r.min_points !== null ? `ab ${r.min_points.toLocaleString('de-DE')} ${sec.points}` : 'ohne Schwelle'}
+                    {' · '}
                     {r.assigned ? `${r.assigned}× vergeben` : 'nicht vergeben'}
                   </div>
                   <div className="row-actions">
@@ -119,22 +119,22 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                       className="btn btn-small btn-secondary"
                       disabled={busy || i === 0}
                       onClick={() => move(list, i, -1)}
-                      aria-label={`${r.title} nach unten`}
+                      aria-label={`${r.title} eine Stufe niedriger`}
                     >
-                      ↓
+                      niedriger
                     </button>
                     <button
                       className="btn btn-small btn-secondary"
                       disabled={busy || i === list.length - 1}
                       onClick={() => move(list, i, 1)}
-                      aria-label={`${r.title} nach oben`}
+                      aria-label={`${r.title} eine Stufe höher`}
                     >
-                      ↑
+                      höher
                     </button>
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(r.id)}>
                       Ändern
                     </button>
-                    {r.assigned ? (
+                    {r.assigned || !r.active ? (
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
@@ -165,16 +165,14 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
           <span>Bezeichnung</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
-        {points && (
-          <label className="field">
-            <span>Punkteschwelle (optional)</span>
-            <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
-          </label>
-        )}
+        <label className="field">
+          <span>{thresholdLabel} (optional)</span>
+          <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
+        </label>
         <button className="btn btn-block" type="submit" disabled={busy}>
           Anlegen
         </button>
-        <p className="muted small">Neue {sec.ranks} kommen ans obere Ende; mit den Pfeilen änderst du die Reihenfolge.</p>
+        <p className="muted small">Neue {sec.ranks} kommen ans obere Ende; mit „niedriger“ und „höher“ änderst du die Reihenfolge.</p>
       </form>
     </div>
   );
@@ -182,13 +180,13 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
 
 function RankForm({
   rank: r,
-  points,
+  thresholdLabel,
   busy,
   onSave,
   onCancel,
 }: {
   rank: Rank;
-  points: boolean;
+  thresholdLabel: string;
   busy: boolean;
   onSave: (data: { title: string; min_points?: number | null }) => void;
   onCancel: () => void;
@@ -200,19 +198,17 @@ function RankForm({
       className="form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave({ title: title.trim(), ...(points ? { min_points: parseThreshold(min) } : {}) });
+        onSave({ title: title.trim(), min_points: parseThreshold(min) });
       }}
     >
       <label className="field">
         <span>Bezeichnung</span>
         <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
-      {points && (
-        <label className="field">
-          <span>Punkteschwelle (leer = ohne)</span>
-          <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
-        </label>
-      )}
+      <label className="field">
+        <span>{thresholdLabel} (leer = ohne)</span>
+        <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
+      </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
           Speichern
@@ -288,7 +284,8 @@ export function MemberRank({
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
-  const ranks = useAsync(() => api.ranks(), []);
+  // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
+  const ranks = useAsync(() => api.ranks(true), []);
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -301,7 +298,7 @@ export function MemberRank({
   const canDemote = !points || currentMin === null || total < currentMin;
   // Mit Punkten nur Ziele anbieten, die die Regeln erlauben (der Server prüft trotzdem).
   const options = list.filter((r, i) => {
-    if (r.id === status.rank?.id) return false;
+    if (r.id === status.rank?.id || !r.active) return false;
     const up = currentIndex === -1 || i > currentIndex;
     if (!points) return true;
     return up ? r.min_points === null || total >= r.min_points : canDemote;

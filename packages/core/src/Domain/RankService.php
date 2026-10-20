@@ -234,8 +234,9 @@ final class RankService
         }
         usort($out, static function (array $a, array $b): int {
             $group = static fn (array $r): int => $r['points_to_next'] === null ? 2 : ($r['points_to_next'] <= 0 ? 0 : 1);
-            return [$group($a), $group($a) === 0 ? (string) $a['threshold_reached_since'] : $a['points_to_next'], $a['name']]
-                <=> [$group($b), $group($b) === 0 ? (string) $b['threshold_reached_since'] : $b['points_to_next'], $b['name']];
+            // Ohne Datum (z. B. Schwelle 0 ohne Buchungen) ans Ende der Gruppe.
+            $key = static fn (array $r): mixed => $group($r) === 0 ? ($r['threshold_reached_since'] ?? '9999-12-31') : $r['points_to_next'];
+            return [$group($a), $key($a), $a['name']] <=> [$group($b), $key($b), $b['name']];
         });
         return $out;
     }
@@ -373,27 +374,39 @@ final class RankService
     private function progress(array $ranks, ?array $current, array $entries): array
     {
         $total = round(array_sum(array_column($entries, 'value')), 2);
+        $above = null;
         $next = null;
         $reachable = null;
         foreach ($ranks as $r) {
-            if (!$r['active']) {
+            if (!$r['active'] || ($current !== null && $this->position($ranks, $r) <= $this->position($ranks, $current))) {
                 continue;
             }
-            if ($next === null && ($current === null || $this->position($ranks, $r) > $this->position($ranks, $current))) {
+            $above ??= $r;
+            // Nächster mit Schwelle: Dienstgrade ohne Schwelle (frei vergeben) überspringen, sonst verdeckten sie
+            // eine anstehende Beförderung.
+            if ($next === null && $r['min_points'] !== null) {
                 $next = $r;
             }
-            if ($r['min_points'] !== null && $r['min_points'] <= $total) {
+        }
+        foreach ($ranks as $r) {
+            if ($r['active'] && $r['min_points'] !== null && $r['min_points'] <= $total) {
                 $reachable = $r;
             }
         }
+        $next ??= $above;
         $threshold = $next['min_points'] ?? null;
         $since = null;
         if ($threshold !== null) {
-            $sum = 0.0;
+            // Je Tag zusammenfassen: Zählt die Summe am Ende des Tages, nicht die Reihenfolge der Buchungen eines Tages.
+            $byDay = [];
             foreach ($entries as $e) {
-                $sum = round($sum + $e['value'], 2);
+                $byDay[$e['entry_date']] = ($byDay[$e['entry_date']] ?? 0.0) + $e['value'];
+            }
+            $sum = 0.0;
+            foreach ($byDay as $day => $value) {
+                $sum = round($sum + $value, 2);
                 if ($sum >= $threshold) {
-                    $since ??= $e['entry_date'];
+                    $since ??= (string) $day;
                 } else {
                     $since = null;
                 }

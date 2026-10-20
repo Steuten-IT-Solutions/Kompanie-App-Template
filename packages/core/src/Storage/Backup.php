@@ -63,10 +63,10 @@ final class Backup
     public function restore(array $tables, array $allowed): void
     {
         $this->db->transaction(function () use ($tables, $allowed): void {
+            // Auch Tabellen leeren, die eine ältere Sicherung noch nicht kannte (z. B. Dienstgrade): Sonst gehörten ihre
+            // Zeilen nach dem Zurückspielen womöglich anderen Personen (gleiche IDs, andere Konten).
             foreach (array_reverse($allowed) as $t) {
-                if (array_key_exists($t, $tables)) {
-                    $this->db->execute('DELETE FROM {' . $t . '}');
-                }
+                $this->db->execute('DELETE FROM {' . $t . '}');
             }
             foreach ($allowed as $t) {
                 if (!isset($tables[$t]) || !is_array($tables[$t])) {

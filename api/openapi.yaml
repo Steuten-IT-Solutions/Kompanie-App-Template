@@ -706,7 +706,10 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Beförderungsübersicht (nur zusammen mit dem Bereich Punkte)
-      description: Erreichte Schwellen zuerst (älteste oben), dann nach fehlenden Punkten; ohne nächsten Dienstgrad am Ende. Ohne Gäste.
+      description: |
+        Nur Mitglieder (ohne Gäste und Anwärter). Erreichte Schwellen zuerst (älteste oben), dann nach fehlenden Punkten;
+        ohne nächsten Dienstgrad mit Schwelle am Ende. Enthält die Punktestände, auch wenn der Abrufende selbst kein
+        manage_points hat (die Übersicht braucht sie).
       x-capability: manage_ranks
       responses:
         '200':
@@ -2049,7 +2052,9 @@ components:
 
     RankStatus:
       type: object
-      description: Dienstgrad eines Mitglieds; alle Felder nach rank nur, wenn auch der Bereich Punkte an ist.
+      description: |
+        Dienstgrad eines Mitglieds; alle Felder nach rank nur, wenn auch der Bereich Punkte an ist. next_rank ist der
+        nächste aktive Dienstgrad mit Schwelle (Dienstgrade ohne Schwelle werden übersprungen), sonst der nächste.
       properties:
         rank:
           oneOf:

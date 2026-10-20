@@ -708,7 +708,9 @@ select {
   border-radius: 12px;
 }
 .segmented button {
-  flex: 1 1 auto;
+  /* gleich breit, aber nie schmaler als der Text (dann umbrechen) */
+  flex: 1 1 0;
+  min-width: max-content;
   padding: 9px 4px;
   border: 0;
   border-radius: 8px;
