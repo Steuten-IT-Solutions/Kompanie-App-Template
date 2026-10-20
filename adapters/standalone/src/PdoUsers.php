@@ -120,6 +120,29 @@ final class PdoUsers implements UserDirectory
         return (int) $this->db->scalar("SELECT COUNT(*) FROM {users} WHERE email <> '' AND LOWER(email) = LOWER(?)", [$email]) > 0;
     }
 
+    public function profile(int $id): ?array
+    {
+        $row = $id > 0 ? $this->db->selectOne('SELECT name, login, email FROM {users} WHERE id = ?', [$id]) : null;
+        return $row ? ['name' => (string) $row['name'], 'login' => (string) $row['login'], 'email' => (string) $row['email']] : null;
+    }
+
+    public function canChangeLogin(): bool
+    {
+        return true;
+    }
+
+    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    {
+        $this->db->update('users', ['name' => $name, 'email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')] + ($login !== null ? ['login' => $login] : []), ['id' => $id]);
+    }
+
+    /** Konto löschen und alle Sitzungen beenden. */
+    public function removeAccount(int $id): void
+    {
+        $this->sessions?->destroyAllFor($id);
+        $this->db->execute('DELETE FROM {users} WHERE id = ?', [$id]);
+    }
+
     /** @param array<string, mixed> $row */
     public function toUser(array $row): User
     {

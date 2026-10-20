@@ -196,6 +196,82 @@ final class WpUsers implements UserDirectory, AuthContext
         return (bool) email_exists($email);
     }
 
+    public function profile(int $id): ?array
+    {
+        $u = $this->find($id) !== null ? get_userdata($id) : false;
+        return $u ? ['name' => (string) $u->display_name, 'login' => (string) $u->user_login, 'email' => (string) $u->user_email] : null;
+    }
+
+    public function canChangeLogin(): bool
+    {
+        return false;
+    }
+
+    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if ($login !== null && $login !== $user->user_login) {
+            throw new \DomainException('Benutzernamen lassen sich in WordPress nicht ändern.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        $parts = preg_split('/\s+/', $name, 2) ?: [$name];
+        $res = wp_update_user(['ID' => $id, 'display_name' => $name, 'nickname' => $name, 'first_name' => $parts[0], 'last_name' => $parts[1] ?? '', 'user_email' => $email]);
+        if (is_wp_error($res)) {
+            throw new \DomainException($res->get_error_message());
+        }
+        clean_user_cache($id);
+    }
+
+    /**
+     * Rolle in der App entfernen, Konto-Markierung löschen, alle Sitzungen beenden. Der WordPress-Benutzer bleibt
+     * (Entscheidung zu Issue #24): Er kann auch Beiträge haben oder anders zur Webseite gehören.
+     */
+    public function removeAccount(int $id): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
+            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht aus der App entfernen.');
+        global $wpdb;
+        delete_user_meta($id, self::metaKey());
+        delete_user_meta($id, $wpdb->get_blog_prefix() . self::ACCOUNT_META);
+        $user->remove_role(Roles::ROLE_MANAGER);
+        $user->remove_role(Roles::ROLE_ORGANIZER);
+        $user->remove_role(Roles::ROLE_MEMBER);
+        if (empty($user->roles)) {
+            $user->add_role('subscriber');
+        }
+        \WP_Session_Tokens::get_instance($id)->destroy_all();
+        clean_user_cache($id);
+    }
+
+    /**
+     * Wie beim Passwort: Benutzer der Webseite (Redakteure usw.) oder Konten, die nicht von der Kompanie sind, nur mit
+     * dem Recht aus WordPress; Konten der Kompanie auch mit „Mitglieder anlegen“ aus der App.
+     */
+    private function guardAccount(int $id, string $message): void
+    {
+        $actor = get_current_user_id();
+        if ($actor === 0) {
+            return;
+        }
+        $target = get_userdata($id);
+        $websiteUser = $target && (is_super_admin($id) || array_filter(self::WEBSITE_CAPS, static fn (string $cap): bool => user_can($target, $cap)) !== []);
+        global $wpdb;
+        $appAccount = get_user_meta($id, $wpdb->get_blog_prefix() . self::ACCOUNT_META, true) === '1';
+        $may = $websiteUser || !$appAccount ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+        if (!$may) {
+            throw new \DomainException($message);
+        }
+    }
+
     /** Darf der angemeldete Benutzer das: in WordPress (z. B. promote_user) oder über seine Rolle in der App? */
     private function actorMay(string $wpCap, int $id, Capability $appCap): bool
     {

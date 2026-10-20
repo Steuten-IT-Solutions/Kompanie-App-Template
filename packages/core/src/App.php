@@ -283,13 +283,16 @@ final class App
     }
 
     /**
-     * Ein Konto wurde gelöscht: Push-Abos, Zuweisungen (Dienstgrad, Titel) und Anwesenheitseinträge entfernen. Buchungen und Verläufe
-     * bleiben als Geschichte erhalten. Verwaiste Zuweisungen würden sonst das Löschen eines Dienstgrads bzw. Titels
-     * blockieren.
+     * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
+     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
+     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
     {
         $this->push()->deleteForUser($userId);
+        $this->db->execute('DELETE FROM {points} WHERE user_id = ?', [$userId]);
+        $this->db->execute('DELETE FROM {penalties} WHERE user_id = ?', [$userId]);
+        $this->db->execute('DELETE FROM {rank_history} WHERE user_id = ?', [$userId]);
         $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
         $this->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
         $this->db->execute('DELETE FROM {attendance_entries} WHERE user_id = ?', [$userId]);

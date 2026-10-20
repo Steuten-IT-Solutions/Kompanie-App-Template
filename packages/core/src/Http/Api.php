@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Http;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability as Cap;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
@@ -120,6 +121,59 @@ final class Api
             'types' => array_map(static fn (string $k): array => ['key' => $k, 'label' => $labels[$k]['label']], $push->availableTypes($user)),
             'subscription' => PushService::formatSubscription($sub),
         ];
+    }
+
+    public const BULK_MAX = 50;
+
+    /**
+     * Mehrere Konten anlegen: alle Einträge vorab prüfen (Namen, Benutzernamen und E-Mail auch untereinander,
+     * Anfangspunkte, Dienstgrad); bei einem Fehler wird keiner angelegt und die Meldung nennt die Zeile. Scheitert danach
+     * doch eines (z. B. Datenbank), steht es mit Grund im Ergebnis.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function createUsers(mixed $level, mixed $people): array
+    {
+        $level = $level ?? Roles::MEMBER;
+        if (!is_array($people) || $people === []) {
+            throw ApiError::invalid('Bitte mindestens eine Person eintragen.');
+        }
+        if (count($people) > self::BULK_MAX) {
+            throw ApiError::invalid(sprintf('Höchstens %d Personen auf einmal.', self::BULK_MAX));
+        }
+        $taken = [];
+        $plans = [];
+        foreach (array_values($people) as $i => $p) {
+            $p = is_array($p) ? $p : [];
+            try {
+                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken);
+                $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
+                if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
+                    throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
+                }
+            } catch (ApiError $e) {
+                $who = is_string($p['name'] ?? null) && trim($p['name']) !== '' ? ' (' . trim($p['name']) . ')' : '';
+                throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
+            }
+            $plans[] = [$prepared, $initial];
+        }
+        $out = [];
+        foreach ($plans as [$prepared, $initial]) {
+            try {
+                $created = $this->app->members()->insert($prepared);
+            } catch (\Throwable $e) {
+                $out[] = ['name' => $prepared['name'], 'username' => $prepared['login'], 'error' => $e instanceof ApiError ? $e->getMessage() : 'Konnte nicht angelegt werden.'];
+                continue;
+            }
+            try {
+                $this->app->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
+                $created['warning'] = 'Angelegt, aber Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
+            }
+            $out[] = $created;
+        }
+        return $out;
     }
 
     /** Dienstgrade in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -390,6 +444,14 @@ final class Api
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : []), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
+            // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
+            new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id()), null, $denyUsers),
+            new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
+                $a->members()->removeAccount($this->user(), $r->id());
+                $a->userDeleted($r->id());
+                return ['deleted' => true];
+            }, null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, function (Request $r) use ($a) {
                 // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.
@@ -406,6 +468,8 @@ final class Api
                 }
                 return Response::created($created);
             }, null, $denyUsers),
+            // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.
+            new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
 
             // Einstellungen (Admins)
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),

@@ -6,11 +6,13 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Port\UserDirectory;
 
-/** Anzeigenamen mit Zwischenspeicher, z. B. für „angelegt von“. */
+/** Anzeigenamen mit Zwischenspeicher, z. B. für „angelegt von“ (Issue #24: auch für Mitglieder sichtbar). */
 final class UserNames
 {
     /** @var array<int, string|null> */
     private array $cache = [];
+
+    public const DELETED = 'gelöschtes Konto';
 
     public function __construct(private readonly UserDirectory $users)
     {
@@ -22,7 +24,8 @@ final class UserNames
             return null;
         }
         if (!array_key_exists($id, $this->cache)) {
-            $this->cache[$id] = $this->users->find($id)?->name;
+            // Konto gelöscht: Der Eintrag bleibt, wer ihn angelegt hat, nicht.
+            $this->cache[$id] = $this->users->find($id)?->name ?? self::DELETED;
         }
         return $this->cache[$id];
     }

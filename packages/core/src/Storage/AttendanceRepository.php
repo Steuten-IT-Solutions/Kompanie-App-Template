@@ -144,7 +144,7 @@ final class AttendanceRepository
         ));
     }
 
-    /** @return list<array{list_id: int, title: string, event_date: string, status: string}> neueste zuerst */
+    /** @return list<array{list_id: int, title: string, event_date: string, status: string, updated_by: int}> neueste zuerst */
     public function forUser(int $userId): array
     {
         return array_values(array_map(static fn (array $r): array => [
@@ -152,8 +152,9 @@ final class AttendanceRepository
             'title' => (string) $r['title'],
             'event_date' => (string) $r['event_date'],
             'status' => (string) $r['status'],
+            'updated_by' => (int) $r['updated_by'],
         ], $this->db->select(
-            'SELECT e.list_id, l.title, l.event_date, e.status FROM {attendance_entries} e JOIN {attendance_lists} l ON l.id = e.list_id'
+            'SELECT e.list_id, l.title, l.event_date, e.status, e.updated_by FROM {attendance_entries} e JOIN {attendance_lists} l ON l.id = e.list_id'
             . ' WHERE e.user_id = ? ORDER BY l.event_date DESC, l.id DESC',
             [$userId],
         )));

@@ -165,4 +165,32 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     {
         $this->passwordChanges++;
     }
+
+    public function profile(int $id): ?array
+    {
+        $u = $this->users[$id] ?? null;
+        return $u === null ? null : ['name' => $u['name'], 'login' => $u['login'], 'email' => $u['email']];
+    }
+
+    public function canChangeLogin(): bool
+    {
+        return $this->adminsAssignable;
+    }
+
+    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    {
+        $this->users[$id]['name'] = $name;
+        $this->users[$id]['email'] = $email;
+        if ($login !== null) {
+            $this->users[$id]['login'] = $login;
+        }
+    }
+
+    public function removeAccount(int $id): void
+    {
+        unset($this->users[$id]);
+        if ($this->current === $id) {
+            $this->current = null;
+        }
+    }
 }

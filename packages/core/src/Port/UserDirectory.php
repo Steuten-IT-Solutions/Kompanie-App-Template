@@ -48,4 +48,29 @@ interface UserDirectory
     public function loginExists(string $login): bool;
 
     public function emailExists(string $email): bool;
+
+    /**
+     * Angaben zum Bearbeiten (Issue #24).
+     *
+     * @return array{name: string, login: string, email: string}|null
+     */
+    public function profile(int $id): ?array;
+
+    /** Ob sich der Benutzername ändern lässt (WordPress: nein). */
+    public function canChangeLogin(): bool;
+
+    /**
+     * Name, E-Mail und (wo möglich) Benutzername ändern; geprüft hat der Kern.
+     *
+     * @throws \DomainException wenn es so nicht geht
+     */
+    public function updateProfile(int $id, string $name, string $email, ?string $login): void;
+
+    /**
+     * Konto aus der App entfernen und alle Sitzungen beenden (Issue #24). Standalone: Das Konto wird gelöscht.
+     * WordPress: Der Benutzer der Webseite bleibt, verliert aber seine Rolle in der App (wie ein Gast).
+     *
+     * @throws \DomainException wenn es so nicht geht
+     */
+    public function removeAccount(int $id): void;
 }

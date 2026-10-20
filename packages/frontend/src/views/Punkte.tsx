@@ -22,7 +22,10 @@ export default function Punkte({ me }: { me: Me }) {
             <li key={p.id} className="card row">
               <div className="row-main">
                 <div className="row-title">{p.reason}</div>
-                <div className="row-sub">{formatDate(p.date)}</div>
+                <div className="row-sub">
+                  {formatDate(p.date)}
+                  {p.created_by_name && ` · eingetragen von ${p.created_by_name}`}
+                </div>
               </div>
               <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
             </li>

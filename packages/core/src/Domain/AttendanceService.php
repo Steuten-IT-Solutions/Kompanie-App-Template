@@ -232,8 +232,15 @@ final class AttendanceService
         foreach ($rows as $r) {
             $counts[$r['status']] = ($counts[$r['status']] ?? 0) + 1;
         }
+        $names = new UserNames($this->app->users);
         return [
-            'entries' => array_map(static fn (array $r): array => ['list_id' => $r['list_id'], 'title' => $r['title'], 'date' => $r['event_date'], 'status' => $r['status']], $rows),
+            'entries' => array_map(static fn (array $r): array => [
+                'list_id' => $r['list_id'],
+                'title' => $r['title'],
+                'date' => $r['event_date'],
+                'status' => $r['status'],
+                'updated_by_name' => $names->name($r['updated_by']),
+            ], $rows),
             'counts' => self::statusCounts($counts),
         ];
     }

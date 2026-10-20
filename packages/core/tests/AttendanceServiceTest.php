@@ -111,7 +111,7 @@ final class AttendanceServiceTest extends TestCase
 
         $this->users->current = $this->m;
         $mine = $this->call('GET', '/me/attendance')->data;
-        $this->assertSame([['list_id' => $id, 'title' => 'Arbeitseinsatz', 'date' => '2026-10-19', 'status' => 'excused']], $mine['entries']);
+        $this->assertSame([['list_id' => $id, 'title' => 'Arbeitseinsatz', 'date' => '2026-10-19', 'status' => 'excused', 'updated_by_name' => 'Admin']], $mine['entries']);
         $this->assertSame(1, $mine['counts']['excused']);
         $this->assertSame(403, $this->call('GET', '/attendance')->status, 'Mitglied ohne Recht');
         $this->assertSame(403, $this->call('GET', "/attendance/$id")->status);

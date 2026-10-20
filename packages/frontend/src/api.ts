@@ -381,7 +381,7 @@ export type AttendanceInput = (
 ) & { entries?: Record<number, AttendanceStatus | null> };
 
 export interface MyAttendance {
-  entries: { list_id: number; title: string; date: string; status: AttendanceStatus }[];
+  entries: { list_id: number; title: string; date: string; status: AttendanceStatus; updated_by_name: string | null }[];
   counts: AttendanceCounts;
 }
 
