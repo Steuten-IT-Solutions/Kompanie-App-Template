@@ -122,9 +122,9 @@ final class DocumentService
             'status' => 200,
             'path' => $path,
             'etag' => FileCache::etag($doc['file'], $path),
-            'cache_control' => $version !== null && (string) $doc['version'] !== '' && hash_equals((string) $doc['version'], $version)
-                ? 'private, max-age=31536000, immutable'
-                : 'private, no-cache',
+            // Bewusst nicht lange im HTTP-Cache des Browsers: Den leert das Abmelden nicht, und auf geteilten Geräten bliebe
+            // ein geschütztes Dokument sonst ohne Rechteprüfung abrufbar. Die Prüfung per ETag/304 kostet keine Übertragung.
+            'cache_control' => 'private, no-cache',
             'mime' => $mime,
             'disposition' => $mode . '; filename="' . self::asciiName($doc['title']) . '.' . $doc['ext'] . '"; filename*=UTF-8\'\'' . rawurlencode($name),
         ];

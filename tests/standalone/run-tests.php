@@ -336,13 +336,13 @@ try {
     $old = $d->send('GET', $badgeUrl, $cookie, null);
     $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
 
-    $c->section('Dokumente: Fassung in der Adresse, ein Jahr im Browser');
+    $c->section('Dokumente: Fassung in der Adresse, Prüfung per ETag');
     [$s, $upDoc] = $d->request('POST', '/documents', ['title' => 'Kpsa Satzung', 'date' => '2026-10-01', 'file' => ['name' => 'satzung.pdf', 'data' => base64_encode("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")]]);
     $docUrl = (string) ($upDoc['url'] ?? '');
     $docRes = $d->send('GET', $docUrl, $cookie, null);
-    $c->ok($s === 201 && str_contains($docUrl, '&v=' . ($upDoc['version'] ?? '-')) && $docRes[0] === 200 && ($docRes[2]['cache-control'] ?? '') === 'private, max-age=31536000, immutable', 'Aktuelle Fassung: Cache-Control private, ein Jahr');
+    $c->ok($s === 201 && str_contains($docUrl, '&v=' . ($upDoc['version'] ?? '-')) && $docRes[0] === 200 && ($docRes[2]['cache-control'] ?? '') === 'private, no-cache', 'Aktuelle Fassung: private, no-cache (Abmelden leert den HTTP-Cache nicht)');
     $docAgain = $d->send('GET', $docUrl, $cookie + ['If-None-Match' => (string) ($docRes[2]['etag'] ?? '-')], null);
-    $c->ok($docAgain[0] === 304 && ($docAgain[2]['cache-control'] ?? '') === 'private, max-age=31536000, immutable', 'Dokument: passender ETag → 304 (wie bisher)');
+    $c->ok($docAgain[0] === 304 && ($docAgain[2]['cache-control'] ?? '') === 'private, no-cache', 'Dokument: passender ETag → 304 (wie bisher)');
     $c->ok(($d->send('GET', preg_replace('/&v=[^&]*/', '&v=alt', $docUrl), $cookie, null)[2]['cache-control'] ?? '') === 'private, no-cache', 'Veraltete Fassung in der Adresse: jedes Mal prüfen');
     $d->request('DELETE', '/documents/' . ($upDoc['id'] ?? 0));
 
