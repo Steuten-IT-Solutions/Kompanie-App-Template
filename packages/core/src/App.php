@@ -6,6 +6,7 @@ namespace KompanieApp\Core;
 
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
+use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
@@ -73,6 +74,7 @@ final class App
         PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
         BoardService::TASK => 3600,
         PollService::TASK => 3600,
+        BirthdayService::TASK => 3600,
     ];
 
     /**
@@ -175,6 +177,8 @@ final class App
             BoardService::TASK => $this->features()->enabled('board'),
             // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
             PollService::TASK => $this->features()->enabled('polls'),
+            // Geburtstage: stündlich, benachrichtigt aber erst ab 7 Uhr Ortszeit und je Geburtstag einmal am Tag.
+            BirthdayService::TASK => $this->features()->enabled('birthdays'),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -228,6 +232,8 @@ final class App
                 $this->board()->cleanup();
             } elseif ($task === PollService::TASK && $this->features()->enabled('polls')) {
                 $this->polls()->remind();
+            } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
+                $this->birthdays()->notifyToday();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -306,7 +312,7 @@ final class App
      * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
      * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
-     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben.
+     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht.
      */
     public function userDeleted(int $userId): void
     {
@@ -385,6 +391,11 @@ final class App
     public function polls(): PollService
     {
         return $this->service(PollService::class, fn () => new PollService($this));
+    }
+
+    public function birthdays(): BirthdayService
+    {
+        return $this->service(BirthdayService::class, fn () => new BirthdayService($this));
     }
 
     public function titles(): TitleService

@@ -46,6 +46,8 @@ final class Features
         'board' => ['label' => 'Schwarzes Brett', 'description' => 'Dringende Nachrichten für 24 Stunden oben auf jeder Seite, mit Benachrichtigung an alle Mitglieder und Anwärter.', 'requires' => [], 'setup' => null, 'role' => ['member', 'post_board']],
         // Umfragen (Issue #4): Laufende Umfragen stehen am Schwarzen Brett, deshalb nur zusammen mit ihm.
         'polls' => ['label' => 'Umfragen', 'description' => 'Umfragen mit einer Frage für Mitglieder, namentlich oder anonym; laufende stehen am Schwarzen Brett.', 'requires' => ['board'], 'setup' => null, 'role' => ['member', 'manage_polls']],
+        // Geburtstage (Issue #1): kein eigenes Recht; das Datum anderer pflegt, wer Mitglieder anlegen darf (create_users).
+        'birthdays' => ['label' => 'Geburtstage', 'description' => 'Geburtstage der Mitglieder: anstehende bei den Terminen, Benachrichtigung am Tag selbst; jedes Mitglied entscheidet, ob andere ihn sehen.', 'requires' => [], 'setup' => null, 'role' => null],
     ];
 
     /** @var array<string, bool>|null */
@@ -173,9 +175,9 @@ final class Features
                 $this->app->roles()->featureChanged($key, $on, $this->roleLabel($key), $caps);
             }
         }
-        // Schwarzes Brett (Issue #5) und Umfragen (Issue #4): Beim ersten Einschalten bekommen bestehende Abos die neue
-        // Art dazu (einmalig je Art, siehe PushService::offerTypeToExisting).
-        foreach (['board' => PushService::TYPE_BOARD, 'polls' => PushService::TYPE_POLLS] as $feature => $type) {
+        // Schwarzes Brett (Issue #5), Umfragen (Issue #4) und Geburtstage (Issue #1): Beim ersten Einschalten bekommen
+        // bestehende Abos die neue Art dazu (einmalig je Art, siehe PushService::offerTypeToExisting).
+        foreach (['board' => PushService::TYPE_BOARD, 'polls' => PushService::TYPE_POLLS, 'birthdays' => PushService::TYPE_BIRTHDAYS] as $feature => $type) {
             if ($next[$feature] && !($before[$feature] ?? false)) {
                 try {
                     $this->app->push()->offerTypeToExisting($type);
@@ -205,9 +207,9 @@ final class Features
         }
         $state = [];
         foreach (self::keys() as $key) {
-            // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett und Umfragen gab es in den alten Versionen
-            // nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls'], true) && $this->app->config->legacyFeature($key);
+            // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen und Geburtstage gab es in den alten
+            // Versionen nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

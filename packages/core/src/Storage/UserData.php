@@ -10,7 +10,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Alle eigenen Daten einer Person löschen (Issue #24, Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit
  * Verlauf, Titel, Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen (namentliche über user_id, anonyme
- * über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt). Was sie für andere eingetragen hat (created_by,
+ * über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag. Was sie für andere eingetragen hat (created_by,
  * updated_by), bleibt.
  * Ohne App: WordPress-Multisite löscht damit auch in den Tabellen anderer Seiten des Netzwerks.
  */
@@ -26,6 +26,7 @@ final class UserData
         'attendance_entries' => 'user_id',
         'poll_votes' => 'user_id',
         'poll_answers' => 'user_id',
+        'birthdays' => 'user_id',
     ];
 
     /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */

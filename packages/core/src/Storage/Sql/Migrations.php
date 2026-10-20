@@ -597,6 +597,40 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {poll_answers}_vote_ref ON {poll_answers} (vote_ref)',
                 ],
             ],
+            // Geburtstage (Issue #1): einer je Konto. year optional (NULL = ohne Jahr); visible = anderen Mitgliedern zeigen,
+            // show_age = Alter anzeigen. last_notified: Tag (Zeitzone der Kompanie, Y-m-d), für den die Benachrichtigung
+            // schon beansprucht wurde (gegen doppelten Versand bei wiederholten Läufen).
+            12 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {birthdays} (
+  user_id bigint(20) unsigned NOT NULL,
+  month tinyint(2) unsigned NOT NULL,
+  day tinyint(2) unsigned NOT NULL,
+  year smallint(4) unsigned DEFAULT NULL,
+  visible tinyint(1) NOT NULL DEFAULT 1,
+  show_age tinyint(1) NOT NULL DEFAULT 0,
+  last_notified date DEFAULT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id),
+  KEY month_day (month, day)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {birthdays} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  month INTEGER NOT NULL,
+  day INTEGER NOT NULL,
+  year INTEGER DEFAULT NULL,
+  visible INTEGER NOT NULL DEFAULT 1,
+  show_age INTEGER NOT NULL DEFAULT 0,
+  last_notified TEXT DEFAULT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {birthdays}_month_day ON {birthdays} (month, day)',
+                ],
+            ],
         ];
     }
 

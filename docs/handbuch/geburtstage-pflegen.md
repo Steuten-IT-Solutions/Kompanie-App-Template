@@ -1,0 +1,20 @@
+---
+titel: "{bereich.birthdays} pflegen"
+reihenfolge: 72
+rechte: [create_users]
+bereiche: [birthdays]
+---
+Jedes Mitglied trägt seinen Geburtstag selbst unter **Mein Konto** ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
+
+## In den Mitgliedsdetails
+**Verwaltung → Mitglieder →** Mitglied antippen. Unter **Geburtstag** steht das eingetragene Datum. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn.
+
+Die beiden Schalter **Anderen Mitgliedern zeigen** und **Alter anzeigen** siehst du dort nur zur Information. Sie gehören der Person selbst: Du kannst sie nicht ändern, und ein neu eingetragener Geburtstag ist zunächst sichtbar und ohne Alter.
+
+## Beim Anlegen
+Bei **+ Mitglied anlegen** und bei **Mehrere auf einmal anlegen** gibt es je Person ein freiwilliges Feld **Geburtstag** (Tag, Monat, Jahr optional). Ein ungültiges Datum (z. B. 31. Februar oder ein Tag in der Zukunft) meldet die App, bevor jemand angelegt wird.
+
+## Gut zu wissen
+- Erlaubt sind nur echte Daten: der 29. Februar nur in einem Schaltjahr (oder ohne Jahr), Jahre ab 1900 und nichts in der Zukunft.
+- Geburtstage sehen nur {rolle.member}. Von {rolle.candidate} kannst du schon einen eintragen; er erscheint, sobald die Person als {rolle.member} aufgenommen ist.
+- Wird ein Konto gelöscht, ist auch der Geburtstag weg.

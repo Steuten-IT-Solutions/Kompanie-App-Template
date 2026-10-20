@@ -157,14 +157,15 @@ final class Api
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
                 }
+                $birthday = $this->birthdayInput($p['birthday'] ?? null);
             } catch (ApiError $e) {
                 $who = is_string($p['name'] ?? null) && trim($p['name']) !== '' ? ' (' . trim($p['name']) . ')' : '';
                 throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
             }
-            $plans[] = [$prepared, $initial];
+            $plans[] = [$prepared, $initial, $birthday];
         }
         $out = [];
-        foreach ($plans as [$prepared, $initial]) {
+        foreach ($plans as [$prepared, $initial, $birthday]) {
             try {
                 $created = $this->app->members()->insert($prepared);
             } catch (\Throwable $e) {
@@ -177,9 +178,43 @@ final class Api
                 error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
                 $created['warning'] = 'Angelegt, aber Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
             }
+            $this->storeBirthday((int) $created['id'], $birthday, $created);
             $out[] = $created;
         }
         return $out;
+    }
+
+    /**
+     * Geburtstag beim Anlegen (Issue #1): „JJJJ-MM-TT“ oder „MM-TT“, vorab geprüft; nur mit eingeschaltetem Bereich.
+     *
+     * @return array{month: int, day: int, year: int|null}|null
+     */
+    private function birthdayInput(mixed $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!$this->app->features()->enabled('birthdays')) {
+            throw ApiError::invalid('Der Bereich Geburtstage ist ausgeschaltet.');
+        }
+        return $this->app->birthdays()->parse($value);
+    }
+
+    /**
+     * @param array{month: int, day: int, year: int|null}|null $birthday
+     * @param array<string, mixed> $created
+     */
+    private function storeBirthday(int $userId, ?array $birthday, array &$created): void
+    {
+        if ($birthday === null) {
+            return;
+        }
+        try {
+            $this->app->birthdays()->store($this->user(), $userId, $birthday);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Geburtstag nicht übernommen: ' . $e->getMessage());
+            $created['warning'] = trim(($created['warning'] ?? '') . ' Der Geburtstag fehlt noch. Bitte in den Mitgliedsdetails nachtragen.');
+        }
     }
 
     /** Dienstgrade in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -287,6 +322,7 @@ final class Api
         $denyRights = 'Dafür fehlen dir die Rechte.';
         $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
         $denyPolls = 'Umfragen sind nur für Mitglieder.';
+        $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
@@ -319,6 +355,13 @@ final class Api
             new Route('GET', '/me/attendance', Cap::Member, fn () => $a->attendance()->mine($this->user()->id), 'attendance', $denyMember),
             new Route('GET', '/me/points', Cap::Member, fn () => $a->scores()->pointsFor($this->user()->id), 'points', $denyMember),
             new Route('GET', '/me/penalties', Cap::Member, fn () => $a->scores()->penaltiesFor($this->user()->id), 'penalties', $denyMember),
+            // Geburtstage (Issue #1): eigener mit Jahr und Schaltern
+            new Route('GET', '/me/birthday', Cap::Member, fn () => ['birthday' => $a->birthdays()->of($this->user()->id)], 'birthdays', $denyBirthdays),
+            new Route('PUT', '/me/birthday', Cap::Member, fn (Request $r) => ['birthday' => $a->birthdays()->saveOwn($this->user(), $r->body)], 'birthdays', $denyBirthdays),
+            new Route('DELETE', '/me/birthday', Cap::Member, function () use ($a) {
+                $a->birthdays()->remove($this->user()->id);
+                return ['birthday' => null];
+            }, 'birthdays', $denyBirthdays),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
                 return ['changed' => true];
@@ -461,6 +504,24 @@ final class Api
             new Route('PUT', '/polls/{id}/vote', Cap::Member, fn (Request $r) => $a->polls()->vote($this->user(), $r->id(), $r->body), 'polls', $denyPolls),
             new Route('DELETE', '/polls/{id}/vote', Cap::Member, fn (Request $r) => $a->polls()->withdraw($this->user(), $r->id()), 'polls', $denyPolls),
 
+            // Geburtstage (Issue #1): sichtbare der Mitglieder ab heute, nie das Geburtsjahr; ?days=7 nur die anstehenden.
+            // Das Datum anderer pflegt, wer Mitglieder anlegt (die Schalter der Person bleiben).
+            new Route('GET', '/birthdays', Cap::Member, function (Request $r) use ($a) {
+                $days = null;
+                if (($r->query['days'] ?? null) !== null) {
+                    $days = Input::integer($r->query['days']);
+                    if ($days === null || $days < 0 || $days > 366) {
+                        throw ApiError::invalid('days: Zahl der Tage von 0 bis 366.');
+                    }
+                }
+                return $a->birthdays()->list($days);
+            }, 'birthdays', $denyBirthdays),
+            new Route('PUT', '/members/{id}/birthday', Cap::CreateUsers, fn (Request $r) => ['birthday' => $a->birthdays()->saveFor($this->user(), $r->id(), $r->body)], 'birthdays', $denyRights),
+            new Route('DELETE', '/members/{id}/birthday', Cap::CreateUsers, function (Request $r) use ($a) {
+                $a->birthdays()->removeFor($r->id());
+                return ['birthday' => null];
+            }, 'birthdays', $denyRights),
+
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
             new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
             new Route('PUT', '/attendance', Cap::ManageAttendance, function (Request $r) use ($a) {
@@ -499,7 +560,9 @@ final class Api
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
                 + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
-                + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : []), null, $denyManage),
+                + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
+                // Geburtstag mit Jahr und Schaltern (Issue #1), für alle, die Mitgliedsdetails sehen
+                + ($a->features()->enabled('birthdays') ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
@@ -517,6 +580,7 @@ final class Api
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && ($r->input('level') ?? 'member') !== 'member') {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
                 }
+                $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
                 $created = $a->members()->create($r->body);
                 try {
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
@@ -524,6 +588,7 @@ final class Api
                     error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
                     $created['warning'] = 'Das Konto ist angelegt, aber Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.';
                 }
+                $this->storeBirthday((int) $created['id'], $birthday, $created);
                 return Response::created($created);
             }, null, $denyUsers),
             // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.

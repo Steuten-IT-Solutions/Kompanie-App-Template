@@ -276,6 +276,18 @@ $pollId = $db->insert('polls', ['title' => 'Kpwp Umfrage', 'description' => '', 
 do_action($hook, $pollTask);
 $c->ok($db->scalar('SELECT reminded_at FROM {polls} WHERE id = ?', [$pollId]) !== null, 'Aufgabe über den Hook erinnert an bald endende Umfragen');
 $db->execute('DELETE FROM {polls} WHERE id = ?', [$pollId]);
+// Geburtstage (Issue #1): stündlich über WP-Cron; der Hook beansprucht einen heutigen Geburtstag ab 7 Uhr Ortszeit.
+$birthdayTask = \KompanieApp\Core\Domain\BirthdayService::TASK;
+$c->ok(wp_get_schedule($hook, [$birthdayTask]) === 'hourly', 'Geburtstage: Benachrichtigung stündlich über WP-Cron');
+$localNow = (new DateTimeImmutable('now'))->setTimezone($app->time()->timezone());
+$db->execute('DELETE FROM {birthdays} WHERE user_id = ?', [$member]);
+$db->insert('birthdays', ['user_id' => $member, 'month' => (int) $localNow->format('n'), 'day' => (int) $localNow->format('j'), 'year' => null, 'visible' => 1, 'show_age' => 0, 'last_notified' => null, 'updated_by' => $member, 'updated_at' => $past(60)]);
+do_action($hook, $birthdayTask);
+$claimed = $db->scalar('SELECT last_notified FROM {birthdays} WHERE user_id = ?', [$member]);
+$c->ok((int) $localNow->format('G') >= 7 ? $claimed === $localNow->format('Y-m-d') : $claimed === null, 'Aufgabe über den Hook benachrichtigt über heutige Geburtstage erst ab 7 Uhr (Ortszeit ' . $localNow->format('H:i') . ')');
+do_action($hook, $birthdayTask);
+$c->ok($db->scalar('SELECT last_notified FROM {birthdays} WHERE user_id = ?', [$member]) === $claimed, 'Zweiter Lauf ändert nichts');
+$db->execute('DELETE FROM {birthdays} WHERE user_id = ?', [$member]);
 
 $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);

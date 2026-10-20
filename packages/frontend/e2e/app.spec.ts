@@ -462,6 +462,7 @@ test.describe('Android', () => {
     await expect(page.getByLabel('Kasse: neue Einträge')).toBeChecked();
     await expect(page.getByLabel('Schwarzes Brett: dringende Nachrichten')).toBeChecked();
     await expect(page.getByLabel('Umfragen: neue Umfrage und Erinnerung')).toBeChecked();
+    await expect(page.getByLabel('Geburtstage: am Tag selbst')).toBeChecked();
     await expect(page.getByLabel('Kasse: Betrag und Grund in der Nachricht zeigen')).not.toBeChecked();
     await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
     await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
@@ -480,7 +481,10 @@ test.describe('Android', () => {
       }, device);
     await expect
       .poll(status)
-      .toEqual({ types: ['board', 'polls', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
+      .toEqual({
+        types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
+        details: true,
+      });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -1381,6 +1385,57 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
   await admin.locator('.poll-managed', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
   await expect(admin.locator('.toast')).toHaveText('Umfrage gelöscht');
   await admin.close();
+});
+
+test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „Anstehende Geburtstage“, ausgeblendet verschwindet er', async ({
+  page,
+  browser,
+}) => {
+  // In drei Tagen (Zeitzone des Browsers; die der Kompanie verschiebt das höchstens um einen Tag, bleibt also in 7 Tagen).
+  const in3 = new Date(Date.now() + 3 * 86400 * 1000);
+  const member = await browser.newPage();
+  member.on('dialog', (d) => d.accept());
+  await login(member, 'mitglied1');
+  await member.getByRole('button', { name: 'Konto' }).click();
+  const card = member.locator('.birthday-card');
+  await card.getByLabel('Tag').selectOption(String(in3.getDate()));
+  await card.getByLabel('Monat').selectOption(String(in3.getMonth() + 1));
+  await card.getByLabel('Jahr (optional)').fill(String(in3.getFullYear() - 30));
+  await expect(card.getByLabel('Anderen Mitgliedern zeigen')).toBeChecked();
+  await expect(card.getByLabel(/Alter anzeigen/)).not.toBeChecked();
+  await card.getByLabel(/Alter anzeigen/).check();
+  await card.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  await card.scrollIntoViewIfNeeded();
+  await shot(member, '36-geburtstag-konto');
+
+  // Ein anderes Mitglied sieht ihn oben unter Termine, mit Alter; „Alle Geburtstage“ zeigt die ganze Liste.
+  await login(page, 'mitglied2');
+  await page.goto('/app/#/termine');
+  const upcoming = page.locator('.birthdays-upcoming');
+  await expect(upcoming.getByRole('heading', { name: 'Anstehende Geburtstage' })).toBeVisible();
+  const entry = upcoming.locator('.birthday-item', { hasText: 'Mitglied1' });
+  await expect(entry).toBeVisible();
+  await expect(entry).toContainText('wird 30');
+  await expect(entry).not.toContainText(String(in3.getFullYear() - 30));
+  await shot(page, '35-geburtstage');
+  await upcoming.getByRole('button', { name: 'Alle Geburtstage' }).click();
+  await expect(page).toHaveURL(/#\/termine\/geburtstage$/);
+  await expect(page.locator('.birthdays-page .birthday-item', { hasText: 'Mitglied1' })).toBeVisible();
+
+  // „Anderen Mitgliedern zeigen“ aus: verschwindet.
+  await card.getByLabel('Anderen Mitgliedern zeigen').uncheck();
+  await card.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  await page.goto('/app/#/termine');
+  await page.reload();
+  await expect(page.getByText('Vereinsabend')).toBeVisible();
+  await expect(page.locator('.birthday-item', { hasText: 'Mitglied1' })).toHaveCount(0);
+
+  // Aufräumen
+  await card.getByRole('button', { name: 'Entfernen' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag entfernt');
+  await member.close();
 });
 
 test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wartungsseite, danach wieder normal', async ({

@@ -1,0 +1,295 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Core\Domain;
+
+use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\BirthdayRepository;
+
+/**
+ * Geburtstage (Issue #1).
+ *
+ * - Jedes Mitglied pflegt seinen eigenen Geburtstag (Tag und Monat, Jahr freiwillig) mit zwei Schaltern: „Anderen
+ *   Mitgliedern zeigen“ (visible, Standard an) und „Alter anzeigen“ (show_age, Standard aus).
+ * - Wer Mitglieder anlegen darf (create_users), trägt das Datum anderer ein oder entfernt es; die beiden Schalter
+ *   bleiben dabei, wie die Person sie gesetzt hat.
+ * - Sehen und erscheinen: nur Konten mit Mitgliederbereich (Recht member). Gäste und Anwärter sehen keine Geburtstage
+ *   und erscheinen auch nicht. Ohne visible weder in der Liste noch in der Benachrichtigung. Das Alter nur mit show_age
+ *   und Jahr; das Geburtsjahr gibt /birthdays nie aus.
+ * - „Heute“ in der Zeitzone der Kompanie. Der 29.02. gilt in Jahren ohne Schalttag am 28.02. Alter = das Alter, das
+ *   die Person an diesem Geburtstag erreicht.
+ * - Benachrichtigung am Tag selbst (Aufgabe birthday_notifications, stündlich, aber erst ab 7 Uhr Ortszeit): an alle
+ *   Mitglieder außer dem Geburtstagskind; je Geburtstag und Tag höchstens einmal (last_notified, atomar beansprucht).
+ *
+ * @phpstan-import-type Birthday from BirthdayRepository
+ */
+final class BirthdayService
+{
+    public const TASK = 'birthday_notifications';
+    /** Ab dieser Stunde (Zeitzone der Kompanie) wird benachrichtigt. */
+    public const NOTIFY_HOUR = 7;
+    public const MIN_YEAR = 1900;
+    /** Anstehend: heute und die nächsten 7 Tage (App, „Anstehende Geburtstage“). */
+    public const UPCOMING_DAYS = 7;
+
+    private ?BirthdayRepository $repo = null;
+
+    public function __construct(private readonly App $app)
+    {
+    }
+
+    public function repository(): BirthdayRepository
+    {
+        return $this->repo ??= new BirthdayRepository($this->app->db);
+    }
+
+    /** Wer Geburtstage sieht, mit seinem erscheint und Benachrichtigungen dazu bekommt: alle mit Mitgliederbereich. */
+    public static function isMember(?User $user): bool
+    {
+        return $user !== null && $user->isMember();
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Eingaben                                                         */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Tag, Monat und optional Jahr prüfen: gültiges Datum (29.02. nur im Schaltjahr oder ohne Jahr), Jahr ab 1900,
+     * nicht in der Zukunft (heute in der Zeitzone der Kompanie).
+     *
+     * @return array{month: int, day: int, year: int|null}
+     */
+    public function validate(mixed $month, mixed $day, mixed $year): array
+    {
+        $m = Input::integer($month);
+        $d = Input::integer($day);
+        if ($m === null || $d === null || $m < 1 || $m > 12 || $d < 1 || $d > 31) {
+            throw ApiError::invalid('Bitte Tag und Monat des Geburtstags angeben.');
+        }
+        $y = null;
+        if ($year !== null && $year !== '') {
+            $y = Input::integer($year);
+            if ($y === null) {
+                throw ApiError::invalid('Ungültiges Geburtsjahr.');
+            }
+        }
+        // Ohne Jahr: der 29.02. ist erlaubt (Schaltjahr 2000 als Maßstab).
+        if (!checkdate($m, $d, $y ?? 2000)) {
+            throw ApiError::invalid($y !== null && $m === 2 && $d === 29
+                ? sprintf('Den 29.02.%d gibt es nicht (kein Schaltjahr).', $y)
+                : 'Dieses Datum gibt es nicht.');
+        }
+        if ($y !== null) {
+            if ($y < self::MIN_YEAR) {
+                throw ApiError::invalid(sprintf('Das Geburtsjahr muss ab %d liegen.', self::MIN_YEAR));
+            }
+            $today = $this->app->time()->today();
+            if (sprintf('%04d-%02d-%02d', $y, $m, $d) > $today->format('Y-m-d')) {
+                throw ApiError::invalid('Der Geburtstag darf nicht in der Zukunft liegen.');
+            }
+        }
+        return ['month' => $m, 'day' => $d, 'year' => $y];
+    }
+
+    /**
+     * Geburtstag beim Anlegen von Konten (POST /users, /users/bulk): „JJJJ-MM-TT“ oder ohne Jahr „MM-TT“; leer = keiner.
+     *
+     * @return array{month: int, day: int, year: int|null}|null
+     */
+    public function parse(mixed $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_string($value) || preg_match('/^(?:(\d{4})-)?(\d{2})-(\d{2})$/', trim($value), $m) !== 1) {
+            throw ApiError::invalid('Geburtstag bitte als JJJJ-MM-TT oder ohne Jahr als MM-TT angeben.');
+        }
+        return $this->validate($m[2], $m[3], $m[1] === '' ? null : $m[1]);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Eigener Geburtstag und Pflege                                    */
+    /* ---------------------------------------------------------------- */
+
+    /** @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}|null */
+    public function of(int $userId): ?array
+    {
+        $b = $this->repository()->find($userId);
+        return $b === null ? null : self::full($b);
+    }
+
+    /**
+     * Eigener Geburtstag mit Jahr und Schaltern (PUT /me/birthday); fehlende Schalter bleiben (neu: sichtbar, ohne Alter).
+     *
+     * @param array<string, mixed> $in month, day, year, visible, show_age
+     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}|null
+     */
+    public function saveOwn(User $user, array $in): ?array
+    {
+        $date = $this->validate($in['month'] ?? null, $in['day'] ?? null, $in['year'] ?? null);
+        $flag = static function (string $key) use ($in): ?bool {
+            if (!array_key_exists($key, $in) || $in[$key] === null) {
+                return null;
+            }
+            if (!is_bool($in[$key])) {
+                throw ApiError::invalid('Ungültiger Wert für ' . $key . ' (an oder aus erwartet).');
+            }
+            return $in[$key];
+        };
+        $this->repository()->save($user->id, $date['month'], $date['day'], $date['year'], $flag('visible'), $flag('show_age'), $user->id, $this->app->time()->nowUtc());
+        return $this->of($user->id);
+    }
+
+    /**
+     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, create_users): nur Tag, Monat und Jahr; visible und
+     * show_age bleiben, wie die Person sie gesetzt hat (mitgeschickte Schalter werden nicht übernommen).
+     *
+     * @param array<string, mixed> $in month, day, year
+     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}|null
+     */
+    public function saveFor(User $actor, int $userId, array $in): ?array
+    {
+        $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $date = $this->validate($in['month'] ?? null, $in['day'] ?? null, $in['year'] ?? null);
+        $this->store($actor, $userId, $date);
+        return $this->of($userId);
+    }
+
+    /** @param array{month: int, day: int, year: int|null} $date geprüft (validate bzw. parse) */
+    public function store(User $actor, int $userId, array $date): void
+    {
+        $this->repository()->save($userId, $date['month'], $date['day'], $date['year'], null, null, $actor->id, $this->app->time()->nowUtc());
+    }
+
+    public function remove(int $userId): void
+    {
+        $this->repository()->delete($userId);
+    }
+
+    public function removeFor(int $userId): void
+    {
+        $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $this->remove($userId);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Liste                                                            */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Sichtbare Geburtstage der Mitglieder, ab heute sortiert (GET /birthdays). Nie das Geburtsjahr; das Alter nur mit
+     * show_age und Jahr. Mit $days nur die in den nächsten $days Tagen (0 = nur heute).
+     *
+     * @return list<array{user_id: int, name: string, month: int, day: int, date: string, days_until: int, today: bool, age: int|null}>
+     */
+    public function list(?int $days = null): array
+    {
+        $today = $this->app->time()->today();
+        $members = [];
+        foreach ($this->app->users->list(false) as $u) {
+            if (self::isMember($u)) {
+                $members[$u->id] = $u;
+            }
+        }
+        $out = [];
+        foreach ($this->repository()->visible() as $b) {
+            $user = $members[$b['user_id']] ?? null;
+            if ($user === null) {
+                continue;
+            }
+            $next = self::nextOccurrence($b['month'], $b['day'], $today);
+            $until = (int) $today->diff($next)->days;
+            if ($days !== null && $until > $days) {
+                continue;
+            }
+            $out[] = [
+                'user_id' => $b['user_id'],
+                'name' => $user->name,
+                'month' => $b['month'],
+                'day' => $b['day'],
+                // Tag des nächsten Geburtstags (29.02. ohne Schaltjahr: 28.02.)
+                'date' => $next->format('Y-m-d'),
+                'days_until' => $until,
+                'today' => $until === 0,
+                'age' => self::publicAge($b, (int) $next->format('Y')),
+            ];
+        }
+        usort($out, static fn (array $a, array $b): int => [$a['days_until'], mb_strtolower($a['name'])] <=> [$b['days_until'], mb_strtolower($b['name'])]);
+        return $out;
+    }
+
+    /** Geburtstag in einem Jahr: der 29.02. in Jahren ohne Schalttag am 28.02. */
+    public static function inYear(int $month, int $day, int $year, \DateTimeZone $tz): \DateTimeImmutable
+    {
+        if ($month === 2 && $day === 29 && !checkdate(2, 29, $year)) {
+            $day = 28;
+        }
+        return (new \DateTimeImmutable('now', $tz))->setDate($year, $month, $day)->setTime(0, 0);
+    }
+
+    /** Nächster Geburtstag ab heute (heute eingeschlossen). */
+    public static function nextOccurrence(int $month, int $day, \DateTimeImmutable $today): \DateTimeImmutable
+    {
+        $year = (int) $today->format('Y');
+        $date = self::inYear($month, $day, $year, $today->getTimezone());
+        return $date->format('Y-m-d') < $today->format('Y-m-d') ? self::inYear($month, $day, $year + 1, $today->getTimezone()) : $date;
+    }
+
+    /**
+     * Alter für andere: nur mit Jahr und „Alter anzeigen“.
+     *
+     * @param Birthday $b
+     */
+    private static function publicAge(array $b, int $inYear): ?int
+    {
+        return $b['show_age'] && $b['year'] !== null ? $inYear - $b['year'] : null;
+    }
+
+    /**
+     * @param Birthday $b
+     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}
+     */
+    private static function full(array $b): array
+    {
+        return ['month' => $b['month'], 'day' => $b['day'], 'year' => $b['year'], 'visible' => $b['visible'], 'show_age' => $b['show_age']];
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Benachrichtigung                                                 */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Aufgabe birthday_notifications (stündlich): ab 7 Uhr Ortszeit für jeden sichtbaren Geburtstag eines Mitglieds
+     * von heute einmal benachrichtigen. last_notified wird vor dem Versand beansprucht (nur ein Lauf gewinnt), damit
+     * wiederholte oder gleichzeitige Läufe (Pseudo-Cron) nicht doppelt senden. Ein im Laufe des Tages eingetragener
+     * Geburtstag von heute kommt beim nächsten Lauf noch dran.
+     *
+     * @return int Zahl der eingereihten Benachrichtigungen
+     */
+    public function notifyToday(): int
+    {
+        $time = $this->app->time();
+        $now = (new \DateTimeImmutable('@' . $time->timestamp()))->setTimezone($time->timezone());
+        if ((int) $now->format('G') < self::NOTIFY_HOUR) {
+            return 0;
+        }
+        $today = $time->today();
+        $date = $today->format('Y-m-d');
+        $year = (int) $today->format('Y');
+        $count = 0;
+        foreach ($this->repository()->visible() as $b) {
+            if (self::inYear($b['month'], $b['day'], $year, $today->getTimezone())->format('Y-m-d') !== $date) {
+                continue;
+            }
+            $user = $this->app->users->find($b['user_id']);
+            if ($user === null || !$user->isMember() || $b['last_notified'] === $date || !$this->repository()->claim($b['user_id'], $date)) {
+                continue;
+            }
+            $count += $this->app->pushTriggers()->birthday($b['user_id'], $user->name, self::publicAge($b, $year));
+        }
+        return $count;
+    }
+}

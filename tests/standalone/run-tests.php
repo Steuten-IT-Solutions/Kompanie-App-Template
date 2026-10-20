@@ -259,6 +259,25 @@ try {
         usleep(100000);
     }
     $c->ok($kdb->scalar('SELECT reminded_at FROM {polls} WHERE id = ?', [$pollId]) !== null, 'Cron erinnert an bald endende Umfragen');
+    // Geburtstage (Issue #1): stündlich eingeplant; der Cron beansprucht einen heutigen Geburtstag ab 7 Uhr Ortszeit
+    // (last_notified), vorher nicht.
+    $birthdayTask = \KompanieApp\Core\Domain\BirthdayService::TASK;
+    $c->ok((int) $kdb->scalar('SELECT interval_seconds FROM {tasks} WHERE name = ?', [$birthdayTask]) === 3600, 'Geburtstage: Benachrichtigung stündlich eingeplant');
+    $localNow = (new DateTimeImmutable('now'))->setTimezone($kernel->app()->time()->timezone());
+    $kdb->execute('DELETE FROM {birthdays} WHERE user_id = ?', [$max]);
+    $kdb->insert('birthdays', ['user_id' => $max, 'month' => (int) $localNow->format('n'), 'day' => (int) $localNow->format('j'), 'year' => null, 'visible' => 1, 'show_age' => 0, 'last_notified' => null, 'updated_by' => $max, 'updated_at' => $past(60)]);
+    $kdb->execute('UPDATE {tasks} SET next_run = ? WHERE name = ?', [time() - 1, $birthdayTask]);
+    $kdb->execute('DELETE FROM {settings} WHERE name = ?', [KompanieApp\Standalone\PseudoScheduler::NEXT_SETTING]);
+    $d->send('GET', $kernel->cronUrl(), [], null);
+    for ($i = 0; $i < 50 && (int) $kdb->scalar('SELECT next_run FROM {tasks} WHERE name = ?', [$birthdayTask]) < time(); $i++) {
+        usleep(100000);
+    }
+    for ($i = 0; $i < 20 && (int) $localNow->format('G') >= 7 && $kdb->scalar('SELECT last_notified FROM {birthdays} WHERE user_id = ?', [$max]) === null; $i++) {
+        usleep(100000);
+    }
+    $claimed = $kdb->scalar('SELECT last_notified FROM {birthdays} WHERE user_id = ?', [$max]);
+    $c->ok((int) $localNow->format('G') >= 7 ? $claimed === $localNow->format('Y-m-d') : $claimed === null, 'Cron benachrichtigt über heutige Geburtstage erst ab 7 Uhr (Ortszeit ' . $localNow->format('H:i') . ')');
+    $kdb->execute('DELETE FROM {birthdays} WHERE user_id = ?', [$max]);
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 404, 'Unbekanntes Foto → 404');
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { api, can, config, levelLabel } from '../api';
 import { isStandalone } from '../install';
 import { canManagePolls, canPostBoard } from '../board';
+import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 
@@ -41,6 +42,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         <h2 className="account-name">{config?.user?.name}</h2>
         <p className="muted small">Rolle: {levelLabel(config?.user?.level ?? 'guest')}</p>
       </div>
+
+      {birthdaysVisible() && <OwnBirthdayCard onToast={onToast} />}
 
       {can('manage_settings') && (
         <div className="card account-card">

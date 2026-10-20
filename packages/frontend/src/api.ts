@@ -32,7 +32,8 @@ export type Feature =
   | 'attendance'
   | 'documents'
   | 'board'
-  | 'polls';
+  | 'polls'
+  | 'birthdays';
 
 export interface AppUser {
   id: number;
@@ -300,6 +301,41 @@ export interface MemberDetail extends MemberSummary {
   /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
   rank?: RankStatus;
   rank_history?: RankHistoryEntry[];
+  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
+  birthday?: Birthday | null;
+}
+
+/** Geburtstag mit Jahr und Schaltern: nur der eigene und in den Mitgliedsdetails (Issue #1). */
+export interface Birthday {
+  month: number;
+  day: number;
+  year: number | null;
+  /** Anderen Mitgliedern zeigen */
+  visible: boolean;
+  /** Alter anzeigen */
+  show_age: boolean;
+}
+
+/** Sichtbarer Geburtstag eines Mitglieds (GET /birthdays), nie mit Geburtsjahr. */
+export interface BirthdayEntry {
+  user_id: number;
+  name: string;
+  month: number;
+  day: number;
+  /** Tag des nächsten Geburtstags (29.02. in Jahren ohne Schalttag: 28.02.) */
+  date: string;
+  days_until: number;
+  today: boolean;
+  /** Alter an diesem Geburtstag, nur wenn freigegeben */
+  age: number | null;
+}
+
+export interface BirthdayInput {
+  month: number;
+  day: number;
+  year: number | null;
+  visible?: boolean;
+  show_age?: boolean;
 }
 
 export interface Rank {
@@ -580,6 +616,8 @@ export interface NewPerson {
   initial_points?: number;
   initial_points_date?: string;
   rank_id?: number;
+  /** JJJJ-MM-TT oder ohne Jahr MM-TT */
+  birthday?: string;
 }
 
 export interface AccountProfile {
@@ -753,6 +791,7 @@ export const api = {
     initial_points?: number;
     initial_points_date?: string;
     rank_id?: number;
+    birthday?: string;
   }) => request<CreatedUser>('POST', '/users', data),
 
   // Dienstgrade (Issue #9)
@@ -797,6 +836,16 @@ export const api = {
   vote: (id: number, answer: { option_ids?: number[]; text?: string }) => request<Poll>('PUT', `/polls/${id}/vote`, answer),
   withdrawVote: (id: number) => request<Poll>('DELETE', `/polls/${id}/vote`),
   deleteBoard: (id: number) => request<{ deleted: boolean }>('DELETE', `/board/${id}`),
+
+  // Geburtstage (Issue #1)
+  birthdays: (days?: number) =>
+    request<BirthdayEntry[]>('GET', '/birthdays', undefined, days === undefined ? undefined : { days: String(days) }),
+  myBirthday: () => request<{ birthday: Birthday | null }>('GET', '/me/birthday'),
+  saveMyBirthday: (data: BirthdayInput) => request<{ birthday: Birthday | null }>('PUT', '/me/birthday', data),
+  deleteMyBirthday: () => request<{ birthday: null }>('DELETE', '/me/birthday'),
+  setMemberBirthday: (id: number, data: { month: number; day: number; year: number | null }) =>
+    request<{ birthday: Birthday | null }>('PUT', `/members/${id}/birthday`, data),
+  deleteMemberBirthday: (id: number) => request<{ birthday: null }>('DELETE', `/members/${id}/birthday`),
 
   // Anwesenheit (Issue #21)
   attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),
@@ -895,7 +944,7 @@ export const api = {
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
 
-export type PushType = 'board' | 'polls' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
+export type PushType = 'board' | 'polls' | 'birthdays' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {

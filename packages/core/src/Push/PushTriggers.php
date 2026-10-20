@@ -21,7 +21,9 @@ use KompanieApp\Core\Domain\RankService;
  * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, dringend und
  *   höchstens bis zum Ablauf der Nachricht zustellbar; Ändern löst nichts aus;
  * - neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem Ende an
- *   alle Mitglieder ohne Antwort (einmal je Umfrage, Aufgabe poll_reminders).
+ *   alle Mitglieder ohne Antwort (einmal je Umfrage, Aufgabe poll_reminders);
+ * - Geburtstag (Issue #1): am Tag selbst ab 7 Uhr an alle Mitglieder außer dem Geburtstagskind, nur für Geburtstage,
+ *   die die Person anderen zeigt (einmal je Geburtstag und Tag, Aufgabe birthday_notifications).
  */
 final class PushTriggers
 {
@@ -113,6 +115,24 @@ final class PushTriggers
             static fn (int $uid): bool => !isset($voted[$uid]),
             'normal',
             $this->ttlUntil($poll['ends_at']),
+        );
+    }
+
+    /**
+     * Geburtstag heute (Issue #1, BirthdayService::notifyToday): an alle Mitglieder außer dem Geburtstagskind, das Alter
+     * nur, wenn die Person es freigegeben hat; zustellbar höchstens bis Mitternacht (Zeitzone der Kompanie).
+     */
+    public function birthday(int $userId, string $name, ?int $age): int
+    {
+        $title = $this->app->config->sectionLabel('birthdays', 'Geburtstage');
+        $body = 'Heute hat ' . $name . ' Geburtstag' . ($age !== null ? ' (wird ' . $age . ')' : '');
+        $midnight = $this->app->time()->today()->modify('+1 day')->getTimestamp();
+        return $this->push->notifyAudience(
+            PushService::TYPE_BIRTHDAYS,
+            PushService::message($title, $body, 'termine/geburtstage', 'geburtstag-' . $userId),
+            static fn (int $uid): bool => $uid !== $userId,
+            'normal',
+            $midnight - $this->app->time()->timestamp(),
         );
     }
 

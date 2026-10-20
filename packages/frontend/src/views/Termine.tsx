@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api, can, config, type CalendarEvent } from '../api';
 import GuestPushButton from '../GuestPushButton';
+import { birthdaysVisible, UpcomingBirthdays } from '../birthdays';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
@@ -15,8 +16,18 @@ async function loadEvents(): Promise<EventLike[]> {
   return list.map((ev) => ({ ...ev, id: `p${ev.id}` }));
 }
 
+/** Termine aus Kalender oder öffentlicher Liste – oder (nur Geburtstage an) gar keine. */
+const hasEvents = (): boolean => !!(config?.features.events || (config?.features.calendar && can('calendar')));
+
 export default function Termine() {
+  // Geburtstage (Issue #1): „Anstehende Geburtstage“ oben; ohne Termine die einzige Karte.
+  if (!hasEvents()) return <UpcomingBirthdays always />;
+  return <EventList />;
+}
+
+function EventList() {
   const { data, error, loading, reload } = useAsync(loadEvents, [], 'termine');
+  const birthdays = birthdaysVisible() ? <UpcomingBirthdays /> : null;
   const [open, setOpen] = useState<string | null>(null);
 
   const groups = useMemo(() => {
@@ -42,11 +53,24 @@ export default function Termine() {
 
   const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
 
-  if (loading && !data) return <Loading />;
-  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (loading && !data)
+    return (
+      <>
+        {birthdays}
+        <Loading />
+      </>
+    );
+  if (error)
+    return (
+      <>
+        {birthdays}
+        <ErrorBox message={error} onRetry={reload} />
+      </>
+    );
   if (groups.length === 0)
     return (
       <>
+        {birthdays}
         {manage}
         <Empty>Keine anstehenden Termine.</Empty>
         {notify}
@@ -55,6 +79,7 @@ export default function Termine() {
 
   return (
     <div className="events">
+      {birthdays}
       {manage}
       {groups.map((evs) => (
         <section key={evs[0].id} className="month">
