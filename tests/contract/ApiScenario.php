@@ -1049,6 +1049,15 @@ final class ApiScenario
         [$s, $d] = $this->req('PATCH', '/admin/push', ['reminder_hour' => 7]);
         $c->ok($s === 200 && $d['reminderHour'] === 7, 'Uhrzeit der Erinnerung ändern');
         $this->req('PATCH', '/admin/push', ['reminder_hour' => $hour]);
+        // Benachrichtigung am Geburtstag: nur mit dem Bereich Geburtstage
+        $c->ok(array_key_exists('birthdays', $d) && ($d['birthdays'] === null || (is_bool($d['birthdays']['enabled'] ?? null) && is_int($d['birthdays']['hour'] ?? null))), 'GET /admin/push nennt die Benachrichtigung am Geburtstag');
+        if (is_array($d['birthdays'] ?? null)) {
+            $before = $d['birthdays'];
+            $c->ok($this->req('PATCH', '/admin/push', ['birthday_hour' => 24])[0] === 400, 'Ungültige Stunde am Geburtstag → 400');
+            [$s, $d] = $this->req('PATCH', '/admin/push', ['birthday_notify' => false, 'birthday_hour' => 9]);
+            $c->ok($s === 200 && $d['birthdays'] === ['enabled' => false, 'hour' => 9], 'Benachrichtigung am Geburtstag ausschalten und Stunde ändern');
+            $this->req('PATCH', '/admin/push', ['birthday_notify' => $before['enabled'], 'birthday_hour' => $before['hour']]);
+        }
     }
 
     private function config(): void

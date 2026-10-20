@@ -419,6 +419,47 @@ final class BirthdayServiceTest extends TestCase
         $this->assertSame('Heute hat Zweite Geburtstag (wird 36)', $this->queued()[0]['body']);
     }
 
+    public function testAdminsSwitchNotificationOffAndChooseTheHour(): void
+    {
+        $this->setUpPush('2026-10-20 07:30:00');
+        $this->setOwn($this->m, ['month' => 10, 'day' => 20, 'year' => 1981]);
+        $res = $this->as($this->admin)->call('GET', '/admin/push');
+        $this->assertSame(['enabled' => true, 'hour' => 7], $res->data['birthdays'], 'Standard: an, ab 7 Uhr');
+        $this->assertSame(403, $this->as($this->m)->call('PATCH', '/admin/push', ['birthday_notify' => false])->status, 'nur Admins');
+
+        // Ungültige Angaben: 400, nichts gespeichert (auch nicht der gültige Teil).
+        foreach ([['birthday_hour' => 24], ['birthday_hour' => -1], ['birthday_hour' => 7.5], ['birthday_hour' => 'acht'], ['birthday_notify' => 'nein'], ['birthday_notify' => false, 'birthday_hour' => 24]] as $body) {
+            $this->assertSame(400, $this->as($this->admin)->call('PATCH', '/admin/push', $body)->status, (string) json_encode($body));
+        }
+        $this->assertSame(['enabled' => true, 'hour' => 7], $this->app->birthdays()->notifySettings());
+
+        // Aus: kein Versand, nichts beansprucht.
+        $res = $this->as($this->admin)->call('PATCH', '/admin/push', ['birthday_notify' => false]);
+        $this->assertSame(['enabled' => false, 'hour' => 7], $res->data['birthdays']);
+        $this->app->runTask(BirthdayService::TASK);
+        $this->assertSame([], $this->queued());
+        $this->assertNull($this->app->birthdays()->repository()->find($this->m)['last_notified'] ?? null);
+
+        // Wieder an, aber erst ab 9 Uhr: um 07:30 nichts, ab 09:00 einmal.
+        $res = $this->as($this->admin)->call('PATCH', '/admin/push', ['birthday_notify' => true, 'birthday_hour' => 9]);
+        $this->assertSame(['enabled' => true, 'hour' => 9], $res->data['birthdays']);
+        $this->app->runTask(BirthdayService::TASK);
+        $this->assertSame([], $this->queued());
+        $this->at('2026-10-20 09:00:00');
+        $this->app->runTask(BirthdayService::TASK);
+        $this->assertSame(['m2', 'admin'], array_column($this->queued(), 'device'));
+
+        // Früher gestellt: kein zweites Mal am selben Tag.
+        $this->as($this->admin)->call('PATCH', '/admin/push', ['birthday_hour' => '6']);
+        $this->assertSame(6, $this->app->birthdays()->notifyHour(), 'Stunde auch als Text aus Formularen');
+        $this->app->runTask(BirthdayService::TASK);
+        $this->assertCount(2, $this->queued());
+
+        // Ohne den Bereich Geburtstage keine Angaben dazu.
+        $this->app->features()->update(['birthdays' => false]);
+        $this->assertNull($this->as($this->admin)->call('GET', '/admin/push')->data['birthdays']);
+    }
+
     public function testPushOnlyForVisibleAndAgeOnlyIfReleased(): void
     {
         $this->setUpPush('2026-10-20 08:00:00');

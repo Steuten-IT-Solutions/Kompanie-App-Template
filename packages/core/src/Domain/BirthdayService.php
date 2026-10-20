@@ -21,16 +21,21 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  *   und Jahr; das Geburtsjahr gibt /birthdays nie aus.
  * - „Heute“ in der Zeitzone der Kompanie. Der 29.02. gilt in Jahren ohne Schalttag am 28.02. Alter = das Alter, das
  *   die Person an diesem Geburtstag erreicht.
- * - Benachrichtigung am Tag selbst (Aufgabe birthday_notifications, stündlich, aber erst ab 7 Uhr Ortszeit): an alle
- *   Mitglieder außer dem Geburtstagskind; je Geburtstag und Tag höchstens einmal (last_notified, atomar beansprucht).
+ * - Benachrichtigung am Tag selbst (Aufgabe birthday_notifications, stündlich, aber erst ab der eingestellten Stunde
+ *   Ortszeit, Standard 7 Uhr): an alle Mitglieder außer dem Geburtstagskind; je Geburtstag und Tag höchstens einmal
+ *   (last_notified, atomar beansprucht). Admins können sie ausschalten (birthday_notify) und die Stunde wählen
+ *   (birthday_notify_hour).
  *
  * @phpstan-import-type Birthday from BirthdayRepository
  */
 final class BirthdayService
 {
     public const TASK = 'birthday_notifications';
-    /** Ab dieser Stunde (Zeitzone der Kompanie) wird benachrichtigt. */
-    public const NOTIFY_HOUR = 7;
+    /** Benachrichtigung am Tag selbst an oder aus; Einstellung der Admins (Standard an). */
+    public const NOTIFY_SETTING = 'birthday_notify';
+    /** Ab dieser Stunde (0–23, Zeitzone der Kompanie) wird benachrichtigt; Einstellung der Admins. */
+    public const NOTIFY_HOUR_SETTING = 'birthday_notify_hour';
+    public const NOTIFY_HOUR_DEFAULT = 7;
     public const MIN_YEAR = 1900;
     /** Anstehend: heute und die nächsten 7 Tage (App, „Anstehende Geburtstage“). */
     public const UPCOMING_DAYS = 7;
@@ -262,7 +267,7 @@ final class BirthdayService
     /* ---------------------------------------------------------------- */
 
     /**
-     * Aufgabe birthday_notifications (stündlich): ab 7 Uhr Ortszeit für jeden sichtbaren Geburtstag eines Mitglieds
+     * Aufgabe birthday_notifications (stündlich): ist die Benachrichtigung an, ab der eingestellten Stunde für jeden sichtbaren Geburtstag eines Mitglieds
      * von heute einmal benachrichtigen. last_notified wird vor dem Versand beansprucht (nur ein Lauf gewinnt), damit
      * wiederholte oder gleichzeitige Läufe (Pseudo-Cron) nicht doppelt senden. Ein im Laufe des Tages eingetragener
      * Geburtstag von heute kommt beim nächsten Lauf noch dran.
@@ -271,9 +276,12 @@ final class BirthdayService
      */
     public function notifyToday(): int
     {
+        if (!$this->notifyEnabled()) {
+            return 0;
+        }
         $time = $this->app->time();
         $now = (new \DateTimeImmutable('@' . $time->timestamp()))->setTimezone($time->timezone());
-        if ((int) $now->format('G') < self::NOTIFY_HOUR) {
+        if ((int) $now->format('G') < $this->notifyHour()) {
             return 0;
         }
         $today = $time->today();
@@ -291,5 +299,42 @@ final class BirthdayService
             $count += $this->app->pushTriggers()->birthday($b['user_id'], $user->name, self::publicAge($b, $year));
         }
         return $count;
+    }
+
+    /** @return array{enabled: bool, hour: int} Einstellungen der Benachrichtigung (GET /admin/push) */
+    public function notifySettings(): array
+    {
+        return ['enabled' => $this->notifyEnabled(), 'hour' => $this->notifyHour()];
+    }
+
+    public function notifyEnabled(): bool
+    {
+        return (bool) $this->app->settings->get(self::NOTIFY_SETTING, true);
+    }
+
+    public function notifyHour(): int
+    {
+        $h = $this->app->settings->get(self::NOTIFY_HOUR_SETTING, self::NOTIFY_HOUR_DEFAULT);
+        return is_numeric($h) && (int) $h >= 0 && (int) $h <= 23 ? (int) $h : self::NOTIFY_HOUR_DEFAULT;
+    }
+
+    /**
+     * Einstellungen ändern (PATCH /admin/push: birthday_notify, birthday_hour); erst beide prüfen, dann speichern.
+     * Ein heute schon benachrichtigter Geburtstag bleibt beansprucht: Eine spätere Stunde schickt ihn nicht noch einmal.
+     */
+    public function setNotify(mixed $enabled, mixed $hour): void
+    {
+        if ($enabled !== null && !is_bool($enabled)) {
+            throw ApiError::invalid('Bitte an oder aus angeben.');
+        }
+        if ($hour !== null && (!is_numeric($hour) || (int) $hour < 0 || (int) $hour > 23 || (string) (int) $hour !== (string) $hour)) {
+            throw ApiError::invalid('Bitte eine volle Stunde von 0 bis 23 angeben.');
+        }
+        if ($enabled !== null) {
+            $this->app->settings->set(self::NOTIFY_SETTING, $enabled);
+        }
+        if ($hour !== null) {
+            $this->app->settings->set(self::NOTIFY_HOUR_SETTING, (int) $hour);
+        }
     }
 }

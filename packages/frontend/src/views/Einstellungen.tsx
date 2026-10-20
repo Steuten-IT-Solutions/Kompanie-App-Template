@@ -88,7 +88,10 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   return s.news ? <News {...props} /> : null;
 }
 
-/** Benachrichtigungen: wie viele Geräte angemeldet sind und wann die Erinnerung an Termine am nächsten Tag kommt. */
+/**
+ * Benachrichtigungen: wie viele Geräte angemeldet sind, wann die Erinnerung an Termine am nächsten Tag kommt und ob und ab
+ * wann am Geburtstag benachrichtigt wird.
+ */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
   const [busy, setBusy] = useState(false);
@@ -97,11 +100,11 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const p = data!;
 
-  async function setHour(hour: number) {
+  async function save(change: () => ReturnType<typeof api.pushAdmin>) {
     setBusy(true);
     setSaveError(null);
     try {
-      setData(await api.setPushReminderHour(hour));
+      setData(await change());
       onToast('Gespeichert');
     } catch (err) {
       setSaveError((err as Error).message);
@@ -127,14 +130,35 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <label className="field">
         <span>Erinnerung an Termine am nächsten Tag ab</span>
-        <select value={p.reminderHour} disabled={busy} onChange={(e) => setHour(Number(e.target.value))}>
-          {Array.from({ length: 24 }, (_, h) => (
-            <option key={h} value={h}>
-              {String(h).padStart(2, '0')}:00 Uhr
-            </option>
-          ))}
+        <select value={p.reminderHour} disabled={busy} onChange={(e) => save(() => api.setPushReminderHour(Number(e.target.value)))}>
+          <HourOptions />
         </select>
       </label>
+      {p.birthdays && (
+        <>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={p.birthdays.enabled}
+              disabled={busy}
+              onChange={(e) => save(() => api.setBirthdayNotify({ birthday_notify: e.target.checked }))}
+            />
+            Am Geburtstag eines Mitglieds alle anderen benachrichtigen
+          </label>
+          {p.birthdays.enabled && (
+            <label className="field">
+              <span>Benachrichtigung am Geburtstag ab</span>
+              <select
+                value={p.birthdays.hour}
+                disabled={busy}
+                onChange={(e) => save(() => api.setBirthdayNotify({ birthday_hour: Number(e.target.value) }))}
+              >
+                <HourOptions />
+              </select>
+            </label>
+          )}
+        </>
+      )}
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}
@@ -144,6 +168,19 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
       </p>
     </section>
+  );
+}
+
+/** Volle Stunden 00:00 bis 23:00 für die Auswahl einer Uhrzeit. */
+function HourOptions() {
+  return (
+    <>
+      {Array.from({ length: 24 }, (_, h) => (
+        <option key={h} value={h}>
+          {String(h).padStart(2, '0')}:00 Uhr
+        </option>
+      ))}
+    </>
   );
 }
 

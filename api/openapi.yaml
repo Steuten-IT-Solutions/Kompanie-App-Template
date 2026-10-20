@@ -2634,7 +2634,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Einstellungen]
-      summary: Uhrzeit der Erinnerung an Termine am nächsten Tag ändern
+      summary: Uhrzeit der Erinnerung an Termine am nächsten Tag und Benachrichtigung am Geburtstag ändern
       x-capability: manage_settings
       requestBody:
         required: true
@@ -2644,6 +2644,8 @@ paths:
               type: object
               properties:
                 reminder_hour: { type: integer, minimum: 0, maximum: 23 }
+                birthday_notify: { type: boolean, description: 'Benachrichtigung am Geburtstag an oder aus (Standard an)' }
+                birthday_hour: { type: integer, minimum: 0, maximum: 23, description: 'Ab dieser Stunde (Ortszeit) am Geburtstag benachrichtigen (Standard 7)' }
       responses:
         '200': { $ref: '#/components/responses/PushAdmin' }
         '400': { $ref: '#/components/responses/Error' }
@@ -2929,7 +2931,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [supported, missing, devices, accounts, guests, queued, reminderHour]
+            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays]
             properties:
               supported: { type: boolean }
               missing: { type: array, items: { type: string }, description: Fehlende PHP-Voraussetzungen }
@@ -2938,6 +2940,13 @@ components:
               guests: { type: integer }
               queued: { type: integer, description: Nachrichten in der Warteschlange }
               reminderHour: { type: integer, minimum: 0, maximum: 23 }
+              birthdays:
+                type: [object, 'null']
+                description: Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage
+                required: [enabled, hour]
+                properties:
+                  enabled: { type: boolean }
+                  hour: { type: integer, minimum: 0, maximum: 23 }
     Error:
       description: Fehler
       content:

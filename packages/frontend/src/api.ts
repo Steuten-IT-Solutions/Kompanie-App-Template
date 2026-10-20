@@ -1024,6 +1024,7 @@ export const api = {
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
+  setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
 };
 
 export type PushType = 'board' | 'polls' | 'birthdays' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
@@ -1054,6 +1055,8 @@ export interface PushAdmin {
   guests: number;
   queued: number;
   reminderHour: number;
+  /** Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage */
+  birthdays: { enabled: boolean; hour: number } | null;
 }
 
 const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;

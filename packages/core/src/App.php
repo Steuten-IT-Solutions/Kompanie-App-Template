@@ -179,7 +179,7 @@ final class App
             BoardService::TASK => $this->features()->enabled('board'),
             // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
             PollService::TASK => $this->features()->enabled('polls'),
-            // Geburtstage: stündlich, benachrichtigt aber erst ab 7 Uhr Ortszeit und je Geburtstag einmal am Tag.
+            // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
         ];
         foreach ($wanted as $task => $on) {

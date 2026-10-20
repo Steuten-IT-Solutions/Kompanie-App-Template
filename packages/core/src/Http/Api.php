@@ -622,11 +622,14 @@ final class Api
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
-            // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung
+            // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung; Benachrichtigung am Geburtstag
             new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),
             new Route('PATCH', '/admin/push', Cap::ManageSettings, function (Request $r) use ($a) {
                 if ($r->has('reminder_hour')) {
                     $a->push()->setReminderHour($r->input('reminder_hour'));
+                }
+                if ($r->has('birthday_notify') || $r->has('birthday_hour')) {
+                    $a->birthdays()->setNotify($r->input('birthday_notify'), $r->input('birthday_hour'));
                 }
                 return $a->push()->adminStatus();
             }, null, $denySettings),

@@ -15,7 +15,7 @@ Mit **Testnachricht senden** prüfst du, ob alles klappt. Die Einstellung gilt n
 ## Was es gibt
 - **{bereich.board}: dringende Nachrichten**: nur mit Konto, für {rolle.member} und {rolle.candidate}, sobald jemand eine Nachricht ans {bereich.board} schreibt. Für neue Geräte ist das von Anfang an eingeschaltet.
 - **{bereich.polls}: neue Umfrage und Erinnerung**: nur für {rolle.member}, bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast. Für neue Geräte von Anfang an eingeschaltet.
-- **{bereich.birthdays}: am Tag selbst**: nur für {rolle.member}, ab 7 Uhr am Geburtstag eines anderen Mitglieds, das seinen Geburtstag anderen zeigt (das Alter nur, wenn es freigegeben ist). Für neue Geräte von Anfang an eingeschaltet.
+- **{bereich.birthdays}: am Tag selbst**: nur für {rolle.member}, am Geburtstag eines anderen Mitglieds ab der Uhrzeit, die der Admin festlegt (üblich 7 Uhr), das seinen Geburtstag anderen zeigt (das Alter nur, wenn es freigegeben ist). Für neue Geräte von Anfang an eingeschaltet.
 - **{bereich.points}: neue Einträge** und **{bereich.penalties}: neue Einträge**: nur mit Konto, nur deine eigenen. Bei {bereich.penalties} stehen Betrag und Grund nur mit dem Schalter **{bereich.penalties}: Betrag und Grund in der Nachricht zeigen** in der Nachricht, sonst nur ein Hinweis – gut, wenn andere deinen Sperrbildschirm sehen.
 - **{bereich.events}: neue und geänderte**: wenn ein Termin dazukommt oder sich Zeit oder Ort ändern.
 - **Erinnerung am Vortag**: einmal am Tag vor einem Termin, ab der Uhrzeit, die der Admin festlegt (üblich 18 Uhr), spätestens vier Stunden danach.
@@ -32,4 +32,4 @@ Unter **Benachrichtigungen** auf **Benachrichtigungen ausschalten** tippen. Meld
 ## Es kommt nichts an?
 - Hast du die Nachfrage abgelehnt, sind Benachrichtigungen für die Seite blockiert. Erlaube sie in den Einstellungen des Browsers (bzw. des Handys unter Mitteilungen) und lade die App neu.
 - Stromsparmodus und „Nicht stören“ halten Nachrichten manchmal zurück.
-- Admins sehen unter **Einstellungen → Benachrichtigungen**, ob der Server Nachrichten senden kann, und legen fest, ab wann die Erinnerung am Vortag kommt.
+- Admins sehen unter **Einstellungen → Benachrichtigungen**, ob der Server Nachrichten senden kann, und legen fest, ab wann die Erinnerung am Vortag kommt. Dort schalten sie auch die Benachrichtigung am Geburtstag aus oder wählen, ab wann sie kommt.

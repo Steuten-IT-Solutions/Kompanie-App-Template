@@ -22,4 +22,4 @@ Wer am 29. Februar Geburtstag hat, steht in Jahren ohne Schalttag am 28. Februar
 Ändern geht jederzeit genauso; mit **Entfernen** löschst du deinen Geburtstag ganz. Wer Mitglieder anlegen darf, kann das Datum für dich eintragen oder korrigieren – die beiden Schalter stellst aber nur du selbst ein.
 
 ## Benachrichtigung
-Am Tag selbst ab 7 Uhr bekommen alle {rolle.member} (außer dem Geburtstagskind) eine Benachrichtigung wie „Heute hat Max Mustermann Geburtstag (wird 45)“ – das Alter nur, wenn es freigegeben ist. Dafür muss die Art **{bereich.birthdays}: am Tag selbst** für das Gerät eingeschaltet sein (siehe [Benachrichtigungen](seite:benachrichtigungen)).
+Am Tag selbst ab 7 Uhr (Admins können die Uhrzeit unter **Einstellungen → Benachrichtigungen** ändern oder die Benachrichtigung dort ausschalten) bekommen alle {rolle.member} (außer dem Geburtstagskind) eine Benachrichtigung wie „Heute hat Max Mustermann Geburtstag (wird 45)“ – das Alter nur, wenn es freigegeben ist. Dafür muss die Art **{bereich.birthdays}: am Tag selbst** für das Gerät eingeschaltet sein (siehe [Benachrichtigungen](seite:benachrichtigungen)).
