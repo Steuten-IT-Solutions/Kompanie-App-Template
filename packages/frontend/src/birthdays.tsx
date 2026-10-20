@@ -158,7 +158,8 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (loading && !data) return null;
+  // Während des Ladens die Karte schon zeigen (gesperrt), damit sich die Seite danach nicht verschiebt.
+  const pending = loading && !data;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const current = data?.birthday ?? null;
   const v = value ?? toBirthdayValue(current);
@@ -209,13 +210,13 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
       <p className="muted small">
         Für die {sec.birthdays} bei den {sec.events} und eine Benachrichtigung der anderen am Tag selbst. Das Jahr ist freiwillig.
       </p>
-      <BirthdayFields value={v} onChange={setValue} disabled={busy} />
+      <BirthdayFields value={v} onChange={setValue} disabled={busy || pending} />
       <label className="toggle">
-        <input type="checkbox" checked={vis} onChange={(e) => setVisible(e.target.checked)} />
+        <input type="checkbox" checked={vis} disabled={pending} onChange={(e) => setVisible(e.target.checked)} />
         Anderen Mitgliedern zeigen
       </label>
       <label className="toggle">
-        <input type="checkbox" checked={age} onChange={(e) => setShowAge(e.target.checked)} />
+        <input type="checkbox" checked={age} disabled={pending} onChange={(e) => setShowAge(e.target.checked)} />
         Alter anzeigen{!v.year.trim() && ' (nur mit Jahr)'}
       </label>
       {formError && (
@@ -223,7 +224,7 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
           {formError}
         </p>
       )}
-      <button className="btn btn-block" type="submit" disabled={busy}>
+      <button className="btn btn-block" type="submit" disabled={busy || pending}>
         {busy ? 'Speichert …' : 'Geburtstag speichern'}
       </button>
       {current && (

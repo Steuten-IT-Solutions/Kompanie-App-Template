@@ -77,6 +77,9 @@ export function deriveTheme(colors) {
     // Fläche für Warnungen (offene Beträge, Warnknöpfe) mit weißer Schrift, hell wie dunkel.
     'warn-surface': warn,
     'on-warn': '#ffffff',
+    // Fläche für den Wartungshinweis mit weißer Schrift, hell wie dunkel (danger ist dunkel als Schrift aufgehellt).
+    'danger-surface': '#b3261e',
+    'on-danger': '#ffffff',
   };
   // Hinweisbanner: leicht in der Akzentfarbe getönte Karte (siehe styles.css .install-hint).
   const hintBg = mix(card, accent, 0.16);

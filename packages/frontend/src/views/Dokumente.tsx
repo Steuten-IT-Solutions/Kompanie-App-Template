@@ -154,7 +154,8 @@ async function fetchFile(doc: DocumentInfo): Promise<Blob> {
 /** Liegt die Datei schon im Cache des Service Workers (also offline verfügbar)? */
 async function isCached(doc: DocumentInfo): Promise<boolean> {
   try {
-    return 'caches' in window && !!(await caches.match(doc.url));
+    // ignoreVary: Hoster mit „Vary: accept“ – die gespeicherte Anfrage (fetch) hatte andere Kopfzeilen als diese.
+    return 'caches' in window && !!(await caches.match(doc.url, { ignoreVary: true }));
   } catch {
     return false;
   }

@@ -1,9 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, can, config, levelLabel } from '../api';
 import { isStandalone } from '../install';
-import { canManagePolls, canPostBoard } from '../board';
 import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
-import brand from '../generated/brand';
 import { navigate } from '../router';
 
 const MIN_LENGTH = 8;
@@ -51,36 +49,6 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           <p className="muted small">Zustand der App, Updates, Datensicherung, Kalender, Galerie und Neuigkeiten.</p>
           <button className="btn btn-secondary btn-block" onClick={() => navigate('einstellungen')}>
             Einstellungen öffnen
-          </button>
-        </div>
-      )}
-
-      {canPostBoard() && (
-        <div className="card account-card">
-          <h3>{brand.labels.sections.board}</h3>
-          <p className="muted small">Dringende Nachrichten für alle Mitglieder und Anwärter, 24 Stunden oben auf jeder Seite.</p>
-          <button className="btn btn-secondary btn-block board-konto" onClick={() => navigate('brett')}>
-            Nachricht schreiben
-          </button>
-        </div>
-      )}
-
-      {canManagePolls() && (
-        <div className="card account-card">
-          <h3>{brand.labels.sections.polls}</h3>
-          <p className="muted small">Umfragen für alle Mitglieder anlegen, ändern, beenden und auswerten.</p>
-          <button className="btn btn-secondary btn-block polls-konto" onClick={() => navigate('umfragen/verwalten')}>
-            Umfrage anlegen
-          </button>
-        </div>
-      )}
-
-      {!!config?.features.inventory && can('manage_inventory') && (
-        <div className="card account-card">
-          <h3>{brand.labels.sections.inventory}</h3>
-          <p className="muted small">Was die Kompanie besitzt, wie viel und wo: pflegen, umlagern und den Verlauf ansehen.</p>
-          <button className="btn btn-secondary btn-block inventory-konto" onClick={() => navigate('inventar')}>
-            {brand.labels.sections.inventory} öffnen
           </button>
         </div>
       )}

@@ -11,7 +11,7 @@ Ihr braucht nur Webspace mit PHP. Eine Datenbank müsst ihr nicht anlegen; der I
 3. `eure-webseite.de/app/install.php` öffnen und den Schritten folgen. Am Ende legt ihr das erste Admin-Konto an; der Installer löscht sich danach selbst.
 
 ## Cronjob (empfohlen)
-Die App erledigt Hintergrundaufgaben (z. B. Galerie, Kalender, Updates) auch ohne Cronjob. Zuverlässiger geht es mit einem Cronjob beim Hoster, der alle 15 Minuten die Cron-Adresse aufruft. Die Adresse steht unter **Einstellungen → Zustand der App**.
+Die App erledigt Hintergrundaufgaben (z. B. Galerie, Kalender, Updates) auch ohne Cronjob. Zuverlässiger geht es mit einem Cronjob beim Hoster, der alle 15 Minuten die Cron-Adresse aufruft. Die Adresse steht unter **Einstellungen → Zustand und Updates**.
 
 Ohne Cronjob erledigt die App fällige Aufgaben nach einem Besuch, ohne den Besucher warten zu lassen. Klappt das auf eurem Webspace nicht, zeigt **Zustand der App** das rot an und nennt die Adresse für den Cronjob.
 

@@ -1,24 +1,23 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { api, config, type AdminStatus, type UpdateStatus } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
-import { MaintenanceCard } from '../maintenance';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
  * Zustimmung) und Datensicherung. Gilt für beide Varianten.
  */
-export default function Wartung({ onToast }: { onToast: (msg: string) => void }) {
+/** Seiten „Zustand und Updates“ und „Datensicherung“ der Einstellungen. */
+export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => api.status(), []);
+  if (part === 'datensicherung') return <Datensicherung onToast={onToast} onChanged={reload} />;
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
   return (
     <>
       <StatusCard status={s} />
-      <MaintenanceCard onToast={onToast} />
       {/* key: nach dem Neuladen mit dem neuen Stand neu aufbauen */}
       <Updates key={JSON.stringify([s.updates, s.statusReports.enabled])} status={s} onChanged={reload} onToast={onToast} />
-      <Datensicherung onToast={onToast} onChanged={reload} />
     </>
   );
 }

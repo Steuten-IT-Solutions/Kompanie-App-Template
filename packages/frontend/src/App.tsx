@@ -10,6 +10,8 @@ import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { navigate, useRoute } from './router';
+import { AdminNav, adminTabs } from './adminNav';
+import { helpSlug } from './helpSlug';
 import News from './views/News';
 import Termine from './views/Termine';
 
@@ -102,6 +104,12 @@ const titles = (): Record<View, string> => ({
   einrichtung: 'Einrichtung',
   hilfe: 'Hilfe',
 });
+
+/** Erste Unterseite von „Meins“ (wie in Meins.tsx), für die Hilfe zu #/meins ohne Unterseite. */
+function meinsFirst(): string | undefined {
+  const f = config?.features;
+  return f?.points ? 'punkte' : f?.penalties ? 'strafen' : f?.ranks ? 'dienstgrad' : f?.attendance ? 'anwesenheit' : undefined;
+}
 
 function Icon({ name }: { name: Tab }) {
   const paths: Record<Tab, string> = {
@@ -223,16 +231,8 @@ export default function App() {
     galerie: !!features?.gallery,
     dokumente: isMember() && !!features?.documents,
     meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
-    // Die Verwaltung beginnt mit der Mitgliederliste: für alle, die Punkte oder Strafen vergeben,
-    // Mitglieder anlegen oder Rollen vergeben (auch wenn Punkte und Strafen aus sind).
-    verwaltung:
-      (!!features?.points && can('manage_points')) ||
-      (!!features?.penalties && can('manage_penalties')) ||
-      (!!features?.ranks && can('manage_ranks')) ||
-      (!!features?.titles && can('manage_titles')) ||
-      (!!features?.attendance && can('manage_attendance')) ||
-      can('create_users') ||
-      can('promote_users'),
+    // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
+    verwaltung: adminTabs().length > 0,
     // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
     brett: boardVisible() || canPostBoard(),
     // Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; laufende stehen am Brett.
@@ -247,11 +247,15 @@ export default function App() {
     einrichtung: can('manage_settings'),
     hilfe: true,
   };
-  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
+  // „Meins“ ganz rechts, die Verwaltung davor.
+  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
   const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : start;
+  // Schwarzes Brett, Umfragen und Inventar gehören für alle, die sie pflegen, zur Verwaltung (Reiter oben, Tab unten).
+  const adminView = ['brett', 'umfragen', 'inventar'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
+  const activeTab: View = adminView ? 'verwaltung' : tab;
 
   const [toast, setToast] = useState<string | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
@@ -317,7 +321,10 @@ export default function App() {
         </div>
         <button
           className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
-          onClick={() => navigate('hilfe')}
+          onClick={() => {
+            const slug = helpSlug([tab, ...path.slice(1)], { boardWriter: canPostBoard(), meinsFirst: meinsFirst() });
+            navigate(slug ? `hilfe/${slug}` : 'hilfe');
+          }}
           aria-label="Hilfe"
           aria-current={tab === 'hilfe' ? 'page' : undefined}
         >
@@ -384,6 +391,7 @@ export default function App() {
               ))}
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
+            {adminView && <AdminNav active={adminView} />}
             {tab === 'brett' && <Brett onToast={showToast} />}
             {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
             {tab === 'inventar' && <Inventar path={path.slice(1)} onToast={showToast} />}
@@ -391,7 +399,7 @@ export default function App() {
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}
             {tab === 'anmelden' && <Anmelden />}
-            {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}
+            {tab === 'einstellungen' && <Einstellungen path={path.slice(1)} onToast={showToast} />}
             {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
             {tab === 'hilfe' && <Hilfe slug={path[1]} />}
           </Suspense>
@@ -409,10 +417,10 @@ export default function App() {
           {tabs.map((t) => (
             <button
               key={t}
-              className={tab === t ? 'active' : ''}
+              className={activeTab === t ? 'active' : ''}
               aria-label={tabLabels()[t]}
               onClick={() => navigate(t)}
-              aria-current={tab === t ? 'page' : undefined}
+              aria-current={activeTab === t ? 'page' : undefined}
             >
               <Icon name={t} />
               <span>{caps(tabLabels()[t])}</span>

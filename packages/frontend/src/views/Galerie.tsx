@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type TouchEvent, type TouchList } from 'react';
 import { api, type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -80,10 +80,15 @@ function Album({ id }: { id: number }) {
       <ul className="photo-grid">
         {photos.map((p, i) => (
           <li key={p.id}>
-            <button className="photo" onClick={() => setOpen(i)} aria-label={`Bild ${i + 1} öffnen`}>
+            <button
+              className="photo"
+              onClick={() => setOpen(i)}
+              data-intern={p.intern ? '' : undefined}
+              aria-label={`Bild ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`}
+            >
               <img src={p.thumb} alt="" loading="lazy" />
               {p.intern && (
-                <span className="photo-lock" title="Nur für Mitglieder">
+                <span className="photo-lock" aria-hidden="true">
                   🔒
                 </span>
               )}
@@ -96,12 +101,77 @@ function Album({ id }: { id: number }) {
   );
 }
 
-/** Vollbild-Ansicht mit Wischen, Pfeiltasten und Escape. */
+type Zoom = { scale: number; x: number; y: number };
+const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
+const MAX_ZOOM = 4;
+
+/** Abstand und Mittelpunkt zweier Finger. */
+function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
+  const [a, b] = [t[0], t[1]];
+  return {
+    dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+    cx: (a.clientX + b.clientX) / 2,
+    cy: (a.clientY + b.clientY) / 2,
+  };
+}
+
+/**
+ * Vollbild-Ansicht mit Wischen, Pfeiltasten und Escape. Zoomen mit zwei Fingern (bis 4-fach) oder doppeltem Tippen;
+ * vergrößert verschiebt ein Finger das Bild statt zu blättern.
+ */
 function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: number; onClose: () => void }) {
   const [i, setI] = useState(start);
-  const touchX = useRef<number | null>(null);
+  const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
+  const gesture = useRef<{ kind: 'swipe' | 'pan' | 'pinch'; x: number; y: number; start: Zoom; dist?: number } | null>(null);
+  const lastTap = useRef(0);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const go = useCallback((d: number) => setI((n) => (n + d + photos.length) % photos.length), [photos.length]);
+  const go = useCallback(
+    (d: number) => {
+      setZoom(NO_ZOOM);
+      setI((n) => (n + d + photos.length) % photos.length);
+    },
+    [photos.length],
+  );
+
+  function onTouchStart(e: TouchEvent) {
+    if (e.touches.length === 2) {
+      const p = pinch(e.touches);
+      gesture.current = { kind: 'pinch', x: p.cx, y: p.cy, start: zoom, dist: p.dist };
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0];
+      gesture.current = { kind: zoom.scale > 1 ? 'pan' : 'swipe', x: t.clientX, y: t.clientY, start: zoom };
+    }
+  }
+
+  function onTouchMove(e: TouchEvent) {
+    const g = gesture.current;
+    if (!g) return;
+    if (g.kind === 'pinch' && e.touches.length === 2 && g.dist) {
+      const p = pinch(e.touches);
+      const scale = Math.min(MAX_ZOOM, Math.max(1, g.start.scale * (p.dist / g.dist)));
+      setZoom(scale === 1 ? NO_ZOOM : { scale, x: g.start.x + p.cx - g.x, y: g.start.y + p.cy - g.y });
+    } else if (g.kind === 'pan' && e.touches.length === 1) {
+      const t = e.touches[0];
+      setZoom({ ...g.start, x: g.start.x + t.clientX - g.x, y: g.start.y + t.clientY - g.y });
+    }
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    const g = gesture.current;
+    if (!g || e.touches.length > 0) return;
+    gesture.current = null;
+    const t = e.changedTouches[0];
+    const moved = Math.hypot(t.clientX - g.x, t.clientY - g.y);
+    if (g.kind === 'swipe' && Math.abs(t.clientX - g.x) > 40) return go(t.clientX < g.x ? 1 : -1);
+    // Doppeltes Tippen: zweifach vergrößern bzw. zurück
+    if (g.kind !== 'pinch' && moved < 10) {
+      const now = Date.now();
+      if (now - lastTap.current < 300) {
+        setZoom(zoom.scale > 1 ? NO_ZOOM : { scale: 2, x: 0, y: 0 });
+        lastTap.current = 0;
+      } else lastTap.current = now;
+    }
+  }
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -132,16 +202,18 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       role="dialog"
       aria-modal="true"
       aria-label={`Bild ${i + 1} von ${photos.length}`}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
-      onTouchEnd={(e) => {
-        if (touchX.current === null) return;
-        const dx = e.changedTouches[0].clientX - touchX.current;
-        if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
-        touchX.current = null;
-      }}
+      onClick={(e) => e.target === e.currentTarget && zoom.scale === 1 && onClose()}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
-      <img key={p.id} src={p.large} alt="" />
+      <img
+        key={p.id}
+        src={p.large}
+        alt=""
+        className={zoom.scale > 1 ? 'zoomed' : undefined}
+        style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
+      />
       <button ref={closeRef} className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
         ✕
       </button>

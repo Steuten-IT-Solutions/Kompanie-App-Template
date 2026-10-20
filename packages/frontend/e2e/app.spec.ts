@@ -91,7 +91,7 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await shot(page, '5-verwaltung-mitglieder');
 
-  await page.getByRole('button', { name: 'Katalog' }).click();
+  await page.getByRole('button', { name: 'Punktekatalog' }).click();
   await page.getByPlaceholder('z. B. Teilnahme am Sommerfest').fill('Teilnahme Sommerfest');
   await page.locator('.field.narrow input').fill('5');
   await page.getByRole('button', { name: 'Hinzufügen' }).click();
@@ -559,6 +559,10 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
   const rollen = page.locator('#einstellungen-rollen');
   await expect(rollen.locator('.row-title', { hasText: SPIESS })).toBeVisible();
   await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
@@ -582,6 +586,10 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
   await rollen.getByRole('button', { name: 'Kassenwart bearbeiten' }).click();
   page.once('dialog', (d) => d.accept());
   await rollen.getByRole('button', { name: 'Löschen' }).click();
@@ -596,11 +604,49 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await expect(page.locator('.album-card', { hasText: 'Vereinsabend' })).toHaveCount(0);
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(2);
-  await expect(page.locator('.photo-lock')).toHaveCount(0);
+  await expect(page.locator('.photo[data-intern]')).toHaveCount(0);
   await page.locator('.photo').first().click();
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  // Zwei Finger auseinander: vergrößert; vergrößert verschiebt ein Finger das Bild statt zu blättern.
+  const touch = (type: string, points: [number, number][]) =>
+    page.locator('.lightbox').evaluate(
+      (el, [type, points]) => {
+        const touches = (points as [number, number][]).map(
+          ([x, y], id) => new Touch({ identifier: id, target: el, clientX: x, clientY: y }),
+        );
+        el.dispatchEvent(
+          new TouchEvent(type as string, {
+            bubbles: true,
+            touches: type === 'touchend' ? [] : touches,
+            changedTouches: touches,
+          }),
+        );
+      },
+      [type, points] as const,
+    );
+  await touch('touchstart', [
+    [150, 300],
+    [200, 300],
+  ]);
+  await touch('touchmove', [
+    [100, 300],
+    [250, 300],
+  ]);
+  await touch('touchend', [
+    [100, 300],
+    [250, 300],
+  ]);
+  await expect(page.locator('.lightbox img')).toHaveClass(/zoomed/);
+  await touch('touchstart', [[200, 300]]);
+  await touch('touchmove', [[100, 300]]);
+  await touch('touchend', [[100, 300]]);
+  await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.lightbox img')).not.toHaveClass(/zoomed/);
+  await expect(page.locator('.lb-count')).toHaveText('1 / 2');
+  await page.keyboard.press('ArrowRight');
   await shot(page, '15-galerie-lightbox');
   await page.keyboard.press('Escape');
   await expect(page.locator('.lightbox')).toHaveCount(0);
@@ -611,11 +657,8 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await shot(page, '16-galerie-alben');
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(3);
-  await expect(page.locator('.photo-lock')).toHaveCount(1);
-  const internSrc = await page
-    .locator('.photo', { has: page.locator('.photo-lock') })
-    .locator('img')
-    .getAttribute('src');
+  await expect(page.locator('.photo[data-intern]')).toHaveCount(1);
+  const internSrc = await page.locator('.photo[data-intern] img').getAttribute('src');
   expect(internSrc).toContain('/app/foto/');
   const asMember = await page.request.get(internSrc!);
   expect(asMember.status()).toBe(200);
@@ -740,7 +783,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
 
   // Einstellungen → Bereiche: Galerie wieder einschalten, die Alben sind unverändert da.
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.goto('/app/#/einstellungen');
+  await page.goto('/app/#/einstellungen/bereiche');
   const bereiche = page.locator('.settings-section', { hasText: 'Bereiche' }).first();
   // Der Schalter speichert sofort und zeigt den neuen Stand erst nach der Antwort des Servers.
   await bereiche.getByRole('checkbox', { name: /^Galerie/ }).click();
@@ -750,7 +793,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await expect(page.locator('.album-card', { hasText: 'Sommerfest' })).toBeVisible();
 
   // Ausschalten nur nach Rückfrage; Abbrechen lässt den Bereich an.
-  await page.goto('/app/#/einstellungen');
+  await page.goto('/app/#/einstellungen/bereiche');
   page.once('dialog', (d) => {
     expect(d.message()).toContain('Die Daten bleiben erhalten');
     void d.dismiss();
@@ -760,7 +803,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
 
   // Wer kein Admin ist, kommt nicht an die Bereiche.
   await login(page, 'verwalter');
-  await page.goto('/app/#/einstellungen');
+  await page.goto('/app/#/einstellungen/bereiche');
   await expect(page.getByRole('heading', { name: 'Bereiche' })).toHaveCount(0);
 });
 
@@ -769,12 +812,21 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Zustand und Updates', { exact: true }) })
+    .click();
   const status = page.locator('.settings-section', { hasText: 'Zustand der App' });
   await expect(status.locator('.status-item').first()).toBeVisible();
   // Die Test-Instanz ist kein Paket aus einem Release: keine Updates über die App.
   await expect(page.getByText(/bekommt keine Updates über die App/)).toBeVisible();
 
   await expect(status.locator('.status-item.status-warn', { hasText: 'Datensicherung' })).toBeVisible();
+  await page.getByRole('button', { name: '‹ Einstellungen' }).click();
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Datensicherung', { exact: true }) })
+    .click();
   const backup = page.locator('.settings-section', { hasText: 'Datensicherung' });
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -800,6 +852,7 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await expect.poll(async () => (await cachedUrls()).some((u) => u.startsWith(decodeURIComponent(apiBase)))).toBe(true);
   expect((await cachedUrls()).filter((u) => u.includes('/admin/'))).toEqual([]);
   // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
+  await page.goto('/app/#/einstellungen/zustand');
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
 });
@@ -879,7 +932,10 @@ test('Service Worker: nach einem Update alte Speicher gelöscht, alle Programmte
   try {
     await page.goto('/app/#/installieren');
     await expect(page.getByRole('heading', { name: 'Die App aufs Handy holen' })).toBeVisible();
+    // „?“ öffnet die Hilfeseite zur aktuellen Seite.
     await page.getByRole('button', { name: 'Hilfe' }).click();
+    await expect(page.locator('.hilfe-seite h2', { hasText: 'Die App aufs Handy holen' })).toBeVisible();
+    await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
     await expect(page.locator('.row-title', { hasText: 'Die App aufs Handy holen' })).toBeVisible();
   } finally {
     await page.context().setOffline(false);
@@ -918,8 +974,8 @@ test.describe('ohne Service Worker', () => {
     let loads = 0;
     page.on('load', () => loads++);
     await page.getByRole('button', { name: 'Hilfe' }).click();
-    // Erster Versuch scheitert → einmal neu laden → jetzt klappt es.
-    await expect(page.locator('.row-title', { hasText: 'Die App aufs Handy holen' })).toBeVisible();
+    // Erster Versuch scheitert → einmal neu laden → jetzt klappt es (Hilfe zur Startseite).
+    await expect(page.locator('.hilfe-seite')).toBeVisible();
     expect(loads).toBe(1);
 
     // Fehlt der Teil dauerhaft und wurde eben erst neu geladen: keine Schleife, sondern eine Meldung.
@@ -943,6 +999,9 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await page.goto('/app/');
   await page.getByRole('button', { name: 'Hilfe' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Hilfe');
+  // „?“ öffnet die Hilfe zur aktuellen Seite (Termine), von dort geht es zum Verzeichnis.
+  await expect(page.locator('.hilfe-seite')).toBeVisible();
+  await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
   await expect(item('Die App aufs Handy holen')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toHaveCount(0);
   await expect(item('Meine Punkte')).toHaveCount(0);
@@ -950,6 +1009,7 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   // Mitglied: dazu die Seiten für Mitglieder; Bezeichnung „Kasse“ statt „Strafen“
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Hilfe' }).click();
+  await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
   await expect(item('Meine Punkte')).toBeVisible();
   await item('Meine Kasse').click();
   await expect(page.locator('.news-headline')).toHaveText('Meine Kasse');
@@ -960,6 +1020,7 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   // Admin: Seiten für Admins, nur die Installation der eigenen Variante; Suche
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Hilfe' }).click();
+  await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toBeVisible();
   await expect(item(STANDALONE ? 'Installation ohne WordPress' : 'Installation mit WordPress')).toBeVisible();
   await expect(item(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
@@ -992,17 +1053,26 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
+  const open = async (title: string) => {
+    await page.goto('/app/#/einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText(title, { exact: true }) })
+      .click();
+  };
   if (!STANDALONE) {
-    // WordPress: Neuigkeiten kommen aus den Beiträgen (kein Abschnitt); Kalender und Galerie sind einstellbar.
+    // WordPress: Neuigkeiten kommen aus den Beiträgen (keine Seite); Kalender und Galerie sind einstellbar.
     // Die Test-Instanz hat keine Attrappen für Google, deshalb nur Speichern und Prüfen der Eingabe.
-    await expect(page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' })).toBeVisible();
-    await expect(page.locator('.settings-section h3', { hasText: /^Neuigkeiten$/ })).toHaveCount(0);
+    await expect(page.locator('.settings-link').filter({ has: page.getByText('Galerie', { exact: true }) })).toBeVisible();
+    await expect(page.locator('.settings-link').filter({ has: page.getByText('Neuigkeiten', { exact: true }) })).toHaveCount(0);
+    await open('Kalender');
     const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
     await cal.locator('input[type=url]').fill('ftp://falsch');
     await cal.getByRole('button', { name: 'Speichern' }).click();
     await expect(cal.locator('.form-error')).toBeVisible();
     return;
   }
+  await open('Kalender');
   await expect(page.getByText('✓ Eingerichtet über die geheime iCal-Adresse.')).toBeVisible();
   await expect(page.getByText('https://kalender.test')).toHaveCount(0); // geheime Adresse wird nicht angezeigt
 
@@ -1010,31 +1080,41 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await expect(page.getByText(/3 Termine gefunden/)).toBeVisible();
 
   const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
+  // Speichern ohne Änderung ist kein Fehler.
+  await cal.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nichts geändert – der Kalender ist schon eingerichtet.');
   await cal.getByLabel('Neue iCal-Adresse (ersetzt die bisherige)').fill('ftp://falsch');
   await cal.getByRole('button', { name: 'Speichern' }).click();
   await expect(cal.locator('.form-error')).toBeVisible();
 
+  await open('Galerie');
   const gallery = page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' });
   await expect(gallery.getByText('test@example.iam.gserviceaccount.com')).toBeVisible();
   await gallery.getByRole('button', { name: 'Jetzt abgleichen' }).click();
   await expect(gallery.getByText('Fertig: 2 Alben, 4 Bilder.')).toBeVisible();
 
+  await open('Neuigkeiten');
   const news = page.locator('.settings-section', { hasText: 'Neuigkeiten' });
   await news.getByRole('button', { name: 'Neuigkeiten testen' }).click();
   await expect(news.getByText('2 Beiträge gefunden.')).toBeVisible();
+  await page.goto('/app/#/einstellungen');
   await shot(page, '18-einstellungen');
 });
 
 test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/einstellungen');
+  // In der Übersicht über Kalender und Galerie
+  const order = await page.locator('.settings-link .row-title').allTextContents();
+  expect(order.indexOf('Google-Zugang')).toBeLessThan(order.indexOf('Kalender'));
+  expect(order.indexOf('Google-Zugang')).toBeLessThan(order.indexOf('Galerie'));
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Google-Zugang', { exact: true }) })
+    .click();
   const google = page.locator('#einstellungen-google');
   await expect(google.getByRole('heading', { name: 'Google-Zugang' })).toBeVisible();
-  // Über Kalender und Galerie, mit dem Dienstkonto als Alternative
-  const order = await page
-    .locator('.settings-section h3')
-    .evaluateAll((hs) => hs.map((h) => h.textContent ?? '').filter((t) => /Google-Zugang|Kalender für|Galerie aus/.test(t)));
-  expect(order[0]).toBe('Google-Zugang');
+  // Mit dem Dienstkonto als Alternative
   await expect(google.getByText('Alternative: Dienstkonto mit JSON-Schlüssel')).toBeVisible();
   const redirect = await google.getByLabel('Weiterleitungs-URI (im OAuth-Client bei Google eintragen)').inputValue();
   expect(redirect).toMatch(STANDALONE ? /\/google\/callback$/ : /\/wp-admin\/admin-post\.php$/);
@@ -1052,14 +1132,16 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
   await google.getByLabel('Clientschlüssel (Client-Secret)').fill('GOCSPX-e2e');
   await google.getByRole('button', { name: 'Speichern und mit Google verbinden' }).click();
   await expect(google.getByRole('status')).toContainText('Mit Google verbunden (kompanie@example.org)');
-  await expect(page).toHaveURL(/#\/einstellungen$/);
+  await expect(page).toHaveURL(/#\/einstellungen\/google$/);
   expect(authorize!.searchParams.get('redirect_uri')).toBe(redirect);
   expect(authorize!.searchParams.get('scope')).toContain('calendar.readonly');
   await expect(google.getByText('Es darf auch den Kalender lesen.')).toBeVisible();
   expect(page.url()).not.toContain('google=1'); // Hinweis nur einmal
+  await page.goto('/app/#/einstellungen/galerie');
   await expect(page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' })).toContainText(
     'die Verbindung mit Google (kompanie@example.org)',
   );
+  await page.goto('/app/#/einstellungen/google');
   await shot(page, '18b-google-zugang');
 
   page.once('dialog', (d) => void d.accept());
@@ -1096,7 +1178,11 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
       body: JSON.stringify({ user_ids: [userId], points: 12, reason: 'E2E Dienstgrad' }),
     });
   }, id);
-  await page.reload();
+  // Aus „Beförderungen“ direkt zum Dienstgrad des Mitglieds, der nächste Dienstgrad ist vorgeschlagen.
+  await page.goto('/app/#/verwaltung/befoerderungen');
+  await page.locator('.promotions .row', { hasText: 'Mitglied2' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/verwaltung/mitglied/${id}/dienstgrad$`));
+  await expect(page.getByLabel('Neuer Dienstgrad').locator('option:checked')).toHaveText('Gefreiter (ab 10)');
   await page.getByLabel('Neuer Dienstgrad').selectOption({ label: 'Gefreiter (ab 10)' });
   await page.getByLabel('Begründung (optional)').fill('Gute Arbeit');
   await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
@@ -1107,7 +1193,7 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await page.locator('.segmented').getByRole('button', { name: 'Dienstgrad' }).click();
-  await expect(page.locator('.stat-value')).toHaveText('Gefreiter');
+  await expect(page.locator('.rank-card-title')).toHaveText('Gefreiter');
   await expect(page.locator('.rank-progress')).toContainText('bis „Unteroffizier“');
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
 });
@@ -1376,12 +1462,15 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   const id = Date.now().toString(36);
   const first = `Heute kein Training ${id}`;
   const second = `Treffpunkt Schützenhaus ${id}`;
-  // Admin schreibt (Recht post_board) über „Mein Konto“ → „Nachricht schreiben“.
+  // Admin schreibt (Recht post_board) über „Verwaltung“ → „Schwarzes Brett“; die Verwaltung bleibt markiert.
   const admin = await browser.newPage();
   admin.on('dialog', (d) => d.accept());
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.getByRole('button', { name: 'Konto' }).click();
-  await admin.getByRole('button', { name: 'Nachricht schreiben' }).click();
+  await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
+  await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await admin.locator('.segmented').getByRole('button', { name: 'Schwarzes Brett' }).click();
+  await expect(admin.locator('.tabbar button.active')).toHaveText(MANAGER);
   await expect(admin.locator('.topbar-title')).toHaveText('Schwarzes Brett');
   const form = admin.locator('.board-form');
   await form.getByLabel('Text').fill(`${first}\nHalle gesperrt.`);
@@ -1463,12 +1552,12 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
   browser,
 }) => {
   const title = `Grillfest ${Date.now().toString(36)}: Samstag oder Sonntag?`;
-  // Admin (Recht manage_polls) legt über „Mein Konto“ → „Umfrage anlegen“ an.
+  // Admin (Recht manage_polls) legt über „Verwaltung“ → „Umfragen“ an.
   const admin = await browser.newPage();
   admin.on('dialog', (d) => d.accept());
   await login(admin, 'admin', ADMIN_PASSWORD);
-  await admin.getByRole('button', { name: 'Konto' }).click();
-  await admin.getByRole('button', { name: 'Umfrage anlegen' }).click();
+  await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await admin.locator('.segmented').getByRole('button', { name: 'Umfragen' }).click();
   await expect(admin.locator('.topbar-title')).toHaveText('Umfragen');
   const form = admin.locator('.poll-form');
   await form.getByLabel('Frage', { exact: true }).fill(title);
@@ -1599,15 +1688,13 @@ test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle S
   page.on('dialog', (d) => d.accept());
   // Mitglieder ohne das Recht sehen das Inventar nicht.
   await login(page, 'mitglied1');
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await expect(page.locator('.inventory-konto')).toHaveCount(0);
   await page.goto('/app/#/inventar');
   await expect(page.locator('.topbar-title')).not.toHaveText('Inventar');
 
-  // Admin (hat manage_inventory) öffnet es über „Mein Konto“.
+  // Admin (hat manage_inventory) öffnet es über „Verwaltung“.
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await page.getByRole('button', { name: 'Inventar öffnen' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Inventar' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Inventar');
   await page.getByRole('button', { name: '+ Eintrag anlegen' }).click();
   const form = page.locator('.inventory-form');
@@ -1701,6 +1788,10 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Konto' }).click();
   await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Wartungsmodus', { exact: true }) })
+    .click();
   const card = page.locator('.settings-section', { hasText: 'Wartungsmodus' });
   await card.getByLabel(/Begründung/).fill('Umstellung auf die neue App,\nbis ca. 18 Uhr');
   await expect(card.getByText('43/500 Zeichen')).toBeVisible();

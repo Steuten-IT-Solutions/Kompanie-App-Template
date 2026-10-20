@@ -6,8 +6,8 @@ bereiche: [points]
 ---
 Wer die Rolle „{bereich.points} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt).
 
-## Vorlagen im Katalog
-Unter **Verwaltung → Katalog** legst du häufige Anlässe mit ihrer Punktzahl an, z. B. „Teilnahme am Sommerfest – 5“. Beim Vergeben wählst du sie dann unter **Vorlage aus dem Katalog** aus. Nicht mehr benötigte Vorlagen lassen sich **deaktivieren**.
+## Vorlagen im {bereich.points}katalog
+Unter **Verwaltung → {bereich.points}katalog** legst du häufige Anlässe mit ihrer Punktzahl an, z. B. „Teilnahme am Sommerfest – 5“. Beim Vergeben wählst du sie dann unter **Vorlage aus dem Katalog** aus. Nicht mehr benötigte Vorlagen lassen sich **deaktivieren**.
 
 ## Punkte vergeben
 1. **Verwaltung → {bereich.points} +** öffnen.

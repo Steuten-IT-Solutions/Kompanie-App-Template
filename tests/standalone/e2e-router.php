@@ -22,6 +22,8 @@ $root = dirname(__DIR__, 2) . '/adapters/standalone';
 if ($rel !== '/' && $rel !== '' && is_file($root . $rel)) {
     return false;
 }
+// Wie manche Hoster (z. B. mit Jetpack Boost): Vary auf allen Antworten. Der Cache des Service Workers muss trotzdem passen.
+header('Vary: accept,content-type');
 $_SERVER['SCRIPT_NAME'] = '/app/index.php';
 require $root . '/autoload.php';
 require __DIR__ . '/MockHttp.php';
