@@ -1534,7 +1534,7 @@ fieldset.feature-list legend {
   margin-top: 18px;
 }
 
-/* Dienstgrade: eigener Dienstgrad wie in der Lank-App (Karte mit Messinglinie und Fortschrittsbalken) */
+/* Dienstgrade: eigener Dienstgrad als Karte mit Akzentlinie und Fortschrittsbalken */
 .rank-card {
   padding: 16px 18px;
   margin-bottom: 12px;
