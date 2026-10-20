@@ -30,12 +30,14 @@ const Dokumente = lazyView(() => import('./views/Dokumente'));
 const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
 const Brett = lazyView(() => import('./views/Brett'));
 const Umfragen = lazyView(() => import('./views/Umfragen'));
+const Inventar = lazyView(() => import('./views/Inventar'));
 
 type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'meins' | 'verwaltung';
 type View =
   | Tab
   | 'brett'
   | 'umfragen'
+  | 'inventar'
   | 'konto'
   | 'benachrichtigungen'
   | 'installieren'
@@ -53,6 +55,7 @@ const VIEWS: View[] = [
   'verwaltung',
   'brett',
   'umfragen',
+  'inventar',
   'konto',
   'benachrichtigungen',
   'installieren',
@@ -87,6 +90,7 @@ const titles = (): Record<View, string> => ({
   news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
   brett: sec.board,
   umfragen: sec.polls,
+  inventar: sec.inventory,
   konto: 'Mein Konto',
   benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
@@ -228,6 +232,8 @@ export default function App() {
     brett: boardVisible() || canPostBoard(),
     // Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; laufende stehen am Brett.
     umfragen: pollsVisible() || canManagePolls(),
+    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über „Mein Konto“.
+    inventar: !!features?.inventory && can('manage_inventory'),
     konto: !!user,
     benachrichtigungen: true,
     installieren: true,
@@ -365,6 +371,7 @@ export default function App() {
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {tab === 'brett' && <Brett onToast={showToast} />}
             {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
+            {tab === 'inventar' && <Inventar path={path.slice(1)} onToast={showToast} />}
             {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}

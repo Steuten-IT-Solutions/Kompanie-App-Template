@@ -32,6 +32,8 @@ enum Capability: string
     case PostBoard = 'post_board';
     /** Umfragen anlegen, ändern, beenden und löschen, Ergebnisse immer sehen (Bereich Umfragen, Issue #4). */
     case ManagePolls = 'manage_polls';
+    /** Inventar pflegen: Einträge anlegen, ändern, umlagern, löschen, Verlauf sehen (Bereich Inventar, Issue #6). */
+    case ManageInventory = 'manage_inventory';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */

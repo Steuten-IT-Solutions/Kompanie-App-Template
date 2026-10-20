@@ -522,6 +522,20 @@ final class Api
                 return ['birthday' => null];
             }, 'birthdays', $denyRights),
 
+            // Inventar (Issue #6): nur mit manage_inventory (Mitglieder ohne das Recht sehen es nicht); optional reason bei
+            // allen Änderungen. Genau ein Verlaufseintrag je Änderung und betroffenem Eintrag (InventoryService).
+            new Route('GET', '/inventory', Cap::ManageInventory, fn () => $a->inventory()->list(), 'inventory', $denyRights),
+            new Route('GET', '/inventory/locations', Cap::ManageInventory, fn () => $a->inventory()->locations(), 'inventory', $denyRights),
+            new Route('GET', '/inventory/log', Cap::ManageInventory, fn (Request $r) => $a->inventory()->log($r->query['limit'] ?? null, $r->query['before'] ?? null), 'inventory', $denyRights),
+            new Route('POST', '/inventory', Cap::ManageInventory, fn (Request $r) => Response::created($a->inventory()->create($this->user(), $r->body)), 'inventory', $denyRights),
+            new Route('PATCH', '/inventory/{id}', Cap::ManageInventory, fn (Request $r) => $a->inventory()->update($this->user(), $r->id(), $r->body), 'inventory', $denyRights),
+            new Route('DELETE', '/inventory/{id}', Cap::ManageInventory, function (Request $r) use ($a) {
+                $a->inventory()->delete($this->user(), $r->id(), $r->body['reason'] ?? $r->query['reason'] ?? null);
+                return ['deleted' => true];
+            }, 'inventory', $denyRights),
+            new Route('GET', '/inventory/{id}/log', Cap::ManageInventory, fn (Request $r) => $a->inventory()->itemLog($r->id(), $r->query['limit'] ?? null, $r->query['before'] ?? null), 'inventory', $denyRights),
+            new Route('POST', '/inventory/{id}/move', Cap::ManageInventory, fn (Request $r) => $a->inventory()->move($this->user(), $r->id(), $r->body), 'inventory', $denyRights),
+
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
             new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
             new Route('PUT', '/attendance', Cap::ManageAttendance, function (Request $r) use ($a) {

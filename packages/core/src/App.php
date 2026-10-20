@@ -24,6 +24,7 @@ use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\MaintenanceService;
+use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
@@ -312,7 +313,8 @@ final class App
      * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
      * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
-     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht.
+     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht. Inventar
+     * und sein Verlauf bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
     {
@@ -396,6 +398,11 @@ final class App
     public function birthdays(): BirthdayService
     {
         return $this->service(BirthdayService::class, fn () => new BirthdayService($this));
+    }
+
+    public function inventory(): InventoryService
+    {
+        return $this->service(InventoryService::class, fn () => new InventoryService($this));
     }
 
     public function titles(): TitleService

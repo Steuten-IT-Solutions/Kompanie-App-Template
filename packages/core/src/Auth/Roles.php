@@ -66,6 +66,7 @@ final class Roles
         Capability::ManageDocuments,
         Capability::PostBoard,
         Capability::ManagePolls,
+        Capability::ManageInventory,
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];

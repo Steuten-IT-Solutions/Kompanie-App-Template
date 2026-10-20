@@ -17,6 +17,7 @@ export type Capability =
   | 'manage_documents'
   | 'post_board'
   | 'manage_polls'
+  | 'manage_inventory'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
@@ -33,7 +34,8 @@ export type Feature =
   | 'documents'
   | 'board'
   | 'polls'
-  | 'birthdays';
+  | 'birthdays'
+  | 'inventory';
 
 export interface AppUser {
   id: number;
@@ -314,6 +316,57 @@ export interface Birthday {
   visible: boolean;
   /** Alter anzeigen */
   show_age: boolean;
+}
+
+/** Eintrag im Inventar (Issue #6): ein Ort je Eintrag. */
+export interface InventoryItem {
+  id: number;
+  title: string;
+  quantity: number;
+  unit: string | null;
+  location: string;
+  category: string | null;
+  note: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  updated_by_name: string | null;
+  updated_at: string;
+}
+
+/** Felder zum Anlegen und Ändern; Mengen auch als Text mit Komma. */
+export interface InventoryInput {
+  title?: string;
+  quantity?: number | string;
+  location?: string;
+  unit?: string;
+  category?: string;
+  note?: string;
+  reason?: string;
+}
+
+export type InventoryChange = { old: string | number | null; new: string | number | null };
+
+export interface InventoryMove {
+  from: string;
+  to: string;
+  quantity: number;
+  source_id: number;
+  target_id: number;
+  source_removed?: boolean;
+}
+
+export interface InventoryLogEntry {
+  id: number;
+  item_id: number;
+  action: 'create' | 'update' | 'move' | 'delete';
+  changes: Partial<Record<'title' | 'quantity' | 'unit' | 'location' | 'category' | 'note', InventoryChange>> & { move?: InventoryMove };
+  reason: string | null;
+  title: string;
+  unit: string | null;
+  location: string;
+  user_id: number;
+  user_name: string | null;
+  created_at: string;
 }
 
 /** Sichtbarer Geburtstag eines Mitglieds (GET /birthdays), nie mit Geburtsjahr. */
@@ -846,6 +899,23 @@ export const api = {
   setMemberBirthday: (id: number, data: { month: number; day: number; year: number | null }) =>
     request<{ birthday: Birthday | null }>('PUT', `/members/${id}/birthday`, data),
   deleteMemberBirthday: (id: number) => request<{ birthday: null }>('DELETE', `/members/${id}/birthday`),
+
+  // Inventar (Issue #6)
+  inventory: () => request<InventoryItem[]>('GET', '/inventory'),
+  inventoryLocations: () => request<string[]>('GET', '/inventory/locations'),
+  /** Verlauf aller Einträge bzw. eines Eintrags, neueste zuerst; before: nächste Seite (ältere als diese ID). */
+  inventoryLog: (itemId?: number, before?: number) =>
+    request<InventoryLogEntry[]>(
+      'GET',
+      itemId === undefined ? '/inventory/log' : `/inventory/${itemId}/log`,
+      undefined,
+      before === undefined ? undefined : { before: String(before) },
+    ),
+  createInventory: (data: InventoryInput) => request<InventoryItem>('POST', '/inventory', data),
+  updateInventory: (id: number, data: InventoryInput & { adjust?: number }) => request<InventoryItem>('PATCH', `/inventory/${id}`, data),
+  deleteInventory: (id: number, reason: string) => request<{ deleted: boolean }>('DELETE', `/inventory/${id}`, { reason }),
+  moveInventory: (id: number, data: { quantity: number | string; location: string; reason?: string }) =>
+    request<{ source: InventoryItem | null; target: InventoryItem }>('POST', `/inventory/${id}/move`, data),
 
   // Anwesenheit (Issue #21)
   attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),
