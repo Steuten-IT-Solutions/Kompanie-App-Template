@@ -38,6 +38,7 @@ tags:
   - name: News
   - name: Galerie
   - name: Verwaltung
+  - name: Schwarzes Brett
   - name: Einstellungen
   - name: Wartung
 
@@ -988,6 +989,92 @@ paths:
       x-capability: manage_documents
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /board:
+    get:
+      tags: [Schwarzes Brett]
+      summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5)
+      description: |
+        Für Mitglieder und Anwärter (Recht `member` oder `calendar`) sowie für alle mit `post_board`. Nur Einträge, deren
+        `expires_at` noch nicht erreicht ist; abgelaufene löscht die Hintergrundaufgabe `board_cleanup` (kein Verlauf).
+        Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
+        Heute gibt es nur `kind: message`; später können weitere Arten dazukommen (z. B. laufende Umfragen) –
+        Clients überspringen unbekannte.
+      x-capability: 'member, calendar oder post_board'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/BoardItem' } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Schwarzes Brett]
+      summary: Nachricht ans Schwarze Brett schreiben
+      description: |
+        Gültig genau 24 Stunden ab jetzt. Alle Mitglieder und Anwärter außer dem Verfasser bekommen eine Benachrichtigung
+        (Art `board`, Urgency high, TTL höchstens bis `expires_at`), sofern sie die Art für das Gerät eingeschaltet haben.
+      x-capability: post_board
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardInput' }
+      responses:
+        '201':
+          description: Veröffentlicht
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoardItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /board/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Schwarzes Brett]
+      summary: Text einer gültigen Nachricht ändern
+      description: |
+        Jede und jeder mit `post_board`, nicht nur der Verfasser. Ohne neue Benachrichtigung; `expires_at` bleibt.
+        `updated_at` wechselt nur, wenn sich der Text ändert (auf Geräten ausgeblendete Nachrichten erscheinen dann
+        wieder). Abgelaufene oder gelöschte Nachrichten → 404.
+      x-capability: post_board
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BoardInput' }
+      responses:
+        '200':
+          description: Geändert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoardItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Schwarzes Brett]
+      summary: Nachricht vorzeitig löschen
+      x-capability: post_board
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -2318,9 +2405,29 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    BoardInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          maxLength: 500
+          description: Reiner Text, Zeilenumbrüche bleiben; HTML-Tags werden entfernt. Leer oder länger als 500 Zeichen → 400.
+    BoardItem:
+      type: object
+      required: [kind, id, text, author_name, created_at, updated_at, expires_at]
+      properties:
+        kind: { type: string, enum: [message], description: 'Art des Eintrags; weitere können dazukommen' }
+        id: { type: integer }
+        text: { type: string, description: Reiner Text mit Zeilenumbrüchen }
+        author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time, description: Genau 24 Stunden nach created_at }
     PushType:
       type: string
-      enum: [penalties, points, ranks, titles, events, reminder, news]
+      enum: [board, penalties, points, ranks, titles, events, reminder, news]
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -2347,7 +2454,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -2461,7 +2568,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
             system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
@@ -2473,7 +2580,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
@@ -2489,7 +2596,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte; member bringt calendar mit.'
 
     UpdateStatus:
@@ -2579,6 +2686,7 @@ components:
             titles: { type: boolean }
             attendance: { type: boolean }
             documents: { type: boolean }
+            board: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'

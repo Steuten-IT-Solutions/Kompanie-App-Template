@@ -477,7 +477,9 @@ test.describe('Android', () => {
         });
         return (await res.json()).subscription;
       }, device);
-    await expect.poll(status).toEqual({ types: ['board', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
+    await expect
+      .poll(status)
+      .toEqual({ types: ['board', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -1233,7 +1235,7 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   const banner = page.locator('.board-banner');
   await expect(banner).toContainText(first);
   await expect(banner).toContainText('Halle gesperrt.');
-  await expect(banner).toContainText('Admin');
+  await expect(banner).toContainText(/admin ·/i);
   const tabs = page.locator('.tabbar button');
   for (let i = 0; i < (await tabs.count()); i++) {
     await tabs.nth(i).click();
