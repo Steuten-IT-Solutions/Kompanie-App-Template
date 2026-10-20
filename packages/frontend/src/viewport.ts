@@ -1,4 +1,4 @@
-// „Desktop-Website“ im Handy-Browser (Issue #24, wie Lank): Chrome ignoriert dann das viewport-Tag und legt die Seite
+// „Desktop-Website“ im Handy-Browser (Issue #24): Chrome ignoriert dann das viewport-Tag und legt die Seite
 // 980 px breit an, die App erschiene winzig. Erkennbar daran, dass die Seite auf einem Touch-Gerät viel breiter ist als
 // der Bildschirm. Dann wird die Seite so vergrößert, dass sie wieder genau Handybreite hat. Als Modul statt Inline-Skript,
 // weil die Content-Security-Policy der eigenständigen Version keine Inline-Skripte erlaubt.
