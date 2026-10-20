@@ -27,6 +27,7 @@ final class ApiScenario
             $this->password();
             $this->roles();
             $this->customRoles();
+            $this->candidates();
             $this->events();
             $this->push();
             $this->config();
@@ -407,6 +408,66 @@ final class ApiScenario
         $c->ok($this->req('POST', "/members/$admin/password")[0] === 403, 'Kontenpflege: Passwort eines Admins → 403');
         $this->d->actAs($admin);
         $this->req('DELETE', '/admin/roles/' . $pflege, [], ['replacement' => 'member']);
+    }
+
+    /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */
+    private function candidates(): void
+    {
+        $c = $this->c;
+        $c->section('Anwärter');
+        $admin = $this->user('kptest_anw_admin', 'admin');
+        $cand = $this->user('kptest_anwaerter', 'candidate');
+        $guest = $this->user('kptest_anw_gast', 'guest');
+
+        // Kalender wie ein Mitglied (ohne eingerichteten Kalender ggf. 503, aber nie „keine Rechte“), sonst nichts.
+        $this->d->actAs($this->m1);
+        $memberCalendar = $this->req('GET', '/calendar')[0];
+        $this->d->actAs($guest);
+        $c->ok($this->req('GET', '/calendar')[0] === 403, 'Gast: kein interner Kalender');
+        $this->d->actAs($cand);
+        $c->ok($this->req('GET', '/calendar')[0] === $memberCalendar && $memberCalendar !== 403, 'Anwärter sieht den internen Kalender');
+        foreach (['/me/points', '/me/penalties', '/members', "/members/{$this->m1}"] as $path) {
+            $c->ok($this->req('GET', $path)[0] === 403, "Anwärter: GET $path → 403");
+        }
+        $types = array_column((array) ($this->req('POST', '/me/push/status')[1]['types'] ?? []), 'key');
+        $c->ok(in_array('events', $types, true) && !array_intersect(['points', 'penalties'], $types), 'Anwärter: Benachrichtigungen zu Terminen, nicht zu Punkten oder Strafen');
+        [, $cfg] = $this->req('GET', '/config');
+        $caps = (array) ($cfg['user']['capabilities'] ?? []);
+        $c->ok(in_array('calendar', $caps, true) && !in_array('member', $caps, true), '/config: Recht calendar, nicht member');
+        $roles = array_column((array) ($cfg['roles'] ?? []), 'label', 'key');
+        $c->ok(isset($roles['candidate']), 'Rolle „Anwärter“ in /config');
+
+        // Wer Konten anlegt, legt Anwärter an und nimmt sie auf – nur von Anwärter zu Mitglied.
+        $this->d->actAs($admin);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => ['member', 'create_users']]);
+        $aufnahme = (string) (array_column((array) $d, 'key', 'label')['Kptest Aufnahme'] ?? '');
+        $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Nur Kalender', 'capabilities' => ['calendar']])[0] === 201, 'Eigene Rolle nur mit dem Kalender');
+        $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
+        $holder = $this->user('kptest_anw_aufnahme', $aufnahme);
+        $this->d->actAs($holder);
+        [$s, $u] = $this->req('POST', '/users', ['name' => 'Kptest Anwärterin', 'level' => 'candidate']);
+        if (isset($u['id'])) {
+            $this->users[] = $u['id'];
+        }
+        $c->ok($s === 201 && ($u['level'] ?? '') === 'candidate', 'Konto als Anwärter anlegen');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 400, 'Neues Konto als Admin → 400');
+        $c->ok($this->req('POST', '/members/' . ($u['id'] ?? 0) . '/password')[0] === 200, 'Passwort eines Anwärters zurücksetzen');
+        $list = array_column((array) $this->req('GET', '/members')[1], 'level', 'id');
+        $withCand = array_column((array) $this->req('GET', '/members', [], ['candidates' => '1'])[1], 'level', 'id');
+        $c->ok(!isset($list[$u['id'] ?? 0]) && ($withCand[$u['id'] ?? 0] ?? '') === 'candidate' && !isset($withCand[$guest]), 'Mitgliederliste: Anwärter nur auf Wunsch, Gäste nie');
+        $c->ok($this->req('POST', "/members/{$this->m2}/promote")[0] === 400, 'Mitglied „aufnehmen“ → 400');
+        $c->ok($this->req('POST', "/members/$guest/promote")[0] === 400, 'Gast aufnehmen → 400');
+        [$s, $d] = $this->req('POST', '/members/' . ($u['id'] ?? 0) . '/promote');
+        $c->ok($s === 200 && ($d['level'] ?? '') === 'member', 'Anwärter zum Mitglied gemacht');
+        $this->d->actAs($this->spiess);
+        $c->ok($this->req('POST', "/members/$cand/promote")[0] === 403, 'Ohne „Mitglieder anlegen“ keine Aufnahme → 403');
+
+        $this->d->actAs($admin);
+        $this->req('DELETE', '/admin/roles/' . $aufnahme, [], ['replacement' => 'member']);
+        $nur = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Nur Kalender'] ?? '');
+        if ($nur !== '') {
+            $this->req('DELETE', '/admin/roles/' . $nur, [], ['replacement' => 'member']);
+        }
     }
 
     private function events(): void

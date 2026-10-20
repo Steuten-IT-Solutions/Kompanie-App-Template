@@ -49,13 +49,20 @@
       "additionalProperties": false,
       "properties": {
         "roles": {
-          "description": "Namen der festen Rollen (Gast, Mitglied, Admin) bei der Ersteinrichtung. Danach benennt und verwaltet der Admin die Rollen in der App (Einstellungen → Rollen); spätere Änderungen hier wirken nicht mehr. organizer und manager gelten nur für Installationen, die diese früheren Rollen schon hatten.",
+          "description": "Namen der festen Rollen (Gast, Anwärter, Mitglied, Admin) bei der Ersteinrichtung. Danach benennt und verwaltet der Admin die Rollen in der App (Einstellungen → Rollen); spätere Änderungen hier wirken nicht mehr. organizer und manager gelten nur für Installationen, die diese früheren Rollen schon hatten.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "guest": {
               "type": "string",
               "default": "Gast",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "candidate": {
+              "type": "string",
+              "default": "Anwärter",
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"

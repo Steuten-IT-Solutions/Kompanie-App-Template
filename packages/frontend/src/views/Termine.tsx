@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { api, can, config, isMember, type CalendarEvent } from '../api';
+import { api, can, config, type CalendarEvent } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
@@ -8,9 +8,9 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 type EventLike = CalendarEvent & { url?: string };
 
-/** Mitglieder sehen den Kalender mit allen Terminen, Gäste die öffentliche Terminliste. */
+/** Mitglieder und Anwärter sehen den Kalender mit allen Terminen, Gäste die öffentliche Terminliste. */
 async function loadEvents(): Promise<EventLike[]> {
-  if (isMember() && config?.features.calendar) return api.calendar();
+  if (can('calendar') && config?.features.calendar) return api.calendar();
   const list = await api.events();
   return list.map((ev) => ({ ...ev, id: `p${ev.id}` }));
 }

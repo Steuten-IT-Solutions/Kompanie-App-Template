@@ -7,8 +7,10 @@ namespace KompanieApp\Core\Auth;
 /** Rechte in der App, unabhängig von WordPress. */
 enum Capability: string
 {
-    /** Eigene Punkte/Strafen, interner Kalender, interne Galerie. */
+    /** Eigene Punkte/Strafen, interne Galerie; schließt den internen Kalender ein. */
     case Member = 'member';
+    /** Interner Kalender ohne Mitgliederbereich, z. B. für Anwärter (Issue #23). */
+    case Calendar = 'calendar';
     /** Punkte vergeben und stornieren, Punktekatalog pflegen (Bereich Punkte). */
     case ManagePoints = 'manage_points';
     /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen). */

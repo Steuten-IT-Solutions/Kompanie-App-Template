@@ -8,13 +8,15 @@ namespace KompanieApp\Core\Auth;
  * Feste Rollen und die Rollen älterer Installationen.
  *
  * Welche Rollen es gibt und welche Rechte sie haben, entscheidet der Admin der Kompanie in der App
- * (Domain\RoleService). Fest sind guest (keine Rechte), member (Mitgliederbereich, Rolle neuer Konten)
- * und admin (alle Rechte); sie lassen sich nur umbenennen. Weitere Standardrollen bringen die Bereiche
+ * (Domain\RoleService). Fest sind guest (keine Rechte), candidate (Anwärter: nur der interne Kalender,
+ * Issue #23), member (Mitgliederbereich, Rolle neuer Konten) und admin (alle Rechte); sie lassen sich nur
+ * umbenennen. Weitere Standardrollen bringen die Bereiche
  * mit, wenn der Admin sie einschaltet (Domain\Features, z. B. „Punkte verwalten“).
  */
 final class Roles
 {
     public const GUEST = 'guest';
+    public const CANDIDATE = 'candidate';
     public const MEMBER = 'member';
     public const ADMIN = 'admin';
     /** Vorlagen bis Issue #28; nur noch in Installationen, die sie schon hatten (LEGACY). */
@@ -32,6 +34,7 @@ final class Roles
      */
     public const TEMPLATES = [
         self::GUEST => [],
+        self::CANDIDATE => ['calendar'],
         self::MEMBER => ['member'],
         self::ADMIN => [],
     ];
@@ -53,6 +56,7 @@ final class Roles
      */
     public const GRANTABLE = [
         Capability::Member,
+        Capability::Calendar,
         Capability::ManagePoints,
         Capability::ManagePenalties,
         Capability::ManageEvents,
@@ -73,7 +77,21 @@ final class Roles
             return Capability::cases();
         }
         $caps = self::TEMPLATES[$key] ?? self::LEGACY[$key] ?? [];
-        return array_values(array_filter(array_map(static fn (string $c): ?Capability => Capability::tryFrom($c), $caps)));
+        return self::withImplied(array_values(array_filter(array_map(static fn (string $c): ?Capability => Capability::tryFrom($c), $caps))));
+    }
+
+    /**
+     * Der Mitgliederbereich schließt den internen Kalender ein.
+     *
+     * @param Capability[] $caps
+     * @return Capability[]
+     */
+    public static function withImplied(array $caps): array
+    {
+        if (in_array(Capability::Member, $caps, true) && !in_array(Capability::Calendar, $caps, true)) {
+            $caps[] = Capability::Calendar;
+        }
+        return $caps;
     }
 
     /** Fest: Rechte nicht änderbar, nicht löschbar (umbenennen geht). */

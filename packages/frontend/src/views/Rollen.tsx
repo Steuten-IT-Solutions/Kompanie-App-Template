@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, applyRoles, config, type Capability, type Level, type RoleAdmin } from '../api';
+import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -8,6 +8,7 @@ const sec = brand.labels.sections;
 /** Rechte, die der Admin einer Rolle geben kann (Einstellungen bleiben den Admins vorbehalten). */
 const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'member', label: 'Mitgliederbereich: eigene Punkte und Strafen, interner Kalender, interne Galerie' },
+  { key: 'calendar', label: 'Interner Kalender (ohne Mitgliederbereich, z. B. für Anwärter)' },
   { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen` },
   { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
   { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
@@ -109,9 +110,13 @@ function RoleForm({
   const fixed = role?.system ?? false;
 
   const toggle = (cap: Capability, on: boolean) => {
-    // Ohne Mitgliederbereich gibt es keine weiteren Rechte (die Person sähe ihre Mitglieder nicht).
+    // Ohne Mitgliederbereich gibt es keine weiteren Rechte (die Person sähe ihre Mitglieder nicht), außer dem Kalender.
     if (cap === 'member' && !on) return setCapabilities([]);
-    setCapabilities((prev) => (on ? Array.from(new Set<Capability>([...prev, 'member', cap])) : prev.filter((c) => c !== cap)));
+    if (cap === 'calendar') return setCapabilities(on ? ['calendar'] : []);
+    // Der Mitgliederbereich enthält den Kalender: nicht zusätzlich speichern.
+    setCapabilities((prev) =>
+      on ? Array.from(new Set<Capability>([...prev.filter((c) => c !== 'calendar'), 'member', cap])) : prev.filter((c) => c !== cap),
+    );
   };
 
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
@@ -155,14 +160,21 @@ function RoleForm({
             ? 'Admins dürfen alles; das lässt sich nicht ändern.'
             : role?.key === 'member'
               ? 'Rolle neuer Konten mit dem Mitgliederbereich; die Rechte lassen sich nicht ändern.'
-              : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
+              : role?.key === 'candidate'
+                ? `Sieht den internen Kalender, aber nicht den Mitgliederbereich. Wer Mitglieder anlegen darf, nimmt sie als „${levelLabel('member')}“ auf; die Rechte lassen sich nicht ändern.`
+                : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
         </p>
       ) : (
         <fieldset className="feature-list">
           <legend className="field-label">Rechte</legend>
           {CAPABILITIES.map((c) => (
             <label key={c.key} className="toggle feature-toggle">
-              <input type="checkbox" checked={capabilities.includes(c.key)} onChange={(e) => toggle(c.key, e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={capabilities.includes(c.key) || (c.key === 'calendar' && capabilities.includes('member'))}
+                disabled={c.key === 'calendar' && capabilities.includes('member')}
+                onChange={(e) => toggle(c.key, e.target.checked)}
+              />
               <span>{c.label}</span>
             </label>
           ))}

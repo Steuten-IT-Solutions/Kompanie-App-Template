@@ -41,10 +41,10 @@ $organizer = $d->createUser('kpwp_verwalter', 'events'); // Standardrolle „Ter
 $manager = $d->createUser('kpwp_leitung', 'points');      // Standardrolle „Punkte verwalten“
 $admin = $d->createUser('kpwp_admin', 'admin');
 $caps = static fn (int $id): array => array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, $app->users->find($id)?->capabilities ?? []);
-$c->ok($caps($member) === ['member'], 'Mitglied: nur Mitgliederbereich');
-$c->ok($caps($organizer) === ['member', 'manage_events'], 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
+$c->ok($caps($member) === ['member', 'calendar'], 'Mitglied: nur Mitgliederbereich (mit Kalender)');
+$c->ok($caps($organizer) === ['member', 'manage_events', 'calendar'], 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
 $c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
-$c->ok($caps($manager) === ['member', 'manage_points'], 'Punkte verwalten: Punkte und Mitglied');
+$c->ok($caps($manager) === ['member', 'manage_points', 'calendar'], 'Punkte verwalten: Punkte und Mitglied');
 $c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
@@ -56,6 +56,41 @@ clean_user_cache($member);
 $c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage_penalties', $caps($member), true) && !in_array('manage_points', $caps($member), true), 'Eigene Rolle: Rechte aus der App');
 $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $app->roles()->delete($kasseKey, null);
+
+// Anwärter (Issue #23): Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt – nur diesen Schritt.
+$c->section('Anwärter');
+$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => ['member', 'create_users']]);
+$aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
+$holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
+$existingCand = get_user_by('login', 'kpwp.anwaerter');
+if ($existingCand) {
+    wp_delete_user($existingCand->ID);
+}
+wp_set_current_user($holder);
+$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => 'candidate']);
+$cand = (int) $created['id'];
+clean_user_cache($cand);
+$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'candidate', 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
+$c->ok($caps($cand) === ['calendar'], 'Anwärter: nur interner Kalender');
+try {
+    $app->users->setRole($cand, 'events');
+    $c->ok(false, 'Wer nur Konten anlegt, vergibt keine anderen Rollen');
+} catch (\DomainException) {
+    $c->ok(true, 'Wer nur Konten anlegt, vergibt keine anderen Rollen');
+}
+$app->members()->promote($app->users->find($holder), $cand);
+clean_user_cache($cand);
+$c->ok($app->users->find($cand)?->role === 'member' && in_array(Roles::ROLE_MEMBER, get_userdata($cand)->roles, true), 'Aufgenommen: Mitglied, mit früherer WP-Rolle');
+try {
+    $app->users->setRole($cand, 'candidate');
+    $c->ok(false, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
+} catch (\DomainException) {
+    $c->ok(true, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
+}
+wp_set_current_user(0);
+wp_delete_user($cand);
+wp_delete_user($holder);
+$app->roles()->delete($aufnahmeKey, null);
 
 // Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
 // Die früheren WP-Rollen gibt es hier nur, wenn die Installation sie hatte; für den Test anlegen.

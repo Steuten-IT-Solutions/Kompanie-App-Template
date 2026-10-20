@@ -49,7 +49,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         $out = [];
         foreach (array_keys($this->users) as $id) {
             $u = $this->find($id);
-            if ($includeGuests || $u->isMember()) {
+            if ($includeGuests || $u->role !== Roles::GUEST) {
                 $out[] = $u;
             }
         }
@@ -57,9 +57,9 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $out;
     }
 
-    public function create(string $name, string $login, string $email, string $password): int
+    public function create(string $name, string $login, string $email, string $password, string $role = Roles::MEMBER): int
     {
-        $id = $this->add($login, Roles::MEMBER, $password);
+        $id = $this->add($login, $role, $password);
         $this->users[$id]['name'] = $name;
         $this->users[$id]['email'] = $email;
         return $id;

@@ -66,7 +66,9 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 function Members() {
   const canPromote = can('promote_users');
   const [showGuests, setShowGuests] = useState(false);
-  const { data, error, loading, reload } = useAsync(() => api.members(showGuests), [showGuests]);
+  // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
+  const [showCandidates, setShowCandidates] = useState(can('create_users'));
+  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates]);
   const [query, setQuery] = useState('');
   const list = useMemo(() => (data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())), [data, query]);
 
@@ -93,6 +95,15 @@ function Members() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Mitglied suchen"
       />
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={showCandidates || showGuests}
+          disabled={showGuests}
+          onChange={(e) => setShowCandidates(e.target.checked)}
+        />
+        Auch {levelLabel('candidate')} anzeigen
+      </label>
       {canPromote && (
         <label className="toggle">
           <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
@@ -106,7 +117,7 @@ function Members() {
               <div className="row-title">
                 {m.name}{' '}
                 {m.level !== 'member' && (
-                  <span className={`badge ${m.level === 'guest' ? 'badge-level-guest' : 'badge-role'}`}>{caps(levelLabel(m.level))}</span>
+                  <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
                 )}
               </div>
               <div className="row-sub">
@@ -156,6 +167,18 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
       </button>
       <h2 className="member-name">{m.name}</h2>
       <RoleControl id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+      {m.level === 'candidate' && can('create_users') && (
+        <button
+          className="btn btn-block promote-candidate"
+          disabled={busy}
+          onClick={() =>
+            window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
+            run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
+          }
+        >
+          Als {levelLabel('member')} aufnehmen
+        </button>
+      )}
       <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
       <div className="stats">
         {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
@@ -163,7 +186,7 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
           <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
         )}
       </div>
-      {m.level !== 'guest' && (
+      {m.member && (
         <div className="button-row">
           {canPoints() && (
             <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
@@ -369,6 +392,7 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 
 function NewMember() {
   const [name, setName] = useState('');
+  const [level, setLevel] = useState<'member' | 'candidate'>('member');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -387,6 +411,7 @@ function NewMember() {
           name: name.trim(),
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(email.trim() ? { email: email.trim() } : {}),
+          level,
         }),
       );
     } catch (err) {
@@ -475,7 +500,16 @@ function NewMember() {
         <span>E-Mail (optional)</span>
         <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
-      <p className="muted small">Das neue Konto bekommt die Rolle „{levelLabel('member')}“ und ein zufälliges Startpasswort.</p>
+      <label className="field">
+        <span>Rolle</span>
+        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
+          <option value="member">{levelLabel('member')}</option>
+          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
+        </select>
+      </label>
+      <p className="muted small">
+        Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
+      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}

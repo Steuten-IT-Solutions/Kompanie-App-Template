@@ -182,7 +182,7 @@ export default function App() {
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
   const allowed: Record<View, boolean> = {
-    termine: !!(features?.events || (features?.calendar && isMember())),
+    termine: !!(features?.events || (features?.calendar && can('calendar'))),
     news: !!features?.news,
     galerie: !!features?.gallery,
     meins: isMember() && !!(features?.points || features?.penalties),

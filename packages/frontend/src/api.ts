@@ -3,10 +3,11 @@
 
 import brand from './generated/brand';
 
-/** Schlüssel einer Rolle: guest, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
+/** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
 export type Capability =
   | 'member'
+  | 'calendar'
   | 'manage_points'
   | 'manage_penalties'
   | 'manage_events'
@@ -240,6 +241,8 @@ export interface MemberSummary {
   id: number;
   name: string;
   level: Level;
+  /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
+  member: boolean;
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
@@ -255,6 +258,7 @@ export interface CreatedUser {
   name: string;
   username: string;
   email: string;
+  level: Level;
   /** Startpasswort – steht nur in dieser einen Antwort. */
   password: string;
 }
@@ -390,7 +394,13 @@ export const api = {
   updateCatalogItem: (id: number, data: Partial<Pick<CatalogItem, 'title' | 'points' | 'active' | 'sort'>>) =>
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
 
-  members: (all = false) => request<MemberSummary[]>('GET', '/members', undefined, all ? { all: '1' } : undefined),
+  members: (all = false, candidates = false) =>
+    request<MemberSummary[]>('GET', '/members', undefined, {
+      ...(all ? { all: '1' } : {}),
+      ...(candidates ? { candidates: '1' } : {}),
+    }),
+  /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
+  promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   setRole: (id: number, level: Level) => request<{ id: number; level: Level }>('PATCH', `/members/${id}/role`, { level }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
   resetPassword: (id: number) => request<{ password: string }>('POST', `/members/${id}/password`),
@@ -399,7 +409,8 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUser: (data: { name: string; username?: string; email?: string }) => request<CreatedUser>('POST', '/users', data),
+  createUser: (data: { name: string; username?: string; email?: string; level?: 'member' | 'candidate' }) =>
+    request<CreatedUser>('POST', '/users', data),
 
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),

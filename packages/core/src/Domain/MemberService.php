@@ -40,23 +40,27 @@ final class MemberService
     }
 
     /**
-     * Mitglieder mit Summen; mit $includeGuests auch Konten ohne Rolle.
+     * Mitglieder mit Summen; mit $includeCandidates auch Anwärter (nur interner Kalender), mit $includeGuests
+     * alle Konten.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function list(bool $includeGuests, ?User $viewer = null): array
+    public function list(bool $includeGuests, ?User $viewer = null, bool $includeCandidates = false): array
     {
         $totals = $this->scores->totalsByUser();
         [$points, $penalties] = self::visibleParts($viewer);
         $out = [];
+        // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
         foreach ($this->users->list($includeGuests) as $u) {
-            if (!$includeGuests && !$u->isMember()) {
+            if (!$includeGuests && !$u->isMember() && !($includeCandidates && self::calendarOnly($u))) {
                 continue;
             }
             $out[] = [
                 'id' => $u->id,
                 'name' => $u->name,
                 'level' => $u->role,
+                // Mit Mitgliederbereich (Punkte und Strafen möglich); sonst nur Kalender oder Gast.
+                'member' => $u->isMember(),
                 'points' => $points ? ($totals[$u->id]['points'] ?? 0) : null,
                 'open_cents' => $penalties ? ($totals[$u->id]['open_cents'] ?? 0) : null,
             ];
@@ -76,11 +80,18 @@ final class MemberService
             'id' => $u->id,
             'name' => $u->name,
             'level' => $u->role,
+            'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
             'point_list' => $points ? $this->scores->pointsFor($u->id) : [],
             'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
         ];
+    }
+
+    /** Interner Kalender ohne Mitgliederbereich: Anwärter oder eine eigene Rolle nur mit dem Kalender. */
+    private static function calendarOnly(User $u): bool
+    {
+        return $u->can(Capability::Calendar) && !$u->isMember();
     }
 
     /**
@@ -129,10 +140,36 @@ final class MemberService
     }
 
     /**
-     * Legt ein Mitglied mit zufälligem Startpasswort an. Das Passwort steht nur
+     * Anwärter zum Mitglied machen (Issue #23): wer Konten anlegen darf, aber nur von Anwärter zu Mitglied.
+     * Andere Rollenwechsel bleiben bei „Rollen vergeben“.
+     *
+     * @return array{id: int, level: string}
+     */
+    public function promote(User $actor, int $id): array
+    {
+        $target = $this->users->find($id);
+        if (!$target) {
+            throw ApiError::notFound('Benutzer nicht gefunden.');
+        }
+        if ($actor->id === $id) {
+            throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
+        }
+        if ($target->role !== Roles::CANDIDATE) {
+            throw ApiError::invalid('Nur Anwärter können so zum Mitglied gemacht werden.');
+        }
+        try {
+            $this->users->setRole($id, Roles::MEMBER);
+        } catch (\DomainException $e) {
+            throw ApiError::invalid($e->getMessage());
+        }
+        return ['id' => $id, 'level' => $this->users->find($id)?->role ?? Roles::MEMBER];
+    }
+
+    /**
+     * Legt ein Konto mit zufälligem Startpasswort an, als Mitglied oder als Anwärter. Das Passwort steht nur
      * in dieser Antwort; es wird keine E-Mail verschickt.
      *
-     * @param array<string, mixed> $in name, username, email
+     * @param array<string, mixed> $in name, username, email, level (member oder candidate)
      * @return array<string, mixed>
      */
     public function create(array $in): array
@@ -140,6 +177,10 @@ final class MemberService
         $name = Text::line($in['name'] ?? '', 100);
         if ($name === '') {
             throw ApiError::invalid('Bitte einen Namen angeben.');
+        }
+        $level = $in['level'] ?? Roles::MEMBER;
+        if ($level !== Roles::MEMBER && $level !== Roles::CANDIDATE) {
+            throw ApiError::invalid('Neue Konten sind Mitglieder oder Anwärter; andere Rollen danach vergeben.');
         }
 
         $login = trim(is_string($in['username'] ?? null) ? $in['username'] : '');
@@ -170,11 +211,11 @@ final class MemberService
 
         $password = Passwords::readable(12);
         try {
-            $id = $this->users->create($name, $login, $email, $password);
+            $id = $this->users->create($name, $login, $email, $password, $level);
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
-        return ['id' => $id, 'name' => $name, 'username' => $login, 'email' => $email, 'password' => $password];
+        return ['id' => $id, 'name' => $name, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
     }
 
     /** Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. */
@@ -192,7 +233,9 @@ final class MemberService
         }
         // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen,
         // oder (bei WordPress) das Konto einer Person, die gar nicht zur Kompanie gehört (Gast).
-        if (!$actor->isAdmin() && !$target->isMember()) {
+        // Anwärter legt an, wer Konten anlegen darf; ihr Passwort (und das anderer Konten nur mit dem Kalender) darf er
+        // deshalb auch zurücksetzen.
+        if (!$actor->isAdmin() && !$target->isMember() && !self::calendarOnly($target)) {
             throw ApiError::forbidden('Passwörter von Personen ohne Mitgliederbereich setzen nur Admins zurück.');
         }
         if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {

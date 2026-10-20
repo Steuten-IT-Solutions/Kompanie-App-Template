@@ -20,23 +20,23 @@
  *   Markdown: ## und ### Überschriften, Absätze, Listen (- oder 1.), **fett**, *kursiv*, `Code`,
  *   [Text](https://…), [Text](seite:name) für eine andere Handbuchseite, > Hinweis.
  *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties},
- *   {rolle.guest|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
+ *   {rolle.guest|candidate|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
  */
 
 declare(strict_types=1);
 
-const CAPABILITIES = ['member', 'manage_points', 'manage_penalties', 'manage_events', 'manage_documents', 'create_users', 'promote_users', 'manage_settings'];
+const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties', 'manage_events', 'manage_documents', 'create_users', 'promote_users', 'manage_settings'];
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
 const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties'];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
 const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
-const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'rolle.guest', 'rolle.member', 'rolle.admin'];
+const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'rolle.guest', 'rolle.candidate', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
     'bereich.events' => 'Termine', 'bereich.calendar' => 'Kalender', 'bereich.news' => 'News', 'bereich.gallery' => 'Galerie',
     'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen',
-    'rolle.guest' => 'Gast', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
+    'rolle.guest' => 'Gast', 'rolle.candidate' => 'Anwärter', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
 ];
 
 $root = dirname(__DIR__);
@@ -150,6 +150,10 @@ function load(string $dir): array
 function reachable(array $from, array $to): bool
 {
     $held = in_array('manage_settings', $from['rechte'], true) ? CAPABILITIES : $from['rechte'];
+    // Der Mitgliederbereich schließt den internen Kalender ein.
+    if (in_array('member', $held, true)) {
+        $held[] = 'calendar';
+    }
     return array_diff($to['rechte'], $held) === []
         && array_diff($to['bereiche'], $from['bereiche']) === []
         && ($to['variante'] === '' || $to['variante'] === $from['variante']);
@@ -162,7 +166,7 @@ function group(array $page): string
     return match (true) {
         $r === [] => 'Für alle',
         in_array('manage_settings', $r, true) => 'Für Admins',
-        $r === ['member'] => 'Für Mitglieder',
+        $r === ['member'], $r === ['calendar'] => 'Für Mitglieder',
         default => 'Für Aufgaben in der Verwaltung',
     };
 }

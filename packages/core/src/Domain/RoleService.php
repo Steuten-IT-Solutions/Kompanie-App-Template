@@ -15,7 +15,7 @@ use KompanieApp\Core\Port\UserDirectory;
 /**
  * Rollen der App: Bezeichnung, Rechte und Punktefaktor – die einzige Stelle, die das sagt (Issue #28).
  *
- * Der Admin legt Rollen in der App an (Einstellungen → Rollen). Fest sind Gast, Mitglied und Admin
+ * Der Admin legt Rollen in der App an (Einstellungen → Rollen). Fest sind Gast, Anwärter, Mitglied und Admin
  * (Bezeichnungen bei der Ersteinrichtung aus kompanie.json, danach in der App). Schaltet der Admin einen
  * Bereich ein, der Rechte braucht, kommt dessen Standardrolle dazu (Domain\Features, z. B. „Punkte
  * verwalten“); schaltet er ihn aus, verschwindet sie wieder, wenn ihr niemand zugeordnet ist.
@@ -76,17 +76,24 @@ final class RoleService
      */
     public function capabilities(string $key): array
     {
+        return $key === Roles::ADMIN ? Capability::cases() : Roles::withImplied($this->granted($key));
+    }
+
+    /**
+     * Die der Rolle ausdrücklich gegebenen Rechte (ohne den im Mitgliederbereich enthaltenen Kalender), wie sie
+     * Einstellungen → Rollen zeigt.
+     *
+     * @return Capability[]
+     */
+    private function granted(string $key): array
+    {
         if ($key === Roles::ADMIN) {
             return Capability::cases();
         }
-        $role = $this->find($key);
-        if ($role === null) {
-            return [];
-        }
         $out = [];
-        foreach ($role['capabilities'] as $c) {
+        foreach ($this->find($key)['capabilities'] ?? [] as $c) {
             $cap = Capability::tryFrom($c);
-            if ($cap !== null && in_array($cap, Roles::GRANTABLE, true)) {
+            if ($cap !== null && in_array($cap, Roles::GRANTABLE, true) && !in_array($cap, $out, true)) {
                 $out[] = $cap;
             }
         }
@@ -132,7 +139,7 @@ final class RoleService
             $out[] = [
                 'key' => $key,
                 'label' => $r['label'],
-                'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->capabilities($key)),
+                'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->granted($key)),
                 'points_factor' => $r['points_factor'],
                 'users' => $counts[$key] ?? 0,
                 'system' => Roles::isSystem($key),
@@ -248,7 +255,7 @@ final class RoleService
         $fixed = Roles::isSystem($key);
         if (array_key_exists('capabilities', $in)) {
             if ($fixed) {
-                throw ApiError::invalid('Die Rechte von Gast, Mitglied und Admin lassen sich nicht ändern.');
+                throw ApiError::invalid('Die Rechte der festen Rollen (Gast, Anwärter, Mitglied, Admin) lassen sich nicht ändern.');
             }
             $role['capabilities'] = self::validCapabilities($in['capabilities']);
         }
@@ -382,10 +389,23 @@ final class RoleService
         }
         $fixed = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            $fixed[$key] = $out[$key] ?? ['key' => $key, 'label' => $this->config->roleLabel($key), 'capabilities' => $caps, 'points_factor' => 1.0];
+            if (!isset($out[$key])) {
+                // Neu hinzugekommene feste Rolle (z. B. Anwärter nach dem Update): Heißt schon eine eigene Rolle so,
+                // bekommt die feste einen anderen Namen; doppelte Namen ließen sich sonst nicht mehr speichern.
+                $base = $this->config->roleLabel($key);
+                $taken = array_map(static fn (array $r): string => mb_strtolower($r['label']), $fixed + $out);
+                $label = $base;
+                for ($n = 1; in_array(mb_strtolower($label), $taken, true); $n++) {
+                    $suffix = $n === 1 ? ' (fest)' : " (fest $n)";
+                    $label = rtrim(mb_substr($base, 0, self::LABEL_MAX - mb_strlen($suffix))) . $suffix;
+                }
+                $out[$key] = ['key' => $key, 'label' => $label, 'capabilities' => $caps, 'points_factor' => 1.0];
+            }
+            $fixed[$key] = $out[$key];
             unset($out[$key]);
         }
-        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::MEMBER => $fixed[Roles::MEMBER]] + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
+        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::CANDIDATE => $fixed[Roles::CANDIDATE], Roles::MEMBER => $fixed[Roles::MEMBER]]
+            + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
     }
 
     /**
@@ -415,6 +435,10 @@ final class RoleService
         if (mb_strlen($label) > self::LABEL_MAX) {
             throw ApiError::invalid(sprintf('Der Name darf höchstens %d Zeichen lang sein.', self::LABEL_MAX));
         }
+        // Unveränderter Name: nicht prüfen (sonst ließen sich Rechte einer Rolle mit doppeltem Namen nicht mehr ändern).
+        if ($key !== null && ($this->find($key)['label'] ?? null) === $label) {
+            return $label;
+        }
         foreach ($this->all() as $k => $r) {
             if ($k !== $key && mb_strtolower($r['label']) === mb_strtolower($label)) {
                 throw ApiError::invalid('Eine Rolle mit diesem Namen gibt es schon.');
@@ -437,9 +461,14 @@ final class RoleService
             }
             $out[$cap->value] = $cap->value;
         }
-        // Verwalten setzt den Mitgliederbereich voraus (sonst sähe die Person ihre Mitglieder nicht).
-        if ($out !== [] && !isset($out[Capability::Member->value])) {
+        // Verwalten setzt den Mitgliederbereich voraus (sonst sähe die Person ihre Mitglieder nicht); nur den
+        // internen Kalender gibt es auch ohne (wie bei Anwärtern).
+        if (array_diff(array_keys($out), [Capability::Calendar->value]) !== [] && !isset($out[Capability::Member->value])) {
             throw ApiError::invalid('Rollen mit Rechten brauchen auch den Mitgliederbereich.');
+        }
+        // Der Mitgliederbereich schließt den Kalender ein: nicht doppelt speichern.
+        if (isset($out[Capability::Member->value])) {
+            unset($out[Capability::Calendar->value]);
         }
         return array_values($out);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Push;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\ExtendedHttpClient;
@@ -160,7 +161,7 @@ final class PushService
     public function usesCalendar(?User $user): bool
     {
         // Wie die App (Bereich an und eingerichtet): Sonst sehen Mitglieder die öffentliche Terminliste.
-        return $user !== null && $user->isMember() && $this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured();
+        return $user !== null && $user->can(Capability::Calendar) && $this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured();
     }
 
     /** @param list<string> $features */

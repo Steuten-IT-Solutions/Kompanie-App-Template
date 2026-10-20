@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Port;
 
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 
 /**
@@ -24,8 +25,8 @@ interface UserDirectory
      */
     public function list(bool $includeGuests): array;
 
-    /** Legt ein Konto mit der Rolle Mitglied an und gibt seine ID zurück. */
-    public function create(string $name, string $login, string $email, string $password): int;
+    /** Legt ein Konto als Mitglied oder als Anwärter (Auth\Roles) an und gibt seine ID zurück. */
+    public function create(string $name, string $login, string $email, string $password, string $role = Roles::MEMBER): int;
 
     /** Ob in dieser Umgebung Admins in der App ernannt werden können (nur Standalone). */
     public function canAssignAdmin(): bool;
