@@ -13,7 +13,7 @@ import {
 } from '../documents';
 import { formatBytes, formatDate } from '../format';
 import { detectPlatform } from '../install';
-import { whenControlled } from '../offline';
+import { pruneDocumentCache, whenControlled } from '../offline';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
@@ -227,6 +227,11 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
       lastOpened = null;
     }
   }, [data, docId, show]);
+
+  // Nur Dokumente aus der aktuellen Liste offline behalten (gelöscht, nicht mehr sichtbar, ältere Fassung).
+  useEffect(() => {
+    if (data) void pruneDocumentCache(data.documents.map((d) => d.url));
+  }, [data]);
 
   useEffect(() => {
     let alive = true;

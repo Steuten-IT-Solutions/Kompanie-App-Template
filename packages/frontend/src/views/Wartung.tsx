@@ -344,6 +344,7 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
           ? ', die Konten (Passwörter als Prüfwerte, aus denen sich einfache Passwörter erraten lassen)'
           : ''}{' '}
         und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen sichert die App automatisch.
+        {config?.features.documents && ' Die Dateien der Dokumente sind nicht enthalten (nur ihre Angaben); sie bleiben auf dem Server.'}
       </p>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>

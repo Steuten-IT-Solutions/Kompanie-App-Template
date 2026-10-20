@@ -44,6 +44,7 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
 
     (async () => {
       await whenControlled();
+      if (cancelled) return;
       let res: Response;
       try {
         res = await fetch(url, { credentials: 'same-origin' });
@@ -54,9 +55,16 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
         throw new Error(res.status === 404 ? 'Das Dokument wurde nicht gefunden.' : `Fehler ${res.status}`);
       }
       const data = new Uint8Array(await res.arrayBuffer());
-      task = getDocument({ data });
-      const pdf = await task.promise;
       if (cancelled) return;
+      // Bilder in gescannten PDFs (JBIG2, JPEG 2000) mit den JavaScript-Dekodierern neben dieser Datei (vite.config.ts).
+      // Variable statt new URL('…', import.meta.url): Vite soll den Ordner nicht beim Bauen auflösen.
+      const here = import.meta.url;
+      task = getDocument({ data, useWasm: false, wasmUrl: new URL(__PDFJS_DIR__, here).href });
+      const pdf = await task.promise;
+      if (cancelled) {
+        await task.destroy();
+        return;
+      }
       setTotal(pdf.numPages);
 
       // Etwa doppelte Bildschirmauflösung: bleibt beim Heranzoomen mit zwei Fingern lesbar.

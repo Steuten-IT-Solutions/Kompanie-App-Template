@@ -162,6 +162,13 @@ final class AppPage
     private static function sendDocument(App $app, int $id): void
     {
         $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id);
+        // Nie in einen Seiten-Cache, nicht in Ausgabepuffer (Dateien bis 20 MB).
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
         nocache_headers();
         if ($res['status'] !== 200 || !isset($res['path'], $res['mime'], $res['disposition'])) {
             status_header($res['status']);

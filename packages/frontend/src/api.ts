@@ -322,7 +322,8 @@ export interface DocumentsResponse {
 async function encodeFile(file: File): Promise<{ name: string; data: string }> {
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
     reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
     reader.readAsDataURL(file);
   });

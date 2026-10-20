@@ -163,6 +163,18 @@ final class DocumentServiceTest extends TestCase
         $this->assertSame(403, $this->call('POST', '/document-categories', ['title' => 'X'])->status);
     }
 
+    public function testForeignFileNamesAreNeverTouched(): void
+    {
+        // Etwa aus einer veränderten Sicherung: Der Dateiname zeigt auf eine andere geschützte Datei.
+        $doc = $this->upload('Satzung');
+        $other = $this->app->files->path('galerie/intern.jpg', false);
+        file_put_contents($other, 'geheim');
+        $this->app->db->update('documents', ['file' => '../galerie/intern.jpg'], ['id' => $doc['id']]);
+        $this->assertSame(404, $this->app->documents()->forDelivery($this->users->find($this->admin), $doc['id'])['status']);
+        $this->assertSame(200, $this->call('DELETE', '/documents/' . $doc['id'])->status);
+        $this->assertFileExists($other);
+    }
+
     public function testMaxBytesFollowsServerLimits(): void
     {
         $this->assertLessThanOrEqual(DocumentService::MAX_BYTES, DocumentService::maxBytes());

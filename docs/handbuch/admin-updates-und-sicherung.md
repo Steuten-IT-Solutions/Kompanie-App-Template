@@ -10,3 +10,5 @@ Neue Versionen kommen automatisch, solange **Updates automatisch einspielen (emp
 Unter **Einstellungen → Datensicherung** lädst du eine Sicherung aller App-Daten und Einstellungen herunter. Bewahre sie an einem sicheren Ort auf: Sie enthält die Daten der Mitglieder. Die Ampel wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
 
 Wiederherstellen: Mit WordPress nur auf derselben Webseite. Ohne WordPress auch auf einer neuen Installation (z. B. beim Umzug), aber nicht aus einer Sicherung des WordPress-Plugins.
+
+Die Dateien der Dokumente sind nicht in der Sicherung, nur ihre Angaben (Titel, Kategorie, Stand). Sie bleiben auf dem Server. Beim Umzug ohne WordPress nimm den Ordner `data/files/dokumente` mit (bzw. das Datenverzeichnis, falls es woanders liegt), sonst lassen sich die Dokumente danach nicht öffnen und müssen neu hochgeladen werden.

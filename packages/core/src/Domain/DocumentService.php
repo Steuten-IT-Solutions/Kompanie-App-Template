@@ -29,6 +29,8 @@ final class DocumentService
     public const VISIBLE_MEMBERS = 'members';
     public const VISIBLE_MANAGERS = 'managers';
     private const DIR = 'dokumente/';
+    /** So heißen gespeicherte Dateien (store()); andere Werte, z. B. aus einer veränderten Sicherung, nie anfassen. */
+    private const FILE_PATTERN = '/^dok-[0-9a-f]{24}\.[a-z]{3,4}$/';
 
     /** Endung => [MIME-Typ, Signatur, Art]; pdf und image zeigt die App an, file wird nur heruntergeladen. */
     public const TYPES = [
@@ -98,7 +100,7 @@ final class DocumentService
             return ['status' => 403];
         }
         $doc = $this->repository()->find($id);
-        if ($doc === null || !self::canSee($user, $doc['visibility']) || !isset(self::TYPES[$doc['ext']])) {
+        if ($doc === null || !self::canSee($user, $doc['visibility']) || !isset(self::TYPES[$doc['ext']]) || !preg_match(self::FILE_PATTERN, $doc['file'])) {
             return ['status' => 404];
         }
         $path = $this->app->files->path(self::DIR . $doc['file'], false);
@@ -161,8 +163,13 @@ final class DocumentService
     {
         $doc = $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
         $stored = $this->store($file);
-        $this->repository()->update($id, $stored + ['uploaded_by' => $by, 'updated_at' => $this->app->time()->nowUtc()]);
-        $this->app->files->delete(self::DIR . $doc['file'], false);
+        try {
+            $this->repository()->update($id, $stored + ['uploaded_by' => $by, 'updated_at' => $this->app->time()->nowUtc()]);
+        } catch (\Throwable $e) {
+            $this->app->files->delete(self::DIR . $stored['file'], false);
+            throw $e;
+        }
+        $this->removeFile($doc['file']);
         return $this->format((array) $this->repository()->find($id));
     }
 
@@ -170,7 +177,14 @@ final class DocumentService
     {
         $doc = $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
         $this->repository()->delete($id);
-        $this->app->files->delete(self::DIR . $doc['file'], false);
+        $this->removeFile($doc['file']);
+    }
+
+    private function removeFile(string $file): void
+    {
+        if (preg_match(self::FILE_PATTERN, $file)) {
+            $this->app->files->delete(self::DIR . $file, false);
+        }
     }
 
     /* ---------------------------------------------------------------- */
@@ -236,17 +250,20 @@ final class DocumentService
      */
     public static function maxBytes(): int
     {
-        $limits = [self::MAX_BYTES];
-        $post = self::iniBytes((string) ini_get('post_max_size'));
-        if ($post > 0) {
-            $limits[] = (int) floor(max(0, $post - 64 * 1024) * 3 / 4);
-        }
+        $limits = [self::requestLimit()];
         $memory = self::iniBytes((string) ini_get('memory_limit'));
         if ($memory > 0) {
             // JSON, Base64 und die Datei liegen gleichzeitig im Speicher (gut das Vierfache).
             $limits[] = (int) floor(max(0, $memory - memory_get_usage()) / 4);
         }
         return max(0, min($limits));
+    }
+
+    /** 20 MB oder was post_max_size zulässt (Base64 macht die Datei um ein Drittel größer). */
+    private static function requestLimit(): int
+    {
+        $post = self::iniBytes((string) ini_get('post_max_size'));
+        return $post > 0 ? min(self::MAX_BYTES, (int) floor(max(0, $post - 64 * 1024) * 3 / 4)) : self::MAX_BYTES;
     }
 
     private static function iniBytes(string $value): int
@@ -347,8 +364,9 @@ final class DocumentService
                 self::formatBytes(self::maxBytes()),
             ));
         }
-        $max = min(self::MAX_BYTES, max(self::maxBytes(), 1));
-        if (strlen($bytes) > self::MAX_BYTES || strlen($bytes) > $max) {
+        // Nicht maxBytes(): Hier liegt die Anfrage schon im Speicher; was angekommen ist, ließ sich auch dekodieren.
+        $max = self::requestLimit();
+        if (strlen($bytes) > $max) {
             throw ApiError::invalid(sprintf('Die Datei darf höchstens %s groß sein.', self::formatBytes($max)));
         }
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
