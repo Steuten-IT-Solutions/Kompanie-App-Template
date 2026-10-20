@@ -25,6 +25,8 @@ use KompanieApp\Core\Storage\PushRepository;
  *
  * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit Urgency high und einer TTL höchstens bis zum
  *   Ablauf der Nachricht.
+ * - Umfragen (Issue #4): neue Umfrage an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem
+ *   Ende an alle Mitglieder ohne Antwort; TTL höchstens bis zum Ende.
  *
  * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
  * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
@@ -46,6 +48,8 @@ final class PushService
     public const NEWS_SETTING = 'push_news_seen';
     /** Neue Art „Schwarzes Brett“ den bestehenden Abos schon einmal hinzugefügt (beim ersten Einschalten des Bereichs). */
     public const BOARD_OFFERED_SETTING = 'push_board_offered';
+    /** Ebenso für die Art „Umfragen“ (Issue #4). */
+    public const POLLS_OFFERED_SETTING = 'push_polls_offered';
     public const REMINDER_DATE_SETTING = 'push_reminder_date';
     /** Uhrzeit der Erinnerung (Stunde 0–23, Zeitzone der Kompanie); Einstellung der Admins. */
     public const REMINDER_HOUR_SETTING = 'push_reminder_hour';
@@ -61,6 +65,7 @@ final class PushService
     public const TYPE_REMINDER = 'reminder';
     public const TYPE_NEWS = 'news';
     public const TYPE_BOARD = 'board';
+    public const TYPE_POLLS = 'polls';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -143,6 +148,7 @@ final class PushService
         $c = $this->app->config;
         return [
             self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'board'],
+            self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'members'],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'members'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'members'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'members'],
@@ -503,47 +509,78 @@ final class PushService
      */
     public function notifyBoard(array $message, int $authorId, int $ttl): int
     {
-        if (!$this->typeEnabled(self::TYPE_BOARD) || $ttl <= 0) {
+        return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl);
+    }
+
+    /**
+     * An alle Geräte von Konten aus dem Empfängerkreis des Typs (types(): audience), die den Typ abonniert haben und
+     * die $include zulässt (z. B. nicht der Verfasser, nur wer noch nicht abgestimmt hat).
+     *
+     * @param Message $message
+     * @param \Closure(int): bool $include Benutzer-ID → bekommt die Nachricht
+     * @param int $ttl Sekunden, höchstens TTL; 0 oder weniger: nichts
+     */
+    public function notifyAudience(string $type, array $message, \Closure $include, string $urgency = 'normal', int $ttl = self::TTL): int
+    {
+        if (!$this->typeEnabled($type) || $ttl <= 0) {
             return 0;
         }
+        $audience = $this->types()[$type]['audience'];
         $json = $this->json($message);
         $items = [];
         $recipients = [];
         foreach ($this->repository()->all() as $sub) {
             $uid = $sub['user_id'];
-            if ($uid <= 0 || $uid === $authorId || !in_array(self::TYPE_BOARD, $sub['types'], true)) {
+            if ($uid <= 0 || !in_array($type, $sub['types'], true)) {
                 continue;
             }
-            $recipients[$uid] ??= BoardService::isRecipient($this->app->users->find($uid));
+            $recipients[$uid] ??= $include($uid) && $this->inAudience($audience, $this->app->users->find($uid));
             if ($recipients[$uid]) {
                 $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
             }
         }
-        return $this->enqueue($items, 'high', min(self::TTL, $ttl));
+        return $this->enqueue($items, $urgency, min(self::TTL, $ttl));
+    }
+
+    /** @param 'members'|'board'|'all' $audience */
+    private function inAudience(string $audience, ?User $user): bool
+    {
+        return match ($audience) {
+            'members' => $user !== null && $user->isMember(),
+            'board' => BoardService::isRecipient($user),
+            'all' => true,
+        };
     }
 
     /**
-     * Beim ersten Einschalten des Schwarzen Bretts: Die neue Art bei allen bestehenden Abos der Empfänger einschalten
-     * (wie bei neuen Abos, die alle angebotenen Arten bekommen). Danach entscheidet jedes Gerät selbst; erneutes
+     * Beim ersten Einschalten eines Bereichs mit eigener Art (Schwarzes Brett, Umfragen): die neue Art bei allen
+     * bestehenden Abos der Konten aus ihrem Empfängerkreis einschalten (wie bei neuen Abos, die alle angebotenen Arten
+     * bekommen). Einmalig je Art (Einstellung push_<art>_offered); danach entscheidet jedes Gerät selbst, erneutes
      * Ein- und Ausschalten des Bereichs ändert die Abos nicht mehr.
      */
-    public function offerBoardToExisting(): int
+    public function offerTypeToExisting(string $type): int
     {
-        if ($this->app->settings->get(self::BOARD_OFFERED_SETTING, false)) {
+        $definition = $this->types()[$type] ?? null;
+        $setting = 'push_' . $type . '_offered';
+        if ($definition === null || $this->app->settings->get($setting, false)) {
             return 0;
         }
-        $this->app->settings->set(self::BOARD_OFFERED_SETTING, true);
+        $this->app->settings->set($setting, true);
         $now = $this->app->time()->nowUtc();
+        $order = array_flip(array_keys($this->types()));
         $recipients = [];
         $count = 0;
         foreach ($this->repository()->all() as $sub) {
             $uid = $sub['user_id'];
-            if ($uid <= 0 || in_array(self::TYPE_BOARD, $sub['types'], true)) {
+            if ($uid <= 0 || in_array($type, $sub['types'], true)) {
                 continue;
             }
-            $recipients[$uid] ??= BoardService::isRecipient($this->app->users->find($uid));
+            $recipients[$uid] ??= $this->inAudience($definition['audience'], $this->app->users->find($uid));
             if ($recipients[$uid]) {
-                $this->repository()->update($sub['id'], ['types' => array_merge([self::TYPE_BOARD], $sub['types'])], $now);
+                // In der üblichen Reihenfolge der Arten (wie bei neuen Abos).
+                $types = [...$sub['types'], $type];
+                usort($types, static fn (string $a, string $b): int => ($order[$a] ?? 999) <=> ($order[$b] ?? 999));
+                $this->repository()->update($sub['id'], ['types' => $types], $now);
                 $count++;
             }
         }

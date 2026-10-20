@@ -286,6 +286,7 @@ final class Api
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
         $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
+        $denyPolls = 'Umfragen sind nur für Mitglieder.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
@@ -428,7 +429,7 @@ final class Api
 
             // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen (BoardService::isRecipient), post_board schreibt,
             // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
-            new Route('GET', '/board', [Cap::Member, Cap::Calendar, Cap::PostBoard], fn () => $a->board()->list(), 'board', $denyBoard),
+            new Route('GET', '/board', [Cap::Member, Cap::Calendar, Cap::PostBoard], fn () => $a->board()->list($this->user()), 'board', $denyBoard),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
                 $item = $a->board()->create($this->user(), $r->input('text'));
                 $author = $this->user()->id;
@@ -440,6 +441,25 @@ final class Api
                 $a->board()->delete($r->id());
                 return ['deleted' => true];
             }, 'board', $denyRights),
+
+            // Umfragen (Issue #4): Mitglieder lesen und antworten (nur solange die Umfrage läuft), manage_polls verwaltet;
+            // nur beim Anlegen eine Benachrichtigung. Antworten anonymer Umfragen nie mit Namen oder IDs (PollService).
+            new Route('GET', '/polls', [Cap::Member, Cap::ManagePolls], fn () => $a->polls()->list($this->user()), 'polls', $denyPolls),
+            new Route('POST', '/polls', Cap::ManagePolls, function (Request $r) use ($a) {
+                $poll = $a->polls()->create($this->user(), $r->body);
+                $creator = $this->user()->id;
+                $this->notify(static fn () => $a->pushTriggers()->pollCreated(['id' => (int) $poll['id'], 'title' => (string) $poll['title'], 'ends_at' => is_string($poll['ends_at']) ? $poll['ends_at'] : null], $creator));
+                return Response::created($poll);
+            }, 'polls', $denyRights),
+            new Route('GET', '/polls/{id}', [Cap::Member, Cap::ManagePolls], fn (Request $r) => $a->polls()->get($this->user(), $r->id()), 'polls', $denyPolls),
+            new Route('PATCH', '/polls/{id}', Cap::ManagePolls, fn (Request $r) => $a->polls()->update($this->user(), $r->id(), $r->body), 'polls', $denyRights),
+            new Route('POST', '/polls/{id}/close', Cap::ManagePolls, fn (Request $r) => $a->polls()->close($this->user(), $r->id()), 'polls', $denyRights),
+            new Route('DELETE', '/polls/{id}', Cap::ManagePolls, function (Request $r) use ($a) {
+                $a->polls()->delete($r->id());
+                return ['deleted' => true];
+            }, 'polls', $denyRights),
+            new Route('PUT', '/polls/{id}/vote', Cap::Member, fn (Request $r) => $a->polls()->vote($this->user(), $r->id(), $r->body), 'polls', $denyPolls),
+            new Route('DELETE', '/polls/{id}/vote', Cap::Member, fn (Request $r) => $a->polls()->withdraw($this->user(), $r->id()), 'polls', $denyPolls),
 
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
             new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),

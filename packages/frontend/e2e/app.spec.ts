@@ -461,6 +461,7 @@ test.describe('Android', () => {
     await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
     await expect(page.getByLabel('Kasse: neue Einträge')).toBeChecked();
     await expect(page.getByLabel('Schwarzes Brett: dringende Nachrichten')).toBeChecked();
+    await expect(page.getByLabel('Umfragen: neue Umfrage und Erinnerung')).toBeChecked();
     await expect(page.getByLabel('Kasse: Betrag und Grund in der Nachricht zeigen')).not.toBeChecked();
     await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
     await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
@@ -479,7 +480,7 @@ test.describe('Android', () => {
       }, device);
     await expect
       .poll(status)
-      .toEqual({ types: ['board', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
+      .toEqual({ types: ['board', 'polls', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -1294,6 +1295,91 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
     await expect(admin.locator('.board-card', { hasText: text })).toHaveCount(0);
   }
   await expect(admin.getByText('Zurzeit gibt es keine Nachrichten.')).toBeVisible();
+  await admin.close();
+});
+
+test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Ergebnis, ändert; beendet keine Änderung mehr', async ({
+  page,
+  browser,
+}) => {
+  const title = `Grillfest ${Date.now().toString(36)}: Samstag oder Sonntag?`;
+  // Admin (Recht manage_polls) legt über „Mein Konto“ → „Umfrage anlegen“ an.
+  const admin = await browser.newPage();
+  admin.on('dialog', (d) => d.accept());
+  await login(admin, 'admin', ADMIN_PASSWORD);
+  await admin.getByRole('button', { name: 'Konto' }).click();
+  await admin.getByRole('button', { name: 'Umfrage anlegen' }).click();
+  await expect(admin.locator('.topbar-title')).toHaveText('Umfragen');
+  const form = admin.locator('.poll-form');
+  await form.getByLabel('Frage', { exact: true }).fill(title);
+  await form.getByLabel('Möglichkeit 1').fill('Samstag');
+  await form.getByLabel('Möglichkeit 2').fill('Sonntag');
+  await expect(form.getByLabel('Namentlich')).toBeChecked();
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(admin.locator('.toast')).toHaveText('Umfrage veröffentlicht');
+  await expect(admin.locator('.poll-managed', { hasText: title })).toBeVisible();
+
+  // Mitglied: Die Umfrage steht im Banner; „Teilnehmen“ öffnet sie.
+  await login(page, 'mitglied1');
+  const banner = page.locator('.board-banner');
+  const entry = banner.locator('.board-entry-poll', { hasText: title });
+  await expect(entry).toBeVisible();
+  await entry.getByRole('button', { name: 'Teilnehmen' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Umfragen');
+  const card = page.locator('.poll-card');
+  await expect(card.locator('.poll-title')).toHaveText(title);
+  // Vor dem Antworten: namentlich oder anonym und wann die Ergebnisse sichtbar werden.
+  await expect(card.locator('.poll-privacy')).toContainText('Namentlich');
+  await expect(card.locator('.poll-privacy')).toContainText('sobald du geantwortet hast');
+  await expect(card.locator('.poll-results')).toHaveCount(0);
+
+  await card.getByRole('radio', { name: 'Samstag' }).check();
+  await card.getByRole('button', { name: 'Antwort senden' }).click();
+  await expect(page.locator('.toast')).toHaveText('Antwort gespeichert');
+  const results = card.locator('.poll-results');
+  await expect(results.locator('.poll-bar', { hasText: 'Samstag' })).toContainText('1 · 100 %');
+  await expect(results.locator('.poll-bar', { hasText: 'Samstag' })).toContainText('Mitglied1');
+  await expect(results.locator('.poll-bar', { hasText: 'Sonntag' })).toContainText('0 · 0 %');
+  await shot(page, '34-umfrage');
+
+  // Beantwortet: nicht mehr im Banner, am Brett als „beantwortet“.
+  await page.goto('/app/#/termine');
+  await expect(page.locator('.topbar-title')).toHaveText('Termine');
+  await expect(page.locator('.board-entry-poll', { hasText: title })).toHaveCount(0);
+  await page.goto('/app/#/brett');
+  const onBoard = page.locator('.board-poll-card', { hasText: title });
+  await expect(onBoard).toContainText('beantwortet');
+
+  // Antwort ändern: Summen stimmen.
+  await onBoard.getByRole('button', { name: 'Antwort ansehen' }).click();
+  await card.getByRole('radio', { name: 'Sonntag' }).check();
+  await card.getByRole('button', { name: 'Antwort ändern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Antwort geändert');
+  await expect(results.locator('.poll-bar', { hasText: 'Sonntag' })).toContainText('1 · 100 %');
+  await expect(results.locator('.poll-bar', { hasText: 'Samstag' })).toContainText('0 · 0 %');
+
+  // Admin beendet die Umfrage vorzeitig.
+  await admin.reload();
+  const managed = admin.locator('.poll-managed', { hasText: title });
+  await expect(managed.locator('.poll-bar', { hasText: 'Sonntag' })).toContainText('1 · 100 %');
+  await managed.getByRole('button', { name: 'Beenden' }).click();
+  await expect(admin.locator('.toast')).toHaveText('Umfrage beendet');
+
+  // Danach keine Änderung mehr möglich; das Ergebnis bleibt sichtbar.
+  await page.reload();
+  await expect(card.locator('.poll-closed-note')).toContainText('Die Umfrage ist beendet');
+  await expect(card.getByRole('button', { name: 'Antwort ändern' })).toHaveCount(0);
+  await expect(card.getByRole('radio', { name: 'Samstag' })).toBeDisabled();
+  await expect(results.locator('.poll-bar', { hasText: 'Sonntag' })).toContainText('1 · 100 %');
+  // Beendete Umfragen findet man über das Brett.
+  await page.goto('/app/#/brett');
+  await expect(page.locator('.board-poll-card', { hasText: title })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Beendete Umfragen' }).click();
+  await expect(page.locator('.poll-list-item', { hasText: title })).toContainText('beantwortet');
+
+  // Aufräumen
+  await admin.locator('.poll-managed', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(admin.locator('.toast')).toHaveText('Umfrage gelöscht');
   await admin.close();
 });
 

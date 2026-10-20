@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
  * Alle eigenen Daten einer Person löschen (Issue #24, Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit
- * Verlauf, Titel, Push-Abos samt Warteschlange. Was sie für andere eingetragen hat (created_by, updated_by), bleibt.
+ * Verlauf, Titel, Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen (namentliche über user_id, anonyme
+ * über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt). Was sie für andere eingetragen hat (created_by,
+ * updated_by), bleibt.
  * Ohne App: WordPress-Multisite löscht damit auch in den Tabellen anderer Seiten des Netzwerks.
  */
 final class UserData
@@ -21,11 +24,21 @@ final class UserData
         'member_ranks' => 'user_id',
         'member_titles' => 'user_id',
         'attendance_entries' => 'user_id',
+        'poll_votes' => 'user_id',
+        'poll_answers' => 'user_id',
     ];
 
-    public static function purge(Connection $db, int $userId): void
+    /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */
+    public static function purge(Connection $db, int $userId, ?string $pollSecret = null): void
     {
         $ok = true;
+        if ($pollSecret !== null) {
+            try {
+                $db->execute('DELETE FROM {poll_answers} WHERE vote_ref = ?', [PollService::pseudonym($pollSecret, $userId)]);
+            } catch (\RuntimeException) {
+                $ok = false;
+            }
+        }
         try {
             $db->execute('DELETE FROM {push_queue} WHERE subscription_id IN (SELECT id FROM {push_subscriptions} WHERE user_id = ?)', [$userId]);
             $db->execute('DELETE FROM {push_subscriptions} WHERE user_id = ?', [$userId]);

@@ -30,6 +30,8 @@ enum Capability: string
     case ManageDocuments = 'manage_documents';
     /** Dringende Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen (Bereich Schwarzes Brett, Issue #5). */
     case PostBoard = 'post_board';
+    /** Umfragen anlegen, ändern, beenden und löschen, Ergebnisse immer sehen (Bereich Umfragen, Issue #4). */
+    case ManagePolls = 'manage_polls';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */

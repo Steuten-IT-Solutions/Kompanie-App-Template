@@ -16,6 +16,7 @@ export type Capability =
   | 'manage_events'
   | 'manage_documents'
   | 'post_board'
+  | 'manage_polls'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
@@ -30,7 +31,8 @@ export type Feature =
   | 'titles'
   | 'attendance'
   | 'documents'
-  | 'board';
+  | 'board'
+  | 'polls';
 
 export interface AppUser {
   id: number;
@@ -317,11 +319,8 @@ export interface Rank {
   badge_push?: boolean;
 }
 
-/**
- * Eintrag am Schwarzen Brett (Issue #5). kind: heute nur „message“; später können weitere Arten dazukommen (z. B.
- * laufende Umfragen), die App überspringt unbekannte.
- */
-export interface BoardItem {
+/** Nachricht am Schwarzen Brett (Issue #5). */
+export interface BoardMessage {
   kind: 'message';
   id: number;
   /** Reiner Text mit Zeilenumbrüchen, nie HTML */
@@ -332,6 +331,66 @@ export interface BoardItem {
   updated_at: string;
   /** Genau 24 Stunden nach created_at; danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+}
+
+/** Laufende Umfrage am Schwarzen Brett (Issue #4), nur für Mitglieder. */
+export interface BoardPoll {
+  kind: 'poll';
+  id: number;
+  title: string;
+  type: PollType;
+  ends_at: string | null;
+  /** wie ends_at; null = läuft, bis sie beendet wird */
+  expires_at: string | null;
+  has_voted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Eintrag am Schwarzen Brett; unbekannte Arten überspringt die App. */
+export type BoardItem = BoardMessage | BoardPoll;
+
+export type PollType = 'single' | 'multiple' | 'text';
+export type PollResults = 'after_vote' | 'after_end' | 'managers';
+
+/** Umfrage (Issue #4); Ergebnisse nur, soweit sie für dieses Konto sichtbar sind. */
+export interface Poll {
+  id: number;
+  title: string;
+  description: string;
+  type: PollType;
+  anonymous: boolean;
+  results: PollResults;
+  status: 'running' | 'ended';
+  ends_at: string | null;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_name: string | null;
+  options: { id: number; title: string }[];
+  /** Es gibt Antworten: Art, Möglichkeiten, Anonymität und Sichtbarkeit sind fest */
+  locked: boolean;
+  has_voted: boolean;
+  my_answer: { option_ids: number[]; text: string | null } | null;
+  results_visible: boolean;
+  results_data: PollResultData | null;
+}
+
+export interface PollResultData {
+  voters: number;
+  options?: { id: number; title: string; count: number; percent: number; names?: string[] }[];
+  texts?: { text: string; name?: string }[];
+}
+
+export interface PollInput {
+  title?: string;
+  description?: string;
+  type?: PollType;
+  options?: string[];
+  anonymous?: boolean;
+  results?: PollResults;
+  /** „JJJJ-MM-TTTHH:MM“ in der Zeitzone der Kompanie; leer = ohne Ende */
+  ends_at?: string | null;
 }
 
 export type DocVisibility = 'members' | 'managers';
@@ -727,8 +786,16 @@ export const api = {
 
   // Schwarzes Brett (Issue #5)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
-  postBoard: (text: string) => request<BoardItem>('POST', '/board', { text }),
-  updateBoard: (id: number, text: string) => request<BoardItem>('PATCH', `/board/${id}`, { text }),
+  postBoard: (text: string) => request<BoardMessage>('POST', '/board', { text }),
+  updateBoard: (id: number, text: string) => request<BoardMessage>('PATCH', `/board/${id}`, { text }),
+  polls: () => request<Poll[]>('GET', '/polls'),
+  poll: (id: number) => request<Poll>('GET', `/polls/${id}`),
+  createPoll: (data: PollInput) => request<Poll>('POST', '/polls', data),
+  updatePoll: (id: number, data: PollInput) => request<Poll>('PATCH', `/polls/${id}`, data),
+  closePoll: (id: number) => request<Poll>('POST', `/polls/${id}/close`, {}),
+  deletePoll: (id: number) => request<{ deleted: boolean }>('DELETE', `/polls/${id}`),
+  vote: (id: number, answer: { option_ids?: number[]; text?: string }) => request<Poll>('PUT', `/polls/${id}/vote`, answer),
+  withdrawVote: (id: number) => request<Poll>('DELETE', `/polls/${id}/vote`),
   deleteBoard: (id: number) => request<{ deleted: boolean }>('DELETE', `/board/${id}`),
 
   // Anwesenheit (Issue #21)
@@ -828,7 +895,7 @@ export const api = {
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
 
-export type PushType = 'board' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
+export type PushType = 'board' | 'polls' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {

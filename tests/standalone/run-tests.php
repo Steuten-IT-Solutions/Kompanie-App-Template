@@ -248,6 +248,17 @@ try {
         usleep(100000);
     }
     $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpsa abgelaufen']) === 0, 'Cron löscht abgelaufene Nachrichten am Brett');
+    // Umfragen (Issue #4): Der Cron führt die Erinnerung aus (bald endende Umfrage wird einmal als erinnert vermerkt).
+    $pollTask = \KompanieApp\Core\Domain\PollService::TASK;
+    $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {tasks} WHERE name = ?', [$pollTask]) === 1, 'Umfragen: Erinnerung eingeplant');
+    $pollId = $kdb->insert('polls', ['title' => 'Kpsa Umfrage', 'description' => '', 'type' => 'text', 'anonymous' => 0, 'results' => 'after_vote', 'ends_at' => gmdate('Y-m-d H:i:s', time() + 3600), 'closed_at' => null, 'reminded_at' => null, 'created_by' => 1, 'created_at' => $past(60), 'updated_at' => $past(60)]);
+    $kdb->execute('UPDATE {tasks} SET next_run = ? WHERE name = ?', [time() - 1, $pollTask]);
+    $kdb->execute('DELETE FROM {settings} WHERE name = ?', [KompanieApp\Standalone\PseudoScheduler::NEXT_SETTING]);
+    $d->send('GET', $kernel->cronUrl(), [], null);
+    for ($i = 0; $i < 50 && $kdb->scalar('SELECT reminded_at FROM {polls} WHERE id = ?', [$pollId]) === null; $i++) {
+        usleep(100000);
+    }
+    $c->ok($kdb->scalar('SELECT reminded_at FROM {polls} WHERE id = ?', [$pollId]) !== null, 'Cron erinnert an bald endende Umfragen');
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 404, 'Unbekanntes Foto → 404');
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');

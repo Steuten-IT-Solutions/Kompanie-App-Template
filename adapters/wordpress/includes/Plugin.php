@@ -6,6 +6,7 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Storage\UserData;
 
@@ -20,7 +21,9 @@ final class Plugin
     {
         try {
             global $wpdb;
-            UserData::purge(new WpdbConnection($wpdb, $wpdb->get_blog_prefix($blogId) . 'kompanie_'), $userId);
+            // Geheimnis der Umfragen dieser Seite: Damit lassen sich auch anonyme Antworten der Person löschen.
+            $secret = get_blog_option($blogId, WpSettings::PREFIX . PollService::SECRET_SETTING);
+            UserData::purge(new WpdbConnection($wpdb, $wpdb->get_blog_prefix($blogId) . 'kompanie_'), $userId, is_string($secret) && $secret !== '' ? $secret : null);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Daten des Kontos nicht entfernt: ' . $e->getMessage());
         }

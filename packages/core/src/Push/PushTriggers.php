@@ -19,7 +19,9 @@ use KompanieApp\Core\Domain\RankService;
  * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
  * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied;
  * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, dringend und
- *   höchstens bis zum Ablauf der Nachricht zustellbar; Ändern löst nichts aus.
+ *   höchstens bis zum Ablauf der Nachricht zustellbar; Ändern löst nichts aus;
+ * - neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem Ende an
+ *   alle Mitglieder ohne Antwort (einmal je Umfrage, Aufgabe poll_reminders).
  */
 final class PushTriggers
 {
@@ -74,6 +76,54 @@ final class PushTriggers
         $ttl = $expires - $this->app->time()->timestamp();
         $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
         return $this->push->notifyBoard(PushService::message($title, $item['text'], 'brett', 'brett-' . $item['id']), $authorId, $ttl);
+    }
+
+    /**
+     * Neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; zustellbar höchstens bis zum Ende.
+     *
+     * @param array{id: int, title: string, ends_at: string|null} $poll
+     */
+    public function pollCreated(array $poll, int $creatorId): int
+    {
+        $title = $this->app->config->sectionLabel('polls', 'Umfragen') . ': neue Umfrage';
+        $body = $poll['title'] . ($poll['ends_at'] !== null ? ' (bis ' . $this->pollEnd($poll['ends_at']) . ')' : '');
+        return $this->push->notifyAudience(
+            PushService::TYPE_POLLS,
+            PushService::message($title, $body, 'umfragen/' . $poll['id'], 'umfrage-' . $poll['id']),
+            static fn (int $uid): bool => $uid !== $creatorId,
+            'normal',
+            $this->ttlUntil($poll['ends_at']),
+        );
+    }
+
+    /**
+     * Erinnerung 24 Stunden vor dem Ende (PollService::remind): an alle Mitglieder, die noch nicht teilgenommen haben.
+     *
+     * @param array{id: int, title: string, ends_at: string|null} $poll
+     * @param list<int> $voters
+     */
+    public function pollReminder(array $poll, array $voters): int
+    {
+        $voted = array_flip($voters);
+        $title = $this->app->config->sectionLabel('polls', 'Umfragen') . ': endet bald';
+        $body = $poll['title'] . ($poll['ends_at'] !== null ? ' – noch bis ' . $this->pollEnd($poll['ends_at']) : '') . '. Du hast noch nicht teilgenommen.';
+        return $this->push->notifyAudience(
+            PushService::TYPE_POLLS,
+            PushService::message($title, $body, 'umfragen/' . $poll['id'], 'umfrage-' . $poll['id']),
+            static fn (int $uid): bool => !isset($voted[$uid]),
+            'normal',
+            $this->ttlUntil($poll['ends_at']),
+        );
+    }
+
+    private function ttlUntil(?string $iso): int
+    {
+        return $iso === null ? PushService::TTL : (int) strtotime($iso) - $this->app->time()->timestamp();
+    }
+
+    private function pollEnd(string $iso): string
+    {
+        return $this->app->time()->format((int) strtotime($iso), 'd.m.Y, H:i') . ' Uhr';
     }
 
     /** @param array<int, array<string, mixed>> $rows Strafen (ScoreService::givePenalty) */

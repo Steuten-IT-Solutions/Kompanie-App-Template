@@ -505,6 +505,98 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {board_messages}_expires_at ON {board_messages} (expires_at)',
                 ],
             ],
+            // Umfragen (Issue #4): eine Frage je Umfrage. poll_votes hält fest, wer teilgenommen hat (für has_voted und die
+            // Erinnerung); poll_answers die Antworten, je Teilnahme unter einem Pseudonym (vote_ref, HMAC der Benutzer-ID mit
+            // dem Geheimnis der Installation). user_id nur bei namentlichen Umfragen, sonst NULL; keine Zeitstempel und keine
+            // laufende Nummer, damit sich anonyme Antworten nicht über die Reihenfolge zuordnen lassen. option_id 0 = Freitext.
+            11 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {polls} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(191) NOT NULL,
+  description text NOT NULL,
+  type varchar(10) NOT NULL,
+  anonymous tinyint(1) NOT NULL DEFAULT 0,
+  results varchar(12) NOT NULL,
+  ends_at datetime DEFAULT NULL,
+  closed_at datetime DEFAULT NULL,
+  reminded_at datetime DEFAULT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY ends_at (ends_at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {poll_options} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  poll_id bigint(20) unsigned NOT NULL,
+  title varchar(191) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY poll_id (poll_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {poll_votes} (
+  poll_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  voted_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (poll_id, user_id),
+  KEY user_id (user_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {poll_answers} (
+  poll_id bigint(20) unsigned NOT NULL,
+  vote_ref varchar(64) NOT NULL,
+  user_id bigint(20) unsigned DEFAULT NULL,
+  option_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  answer_text text NOT NULL,
+  PRIMARY KEY (poll_id, vote_ref, option_id),
+  KEY user_id (user_id),
+  KEY vote_ref (vote_ref)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {polls} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  type TEXT NOT NULL,
+  anonymous INTEGER NOT NULL DEFAULT 0,
+  results TEXT NOT NULL,
+  ends_at TEXT DEFAULT NULL,
+  closed_at TEXT DEFAULT NULL,
+  reminded_at TEXT DEFAULT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {polls}_ends_at ON {polls} (ends_at)',
+                    'CREATE TABLE IF NOT EXISTS {poll_options} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  poll_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE INDEX IF NOT EXISTS {poll_options}_poll_id ON {poll_options} (poll_id)',
+                    'CREATE TABLE IF NOT EXISTS {poll_votes} (
+  poll_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  voted_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (poll_id, user_id)
+)',
+                    'CREATE INDEX IF NOT EXISTS {poll_votes}_user_id ON {poll_votes} (user_id)',
+                    'CREATE TABLE IF NOT EXISTS {poll_answers} (
+  poll_id INTEGER NOT NULL,
+  vote_ref TEXT NOT NULL,
+  user_id INTEGER DEFAULT NULL,
+  option_id INTEGER NOT NULL DEFAULT 0,
+  answer_text TEXT NOT NULL,
+  PRIMARY KEY (poll_id, vote_ref, option_id)
+) WITHOUT ROWID',
+                    'CREATE INDEX IF NOT EXISTS {poll_answers}_user_id ON {poll_answers} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {poll_answers}_vote_ref ON {poll_answers} (vote_ref)',
+                ],
+            ],
         ];
     }
 
