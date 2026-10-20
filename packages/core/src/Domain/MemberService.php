@@ -59,6 +59,8 @@ final class MemberService
                 'id' => $u->id,
                 'name' => $u->name,
                 'level' => $u->role,
+                // Mit Mitgliederbereich (Punkte und Strafen möglich); sonst nur Kalender oder Gast.
+                'member' => $u->isMember(),
                 'points' => $points ? ($totals[$u->id]['points'] ?? 0) : null,
                 'open_cents' => $penalties ? ($totals[$u->id]['open_cents'] ?? 0) : null,
             ];
@@ -78,6 +80,7 @@ final class MemberService
             'id' => $u->id,
             'name' => $u->name,
             'level' => $u->role,
+            'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
             'point_list' => $points ? $this->scores->pointsFor($u->id) : [],

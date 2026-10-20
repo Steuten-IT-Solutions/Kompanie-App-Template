@@ -117,9 +117,7 @@ function Members() {
               <div className="row-title">
                 {m.name}{' '}
                 {m.level !== 'member' && (
-                  <span className={`badge ${m.level === 'guest' || m.level === 'candidate' ? 'badge-level-guest' : 'badge-role'}`}>
-                    {caps(levelLabel(m.level))}
-                  </span>
+                  <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
                 )}
               </div>
               <div className="row-sub">
@@ -188,7 +186,7 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
           <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
         )}
       </div>
-      {m.level !== 'guest' && m.level !== 'candidate' && (
+      {m.member && (
         <div className="button-row">
           {canPoints() && (
             <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>

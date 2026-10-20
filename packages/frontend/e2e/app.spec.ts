@@ -149,10 +149,12 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
 });
 
 test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis er aufgenommen ist', async ({ page }) => {
+  // Eindeutiger Name: Bei WordPress bleiben Konten früherer Läufe bestehen.
+  const name = `Anna Anwärterin ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
-  await page.getByPlaceholder('Vorname Nachname').fill('Anna Anwärterin');
+  await page.getByPlaceholder('Vorname Nachname').fill(name);
   await page.getByLabel('Rolle').selectOption('candidate');
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
   const username = (await page.getByTestId('new-username').textContent())!.trim();
@@ -166,10 +168,10 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await expect(page.getByLabel('Auch Anwärter anzeigen')).toBeChecked();
-  await page.locator('.row', { hasText: 'Anna Anwärterin' }).click();
+  await page.locator('.row', { hasText: name }).click();
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();
-  await expect(page.locator('.toast')).toHaveText('Anna Anwärterin ist jetzt Mitglied');
+  await expect(page.locator('.toast')).toHaveText(`${name} ist jetzt Mitglied`);
   await expect(page.getByRole('button', { name: 'Als Mitglied aufnehmen' })).toHaveCount(0);
 
   await login(page, username, password);

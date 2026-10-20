@@ -626,7 +626,7 @@ paths:
           schema: { type: string, enum: ['1'] }
         - name: candidates
           in: query
-          description: Auch Anwärter (Rolle `candidate`).
+          description: Auch Anwärter (Rolle `candidate`) und Personen mit eigenen Rollen nur mit dem internen Kalender.
           schema: { type: string, enum: ['1'] }
       responses:
         '200':
@@ -719,8 +719,8 @@ paths:
       description: |
         Neu gegenüber der ersten Umsetzung. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
-        werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern und Mitgliedern, deren Rechte er selbst
-        hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
+        werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern (auch eigenen Rollen nur mit dem Kalender)
+        und Mitgliedern, deren Rechte er selbst hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
       x-capability: create_users
       responses:
         '200':
@@ -1820,6 +1820,7 @@ components:
         id: { type: integer }
         name: { type: string }
         level: { $ref: '#/components/schemas/Level' }
+        member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
 

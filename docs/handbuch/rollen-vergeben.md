@@ -14,4 +14,4 @@ Unter **Verwaltung → Mitglieder** die Person öffnen und unter **Rolle in der 
 - Wer kein {rolle.admin} ist, vergibt nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
 
 ## Gäste und {rolle.candidate}
-Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit **Auch Gast-Konten anzeigen** erscheinen sie, und du kannst ihnen eine Rolle geben. {rolle.candidate} (nur interner Kalender) erscheinen mit **Auch {rolle.candidate} anzeigen**.
+Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit **Auch Gast-Konten anzeigen** erscheinen sie, und du kannst ihnen eine Rolle geben. {rolle.candidate} und Personen mit Rollen nur für den internen Kalender erscheinen mit **Auch {rolle.candidate} anzeigen**.

@@ -124,6 +124,16 @@ final class RolesTest extends TestCase
         $app = TestApp::create(TestApp::connection(), settings: $settings, features: false);
         $labels = array_column($app->roles()->all(), 'label', 'key');
         $this->assertSame('Anwärter (fest)', $labels[Roles::CANDIDATE]);
+
+        // Auch „Anwärter (fest)“ vergeben, und Gast heißt „Anwärter“: ein freier Name, keine Dopplung.
+        $settings = new MemorySettings([RoleService::SETTING => [
+            ['key' => 'guest', 'label' => 'Anwärter', 'capabilities' => []],
+            ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member']],
+            ['key' => 'r1', 'label' => 'Anwärter (fest)', 'capabilities' => ['member']],
+            ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
+        ]]);
+        $labels = array_column(TestApp::create(TestApp::connection(), settings: $settings, features: false)->roles()->all(), 'label', 'key');
+        $this->assertSame('Anwärter (fest 2)', $labels[Roles::CANDIDATE]);
         // Rechte der eigenen Rolle lassen sich weiter ändern, auch mit unverändertem Namen.
         $app->roles()->update('r1', ['label' => 'Anwärter', 'capabilities' => ['calendar']]);
         $this->assertSame([Capability::Calendar], $app->roles()->capabilities('r1'));

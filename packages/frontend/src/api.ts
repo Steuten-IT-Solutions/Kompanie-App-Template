@@ -241,6 +241,8 @@ export interface MemberSummary {
   id: number;
   name: string;
   level: Level;
+  /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
+  member: boolean;
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;

@@ -392,10 +392,12 @@ final class RoleService
             if (!isset($out[$key])) {
                 // Neu hinzugekommene feste Rolle (z. B. Anwärter nach dem Update): Heißt schon eine eigene Rolle so,
                 // bekommt die feste einen anderen Namen; doppelte Namen ließen sich sonst nicht mehr speichern.
-                $label = $this->config->roleLabel($key);
-                $taken = array_map(static fn (array $r): string => mb_strtolower($r['label']), $out);
-                if (in_array(mb_strtolower($label), $taken, true)) {
-                    $label = mb_substr($label, 0, self::LABEL_MAX - 7) . ' (fest)';
+                $base = $this->config->roleLabel($key);
+                $taken = array_map(static fn (array $r): string => mb_strtolower($r['label']), $fixed + $out);
+                $label = $base;
+                for ($n = 1; in_array(mb_strtolower($label), $taken, true); $n++) {
+                    $suffix = $n === 1 ? ' (fest)' : " (fest $n)";
+                    $label = rtrim(mb_substr($base, 0, self::LABEL_MAX - mb_strlen($suffix))) . $suffix;
                 }
                 $out[$key] = ['key' => $key, 'label' => $label, 'capabilities' => $caps, 'points_factor' => 1.0];
             }
