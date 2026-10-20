@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, can, config, levelLabel, roleFactor, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
 import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
+import { AdminNav, adminTabs, memberListAllowed } from '../adminNav';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
 import { RankLabel } from '../RankBadge';
@@ -22,8 +23,6 @@ const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
-const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
-const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
@@ -31,43 +30,19 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
 
-  const points = canPoints();
-  const penalties = canPenalties();
-  const tabs = (
-    [
-      { id: 'mitglieder', label: 'Mitglieder', on: true },
-      { id: 'punkte', label: `${sec.points} +`, on: points },
-      { id: 'strafe', label: `${sec.penalties} +`, on: penalties },
-      { id: 'katalog', label: `${sec.points}katalog`, on: points },
-      { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
-      { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && ranksUsePoints() },
-      { id: 'titel', label: sec.titles, on: canTitles() },
-      { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
-    ] as { id: Sub; label: string; on: boolean }[]
-  ).filter((t) => t.on);
-  const active: Sub = tabs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
-  // Die Reiterleiste wischt seitlich: den aktiven Reiter sichtbar halten.
-  const navRef = useRef<HTMLElement>(null);
+  const subs = adminTabs().filter((t) => !t.route);
+  const active: Sub = subs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
+  // Ohne Mitgliederliste (z. B. nur Schwarzes Brett): gleich den ersten Bereich öffnen.
+  const first = adminTabs()[0];
+  const redirect = !memberListAllowed() && !sub && first?.route ? first.route : null;
   useEffect(() => {
-    const nav = navRef.current;
-    const button = nav?.querySelector<HTMLElement>('button.active');
-    if (nav && button) nav.scrollLeft = Math.max(0, button.offsetLeft - (nav.clientWidth - button.offsetWidth) / 2);
-  }, [active]);
+    if (redirect) navigate(redirect);
+  }, [redirect]);
+  if (redirect) return null;
 
   return (
     <div>
-      <nav className="segmented" aria-label="Verwaltung" ref={navRef}>
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            className={active === t.id ? 'active' : ''}
-            onClick={() => navigate(`verwaltung/${t.id}`)}
-            aria-current={active === t.id ? 'page' : undefined}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <AdminNav active={active} />
       {sub === 'mitglied' && arg ? (
         <MemberDetailView id={Number(arg)} focus={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (

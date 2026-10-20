@@ -11,7 +11,7 @@ Eine neue Installation hat keine Bereiche. Wähle, was eure Kompanie nutzt: {ber
 Bereiche mit eigenen Aufgaben bringen beim Einschalten eine **Standardrolle** mit, z. B. „{bereich.points} verwalten“ (siehe [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder)).
 
 ## Google-Zugang
-{bereich.gallery} und ein privater Google Kalender lesen über einen gemeinsamen **Google-Zugang** (Abschnitt **Google-Zugang** in den Einstellungen, über {bereich.calendar} und {bereich.gallery}). Empfohlen ist **Speichern und mit Google verbinden** mit einem eigenen OAuth-Client; alternativ ein Dienstkonto mit JSON-Schlüssel. Schritt für Schritt: [Google einrichten](seite:admin-google).
+{bereich.gallery} und ein privater Google Kalender lesen über einen gemeinsamen **Google-Zugang** (Seite **Google-Zugang** in den Einstellungen). Empfohlen ist **Speichern und mit Google verbinden** mit einem eigenen OAuth-Client; alternativ ein Dienstkonto mit JSON-Schlüssel. Schritt für Schritt: [Google einrichten](seite:admin-google).
 
 ## {bereich.calendar}
 Für den Bereich {bereich.calendar} gibt es zwei Wege:

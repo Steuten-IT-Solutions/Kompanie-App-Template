@@ -4,7 +4,7 @@ reihenfolge: 66
 rechte: [manage_inventory]
 bereiche: [inventory]
 ---
-Im {bereich.inventory} steht, was die Kompanie besitzt, wie viel davon da ist und wo es liegt. Es sehen und pflegen nur alle mit der Rolle „{bereich.inventory} verwalten“ oder einer Rolle mit diesem Recht (und die Admins); andere {rolle.member} sehen es nicht. Du findest es unter **Mein Konto** → **{bereich.inventory} öffnen**.
+Im {bereich.inventory} steht, was die Kompanie besitzt, wie viel davon da ist und wo es liegt. Es sehen und pflegen nur alle mit der Rolle „{bereich.inventory} verwalten“ oder einer Rolle mit diesem Recht (und die Admins); andere {rolle.member} sehen es nicht. Du findest es unter **Verwaltung** → **{bereich.inventory}** (Reiter oben).
 
 ## Die Liste
 Die Liste ist **nach Material sortiert**, nicht nach Ort: Jede Zeile zeigt ein Material mit der **Summe über alle Orte**, z. B. „12 Stück“. Gleiche Bezeichnungen gehören zusammen, auch in anderer Groß- und Kleinschreibung. Verschiedene Einheiten werden nicht zusammengezählt, sondern nebeneinander angezeigt, z. B. „12 Stück · 3 kg“.

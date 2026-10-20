@@ -13,4 +13,4 @@ Neue Bilder bereitet die App beim ersten Abruf und im Hintergrund auf. Bei viele
 Im Mitglied die Rolle prüfen und unter **Einstellungen → Rollen**, welche Rechte sie hat. Rechte wirken nur in eingeschalteten Bereichen.
 
 ## Updates kommen nicht an
-Unter **Einstellungen → Updates** steht, was zuletzt passiert ist. Mit WordPress fragt der Server manchmal nach FTP-Zugangsdaten; die App erklärt dann den Ausweg.
+Unter **Einstellungen → Zustand und Updates** steht, was zuletzt passiert ist. Mit WordPress fragt der Server manchmal nach FTP-Zugangsdaten; die App erklärt dann den Ausweg.

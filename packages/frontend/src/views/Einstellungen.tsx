@@ -3,45 +3,89 @@ import { api, applyFeatures, refreshRoles, type AdminSettings, type Feature, typ
 import { ErrorBox, Loading, useAsync } from '../ui';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
+import { MaintenanceCard } from '../maintenance';
+import { navigate } from '../router';
+
+/** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
+const PAGES = [
+  { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
+  { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
+  { id: 'google', title: 'Google-Zugang', text: 'Verbindung zu Google für Galerie und Kalender.' },
+  { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
+  { id: 'galerie', title: 'Galerie', text: 'Fotoalben aus einem Ordner in Google Drive.' },
+  { id: 'news', title: 'Neuigkeiten', text: 'Woher die Neuigkeiten kommen.' },
+  { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
+  { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
+  { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
+  { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
+] as const;
 
 /**
- * Einstellungen für Admins (beide Varianten): Bereiche, Rollen, Zustand, Updates und Datensicherung, dann Google-Zugang,
- * Kalender, Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
- * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
+ * Einstellungen für Admins (beide Varianten): eine Übersicht, jede Gruppe auf einer eigenen Seite. Geheime Werte zeigt
+ * der Server nie an, nur ob sie gesetzt sind. Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort
+ * gibt es keine Seite dafür.
  */
-export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
-  // Nach dem Speichern von Kalender, Galerie oder News: „eingerichtet?“ der Bereiche neu laden.
-  const [setupSaved, setSetupSaved] = useState(0);
-  // Nach dem Schalten von Bereichen: Standardrollen neu laden.
-  const [featuresSaved, setFeaturesSaved] = useState(0);
+export default function Einstellungen({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
+  // Rückkehr von Google landet auf #/einstellungen?google=1: gleich zur Seite Google-Zugang (sie liest ?google=1).
+  const [fromGoogle] = useState(() => !path[0] && new URLSearchParams(window.location.search).has('google'));
+  useEffect(() => {
+    if (fromGoogle) window.location.replace('#/einstellungen/google');
+  }, [fromGoogle]);
+  const page = PAGES.find((p) => p.id === path[0]);
+  if (fromGoogle && !page) return <Loading />;
+  if (!page) return <Overview />;
   return (
     <div className="settings">
-      <Bereiche onToast={onToast} refresh={setupSaved} onSaved={() => setFeaturesSaved((n) => n + 1)} />
-      <Rollen onToast={onToast} refresh={featuresSaved} />
-      <Wartung onToast={onToast} />
-      <PushSettings onToast={onToast} />
-      <Verbindungen onToast={onToast} onSetupSaved={() => setSetupSaved((n) => n + 1)} />
+      <button type="button" className="btn btn-link back" onClick={() => navigate('einstellungen')}>
+        ‹ Einstellungen
+      </button>
+      {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
+      {page.id === 'rollen' && <Rollen onToast={onToast} />}
+      {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
+      {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
+      {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
+      {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
+      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
+        <Verbindung page={page.id} onToast={onToast} />
+      )}
     </div>
   );
 }
 
-function Verbindungen({ onToast, onSetupSaved }: { onToast: (msg: string) => void; onSetupSaved: () => void }) {
+/** Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat. */
+function Overview() {
+  const { data } = useAsync(() => api.settings(), []);
+  const pages = PAGES.filter((p) => p.id !== 'news' || !!data?.news);
+  return (
+    <ul className="card-list settings-overview">
+      {pages.map((p) => (
+        <li key={p.id}>
+          <button type="button" className="card row clickable settings-link" onClick={() => navigate(`einstellungen/${p.id}`)}>
+            <span className="row-main">
+              <span className="row-title">{p.title}</span>
+              <span className="row-sub">{p.text}</span>
+            </span>
+            <span className="settings-chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
+function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
-  const onSaved = (n: AdminSettings) => {
-    setData(n);
-    onSetupSaved();
-  };
-  return (
-    <>
-      <GoogleAccess settings={s} onSaved={onSaved} onToast={onToast} />
-      <Calendar settings={s} onSaved={onSaved} onToast={onToast} />
-      <Gallery settings={s} onSaved={onSaved} onToast={onToast} />
-      {s.news && <News settings={s} onSaved={onSaved} onToast={onToast} />}
-    </>
-  );
+  const props = { settings: s, onSaved: setData, onToast };
+  if (page === 'google') return <GoogleAccess {...props} />;
+  if (page === 'kalender') return <Calendar {...props} />;
+  if (page === 'galerie') return <Gallery {...props} />;
+  return s.news ? <News {...props} /> : null;
 }
 
 /** Benachrichtigungen: wie viele Geräte angemeldet sind und wann die Erinnerung an Termine am nächsten Tag kommt. */
@@ -103,9 +147,14 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
-/** Scrollt zum Abschnitt eines Bereichs (Kalender, Galerie, News), z. B. aus „noch nicht eingerichtet“. */
+/**
+ * Zum Abschnitt eines Bereichs (Kalender, Galerie, News, Google-Zugang), z. B. aus „noch nicht eingerichtet“: steht er
+ * auf derselben Seite (Einrichtungsassistent), dorthin scrollen, sonst seine Seite der Einstellungen öffnen.
+ */
 function scrollToSetup(setup: string) {
-  document.getElementById(`einstellungen-${setup}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const el = document.getElementById(`einstellungen-${setup}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  else navigate(`einstellungen/${setup}`);
 }
 
 /**
@@ -164,14 +213,14 @@ export function FeatureSwitches({
  * Einstellungen → Bereiche: Jeder Schalter speichert sofort; beim Ausschalten wird nachgefragt.
  * Jeder geladene Stand geht auch an die App (Tabs), z. B. wenn ein Bereich gerade eingerichtet wurde.
  */
-function Bereiche({ onToast, refresh, onSaved }: { onToast: (msg: string) => void; refresh: number; onSaved: () => void }) {
+function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(
     () =>
       api.features().then((list) => {
         applyFeatures(list);
         return list;
       }),
-    [refresh],
+    [],
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -194,7 +243,6 @@ function Bereiche({ onToast, refresh, onSaved }: { onToast: (msg: string) => voi
       setData(next);
       applyFeatures(next);
       await refreshRoles();
-      onSaved();
       onToast(on ? `${name} eingeschaltet` : `${name} ausgeschaltet`);
     } catch (err) {
       setSaveError((err as Error).message);
@@ -496,11 +544,7 @@ function googleAccessLabel(g: AdminSettings['google']): string {
 /** Verweis auf den Abschnitt Google-Zugang (in den Einstellungen und im Assistenten darüber). */
 function GoogleLink() {
   return (
-    <button
-      type="button"
-      className="btn btn-link btn-inline"
-      onClick={() => document.getElementById('einstellungen-google')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-    >
+    <button type="button" className="btn btn-link btn-inline" onClick={() => scrollToSetup('google')}>
       Google-Zugang
     </button>
   );

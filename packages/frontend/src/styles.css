@@ -85,10 +85,29 @@ select {
 .topbar-title {
   font-family: var(--font-head);
   font-weight: 700;
-  font-size: 1.35rem;
+  /* Lange Titel (z. B. „Einstellungen“) neben Hilfe und Konto: auf schmalen Handys kleiner, notfalls mit „…“ */
+  font-size: clamp(1rem, 4.4vw, 1.35rem);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 430px) {
+  .topbar {
+    gap: 10px;
+  }
+  .topbar-title {
+    letter-spacing: 0.03em;
+  }
+  .topbar .topbar-help {
+    margin-right: 0;
+  }
+  .topbar .topbar-account {
+    padding: 6px 11px;
+    letter-spacing: 0.06em;
+  }
 }
 .topbar-sub {
   font-size: 0.82rem;
@@ -764,7 +783,8 @@ select {
   padding: 16px;
   margin-bottom: 16px;
 }
-.form.card h3 {
+.form.card h3,
+.settings-section h3 {
   margin: 0;
   font-family: var(--font-head);
   font-weight: 600;
@@ -1201,6 +1221,18 @@ code {
   object-fit: cover;
   display: block;
 }
+/* Kleines Schloss auf internen Bildern (nur für Mitglieder) */
+.photo-lock {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  font-size: 0.5rem;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-ink) 65%, transparent);
+  pointer-events: none;
+}
 .lightbox {
   position: fixed;
   inset: 0;
@@ -1209,12 +1241,17 @@ code {
   display: flex;
   align-items: center;
   justify-content: center;
-  touch-action: pan-y;
+  /* Wischen und Zoomen mit zwei Fingern übernimmt die App (nicht der Browser für die ganze Seite) */
+  touch-action: none;
 }
 .lightbox img {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
   max-height: calc(86vh / var(--kompanie-zoom, 1));
   object-fit: contain;
+  transition: transform 0.15s ease-out;
+}
+.lightbox img.zoomed {
+  transition: none;
 }
 .lb-btn {
   position: absolute;
@@ -1451,6 +1488,29 @@ code {
   border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+/* Übersicht der Einstellungen: je Seite eine Zeile */
+.settings-link {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.settings-link .row-title,
+.settings-link .row-sub {
+  display: block;
+}
+.settings-chevron {
+  font-size: 1.4rem;
+  color: var(--accent-text);
+}
+/* Kacheln der Einstellungen: Innenabstand und Abstand untereinander (auch ohne .form) */
+.settings-section {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+section.settings-section > h3 {
+  margin-bottom: 12px;
 }
 .settings-section details {
   margin: 12px 0;
