@@ -184,7 +184,15 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Tabellen `titles` (`title`, `sort`, `active`) und `member_titles` (mehrere je Benutzer). Wie in Lank (`wp_mkl_titles`, Meta `mkl_title_id`), damit die Lanker Daten übernommen werden können.
 - Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren; deaktivierte werden nicht neu vergeben, bleiben aber bei ihren Trägern. Neu verliehene Titel lösen eine Benachrichtigung (Art `titles`) aus.
 - Die Mitgliederliste holt alle Titel in zwei Abfragen (`TitleService::byUser`).
-- Wird ein Konto gelöscht (WordPress `deleted_user`), entfernt `App::userDeleted` seine Push-Abos und seine Zuweisungen (Dienstgrad, Titel); Buchungen und Verläufe bleiben.
+- Wird ein Konto gelöscht (WordPress `deleted_user`), entfernt `App::userDeleted` seine Push-Abos und seine Zuweisungen (Dienstgrad, Titel) und Anwesenheitseinträge; Buchungen und Verläufe bleiben.
+
+### Anwesenheit (Issue #21)
+
+- Bereich `attendance`, Recht `manage_attendance`. Tabellen `attendance_lists` (`source` calendar|free, `event_key`, `title` und `event_date` als Momentaufnahme, eindeutig je `source`+`event_key`) und `attendance_entries` (`status` present|excused|absent, `updated_by`); `points.attendance_id`. Wie in Lank (`wp_mkl_attendance_lists`, `wp_mkl_attendance`, `wp_mkl_points.attendance_id`; Status dort deutsch).
+- In jeder Liste stehen alle mit einer Rolle (ohne Gäste). Punkte und Strafen nur für Mitglieder; sie werden über die üblichen Formulare gebucht (`POST /points` mit `attendance_id` bucht nur für, wer für die Liste noch keine Punkte hat).
+- Der Kalender lädt dafür auch die letzten 90 Tage (`CalendarService::PAST_DAYS`); `/calendar` und die Benachrichtigungen sehen weiter nur anstehende Termine.
+- Zähler nach Gruppen: Einstellung `attendance_groups` (Rolle → Rolle, als die sie zählt; keine Ketten). Ohne Einstellung zählen Rollen mit Mitgliederbereich als Mitglied.
+- Feste Zahl von Abfragen je Liste, unabhängig von der Zahl der Personen (gemessen im Test mit 40 Personen).
 
 ### Rechte und Rollen
 
@@ -196,6 +204,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_penalties` | Strafen vergeben, als bezahlt markieren, stornieren |
 | `manage_ranks` | Dienstgradliste pflegen, befördern und degradieren |
 | `manage_titles` | Titelliste pflegen und Titel vergeben |
+| `manage_attendance` | Anwesenheitslisten je Termin führen |
 | `manage_events` | öffentliche Termine pflegen |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (die Dokumente selbst kommen mit #2) |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
@@ -222,6 +231,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Strafen | Strafen verwalten | `member`, `manage_penalties` |
   | Dienstgrade | Dienstgrade verwalten | `member`, `manage_ranks` |
   | Titel | Titel verwalten | `member`, `manage_titles` |
+  | Anwesenheit | Anwesenheit verwalten | `member`, `manage_attendance` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.

@@ -43,11 +43,12 @@ final class PointRepository
 
     /**
      * @param array<int, float> $factors Benutzer-ID => Punktefaktor
+     * @param int|null $attendanceId Liste, aus deren Vorschlag gebucht wird (Issue #21)
      * @return int[] IDs der neuen Einträge
      */
-    public function add(array $factors, int $points, string $reason, ?int $catalogId, string $date, int $by, string $now): array
+    public function add(array $factors, int $points, string $reason, ?int $catalogId, string $date, int $by, string $now, ?int $attendanceId = null): array
     {
-        return $this->db->transaction(function () use ($factors, $points, $reason, $catalogId, $date, $by, $now): array {
+        return $this->db->transaction(function () use ($factors, $points, $reason, $catalogId, $date, $by, $now, $attendanceId): array {
             $ids = [];
             foreach ($factors as $userId => $factor) {
                 $ids[] = $this->db->insert('points', [
@@ -59,6 +60,7 @@ final class PointRepository
                     'entry_date' => $date,
                     'created_by' => $by,
                     'created_at' => $now,
+                    'attendance_id' => $attendanceId,
                 ]);
             }
             return $ids;

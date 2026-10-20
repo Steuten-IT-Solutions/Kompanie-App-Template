@@ -3,6 +3,7 @@ import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
+import MeineAnwesenheit from './MeineAnwesenheit';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 import { TitleBadges } from './TitelVerwalten';
@@ -18,6 +19,7 @@ export default function Meins({ sub }: { sub?: string }) {
       ['punkte', brand.labels.sections.points, config?.features.points],
       ['strafen', brand.labels.sections.penalties, config?.features.penalties],
       ['dienstgrad', brand.labels.rank, config?.features.ranks],
+      ['anwesenheit', brand.labels.sections.attendance, config?.features.attendance],
     ] as const
   ).filter(([, , on]) => on);
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
@@ -54,6 +56,8 @@ export default function Meins({ sub }: { sub?: string }) {
         <Strafen me={me.data!} />
       ) : active === 'dienstgrad' ? (
         <Dienstgrad />
+      ) : active === 'anwesenheit' ? (
+        <MeineAnwesenheit />
       ) : null}
     </div>
   );

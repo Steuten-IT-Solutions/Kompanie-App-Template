@@ -47,7 +47,23 @@ final class CalendarTest extends TestCase
     {
         $clock = new FixedClock(new \DateTimeImmutable('2026-03-01 12:00:00', new \DateTimeZone('Europe/Berlin')));
         $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], null, null, null, $clock);
-        return $app->calendar()->parseIcs("BEGIN:VCALENDAR\r\n" . $events . "END:VCALENDAR\r\n");
+        // Wie die Terminansicht (CalendarService::upcoming): ab gestern. Der Kalender lädt zusätzlich die letzten
+        // Wochen für Anwesenheitslisten (siehe testPastWeeksForAttendance).
+        $from = $clock->now()->getTimestamp() - 86400;
+        return array_values(array_filter(
+            $app->calendar()->parseIcs("BEGIN:VCALENDAR\r\n" . $events . "END:VCALENDAR\r\n"),
+            static fn (array $e): bool => strtotime($e['end']) >= $from,
+        ));
+    }
+
+    public function testPastWeeksForAttendance(): void
+    {
+        $clock = new FixedClock(new \DateTimeImmutable('2026-03-01 12:00:00', new \DateTimeZone('Europe/Berlin')));
+        $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], null, null, null, $clock);
+        $events = $app->calendar()->parseIcs("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:w\r\nDTSTART:20260105T180000Z\r\nDTEND:20260105T200000Z\r\nRRULE:FREQ=WEEKLY\r\nSUMMARY:Probe\r\nEND:VEVENT\r\n"
+            . "BEGIN:VEVENT\r\nUID:alt\r\nDTSTART:20251101T180000Z\r\nSUMMARY:Zu alt\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n");
+        $this->assertSame('2026-01-05', substr($events[0]['start'], 0, 10), 'die letzten 90 Tage');
+        $this->assertNotContains('Zu alt', array_column($events, 'title'));
     }
 
     public function testValarmDoesNotOverwriteEvent(): void

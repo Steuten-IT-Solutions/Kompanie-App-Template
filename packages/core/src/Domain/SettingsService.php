@@ -151,7 +151,7 @@ final class SettingsService
     {
         $cal = $this->app->calendar();
         $cal->clearCache();
-        $events = $cal->events();
+        $events = $cal->upcoming();
         return [
             'count' => count($events),
             'sample' => array_map(static fn (array $e): array => ['start' => $e['start'], 'title' => $e['title']], array_slice($events, 0, 5)),

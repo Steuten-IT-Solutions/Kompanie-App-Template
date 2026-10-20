@@ -185,7 +185,7 @@ export default function App() {
     termine: !!(features?.events || (features?.calendar && can('calendar'))),
     news: !!features?.news,
     galerie: !!features?.gallery,
-    meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles),
+    meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
     // Die Verwaltung beginnt mit der Mitgliederliste: für alle, die Punkte oder Strafen vergeben,
     // Mitglieder anlegen oder Rollen vergeben (auch wenn Punkte und Strafen aus sind).
     verwaltung:
@@ -193,6 +193,7 @@ export default function App() {
       (!!features?.penalties && can('manage_penalties')) ||
       (!!features?.ranks && can('manage_ranks')) ||
       (!!features?.titles && can('manage_titles')) ||
+      (!!features?.attendance && can('manage_attendance')) ||
       can('create_users') ||
       can('promote_users'),
     konto: !!user,

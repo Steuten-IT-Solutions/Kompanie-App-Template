@@ -13,6 +13,7 @@ const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
   { key: 'manage_ranks', label: `${sec.ranks} pflegen, befördern und degradieren` },
   { key: 'manage_titles', label: `${sec.titles} pflegen und vergeben` },
+  { key: 'manage_attendance', label: `${sec.attendance}: Listen je Termin führen` },
   { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
   { key: 'manage_documents', label: 'Dokumente pflegen und alle Dokumente sehen' },
   { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
@@ -88,7 +89,77 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
           + Neue Rolle
         </button>
       )}
+      {config?.features.attendance && <AttendanceGroups roles={roles} onToast={onToast} />}
     </section>
+  );
+}
+
+/**
+ * Einstellungen → Rollen → Anwesenheit: Gruppen im Zähler (Issue #21). Jede Rolle zählt als eigene Gruppe oder als
+ * eine andere Rolle; Ketten gibt es nicht.
+ */
+function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.attendanceGroups(), [roles]);
+  const [draft, setDraft] = useState<Record<string, string> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const groups = data!;
+  const current = draft ?? Object.fromEntries(groups.map((g) => [g.key, g.counts_as ?? '']));
+  // Ziele: nur Rollen, die selbst als eigene Gruppe zählen.
+  const targets = groups.filter((g) => (current[g.key] ?? '') === '');
+  const changed = draft !== null && groups.some((g) => (draft[g.key] ?? '') !== (g.counts_as ?? ''));
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setFormError(null);
+    try {
+      setData(await api.setAttendanceGroups(Object.fromEntries(Object.entries(current).map(([k, v]) => [k, v === '' ? null : v]))));
+      setDraft(null);
+      onToast('Gruppen gespeichert');
+    } catch (err) {
+      setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="form attendance-group-form" onSubmit={save}>
+      <h4>{sec.attendance}: Gruppen im Zähler</h4>
+      <p className="small muted">
+        Als was zählt jede Rolle in den Listen? „Eigene Gruppe“ zeigt sie gesondert, sonst zählt sie bei der gewählten Rolle mit.
+      </p>
+      {groups.map((g) => (
+        <label key={g.key} className="field field-inline">
+          <span>{g.label}</span>
+          <select value={current[g.key] ?? ''} disabled={busy} onChange={(e) => setDraft({ ...current, [g.key]: e.target.value })}>
+            <option value="">Eigene Gruppe</option>
+            {targets
+              .filter((t) => t.key !== g.key)
+              .map((t) => (
+                <option key={t.key} value={t.key}>
+                  zählt als {t.label}
+                </option>
+              ))}
+            {current[g.key] && !targets.some((t) => t.key === current[g.key]) && (
+              <option value={current[g.key]}>zählt als {groups.find((x) => x.key === current[g.key])?.label}</option>
+            )}
+          </select>
+        </label>
+      ))}
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
+      <button className="btn btn-secondary btn-block" type="submit" disabled={busy || !changed}>
+        Gruppen speichern
+      </button>
+    </form>
   );
 }
 

@@ -122,6 +122,31 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Error' }
 
+  /me/attendance:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene Anwesenheit (jüngste Termine zuerst) mit Summen
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        list_id: { type: integer }
+                        title: { type: string }
+                        date: { type: string, format: date }
+                        status: { $ref: '#/components/schemas/AttendanceStatus' }
+                  counts: { $ref: '#/components/schemas/AttendanceCounts' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /me/points:
     get:
       tags: [Eigene Daten]
@@ -728,6 +753,145 @@ paths:
                         name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
 
+  /attendance:
+    get:
+      tags: [Verwaltung]
+      summary: Die letzten 50 Anwesenheitslisten (Issue #21)
+      x-capability: manage_attendance
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AttendanceSummary' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Verwaltung]
+      summary: Liste anlegen oder ändern und Status setzen
+      description: |
+        Mit `id` eine vorhandene Liste (bei freien Listen auch Titel und Datum). Ohne `id` neu: `source: calendar` mit
+        `event_key` (gibt es schon eine Liste zu diesem Termin, wird sie genommen, 200) oder `source: free` mit `title` und
+        `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
+        nur Personen mit einer Rolle (keine Gäste).
+      x-capability: manage_attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: integer }
+                source: { type: string, enum: [calendar, free] }
+                event_key: { type: string }
+                title: { type: string, maxLength: 191 }
+                date: { type: string, format: date }
+                entries:
+                  type: object
+                  description: Benutzer-ID → Status
+                  additionalProperties:
+                    oneOf:
+                      - $ref: '#/components/schemas/AttendanceStatus'
+                      - type: 'null'
+      responses:
+        '200':
+          description: Geändert bzw. vorhandene Liste
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttendanceDetail' }
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttendanceDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /attendance/events:
+    get:
+      tags: [Verwaltung]
+      summary: Termine aus dem internen Kalender der letzten 90 Tage bis heute (jüngste zuerst)
+      description: Ohne Bereich Kalender bzw. ohne eingerichteten Kalender eine leere Liste.
+      x-capability: manage_attendance
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { type: string }
+                    title: { type: string }
+                    date: { type: string, format: date }
+                    start: { type: string }
+                    end: { type: string }
+                    all_day: { type: boolean }
+                    list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+
+  /attendance/groups:
+    get:
+      tags: [Einstellungen]
+      summary: Gruppen im Zähler je Rolle (ohne Gast)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/AttendanceGroups' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Gruppen im Zähler ändern
+      description: |
+        Je Rolle null (eigene Gruppe) oder die Rolle, als die sie zählt. Ziele müssen selbst als eigene Gruppe zählen
+        (keine Ketten, sonst 400). Nicht genannte Rollen bleiben, wie sie sind. Ohne Einstellung zählen Rollen mit
+        Mitgliederbereich als Mitglied, die übrigen als eigene Gruppe.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [groups]
+              properties:
+                groups:
+                  type: object
+                  additionalProperties: { type: [string, 'null'] }
+      responses:
+        '200': { $ref: '#/components/responses/AttendanceGroups' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /attendance/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Verwaltung]
+      summary: Liste mit allen Personen, Status, gebuchten Punkten und Zählern
+      x-capability: manage_attendance
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttendanceDetail' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Liste löschen (gebuchte Punkte bleiben)
+      x-capability: manage_attendance
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /titles:
     get:
       tags: [Verwaltung]
@@ -1100,6 +1264,7 @@ paths:
                 catalog_id: { type: integer }
                 reason: { type: string, description: 'Ohne Angabe: Titel des Katalogeintrags.' }
                 date: { type: string, format: date }
+                attendance_id: { type: integer, description: 'Aus dem Vorschlag einer Anwesenheitsliste (Issue #21): bucht nur für, wer für diese Liste noch keine Punkte hat; sonst 400' }
                 apply_factor:
                   type: boolean
                   default: true
@@ -1746,6 +1911,18 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    AttendanceGroups:
+      description: Je Rolle (ohne Gast), als welche sie im Zähler zählt
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                key: { type: string }
+                label: { type: string }
+                counts_as: { type: [string, 'null'], description: null = eigene Gruppe }
     Deleted:
       description: OK
       content:
@@ -1785,7 +1962,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -1869,7 +2046,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_events, manage_documents, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
             system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
@@ -1881,7 +2058,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_events, manage_documents, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
@@ -1897,7 +2074,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_events, manage_documents, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte; member bringt calendar mit.'
 
     UpdateStatus:
@@ -1984,6 +2161,7 @@ components:
             penalties: { type: boolean }
             ranks: { type: boolean }
             titles: { type: boolean }
+            attendance: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -2018,6 +2196,7 @@ components:
         factor: { type: number, description: Punktefaktor der Rolle beim Buchen }
         reason: { type: string }
         catalog_id: { type: [integer, 'null'] }
+        attendance_id: { type: [integer, 'null'], description: 'Anwesenheitsliste, aus deren Vorschlag gebucht wurde (Issue #21)' }
         date: { type: string, format: date }
         created_by_name: { type: [string, 'null'] }
 
@@ -2196,6 +2375,63 @@ components:
         sort: { type: integer, description: Reihenfolge der Anzeige }
         active: { type: boolean, description: 'Deaktivierte werden nicht mehr neu vergeben; wer sie hat, behält sie' }
         assigned: { type: integer, description: Wie vielen Mitgliedern zugewiesen }
+
+    AttendanceStatus:
+      type: string
+      enum: [present, excused, absent]
+      description: anwesend, entschuldigt, fehlt
+
+    AttendanceCounts:
+      type: object
+      properties:
+        present: { type: integer }
+        excused: { type: integer }
+        absent: { type: integer }
+
+    AttendanceSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        source: { type: string, enum: [calendar, free] }
+        title: { type: string, description: Momentaufnahme beim Anlegen }
+        date: { type: string, format: date }
+        counts: { $ref: '#/components/schemas/AttendanceCounts' }
+
+    AttendanceDetail:
+      allOf:
+        - $ref: '#/components/schemas/AttendanceSummary'
+        - type: object
+          properties:
+            event_key: { type: [string, 'null'], description: ID des Kalendertermins (nur source calendar) }
+            updated_by_name: { type: [string, 'null'] }
+            updated_at: { type: string }
+            people:
+              type: array
+              description: Alle mit einer Rolle (ohne Gäste), nach Namen
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  role: { $ref: '#/components/schemas/Level' }
+                  group: { type: string, description: Rolle, als die die Person im Zähler zählt }
+                  member: { type: boolean, description: 'Mit Mitgliederbereich: Punkte und Strafen möglich' }
+                  status:
+                    oneOf:
+                      - $ref: '#/components/schemas/AttendanceStatus'
+                      - type: 'null'
+                  booked: { type: boolean, description: Hat für diese Liste schon Punkte (ohne stornierte) }
+            counts_by_group:
+              type: object
+              description: Je Status die Gruppen in der Reihenfolge der Rollen
+              additionalProperties:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    group: { type: string }
+                    label: { type: string }
+                    count: { type: integer }
 
     TitleRef:
       type: object

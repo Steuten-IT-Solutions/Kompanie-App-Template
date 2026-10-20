@@ -58,7 +58,9 @@ final class ScoreService
      * Der Punktefaktor kommt aus der Rolle der Person (Issue #28) und wird mit dem Eintrag gespeichert.
      * apply_factor = false bucht für alle mit Faktor 1 (die Leitung kann den Faktor so übergehen).
      *
-     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor
+     * attendance_id: die Anwesenheitsliste, aus deren Vorschlag gebucht wird (geprüft von AttendanceService::forBooking).
+     *
+     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor, attendance_id
      * @return array<int, array<string, mixed>>
      */
     public function givePoints(array $in, int $by): array
@@ -91,7 +93,8 @@ final class ScoreService
             throw ApiError::invalid('Bitte einen Grund angeben.');
         }
 
-        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc());
+        $attendanceId = Input::integer($in['attendance_id'] ?? null) ?: null;
+        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc(), $attendanceId);
         return array_map(fn (int $id): array => $this->formatPoints((array) $this->points->find($id)), $ids);
     }
 
@@ -291,6 +294,7 @@ final class ScoreService
             'factor' => (float) ($r['factor'] ?? 1),
             'reason' => (string) $r['reason'],
             'catalog_id' => $r['catalog_id'] ? (int) $r['catalog_id'] : null,
+            'attendance_id' => ($r['attendance_id'] ?? null) ? (int) $r['attendance_id'] : null,
             'date' => (string) $r['entry_date'],
             'created_by_name' => $this->names->name((int) $r['created_by']),
         ];

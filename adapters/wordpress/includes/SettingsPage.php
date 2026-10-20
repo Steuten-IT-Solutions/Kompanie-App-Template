@@ -193,7 +193,7 @@ final class SettingsPage
     {
         $app->calendar()->clearCache();
         try {
-            $events = $app->calendar()->events();
+            $events = $app->calendar()->upcoming();
             echo '<div class="notice notice-success inline"><p>' . esc_html(sprintf('%d Termine gefunden.', count($events))) . '</p><ul>';
             foreach (array_slice($events, 0, 5) as $ev) {
                 echo '<li>' . esc_html($ev['start'] . ' – ' . $ev['title']) . '</li>';

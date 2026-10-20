@@ -244,6 +244,7 @@ final class Api
             // Dienstgrade (Issue #9): eigener Stand und Verlauf, die Liste mit Schwellen (mit Punkten)
             new Route('GET', '/me/rank', Cap::Member, fn () => $a->ranks()->status($this->user()->id)
                 + ['ranks' => $a->ranks()->list(false), 'history' => $a->ranks()->history($this->user()->id)], 'ranks', $denyMember),
+            new Route('GET', '/me/attendance', Cap::Member, fn () => $a->attendance()->mine($this->user()->id), 'attendance', $denyMember),
             new Route('GET', '/me/points', Cap::Member, fn () => $a->scores()->pointsFor($this->user()->id), 'points', $denyMember),
             new Route('GET', '/me/penalties', Cap::Member, fn () => $a->scores()->penaltiesFor($this->user()->id), 'penalties', $denyMember),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
@@ -272,7 +273,7 @@ final class Api
                 $a->push()->sendTest($a->push()->own(null, $r->input('endpoint'), $r->input('auth')));
                 return ['sent' => true];
             }),
-            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->calendar()->events(), 'calendar', $denyCalendar),
+            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->calendar()->upcoming(), 'calendar', $denyCalendar),
 
             // Öffentliche Termine
             new Route('GET', '/events', $P, fn () => $a->events()->upcoming(), 'events'),
@@ -333,6 +334,21 @@ final class Api
                 return ['deleted' => true];
             }, 'titles', $denyRights),
             new Route('PUT', '/members/{id}/titles', Cap::ManageTitles, fn (Request $r) => ['titles' => $a->titles()->assign($r->id(), $r->input('title_ids'))], 'titles', $denyRights),
+
+            // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
+            new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
+            new Route('PUT', '/attendance', Cap::ManageAttendance, function (Request $r) use ($a) {
+                [$list, $created] = $a->attendance()->save($this->user(), $r->body);
+                return $created ? Response::created($list) : $list;
+            }, 'attendance', $denyRights),
+            new Route('GET', '/attendance/events', Cap::ManageAttendance, fn () => $a->attendance()->events(), 'attendance', $denyRights),
+            new Route('GET', '/attendance/groups', Cap::ManageSettings, fn () => $a->attendance()->groups(), 'attendance', $denySettings),
+            new Route('PUT', '/attendance/groups', Cap::ManageSettings, fn (Request $r) => $a->attendance()->setGroups($r->input('groups')), 'attendance', $denySettings),
+            new Route('GET', '/attendance/{id}', Cap::ManageAttendance, fn (Request $r) => $a->attendance()->detail($r->id()), 'attendance', $denyRights),
+            new Route('DELETE', '/attendance/{id}', Cap::ManageAttendance, function (Request $r) use ($a) {
+                $a->attendance()->delete($r->id());
+                return ['deleted' => true];
+            }, 'attendance', $denyRights),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {
@@ -471,7 +487,12 @@ final class Api
 
             // Punkte und Strafen
             new Route('POST', '/points', Cap::ManagePoints, function (Request $r) use ($a) {
-                $rows = $a->scores()->givePoints($r->body, $this->user()->id);
+                $body = $r->body;
+                // Aus dem Vorschlag einer Anwesenheitsliste: nur, wer für diese Liste noch keine Punkte hat.
+                if (($body['attendance_id'] ?? null) !== null && $body['attendance_id'] !== '') {
+                    [$body['attendance_id'], $body['user_ids']] = $a->attendance()->forBooking($body['attendance_id'], $body['user_ids'] ?? null);
+                }
+                $rows = $a->scores()->givePoints($body, $this->user()->id);
                 $this->notify(static fn () => $a->pushTriggers()->pointsAdded($rows));
                 return Response::created($rows);
             }, 'points', $denyManage),

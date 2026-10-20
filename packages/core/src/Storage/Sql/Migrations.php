@@ -355,6 +355,66 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {member_titles}_title_id ON {member_titles} (title_id)',
                 ],
             ],
+            // Anwesenheit (Issue #21): Listen je Termin (aus dem Kalender oder frei) mit Titel und Datum als
+            // Momentaufnahme, Status je Person, Punkte aus dem Vorschlag mit der ID der Liste.
+            7 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {attendance_lists} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  source varchar(10) NOT NULL,
+  event_key varchar(64) NOT NULL,
+  title varchar(191) NOT NULL,
+  event_date date NOT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY event (source, event_key),
+  KEY event_date (event_date)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {attendance_entries} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  list_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  status varchar(15) NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY list_user (list_id, user_id),
+  KEY user_id (user_id)
+) {options}',
+                    // Eine Anweisung: wird übersprungen, wenn die Spalte schon da ist (wiederholbar).
+                    'ALTER TABLE {points} ADD COLUMN attendance_id bigint(20) unsigned DEFAULT NULL, ADD KEY attendance_id (attendance_id)',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {attendance_lists} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL,
+  event_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  event_date TEXT NOT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {attendance_lists}_event ON {attendance_lists} (source, event_key)',
+                    'CREATE INDEX IF NOT EXISTS {attendance_lists}_event_date ON {attendance_lists} (event_date)',
+                    'CREATE TABLE IF NOT EXISTS {attendance_entries} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {attendance_entries}_list_user ON {attendance_entries} (list_id, user_id)',
+                    'CREATE INDEX IF NOT EXISTS {attendance_entries}_user_id ON {attendance_entries} (user_id)',
+                    'ALTER TABLE {points} ADD COLUMN attendance_id INTEGER DEFAULT NULL',
+                    'CREATE INDEX IF NOT EXISTS {points}_attendance_id ON {points} (attendance_id)',
+                ],
+            ],
         ];
     }
 

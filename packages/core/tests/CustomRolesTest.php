@@ -43,10 +43,10 @@ final class CustomRolesTest extends TestCase
     {
         // Feste Rollen und die Standardrollen der eingeschalteten Bereiche (TestApp schaltet alle ein).
         $roles = $this->call('GET', '/admin/roles')->data;
-        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'events', 'points', 'penalties', 'ranks', 'titles', Roles::ADMIN], array_column($roles, 'key'));
-        $this->assertSame(['Gast', 'Anwärter', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Admin'], array_column($roles, 'label'));
-        $this->assertSame(1, $roles[8]['users'], 'ein Admin');
-        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[2]['system'] && $roles[8]['system']);
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'events', 'points', 'penalties', 'ranks', 'titles', 'attendance', Roles::ADMIN], array_column($roles, 'key'));
+        $this->assertSame(['Gast', 'Anwärter', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Admin'], array_column($roles, 'label'));
+        $this->assertSame(1, $roles[9]['users'], 'ein Admin');
+        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[2]['system'] && $roles[9]['system']);
         $this->assertFalse($roles[2]['deletable'], 'Mitglied ist die Rolle neuer Konten');
         $this->assertSame(['calendar'], $roles[1]['capabilities'], 'Anwärter: nur der interne Kalender');
         $this->assertSame(['member'], $roles[2]['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt angezeigt');

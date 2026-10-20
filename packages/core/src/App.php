@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core;
 
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
@@ -281,7 +282,7 @@ final class App
     }
 
     /**
-     * Ein Konto wurde gelöscht: Push-Abos und Zuweisungen (Dienstgrad, Titel) entfernen. Buchungen und Verläufe
+     * Ein Konto wurde gelöscht: Push-Abos, Zuweisungen (Dienstgrad, Titel) und Anwesenheitseinträge entfernen. Buchungen und Verläufe
      * bleiben als Geschichte erhalten. Verwaiste Zuweisungen würden sonst das Löschen eines Dienstgrads bzw. Titels
      * blockieren.
      */
@@ -290,6 +291,7 @@ final class App
         $this->push()->deleteForUser($userId);
         $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
         $this->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
+        $this->db->execute('DELETE FROM {attendance_entries} WHERE user_id = ?', [$userId]);
     }
 
     public function pushTriggers(): PushTriggers
@@ -344,6 +346,11 @@ final class App
     public function ranks(): RankService
     {
         return $this->service(RankService::class, fn () => new RankService($this));
+    }
+
+    public function attendance(): AttendanceService
+    {
+        return $this->service(AttendanceService::class, fn () => new AttendanceService($this));
     }
 
     public function titles(): TitleService

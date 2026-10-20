@@ -12,12 +12,13 @@ export type Capability =
   | 'manage_penalties'
   | 'manage_ranks'
   | 'manage_titles'
+  | 'manage_attendance'
   | 'manage_events'
   | 'manage_documents'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
-export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks' | 'titles';
+export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks' | 'titles' | 'attendance';
 
 export interface AppUser {
   id: number;
@@ -277,6 +278,68 @@ export interface Rank {
   assigned?: number;
 }
 
+export type AttendanceStatus = 'present' | 'excused' | 'absent';
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'anwesend', excused: 'entschuldigt', absent: 'fehlt' };
+export type AttendanceCounts = Record<AttendanceStatus, number>;
+
+export interface AttendanceSummary {
+  id: number;
+  source: 'calendar' | 'free';
+  title: string;
+  date: string;
+  counts: AttendanceCounts;
+}
+
+/** Termin aus dem internen Kalender zur Auswahl (letzte Wochen bis heute) */
+export interface AttendanceEvent {
+  key: string;
+  title: string;
+  date: string;
+  start: string;
+  end: string;
+  all_day: boolean;
+  list_id: number | null;
+}
+
+export interface AttendancePerson {
+  id: number;
+  name: string;
+  role: Level;
+  /** Rolle, als die die Person im Zähler zählt */
+  group: Level;
+  /** Mit Mitgliederbereich: Punkte und Strafen möglich */
+  member: boolean;
+  status: AttendanceStatus | null;
+  /** Hat für diese Liste schon Punkte */
+  booked: boolean;
+}
+
+export interface AttendanceDetail extends AttendanceSummary {
+  event_key: string | null;
+  updated_by_name: string | null;
+  updated_at: string;
+  people: AttendancePerson[];
+  counts_by_group: Record<AttendanceStatus, { group: Level; label: string; count: number }[]>;
+}
+
+export type AttendanceInput = (
+  | { id: number; title?: string; date?: string }
+  | { source: 'calendar'; event_key: string }
+  | { source: 'free'; title: string; date: string }
+) & { entries?: Record<number, AttendanceStatus | null> };
+
+export interface MyAttendance {
+  entries: { list_id: number; title: string; date: string; status: AttendanceStatus }[];
+  counts: AttendanceCounts;
+}
+
+export interface AttendanceGroup {
+  key: Level;
+  label: string;
+  /** null: eigene Gruppe */
+  counts_as: Level | null;
+}
+
 export interface Title {
   id: number;
   title: string;
@@ -504,6 +567,16 @@ export const api = {
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   myRank: () => request<RankStatus & { ranks: Rank[]; history: RankHistoryEntry[] }>('GET', '/me/rank'),
 
+  // Anwesenheit (Issue #21)
+  attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),
+  attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
+  attendance: (id: number) => request<AttendanceDetail>('GET', `/attendance/${id}`),
+  saveAttendance: (data: AttendanceInput) => request<AttendanceDetail>('PUT', '/attendance', data),
+  deleteAttendance: (id: number) => request<{ deleted: boolean }>('DELETE', `/attendance/${id}`),
+  myAttendance: () => request<MyAttendance>('GET', '/me/attendance'),
+  attendanceGroups: () => request<AttendanceGroup[]>('GET', '/attendance/groups'),
+  setAttendanceGroups: (groups: Record<string, string | null>) => request<AttendanceGroup[]>('PUT', '/attendance/groups', { groups }),
+
   // Titel (Issue #22)
   titles: () => request<Title[]>('GET', '/titles'),
   createTitle: (title: string) => request<Title>('POST', '/titles', { title }),
@@ -524,6 +597,8 @@ export const api = {
     reason?: string;
     date?: string;
     apply_factor?: boolean;
+    /** Aus dem Vorschlag einer Anwesenheitsliste: bucht nur für, wer dafür noch keine Punkte hat. */
+    attendance_id?: number;
   }) => request<PointEntry[]>('POST', '/points', data),
   deletePoints: (id: number) => request<{ deleted: boolean }>('DELETE', `/points/${id}`),
 

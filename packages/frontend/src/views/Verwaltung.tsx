@@ -4,11 +4,12 @@ import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
+import Anwesenheit from './Anwesenheit';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { PenaltyRow } from './Strafen';
 import { MemberTitles, TitleBadges, TitleList } from './TitelVerwalten';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel';
+type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
 const sec = brand.labels.sections;
 
@@ -17,10 +18,13 @@ const canPoints = (): boolean => !!config?.features.points && can('manage_points
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
+const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
+  // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
+  const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
 
   const points = canPoints();
   const penalties = canPenalties();
@@ -33,6 +37,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
       { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && ranksUsePoints() },
       { id: 'titel', label: sec.titles, on: canTitles() },
+      { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
     ] as { id: Sub; label: string; on: boolean }[]
   ).filter((t) => t.on);
   const active: Sub = tabs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
@@ -55,6 +60,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <MemberDetailView id={Number(arg)} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
+      ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
+        <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
         <GivePoints key={path.join('/')} preselect={preselect} onToast={onToast} />
       ) : active === 'strafe' ? (
@@ -67,6 +74,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Promotions />
       ) : active === 'titel' ? (
         <TitleList onToast={onToast} />
+      ) : active === 'anwesenheit' ? (
+        <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : (
         <Members />
       )}
@@ -596,13 +605,52 @@ function useMembersAndCatalog() {
   return useAsync(() => Promise.all([api.members(), api.catalog()]));
 }
 
-function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg: string) => void }) {
+/** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
+function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
+  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId]);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const list = data!;
+  const back = () => navigate(`verwaltung/anwesenheit/${list.id}`);
+  const ids = list.people
+    .filter((p) => p.member && (kind === 'punkte' ? p.status === 'present' && !p.booked : p.status === 'absent'))
+    .map((p) => p.id);
+  return (
+    <div>
+      <button className="btn btn-link back" onClick={back}>
+        ‹ {list.title}
+      </button>
+      <p className="muted small">
+        {kind === 'punkte'
+          ? `Vorschlag: alle Anwesenden, die für „${list.title}“ noch keine ${sec.points} haben.`
+          : `Vorschlag: alle, die bei „${list.title}“ gefehlt haben. Anders als bei ${sec.points} merkt sich die Liste nicht, wer schon einen Eintrag hat.`}
+      </p>
+      {kind === 'punkte' ? (
+        <GivePoints preselect={ids} attendance={list} onToast={onToast} onDone={back} />
+      ) : (
+        <GivePenalty preselect={ids} attendance={list} onToast={onToast} onDone={back} />
+      )}
+    </div>
+  );
+}
+
+function GivePoints({
+  preselect,
+  attendance,
+  onToast,
+  onDone,
+}: {
+  preselect: number[];
+  attendance?: { id: number; title: string; date: string };
+  onToast: (msg: string) => void;
+  onDone?: () => void;
+}) {
   const { data, error, loading, reload } = useMembersAndCatalog();
   const [selected, setSelected] = useState<number[]>(preselect);
   const [catalogId, setCatalogId] = useState<string>('');
   const [points, setPoints] = useState('');
-  const [reason, setReason] = useState('');
-  const [date, setDate] = useState(todayYmd());
+  const [reason, setReason] = useState(attendance?.title ?? '');
+  const [date, setDate] = useState(attendance?.date ?? todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [applyFactor, setApplyFactor] = useState(true);
@@ -622,7 +670,7 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
     const item = catalog.find((c) => String(c.id) === id);
     if (item) {
       setPoints(String(item.points));
-      setReason(item.title);
+      setReason(attendance ? `${item.title}: ${attendance.title}` : item.title);
     }
   }
 
@@ -635,16 +683,19 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
     if (!reason.trim()) return setFormError('Bitte einen Grund angeben.');
     setBusy(true);
     try {
-      await api.givePoints({
+      const rows = await api.givePoints({
         user_ids: selected,
         points: n,
         reason: reason.trim(),
         date,
         apply_factor: applyFactor,
         ...(catalogId ? { catalog_id: Number(catalogId) } : {}),
+        ...(attendance ? { attendance_id: attendance.id } : {}),
       });
-      onToast(`${formatPoints(n)} ${sec.points} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
+      // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
+      onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
       setSelected([]);
+      onDone?.();
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -711,12 +762,22 @@ function GivePoints({ preselect, onToast }: { preselect: number[]; onToast: (msg
   );
 }
 
-function GivePenalty({ preselect, onToast }: { preselect: number[]; onToast: (msg: string) => void }) {
+function GivePenalty({
+  preselect,
+  attendance,
+  onToast,
+  onDone,
+}: {
+  preselect: number[];
+  attendance?: { title: string; date: string };
+  onToast: (msg: string) => void;
+  onDone?: () => void;
+}) {
   const { data, error, loading, reload } = useAsync(api.members);
   const [selected, setSelected] = useState<number[]>(preselect);
   const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState('');
-  const [date, setDate] = useState(todayYmd());
+  const [reason, setReason] = useState(attendance ? `Gefehlt: ${attendance.title}` : '');
+  const [date, setDate] = useState(attendance?.date ?? todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -738,6 +799,7 @@ function GivePenalty({ preselect, onToast }: { preselect: number[]; onToast: (ms
       setSelected([]);
       setAmount('');
       setReason('');
+      onDone?.();
     } catch (err) {
       setFormError((err as Error).message);
     } finally {

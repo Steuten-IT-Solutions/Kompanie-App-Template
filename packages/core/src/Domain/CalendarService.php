@@ -32,6 +32,8 @@ final class CalendarService
     public const TASK = 'calendar_refresh';
     /** So lange bleibt die letzte gute Fassung als Rückfall erhalten. */
     public const KEEP_SECONDS = 30 * 86400;
+    /** Wie weit zurück der Kalender Termine lädt (Anwesenheit nachtragen). */
+    public const PAST_DAYS = 90;
     /** So lange wird ein Fehler gemerkt (kein neuer Abruf). */
     public const ERROR_SECONDS = 60;
     /** Sperre gegen gleichzeitige Abrufe. */
@@ -166,11 +168,26 @@ final class CalendarService
         return $events;
     }
 
-    /** @return array{0: int, 1: int} Zeitraum: ab gestern bis ein Jahr in die Zukunft */
+    /**
+     * Termine ab gestern (für die Terminansicht).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function upcoming(): array
+    {
+        $from = $this->time->timestamp() - 86400;
+        return array_values(array_filter($this->events(), static fn (array $e): bool => (int) strtotime((string) $e['end']) >= $from));
+    }
+
+    /**
+     * Zeitraum: die letzten Wochen (für Anwesenheitslisten, Issue #21) bis ein Jahr in die Zukunft.
+     *
+     * @return array{0: int, 1: int}
+     */
     private function range(): array
     {
         $now = $this->time->timestamp();
-        return [$now - 86400, $now + 365 * 86400];
+        return [$now - self::PAST_DAYS * 86400, $now + 365 * 86400];
     }
 
     /** @return array<int, array<string, mixed>> */
