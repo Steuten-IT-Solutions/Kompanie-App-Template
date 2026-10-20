@@ -36,6 +36,9 @@ const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
 const NAVIGATION_TIMEOUT_MS = 2500;
 const DATA_MAX = 100;
+// Gespeichert wird je Adresse genau eine Antwort. Manche Hoster schicken „Vary: accept“ auf jeder Antwort; ohne
+// ignoreVary passte ein Eintrag nur zu einer Anfrage mit genau denselben Kopfzeilen (die App fragt mal mit, mal ohne).
+const MATCH = { ignoreVary: true };
 
 /**
  * Programmdateien dieses Builds vorab speichern. Dateien mit gleichem Namen (Hash) sind unverändert: aus dem Speicher
@@ -130,7 +133,7 @@ function documentId(url) {
 /** Dokumente: gespeicherte Fassung, sonst laden und ältere Fassungen desselben Dokuments ersetzen. */
 async function documentFirst(request, id) {
   const cache = await caches.open(DOCS_CACHE);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request, MATCH);
   if (cached) return cached;
   const res = await fetch(request);
   if (cacheable(res)) {
@@ -162,7 +165,7 @@ function badgeKey(url) {
 /** Abzeichen: gespeicherte Fassung, sonst laden und ältere Fassungen desselben Abzeichens (gleiche Größe) ersetzen. */
 async function badgeFirst(request, key) {
   const cache = await caches.open(BADGES_CACHE);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request, MATCH);
   if (cached) return cached;
   const res = await fetch(request);
   if (cacheable(res)) {
@@ -184,7 +187,7 @@ function isPage(res) {
 }
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request, MATCH);
   if (cached) return cached;
   const res = await fetch(request);
   if (cacheable(res)) {
@@ -221,7 +224,7 @@ async function networkFirst(request, fallbackUrl, timeoutMs, event) {
     }
     return res;
   });
-  const cached = caches.match(key);
+  const cached = caches.match(key, MATCH);
   if (timeoutMs) {
     const fallback = await cached;
     if (fallback) {
