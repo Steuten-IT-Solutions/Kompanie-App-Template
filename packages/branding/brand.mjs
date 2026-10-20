@@ -62,6 +62,7 @@ const DEFAULTS = {
     attendance: 'Anwesenheit',
     documents: 'Dokumente',
     board: 'Schwarzes Brett',
+    polls: 'Umfragen',
   },
   rank: 'Dienstgrad',
 };

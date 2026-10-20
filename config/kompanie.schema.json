@@ -171,6 +171,13 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "polls": {
+              "type": "string",
+              "default": "Umfragen",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },

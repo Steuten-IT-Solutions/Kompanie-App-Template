@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Push\PushService;
 
 /**
  * Die Bereiche (Funktionen) der App und ob sie eingeschaltet sind – die einzige Stelle, die das sagt.
@@ -43,6 +44,8 @@ final class Features
         'attendance' => ['label' => 'Anwesenheit', 'description' => 'Anwesenheitslisten je Termin; zusammen mit Punkten und Strafen gesammelt buchen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_attendance']],
         'documents' => ['label' => 'Dokumente', 'description' => 'Dateien wie Satzung, Protokolle und Formulare für Mitglieder, nach Kategorien, auch offline.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_documents']],
         'board' => ['label' => 'Schwarzes Brett', 'description' => 'Dringende Nachrichten für 24 Stunden oben auf jeder Seite, mit Benachrichtigung an alle Mitglieder und Anwärter.', 'requires' => [], 'setup' => null, 'role' => ['member', 'post_board']],
+        // Umfragen (Issue #4): Laufende Umfragen stehen am Schwarzen Brett, deshalb nur zusammen mit ihm.
+        'polls' => ['label' => 'Umfragen', 'description' => 'Umfragen mit einer Frage für Mitglieder, namentlich oder anonym; laufende stehen am Schwarzen Brett.', 'requires' => ['board'], 'setup' => null, 'role' => ['member', 'manage_polls']],
     ];
 
     /** @var array<string, bool>|null */
@@ -170,12 +173,15 @@ final class Features
                 $this->app->roles()->featureChanged($key, $on, $this->roleLabel($key), $caps);
             }
         }
-        // Schwarzes Brett (Issue #5): Beim ersten Einschalten bekommen bestehende Abos die neue Art dazu.
-        if ($next['board'] && !($before['board'] ?? false)) {
-            try {
-                $this->app->push()->offerBoardToExisting();
-            } catch (\Throwable $e) {
-                error_log('Kompanie-App: Benachrichtigungen für das Schwarze Brett nicht eingeschaltet: ' . $e->getMessage());
+        // Schwarzes Brett (Issue #5) und Umfragen (Issue #4): Beim ersten Einschalten bekommen bestehende Abos die neue
+        // Art dazu (einmalig je Art, siehe PushService::offerTypeToExisting).
+        foreach (['board' => PushService::TYPE_BOARD, 'polls' => PushService::TYPE_POLLS] as $feature => $type) {
+            if ($next[$feature] && !($before[$feature] ?? false)) {
+                try {
+                    $this->app->push()->offerTypeToExisting($type);
+                } catch (\Throwable $e) {
+                    error_log('Kompanie-App: Benachrichtigungen „' . $type . '“ nicht eingeschaltet: ' . $e->getMessage());
+                }
             }
         }
         return $next;
@@ -199,9 +205,9 @@ final class Features
         }
         $state = [];
         foreach (self::keys() as $key) {
-            // Dienstgrade, Titel, Anwesenheit, Dokumente und das Schwarze Brett gab es in den alten Versionen nicht: nie aus
-            // kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board'], true) && $this->app->config->legacyFeature($key);
+            // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett und Umfragen gab es in den alten Versionen
+            // nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }
