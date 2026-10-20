@@ -15,6 +15,8 @@ enum Capability: string
     case ManagePoints = 'manage_points';
     /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen). */
     case ManagePenalties = 'manage_penalties';
+    /** Dienstgradliste pflegen, befördern und degradieren (Bereich Dienstgrade, Issue #9). */
+    case ManageRanks = 'manage_ranks';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
     /**

@@ -38,6 +38,7 @@ final class Features
         'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive, mit internen Bildern nur für Mitglieder.', 'requires' => [], 'setup' => 'galerie', 'role' => null],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
+        'ranks' => ['label' => 'Dienstgrade', 'description' => 'Dienstgrade der Mitglieder mit Verlauf; zusammen mit Punkten mit Punkteschwellen und Beförderungsübersicht.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_ranks']],
     ];
 
     /** @var array<string, bool>|null */
@@ -75,6 +76,15 @@ final class Features
             }
         }
         return $this->state;
+    }
+
+    /**
+     * Arbeiten Dienstgrade mit Punkten zusammen (Schwellen, Beförderungsübersicht, „noch N Punkte bis …“)?
+     * Die einzige Stelle für diese Kopplung (Issue #9).
+     */
+    public function ranksUsePoints(): bool
+    {
+        return $this->enabled('ranks') && $this->enabled('points');
     }
 
     public function isStored(): bool
@@ -177,7 +187,8 @@ final class Features
         }
         $state = [];
         foreach (self::keys() as $key) {
-            $state[$key] = $existingInstallation && $this->app->config->legacyFeature($key);
+            // Dienstgrade gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && $key !== 'ranks' && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

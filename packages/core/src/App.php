@@ -11,6 +11,7 @@ use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\MemberService;
+use KompanieApp\Core\Domain\RankService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
@@ -325,6 +326,11 @@ final class App
             $this->time(),
             $this->roles(),
         ));
+    }
+
+    public function ranks(): RankService
+    {
+        return $this->service(RankService::class, fn () => new RankService($this));
     }
 
     public function members(): MemberService
