@@ -47,6 +47,17 @@ final class WpEnvironment implements Environment
         return $this->appUrl('sw.js');
     }
 
+    /**
+     * admin-post.php ohne Parameter (Google vergleicht die Adresse genau): Dort ist der Admin über das Anmelde-Cookie
+     * von WordPress angemeldet, anders als bei der REST-API, die ohne Nonce niemanden als angemeldet behandelt.
+     * Dieselbe Adresse wie in der früheren App einer Kompanie; ein übernommener OAuth-Client passt so weiter.
+     * Rückkehrer erkennt SettingsPage::googleCallback am state (DriveClient::STATE_PREFIX).
+     */
+    public function googleRedirectUri(): string
+    {
+        return admin_url('admin-post.php');
+    }
+
     public function siteUrl(): ?string
     {
         return home_url('/');

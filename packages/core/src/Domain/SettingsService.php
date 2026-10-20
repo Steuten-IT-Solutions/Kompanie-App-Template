@@ -10,9 +10,9 @@ use KompanieApp\Core\Infra\RemoteNewsSource;
 
 /**
  * Einstellungen, die Admins in der App pflegen (bei WordPress zusätzlich im WP-Admin):
- * Kalender, Galerie und – wo die App keine eigenen Beiträge hat – die Quelle der Neuigkeiten.
+ * Google-Zugang, Kalender, Galerie und – wo die App keine eigenen Beiträge hat – die Quelle der Neuigkeiten.
  *
- * Geheimnisse (geheime iCal-Adresse, API-Schlüssel, Dienstkonto) werden nie zurückgegeben,
+ * Geheimnisse (geheime iCal-Adresse, API-Schlüssel, Dienstkonto, Client-Secret, Refresh-Token) werden nie zurückgegeben,
  * nur ob sie gesetzt sind. Zum Ändern schickt man den neuen Wert, zum Löschen einen leeren Text.
  */
 final class SettingsService
@@ -26,7 +26,20 @@ final class SettingsService
     {
         $a = $this->app;
         $s = $a->settings;
+        $drive = $a->drive();
+        $client = $drive->oauthClient();
         $out = [
+            // Gemeinsamer Zugang für Galerie und Kalender: „Mit Google verbinden“ oder Dienstkonto
+            'google' => [
+                'redirect_uri' => $a->env->googleRedirectUri(),
+                'client_id' => $client['client_id'],
+                'client_secret_set' => $client['client_secret_set'],
+                'connected' => $drive->oauth() !== null,
+                'email' => $drive->oauthEmail(),
+                'calendar_access' => $drive->calendarAccess(),
+                'service_account_email' => $drive->clientEmail(),
+                'last_result' => $a->googleConnect()->lastResult(),
+            ],
             'calendar' => [
                 'source' => $a->calendar()->source(),
                 // Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen: neu verbinden.
@@ -39,10 +52,11 @@ final class SettingsService
             'gallery' => [
                 'configured' => $a->gallery()->isConfigured(),
                 'root' => $a->gallery()->root(),
-                'service_account_email' => $a->drive()->clientEmail(),
-                'oauth_connected' => $a->drive()->oauth() !== null,
-                'oauth_email' => $a->drive()->oauthEmail(),
-                'calendar_access' => $a->drive()->calendarAccess(),
+                // Wie google.* (für ältere Fassungen der App)
+                'service_account_email' => $drive->clientEmail(),
+                'oauth_connected' => $drive->oauth() !== null,
+                'oauth_email' => $drive->oauthEmail(),
+                'calendar_access' => $drive->calendarAccess(),
                 'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending()]),
             ],
             'news' => null,
@@ -111,7 +125,7 @@ final class SettingsService
             }
         }
         if (array_key_exists('drive_oauth', $in) && $in['drive_oauth'] !== '') {
-            throw ApiError::invalid('Eine Verbindung zu Google lässt sich hier nur trennen (leerer Wert).');
+            throw ApiError::invalid('Eine Verbindung zu Google lässt sich hier nur trennen (leerer Wert). Verbinden: POST /admin/google/connect.');
         }
         $root = null;
         if (array_key_exists('gallery_root', $in)) {
@@ -137,7 +151,7 @@ final class SettingsService
         foreach ($set as $k => $v) {
             $a->settings->set($k, $v);
         }
-        // Auch der Google-Zugang der Galerie kann die Quelle des Kalenders sein (Kalender-IDs ohne API-Schlüssel).
+        // Auch der Google-Zugang kann die Quelle des Kalenders sein (Kalender-IDs ohne API-Schlüssel).
         $driveChanged = array_key_exists('drive_service_account', $in) || array_key_exists('drive_oauth', $in);
         if (array_intersect(array_keys($set), ['calendar_ics_url', 'google_api_key', 'calendar_ids', 'calendar_cache_minutes'])
             || ($driveChanged && $a->calendar()->calendarIds() !== [])) {
@@ -147,7 +161,9 @@ final class SettingsService
             $serviceAccount === null ? $a->drive()->removeServiceAccount() : $a->drive()->saveServiceAccount((string) json_encode($serviceAccount));
         }
         if (array_key_exists('drive_oauth', $in)) {
-            $a->drive()->removeOAuth();
+            // Trennen wie POST /admin/google/disconnect: bei Google widerrufen, der Client bleibt gespeichert.
+            $a->drive()->disconnect();
+            $a->settings->delete(GoogleConnect::RESULT_SETTING);
         }
         if ($root !== null) {
             $before = $a->gallery()->root();

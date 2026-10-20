@@ -13,9 +13,13 @@ use KompanieApp\Core\Port\Settings;
 /**
  * Lesender Zugriff auf Google Drive und, über denselben Zugang, auf den Google Kalender.
  *
- * Der Schlüssel des Dienstkontos liegt nur auf dem Server. Der Galerie-Ordner
- * muss in Google Drive für die E-Mail-Adresse des Dienstkontos freigegeben sein.
- * Ohne Bibliothek: Das Zugriffstoken wird per signiertem JWT (RS256) geholt.
+ * Zwei Wege, in dieser Reihenfolge:
+ *  1. „Mit Google verbinden“ (OAuth mit dem eigenen OAuth-Client der Installation): Ein Admin trägt Client-ID und
+ *     Client-Secret ein und meldet sich einmal bei Google an. Gespeichert wird das Refresh-Token; daraus holt die App
+ *     Zugriffstokens. Braucht keinen Dienstkontoschlüssel.
+ *  2. Dienstkonto (JSON-Schlüssel, liegt nur auf dem Server): Der Galerie-Ordner muss in Google Drive für die
+ *     E-Mail-Adresse des Dienstkontos freigegeben sein. Das Zugriffstoken wird per signiertem JWT (RS256) geholt.
+ * Ohne Bibliothek.
  *
  * Den Kalender liest CalendarService mit accessToken(), wenn calendarAccess() zutrifft:
  * bei einer OAuth-Verbindung nur, wenn Google dabei auch calendar.readonly erlaubt hat
@@ -28,12 +32,22 @@ final class DriveClient
 {
     public const SETTING = 'drive_service_account';
     /**
-     * Bestehende Verbindung über OAuth (client_id, client_secret, refresh_token, email, scope), etwa aus der Übernahme
-     * einer früheren App. `scope` sind die bei Google erlaubten Berechtigungen, durch Leerzeichen getrennt (wie Google
-     * sie beim Token-Austausch liefert). Sie geht dem Dienstkonto vor. Neu verbinden lässt sich so (noch) nicht, siehe
-     * OFFENE-PUNKTE.md, Abschnitt 5; nur trennen.
+     * Verbindung über OAuth: {client_id, client_secret, refresh_token, email, scope}. Entsteht über „Mit Google
+     * verbinden“ (saveClient, createState, authorizeUrl, exchangeCode) oder durch die Übernahme einer früheren App
+     * (saveOAuth, gleiches Format). `scope` sind die bei Google erlaubten Berechtigungen, durch Leerzeichen getrennt
+     * (wie Google sie beim Token-Austausch liefert). Ohne refresh_token ist nur der Client gespeichert (nicht verbunden).
+     * Eine Verbindung geht dem Dienstkonto vor.
      */
     public const OAUTH_SETTING = 'drive_oauth';
+    /** Offene Anmeldungen bei Google: Benutzer-ID => {state (Hash), session (Hash), expires}. */
+    public const STATE_SETTING = 'drive_oauth_state';
+    /** Kennzeichen eines state dieser App (der WordPress-Adapter erkennt daran Rückkehrer von Google). */
+    public const STATE_PREFIX = 'kompanie_app_';
+    /** So lange (Sekunden) darf die Anmeldung bei Google dauern. */
+    public const STATE_TTL = 900;
+    public const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+    public const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
+    public const ABOUT_URL = 'https://www.googleapis.com/drive/v3/about';
     public const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
     /** Lesezugriff auf den Google Kalender (für CalendarService, über denselben Zugang). */
     public const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
@@ -63,7 +77,7 @@ final class DriveClient
         return $this->serviceAccount()['client_email'] ?? '';
     }
 
-    /** Angeforderte Berechtigungen des Dienstkontos: Drive für die Galerie, Kalender für die Termine (beide nur Lesen). */
+    /** Angeforderte Berechtigungen (OAuth und Dienstkonto): Drive für die Galerie, Kalender für die Termine (beide nur Lesen). */
     public static function scopes(): string
     {
         return self::SCOPE . ' ' . self::CALENDAR_SCOPE;
@@ -135,11 +149,246 @@ final class DriveClient
         $this->cache->delete(self::TOKEN_CACHE);
     }
 
-    /** Trennt die OAuth-Verbindung (das Dienstkonto bleibt, falls hinterlegt). */
+    /** Entfernt die OAuth-Verbindung samt Client ohne Widerruf bei Google (das Dienstkonto bleibt, falls hinterlegt). */
     public function removeOAuth(): void
     {
         $this->settings->delete(self::OAUTH_SETTING);
         $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* „Mit Google verbinden“                                              */
+    /* ------------------------------------------------------------------ */
+
+    /** @return array<string, string> gespeicherter Stand von drive_oauth, auch ohne Verbindung (nur Client) */
+    private function storedOAuth(): array
+    {
+        $o = $this->settings->get(self::OAUTH_SETTING);
+        $out = [];
+        foreach (['client_id', 'client_secret', 'refresh_token', 'email', 'scope'] as $k) {
+            $out[$k] = is_array($o) && is_string($o[$k] ?? null) ? $o[$k] : '';
+        }
+        return $out;
+    }
+
+    /** @return array{client_id: string, client_secret_set: bool} gespeicherter OAuth-Client (auch ohne Verbindung) */
+    public function oauthClient(): array
+    {
+        $o = $this->storedOAuth();
+        return ['client_id' => $o['client_id'], 'client_secret_set' => $o['client_secret'] !== ''];
+    }
+
+    /**
+     * Speichert Client-ID und Client-Secret des eigenen OAuth-Clients. Ein leeres Secret behält das bisherige (nur
+     * bei gleicher Client-ID). Ein anderer Client macht eine bestehende Verbindung ungültig: Refresh-Token, E-Mail
+     * und die erlaubten Berechtigungen werden dann geleert.
+     *
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public function saveClient(string $clientId, string $clientSecret): void
+    {
+        $clientId = trim($clientId);
+        $clientSecret = trim($clientSecret);
+        $old = $this->storedOAuth();
+        if (!preg_match('/^[0-9A-Za-z_.-]+\.apps\.googleusercontent\.com$/', $clientId) || strlen($clientId) > 200) {
+            throw new \RuntimeException('Die Client-ID sieht nicht richtig aus. Sie endet auf „.apps.googleusercontent.com“.');
+        }
+        if ($clientSecret === '') {
+            if ($old['client_secret'] === '' || $old['client_id'] !== $clientId) {
+                throw new \RuntimeException('Bitte auch den Clientschlüssel (Client-Secret) eintragen.');
+            }
+            $clientSecret = $old['client_secret'];
+        }
+        if (strlen($clientSecret) > 200 || !preg_match('/^[\x21-\x7E]+$/', $clientSecret)) {
+            throw new \RuntimeException('Der Clientschlüssel (Client-Secret) enthält ungültige Zeichen.');
+        }
+        $new = ['client_id' => $clientId, 'client_secret' => $clientSecret] + $old;
+        if ($old['client_id'] !== $clientId || $old['client_secret'] !== $clientSecret) {
+            $new = ['refresh_token' => '', 'email' => '', 'scope' => ''] + $new;
+        }
+        $this->settings->set(self::OAUTH_SETTING, $new);
+        $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    /**
+     * Neues, einmaliges state für die Anmeldung bei Google (Schutz vor CSRF). Es gehört zum Benutzer und zu seiner
+     * Sitzung (Kennung vom Adapter, siehe Authenticator::sessionKey) und gilt STATE_TTL Sekunden. Gespeichert wird nur
+     * ein Hash; je Benutzer gilt die zuletzt begonnene Anmeldung.
+     *
+     * @param string $return wohin es nach der Rückkehr geht ('app' oder 'admin'), steht lesbar im state
+     */
+    public function createState(int $userId, string $sessionKey, string $return = 'app'): string
+    {
+        $return = preg_match('/^[a-z]{1,10}$/', $return) ? $return : 'app';
+        $state = self::STATE_PREFIX . $return . '_' . bin2hex(random_bytes(24));
+        $now = $this->time->timestamp();
+        $all = array_filter($this->states(), static fn (array $s): bool => $s['expires'] > $now);
+        $all[$userId] = ['state' => hash('sha256', $state), 'session' => hash('sha256', $sessionKey), 'expires' => $now + self::STATE_TTL];
+        $this->settings->set(self::STATE_SETTING, $all);
+        return $state;
+    }
+
+    /** Ziel nach der Rückkehr, wie es im state steht ('app', wenn es fehlt oder unbekannt ist). */
+    public static function stateReturn(string $state): string
+    {
+        return preg_match('/^' . self::STATE_PREFIX . '([a-z]{1,10})_[0-9a-f]+$/', $state, $m) ? $m[1] : 'app';
+    }
+
+    /**
+     * Prüft das state aus der Rückkehr von Google: gleicher Benutzer, gleiche Sitzung, nicht abgelaufen. Es gilt nur
+     * einmal und wird dabei verbraucht (auch wenn die Prüfung scheitert).
+     */
+    public function checkState(string $state, int $userId, string $sessionKey): bool
+    {
+        $all = $this->states();
+        $entry = $all[$userId] ?? null;
+        if ($entry === null) {
+            return false;
+        }
+        unset($all[$userId]);
+        $all === [] ? $this->settings->delete(self::STATE_SETTING) : $this->settings->set(self::STATE_SETTING, $all);
+        return $entry['expires'] > $this->time->timestamp()
+            && hash_equals($entry['state'], hash('sha256', $state))
+            && hash_equals($entry['session'], hash('sha256', $sessionKey));
+    }
+
+    /** @return array<int, array{state: string, session: string, expires: int}> */
+    private function states(): array
+    {
+        $raw = $this->settings->get(self::STATE_SETTING);
+        $out = [];
+        foreach (is_array($raw) ? $raw : [] as $user => $s) {
+            if (is_array($s) && is_string($s['state'] ?? null) && is_string($s['session'] ?? null) && is_numeric($s['expires'] ?? null)) {
+                $out[(int) $user] = ['state' => $s['state'], 'session' => $s['session'], 'expires' => (int) $s['expires']];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Adresse der Anmeldung bei Google für den gespeicherten Client. `prompt=consent` und `access_type=offline`, damit
+     * Google auch bei einer erneuten Verbindung ein Refresh-Token liefert.
+     *
+     * @throws \RuntimeException wenn noch kein Client gespeichert ist
+     */
+    public function authorizeUrl(string $redirectUri, string $state): string
+    {
+        $o = $this->storedOAuth();
+        if ($o['client_id'] === '') {
+            throw new \RuntimeException('Es ist noch keine Client-ID gespeichert.');
+        }
+        return self::AUTH_URL . '?' . http_build_query([
+            'client_id' => $o['client_id'],
+            'redirect_uri' => $redirectUri,
+            'response_type' => 'code',
+            'scope' => self::scopes(),
+            'access_type' => 'offline',
+            'prompt' => 'consent',
+            'include_granted_scopes' => 'true',
+            'state' => $state,
+        ], '', '&', PHP_QUERY_RFC3986);
+    }
+
+    /**
+     * Tauscht den Code aus der Rückkehr von Google gegen ein Refresh-Token und speichert die Verbindung: Refresh-Token,
+     * die erlaubten Berechtigungen (Häkchen lassen sich bei Google abwählen) und das Google-Konto (nur zur Anzeige).
+     *
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public function exchangeCode(string $code, string $redirectUri): void
+    {
+        $o = $this->storedOAuth();
+        if ($o['client_id'] === '' || $o['client_secret'] === '') {
+            throw new \RuntimeException('Es sind noch keine Client-ID und kein Clientschlüssel gespeichert.');
+        }
+        if ($code === '') {
+            throw new \RuntimeException('Google hat keinen Code zurückgegeben.');
+        }
+        $res = $this->http->request('POST', self::TOKEN_URI, ['Content-Type' => 'application/x-www-form-urlencoded'], http_build_query([
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'client_id' => $o['client_id'],
+            'client_secret' => $o['client_secret'],
+            'redirect_uri' => $redirectUri,
+        ]), 20);
+        $body = json_decode($res['body'], true);
+        if ($res['status'] !== 200 || !is_array($body) || !is_string($body['access_token'] ?? null) || $body['access_token'] === '') {
+            $error = is_array($body) && is_string($body['error'] ?? null) ? $body['error'] : '';
+            if ($error === 'invalid_client' || $error === 'unauthorized_client') {
+                throw new \RuntimeException('Google kennt diesen Client nicht oder der Clientschlüssel stimmt nicht. Bitte Client-ID und Clientschlüssel prüfen.');
+            }
+            if ($error === 'redirect_uri_mismatch') {
+                throw new \RuntimeException('Die Weiterleitungs-URI stimmt nicht mit der im OAuth-Client bei Google überein. Bitte genau die angezeigte Adresse eintragen.');
+            }
+            throw new \RuntimeException(self::errorMessage($body, $res['status']));
+        }
+        if (!is_string($body['refresh_token'] ?? null) || $body['refresh_token'] === '') {
+            throw new \RuntimeException('Google hat kein Refresh-Token geliefert. Bitte die Verbindung erneut herstellen.');
+        }
+        // Bei Google lassen sich einzelne Berechtigungen abwählen; gemerkt wird, was erlaubt wurde.
+        $scope = is_string($body['scope'] ?? null) ? trim($body['scope']) : self::scopes();
+        if (!in_array(self::SCOPE, preg_split('/\s+/', $scope) ?: [], true)) {
+            throw new \RuntimeException('Der Zugriff auf Google Drive wurde nicht erlaubt. Bitte beim Verbinden das Häkchen für Google Drive setzen.');
+        }
+        $this->settings->set(self::OAUTH_SETTING, ['refresh_token' => $body['refresh_token'], 'email' => '', 'scope' => $scope] + $o);
+        $ttl = max(60, (int) ($body['expires_in'] ?? 3600) - 300);
+        $this->cache->set(self::TOKEN_CACHE, ['email' => self::oauthOwner($body['refresh_token']), 'token' => $body['access_token']], $ttl);
+        $email = $this->connectedEmail($body);
+        if ($email !== '') {
+            $this->settings->set(self::OAUTH_SETTING, ['email' => $email] + $this->storedOAuth());
+        }
+    }
+
+    /**
+     * Google-Konto der neuen Verbindung, nur zur Anzeige: aus dem id_token, falls Google eines liefert (nur mit
+     * openid/email), sonst über Drive (about.user), wie die frühere App. Fehler sind hier egal.
+     *
+     * @param array<string, mixed> $token Antwort des Token-Endpunkts
+     */
+    private function connectedEmail(array $token): string
+    {
+        if (is_string($token['id_token'] ?? null)) {
+            $claims = json_decode((string) base64_decode(strtr(explode('.', $token['id_token'])[1] ?? '', '-_', '+/')), true);
+            if (is_array($claims) && is_string($claims['email'] ?? null) && filter_var($claims['email'], FILTER_VALIDATE_EMAIL)) {
+                return $claims['email'];
+            }
+        }
+        try {
+            $res = $this->http->request('GET', self::ABOUT_URL . '?fields=user(emailAddress)', ['Authorization' => 'Bearer ' . $token['access_token']], null, 20);
+        } catch (\RuntimeException) {
+            return '';
+        }
+        $about = json_decode($res['body'], true);
+        $email = $res['status'] === 200 && is_array($about) ? ($about['user']['emailAddress'] ?? '') : '';
+        return is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
+    }
+
+    /**
+     * Trennt die OAuth-Verbindung und widerruft das Refresh-Token bei Google (Fehler dabei sind egal). Client-ID und
+     * Client-Secret bleiben für eine neue Verbindung gespeichert, das Dienstkonto ebenso.
+     */
+    public function disconnect(): void
+    {
+        $o = $this->storedOAuth();
+        if ($o['refresh_token'] !== '') {
+            try {
+                $this->http->request('POST', self::REVOKE_URL, ['Content-Type' => 'application/x-www-form-urlencoded'], http_build_query(['token' => $o['refresh_token']]), 15);
+            } catch (\RuntimeException $e) {
+                error_log('Kompanie-App: Widerruf bei Google fehlgeschlagen: ' . $e->getMessage());
+            }
+        }
+        if ($o['client_id'] === '' && $o['client_secret'] === '') {
+            $this->settings->delete(self::OAUTH_SETTING);
+        } else {
+            $this->settings->set(self::OAUTH_SETTING, ['refresh_token' => '', 'email' => '', 'scope' => ''] + $o);
+        }
+        $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    /** Kennung des Token-Zwischenspeichers für eine OAuth-Verbindung. */
+    private static function oauthOwner(string $refreshToken): string
+    {
+        return 'oauth:' . hash('sha256', $refreshToken);
     }
 
     /**
@@ -209,7 +458,7 @@ final class DriveClient
         }
         // Der Zwischenspeicher gehört zu genau diesem Zugang (nach einem Wechsel nicht weiterverwenden). Beim Dienstkonto
         // mit den Berechtigungen, damit ein Token von vor der Kalender-Erweiterung (nur Drive) nicht weiterverwendet wird.
-        $owner = $oauth !== null ? 'oauth:' . hash('sha256', $oauth['refresh_token']) : $sa['client_email'] . '|' . self::scopes();
+        $owner = $oauth !== null ? self::oauthOwner($oauth['refresh_token']) : $sa['client_email'] . '|' . self::scopes();
         $cached = $this->cache->get(self::TOKEN_CACHE);
         if (is_array($cached) && ($cached['email'] ?? '') === $owner) {
             return (string) $cached['token'];
@@ -227,7 +476,7 @@ final class DriveClient
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || empty($body['access_token'])) {
             if ($oauth !== null && is_array($body) && ($body['error'] ?? '') === 'invalid_grant') {
-                throw new \RuntimeException('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Trenne sie und hinterlege ein Dienstkonto.');
+                throw new \RuntimeException('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Bitte unter Einstellungen → Google-Zugang die Verbindung trennen und neu mit Google verbinden.');
             }
             throw new \RuntimeException('Die Anmeldung bei Google ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));
         }

@@ -162,6 +162,14 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $this->current ? 'token-' . $this->current : '';
     }
 
+    /** Sitzung des aktuellen Benutzers; ein Test kann sie wechseln (z. B. Anmeldung auf einem anderen Gerät). */
+    public string $session = 'sitzung-1';
+
+    public function sessionKey(): string
+    {
+        return $this->current ? $this->session . '-' . $this->current : '';
+    }
+
     public function csrfRefreshUrl(): string
     {
         return 'https://example.org/api/v1/auth/csrf';

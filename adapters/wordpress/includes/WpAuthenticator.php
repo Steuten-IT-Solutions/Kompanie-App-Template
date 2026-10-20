@@ -45,6 +45,12 @@ final class WpAuthenticator implements Authenticator
         return is_user_logged_in() ? wp_create_nonce('wp_rest') : '';
     }
 
+    /** Hash des Sitzungs-Tokens von WordPress (Anmelde-Cookie); ohne Cookie (z. B. WP-CLI) nur die Benutzer-ID. */
+    public function sessionKey(): string
+    {
+        return is_user_logged_in() ? hash('sha256', get_current_user_id() . '|' . wp_get_session_token()) : '';
+    }
+
     /**
      * Die REST-API von WordPress behandelt eine Anfrage ohne gültigen Nonce als nicht
      * angemeldet. Ein neues Token gibt es deshalb über die App-Seite (nur Cookie).

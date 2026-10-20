@@ -26,6 +26,13 @@ interface Authenticator
     public function csrfToken(): string;
 
     /**
+     * Kennung der aktuellen Anmeldung (Sitzung), die sich während der Sitzung nicht ändert; leer für Gäste.
+     * Bindet z. B. die Anmeldung bei Google („Mit Google verbinden“) an die Sitzung, in der sie begonnen wurde.
+     * Nur zum Vergleichen: Sie darf kein Geheimnis preisgeben (z. B. ein Hash des Sitzungsschlüssels).
+     */
+    public function sessionKey(): string;
+
+    /**
      * Adresse, unter der die App ein neues CSRF-Token holt (GET, Antwort {token}).
      * Sie muss allein mit dem Sitzungs-Cookie funktionieren, auch wenn das alte Token abgelaufen ist.
      */

@@ -71,6 +71,12 @@ final class SessionAuth implements Authenticator, AuthContext
         return $hash === null ? '' : hash_hmac('sha256', 'csrf|' . $hash, $this->secret);
     }
 
+    public function sessionKey(): string
+    {
+        $hash = $this->currentUser() !== null ? $this->sessions->tokenHash() : null;
+        return $hash === null ? '' : hash_hmac('sha256', 'session|' . $hash, $this->secret);
+    }
+
     public function csrfRefreshUrl(): string
     {
         return $this->env->apiUrl('auth/csrf');
