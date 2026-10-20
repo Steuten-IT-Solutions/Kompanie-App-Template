@@ -173,7 +173,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
   await page.getByRole('button', { name: 'Angaben ändern' }).click();
   await page.locator('.account-edit').getByLabel('Name', { exact: true }).fill(`Ida Neu ${id}`);
   await page.locator('.account-edit').getByLabel('E-Mail (optional)').fill(`ida-${id}@example.org`);
-  await page.getByRole('button', { name: 'Speichern' }).click();
+  await page.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(page.locator('.member-name')).toHaveText(`Ida Neu ${id}`);
   await expect(page.locator('.account-panel')).toContainText(`ida-${id}@example.org`);
 
@@ -1398,7 +1398,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   const card = member.locator('.birthday-card');
   await card.getByLabel('Tag').selectOption(String(in3.getDate()));
   await card.getByLabel('Monat').selectOption(String(in3.getMonth() + 1));
-  await card.getByLabel('Jahr').fill(String(in3.getFullYear() - 30));
+  await card.getByLabel('Jahr', { exact: true }).fill(String(in3.getFullYear() - 30));
   await expect(card.getByLabel('Anderen Mitgliedern zeigen')).toBeChecked();
   await expect(card.getByLabel(/Alter anzeigen/)).not.toBeChecked();
   await card.getByLabel(/Alter anzeigen/).check();
