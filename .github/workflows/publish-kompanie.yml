@@ -57,12 +57,12 @@ jobs:
           [[ "$PRIVATE" == false ]] || { echo "::error::$REPO muss öffentlich sein."; exit 1; }
           echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           path: core
           persist-credentials: false
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: ${{ inputs.repo }}
           ref: main
@@ -73,13 +73,13 @@ jobs:
         id: kompanie
         run: echo "sha=$(git -C kompanie rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.2'
           extensions: pdo_sqlite, gd, sodium, zip, mbstring, curl, openssl, simplexml, intl
           tools: none
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
@@ -112,7 +112,7 @@ jobs:
           cp packages/frontend/public/icons/favicon-32.png "$OUT/brand/favicon.png"
 
       # Name je Kompanie: Aus „Kompanien abgleichen“ laufen mehrere Kompanien im selben Workflow-Lauf.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: build-${{ steps.check.outputs.name }}
           path: out
@@ -129,7 +129,7 @@ jobs:
       group: kompanie-publish-job-${{ inputs.repo }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           path: core
           persist-credentials: false
@@ -140,7 +140,7 @@ jobs:
         run: '[[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Ungültiger Commit: $SHA"; exit 1; }'
 
       # Derselbe Stand wie im Build-Job, hier selbst geholt (kompanie.json kommt nicht aus dem Build-Ergebnis).
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ needs.build.outputs.kompanie-sha }}
@@ -154,7 +154,7 @@ jobs:
           SHA: ${{ needs.build.outputs.kompanie-sha }}
         run: git -C kompanie merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA gehört nicht zu main."; exit 1; }
 
-      - uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # 2.35.5
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.2'
           extensions: sodium, zip, mbstring
@@ -166,7 +166,7 @@ jobs:
           REPO: ${{ inputs.repo }}
         run: echo "name=${REPO#*/}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: build-${{ steps.name.outputs.name }}
           path: ${{ runner.temp }}/untrusted
@@ -182,7 +182,7 @@ jobs:
 
       - name: Zugang zum Kompanie-Repo (GitHub App)
         id: app
-        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.KOMPANIE_APP_ID }}
           private-key: ${{ secrets.KOMPANIE_APP_KEY }}
