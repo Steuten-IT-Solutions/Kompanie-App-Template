@@ -285,8 +285,8 @@ function sessionExpired(): never {
   throw new ApiError('Sitzung abgelaufen – bitte neu anmelden.', 401, 'not_logged_in');
 }
 
-/** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). */
-export async function refreshCsrf(): Promise<void> {
+/** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). quiet: ohne Weiterleitung zur Anmeldung. */
+export async function refreshCsrf(quiet = false): Promise<void> {
   let res: Response;
   try {
     res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
@@ -295,6 +295,7 @@ export async function refreshCsrf(): Promise<void> {
   }
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.token) {
+    if (quiet) throw new ApiError('Sitzung abgelaufen.', 401, 'not_logged_in');
     sessionExpired();
   }
   csrfToken = data.token;
@@ -318,6 +319,8 @@ async function requestFull<T>(
   body?: unknown,
   query?: Record<string, string>,
   retry = true,
+  /** 401 nur melden, nicht zur Anmeldung weiterleiten (z. B. beim Abmelden) */
+  quiet = false,
 ): Promise<{ data: T; headers: Headers }> {
   if (!config) {
     throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
@@ -341,10 +344,10 @@ async function requestFull<T>(
   const data = await res.json().catch(() => null);
 
   if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
-    await refreshCsrf();
-    return requestFull<T>(method, path, body, query, false);
+    await refreshCsrf(quiet);
+    return requestFull<T>(method, path, body, query, false, quiet);
   }
-  if (res.status === 401 && config.user) {
+  if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
   }
   if (!res.ok) {
@@ -439,7 +442,70 @@ export const api = {
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
+
+  // Benachrichtigungen (Web Push): Konten über /me/push, Gäste über /push mit dem auth-Geheimnis des Geräts.
+  // Mit dem Geheimnis auch für Konten: Ein Abo eines hier nicht mehr angemeldeten Kontos gibt der Server dann frei.
+  pushStatus: (device: PushDevice | null) =>
+    request<PushStatus>('POST', pushPath('/status'), device ? { endpoint: device.endpoint, auth: device.keys.auth } : {}),
+  pushSubscribe: (device: PushDevice, types: PushType[], details?: boolean) =>
+    request<PushSubscriptionInfo>('POST', pushPath(''), { endpoint: device.endpoint, keys: device.keys, types, details }),
+  pushUpdate: (device: PushDevice, data: { types?: PushType[]; details?: boolean }) =>
+    request<PushSubscriptionInfo>('PUT', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device), ...data }),
+  pushUnsubscribe: (device: PushDevice) =>
+    request<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint, auth: guestAuth(device) }),
+  // Beim Abmelden: ohne Weiterleitung, wenn die Sitzung schon beendet ist.
+  pushStatusQuiet: async (device: PushDevice) =>
+    (
+      await requestFull<PushStatus>(
+        'POST',
+        pushPath('/status'),
+        { endpoint: device.endpoint, auth: device.keys.auth },
+        undefined,
+        true,
+        true,
+      )
+    ).data,
+  pushForget: async (device: PushDevice) =>
+    (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint }, undefined, true, true)).data,
+  pushTest: (device: PushDevice) =>
+    request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
+  pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
+  setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
+
+export type PushType = 'penalties' | 'points' | 'events' | 'reminder' | 'news';
+
+/** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
+export interface PushDevice {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export interface PushSubscriptionInfo {
+  types: PushType[];
+  details: boolean;
+}
+
+export interface PushStatus {
+  supported: boolean;
+  publicKey: string;
+  types: { key: PushType; label: string }[];
+  subscription: PushSubscriptionInfo | null;
+}
+
+export interface PushAdmin {
+  supported: boolean;
+  missing: string[];
+  devices: number;
+  accounts: number;
+  guests: number;
+  queued: number;
+  reminderHour: number;
+}
+
+const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;
+// Nur Gäste weisen sich mit dem Geheimnis aus; Konten über die Anmeldung.
+const guestAuth = (device: PushDevice): string | undefined => (config?.user ? undefined : device.keys.auth);
 
 export type StatusLevel = 'ok' | 'warn' | 'error' | 'off';
 

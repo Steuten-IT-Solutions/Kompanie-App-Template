@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api, can, config, isMember, type CalendarEvent } from '../api';
+import GuestPushButton from '../GuestPushButton';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
@@ -39,6 +40,8 @@ export default function Termine() {
       </button>
     ) : null;
 
+  const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
+
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   if (groups.length === 0)
@@ -46,6 +49,7 @@ export default function Termine() {
       <>
         {manage}
         <Empty>Keine anstehenden Termine.</Empty>
+        {notify}
       </>
     );
 
@@ -103,6 +107,7 @@ export default function Termine() {
           </ul>
         </section>
       ))}
+      {notify}
     </div>
   );
 }

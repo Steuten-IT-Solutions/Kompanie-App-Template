@@ -152,3 +152,44 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(networkFirst(request, undefined, 0, event));
   }
 });
+
+/* Benachrichtigungen (Web Push, Issue #19). Der Server schickt verschlüsselt {title, body, route, tag};
+ * route ist ein Ziel in der App (z. B. „meins/punkte“). */
+self.addEventListener('push', (event) => {
+  let msg = {};
+  try {
+    msg = event.data ? event.data.json() : {};
+  } catch {
+    msg = { body: event.data ? event.data.text() : '' };
+  }
+  const title = typeof msg.title === 'string' && msg.title !== '' ? msg.title : 'Neuigkeiten';
+  const options = {
+    body: typeof msg.body === 'string' ? msg.body : '',
+    data: { route: typeof msg.route === 'string' ? msg.route : '' },
+  };
+  if (ASSETS !== '') options.icon = ASSETS + 'icons/icon-192.png';
+  // Gleiche Kennung: Die neue Nachricht ersetzt die alte (z. B. die tägliche Erinnerung).
+  if (typeof msg.tag === 'string' && msg.tag !== '') {
+    options.tag = msg.tag;
+    options.renotify = true;
+  }
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const route = String((event.notification.data && event.notification.data.route) || '').replace(/^[#/]+/, '');
+  const target = self.registration.scope + '#/' + route;
+  event.waitUntil(
+    // Nur Fenster, die dieser Service Worker steuert: Nur die lassen sich per navigate() umleiten.
+    self.clients.matchAll({ type: 'window' }).then((list) => {
+      // Ein offenes Fenster der App nach vorn holen, sonst ein neues öffnen.
+      const open = list.find((c) => c.url.startsWith(self.registration.scope));
+      if (!open) return self.clients.openWindow(target);
+      return open
+        .focus()
+        .then((c) => (c || open).navigate(target))
+        .catch(() => self.clients.openWindow(target));
+    }),
+  );
+});

@@ -361,7 +361,7 @@ final class Kernel
             }
             $query = $_GET;
             unset($query['r']);
-            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body));
+            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp()));
         } catch (ApiError $e) {
             $res = Response::error($e);
         }

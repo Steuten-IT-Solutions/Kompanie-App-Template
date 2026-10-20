@@ -22,7 +22,7 @@ final class StatusService
     /** @return array{items: array<int, array<string, string>>, support: string} */
     public function report(): array
     {
-        $items = [$this->updates(), $this->gallery(), $this->calendar(), $this->backup(), $this->server()];
+        $items = [$this->updates(), $this->gallery(), $this->calendar(), $this->backup(), $this->server(), $this->push()];
         foreach ($this->app->healthChecks?->checks() ?? [] as $check) {
             $items[] = $check;
         }
@@ -128,6 +128,16 @@ final class StatusService
             return $this->item('backup', 'Datensicherung', 'warn', 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '. Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren.');
         }
         return $this->item('backup', 'Datensicherung', 'ok', 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '.');
+    }
+
+    private function push(): array
+    {
+        $missing = $this->app->push()->requirements();
+        if ($missing !== []) {
+            return $this->item('push', 'Push-Benachrichtigungen', 'warn', 'Auf diesem Server nicht möglich, es fehlt: ' . implode(', ', $missing) . '. Bitte beim Hoster nachfragen.');
+        }
+        $c = $this->app->push()->repository()->counts();
+        return $this->item('push', 'Push-Benachrichtigungen', 'ok', sprintf('%d Geräte angemeldet (%d Konten, %d Gäste).', $c['devices'], $c['accounts'], $c['guests']));
     }
 
     private function server(): array

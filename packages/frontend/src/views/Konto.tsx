@@ -50,6 +50,14 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         </div>
       )}
 
+      <div className="card account-card">
+        <h3>Benachrichtigungen</h3>
+        <p className="muted small">Auf diesem Gerät benachrichtigt werden, wenn es Neues für dich gibt.</p>
+        <button className="btn btn-secondary btn-block push-konto" onClick={() => navigate('benachrichtigungen')}>
+          Benachrichtigungen einstellen
+        </button>
+      </div>
+
       {!isStandalone() && (
         <div className="card account-card">
           <h3>App aufs Handy holen</h3>

@@ -33,6 +33,7 @@ tags:
   - name: App
   - name: Anmeldung
   - name: Eigene Daten
+  - name: Benachrichtigungen
   - name: Termine
   - name: News
   - name: Galerie
@@ -179,6 +180,210 @@ paths:
                   changed: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+
+  /push/key:
+    get:
+      tags: [Benachrichtigungen]
+      summary: Öffentlicher VAPID-Schlüssel des Servers
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [supported, publicKey]
+                properties:
+                  supported: { type: boolean, description: Der Server kann Push-Nachrichten verschlüsseln und signieren }
+                  publicKey: { type: string, description: 'applicationServerKey (base64url, unkomprimierter P-256-Punkt); leer, wenn nicht unterstützt' }
+
+  /me/push/status:
+    post:
+      tags: [Benachrichtigungen]
+      summary: Mögliche Arten und das Abo dieses Geräts (Konto)
+      description: |
+        POST, damit die Push-Adresse nicht in Protokollen von Adressen landet. Mit `auth` gibt das Gerät außerdem ein
+        Abo frei, das einem anderen, hier nicht mehr angemeldeten Konto gehört (die App fragt dazu beim Start nach).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint: { type: string }
+                auth: { type: string, description: auth-Geheimnis des Geräts (base64url) }
+      responses:
+        '200': { $ref: '#/components/responses/PushStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /push/status:
+    post:
+      tags: [Benachrichtigungen]
+      summary: Mögliche Arten und das Abo dieses Geräts (Gast ohne Konto)
+      description: Gibt wie `/me/push/status` das Abo eines hier nicht mehr angemeldeten Kontos frei.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint: { type: string }
+                auth: { type: string, description: auth-Geheimnis des Geräts (base64url) }
+      responses:
+        '200': { $ref: '#/components/responses/PushStatus' }
+
+  /me/push:
+    post:
+      tags: [Benachrichtigungen]
+      summary: Gerät für Benachrichtigungen anmelden (Konto)
+      description: |
+        Übernimmt ein vorhandenes Abo desselben Geräts (gleiches auth-Geheimnis), z. B. nach einem Kontowechsel.
+        Höchstens 10 Geräte je Konto; das älteste fällt dann weg. Ohne `types` alle möglichen Arten; mindestens eine
+        erlaubte Art muss übrig bleiben (sonst 400).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PushSubscribe' }
+      responses:
+        '200': { $ref: '#/components/responses/PushSubscription' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '501': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Benachrichtigungen]
+      summary: Arten und Details-Schalter ändern (Konto)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string }
+                types: { type: array, items: { $ref: '#/components/schemas/PushType' } }
+                details: { type: boolean, description: 'Bei Strafen Betrag und Grund in der Nachricht zeigen (sonst nur ein Hinweis); Punkte zeigen immer Wert und Grund' }
+      responses:
+        '200': { $ref: '#/components/responses/PushSubscription' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Benachrichtigungen]
+      summary: Gerät abmelden (Konto)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /push:
+    post:
+      tags: [Benachrichtigungen]
+      summary: Gerät für öffentliche Benachrichtigungen anmelden (Gast ohne Konto)
+      description: |
+        Nur öffentliche Arten (Termine, Erinnerung, News). Neue Gast-Abos sind je Anfragendem (IPv6: je /64-Netz) und
+        insgesamt begrenzt; ohne Änderung und ohne Nachricht verfallen sie nach 180 Tagen.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PushSubscribe' }
+      responses:
+        '200': { $ref: '#/components/responses/PushSubscription' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '501': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Benachrichtigungen]
+      summary: Arten ändern (Gast, nur mit dem auth-Geheimnis des Geräts)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, auth]
+              properties:
+                endpoint: { type: string }
+                auth: { type: string }
+                types: { type: array, items: { $ref: '#/components/schemas/PushType' } }
+      responses:
+        '200': { $ref: '#/components/responses/PushSubscription' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Benachrichtigungen]
+      summary: Gerät abmelden (Gast, nur mit dem auth-Geheimnis des Geräts)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, auth]
+              properties:
+                endpoint: { type: string }
+                auth: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+
+  /me/push/test:
+    post:
+      tags: [Benachrichtigungen]
+      summary: Testnachricht an dieses Gerät (Konto)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/PushTest' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+
+  /push/test:
+    post:
+      tags: [Benachrichtigungen]
+      summary: Testnachricht an dieses Gerät (Gast)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, auth]
+              properties:
+                endpoint: { type: string }
+                auth: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/PushTest' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '410': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
 
   /calendar:
     get:
@@ -890,6 +1095,33 @@ paths:
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
+  /admin/push:
+    get:
+      tags: [Einstellungen]
+      summary: Stand der Benachrichtigungen (Geräte, Warteschlange, Uhrzeit der Erinnerung)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/PushAdmin' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Uhrzeit der Erinnerung an Termine am nächsten Tag ändern
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reminder_hour: { type: integer, minimum: 0, maximum: 23 }
+      responses:
+        '200': { $ref: '#/components/responses/PushAdmin' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/status:
     get:
       tags: [Wartung]
@@ -1115,6 +1347,57 @@ components:
       schema: { type: integer }
 
   responses:
+    PushStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [supported, publicKey, types, subscription]
+            properties:
+              supported: { type: boolean }
+              publicKey: { type: string }
+              types:
+                type: array
+                description: Arten, die dieser Anfragende abonnieren kann (nach Bereichen und Rechten)
+                items:
+                  type: object
+                  required: [key, label]
+                  properties:
+                    key: { $ref: '#/components/schemas/PushType' }
+                    label: { type: string }
+              subscription:
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/schemas/PushSubscriptionInfo'
+    PushSubscription:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PushSubscriptionInfo' }
+    PushTest:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sent: { type: boolean }
+    PushAdmin:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [supported, missing, devices, accounts, guests, queued, reminderHour]
+            properties:
+              supported: { type: boolean }
+              missing: { type: array, items: { type: string }, description: Fehlende PHP-Voraussetzungen }
+              devices: { type: integer }
+              accounts: { type: integer }
+              guests: { type: integer }
+              queued: { type: integer, description: Nachrichten in der Warteschlange }
+              reminderHour: { type: integer, minimum: 0, maximum: 23 }
     Error:
       description: Fehler
       content:
@@ -1130,6 +1413,29 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    PushType:
+      type: string
+      enum: [penalties, points, events, reminder, news]
+    PushSubscribe:
+      type: object
+      required: [endpoint, keys]
+      description: Angaben aus `PushSubscription.toJSON()` des Browsers, dazu die gewünschten Arten.
+      properties:
+        endpoint: { type: string, description: https-Adresse des Push-Dienstes }
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh: { type: string }
+            auth: { type: string }
+        types: { type: array, items: { $ref: '#/components/schemas/PushType' } }
+        details: { type: boolean }
+    PushSubscriptionInfo:
+      type: object
+      required: [types, details]
+      properties:
+        types: { type: array, items: { $ref: '#/components/schemas/PushType' } }
+        details: { type: boolean }
     Feature:
       type: object
       required: [key, label, description, enabled, requires, configured, setup]
@@ -1160,6 +1466,8 @@ components:
             z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
             `feature_disabled` (403, Bereich vom Admin ausgeschaltet), `method_not_allowed` (405),
             `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500).
+            Push (Issue #19): `push_unsupported` (501), `push_full` (503), `too_many_attempts` (429),
+            `push_gone` (410) und `push_key_mismatch` (409, Gerät neu anmelden) bei der Testnachricht.
             Nur eigenständige Version: `login_failed` (400), `too_many_attempts` (429),
             `unsupported_media_type` (415, Änderungen nur als JSON), `not_installed` (503).
             Nur WordPress: `use_login_page` (400).

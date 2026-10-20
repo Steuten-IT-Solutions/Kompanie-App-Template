@@ -5,6 +5,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import { ErrorBoundary, lazyView, Loading } from './ui';
+import { forgetPushOnLogout } from './push';
 import { navigate, useRoute } from './router';
 import Anmelden from './views/Anmelden';
 import Galerie from './views/Galerie';
@@ -20,9 +21,10 @@ const Konto = lazyView(() => import('./views/Konto'));
 const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
 const Hilfe = lazyView(() => import('./views/Hilfe'));
+const Benachrichtigungen = lazyView(() => import('./views/Benachrichtigungen'));
 
 type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
-type View = Tab | 'konto' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
+type View = Tab | 'konto' | 'benachrichtigungen' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
 
 const VIEWS: View[] = [
   'termine',
@@ -31,6 +33,7 @@ const VIEWS: View[] = [
   'meins',
   'verwaltung',
   'konto',
+  'benachrichtigungen',
   'installieren',
   'anmelden',
   'einstellungen',
@@ -61,6 +64,7 @@ const titles = (): Record<View, string> => ({
   // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
   news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
   konto: 'Mein Konto',
+  benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
   anmelden: 'Anmelden',
   einstellungen: 'Einstellungen',
@@ -145,17 +149,21 @@ async function clearCaches() {
  * bleibt alles, wie es ist – sonst sähe die App abgemeldet aus, die Sitzung bestünde aber weiter.
  */
 async function logout(onError: (msg: string) => void) {
+  // Solange die Sitzung noch gilt: Dieses Gerät bekommt keine Nachrichten des Kontos mehr.
+  const finishPush = await forgetPushOnLogout();
   if (config?.auth.mode === 'form') {
     try {
       await api.logout();
     } catch (err) {
       // 401: Die Sitzung ist auf dem Server schon beendet.
       if (!(err instanceof ApiError && err.status === 401)) {
+        await finishPush(false);
         onError('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.');
         return;
       }
     }
   }
+  await finishPush(true);
   await clearCaches().catch(() => undefined);
   if (config?.auth.mode === 'redirect' && config.auth.logoutUrl) {
     window.location.href = config.auth.logoutUrl;
@@ -186,6 +194,7 @@ export default function App() {
       can('create_users') ||
       can('promote_users'),
     konto: !!user,
+    benachrichtigungen: true,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
     einstellungen: can('manage_settings'),
@@ -299,6 +308,7 @@ export default function App() {
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
+            {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}
             {tab === 'anmelden' && <Anmelden />}
             {tab === 'einstellungen' && <Einstellungen onToast={showToast} />}

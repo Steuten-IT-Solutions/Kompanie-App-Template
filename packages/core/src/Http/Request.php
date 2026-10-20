@@ -18,6 +18,8 @@ final class Request
         public readonly array $query = [],
         public readonly array $body = [],
         public array $params = [],
+        /** Kennung des Anfragenden (z. B. die IP-Adresse), nur für Begrenzungen; leer, wenn unbekannt */
+        public readonly string $client = '',
     ) {
     }
 

@@ -13,6 +13,9 @@ export default defineConfig({
     baseURL: process.env.KOMPANIE_BASE_URL ?? 'http://localhost:8888',
     ...devices['iPhone 13'],
     browserName: 'chromium',
+    // Voller Chromium im neuen Headless-Modus statt der abgespeckten Headless-Shell: Nur er zeigt Benachrichtigungen
+    // des Service Workers an (E2E-Test „Benachrichtigungen“).
+    channel: process.env.PW_CHROMIUM_PATH ? undefined : 'chromium',
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
     locale: 'de-DE',
     timezoneId: 'Europe/Berlin',

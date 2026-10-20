@@ -11,6 +11,7 @@ use KompanieApp\Core\Infra\ArrayCache;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Infra\NullNewsSource;
+use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
 
@@ -34,7 +35,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -54,6 +55,7 @@ final class TestApp
         array|false|null $features = null,
         array $packageConfig = [],
         ?NullScheduler $scheduler = null,
+        ?NewsSource $news = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -64,7 +66,7 @@ final class TestApp
             files: new LocalFileStorage($filesDir . '/public', 'https://example.org/media', $filesDir . '/private', ''),
             images: new GdImageResizer(),
             scheduler: $scheduler ?? new NullScheduler(),
-            news: new NullNewsSource(),
+            news: $news ?? new NullNewsSource(),
             clock: $clock ?? new FixedClock(),
             env: new FakeEnvironment(),
             authContext: $users,

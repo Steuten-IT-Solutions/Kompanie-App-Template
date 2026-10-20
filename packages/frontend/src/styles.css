@@ -1004,6 +1004,17 @@ button:focus-visible {
 .event-form {
   margin-top: 12px;
 }
+
+/* Benachrichtigungen */
+.push-guest {
+  margin-top: 16px;
+}
+.push-types {
+  margin-top: 12px;
+}
+.push-card .btn + .btn {
+  margin-top: 8px;
+}
 textarea,
 input[type='time'],
 input[type='url'] {
