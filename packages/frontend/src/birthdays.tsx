@@ -96,13 +96,13 @@ export function BirthdayFields({
         </select>
       </label>
       <label className="field birthday-year">
-        <span>Jahr (optional)</span>
+        <span>Jahr</span>
         <input
           type="text"
           inputMode="numeric"
           autoComplete="off"
           maxLength={4}
-          placeholder="z. B. 1985"
+          placeholder="freiwillig"
           value={value.year}
           disabled={disabled}
           onChange={(e) => onChange({ ...value, year: e.target.value.replace(/\D/g, '') })}

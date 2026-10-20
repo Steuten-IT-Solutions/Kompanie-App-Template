@@ -479,12 +479,10 @@ test.describe('Android', () => {
         });
         return (await res.json()).subscription;
       }, device);
-    await expect
-      .poll(status)
-      .toEqual({
-        types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
-        details: true,
-      });
+    await expect.poll(status).toEqual({
+      types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
+      details: true,
+    });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -1400,7 +1398,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   const card = member.locator('.birthday-card');
   await card.getByLabel('Tag').selectOption(String(in3.getDate()));
   await card.getByLabel('Monat').selectOption(String(in3.getMonth() + 1));
-  await card.getByLabel('Jahr (optional)').fill(String(in3.getFullYear() - 30));
+  await card.getByLabel('Jahr').fill(String(in3.getFullYear() - 30));
   await expect(card.getByLabel('Anderen Mitgliedern zeigen')).toBeChecked();
   await expect(card.getByLabel(/Alter anzeigen/)).not.toBeChecked();
   await card.getByLabel(/Alter anzeigen/).check();
