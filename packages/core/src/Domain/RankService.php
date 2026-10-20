@@ -11,7 +11,7 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\RankRepository;
 
 /**
- * Dienstgrade (Issue #9, Vorbild Lank #16).
+ * Dienstgrade (Issue #9).
  *
  * Eine Liste mit einer Reihenfolge (sort, der niedrigste zuerst). Den Dienstgrad eines Mitglieds legt fest, wer
  * „Dienstgrade verwalten“ darf; er ändert sich nie von selbst.
@@ -284,7 +284,7 @@ final class RankService
     }
 
     /**
-     * Anlegen mit Anfangspunkten und Dienstgrad (Lank #16): vor dem Anlegen des Kontos prüfen.
+     * Anlegen mit Anfangspunkten und Dienstgrad: vor dem Anlegen des Kontos prüfen.
      *
      * @param array<string, mixed> $in initial_points, initial_points_date, rank_id
      * @return array{points: int, date: string, rank: Rank|null}
@@ -363,7 +363,7 @@ final class RankService
     }
 
     /**
-     * Nächster Dienstgrad, fehlende Punkte, erreichbarer Dienstgrad, „Schwelle erreicht seit“ (Lank #16).
+     * Nächster Dienstgrad, fehlende Punkte, erreichbarer Dienstgrad, „Schwelle erreicht seit“.
      *
      * @param list<Rank> $ranks
      * @param Rank|null $current

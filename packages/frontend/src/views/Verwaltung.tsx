@@ -4,15 +4,17 @@ import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
+import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { PenaltyRow } from './Strafen';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog';
+type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen';
 
 const sec = brand.labels.sections;
 
 /** Bereich an und das Recht dazu (Punkte bzw. Strafen vergeben sind getrennte Rechte). */
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
+const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | undefined, path[1]];
@@ -26,6 +28,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: penalties },
       { id: 'katalog', label: 'Katalog', on: points },
+      { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
+      { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && ranksUsePoints() },
     ] as { id: Sub; label: string; on: boolean }[]
   ).filter((t) => t.on);
   const active: Sub = tabs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
@@ -54,6 +58,10 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <GivePenalty key={path.join('/')} preselect={preselect} onToast={onToast} />
       ) : active === 'katalog' ? (
         <Catalog onToast={onToast} />
+      ) : active === 'dienstgrade' ? (
+        <RankList onToast={onToast} />
+      ) : active === 'befoerderungen' ? (
+        <Promotions />
       ) : (
         <Members />
       )}
@@ -121,6 +129,7 @@ function Members() {
                 )}
               </div>
               <div className="row-sub">
+                {m.rank_title !== undefined && `${m.rank_title ?? `Kein ${brand.labels.rank}`}${canPoints() ? ' · ' : ''}`}
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
                 {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
@@ -200,6 +209,8 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
           )}
         </div>
       )}
+
+      {m.rank && m.member && <MemberRank id={m.id} status={m.rank} history={m.rank_history ?? []} onChanged={reload} onToast={onToast} />}
 
       {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
       {!canPenalties() ? null : m.penalties.length === 0 ? (
@@ -393,6 +404,14 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 function NewMember() {
   const [name, setName] = useState('');
   const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
+  const [initialPoints, setInitialPoints] = useState('');
+  const [initialDate, setInitialDate] = useState(todayYmd());
+  const [rankId, setRankId] = useState('');
+  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), []);
+  const extras = level === 'member';
+  const pointsNum = Number(initialPoints || 0);
+  const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -412,6 +431,8 @@ function NewMember() {
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(email.trim() ? { email: email.trim() } : {}),
           level,
+          ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
+          ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
         }),
       );
     } catch (err) {
@@ -434,6 +455,11 @@ function NewMember() {
     return (
       <div className="card created">
         <h2>{created.name} ist angelegt</h2>
+        {created.warning && (
+          <p className="form-error" role="alert">
+            {created.warning}
+          </p>
+        )}
         <p className="muted">
           Das Startpasswort wird <strong>nur jetzt</strong> angezeigt. Bitte notieren oder kopieren und persönlich weitergeben.
         </p>
@@ -457,6 +483,8 @@ function NewMember() {
               setName('');
               setUsername('');
               setEmail('');
+              setInitialPoints('');
+              setRankId('');
             }}
           >
             Weiteres Mitglied
@@ -507,6 +535,34 @@ function NewMember() {
           <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
         </select>
       </label>
+      {extras && canPoints() && (
+        <>
+          <label className="field">
+            <span>{sec.points} (Anfangsbestand, optional)</span>
+            <input type="number" inputMode="numeric" min={0} value={initialPoints} onChange={(e) => setInitialPoints(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Stand vom</span>
+            <input type="date" value={initialDate} onChange={(e) => setInitialDate(e.target.value)} />
+          </label>
+        </>
+      )}
+      {extras && canRanks() && (ranks.data ?? []).length > 0 && (
+        <label className="field">
+          <span>{brand.labels.rank} (optional)</span>
+          <select value={rankOptions.some((r) => String(r.id) === rankId) ? rankId : ''} onChange={(e) => setRankId(e.target.value)}>
+            <option value="">Kein {brand.labels.rank}</option>
+            {rankOptions.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {extras && (canPoints() || canRanks()) && (
+        <p className="muted small">Für die Übernahme bestehender Mitglieder: aktuellen Punktestand und {brand.labels.rank} eintragen.</p>
+      )}
       <p className="muted small">
         Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
       </p>

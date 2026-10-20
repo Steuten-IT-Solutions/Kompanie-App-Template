@@ -14,6 +14,9 @@ export function parseLocalDate(ymd: string): Date {
 
 export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
 
+/** Zeitpunkt des Servers ('YYYY-MM-DD HH:MM:SS', UTC) als lokales Datum. */
+export const formatUtcDate = (utc: string) => dateFmt.format(new Date(utc.replace(' ', 'T') + 'Z'));
+
 export function todayYmd(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');

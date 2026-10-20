@@ -2,16 +2,18 @@ import { api, config } from '../api';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Dienstgrad from './Dienstgrad';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 
-/** „Meins“: eigene Punkte und Strafen, umschaltbar. Die Summen (/me) lädt Meins einmal für beide. */
+/** „Meins“: eigene Punkte, Strafen und Dienstgrad, umschaltbar. Die Summen (/me) lädt Meins einmal für beide. */
 export default function Meins({ sub }: { sub?: string }) {
   const me = useAsync(api.me, [], 'me');
   const parts = (
     [
       ['punkte', brand.labels.sections.points, config?.features.points],
       ['strafen', brand.labels.sections.penalties, config?.features.penalties],
+      ['dienstgrad', brand.labels.rank, config?.features.ranks],
     ] as const
   ).filter(([, , on]) => on);
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
@@ -39,6 +41,8 @@ export default function Meins({ sub }: { sub?: string }) {
         <Punkte me={me.data!} />
       ) : active === 'strafen' ? (
         <Strafen me={me.data!} />
+      ) : active === 'dienstgrad' ? (
+        <Dienstgrad />
       ) : null}
     </div>
   );

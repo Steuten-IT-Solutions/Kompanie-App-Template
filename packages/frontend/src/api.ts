@@ -10,12 +10,13 @@ export type Capability =
   | 'calendar'
   | 'manage_points'
   | 'manage_penalties'
+  | 'manage_ranks'
   | 'manage_events'
   | 'manage_documents'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
-export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties';
+export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks';
 
 export interface AppUser {
   id: number;
@@ -131,6 +132,8 @@ export interface Me {
   level: Level;
   points: number;
   open_cents: number;
+  /** Eigener Dienstgrad (mit Bereich Dienstgrade) */
+  rank?: RankRef | null;
 }
 
 export interface PointEntry {
@@ -243,6 +246,8 @@ export interface MemberSummary {
   level: Level;
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
+  /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
+  rank_title?: string | null;
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
@@ -251,6 +256,52 @@ export interface MemberSummary {
 export interface MemberDetail extends MemberSummary {
   point_list: PointEntry[];
   penalties: Penalty[];
+  /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
+  rank?: RankStatus;
+  rank_history?: RankHistoryEntry[];
+}
+
+export interface Rank {
+  id: number;
+  title: string;
+  sort: number;
+  /** Punkteschwelle (nur mit dem Bereich Punkte; null = ohne Schwelle) */
+  min_points: number | null;
+  active: boolean;
+  /** Wie viele Mitglieder ihn haben (nur in der Pflege) */
+  assigned?: number;
+}
+
+export interface RankRef {
+  id: number;
+  title: string;
+}
+
+/** Stand eines Mitglieds; die Felder nach rank nur mit dem Bereich Punkte. */
+export interface RankStatus {
+  rank: RankRef | null;
+  points?: number;
+  next_rank?: (RankRef & { min_points: number | null }) | null;
+  points_to_next?: number | null;
+  reachable_rank?: RankRef | null;
+  threshold_reached_since?: string | null;
+  below_current_threshold?: boolean;
+}
+
+export interface RankHistoryEntry {
+  from: string | null;
+  to: string | null;
+  kind: 'promotion' | 'demotion' | 'initial';
+  points_at_change: number | null;
+  reason: string;
+  changed_by_name: string | null;
+  changed_at: string;
+}
+
+export interface Promotion extends Required<Omit<RankStatus, 'rank'>> {
+  user_id: number;
+  name: string;
+  rank: RankRef | null;
 }
 
 export interface CreatedUser {
@@ -259,6 +310,8 @@ export interface CreatedUser {
   username: string;
   email: string;
   level: Level;
+  /** Konto angelegt, aber Anfangspunkte bzw. Dienstgrad nicht übernommen */
+  warning?: string;
   /** Startpasswort – steht nur in dieser einen Antwort. */
   password: string;
 }
@@ -409,8 +462,27 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUser: (data: { name: string; username?: string; email?: string; level?: 'member' | 'candidate' }) =>
-    request<CreatedUser>('POST', '/users', data),
+  createUser: (data: {
+    name: string;
+    username?: string;
+    email?: string;
+    level?: 'member' | 'candidate';
+    initial_points?: number;
+    initial_points_date?: string;
+    rank_id?: number;
+  }) => request<CreatedUser>('POST', '/users', data),
+
+  // Dienstgrade (Issue #9)
+  ranks: (all = false) => request<Rank[]>('GET', '/ranks', undefined, all ? { all: '1' } : undefined),
+  createRank: (data: { title: string; min_points?: number | null }) => request<Rank>('POST', '/ranks', data),
+  updateRank: (id: number, data: { title?: string; min_points?: number | null; active?: boolean }) =>
+    request<Rank>('PATCH', `/ranks/${id}`, data),
+  deleteRank: (id: number) => request<{ deleted: boolean }>('DELETE', `/ranks/${id}`),
+  reorderRanks: (ids: number[]) => request<Rank[]>('PUT', '/ranks/order', { ids }),
+  setMemberRank: (id: number, rank_id: number | null, reason: string) =>
+    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason }),
+  promotions: () => request<Promotion[]>('GET', '/promotions'),
+  myRank: () => request<RankStatus & { ranks: Rank[]; history: RankHistoryEntry[] }>('GET', '/me/rank'),
 
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),

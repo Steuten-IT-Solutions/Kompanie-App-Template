@@ -698,6 +698,8 @@ select {
 
 .segmented {
   display: flex;
+  /* Viele Reiter (z. B. Verwaltung mit Dienstgraden): auf schmalen Bildschirmen in zwei Zeilen statt zu breit */
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   margin-bottom: 18px;
@@ -706,7 +708,7 @@ select {
   border-radius: 12px;
 }
 .segmented button {
-  flex: 1;
+  flex: 1 1 auto;
   padding: 9px 4px;
   border: 0;
   border-radius: 8px;
@@ -1523,4 +1525,25 @@ fieldset.feature-list legend {
 }
 .hilfe-web {
   margin-top: 18px;
+}
+
+/* Dienstgrade */
+.rank-progress p {
+  margin: 0 0 10px;
+}
+.progress {
+  width: 100%;
+  height: 10px;
+  accent-color: var(--primary);
+}
+.rank-list summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.rank-list ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+.rank-list li.current {
+  font-weight: 700;
 }

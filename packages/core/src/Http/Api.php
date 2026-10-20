@@ -323,7 +323,7 @@ final class Api
                     return $list;
                 }
                 $titles = $a->ranks()->titles();
-                return array_map(static fn (array $m): array => $m + ['rank' => $titles[$m['id']] ?? null], $list);
+                return array_map(static fn (array $m): array => $m + ['rank_title' => $titles[$m['id']] ?? null], $list);
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
                 + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : []), null, $denyManage),
@@ -331,7 +331,7 @@ final class Api
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, function (Request $r) use ($a) {
-                // Anfangspunkte und Dienstgrad (Lank #16): alles prüfen, bevor das Konto entsteht.
+                // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.
                 $initial = $a->ranks()->prepareInitial($this->user(), $r->body);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && ($r->input('level') ?? 'member') !== 'member') {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');

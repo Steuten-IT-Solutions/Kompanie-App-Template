@@ -14,7 +14,7 @@ use KompanieApp\Core\Tests\Support\FixedClock;
 use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\TestCase;
 
-/** Dienstgrade (Issue #9): allein frei, mit Punkten nach Schwellen (Lank #16), Übersicht, Anlage. */
+/** Dienstgrade (Issue #9): allein frei, mit Punkten nach Schwellen, Übersicht, Anlage. */
 final class RankServiceTest extends TestCase
 {
     private FakeUsers $users;

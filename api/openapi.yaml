@@ -544,6 +544,186 @@ paths:
               schema: { $ref: '#/components/schemas/GalleryAlbum' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /me/rank:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigener Dienstgrad, Liste und Verlauf (Bereich Dienstgrade)
+      description: Mit dem Bereich Punkte zusätzlich Schwellen, nächster Dienstgrad und fehlende Punkte. Nur der eigene Verlauf.
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/RankStatus'
+                  - type: object
+                    properties:
+                      ranks:
+                        type: array
+                        items: { $ref: '#/components/schemas/Rank' }
+                      history:
+                        type: array
+                        items: { $ref: '#/components/schemas/RankHistoryEntry' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /ranks:
+    get:
+      tags: [Verwaltung]
+      summary: Dienstgrade (aktive, vom niedrigsten zum höchsten)
+      x-capability: member
+      parameters:
+        - name: all
+          in: query
+          description: Auch inaktive, mit Anzahl der Vergaben (nur mit manage_ranks).
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Rank' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Dienstgrad anlegen (ans obere Ende)
+      description: Gesetzte Schwellen aktiver Dienstgrade müssen mit der Reihenfolge streng steigen, sonst 400.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60 }
+                min_points: { type: [integer, 'null'], minimum: 0 }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rank' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /ranks/order:
+    put:
+      tags: [Verwaltung]
+      summary: Reihenfolge festlegen (alle IDs vom niedrigsten zum höchsten)
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Rank' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /ranks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Dienstgrad ändern (Bezeichnung, Schwelle, aktiv)
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 60 }
+                min_points: { type: [integer, 'null'], minimum: 0 }
+                active: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rank' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Dienstgrad löschen (vergebene nur deaktivieren → 400)
+      x-capability: manage_ranks
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/rank:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: Befördern oder degradieren
+      description: |
+        Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels,
+        degradieren nur unter der Schwelle des aktuellen Dienstgrads; Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
+                reason: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RankStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /promotions:
+    get:
+      tags: [Verwaltung]
+      summary: Beförderungsübersicht (nur zusammen mit dem Bereich Punkte)
+      description: Erreichte Schwellen zuerst (älteste oben), dann nach fehlenden Punkten; ohne nächsten Dienstgrad am Ende. Ohne Gäste.
+      x-capability: manage_ranks
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/RankStatus'
+                    - type: object
+                      properties:
+                        user_id: { type: integer }
+                        name: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+
   /catalog:
     get:
       tags: [Verwaltung]
@@ -754,6 +934,9 @@ paths:
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
                 level: { type: string, enum: [member, candidate], default: member }
+                initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
+                initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
+                rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
       responses:
         '201':
           description: Angelegt
@@ -1469,7 +1652,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties]
+          enum: [events, calendar, news, gallery, points, penalties, ranks]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -1553,7 +1736,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_events, manage_documents, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
             system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
@@ -1565,7 +1748,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_events, manage_documents, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
@@ -1581,7 +1764,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_events, manage_documents, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_events, manage_documents, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte; member bringt calendar mit.'
 
     UpdateStatus:
@@ -1666,6 +1849,7 @@ components:
             gallery: { type: boolean }
             points: { type: boolean }
             penalties: { type: boolean }
+            ranks: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -1680,6 +1864,11 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         points: { type: number, description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen' }
         open_cents: { type: integer }
+        rank:
+          description: Eigener Dienstgrad (nur mit Bereich Dienstgrade)
+          oneOf:
+            - $ref: '#/components/schemas/RankRef'
+            - type: 'null'
 
     PointEntry:
       type: object
@@ -1823,6 +2012,7 @@ components:
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
+        rank_title: { type: [string, 'null'], description: 'Dienstgrad (nur mit Bereich Dienstgrade und Recht manage_ranks)' }
 
     MemberDetail:
       allOf:
@@ -1835,6 +2025,64 @@ components:
             penalties:
               type: array
               items: { $ref: '#/components/schemas/Penalty' }
+            rank: { $ref: '#/components/schemas/RankStatus' }
+            rank_history:
+              type: array
+              items: { $ref: '#/components/schemas/RankHistoryEntry' }
+
+    Rank:
+      type: object
+      required: [id, title, sort, min_points, active]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 60 }
+        sort: { type: integer, description: Reihenfolge, der niedrigste zuerst }
+        min_points: { type: [integer, 'null'], description: 'Punkteschwelle; null = ohne. Für Mitglieder nur mit dem Bereich Punkte' }
+        active: { type: boolean }
+        assigned: { type: integer, description: 'Wie oft vergeben (nur mit all=1)' }
+
+    RankRef:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+
+    RankStatus:
+      type: object
+      description: Dienstgrad eines Mitglieds; alle Felder nach rank nur, wenn auch der Bereich Punkte an ist.
+      properties:
+        rank:
+          oneOf:
+            - $ref: '#/components/schemas/RankRef'
+            - type: 'null'
+        points: { type: number }
+        next_rank:
+          oneOf:
+            - allOf:
+                - $ref: '#/components/schemas/RankRef'
+                - type: object
+                  properties:
+                    min_points: { type: [integer, 'null'] }
+            - type: 'null'
+        points_to_next: { type: [number, 'null'], description: '≤ 0: Schwelle erreicht; null ohne nächsten Dienstgrad oder ohne Schwelle' }
+        reachable_rank:
+          description: Höchster Dienstgrad mit erreichter Schwelle
+          oneOf:
+            - $ref: '#/components/schemas/RankRef'
+            - type: 'null'
+        threshold_reached_since: { type: [string, 'null'], format: date, description: 'Seit wann die Summe durchgehend die Schwelle des nächsten erreicht' }
+        below_current_threshold: { type: boolean }
+
+    RankHistoryEntry:
+      type: object
+      properties:
+        from: { type: [string, 'null'] }
+        to: { type: [string, 'null'] }
+        kind: { type: string, enum: [promotion, demotion, initial] }
+        points_at_change: { type: [number, 'null'], description: 'null ohne den Bereich Punkte' }
+        reason: { type: string }
+        changed_by_name: { type: [string, 'null'] }
+        changed_at: { type: string, description: 'UTC, YYYY-MM-DD HH:MM:SS' }
 
     CreatedUser:
       type: object
@@ -1844,4 +2092,5 @@ components:
         username: { type: string }
         email: { type: string }
         level: { type: string, enum: [member, candidate] }
+        warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte bzw. Dienstgrad nicht übernommen' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort }

@@ -24,8 +24,13 @@ async function fillLogin(page: Page, user: string, password: string) {
     await page.locator('form.login').getByRole('button', { name: 'Anmelden' }).click();
   } else {
     await expect(page).toHaveURL(/wp-login\.php/);
-    await page.fill('#user_login', user);
-    await page.fill('#user_pass', password);
+    // wp-login.php setzt kurz nach dem Laden den Fokus ins Benutzerfeld; danach prüfen, ob beide Werte stimmen.
+    await expect(async () => {
+      await page.fill('#user_login', user);
+      await page.fill('#user_pass', password);
+      await expect(page.locator('#user_login')).toHaveValue(user, { timeout: 500 });
+      await expect(page.locator('#user_pass')).toHaveValue(password, { timeout: 500 });
+    }).toPass();
     await page.click('#wp-submit');
   }
 }
@@ -433,7 +438,7 @@ test.describe('Android', () => {
         });
         return (await res.json()).subscription;
       }, device);
-    await expect.poll(status).toEqual({ types: ['penalties', 'points', 'events', 'reminder', 'news'], details: true });
+    await expect.poll(status).toEqual({ types: ['penalties', 'points', 'ranks', 'events', 'reminder', 'news'], details: true });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -914,4 +919,48 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await news.getByRole('button', { name: 'Neuigkeiten testen' }).click();
   await expect(news.getByText('2 Beiträge gefunden.')).toBeVisible();
   await shot(page, '18-einstellungen');
+});
+
+test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht Stand und Verlauf', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrade' }).click();
+  for (const [title, min] of [
+    ['Gefreiter', '10'],
+    ['Unteroffizier', '1000'],
+  ]) {
+    await page.getByLabel('Bezeichnung').fill(title);
+    await page.getByLabel('Punkteschwelle (optional)').fill(min);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.row', { hasText: title })).toBeVisible();
+  }
+  await expect(page.locator('.segmented').getByRole('button', { name: 'Beförderungen' })).toBeVisible();
+
+  // Punkte für mitglied2 buchen, dann befördern.
+  await page.locator('.segmented').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  const id = Number(page.url().split('/').pop());
+  await page.evaluate(async (userId) => {
+    const c = window.KOMPANIE_CONFIG!;
+    await fetch(c.apiBase + 'points', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', [c.csrf.header]: c.csrf.token },
+      body: JSON.stringify({ user_ids: [userId], points: 12, reason: 'E2E Dienstgrad' }),
+    });
+  }, id);
+  await page.reload();
+  await page.getByLabel('Neuer Dienstgrad').selectOption({ label: 'Gefreiter (ab 10)' });
+  await page.getByLabel('Begründung (optional)').fill('Gute Arbeit');
+  await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
+  await expect(page.getByText('Beförderung: kein Dienstgrad → Gefreiter')).toBeVisible();
+  await expect(page.locator('.member-rank strong')).toHaveText('Gefreiter');
+
+  await login(page, 'mitglied2');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await page.locator('.segmented').getByRole('button', { name: 'Dienstgrad' }).click();
+  await expect(page.locator('.stat-value')).toHaveText('Gefreiter');
+  await expect(page.locator('.rank-progress')).toContainText('bis „Unteroffizier“');
+  await expect(page.getByText('Gute Arbeit')).toBeVisible();
 });
