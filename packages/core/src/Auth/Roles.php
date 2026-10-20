@@ -64,6 +64,7 @@ final class Roles
         Capability::ManageAttendance,
         Capability::ManageEvents,
         Capability::ManageDocuments,
+        Capability::PostBoard,
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];

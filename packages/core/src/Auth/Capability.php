@@ -28,6 +28,8 @@ enum Capability: string
      * Die Dokumente selbst kommen mit Issue #2.
      */
     case ManageDocuments = 'manage_documents';
+    /** Dringende Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen (Bereich Schwarzes Brett, Issue #5). */
+    case PostBoard = 'post_board';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */
