@@ -510,7 +510,7 @@ function NewMember() {
         </select>
       </label>
       <p className="muted small">
-        Das neue Konto bekommt ein zufälliges Startpasswort. Weitere Rollen vergibst du danach in den Mitgliedsdetails.
+        Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
       </p>
       {formError && (
         <p className="form-error" role="alert">

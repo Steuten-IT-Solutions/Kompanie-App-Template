@@ -50,8 +50,9 @@ final class MemberService
         $totals = $this->scores->totalsByUser();
         [$points, $penalties] = self::visibleParts($viewer);
         $out = [];
-        foreach ($this->users->list($includeGuests || $includeCandidates) as $u) {
-            if (!$includeGuests && !$u->isMember() && !($includeCandidates && $u->role === Roles::CANDIDATE)) {
+        // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
+        foreach ($this->users->list($includeGuests) as $u) {
+            if (!$includeGuests && !$u->isMember() && !($includeCandidates && self::calendarOnly($u))) {
                 continue;
             }
             $out[] = [
@@ -82,6 +83,12 @@ final class MemberService
             'point_list' => $points ? $this->scores->pointsFor($u->id) : [],
             'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
         ];
+    }
+
+    /** Interner Kalender ohne Mitgliederbereich: Anwärter oder eine eigene Rolle nur mit dem Kalender. */
+    private static function calendarOnly(User $u): bool
+    {
+        return $u->can(Capability::Calendar) && !$u->isMember();
     }
 
     /**
@@ -223,8 +230,9 @@ final class MemberService
         }
         // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen,
         // oder (bei WordPress) das Konto einer Person, die gar nicht zur Kompanie gehört (Gast).
-        // Anwärter legt an, wer Konten anlegen darf; ihr Passwort darf er deshalb auch zurücksetzen.
-        if (!$actor->isAdmin() && !$target->isMember() && $target->role !== Roles::CANDIDATE) {
+        // Anwärter legt an, wer Konten anlegen darf; ihr Passwort (und das anderer Konten nur mit dem Kalender) darf er
+        // deshalb auch zurücksetzen.
+        if (!$actor->isAdmin() && !$target->isMember() && !self::calendarOnly($target)) {
             throw ApiError::forbidden('Passwörter von Personen ohne Mitgliederbereich setzen nur Admins zurück.');
         }
         if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {

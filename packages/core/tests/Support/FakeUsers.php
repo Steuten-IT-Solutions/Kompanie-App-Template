@@ -49,7 +49,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         $out = [];
         foreach (array_keys($this->users) as $id) {
             $u = $this->find($id);
-            if ($includeGuests || $u->isMember()) {
+            if ($includeGuests || $u->role !== Roles::GUEST) {
                 $out[] = $u;
             }
         }

@@ -111,4 +111,50 @@ final class RolesTest extends TestCase
         $this->assertSame(403, $reset($kasse), 'kein Passwort von Personen mit anderen Rechten (Kontoübernahme)');
         $this->assertSame(200, $reset($m));
     }
+
+    public function testCandidateAddedOnUpdateDoesNotClashWithOwnRoleOfThatName(): void
+    {
+        // Vor Issue #23 eine eigene Rolle „Anwärter“ angelegt.
+        $settings = new MemorySettings([RoleService::SETTING => [
+            ['key' => 'guest', 'label' => 'Gast', 'capabilities' => []],
+            ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member']],
+            ['key' => 'r1', 'label' => 'Anwärter', 'capabilities' => ['member']],
+            ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
+        ]]);
+        $app = TestApp::create(TestApp::connection(), settings: $settings, features: false);
+        $labels = array_column($app->roles()->all(), 'label', 'key');
+        $this->assertSame('Anwärter (fest)', $labels[Roles::CANDIDATE]);
+        // Rechte der eigenen Rolle lassen sich weiter ändern, auch mit unverändertem Namen.
+        $app->roles()->update('r1', ['label' => 'Anwärter', 'capabilities' => ['calendar']]);
+        $this->assertSame([Capability::Calendar], $app->roles()->capabilities('r1'));
+    }
+
+    public function testCalendarAloneOrIncludedInMemberArea(): void
+    {
+        $app = TestApp::create(TestApp::connection(), features: false);
+        $key = $app->roles()->create(['label' => 'Nur Kalender', 'capabilities' => ['calendar']])['key'];
+        $this->assertSame(['calendar'], $app->roles()->find($key)['capabilities']);
+        $app->roles()->update($key, ['capabilities' => ['calendar', 'member']]);
+        $this->assertSame(['member'], $app->roles()->find($key)['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt gespeichert');
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar], $app->roles()->capabilities($key));
+        $this->expectException(\KompanieApp\Core\Http\ApiError::class);
+        $app->roles()->update($key, ['capabilities' => ['calendar', 'manage_events']]);
+    }
+
+    public function testCalendarOnlyRolesAreListedAndHandledLikeCandidates(): void
+    {
+        $users = new FakeUsers();
+        $app = TestApp::create(TestApp::connection(), $users, features: false);
+        $key = $app->roles()->create(['label' => 'Freunde', 'capabilities' => ['calendar']])['key'];
+        $friend = $users->add('freund', $key);
+        $cand = $users->add('anwaerter', Roles::CANDIDATE);
+        $users->add('gast', Roles::GUEST);
+        $ids = static fn (array $rows): array => array_column($rows, 'id');
+        $this->assertSame([], array_intersect([$friend, $cand], $ids($app->members()->list(false))));
+        $this->assertEqualsCanonicalizing([$friend, $cand], $ids($app->members()->list(false, null, true)));
+        $holder = $users->find($users->add('pflege', Roles::MEMBER));
+        $this->assertNotNull($holder);
+        $holder = new \KompanieApp\Core\Auth\User($holder->id, 'Pflege', 'pflege', 'x', [Capability::Member, Capability::Calendar, Capability::CreateUsers]);
+        $this->assertArrayHasKey('password', $app->members()->resetPassword($holder, $friend));
+    }
 }

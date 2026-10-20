@@ -174,7 +174,8 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 
 | Recht | Bedeutung |
 |---|---|
-| `member` | eigene Punkte/Strafen, interner Kalender, interne Galerie |
+| `member` | eigene Punkte/Strafen, interne Galerie; schließt `calendar` ein |
+| `calendar` | interner Kalender (allein z. B. für Anwärter) |
 | `manage_points` | Punkte vergeben und stornieren, Katalog pflegen |
 | `manage_penalties` | Strafen vergeben, als bezahlt markieren, stornieren |
 | `manage_events` | öffentliche Termine pflegen |
@@ -190,7 +191,8 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Rolle | Rechte |
   |---|---|
   | `guest` (Gast) | nur öffentliche Inhalte |
-  | `member` (Mitglied) | `member` – Rolle neuer Konten; Punktefaktor änderbar |
+  | `candidate` (Anwärter) | `calendar` |
+  | `member` (Mitglied) | `member` (mit `calendar`) – Rolle neuer Konten; Punktefaktor änderbar |
   | `admin` (Admin) | alle |
 
 - **Standardrollen der Bereiche:** Schaltet der Admin einen Bereich ein, der Rechte braucht, kommt dessen Standardrolle „‹Bereich› verwalten“ dazu (`Domain\Features`, Feld `role`), sofern es sie oder eine Rolle mit diesem Namen noch nicht gibt. Schaltet er ihn aus, verschwindet sie, wenn ihr niemand zugeordnet ist. Ihre Rechte wirken nur, solange der Bereich an ist.

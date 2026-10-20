@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, applyRoles, config, type Capability, type Level, type RoleAdmin } from '../api';
+import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -161,7 +161,7 @@ function RoleForm({
             : role?.key === 'member'
               ? 'Rolle neuer Konten mit dem Mitgliederbereich; die Rechte lassen sich nicht ändern.'
               : role?.key === 'candidate'
-                ? 'Anwärter sehen den internen Kalender, aber nicht den Mitgliederbereich. Wer Mitglieder anlegen darf, macht sie zu Mitgliedern; die Rechte lassen sich nicht ändern.'
+                ? `Sieht den internen Kalender, aber nicht den Mitgliederbereich. Wer Mitglieder anlegen darf, nimmt sie als „${levelLabel('member')}“ auf; die Rechte lassen sich nicht ändern.`
                 : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
         </p>
       ) : (

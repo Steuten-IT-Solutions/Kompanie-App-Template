@@ -426,9 +426,11 @@ final class ApiScenario
         $c->ok($this->req('GET', '/calendar')[0] === 403, 'Gast: kein interner Kalender');
         $this->d->actAs($cand);
         $c->ok($this->req('GET', '/calendar')[0] === $memberCalendar && $memberCalendar !== 403, 'Anwärter sieht den internen Kalender');
-        foreach (['/me/points', '/me/penalties', '/members'] as $path) {
+        foreach (['/me/points', '/me/penalties', '/members', "/members/{$this->m1}"] as $path) {
             $c->ok($this->req('GET', $path)[0] === 403, "Anwärter: GET $path → 403");
         }
+        $types = array_column((array) ($this->req('POST', '/me/push/status')[1]['types'] ?? []), 'key');
+        $c->ok(in_array('events', $types, true) && !array_intersect(['points', 'penalties'], $types), 'Anwärter: Benachrichtigungen zu Terminen, nicht zu Punkten oder Strafen');
         [, $cfg] = $this->req('GET', '/config');
         $caps = (array) ($cfg['user']['capabilities'] ?? []);
         $c->ok(in_array('calendar', $caps, true) && !in_array('member', $caps, true), '/config: Recht calendar, nicht member');
