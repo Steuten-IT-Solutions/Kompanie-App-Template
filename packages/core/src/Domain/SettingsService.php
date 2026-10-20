@@ -29,6 +29,8 @@ final class SettingsService
         $out = [
             'calendar' => [
                 'source' => $a->calendar()->source(),
+                // Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen: neu verbinden.
+                'connection_needs_calendar_access' => $a->calendar()->connectionNeedsCalendarAccess(),
                 'ics_url_set' => trim((string) $s->get('calendar_ics_url', '')) !== '',
                 'google_api_key_set' => trim((string) $s->get('google_api_key', '')) !== '',
                 'calendar_ids' => (string) $s->get('calendar_ids', ''),
@@ -40,6 +42,7 @@ final class SettingsService
                 'service_account_email' => $a->drive()->clientEmail(),
                 'oauth_connected' => $a->drive()->oauth() !== null,
                 'oauth_email' => $a->drive()->oauthEmail(),
+                'calendar_access' => $a->drive()->calendarAccess(),
                 'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending()]),
             ],
             'news' => null,
@@ -134,7 +137,10 @@ final class SettingsService
         foreach ($set as $k => $v) {
             $a->settings->set($k, $v);
         }
-        if (array_intersect(array_keys($set), ['calendar_ics_url', 'google_api_key', 'calendar_ids', 'calendar_cache_minutes'])) {
+        // Auch der Google-Zugang der Galerie kann die Quelle des Kalenders sein (Kalender-IDs ohne API-Schlüssel).
+        $driveChanged = array_key_exists('drive_service_account', $in) || array_key_exists('drive_oauth', $in);
+        if (array_intersect(array_keys($set), ['calendar_ics_url', 'google_api_key', 'calendar_ids', 'calendar_cache_minutes'])
+            || ($driveChanged && $a->calendar()->calendarIds() !== [])) {
             $a->calendar()->clearCache();
         }
         if (array_key_exists('drive_service_account', $in)) {

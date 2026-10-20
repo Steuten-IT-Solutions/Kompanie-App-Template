@@ -11,11 +11,16 @@ use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
 
 /**
- * Lesender Zugriff auf Google Drive über ein Dienstkonto.
+ * Lesender Zugriff auf Google Drive und, über denselben Zugang, auf den Google Kalender.
  *
  * Der Schlüssel des Dienstkontos liegt nur auf dem Server. Der Galerie-Ordner
  * muss in Google Drive für die E-Mail-Adresse des Dienstkontos freigegeben sein.
  * Ohne Bibliothek: Das Zugriffstoken wird per signiertem JWT (RS256) geholt.
+ *
+ * Den Kalender liest CalendarService mit accessToken(), wenn calendarAccess() zutrifft:
+ * bei einer OAuth-Verbindung nur, wenn Google dabei auch calendar.readonly erlaubt hat
+ * (gespeichert in `scope`); beim Dienstkonto immer (der Kalender muss für dessen
+ * E-Mail-Adresse freigegeben sein, sonst lehnt Google den Abruf ab).
  *
  * Fehler werden als \RuntimeException mit verständlicher Meldung geworfen.
  */
@@ -23,12 +28,15 @@ final class DriveClient
 {
     public const SETTING = 'drive_service_account';
     /**
-     * Bestehende Verbindung über OAuth (client_id, client_secret, refresh_token, email), etwa aus der Übernahme
-     * einer früheren App. Sie geht dem Dienstkonto vor. Neu verbinden lässt sich so (noch) nicht, siehe
+     * Bestehende Verbindung über OAuth (client_id, client_secret, refresh_token, email, scope), etwa aus der Übernahme
+     * einer früheren App. `scope` sind die bei Google erlaubten Berechtigungen, durch Leerzeichen getrennt (wie Google
+     * sie beim Token-Austausch liefert). Sie geht dem Dienstkonto vor. Neu verbinden lässt sich so (noch) nicht, siehe
      * OFFENE-PUNKTE.md, Abschnitt 5; nur trennen.
      */
     public const OAUTH_SETTING = 'drive_oauth';
     public const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+    /** Lesezugriff auf den Google Kalender (für CalendarService, über denselben Zugang). */
+    public const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
     public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
     public const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
     public const FOLDER_MIME = 'application/vnd.google-apps.folder';
@@ -55,7 +63,13 @@ final class DriveClient
         return $this->serviceAccount()['client_email'] ?? '';
     }
 
-    /** @return array{client_id: string, client_secret: string, refresh_token: string, email: string}|null */
+    /** Angeforderte Berechtigungen des Dienstkontos: Drive für die Galerie, Kalender für die Termine (beide nur Lesen). */
+    public static function scopes(): string
+    {
+        return self::SCOPE . ' ' . self::CALENDAR_SCOPE;
+    }
+
+    /** @return array{client_id: string, client_secret: string, refresh_token: string, email: string, scope: string}|null */
     public function oauth(): ?array
     {
         $o = $this->settings->get(self::OAUTH_SETTING);
@@ -67,13 +81,33 @@ final class DriveClient
                 return null;
             }
         }
-        return ['client_id' => $o['client_id'], 'client_secret' => $o['client_secret'], 'refresh_token' => $o['refresh_token'], 'email' => is_string($o['email'] ?? null) ? $o['email'] : ''];
+        return [
+            'client_id' => $o['client_id'],
+            'client_secret' => $o['client_secret'],
+            'refresh_token' => $o['refresh_token'],
+            'email' => is_string($o['email'] ?? null) ? $o['email'] : '',
+            'scope' => is_string($o['scope'] ?? null) ? $o['scope'] : '',
+        ];
     }
 
     /** Google-Konto der OAuth-Verbindung ('' ohne Verbindung oder wenn es unbekannt ist). */
     public function oauthEmail(): string
     {
         return $this->oauth()['email'] ?? '';
+    }
+
+    /**
+     * Darf der aktive Zugang den Kalender lesen? Bei einer OAuth-Verbindung nur, wenn Google dabei
+     * calendar.readonly erlaubt hat; Verbindungen ohne diese Berechtigung (oder ohne gespeicherte
+     * Berechtigungen) müssen neu verbunden werden. Ein Dienstkonto fragt den Kalender immer mit an.
+     */
+    public function calendarAccess(): bool
+    {
+        $oauth = $this->oauth();
+        if ($oauth !== null) {
+            return in_array(self::CALENDAR_SCOPE, preg_split('/\s+/', trim($oauth['scope'])) ?: [], true);
+        }
+        return $this->serviceAccount() !== null;
     }
 
     /** Ist ein Google-Zugang hinterlegt (OAuth-Verbindung oder Dienstkonto)? */
@@ -85,15 +119,15 @@ final class DriveClient
     /**
      * Speichert eine bestehende OAuth-Verbindung.
      *
-     * @param array<string, mixed> $o client_id, client_secret, refresh_token, email
+     * @param array<string, mixed> $o client_id, client_secret, refresh_token, email, scope (die beiden letzten optional)
      * @throws \RuntimeException wenn ein Pflichtfeld fehlt
      */
     public function saveOAuth(array $o): void
     {
         $clean = [];
-        foreach (['client_id', 'client_secret', 'refresh_token', 'email'] as $k) {
+        foreach (['client_id', 'client_secret', 'refresh_token', 'email', 'scope'] as $k) {
             $clean[$k] = is_string($o[$k] ?? null) ? trim($o[$k]) : '';
-            if ($clean[$k] === '' && $k !== 'email') {
+            if ($clean[$k] === '' && !in_array($k, ['email', 'scope'], true)) {
                 throw new \RuntimeException('Für die Verbindung zu Google fehlt ' . $k . '.');
             }
         }
@@ -153,7 +187,7 @@ final class DriveClient
         $header = ['alg' => 'RS256', 'typ' => 'JWT'];
         $claims = [
             'iss' => $sa['client_email'],
-            'scope' => self::SCOPE,
+            'scope' => self::scopes(),
             'aud' => $sa['token_uri'] ?? self::TOKEN_URI,
             'iat' => $now,
             'exp' => $now + 3600,
@@ -173,8 +207,9 @@ final class DriveClient
         if ($oauth === null && $sa === null) {
             throw new \RuntimeException('Es ist noch kein Google-Zugang hinterlegt.');
         }
-        // Der Zwischenspeicher gehört zu genau diesem Zugang (nach einem Wechsel nicht weiterverwenden).
-        $owner = $oauth !== null ? 'oauth:' . hash('sha256', $oauth['refresh_token']) : $sa['client_email'];
+        // Der Zwischenspeicher gehört zu genau diesem Zugang (nach einem Wechsel nicht weiterverwenden). Beim Dienstkonto
+        // mit den Berechtigungen, damit ein Token von vor der Kalender-Erweiterung (nur Drive) nicht weiterverwendet wird.
+        $owner = $oauth !== null ? 'oauth:' . hash('sha256', $oauth['refresh_token']) : $sa['client_email'] . '|' . self::scopes();
         $cached = $this->cache->get(self::TOKEN_CACHE);
         if (is_array($cached) && ($cached['email'] ?? '') === $owner) {
             return (string) $cached['token'];

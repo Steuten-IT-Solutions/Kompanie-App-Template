@@ -13,9 +13,12 @@ use KompanieApp\Core\Port\Settings;
 /**
  * Alle Termine für Mitglieder aus dem Google Kalender.
  *
- * Quellen:
- *  1. Geheime iCal-Adresse (Standard, ohne Google Cloud).
- *  2. Google-Kalender-IDs mit API-Schlüssel (nur öffentliche Kalender).
+ * Quellen, in dieser Reihenfolge:
+ *  1. Google-Kalender-IDs mit eigenem API-Schlüssel (nur öffentliche Kalender), 'google'.
+ *  2. Google-Kalender-IDs über den Google-Zugang der Galerie (DriveClient: OAuth-Verbindung mit
+ *     calendar.readonly oder Dienstkonto), auch für private Kalender, 'google_connection'.
+ *  3. Geheime iCal-Adresse (Standard in der App, ohne Google Cloud), 'ics'.
+ * Bei 1. und 2. löst Google Serientermine selbst auf (singleEvents=true).
  *
  * Schlüssel verlassen nie den Server.
  *
@@ -45,6 +48,7 @@ final class CalendarService
         private readonly HttpClient $http,
         private readonly Cache $cache,
         private readonly Time $time,
+        private readonly ?DriveClient $drive = null,
     ) {
     }
 
@@ -53,13 +57,32 @@ final class CalendarService
         return $this->source() !== 'none';
     }
 
-    /** 'ics', 'google' oder 'none' */
+    /** 'google' (eigener API-Schlüssel), 'google_connection' (Google-Zugang der Galerie), 'ics' oder 'none' */
     public function source(): string
     {
-        if ($this->calendarIds() !== [] && trim((string) $this->settings->get('google_api_key', '')) !== '') {
-            return 'google';
+        if ($this->calendarIds() !== []) {
+            if (trim((string) $this->settings->get('google_api_key', '')) !== '') {
+                return 'google';
+            }
+            if ($this->drive?->calendarAccess()) {
+                return 'google_connection';
+            }
         }
         return trim((string) $this->settings->get('calendar_ics_url', '')) !== '' ? 'ics' : 'none';
+    }
+
+    /**
+     * Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung der Galerie darf den Kalender nicht lesen
+     * (verbunden vor der Kalender-Erweiterung oder ohne Häkchen dafür): Hinweis „neu verbinden“.
+     */
+    public function connectionNeedsCalendarAccess(): bool
+    {
+        $drive = $this->drive;
+        return $drive !== null
+            && $drive->oauth() !== null
+            && !$drive->calendarAccess()
+            && $this->calendarIds() !== []
+            && trim((string) $this->settings->get('google_api_key', '')) === '';
     }
 
     /** @return string[] */
@@ -150,7 +173,8 @@ final class CalendarService
     {
         try {
             $events = match ($this->source()) {
-                'google' => $this->fetchGoogle(),
+                'google' => $this->fetchGoogle(['key' => (string) $this->settings->get('google_api_key', '')], []),
+                'google_connection' => $this->fetchWithConnection(),
                 'ics' => $this->fetchIcs((string) $this->settings->get('calendar_ics_url')),
                 default => throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.'),
             };
@@ -190,11 +214,38 @@ final class CalendarService
         return [$now - self::PAST_DAYS * 86400, $now + 365 * 86400];
     }
 
-    /** @return array<int, array<string, mixed>> */
-    private function fetchGoogle(): array
+    /**
+     * Über den Google-Zugang der Galerie: Zugriffstoken als Bearer, ohne API-Schlüssel.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchWithConnection(): array
+    {
+        $drive = $this->drive;
+        if ($drive === null) {
+            throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.');
+        }
+        try {
+            $token = $drive->accessToken();
+        } catch (\RuntimeException $e) {
+            throw ApiError::upstream('Google Kalender: ' . $e->getMessage());
+        }
+        $hint = $drive->oauth() !== null
+            ? 'Kann das verbundene Google-Konto' . ($drive->oauthEmail() !== '' ? ' (' . $drive->oauthEmail() . ')' : '')
+                . ' den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?'
+            : 'Ist der Kalender für ' . $drive->clientEmail() . ' freigegeben („Alle Termindetails sehen“), und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?';
+        return $this->fetchGoogle([], ['Authorization' => 'Bearer ' . $token], $hint);
+    }
+
+    /**
+     * @param array<string, string> $auth Parameter für die Anmeldung (API-Schlüssel) oder leer
+     * @param array<string, string> $headers z. B. Authorization mit Zugriffstoken
+     * @param string $hint Zusatz zur Fehlermeldung, wenn Google den Abruf ablehnt (401, 403, 404)
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchGoogle(array $auth, array $headers, string $hint = ''): array
     {
         [$min, $max] = $this->range();
-        $key = (string) $this->settings->get('google_api_key', '');
         $requests = [];
         foreach ($this->calendarIds() as $calId) {
             $params = [
@@ -204,16 +255,15 @@ final class CalendarService
                 'timeMin' => gmdate('Y-m-d\TH:i:s\Z', $min),
                 'timeMax' => gmdate('Y-m-d\TH:i:s\Z', $max),
                 'timeZone' => $this->time->timezone()->getName(),
-                'key' => $key,
-            ];
-            $requests[$calId] = ['method' => 'GET', 'url' => sprintf(self::GOOGLE_EVENTS_URL, rawurlencode($calId)) . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986)];
+            ] + $auth;
+            $requests[$calId] = ['method' => 'GET', 'url' => sprintf(self::GOOGLE_EVENTS_URL, rawurlencode($calId)) . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986), 'headers' => $headers];
         }
         // Mehrere Kalender gleichzeitig abrufen, wenn der HttpClient das kann; sonst nacheinander.
         $responses = $this->http instanceof ExtendedHttpClient && count($requests) > 1 ? $this->http->requestAll($requests, 15) : [];
         $events = [];
         foreach ($requests as $calId => $request) {
             $calId = (string) $calId;
-            $res = $responses[$calId] ?? $this->tryGet($request['url']);
+            $res = $responses[$calId] ?? $this->tryGet($request['url'], $headers);
             if ($res instanceof \RuntimeException) {
                 throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
             }
@@ -224,14 +274,15 @@ final class CalendarService
                 $body = json_decode($res['body'], true);
                 if ($res['status'] !== 200 || !is_array($body)) {
                     $msg = $body['error']['message'] ?? ('HTTP ' . $res['status']);
-                    throw ApiError::upstream('Google Kalender: ' . $msg);
+                    $withHint = $hint !== '' && in_array($res['status'], [401, 403, 404], true);
+                    throw ApiError::upstream('Google Kalender: ' . $msg . ($withHint ? ' – ' . $hint : ''));
                 }
                 array_push($items, ...array_values((array) ($body['items'] ?? [])));
                 $token = $body['nextPageToken'] ?? null;
                 if (!is_string($token) || $token === '' || $page === 3) {
                     break;
                 }
-                $res = $this->tryGet($request['url'] . '&pageToken=' . rawurlencode($token));
+                $res = $this->tryGet($request['url'] . '&pageToken=' . rawurlencode($token), $headers);
                 if ($res instanceof \RuntimeException) {
                     throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
                 }
@@ -290,11 +341,14 @@ final class CalendarService
         return $res;
     }
 
-    /** @return array{status: int, headers: array<string, string>, body: string}|\RuntimeException */
-    private function tryGet(string $url): array|\RuntimeException
+    /**
+     * @param array<string, string> $headers
+     * @return array{status: int, headers: array<string, string>, body: string}|\RuntimeException
+     */
+    private function tryGet(string $url, array $headers = []): array|\RuntimeException
     {
         try {
-            return $this->http->request('GET', $url, [], null, 15);
+            return $this->http->request('GET', $url, $headers, null, 15);
         } catch (\RuntimeException $e) {
             return $e;
         }
