@@ -46,6 +46,18 @@ export interface AppConfig {
   user: AppUser | null;
   /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
   setupPending?: boolean;
+  /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
+  maintenance?: MaintenanceInfo;
+}
+
+export interface MaintenanceInfo {
+  on: boolean;
+  reason: string;
+  since: number;
+}
+
+export interface MaintenanceState extends MaintenanceInfo {
+  log: { at: number; by: number; by_name: string; on: boolean; reason: string }[];
 }
 
 declare global {
@@ -78,6 +90,13 @@ export const CONFIG_CHANGED = 'kompanie-config-changed';
 export function applyFeatures(list: FeatureInfo[]): void {
   if (!config) return;
   for (const f of list) config.features[f.key] = f.enabled && f.configured !== false;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Wartungsmodus in die geladene Konfiguration (nach dem Schalten oder einer 503 `maintenance`). */
+export function applyMaintenance(m: MaintenanceInfo): void {
+  if (!config) return;
+  config.maintenance = { on: m.on, reason: m.reason, since: m.since };
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -562,6 +581,10 @@ async function requestFull<T>(
   if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
   }
+  // Wartungsmodus wurde eingeschaltet, während die App offen ist: Wartungsseite zeigen.
+  if (res.status === 503 && data?.code === 'maintenance') {
+    applyMaintenance({ on: true, reason: String(data.reason ?? ''), since: config.maintenance?.since ?? 0 });
+  }
   if (!res.ok) {
     throw new ApiError(data?.message ?? `Fehler ${res.status}`, res.status, data?.code ?? '');
   }
@@ -700,6 +723,11 @@ export const api = {
   features: () => request<FeatureInfo[]>('GET', '/admin/features'),
   setFeatures: (data: Partial<Record<Feature, boolean>>) => request<FeatureInfo[]>('PUT', '/admin/features', data),
   settings: () => request<AdminSettings>('GET', '/admin/settings'),
+  maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
+  setMaintenance: (on: boolean, reason?: string) =>
+    request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
+  /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
+  config: () => request<AppConfig>('GET', '/config'),
   updateSettings: (data: AdminSettingsInput) => request<AdminSettings>('PATCH', '/admin/settings', data),
   testCalendar: () => request<{ count: number; sample: { start: string; title: string }[] }>('POST', '/admin/calendar/test'),
   testNews: () => request<{ count: number }>('POST', '/admin/news/test'),

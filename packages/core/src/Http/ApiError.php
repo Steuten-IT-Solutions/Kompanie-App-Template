@@ -10,10 +10,12 @@ namespace KompanieApp\Core\Http;
  */
 final class ApiError extends \RuntimeException
 {
+    /** @param array<string, mixed> $extra weitere Felder der Antwort (z. B. reason beim Wartungsmodus) */
     public function __construct(
         public readonly int $status,
         public readonly string $errorCode,
         string $message,
+        public readonly array $extra = [],
     ) {
         parent::__construct($message);
     }

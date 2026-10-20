@@ -86,6 +86,8 @@ final class StatusReporter
             'update' => is_array($last) ? ['ok' => (bool) ($last['ok'] ?? false), 'at' => (int) ($last['at'] ?? 0), 'to' => (string) ($last['to'] ?? '')] : null,
             'updateCheckOk' => (string) (((array) $a->settings->get('update_state', []))['error'] ?? '') === '',
             'gallery' => $a->gallery()->isConfigured() ? ['ok' => ($gallery['error'] ?? '') === '', 'at' => (int) ($gallery['last_sync'] ?? 0)] : null,
+            // Wartungsmodus (Issue #42): nur ob, nie die Begründung (Freitext gehört nicht in Statusmeldungen).
+            'maintenance' => $a->maintenance()->active(),
             'sent' => $a->time()->timestamp(),
             'nonce' => bin2hex(random_bytes(8)),
         ];

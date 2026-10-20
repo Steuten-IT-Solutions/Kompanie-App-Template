@@ -5,6 +5,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import { ErrorBoundary, lazyView, Loading } from './ui';
+import { MaintenanceBanner, MaintenancePage } from './maintenance';
 import { forgetPushOnLogout } from './push';
 import { navigate, useRoute } from './router';
 import Anmelden from './views/Anmelden';
@@ -253,6 +254,16 @@ export default function App() {
     );
   }
 
+  // Wartungsmodus (Issue #42): alle außer Admins sehen nur die Wartungsseite; die Anmeldung bleibt erreichbar.
+  const maintenance = config.maintenance?.on ? config.maintenance : null;
+  if (maintenance && !can('manage_settings') && tab !== 'anmelden') {
+    return (
+      <div className="app">
+        <MaintenancePage reason={maintenance.reason} />
+      </div>
+    );
+  }
+
   const albumId = tab === 'galerie' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
@@ -290,6 +301,7 @@ export default function App() {
         )}
       </header>
 
+      {maintenance && <MaintenanceBanner reason={maintenance.reason} onToast={showToast} />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 

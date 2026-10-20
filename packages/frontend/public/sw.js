@@ -109,6 +109,7 @@ async function documentFirst(request, id) {
   return res;
 }
 
+/** Nur erfolgreiche Antworten: Fehler wie 503 im Wartungsmodus überschreiben nie gespeicherte Daten. */
 function cacheable(res) {
   return res && res.ok && !res.redirected && res.type === 'basic';
 }

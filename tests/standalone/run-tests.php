@@ -376,6 +376,24 @@ try {
     $settings->delete('kptest_frisch');
     $c->ok($settings->fresh('kptest_frisch', 'weg') === 'weg', 'fresh(): fehlender Wert → Vorgabe');
 
+    $c->section('Wartungsmodus');
+    $d->actAs($anna);
+    [$s, $m] = $d->request('POST', '/admin/maintenance', ['on' => true, 'reason' => 'Umstellung, bis ca. 18 Uhr']);
+    $c->ok($s === 200 && $m['on'] === true, 'Admin schaltet den Wartungsmodus ein');
+    $c->ok($d->request('GET', '/me')[0] === 200, 'Admin arbeitet normal weiter');
+    $d->actAs($max);
+    [$s, $e] = $d->request('GET', '/me');
+    $c->ok($s === 503 && ($e['code'] ?? '') === 'maintenance' && ($e['reason'] ?? '') === 'Umstellung, bis ca. 18 Uhr', 'Mitglied → 503 maintenance mit Begründung');
+    [$s, $cfg] = $d->request('GET', '/config');
+    $c->ok($s === 200 && ($cfg['maintenance']['on'] ?? false) === true, '/config bleibt erreichbar und meldet die Wartung');
+    $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 503, 'Geschützte Fotos → 503');
+    $c->ok($d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null)[0] === 503, 'Dokumente → 503');
+    $c->ok($d->send('GET', $base, [], null)[0] === 200, 'App-Seite wird weiter ausgeliefert (zeigt die Wartungsseite)');
+    $d->actAs($anna);
+    $c->ok($d->request('POST', '/admin/maintenance', ['on' => false])[1]['on'] === false, 'Admin beendet den Wartungsmodus');
+    $d->actAs($max);
+    $c->ok($d->request('GET', '/me')[0] === 200, 'Danach wieder normal');
+
     $c->section('Datensicherung');
     $d->actAs($anna);
     [, $ev] = $d->request('POST', '/events', ['title' => 'Sicherungstest', 'start_date' => '2031-05-01']);

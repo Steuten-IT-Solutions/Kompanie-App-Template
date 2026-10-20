@@ -93,6 +93,9 @@ final class DocumentService
         if (!$this->app->features()->enabled('documents')) {
             return ['status' => 404];
         }
+        if ($this->app->maintenance()->blocks($user)) {
+            return ['status' => 503];
+        }
         if ($user === null) {
             return ['status' => 401];
         }

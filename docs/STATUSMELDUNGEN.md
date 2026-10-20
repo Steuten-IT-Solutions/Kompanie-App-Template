@@ -46,6 +46,7 @@ durch das ausbleibende Lebenszeichen auf.
   "update": { "ok": false, "at": 1790000000, "to": "1.4.0.4" },
   "updateCheckOk": true,
   "gallery": { "ok": false, "at": 1789990000 },
+  "maintenance": false,
   "sent": 1790000300,
   "nonce": "a1b2c3d4e5f60718",
   "event": "UPDATE_FAILED",
@@ -63,6 +64,7 @@ durch das ausbleibende Lebenszeichen auf.
   mit `DISABLE_WP_CRON`), `pseudo` (eigenständig, nur bei Seitenaufrufen), `wp` (WP-Cron, läuft ebenfalls
   nur bei Seitenaufrufen). `cron.last`: letzter Lauf einer Hintergrundaufgabe.
 - `update`, `updateCheckOk`, `gallery`, `sent`: wie in Format 1.
+- `maintenance`: ob der Wartungsmodus an ist (Issue #42), ohne Begründung. Das Cockpit zeigt die Installation dann als „in Wartung“, nicht als Fehler.
 
 **Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. Was genau gesendet wird, sehen
 Admins unter *Einstellungen → Updates* (Beispiel eines Lebenszeichens, ohne `key`), dazu den Zeitpunkt der

@@ -1760,6 +1760,46 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /admin/maintenance:
+    get:
+      tags: [Einstellungen]
+      summary: Wartungsmodus mit Verlauf
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Maintenance' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Einstellungen]
+      summary: Wartungsmodus ein- oder ausschalten, Begründung ändern
+      description: |
+        Issue #42. Solange er an ist, antworten alle Routen außer `/config`, `/auth/login`, `/auth/logout` und
+        `/auth/csrf` für alle ohne `manage_settings` mit 503 `maintenance` (samt `reason`), ebenso geschützte Fotos
+        und Dokumente. Hintergrundaufgaben außer Updates und Statusmeldungen pausieren. Jede Änderung kommt in den Verlauf.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['on']
+              properties:
+                'on': { type: boolean }
+                reason: { type: string, maxLength: 500, description: 'Klartext, Zeilenumbrüche bleiben; ohne Angabe bleibt die bisherige Begründung' }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Maintenance' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/settings:
     get:
       tags: [Einstellungen]
@@ -2271,16 +2311,44 @@ components:
         setup:
           type: [string, 'null']
           description: Abschnitt der Einstellungen bzw. Schritt der Ersteinrichtung, z. B. `kalender`
+    MaintenanceInfo:
+      type: object
+      required: ['on', reason, since]
+      properties:
+        'on': { type: boolean }
+        reason: { type: string, description: 'Begründung (Klartext), leer wenn keine' }
+        since: { type: integer, description: 'Eingeschaltet seit (Unix-Zeit), 0 wenn aus' }
+    Maintenance:
+      allOf:
+        - $ref: '#/components/schemas/MaintenanceInfo'
+        - type: object
+          required: [by, log]
+          properties:
+            by: { type: integer, description: Konto, das eingeschaltet hat }
+            log:
+              type: array
+              description: Verlauf, neueste zuerst (höchstens 20)
+              items:
+                type: object
+                required: [at, by, by_name, 'on', reason]
+                properties:
+                  at: { type: integer }
+                  by: { type: integer }
+                  by_name: { type: string }
+                  'on': { type: boolean }
+                  reason: { type: string }
     Error:
       type: object
       required: [code, message]
       properties:
+        reason: { type: string, description: 'Nur bei `maintenance`: Begründung des Wartungsmodus' }
         code:
           type: string
           description: |
             z. B. `not_logged_in` (401), `forbidden` (403), `invalid` (400), `not_found` (404),
             `feature_disabled` (403, Bereich vom Admin ausgeschaltet), `method_not_allowed` (405),
-            `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500).
+            `csrf_invalid` (403), `upstream_error` (502), `not_configured` (503), `internal_error` (500),
+            `maintenance` (503, Wartungsmodus, mit `reason`).
             Push (Issue #19): `push_unsupported` (501), `push_full` (503), `too_many_attempts` (429),
             `push_gone` (410) und `push_key_mismatch` (409, Gerät neu anmelden) bei der Testnachricht.
             Nur eigenständige Version: `login_failed` (400), `too_many_attempts` (429),
@@ -2422,6 +2490,7 @@ components:
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
+        maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         csrf:
           type: object
           required: [header, token, refreshUrl]

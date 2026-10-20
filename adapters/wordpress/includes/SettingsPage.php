@@ -6,6 +6,7 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Http\ApiError;
 
 /** Einstellungen → <Name der Kompanie>: Bereiche, Kalender und Galerie. */
@@ -23,6 +24,7 @@ final class SettingsPage
             static fn () => self::render(Plugin::app()),
         ));
         add_action('admin_post_kompanie_app_features', static fn () => self::saveFeatures(Plugin::app()));
+        add_action('admin_post_kompanie_app_maintenance', static fn () => self::saveMaintenance(Plugin::app()));
         add_action('admin_post_kompanie_app_calendar', static fn () => self::saveCalendar(Plugin::app()));
         add_action('admin_notices', [self::class, 'permalinkNotice']);
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
@@ -91,6 +93,28 @@ final class SettingsPage
                 Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, die Galerie <code>[kompanie_galerie]</code>.
             </p>
 
+            <?php $maintenance = $app->maintenance()->state(); ?>
+            <h2 id="wartung">Wartungsmodus</h2>
+            <?php if ($maintenance['on']) : ?>
+                <div class="notice notice-error inline"><p><strong>Wartungsmodus aktiv – nur Admins können die App nutzen.</strong>
+                    Seit <?php echo esc_html(wp_date('d.m.Y H:i', $maintenance['since'])); ?>.</p></div>
+            <?php endif; ?>
+            <p>Solange der Wartungsmodus an ist, sehen alle außer Admins in der App nur eine Wartungsseite (z. B. während einer
+               Datenübernahme). Die übrige Webseite und ihre Shortcodes sind nicht betroffen.</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="kompanie_app_maintenance" />
+                <?php wp_nonce_field('kompanie_app_maintenance'); ?>
+                <p><label for="maintenance_reason">Begründung (optional, erscheint auf der Wartungsseite)</label><br />
+                   <textarea id="maintenance_reason" name="reason" rows="3" class="large-text" maxlength="<?php echo (int) MaintenanceService::REASON_MAX; ?>"><?php echo esc_textarea($maintenance['reason']); ?></textarea></p>
+                <?php if ($maintenance['on']) : ?>
+                    <?php submit_button('Begründung speichern', 'secondary', 'maintenance_keep', false); ?>
+                    <?php submit_button('Wartungsmodus beenden', 'primary', 'maintenance_off', false); ?>
+                <?php else : ?>
+                    <?php submit_button('Wartungsmodus einschalten', 'secondary', 'maintenance_on', false); ?>
+                <?php endif; ?>
+            </form>
+
+            <hr />
             <h2 id="bereiche">Bereiche</h2>
             <p>Welche Bereiche die App für alle hat (dasselbe wie in der App unter <em>Einstellungen → Bereiche</em>).
                Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.</p>
@@ -206,6 +230,23 @@ final class SettingsPage
         } catch (\Throwable $e) {
             echo '<div class="notice notice-error inline"><p>' . esc_html($e->getMessage()) . '</p></div>';
         }
+    }
+
+    private static function saveMaintenance(App $app): never
+    {
+        self::guard('kompanie_app_maintenance');
+        $on = isset($_POST['maintenance_on']) || isset($_POST['maintenance_keep']);
+        $reason = isset($_POST['reason']) ? sanitize_textarea_field(wp_unslash($_POST['reason'])) : '';
+        $actor = $app->authContext->currentUser();
+        if ($actor === null) {
+            wp_die('Keine Berechtigung.');
+        }
+        try {
+            $app->maintenance()->set($on, $reason, $actor);
+        } catch (ApiError $e) {
+            self::back($e->getMessage(), true, 'wartung');
+        }
+        self::back($on ? 'Wartungsmodus ist an.' : 'Wartungsmodus beendet.', false, 'wartung');
     }
 
     private static function saveFeatures(App $app): never

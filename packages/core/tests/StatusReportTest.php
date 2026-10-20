@@ -72,7 +72,7 @@ final class StatusReportTest extends TestCase
         $this->assertCount(1, $sent);
         $hb = $sent[0];
         $allowed = ['format', 'installation', 'kompanie', 'version', 'variant', 'php', 'database', 'kind', 'checks', 'errors', 'cron',
-            'features', 'update', 'updateCheckOk', 'gallery', 'sent', 'nonce', 'key', '_signature'];
+            'features', 'update', 'updateCheckOk', 'gallery', 'maintenance', 'sent', 'nonce', 'key', '_signature'];
         $this->assertSame([], array_diff(array_keys($hb), $allowed), 'nur Felder der Positivliste');
         $this->assertSame(2, $hb['format']);
         $this->assertSame('heartbeat', $hb['kind']);
