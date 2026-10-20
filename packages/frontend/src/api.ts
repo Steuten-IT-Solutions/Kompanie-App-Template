@@ -1099,7 +1099,10 @@ export type NewsSourceType = 'none' | 'wordpress' | 'rss';
 
 export interface AdminSettings {
   calendar: {
-    source: 'ics' | 'google' | 'none';
+    /** google: eigener API-Schlüssel; google_connection: Google-Zugang der Galerie (OAuth mit Kalender-Berechtigung oder Dienstkonto) */
+    source: 'ics' | 'google' | 'google_connection' | 'none';
+    /** Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen (neu verbinden) */
+    connection_needs_calendar_access: boolean;
     ics_url_set: boolean;
     google_api_key_set: boolean;
     calendar_ids: string;
@@ -1111,6 +1114,8 @@ export interface AdminSettings {
     service_account_email: string;
     oauth_connected: boolean;
     oauth_email: string;
+    /** Darf der Google-Zugang auch den Kalender lesen (OAuth mit calendar.readonly bzw. Dienstkonto)? */
+    calendar_access: boolean;
     status: { albums?: number; photos?: number; pending?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;

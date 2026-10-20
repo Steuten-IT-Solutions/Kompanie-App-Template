@@ -280,6 +280,7 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const status = {
     ics: '✓ Eingerichtet über die geheime iCal-Adresse.',
     google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).',
+    google_connection: '✓ Eingerichtet über die Kalender-IDs und den Google-Zugang der Galerie.',
     none: 'Noch kein Kalender eingerichtet.',
   }[c.source];
 
@@ -318,6 +319,13 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         <strong>geheime Adresse im iCal-Format</strong> kopieren und hier einfügen. Sie wird nicht wieder angezeigt.
       </p>
       <p className="small">{status}</p>
+      {c.connection_needs_calendar_access && (
+        <p className="small">
+          Die Kalender-IDs <code>{c.calendar_ids}</code> sind eingetragen, aber die Google-Verbindung der Galerie darf den Kalender nicht
+          lesen (beim Verbinden nicht erlaubt). Dafür muss sie neu verbunden werden, mit Erlaubnis für den Kalender
+          {c.source === 'ics' ? '; bis dahin gilt die iCal-Adresse' : ''}.
+        </p>
+      )}
       <label className="field">
         <span>{c.source === 'none' ? 'Geheime iCal-Adresse' : 'Neue iCal-Adresse (ersetzt die bisherige Einrichtung)'}</span>
         <input
@@ -419,6 +427,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           )}
           . Diese Verbindung wird für den Abgleich genutzt
           {g.service_account_email ? ', das Dienstkonto erst nach dem Trennen' : ''}.
+          {g.calendar_access ? ' Sie darf auch den Kalender lesen.' : ' Den Kalender darf sie nicht lesen.'}
           <div className="button-row">
             <button
               type="button"

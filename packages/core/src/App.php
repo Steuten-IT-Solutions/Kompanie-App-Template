@@ -422,7 +422,7 @@ final class App
 
     public function calendar(): CalendarService
     {
-        return $this->service(CalendarService::class, fn () => new CalendarService($this->settings, $this->http, $this->cache, $this->time()));
+        return $this->service(CalendarService::class, fn () => new CalendarService($this->settings, $this->http, $this->cache, $this->time(), $this->drive()));
     }
 
     public function drive(): DriveClient

@@ -111,8 +111,21 @@ final class StatusService
         if (!$this->app->features()->enabled('calendar')) {
             return $this->item('calendar', 'Kalender', 'off', 'Der Kalender ist ausgeschaltet.');
         }
-        return $this->app->calendar()->isConfigured()
-            ? $this->item('calendar', 'Kalender', 'ok', 'Eingerichtet. Ob er erreichbar ist, zeigt „Kalender testen“ in den Einstellungen.')
+        $cal = $this->app->calendar();
+        $via = [
+            'google' => 'über die Google-API mit eigenem API-Schlüssel',
+            'google_connection' => 'über den Google-Zugang der Galerie',
+            'ics' => 'über die iCal-Adresse',
+        ][$cal->source()] ?? '';
+        if ($cal->connectionNeedsCalendarAccess()) {
+            // Kalender-IDs eingetragen, aber die Verbindung zu Google wurde ohne Kalender-Berechtigung hergestellt.
+            $reconnect = 'Die Google-Verbindung der Galerie darf den Kalender mit den eingetragenen Kalender-IDs nicht lesen (beim Verbinden nicht erlaubt). Dafür muss sie neu verbunden werden, mit Erlaubnis für den Kalender.';
+            return $cal->isConfigured()
+                ? $this->item('calendar', 'Kalender', 'ok', 'Eingerichtet ' . $via . '. ' . $reconnect)
+                : $this->item('calendar', 'Kalender', 'warn', $reconnect . ' Bis dahin kannst du eine iCal-Adresse eintragen (Einstellungen → Kalender).');
+        }
+        return $cal->isConfigured()
+            ? $this->item('calendar', 'Kalender', 'ok', 'Eingerichtet ' . $via . '. Ob er erreichbar ist, zeigt „Kalender testen“ in den Einstellungen.')
             : $this->item('calendar', 'Kalender', 'off', 'Noch nicht eingerichtet (Einstellungen → Kalender).');
     }
 
