@@ -15,6 +15,9 @@ use KompanieApp\Core\Port\UserDirectory;
 /** Mitglieder, Rollen und Passwörter. */
 final class MemberService
 {
+    /** WordPress speichert höchstens 100 Zeichen (user_email); vorab prüfen, damit Mehrere-Anlegen nicht mittendrin scheitert. */
+    public const EMAIL_MAX = 100;
+
     public function __construct(
         private readonly UserDirectory $users,
         private readonly ScoreService $scores,
@@ -185,6 +188,20 @@ final class MemberService
      */
     public function create(array $in): array
     {
+        $taken = [];
+        return $this->insert($this->prepare($in, $taken));
+    }
+
+    /**
+     * Angaben eines neuen Kontos prüfen; $taken sammelt Benutzernamen und E-Mail-Adressen, die schon für andere
+     * Einträge derselben Anfrage vorgesehen sind (mehrere anlegen).
+     *
+     * @param array<string, mixed> $in name, username, email, level
+     * @param array<string, true> $taken
+     * @return array{name: string, login: string, email: string, level: string}
+     */
+    public function prepare(array $in, array &$taken): array
+    {
         $name = Text::line($in['name'] ?? '', 100);
         if ($name === '') {
             throw ApiError::invalid('Bitte einen Namen angeben.');
@@ -195,31 +212,45 @@ final class MemberService
         }
 
         $login = trim(is_string($in['username'] ?? null) ? $in['username'] : '');
+        $isTaken = fn (string $l): bool => isset($taken['login:' . mb_strtolower($l)]) || $this->users->loginExists($l);
         if ($login === '') {
             $base = Passwords::loginBase($name);
             $login = $base;
-            for ($i = 2; $this->users->loginExists($login); $i++) {
+            for ($i = 2; $isTaken($login); $i++) {
                 $login = $base . $i;
             }
         } else {
             if (!Passwords::validLogin($login)) {
                 throw ApiError::invalid('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.');
             }
-            if ($this->users->loginExists($login)) {
+            if ($isTaken($login)) {
                 throw ApiError::invalid('Dieser Benutzername ist schon vergeben.');
             }
         }
 
         $email = trim(is_string($in['email'] ?? null) ? $in['email'] : '');
         if ($email !== '') {
-            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
                 throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
             }
-            if ($this->users->emailExists($email)) {
+            if (isset($taken['email:' . mb_strtolower($email)]) || $this->users->emailExists($email)) {
                 throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
             }
+            $taken['email:' . mb_strtolower($email)] = true;
         }
+        $taken['login:' . mb_strtolower($login)] = true;
+        return ['name' => $name, 'login' => $login, 'email' => $email, 'level' => (string) $level];
+    }
 
+    /**
+     * Konto mit zufälligem Startpasswort anlegen (geprüft mit prepare()).
+     *
+     * @param array{name: string, login: string, email: string, level: string} $p
+     * @return array<string, mixed>
+     */
+    public function insert(array $p): array
+    {
+        ['name' => $name, 'login' => $login, 'email' => $email, 'level' => $level] = $p;
         $password = Passwords::readable(12);
         try {
             $id = $this->users->create($name, $login, $email, $password, $level);
@@ -239,19 +270,7 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Mitglied nicht gefunden.');
         }
-        if ($target->isAdmin() && !$actor->isAdmin()) {
-            throw ApiError::forbidden('Nur Admins dürfen Passwörter von Admins zurücksetzen.');
-        }
-        // Sonst könnte, wer Konten anlegen darf, das Konto einer Person mit mehr Rechten übernehmen,
-        // oder (bei WordPress) das Konto einer Person, die gar nicht zur Kompanie gehört (Gast).
-        // Anwärter legt an, wer Konten anlegen darf; ihr Passwort (und das anderer Konten nur mit dem Kalender) darf er
-        // deshalb auch zurücksetzen.
-        if (!$actor->isAdmin() && !$target->isMember() && !self::calendarOnly($target)) {
-            throw ApiError::forbidden('Passwörter von Personen ohne Mitgliederbereich setzen nur Admins zurück.');
-        }
-        if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {
-            throw ApiError::forbidden('Das Passwort dieser Person darfst du nicht zurücksetzen.');
-        }
+        $this->guardAccount($actor, $target, 'Das Passwort dieser Person darfst du nicht zurücksetzen.');
         $password = Passwords::readable(12);
         try {
             $this->users->setPassword($id, $password);
@@ -259,6 +278,112 @@ final class MemberService
             throw ApiError::forbidden($e->getMessage());
         }
         return ['password' => $password];
+    }
+
+    /**
+     * Wer Konten verwalten darf (Passwort zurücksetzen, Angaben ändern, löschen): Admins alle; sonst nur Konten mit
+     * Mitgliederbereich bzw. nur Kalender und ohne mehr Rechte als man selbst. Sonst könnte, wer Konten anlegen darf,
+     * das Konto einer Person mit mehr Rechten übernehmen, oder (bei WordPress) das Konto einer Person, die gar nicht zur
+     * Kompanie gehört (Gast). Anwärter legt an, wer Konten anlegen darf; ihr Konto darf er deshalb auch verwalten.
+     */
+    private function guardAccount(User $actor, User $target, string $message): void
+    {
+        if ($target->isAdmin() && !$actor->isAdmin()) {
+            throw ApiError::forbidden('Konten von Admins verwalten nur Admins.');
+        }
+        if (!$actor->isAdmin() && !$target->isMember() && !self::calendarOnly($target)) {
+            throw ApiError::forbidden('Konten von Personen ohne Mitgliederbereich verwalten nur Admins.');
+        }
+        if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {
+            throw ApiError::forbidden($message);
+        }
+    }
+
+    /**
+     * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt).
+     *
+     * @return array{name: string, login: string, email: string, can_change_login: bool}
+     */
+    public function profile(int $id, ?User $actor = null): array
+    {
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        if ($actor !== null && $actor->id !== $id) {
+            $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht sehen.');
+        }
+        $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        return $p + ['can_change_login' => $this->users->canChangeLogin()];
+    }
+
+    /**
+     * Name, E-Mail und (nicht bei WordPress) Benutzername ändern (Issue #24).
+     *
+     * @param array<string, mixed> $in name, email, username
+     * @return array{name: string, login: string, email: string, can_change_login: bool}
+     */
+    public function updateProfile(User $actor, int $id, array $in): array
+    {
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        if ($actor->id !== $id) {
+            $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht ändern.');
+        }
+        $current = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $name = array_key_exists('name', $in) ? Text::line($in['name'] ?? '', 100) : $current['name'];
+        if ($name === '') {
+            throw ApiError::invalid('Bitte einen Namen angeben.');
+        }
+        $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
+        // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
+        if (mb_strtolower($email) !== mb_strtolower($current['email']) && $email !== '') {
+            if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
+                throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
+            }
+            if ($this->users->emailExists($email)) {
+                throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
+            }
+        }
+        $login = null;
+        if (array_key_exists('username', $in)) {
+            $wanted = trim(is_string($in['username']) ? $in['username'] : '');
+            if ($wanted !== $current['login']) {
+                if (!$this->users->canChangeLogin()) {
+                    throw ApiError::invalid('Benutzernamen lassen sich in WordPress nicht ändern.');
+                }
+                if (!Passwords::validLogin($wanted)) {
+                    throw ApiError::invalid('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.');
+                }
+                if (mb_strtolower($wanted) !== mb_strtolower($current['login']) && $this->users->loginExists($wanted)) {
+                    throw ApiError::invalid('Dieser Benutzername ist schon vergeben.');
+                }
+                $login = $wanted;
+            }
+        }
+        try {
+            $this->users->updateProfile($id, $name, $email, $login);
+        } catch (\DomainException $e) {
+            throw ApiError::forbidden($e->getMessage());
+        }
+        return $this->profile($id);
+    }
+
+    /**
+     * Konto aus der App entfernen (Issue #24): Standalone wird es gelöscht, bei WordPress verliert es seine Rolle in der
+     * App. Die eigenen Daten löscht danach App::userDeleted().
+     */
+    public function removeAccount(User $actor, int $id): void
+    {
+        if ($actor->id === $id) {
+            throw ApiError::invalid('Das eigene Konto kannst du hier nicht löschen.');
+        }
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $this->guardAccount($actor, $target, 'Dieses Konto darfst du nicht löschen.');
+        if ($target->isAdmin() && $this->users->countAdmins() <= 1) {
+            throw ApiError::invalid('Der letzte Admin kann nicht gelöscht werden.');
+        }
+        try {
+            $this->users->removeAccount($id);
+        } catch (\DomainException $e) {
+            throw ApiError::forbidden($e->getMessage());
+        }
     }
 
     public function changeOwnPassword(User $user, mixed $current, mixed $new): void

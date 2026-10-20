@@ -153,6 +153,44 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
 });
 
+test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
+  await page.getByRole('button', { name: 'Mehrere auf einmal anlegen' }).click();
+  const rows = page.locator('.bulk-row');
+  await rows.nth(0).getByLabel('Name', { exact: true }).fill(`Ida ${id}`);
+  await rows.nth(1).getByLabel('Name', { exact: true }).fill(`Jan ${id}`);
+  await page.getByRole('button', { name: 'Alle anlegen' }).click();
+  await expect(page.getByRole('heading', { name: '2 Konten angelegt' })).toBeVisible();
+  await expect(page.locator('.print-sheet')).toHaveCount(2);
+  await expect(page.locator('.print-sheet').first()).toContainText('installieren');
+  await expect(page.getByRole('button', { name: 'Ausdrucken' })).toBeVisible();
+
+  await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
+  await page.locator('.row', { hasText: `Ida ${id}` }).click();
+  await page.getByRole('button', { name: 'Angaben ändern' }).click();
+  await page.locator('.account-edit').getByLabel('Name', { exact: true }).fill(`Ida Neu ${id}`);
+  await page.locator('.account-edit').getByLabel('E-Mail (optional)').fill(`ida-${id}@example.org`);
+  await page.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.member-name')).toHaveText(`Ida Neu ${id}`);
+  await expect(page.locator('.account-panel')).toContainText(`ida-${id}@example.org`);
+
+  await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
+  await page.locator('.row', { hasText: `Jan ${id}` }).click();
+  await page
+    .locator('.account-panel')
+    .getByRole('button', { name: /Konto löschen|Aus der App entfernen/ })
+    .click();
+  const confirm = page.getByRole('button', { name: /Endgültig (löschen|entfernen)/ });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('Zur Bestätigung den Namen eintippen').fill(`jan ${id}`);
+  await confirm.click();
+  await expect(page.locator('.toast')).toContainText(`Jan ${id}`);
+  await expect(page.locator('.row', { hasText: `Jan ${id}` })).toHaveCount(0);
+});
+
 test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis er aufgenommen ist', async ({ page }) => {
   // Eindeutiger Name: Bei WordPress bleiben Konten früherer Läufe bestehen.
   const name = `Anna Anwärterin ${Date.now() % 1000000}`;

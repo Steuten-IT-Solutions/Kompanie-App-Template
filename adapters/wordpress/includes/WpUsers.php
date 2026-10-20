@@ -167,16 +167,9 @@ final class WpUsers implements UserDirectory, AuthContext
     public function setPassword(int $id, string $password): void
     {
         $actor = get_current_user_id();
-        $target = get_userdata($id);
         if ($actor !== 0 && $actor !== $id) {
-            // Wer die Webseite bearbeiten oder Benutzer verwalten darf (Redakteure, Administratoren, eigene
-            // WP-Rollen) oder kein Konto der Kompanie ist (ACCOUNT_META), dessen Passwort nur mit dem Recht
-            // aus WordPress; sonst genügt das Recht „Mitglieder anlegen“ der Rolle in der App.
-            $websiteUser = $target && (is_super_admin($id) || array_filter(self::WEBSITE_CAPS, static fn (string $cap): bool => user_can($target, $cap)) !== []);
-            // Nur das Meta dieser Website (wie bei der Rolle), nicht das ohne Präfix.
-            global $wpdb;
-            $appAccount = get_user_meta($id, $wpdb->get_blog_prefix() . self::ACCOUNT_META, true) === '1';
-            $may = $websiteUser || !$appAccount ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+            // Siehe needsWpRight(): sonst genügt das Recht „Mitglieder anlegen“ der Rolle in der App.
+            $may = $this->needsWpRight($id) ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
             if (!$may || $this->find($id) === null) {
                 throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
             }
@@ -194,6 +187,100 @@ final class WpUsers implements UserDirectory, AuthContext
     public function emailExists(string $email): bool
     {
         return (bool) email_exists($email);
+    }
+
+    public function profile(int $id): ?array
+    {
+        $u = $this->find($id) !== null ? get_userdata($id) : false;
+        return $u ? ['name' => (string) $u->display_name, 'login' => (string) $u->user_login, 'email' => (string) $u->user_email] : null;
+    }
+
+    public function canChangeLogin(): bool
+    {
+        return false;
+    }
+
+    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if ($login !== null && $login !== $user->user_login) {
+            throw new \DomainException('Benutzernamen lassen sich in WordPress nicht ändern.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        $parts = preg_split('/\s+/', $name, 2) ?: [$name];
+        $res = wp_update_user(['ID' => $id, 'display_name' => $name, 'nickname' => $name, 'first_name' => $parts[0], 'last_name' => $parts[1] ?? '', 'user_email' => $email]);
+        if (is_wp_error($res)) {
+            throw new \DomainException($res->get_error_message());
+        }
+        clean_user_cache($id);
+    }
+
+    /**
+     * Rolle in der App entfernen, Konto-Markierung löschen, alle Sitzungen beenden. Der WordPress-Benutzer bleibt
+     * (Entscheidung zu Issue #24): Er kann auch Beiträge haben oder anders zur Webseite gehören.
+     */
+    public function removeAccount(int $id): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
+            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht aus der App entfernen.');
+        global $wpdb;
+        // Rolle Gast fest eintragen statt löschen: Ohne Eintrag gälten sonst frühere WP-Rollen bzw. -Rechte der App weiter
+        // (legacyRole, z. B. kompanie_member über eine eigene WP-Rolle).
+        update_user_option($id, self::ROLE_META, AppRoles::GUEST, false);
+        delete_user_meta($id, $wpdb->get_blog_prefix() . self::ACCOUNT_META);
+        $user->remove_role(Roles::ROLE_MANAGER);
+        $user->remove_role(Roles::ROLE_ORGANIZER);
+        $user->remove_role(Roles::ROLE_MEMBER);
+        if (empty($user->roles)) {
+            $user->add_role('subscriber');
+        }
+        \WP_Session_Tokens::get_instance($id)->destroy_all();
+        clean_user_cache($id);
+    }
+
+    /**
+     * Braucht das Ändern dieses Kontos das Recht aus WordPress (statt „Mitglieder anlegen“ aus der App)? Ja für Benutzer
+     * der Webseite (Redakteure, Administratoren, eigene WP-Rollen), für Konten, die nicht von der Kompanie sind
+     * (ACCOUNT_META), und bei Multisite für Konten, die auch zu anderen Seiten des Netzwerks gehören: Dort könnten sie
+     * mehr Rechte haben (z. B. Administrator), und über eine geänderte E-Mail oder ein neues Passwort ließe sich ihr
+     * Konto übernehmen. WordPress selbst lässt deshalb nur Netzwerk-Admins fremde Benutzer bearbeiten.
+     */
+    private function needsWpRight(int $id): bool
+    {
+        $target = get_userdata($id);
+        if (!$target || is_super_admin($id) || array_filter(self::WEBSITE_CAPS, static fn (string $cap): bool => user_can($target, $cap)) !== []) {
+            return true;
+        }
+        if (is_multisite() && count(get_blogs_of_user($id)) > 1) {
+            return true;
+        }
+        global $wpdb;
+        return get_user_meta($id, $wpdb->get_blog_prefix() . self::ACCOUNT_META, true) !== '1';
+    }
+
+    /**
+     * Wie beim Passwort: Benutzer der Webseite (Redakteure usw.) oder Konten, die nicht von der Kompanie sind, nur mit
+     * dem Recht aus WordPress; Konten der Kompanie auch mit „Mitglieder anlegen“ aus der App.
+     */
+    private function guardAccount(int $id, string $message): void
+    {
+        $actor = get_current_user_id();
+        if ($actor === 0) {
+            return;
+        }
+        $may = $this->needsWpRight($id) ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+        if (!$may) {
+            throw new \DomainException($message);
+        }
     }
 
     /** Darf der angemeldete Benutzer das: in WordPress (z. B. promote_user) oder über seine Rolle in der App? */

@@ -32,6 +32,7 @@ final class ApiScenario
             $this->titles();
             $this->attendance();
             $this->documents();
+            $this->accounts();
             $this->events();
             $this->push();
             $this->config();
@@ -622,6 +623,34 @@ final class ApiScenario
             $ok = $this->req('DELETE', '/documents/' . ($doc['id'] ?? 0))[0] === 200 && $ok;
         }
         $c->ok($ok, 'Dokumente löschen');
+    }
+
+    /** Konten verwalten (Issue #24): mehrere anlegen, Angaben ändern, aus der App entfernen mit allen eigenen Daten. */
+    private function accounts(): void
+    {
+        $c = $this->c;
+        $c->section('Konten verwalten');
+        $admin = $this->user('kptest_konto_admin', 'admin');
+        $this->d->actAs($admin);
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [$s, $d] = $this->req('POST', '/users/bulk', ['people' => [['name' => "Kptest Anna $sfx", 'username' => "kptest_anna_$sfx"], ['name' => "Kptest Ben $sfx", 'username' => "kptest_anna_$sfx"]]]);
+        $c->ok($s === 400 && str_contains((string) ($d['message'] ?? ''), 'Zeile 2'), 'Mehrere anlegen: doppelter Benutzername → 400, keiner angelegt');
+        [$s, $d] = $this->req('POST', '/users/bulk', ['people' => [['name' => "Kptest Anna $sfx", 'username' => "kptest_anna_$sfx"], ['name' => "Kptest Ben $sfx", 'username' => "kptest_ben_$sfx"]]]);
+        $ids = array_map('intval', array_column((array) $d, 'id'));
+        foreach ($ids as $id) {
+            $this->users[] = $id;
+        }
+        $c->ok($s === 201 && count($ids) === 2 && strlen((string) ($d[0]['password'] ?? '')) >= 12, 'Mehrere anlegen mit Startpasswörtern');
+        [$a, $b] = $ids + [0, 0];
+        [$s, $p] = $this->req('PATCH', "/members/$a/account", ['name' => "Kptest Anna Neu $sfx", 'email' => "anna_$sfx@example.org"]);
+        $c->ok($s === 200 && ($p['name'] ?? '') === "Kptest Anna Neu $sfx" && ($p['email'] ?? '') === "anna_$sfx@example.org", 'Name und E-Mail ändern');
+        $this->req('POST', '/points', ['user_ids' => [$b], 'points' => 2, 'reason' => 'Kptest Konto']);
+        $c->ok($this->req('DELETE', "/members/$b")[0] === 200, 'Konto aus der App entfernen');
+        $list = array_column((array) $this->req('GET', '/members')[1], 'id');
+        $c->ok(!in_array($b, $list, true), 'Entferntes Konto nicht mehr in der Mitgliederliste');
+        $detail = $this->req('GET', "/members/$b");
+        $c->ok($detail[0] === 404 || ($detail[1]['level'] ?? '') === 'guest', 'Entfernt: gelöscht bzw. (WordPress) Gast ohne Rolle');
+        $c->ok($this->req('DELETE', "/members/$admin")[0] === 400, 'Eigenes Konto → 400');
     }
 
     private function events(): void

@@ -184,7 +184,13 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Tabellen `titles` (`title`, `sort`, `active`) und `member_titles` (mehrere je Benutzer). Wie in Lank (`wp_mkl_titles`, Meta `mkl_title_id`), damit die Lanker Daten übernommen werden können.
 - Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren; deaktivierte werden nicht neu vergeben, bleiben aber bei ihren Trägern. Neu verliehene Titel lösen eine Benachrichtigung (Art `titles`) aus.
 - Die Mitgliederliste holt alle Titel in zwei Abfragen (`TitleService::byUser`).
-- Wird ein Konto gelöscht (WordPress `deleted_user`), entfernt `App::userDeleted` seine Push-Abos und seine Zuweisungen (Dienstgrad, Titel) und Anwesenheitseinträge; Buchungen und Verläufe bleiben.
+- Wird ein Konto gelöscht (in der App oder bei WordPress `deleted_user`), entfernt `App::userDeleted` alle seine Daten (siehe *Konten verwalten*).
+
+### Konten verwalten (Issue #24)
+
+- Wer Konten anlegt (`create_users`), ändert Name, E-Mail und (nur Standalone) Benutzernamen und löscht Konten, mit denselben Grenzen wie beim Passwort-Zurücksetzen (`MemberService::guardAccount`: Admins nur durch Admins, Personen ohne Mitgliederbereich nur durch Admins, nie mehr Rechte als man selbst). Nicht das eigene Konto, nicht den letzten Admin.
+- Löschen: Port `UserDirectory::removeAccount()` beendet alle Sitzungen; Standalone löscht das Konto, WordPress entfernt nur die Rolle in der App (Entscheidung: der Benutzer der Webseite bleibt). Danach löscht `App::userDeleted()` alle eigenen Daten (Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos), auch wenn WordPress einen Benutzer im Backend löscht. Was die Person für andere eingetragen hat, bleibt; angezeigt als „gelöschtes Konto“ (`UserNames`).
+- Mehrere anlegen (`POST /users/bulk`, höchstens 50): erst alles prüfen (`MemberService::prepare`, Benutzernamen und E-Mail auch untereinander, Anfangspunkte und Dienstgrad), dann anlegen. Die Zugangsdaten enthalten den Link zur Installationsanleitung und lassen sich als Zettel je Person ausdrucken.
 
 ### Dokumente (Issue #2)
 

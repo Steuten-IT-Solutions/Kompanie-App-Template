@@ -47,6 +47,7 @@ use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Storage\UserData;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
@@ -283,16 +284,13 @@ final class App
     }
 
     /**
-     * Ein Konto wurde gelöscht: Push-Abos, Zuweisungen (Dienstgrad, Titel) und Anwesenheitseinträge entfernen. Buchungen und Verläufe
-     * bleiben als Geschichte erhalten. Verwaiste Zuweisungen würden sonst das Löschen eines Dienstgrads bzw. Titels
-     * blockieren.
+     * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
+     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
+     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
     {
-        $this->push()->deleteForUser($userId);
-        $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
-        $this->db->execute('DELETE FROM {attendance_entries} WHERE user_id = ?', [$userId]);
+        UserData::purge($this->db, $userId);
     }
 
     public function pushTriggers(): PushTriggers
