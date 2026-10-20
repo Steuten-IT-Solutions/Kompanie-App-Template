@@ -19,6 +19,8 @@ enum Capability: string
     case ManageRanks = 'manage_ranks';
     /** Titelliste pflegen und Titel zuweisen (Bereich Titel, Issue #22). */
     case ManageTitles = 'manage_titles';
+    /** Anwesenheitslisten je Termin führen (Bereich Anwesenheit, Issue #21). */
+    case ManageAttendance = 'manage_attendance';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
     /**

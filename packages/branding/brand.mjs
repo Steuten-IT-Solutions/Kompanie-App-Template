@@ -59,6 +59,7 @@ const DEFAULTS = {
     penalties: 'Strafen',
     ranks: 'Dienstgrade',
     titles: 'Titel',
+    attendance: 'Anwesenheit',
   },
   rank: 'Dienstgrad',
 };

@@ -30,6 +30,7 @@ final class ApiScenario
             $this->candidates();
             $this->ranks();
             $this->titles();
+            $this->attendance();
             $this->events();
             $this->push();
             $this->config();
@@ -78,7 +79,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -560,6 +561,35 @@ final class ApiScenario
             $ok = $this->req('DELETE', '/titles/' . ($t['id'] ?? 0))[0] === 200 && $ok;
         }
         $c->ok($ok, 'Nicht mehr zugewiesene Titel löschen');
+    }
+
+    /** Anwesenheit (Issue #21): freie Liste, Status, Vorschlag für Punkte einmal je Person, eigene Anwesenheit. */
+    private function attendance(): void
+    {
+        $c = $this->c;
+        $c->section('Anwesenheit');
+        $admin = $this->user('kptest_anw_admin', 'admin');
+        $m = $this->user('kptest_anw_m', 'member');
+        $cand = $this->user('kptest_anw_anw', 'candidate');
+        $guest = $this->user('kptest_anw_gast', 'guest');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/attendance')[0] === 403, 'Mitglied: GET /attendance → 403');
+        $this->d->actAs($admin);
+        [$s, $l] = $this->req('PUT', '/attendance', ['source' => 'free', 'title' => 'Kptest Übung', 'date' => '2026-10-19', 'entries' => [$m => 'present', $cand => 'absent']]);
+        $people = array_column((array) ($l['people'] ?? []), null, 'id');
+        $c->ok($s === 201 && ($l['counts'] ?? null) === ['present' => 1, 'excused' => 0, 'absent' => 1], 'Freie Liste mit Status anlegen');
+        $c->ok(isset($people[$m], $people[$cand]) && !isset($people[$guest]) && $people[$cand]['member'] === false, 'Alle mit einer Rolle, ohne Gäste; Anwärter ohne Punkte');
+        $id = (int) ($l['id'] ?? 0);
+        $c->ok($this->req('PUT', '/attendance', ['id' => $id, 'entries' => [$guest => 'present']])[0] === 400, 'Gast eintragen → 400');
+        [$s, $rows] = $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 3, 'reason' => 'Kptest Übung', 'attendance_id' => $id]);
+        $c->ok($s === 201 && ($rows[0]['attendance_id'] ?? null) === $id, 'Punkte aus dem Vorschlag tragen die Liste');
+        $c->ok($this->req('POST', '/points', ['user_ids' => [$m], 'points' => 3, 'reason' => 'Kptest Übung', 'attendance_id' => $id])[0] === 400, 'Zweites Mal für dieselbe Liste → 400');
+        $c->ok((array_column((array) ($this->req('GET', "/attendance/$id")[1]['people'] ?? []), 'booked', 'id')[$m] ?? false) === true, 'Liste zeigt, wer schon Punkte hat');
+        $this->d->actAs($m);
+        [, $mine] = $this->req('GET', '/me/attendance');
+        $c->ok(in_array($id, array_column((array) ($mine['entries'] ?? []), 'list_id'), true), 'Eigene Anwesenheit');
+        $this->d->actAs($admin);
+        $c->ok($this->req('DELETE', "/attendance/$id")[0] === 200, 'Liste löschen');
     }
 
     private function events(): void
