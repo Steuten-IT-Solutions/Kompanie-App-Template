@@ -1,29 +1,21 @@
-# Eine getestete Version als stable markieren und für alle Kompanien freigeben (in einem Schritt):
-# 1. Kern-Version und Code-Prüfsumme aus der signierten release.json der Version lesen.
-# 2. Bei jeder Kompanie (Topic kompanie-app) die neueste Version mit genau diesem Programmcode freigeben
-#    (wie „Versionen steuern“ → promote-checked); Kompanien ohne solche Version bleiben unverändert.
-# 3. Den Programmcode in STABLE_CORE auf main eintragen: Spätere Versionen mit diesem Code gehen direkt nach stable.
+# Eine Kern-Version für alle Kompanien freigeben (nach dem Test auf einer Installation):
+# Ohne Eingaben: freigegeben wird immer der aktuelle Stand von main.
+# 1. Programmcode des Kerns auf main bestimmen (Kern-Version aus VERSION, Prüfsumme wie beim Veröffentlichen).
+# 2. Bei jeder Kompanie (Topic kompanie-app) die neueste Version mit genau diesem Programmcode freigeben;
+#    Kompanien ohne solche Version bleiben vorerst unverändert.
+# 3. Den Programmcode in STABLE_CORE auf main eintragen und „Kompanien abgleichen“ starten: Kompanien, die noch
+#    keine Version mit diesem Code haben, bekommen sie dabei gebaut und direkt als stable veröffentlicht.
 # Hinter der Environment „veroeffentlichen“; starten dürfen nur Personen mit Schreibrecht auf das Kern-Repo.
-name: Version freigeben
+name: Kernversion freigeben
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Getestete Version, z. B. 0.1.0.4
-        type: string
-        required: true
-      repo:
-        description: Kompanie-Repo, auf dem die Version getestet wurde
-        type: string
-        required: true
-        default: Steuten-IT-Solutions/marinekompanie-app
 
 permissions:
   contents: read
 
 concurrency:
-  group: version-freigeben
+  group: kern-freigeben
   cancel-in-progress: false
 
 jobs:
@@ -44,18 +36,13 @@ jobs:
           extensions: sodium, mbstring
           tools: none
 
-      - name: Programmcode der Version bestimmen (signierte release.json)
+      - name: Programmcode des Kerns bestimmen (aktueller Stand von main)
         id: code
-        env:
-          REPO: ${{ inputs.repo }}
-          VERSION: ${{ inputs.version }}
         run: |
-          [[ "$REPO" =~ ^Steuten-IT-Solutions/[A-Za-z0-9._-]+$ ]] || { echo "::error::Ungültiges Kompanie-Repo: $REPO"; exit 1; }
-          [[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,6}$ ]] || { echo "::error::Ungültige Version: $VERSION (z. B. 0.1.0.4)"; exit 1; }
-          curl -fsSL --max-time 30 -o "$RUNNER_TEMP/release.json" "https://github.com/$REPO/releases/download/v$VERSION/release.json" \
-            || { echo "::error::Version $VERSION von $REPO nicht gefunden (Release noch nicht veröffentlicht?)."; exit 1; }
-          STABLE="$(php scripts/checked-core.php --release="$RUNNER_TEMP/release.json")"
-          echo "Geprüfter Programmcode: $STABLE"
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          [[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || { echo "::error::Ungültige Kern-Version in VERSION: $VERSION"; exit 1; }
+          STABLE="$VERSION $(php scripts/package.php --code-hash)"
+          echo "Programmcode: $STABLE (main, $(git rev-parse --short HEAD))"
           echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
 
       - name: Kompanien bestimmen
@@ -125,15 +112,16 @@ jobs:
     environment: veroeffentlichen
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: main
 
       - name: STABLE_CORE auf main eintragen
+        id: eintragen
         env:
           STABLE: ${{ needs.pruefen.outputs.stable }}
-          VERSION: ${{ inputs.version }}
         run: |
           if [ "$(cat STABLE_CORE 2> /dev/null)" = "$STABLE" ]; then
             echo "STABLE_CORE enthält schon $STABLE."
@@ -141,7 +129,12 @@ jobs:
           fi
           echo "$STABLE" > STABLE_CORE
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit --quiet -m "chore(release): mark core ${STABLE%% *} of version $VERSION as checked" STABLE_CORE
+            commit --quiet -m "chore(release): mark core ${STABLE%% *} as checked" STABLE_CORE
           if ! git push --quiet origin HEAD:main; then
-            echo "::warning::STABLE_CORE ließ sich nicht auf main schreiben (Branch-Schutz?). Die Freigabe ist trotzdem erfolgt. Bitte per Pull Request eintragen: $STABLE"
+            echo "::warning::STABLE_CORE ließ sich nicht auf main schreiben (Branch-Schutz?). Vorhandene Versionen sind freigegeben; damit neue Versionen mit diesem Code direkt stable werden, STABLE_CORE per Pull Request eintragen: $STABLE"
           fi
+
+      - name: „Kompanien abgleichen“ starten (Kompanien ohne Version mit diesem Code)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run kompanien-abgleichen.yml --ref main

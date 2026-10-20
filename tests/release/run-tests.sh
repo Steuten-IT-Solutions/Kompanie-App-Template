@@ -166,11 +166,9 @@ if checked > "$T/checked.log" 2>&1; then fail "promote-checked ohne STABLE_CORE"
 grep -q "STABLE_CORE ist leer" "$T/checked.log" && ok "promote-checked ohne STABLE_CORE: Abbruch" || fail "Leeres STABLE_CORE: $(cat "$T/checked.log")"
 echo "$CORE 0000000000000000000000000000000000000000000000000000000000000000" > "$T/STABLE_CORE"
 grep -q "keine geprüfte Version" <<< "$(checked)" && [ -f "$T/releases/v$CORE.2/PRERELEASE" ] && ok "promote-checked mit anderem Programmcode: nichts freigegeben" || fail "Fremder Code freigegeben"
-# „Version freigeben“: geprüfter Code aus der signierten release.json, statt der Datei als STABLE_CORE_VALUE
-CHECKED="$(php scripts/checked-core.php --release="$T/r1/release.json")"
-[ "$CHECKED" = "$CORE $(php scripts/package.php --code-hash)" ] && ok "checked-core.php liest Kern und Code aus der release.json" || fail "checked-core.php: $CHECKED"
-sed 's/"payload": "ew/"payload": "eX/' "$T/r1/release.json" > "$T/release-boese.json"
-if php scripts/checked-core.php --release="$T/release-boese.json" > /dev/null 2>&1; then fail "Manipulierte release.json angenommen"; else ok "checked-core.php lehnt eine manipulierte release.json ab"; fi
+# „Kernversion freigeben“: geprüfter Code als STABLE_CORE_VALUE (Kern-Version und Prüfsumme wie beim Veröffentlichen),
+# gilt vor der Datei (die hier noch einen anderen Code enthält)
+CHECKED="$CORE $(php scripts/package.php --code-hash)"
 grep -q "gebe $CORE.2 frei" <<< "$(STABLE_CORE_VALUE="$CHECKED" checked)" && pages && [ ! -f "$T/releases/v$CORE.2/PRERELEASE" ] && grep -q "\"stable\": \"$CORE.2\"" <<< "$(list)" \
   && ok "promote-checked gibt die neueste geprüfte Version frei" || fail "promote-checked: $(list | grep -A3 channels)"
 echo "$CHECKED" > "$T/STABLE_CORE"
