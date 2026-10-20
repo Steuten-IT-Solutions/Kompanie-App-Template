@@ -18,7 +18,7 @@ export type Capability =
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
-export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks' | 'titles' | 'attendance';
+export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks' | 'titles' | 'attendance' | 'documents';
 
 export interface AppUser {
   id: number;
@@ -276,6 +276,57 @@ export interface Rank {
   active: boolean;
   /** Wie viele Mitglieder ihn haben (nur in der Pflege) */
   assigned?: number;
+}
+
+export type DocVisibility = 'members' | 'managers';
+
+export interface DocCategory {
+  id: number;
+  title: string;
+  sort: number;
+}
+
+export interface DocumentInfo {
+  id: number;
+  title: string;
+  category_id: number | null;
+  /** Stand (JJJJ-MM-TT) */
+  date: string;
+  visibility: DocVisibility;
+  ext: string;
+  /** pdf und image zeigt die App an, file wird nur heruntergeladen */
+  kind: 'pdf' | 'image' | 'file';
+  mime: string;
+  size: number;
+  version: string;
+  /** Auslieferung mit Prüfung der Anmeldung; wechselt mit jeder Fassung */
+  url: string;
+  updated_at: string;
+}
+
+export interface DocumentMeta {
+  title: string;
+  category_id: number | null;
+  date: string;
+  visibility: DocVisibility;
+}
+
+export interface DocumentsResponse {
+  categories: DocCategory[];
+  documents: DocumentInfo[];
+  /** Höchstgröße einer Datei (nur für wer Dokumente pflegt) */
+  max_bytes?: number;
+}
+
+/** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
+async function encodeFile(file: File): Promise<{ name: string; data: string }> {
+  const data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
+    reader.readAsDataURL(file);
+  });
+  return { name: file.name, data };
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
@@ -566,6 +617,19 @@ export const api = {
     request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason }),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   myRank: () => request<RankStatus & { ranks: Rank[]; history: RankHistoryEntry[] }>('GET', '/me/rank'),
+
+  // Dokumente (Issue #2)
+  documents: () => request<DocumentsResponse>('GET', '/documents'),
+  createDocument: async (file: File, meta: DocumentMeta) =>
+    request<DocumentInfo>('POST', '/documents', { ...meta, file: await encodeFile(file) }),
+  updateDocument: (id: number, meta: Partial<DocumentMeta>) => request<DocumentInfo>('PATCH', `/documents/${id}`, meta),
+  replaceDocumentFile: async (id: number, file: File) =>
+    request<DocumentInfo>('POST', `/documents/${id}/file`, { file: await encodeFile(file) }),
+  deleteDocument: (id: number) => request<{ deleted: boolean }>('DELETE', `/documents/${id}`),
+  createDocCategory: (title: string) => request<DocCategory>('POST', '/document-categories', { title }),
+  updateDocCategory: (id: number, title: string) => request<DocCategory>('PATCH', `/document-categories/${id}`, { title }),
+  deleteDocCategory: (id: number) => request<{ deleted: boolean }>('DELETE', `/document-categories/${id}`),
+  reorderDocCategories: (ids: number[]) => request<DocCategory[]>('PUT', '/document-categories/order', { ids }),
 
   // Anwesenheit (Issue #21)
   attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),

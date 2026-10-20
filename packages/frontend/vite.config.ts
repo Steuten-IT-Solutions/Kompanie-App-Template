@@ -60,5 +60,14 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     assetsDir: 'assets',
+    // Die PDF-Anzeige (pdf.js, Issue #2) wird erst beim Öffnen eines Dokuments nachgeladen.
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Der pdf.js-Worker hieße sonst *.mjs: Manche Webserver liefern .mjs ohne JavaScript-Typ aus (dann startet
+        // der Worker nicht), und die Veröffentlichung nimmt nur bekannte Dateitypen an (scripts/import-build.php).
+        assetFileNames: (info) => (info.names?.[0]?.endsWith('.mjs') ? 'assets/[name]-[hash].js' : 'assets/[name]-[hash][extname]'),
+      },
+    },
   },
 });

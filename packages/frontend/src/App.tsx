@@ -22,14 +22,17 @@ const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
 const Hilfe = lazyView(() => import('./views/Hilfe'));
 const Benachrichtigungen = lazyView(() => import('./views/Benachrichtigungen'));
+const Dokumente = lazyView(() => import('./views/Dokumente'));
+const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
 
-type Tab = 'termine' | 'news' | 'galerie' | 'meins' | 'verwaltung';
+type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'meins' | 'verwaltung';
 type View = Tab | 'konto' | 'benachrichtigungen' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
 
 const VIEWS: View[] = [
   'termine',
   'news',
   'galerie',
+  'dokumente',
   'meins',
   'verwaltung',
   'konto',
@@ -55,6 +58,7 @@ const tabLabels = (): Record<Tab, string> => ({
   termine: sec.events,
   news: sec.news,
   galerie: sec.gallery,
+  dokumente: sec.documents,
   meins: 'Meins',
   verwaltung: 'Verwaltung',
 });
@@ -78,6 +82,8 @@ function Icon({ name }: { name: Tab }) {
     news: 'M4 4h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2V4zm15 4h1a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0V8h2zM7 7v4h7V7H7zm0 6v1.5h7V13H7zm0 3v1.5h7V16H7z',
     galerie:
       'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
+    dokumente:
+      'M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 13v1.5h8V13H8zm0 3v1.5h8V16H8zm0-6v1.5h4V10H8z',
     meins: 'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z',
     verwaltung:
       'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm-4 9.5c.8-1.6 2.3-2.5 4-2.5s3.2.9 4 2.5',
@@ -185,6 +191,7 @@ export default function App() {
     termine: !!(features?.events || (features?.calendar && can('calendar'))),
     news: !!features?.news,
     galerie: !!features?.gallery,
+    dokumente: isMember() && !!features?.documents,
     meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
     // Die Verwaltung beginnt mit der Mitgliederliste: für alle, die Punkte oder Strafen vergeben,
     // Mitglieder anlegen oder Rollen vergeben (auch wenn Punkte und Strafen aus sind).
@@ -204,7 +211,7 @@ export default function App() {
     einrichtung: can('manage_settings'),
     hilfe: true,
   };
-  const tabs = (['termine', 'news', 'galerie', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
+  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'meins', 'verwaltung'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
@@ -247,6 +254,7 @@ export default function App() {
   }
 
   const albumId = tab === 'galerie' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
+  const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
   return (
@@ -308,6 +316,12 @@ export default function App() {
               ))}
             {tab === 'news' && <News id={newsId} />}
             {tab === 'galerie' && <Galerie albumId={albumId} />}
+            {tab === 'dokumente' &&
+              (path[1] === 'verwalten' && can('manage_documents') ? (
+                <DokumenteVerwalten onToast={showToast} />
+              ) : (
+                <Dokumente docId={docId} onToast={showToast} />
+              ))}
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}

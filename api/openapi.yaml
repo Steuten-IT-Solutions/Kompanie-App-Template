@@ -753,6 +753,194 @@ paths:
                         name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
 
+  /documents:
+    get:
+      tags: [Verwaltung]
+      summary: Sichtbare Dokumente (nach Titel) und alle Kategorien (Issue #2)
+      description: Dokumente mit Sichtbarkeit `managers` nur für wer `manage_documents` hat; für sie auch `max_bytes`.
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories: { type: array, items: { $ref: '#/components/schemas/DocCategory' } }
+                  documents: { type: array, items: { $ref: '#/components/schemas/DocumentInfo' } }
+                  max_bytes: { type: integer, description: 'Höchstgröße einer Datei: 20 MB oder weniger (post_max_size, memory_limit)' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Dokument hochladen
+      x-capability: manage_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, date, file]
+              properties:
+                title: { type: string, maxLength: 191 }
+                category_id: { type: [integer, 'null'] }
+                date: { type: string, format: date }
+                visibility: { type: string, enum: [members, managers], default: members }
+                file: { $ref: '#/components/schemas/DocumentFile' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentInfo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /documents/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Titel, Kategorie, Stand oder Sichtbarkeit ändern
+      x-capability: manage_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 191 }
+                category_id: { type: [integer, 'null'] }
+                date: { type: string, format: date }
+                visibility: { type: string, enum: [members, managers] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentInfo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Dokument und Datei löschen
+      x-capability: manage_documents
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /documents/{id}/file:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Neue Fassung (ersetzt die Datei, auch mit anderer Endung; version ändert sich)
+      x-capability: manage_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { $ref: '#/components/schemas/DocumentFile' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentInfo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /document-categories:
+    post:
+      tags: [Verwaltung]
+      summary: Kategorie anlegen (kommt ans Ende)
+      x-capability: manage_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 191 }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocCategory' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /document-categories/order:
+    put:
+      tags: [Verwaltung]
+      summary: Reihenfolge der Kategorien
+      x-capability: manage_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Neue Reihenfolge
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocCategory' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /document-categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Verwaltung]
+      summary: Kategorie umbenennen
+      x-capability: manage_documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 191 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocCategory' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Kategorie löschen (ihre Dokumente stehen danach ohne Kategorie da)
+      x-capability: manage_documents
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /attendance:
     get:
       tags: [Verwaltung]
@@ -1962,7 +2150,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -2162,6 +2350,7 @@ components:
             ranks: { type: boolean }
             titles: { type: boolean }
             attendance: { type: boolean }
+            documents: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -2375,6 +2564,37 @@ components:
         sort: { type: integer, description: Reihenfolge der Anzeige }
         active: { type: boolean, description: 'Deaktivierte werden nicht mehr neu vergeben; wer sie hat, behält sie' }
         assigned: { type: integer, description: Wie vielen Mitgliedern zugewiesen }
+
+    DocCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 191 }
+        sort: { type: integer }
+
+    DocumentInfo:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 191 }
+        category_id: { type: [integer, 'null'] }
+        date: { type: string, format: date, description: Stand }
+        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer manage_documents hat' }
+        ext: { type: string }
+        kind: { type: string, enum: [pdf, image, file], description: 'pdf und image zeigt die App an, file nur herunterladen' }
+        mime: { type: string }
+        size: { type: integer }
+        version: { type: string, description: Wechselt mit jeder neuen Fassung }
+        url: { type: string, description: 'Auslieferung mit Prüfung der Anmeldung: <App>/dokument/<id>?v=<version>' }
+        updated_at: { type: string }
+
+    DocumentFile:
+      type: object
+      required: [name, data]
+      description: Datei für das Hochladen (beide Adapter nehmen nur JSON an)
+      properties:
+        name: { type: string, description: 'Dateiname; die Endung bestimmt den Typ (pdf, jpg, jpeg, png, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp)' }
+        data: { type: string, description: 'Inhalt Base64-kodiert, auch als data:-Adresse; die Signatur muss zur Endung passen' }
 
     AttendanceStatus:
       type: string
