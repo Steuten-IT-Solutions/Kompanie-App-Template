@@ -3,6 +3,7 @@ import {
   api,
   ATTENDANCE_LABELS,
   can,
+  countsText,
   config,
   levelLabel,
   type AttendanceCounts,
@@ -17,8 +18,6 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
 const EVENTS_SHOWN = 8;
-
-export const countsText = (c: AttendanceCounts): string => STATUSES.map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`).join(' · ');
 
 /** Verwaltung → Anwesenheit: #/verwaltung/anwesenheit[/<id>] */
 export default function Anwesenheit({ id, onToast }: { id?: number; onToast: (msg: string) => void }) {

@@ -1,21 +1,15 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import type { MemberSummary } from './api';
-
-/** Zuletzt geladene Daten je Schlüssel (nur im Speicher; beim Abmelden geleert). */
-const asyncCache = new Map<string, unknown>();
-
-export function clearAsyncCache() {
-  asyncCache.clear();
-}
+import { dataCache } from './dataCache';
 
 /**
  * Lädt Daten asynchron; reload() lädt neu.
  * Mit `key` zeigt die Ansicht beim nächsten Öffnen sofort die zuletzt geladenen Daten und
- * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs).
+ * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs; siehe dataCache.ts).
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
   const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
-  const cached = () => (cacheKey !== null && asyncCache.has(cacheKey) ? (asyncCache.get(cacheKey) as T) : null);
+  const cached = () => (cacheKey !== null && dataCache.has(cacheKey) ? dataCache.get<T>(cacheKey) : null);
   const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +17,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
 
   const setData = useCallback(
     (d: T | null) => {
-      if (cacheKey !== null && d !== null) asyncCache.set(cacheKey, d);
+      if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d);
       setDataState(d);
     },
     [cacheKey],
@@ -34,12 +28,15 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
     setLoading(true);
     const hit = cached();
     if (hit !== null) setDataState(hit);
+    const since = dataCache.generation();
     fn()
       .then((d) => {
         if (alive) {
-          setData(d);
+          setDataState(d);
           setError(null);
         }
+        // Auch wenn die Ansicht schon geschlossen ist: Beim nächsten Öffnen sind die Daten dann aktuell.
+        if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since);
       })
       .catch((e: Error) => alive && setError(e.message))
       .finally(() => alive && setLoading(false));
@@ -165,39 +162,38 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
 }
 
 const CHUNK_RELOAD = 'kompanie-chunk-reload';
+/** Höchstens ein Neuladen je Minute: schützt vor einer Schleife, wenn ein Teil dauerhaft fehlt. */
+const CHUNK_RELOAD_PAUSE_MS = 60_000;
+
+/**
+ * Ein Programmteil ließ sich nicht laden. Nach einem Update fehlen die Teile der alten Version: Dann einmal neu laden
+ * und die aktuelle Version holen. true, wenn die Seite neu lädt.
+ */
+export function reloadAfterChunkError(): boolean {
+  if (!navigator.onLine) return false;
+  try {
+    const last = Number(sessionStorage.getItem(CHUNK_RELOAD) ?? 0);
+    if (Date.now() - last < CHUNK_RELOAD_PAUSE_MS) return false;
+    sessionStorage.setItem(CHUNK_RELOAD, String(Date.now()));
+  } catch {
+    // Ohne sessionStorage ließe sich eine Schleife nicht erkennen: lieber die Meldung zeigen.
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
 
 /**
  * Selten gebrauchte Ansicht erst bei Bedarf laden (kleinerer App-Start).
- * Nach einem Update kann ein Programmteil der alten Version fehlen: Dann lädt die App einmal neu
- * und holt die aktuelle Version. Schlägt es danach wieder fehl (z. B. offline), zeigt die
- * ErrorBoundary eine Meldung.
+ * Fehlt ein Programmteil (z. B. nach einem Update), lädt die App einmal neu (reloadAfterChunkError). Schlägt es danach
+ * wieder fehl (z. B. offline ohne gespeicherte Fassung), zeigt die ErrorBoundary eine Meldung.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyView<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
   return lazy(() =>
-    load().then(
-      (mod) => {
-        try {
-          sessionStorage.removeItem(CHUNK_RELOAD);
-        } catch {
-          // ohne sessionStorage: nichts zu merken
-        }
-        return mod;
-      },
-      (err: unknown) => {
-        let again = true;
-        try {
-          again = sessionStorage.getItem(CHUNK_RELOAD) === null;
-          sessionStorage.setItem(CHUNK_RELOAD, '1');
-        } catch {
-          again = false;
-        }
-        if (again && navigator.onLine) {
-          window.location.reload();
-          return new Promise<never>(() => undefined);
-        }
-        throw err;
-      },
-    ),
+    load().catch((err: unknown) => {
+      if (reloadAfterChunkError()) return new Promise<never>(() => undefined);
+      throw err;
+    }),
   );
 }

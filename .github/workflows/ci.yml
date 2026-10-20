@@ -115,6 +115,9 @@ jobs:
       - name: Branding-Tests (Farben, Kontrast, Icons, Konfiguration)
         run: npm run test:branding
 
+      - name: Frontend-Tests (Service Worker, Zwischenspeicher)
+        run: npm run test:frontend
+
       - name: Frontend bauen (inkl. TypeScript-Prüfung)
         run: npm run build
 

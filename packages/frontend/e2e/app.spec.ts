@@ -835,31 +835,58 @@ test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async 
   }
 });
 
-test('Service Worker: Programmdateien vorab gespeichert, alte Speicher gelöscht, langsames Netz', async ({ page }) => {
+test('Service Worker: nach einem Update alte Speicher gelöscht, alle Programmteile offline da, langsames Netz', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
-  await page.evaluate(async () => {
-    // Stand vor einem Update: alter Speicher einer früheren Version, Service Worker noch nicht da.
+  const assets = await page.evaluate(() => {
+    const src = document.querySelector<HTMLScriptElement>('script[type="module"][src]')!.src;
+    return src.slice(0, src.lastIndexOf('/assets/') + 1);
+  });
+  await page.evaluate(async (assets) => {
+    // Stand vor einem Update: Speicher früherer Versionen (alter Name und voriger Build), kein Service Worker,
+    // keine gespeicherte App-Seite.
     for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
     await (await caches.open('kompanie-static-v2')).put('/alt.js', new Response('alt'));
-  });
+    await (await caches.open('kompanie-static-000000000000')).put(assets + 'assets/Alt-0000.js', new Response('alt'));
+    await caches.delete('kompanie-data-v2');
+  }, assets);
   await page.reload();
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
   const statics = () => page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('kompanie-static-')));
   await expect.poll(statics).toHaveLength(1);
-  expect((await statics())[0]).not.toBe('kompanie-static-v2');
-  // Auch die erst bei Bedarf geladenen Ansichten liegen schon im Speicher (offline verfügbar).
+  expect(['kompanie-static-v2', 'kompanie-static-000000000000']).not.toContain((await statics())[0]);
+  // Vorab gespeichert: auch die erst bei Bedarf geladenen Ansichten und die Icons.
   const cached = await page.evaluate(async () => {
     const name = (await caches.keys()).find((k) => k.startsWith('kompanie-static-'))!;
-    return (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname.split('/').pop());
+    return (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname.split('/').slice(-2).join('/'));
   });
-  expect(cached.some((f) => /^Verwaltung-.*\.js$/.test(f ?? ''))).toBe(true);
-  expect(cached.some((f) => /^Einstellungen-.*\.js$/.test(f ?? ''))).toBe(true);
+  for (const chunk of ['Verwaltung', 'Einstellungen', 'Installieren', 'Galerie', 'Meins', 'maintenance']) {
+    expect(
+      cached.some((f) => new RegExp(`^assets/${chunk}-.*\\.js$`).test(f)),
+      chunk,
+    ).toBe(true);
+  }
+  expect(cached).toContain('icons/icon-192.png');
+  // Auch die App-Seite ist schon gespeichert (beim Installieren, ohne weiteres Laden).
+  await expect
+    .poll(() => page.evaluate(async () => !!(await (await caches.open('kompanie-data-v2')).match(new URL('./', location.href).href))))
+    .toBe(true);
 
-  // Langsames Netz: Die gespeicherte App-Seite erscheint nach höchstens 3 Sekunden.
-  await page.reload();
+  // Offline: App-Seite und erst bei Bedarf geladene Ansichten kommen aus dem Speicher.
+  await page.context().setOffline(true);
+  try {
+    await page.goto('/app/#/installieren');
+    await expect(page.getByRole('heading', { name: 'Die App aufs Handy holen' })).toBeVisible();
+    await page.getByRole('button', { name: 'Hilfe' }).click();
+    await expect(page.locator('.row-title', { hasText: 'Die App aufs Handy holen' })).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
+
+  // Langsames Netz: Die gespeicherte App-Seite erscheint nach höchstens 3 Sekunden (der Service Worker wartet 2,5 s).
+  await page.goto('/app/');
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await page.context().route(/\/app\/?$/, async (route) => {
     await new Promise((r) => setTimeout(r, 10000));
@@ -869,10 +896,43 @@ test('Service Worker: Programmdateien vorab gespeichert, alte Speicher gelöscht
     const start = Date.now();
     await page.goto('/app/', { waitUntil: 'commit', timeout: 9000 });
     await expect(page.locator('.topbar')).toBeVisible({ timeout: 9000 });
-    expect(Date.now() - start).toBeLessThan(6000);
+    expect(Date.now() - start).toBeLessThan(3500);
   } finally {
     await page.context().unrouteAll({ behavior: 'ignoreErrors' });
   }
+});
+
+test.describe('ohne Service Worker', () => {
+  // Damit der Programmteil wirklich aus dem Netz kommt.
+  test.use({ serviceWorkers: 'block' });
+
+  test('Fehlt ein Programmteil (nach einem Update), lädt die App einmal neu, ohne Schleife', async ({ page, context }) => {
+    let failures = 1;
+    await context.route(/\/assets\/Hilfe-[^/]*\.js$/, async (route) => {
+      if (failures-- > 0) await route.fulfill({ status: 404, body: '' });
+      else await route.continue();
+    });
+    await context.clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar')).toBeVisible();
+    let loads = 0;
+    page.on('load', () => loads++);
+    await page.getByRole('button', { name: 'Hilfe' }).click();
+    // Erster Versuch scheitert → einmal neu laden → jetzt klappt es.
+    await expect(page.locator('.row-title', { hasText: 'Die App aufs Handy holen' })).toBeVisible();
+    expect(loads).toBe(1);
+
+    // Fehlt der Teil dauerhaft und wurde eben erst neu geladen: keine Schleife, sondern eine Meldung.
+    failures = 100;
+    const page2 = await context.newPage();
+    await page2.goto('/app/');
+    await page2.evaluate(() => sessionStorage.setItem('kompanie-chunk-reload', String(Date.now())));
+    let loads2 = 0;
+    page2.on('load', () => loads2++);
+    await page2.getByRole('button', { name: 'Hilfe' }).click();
+    await expect(page2.getByText('Diese Ansicht konnte nicht angezeigt werden.')).toBeVisible();
+    expect(loads2).toBe(0);
+  });
 });
 
 test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Bezeichnungen, auch offline', async ({ page }) => {

@@ -374,7 +374,7 @@ select {
   width: 120px;
   height: 120px;
   opacity: 0.12;
-  background: no-repeat center / contain url('./generated/logo.png');
+  background: no-repeat center / contain url('./generated/logo-small.webp');
   filter: grayscale(1) brightness(2);
 }
 .stat-value {

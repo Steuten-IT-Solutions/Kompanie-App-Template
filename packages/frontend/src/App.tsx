@@ -7,17 +7,20 @@ import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './ins
 import BoardBanner from './BoardBanner';
 import { boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
-import { BirthdayPage, birthdaysVisible } from './birthdays';
-import { MaintenanceBanner, MaintenancePage } from './maintenance';
+import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { navigate, useRoute } from './router';
-import Anmelden from './views/Anmelden';
-import Galerie from './views/Galerie';
-import Meins from './views/Meins';
 import News from './views/News';
 import Termine from './views/Termine';
 
-// Selten gebraucht: erst bei Bedarf laden (der Service Worker speichert sie trotzdem vorab).
+// Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
+// Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
+const Anmelden = lazyView(() => import('./views/Anmelden'));
+const Galerie = lazyView(() => import('./views/Galerie'));
+const Meins = lazyView(() => import('./views/Meins'));
+const BirthdayPage = lazyView(() => import('./birthdays'));
+const MaintenancePage = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenancePage })));
+const MaintenanceBanner = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenanceBanner })));
 const Einrichtung = lazyView(() => import('./views/Einrichtung'));
 const Einstellungen = lazyView(() => import('./views/Einstellungen'));
 const Installieren = lazyView(() => import('./views/Installieren'));
@@ -167,10 +170,12 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/** Beim Abmelden: alle gespeicherten Daten löschen. Die Programmdateien bleiben (sie enthalten keine Daten), damit die
+ * App weiter offline startet. */
 async function clearCaches() {
   if ('caches' in window) {
     const keys = await caches.keys();
-    await Promise.all(keys.map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => !k.startsWith('kompanie-static-')).map((k) => caches.delete(k)));
   }
 }
 
@@ -289,7 +294,11 @@ export default function App() {
   if (maintenance && !can('manage_settings') && tab !== 'anmelden') {
     return (
       <div className="app">
-        <MaintenancePage reason={maintenance.reason} />
+        <ErrorBoundary>
+          <Suspense fallback={<Loading />}>
+            <MaintenancePage reason={maintenance.reason} />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     );
   }
@@ -331,7 +340,13 @@ export default function App() {
         )}
       </header>
 
-      {maintenance && <MaintenanceBanner reason={maintenance.reason} onToast={showToast} />}
+      {maintenance && (
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <MaintenanceBanner reason={maintenance.reason} onToast={showToast} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
       {boardVisible() && tab !== 'brett' && <BoardBanner />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}

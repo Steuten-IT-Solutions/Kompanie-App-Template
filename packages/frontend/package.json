@@ -8,6 +8,7 @@
     "dev": "npm run brand && npm run handbuch && vite",
     "build": "npm run brand && npm run handbuch && tsc --noEmit && vite build",
     "typecheck": "npm run brand && npm run handbuch && tsc --noEmit",
+    "test": "node --test test/*.test.mjs test/*.test.ts",
     "handbuch": "php ../../scripts/handbuch.php --app=src/generated/handbuch.json"
   },
   "dependencies": {

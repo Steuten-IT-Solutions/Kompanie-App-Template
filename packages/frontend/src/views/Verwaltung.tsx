@@ -10,7 +10,8 @@ import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeV
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
-import { MemberTitles, TitleBadges, TitleList } from './TitelVerwalten';
+import { TitleBadges } from '../TitleBadges';
+import { MemberTitles, TitleList } from './TitelVerwalten';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
