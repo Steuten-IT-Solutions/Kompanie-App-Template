@@ -37,13 +37,18 @@ final class PushTriggers
         }
     }
 
-    /** @param array{to_title: string, kind: string} $entry Verlaufseintrag (RankService::change) */
+    /**
+     * Mit Abzeichen des neuen Dienstgrads als Bild (PNG, 256 Pixel), wenn es eins gibt (Issue #17).
+     *
+     * @param array{to_title: string, kind: string, to_rank_id?: int|null} $entry Verlaufseintrag (RankService::change)
+     */
     public function rankChanged(int $userId, array $entry): void
     {
         $label = $this->app->config->rankLabel();
         $title = $entry['kind'] === RankService::KIND_PROMOTION ? 'Beförderung' : $label . ' geändert';
         $body = $entry['to_title'] !== '' ? sprintf('Dein %s: %s', $label, $entry['to_title']) : sprintf('Du hast keinen %s mehr.', $label);
-        $this->push->notifyUser($userId, PushService::TYPE_RANKS, PushService::message($title, $body, 'meins/dienstgrad', 'dienstgrad'));
+        $image = ($entry['to_rank_id'] ?? null) !== null ? $this->app->ranks()->badgePushImage((int) $entry['to_rank_id']) : null;
+        $this->push->notifyUser($userId, PushService::TYPE_RANKS, PushService::message($title, $body, 'meins/dienstgrad', 'dienstgrad', $image));
     }
 
     /** @param list<string> $titles neu verliehene Titel (TitleService::assign) */

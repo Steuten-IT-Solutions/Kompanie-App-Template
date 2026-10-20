@@ -22,11 +22,13 @@ use KompanieApp\Core\Storage\PushRepository;
  * - Abgleich alle 15 Minuten (push_watch): interner Kalender und Neuigkeiten gegen den letzten Stand (beim ersten
  *   Lauf nur merken), Erinnerung an die Termine von morgen ab der eingestellten Uhrzeit, einmal am Tag.
  *
- * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker.
+ * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
+ * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
+ * und Symbol der Benachrichtigung zeigt.
  *
  * @phpstan-import-type Subscription from PushRepository
  * @phpstan-import-type QueueItem from PushRepository
- * @phpstan-type Message array{title: string, body: string, route: string, tag: string}
+ * @phpstan-type Message array{title: string, body: string, route: string, tag: string, image?: string}
  */
 final class PushService
 {
@@ -426,9 +428,10 @@ final class PushService
     /* ---------------------------------------------------------------- */
 
     /** @return Message */
-    public static function message(string $title, string $body, string $route, string $tag = ''): array
+    public static function message(string $title, string $body, string $route, string $tag = '', ?string $image = null): array
     {
-        return ['title' => mb_substr($title, 0, 100), 'body' => mb_substr($body, 0, 300), 'route' => $route, 'tag' => $tag];
+        return ['title' => mb_substr($title, 0, 100), 'body' => mb_substr($body, 0, 300), 'route' => $route, 'tag' => $tag]
+            + ($image !== null && $image !== '' ? ['image' => $image] : []);
     }
 
     /**

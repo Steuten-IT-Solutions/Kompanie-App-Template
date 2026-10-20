@@ -62,4 +62,10 @@ final class WpEnvironment implements Environment
         $url = $this->appUrl('dokument/' . $id);
         return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version);
     }
+
+    public function badgeUrl(int $rankId, string $version, int $size): string
+    {
+        $url = $this->appUrl('abzeichen/' . $rankId);
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version) . '&s=' . $size;
+    }
 }

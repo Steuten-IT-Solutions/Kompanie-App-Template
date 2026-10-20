@@ -465,6 +465,20 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {documents}_category_id ON {documents} (category_id)',
                 ],
             ],
+            // Abzeichen der Dienstgrade (Issue #17): Name der Dateien in der geschützten Ablage (abzeichen/), ursprüngliches
+            // Format und Fassung (wechselt mit jedem Hochladen, damit die Adresse). Leer = kein Abzeichen.
+            9 => [
+                'mysql' => [
+                    "ALTER TABLE {ranks} ADD COLUMN badge_file varchar(40) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {ranks} ADD COLUMN badge_ext varchar(5) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {ranks} ADD COLUMN badge_version varchar(16) NOT NULL DEFAULT ''",
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {ranks} ADD COLUMN badge_file TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {ranks} ADD COLUMN badge_ext TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {ranks} ADD COLUMN badge_version TEXT NOT NULL DEFAULT ''",
+                ],
+            ],
         ];
     }
 

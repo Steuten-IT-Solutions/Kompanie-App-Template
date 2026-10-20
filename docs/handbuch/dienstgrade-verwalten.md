@@ -9,6 +9,8 @@ Wer die Rolle „{bereich.ranks} verwalten“ oder eine Rolle mit diesem Recht h
 ## Liste pflegen
 Unter **Verwaltung → {bereich.ranks}** legst du die {bereich.ranks} an, vom niedrigsten zum höchsten. Mit **niedriger** und **höher** änderst du die Reihenfolge, mit **Ändern** Bezeichnung und Punkteschwelle. Ein {begriff.rank}, den jemand hat, lässt sich nicht löschen, nur deaktivieren; die Person behält ihn.
 
+Zu jedem {begriff.rank} kannst du ein Abzeichen (Bild) hinterlegen, siehe [Abzeichen für {bereich.ranks}](seite:dienstgrade-abzeichen).
+
 ## Befördern und degradieren
 Im Mitglied (**Verwaltung → Mitglieder**) unter **{begriff.rank}** den neuen {begriff.rank} wählen, optional eine Begründung eintragen und **{begriff.rank} ändern** tippen. Jede Änderung steht im Verlauf des Mitglieds, mit Datum, Begründung und wer sie vorgenommen hat. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seinen {begriff.rank}; du kannst ihn dort jederzeit auf „Kein {begriff.rank}“ setzen.
 

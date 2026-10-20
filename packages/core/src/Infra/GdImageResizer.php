@@ -39,6 +39,40 @@ final class GdImageResizer implements ImageResizer
         return ['width' => $nw, 'height' => $nh];
     }
 
+    public function resizeToPng(string $sourceFile, string $targetFile, int $maxEdge): array
+    {
+        if (!function_exists('imagecreatefromstring')) {
+            throw new \RuntimeException('Auf dem Server fehlt die PHP-Erweiterung GD für Bilder.');
+        }
+        $data = @file_get_contents($sourceFile);
+        $src = $data === false ? false : @imagecreatefromstring($data);
+        if ($src === false) {
+            throw new \RuntimeException('Das Bild kann nicht gelesen werden.');
+        }
+        // Palettenbilder (PNG-8) erst in Echtfarben umwandeln, sonst geht beim Verkleinern die Transparenz verloren.
+        if (!imageistruecolor($src)) {
+            imagepalettetotruecolor($src);
+        }
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $scale = min(1.0, $maxEdge / max($w, $h));
+        $nw = max(1, (int) round($w * $scale));
+        $nh = max(1, (int) round($h * $scale));
+        $dst = imagecreatetruecolor($nw, $nh);
+        // Alphakanal behalten: nicht mischen, mit voller Transparenz füllen, Alpha mitspeichern.
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        imagefill($dst, 0, 0, (int) imagecolorallocatealpha($dst, 0, 0, 0, 127));
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        $ok = imagepng($dst, $targetFile, 9);
+        imagedestroy($src);
+        imagedestroy($dst);
+        if (!$ok) {
+            throw new \RuntimeException('Das Bild kann nicht gespeichert werden.');
+        }
+        return ['width' => $nw, 'height' => $nh];
+    }
+
     /** Dreht nach der EXIF-Ausrichtung von Handyfotos. */
     private function orient(\GdImage $img, string $file): \GdImage
     {

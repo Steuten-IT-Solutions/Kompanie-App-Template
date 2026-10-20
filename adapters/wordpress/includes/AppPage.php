@@ -14,6 +14,7 @@ use KompanieApp\Core\App;
  * /app/sw.js                 → Service Worker (Bereich /app/)
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
+ * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -72,6 +73,8 @@ final class AppPage
             self::sendPhoto($app, (int) $m[1], $m[2]);
         } elseif (preg_match('#^dokument/(\d+)/?$#', $path, $m)) {
             self::sendDocument($app, (int) $m[1]);
+        } elseif (preg_match('#^abzeichen/(\d+)/?$#', $path, $m)) {
+            self::sendBadge($app, (int) $m[1]);
         } else {
             self::sendApp($app);
         }
@@ -187,6 +190,39 @@ final class AppPage
         header('X-Content-Type-Options: nosniff');
         header('X-Robots-Tag: noindex');
         readfile($res['path']);
+    }
+
+    /**
+     * Abzeichen (Issue #17): Status, Header und Datei wie im Kern festgelegt (SVG mit strenger CSP).
+     *
+     * @return array{status: int, headers: array<string, string>, path?: string}
+     */
+    public static function badgeResponse(App $app, int $id): array
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, Rechte prüft der Kern
+        $v = isset($_GET['v']) && is_string($_GET['v']) ? $_GET['v'] : null;
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $s = isset($_GET['s']) && is_string($_GET['s']) ? $_GET['s'] : null;
+        return $app->ranks()->badgeForDelivery($app->authContext->currentUser(), $id, $v, $s);
+    }
+
+    private static function sendBadge(App $app, int $id): void
+    {
+        $res = self::badgeResponse($app, $id);
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        status_header($res['status']);
+        foreach ($res['headers'] as $name => $value) {
+            header($name . ': ' . $value);
+        }
+        if ($res['status'] === 200 && isset($res['path'])) {
+            header('Content-Length: ' . filesize($res['path']));
+            readfile($res['path']);
+        }
     }
 
     private static function sendApp(App $app): void

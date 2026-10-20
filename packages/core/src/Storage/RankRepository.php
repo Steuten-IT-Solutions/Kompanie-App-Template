@@ -9,7 +9,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Dienstgrade (Issue #9): die Liste, der zugewiesene Dienstgrad je Mitglied und der Verlauf.
  *
- * @phpstan-type Rank array{id: int, title: string, sort: int, min_points: int|null, active: bool}
+ * @phpstan-type Rank array{id: int, title: string, sort: int, min_points: int|null, active: bool, badge_file: string, badge_ext: string,
+ *     badge_version: string}
  * @phpstan-type HistoryEntry array{id: int, user_id: int, from_rank_id: int|null, to_rank_id: int|null, from_title: string,
  *     to_title: string, kind: string, points_at_change: float|null, reason: string, changed_by: int, changed_at: string}
  */
@@ -38,7 +39,7 @@ final class RankRepository
         return $this->db->insert('ranks', ['title' => $title, 'sort' => $sort, 'min_points' => $minPoints, 'active' => 1]);
     }
 
-    /** @param array{title?: string, sort?: int, min_points?: int|null, active?: bool} $data */
+    /** @param array{title?: string, sort?: int, min_points?: int|null, active?: bool, badge_file?: string, badge_ext?: string, badge_version?: string} $data */
     public function update(int $id, array $data): void
     {
         if (isset($data['active'])) {
@@ -143,6 +144,9 @@ final class RankRepository
             'sort' => (int) $r['sort'],
             'min_points' => $r['min_points'] === null ? null : (int) $r['min_points'],
             'active' => (bool) $r['active'],
+            'badge_file' => (string) ($r['badge_file'] ?? ''),
+            'badge_ext' => (string) ($r['badge_ext'] ?? ''),
+            'badge_version' => (string) ($r['badge_version'] ?? ''),
         ];
     }
 }

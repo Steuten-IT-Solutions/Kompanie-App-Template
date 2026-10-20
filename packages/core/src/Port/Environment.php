@@ -36,4 +36,11 @@ interface Environment
      * Service Workers; die Fassung (?v=…) gehört dazu, damit eine neue Fassung eine neue Adresse hat.
      */
     public function documentUrl(int $id, string $version): string;
+
+    /**
+     * Adresse eines Abzeichens (Issue #17), ausgeliefert nach Prüfung der Anmeldung: <App>/abzeichen/<id>?v=…&s=…
+     * Liegt im Bereich des Service Workers; die Fassung (v) wechselt mit jedem Hochladen, s ist die Größe
+     * (64, 128 oder 256 Pixel; bei SVG dieselbe Datei).
+     */
+    public function badgeUrl(int $rankId, string $version, int $size): string;
 }

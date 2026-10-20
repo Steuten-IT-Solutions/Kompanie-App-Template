@@ -419,6 +419,30 @@ final class PushServiceTest extends TestCase
         $this->assertSame('Punkte abgezogen', $bodies[1]['title']);
     }
 
+    public function testPromotionCarriesBadgeImage(): void
+    {
+        $app = $this->app();
+        $admin = $this->users->find($this->users->add('admin', Roles::ADMIN));
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $a = self::device('a');
+        $app->push()->subscribe($m, $a['endpoint'], $a['keys'], ['ranks'], true, '');
+        $plain = $app->ranks()->create(['title' => 'Gefreiter']);
+        $badged = $app->ranks()->create(['title' => 'Unteroffizier']);
+        $im = imagecreatetruecolor(300, 300);
+        ob_start();
+        imagepng($im);
+        $app->ranks()->uploadBadge($badged['id'], ['name' => 'uffz.png', 'data' => base64_encode((string) ob_get_clean())]);
+        $app->ranks()->change($admin, $m->id, $plain['id'], '');
+        $app->ranks()->change($admin, $m->id, $badged['id'], '');
+        $app->push()->processQueue();
+        $bodies = array_map(fn (array $c): array => self::decrypt((string) $c['body'], $a), $this->pushes());
+        $this->assertCount(2, $bodies);
+        $this->assertArrayNotHasKey('image', $bodies[0], 'ohne Abzeichen wie bisher');
+        $version = $app->ranks()->repository()->find($badged['id'])['badge_version'] ?? '';
+        $this->assertSame('https://example.org/app/abzeichen/' . $badged['id'] . '?v=' . $version . '&s=256', $bodies[1]['image'] ?? null, 'Abzeichen als PNG (256 Pixel), vollständige Adresse');
+        $this->assertSame('Beförderung', $bodies[1]['title']);
+    }
+
     private function ics(string ...$events): void
     {
         $this->ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" . implode('', $events) . "END:VCALENDAR\r\n";

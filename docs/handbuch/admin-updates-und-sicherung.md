@@ -11,4 +11,4 @@ Unter **Einstellungen → Datensicherung** lädst du eine Sicherung aller App-Da
 
 Wiederherstellen: Mit WordPress nur auf derselben Webseite. Ohne WordPress auch auf einer neuen Installation (z. B. beim Umzug), aber nicht aus einer Sicherung des WordPress-Plugins.
 
-Die Dateien der Dokumente sind nicht in der Sicherung, nur ihre Angaben (Titel, Kategorie, Stand). Sie bleiben auf dem Server. Beim Umzug ohne WordPress nimm den Ordner `data/files/dokumente` mit (bzw. das Datenverzeichnis, falls es woanders liegt), sonst lassen sich die Dokumente danach nicht öffnen und müssen neu hochgeladen werden.
+Die Dateien der Dokumente und die Abzeichen der {bereich.ranks} sind nicht in der Sicherung, nur ihre Angaben (Titel, Kategorie, Stand bzw. welcher {begriff.rank} welches Abzeichen hat). Sie bleiben auf dem Server. Beim Umzug ohne WordPress nimm die Ordner `data/files/dokumente` und `data/files/abzeichen` mit (bzw. das Datenverzeichnis, falls es woanders liegt), sonst lassen sich die Dokumente danach nicht öffnen und müssen neu hochgeladen werden; fehlende Abzeichen zeigt die App nicht an, bis du sie neu hochlädst.

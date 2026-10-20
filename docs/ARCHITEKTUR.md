@@ -178,6 +178,18 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Ohne Punkte:** frei befördern und degradieren. **Mit Punkten** (Lank #16, für alle, auch Admins): befördern erst ab der Schwelle des Ziels, degradieren nur unter der Schwelle des aktuellen; Dienstgrade ohne Schwelle frei. Gesetzte Schwellen aktiver Dienstgrade müssen mit `sort` streng steigen. Nächster Dienstgrad, fehlende Punkte, erreichbarer Dienstgrad und „Schwelle erreicht seit“ werden berechnet (Beförderungsübersicht in einem Durchlauf über alle Buchungen).
 - Anlegen eines Mitglieds mit Anfangspunkten (`manage_points`) und Dienstgrad (`manage_ranks`): alles wird vor dem Anlegen des Kontos geprüft.
 
+#### Abzeichen (Issue #17)
+
+- Optional ein Bild je Dienstgrad, pflegen mit `manage_ranks` (`POST /ranks/{id}/badge`, `DELETE /ranks/{id}/badge`). Spalten `badge_file`, `badge_ext`, `badge_version` in `ranks` (Migration 9, leer = keins). Ein deaktivierter Dienstgrad behält sein Abzeichen.
+- PNG, JPG, WebP, SVG, höchstens 1 MB, Base64 im JSON. Rasterbilder: Endung und Signatur, höchstens 4096 × 4096 Pixel; daraus PNG in 64/128/256 Pixeln mit Alphakanal (`ImageResizer::resizeToPng`, GD bzw. `wp_get_image_editor`, nie vergrößert). Das Original wird nicht aufgehoben.
+- SVG: `SvgSanitizer` (DOMDocument, ohne Netz, DOCTYPE wird abgelehnt) lässt nur Elemente und Attribute einer Liste stehen; `href` nur auf `#…`, `url()` nur auf `#…`, kein `<style>` mit `@import`, keine Animationen, kein `<script>`, `<foreignObject>`, `<image>`, keine `on*`-Attribute. Gespeichert wird das bereinigte SVG. Weil GD kein SVG rastert, zeichnet die App beim Hochladen eine PNG-Fassung (256 Pixel, transparent, Canvas) und schickt sie als `png` mit; der Server prüft sie wie ein PNG. Fehlt sie, gibt es nur kein Bild in Benachrichtigungen.
+- Dateien in der geschützten Dateiablage (`abzeichen/abz-<24 hex>(.svg|-64.png|-128.png|-256.png)`), Namen vor jedem Zugriff gegen ein Muster geprüft; Ersetzen, Entfernen und Löschen des Dienstgrads löschen die alten Dateien.
+- Auslieferung über `Environment::badgeUrl()` (`<App>/abzeichen/<id>?v=<Fassung>&s=<64|128|256>`, im Bereich des Service Workers). `RankService::badgeForDelivery` legt Status und Header für beide Adapter fest: angemeldet mit `member` oder `calendar` (auch Anwärter), sonst 401/403; Wartungsmodus 503; Bereich aus 404. SVG als `image/svg+xml` mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` und `nosniff`, sonst `image/png`; `Cache-Control: private`, bei passender Fassung ein Jahr (`immutable`).
+- `badge_url` (128er-Adresse, die App setzt `s` je nach Anzeigegröße) überall, wo ein Dienstgrad steht: Liste, Stand (`rank`, `next_rank`, `reachable_rank`), Beförderungsübersicht, Mitgliederliste (`rank_badge_url`) und -details, Verlauf (`to_badge_url`, das heutige Abzeichen; der Verlauf speichert nur Bezeichnungen). Fehlt die Datei (z. B. Sicherung auf einem anderen Server), ist `badge_url` null.
+- Die Benachrichtigung zur Beförderung bekommt `image` (vollständige Adresse der 256er-PNG-Fassung); der Service Worker setzt daraus `image` und `icon`. Der Service Worker hält Abzeichen zuerst aus dem Speicher (`kompanie-badges-v1`, je Dienstgrad und Größe nur die aktuelle Fassung).
+- In Sicherungen wie Dokumente: die Zeilen ja, die Dateien nicht.
+- App: `RankBadge` (klein/mittel/groß, `alt` = Bezeichnung, ohne eigenen Hintergrund, Rahmen oder Farbfilter); die Pflege zeigt eine Vorschau auf heller und dunkler Fläche.
+
 ### Titel (Issue #22)
 
 - Bereich `titles`: Ehrentitel und Ämter, unabhängig von Dienstgrad und Punkten; Recht `manage_titles` für Liste und Zuweisung.

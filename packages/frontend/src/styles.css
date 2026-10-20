@@ -1551,6 +1551,92 @@ fieldset.feature-list legend {
   font-weight: 700;
 }
 
+/* Abzeichen der Dienstgrade (Issue #17): ohne eigenen Hintergrund, Rahmen oder Farbfilter, damit transparente
+ * Abzeichen direkt auf der Fläche dahinter stehen (hell wie dunkel). Höhe fest, Breite nach Seitenverhältnis. */
+.rank-badge {
+  display: inline-block;
+  flex: none;
+  width: auto;
+  object-fit: contain;
+  vertical-align: middle;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+}
+.rank-badge-small {
+  height: 24px;
+  max-width: 48px;
+}
+.rank-badge-medium {
+  height: 48px;
+  max-width: 96px;
+}
+.rank-badge-large {
+  height: 128px;
+  max-width: min(100%, 256px);
+}
+.rank-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+.rank-badge-hero {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 14px;
+}
+.rank-progress.with-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.rank-progress-main {
+  flex: 1;
+  min-width: 0;
+}
+.rank-list li {
+  margin: 4px 0;
+}
+.member-rank-current {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.rank-badge-tools {
+  margin-top: 8px;
+}
+.badge-preview {
+  display: flex;
+  gap: 8px;
+  max-width: 320px;
+  margin-bottom: 6px;
+}
+.badge-preview > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px 6px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+/* Feste Flächen statt Farbschema: die Vorschau zeigt immer beide Fälle. */
+.badge-preview-light {
+  background: #ffffff;
+  color: #5b5f66;
+  border: 1px solid #d9dbe0;
+}
+.badge-preview-dark {
+  background: #17191d;
+  color: #b9bcc2;
+  border: 1px solid #33363c;
+}
+
 /* Titel (Ehrentitel und Ämter) */
 .title-badges {
   display: inline-flex;

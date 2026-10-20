@@ -75,4 +75,10 @@ final class StandaloneEnvironment implements Environment
         $url = $this->route('dokument/' . $id);
         return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version);
     }
+
+    public function badgeUrl(int $rankId, string $version, int $size): string
+    {
+        $url = $this->route('abzeichen/' . $rankId);
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version) . '&s=' . $size;
+    }
 }

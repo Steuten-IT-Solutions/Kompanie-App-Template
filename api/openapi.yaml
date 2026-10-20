@@ -698,6 +698,56 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /ranks/{id}/badge:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Abzeichen hochladen oder ersetzen (Issue #17)
+      description: |
+        PNG, JPG, WebP oder SVG, höchstens 1 MB, Base64 im JSON. Geprüft werden Endung und Signatur (Rasterbilder
+        höchstens 4096 × 4096 Pixel). Rasterbilder werden zu PNG in 64, 128 und 256 Pixeln (längere Kante, nie
+        vergrößert, Transparenz bleibt). SVGs werden bereinigt gespeichert (keine Skripte, keine Verweise nach außen,
+        kein DOCTYPE); `png` ist dann optional eine in der App gezeichnete PNG-Fassung (256 Pixel) für Benachrichtigungen.
+        Ein vorhandenes Abzeichen wird ersetzt und gelöscht; die Fassung (und damit `badge_url`) ändert sich.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: 'Dateiname; die Endung (.png, .jpg, .jpeg, .webp, .svg) bestimmt das Format' }
+                    data: { type: string, description: 'Inhalt Base64-kodiert (auch als data:-Adresse)' }
+                png: { type: string, description: 'Nur bei SVG, optional: PNG-Fassung Base64-kodiert, für das Bild in Benachrichtigungen' }
+      responses:
+        '200':
+          description: Der Dienstgrad wie in GET /ranks?all=1
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rank' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Abzeichen entfernen (löscht die Dateien)
+      x-capability: manage_ranks
+      responses:
+        '200':
+          description: Der Dienstgrad ohne Abzeichen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rank' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/rank:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -2697,6 +2747,7 @@ components:
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
         rank_title: { type: [string, 'null'], description: 'Dienstgrad (nur mit Bereich Dienstgrade und Recht manage_ranks)' }
+        rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         titles:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
           type: array
@@ -2732,6 +2783,18 @@ components:
         min_points: { type: [integer, 'null'], description: 'Punkteschwelle; null = ohne. Für Mitglieder nur mit dem Bereich Punkte' }
         active: { type: boolean }
         assigned: { type: integer, description: 'Wie oft vergeben (nur mit all=1)' }
+        badge_url: { $ref: '#/components/schemas/BadgeUrl' }
+        badge_type: { type: [string, 'null'], enum: [png, jpg, webp, svg, null], description: 'Format des hochgeladenen Abzeichens (nur mit all=1)' }
+        badge_push: { type: boolean, description: 'Es gibt eine PNG-Fassung für Benachrichtigungen (nur mit all=1; bei SVG nur, wenn die App eine mitgeschickt hat)' }
+
+    BadgeUrl:
+      type: [string, 'null']
+      description: |
+        Abzeichen des Dienstgrads (Issue #17) oder null: `<App>/abzeichen/<id>?v=<Fassung>&s=128`. Die App ersetzt
+        `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert nur an angemeldete
+        Personen mit Mitgliederbereich oder internem Kalender (sonst 401/403, im Wartungsmodus 503, Bereich aus 404);
+        SVG als image/svg+xml mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
+        und `X-Content-Type-Options: nosniff`, sonst image/png. Die Adresse wechselt mit jeder Fassung.
 
     Title:
       type: object
@@ -2843,6 +2906,7 @@ components:
       properties:
         id: { type: integer }
         title: { type: string }
+        badge_url: { $ref: '#/components/schemas/BadgeUrl' }
 
     RankStatus:
       type: object
@@ -2877,6 +2941,9 @@ components:
       properties:
         from: { type: [string, 'null'] }
         to: { type: [string, 'null'] }
+        to_badge_url:
+          description: Heutiges Abzeichen des neuen Dienstgrads (der Verlauf speichert nur Bezeichnungen); null ohne
+          $ref: '#/components/schemas/BadgeUrl'
         kind: { type: string, enum: [promotion, demotion, initial] }
         points_at_change: { type: [number, 'null'], description: 'null ohne den Bereich Punkte' }
         reason: { type: string }

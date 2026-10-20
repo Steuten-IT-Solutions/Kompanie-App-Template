@@ -271,6 +271,8 @@ export interface MemberSummary {
   member: boolean;
   /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
   rank_title?: string | null;
+  /** Abzeichen des Dienstgrads (wie rank_title) */
+  rank_badge_url?: string | null;
   /** Titel (nur mit Bereich und Recht „Titel verwalten“) */
   titles?: TitleRef[];
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
@@ -293,8 +295,14 @@ export interface Rank {
   /** Punkteschwelle (null = ohne); wirkt nur mit dem Bereich Punkte, Mitglieder sehen sie nur dann */
   min_points: number | null;
   active: boolean;
+  /** Abzeichen (Issue #17): Adresse mit s=128, siehe badgeSrc(); null ohne */
+  badge_url: string | null;
   /** Wie viele Mitglieder ihn haben (nur in der Pflege) */
   assigned?: number;
+  /** Format des Abzeichens (nur in der Pflege) */
+  badge_type?: 'png' | 'jpg' | 'webp' | 'svg' | null;
+  /** Es gibt eine PNG-Fassung für Benachrichtigungen (nur in der Pflege) */
+  badge_push?: boolean;
 }
 
 export type DocVisibility = 'members' | 'managers';
@@ -429,6 +437,8 @@ export interface TitleRef {
 export interface RankRef {
   id: number;
   title: string;
+  /** Abzeichen (Issue #17): Adresse mit s=128, siehe badgeSrc(); null ohne */
+  badge_url: string | null;
 }
 
 /** Stand eines Mitglieds; die Felder nach rank nur mit dem Bereich Punkte. */
@@ -445,6 +455,8 @@ export interface RankStatus {
 export interface RankHistoryEntry {
   from: string | null;
   to: string | null;
+  /** Heutiges Abzeichen des neuen Dienstgrads */
+  to_badge_url?: string | null;
   kind: 'promotion' | 'demotion' | 'initial';
   points_at_change: number | null;
   reason: string;
@@ -665,6 +677,10 @@ export const api = {
   setMemberRank: (id: number, rank_id: number | null, reason: string) =>
     request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason }),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
+  /** Abzeichen hochladen; bei SVG optional eine PNG-Fassung (Base64) für Benachrichtigungen. */
+  uploadRankBadge: async (id: number, file: File, png?: string | null) =>
+    request<Rank>('POST', `/ranks/${id}/badge`, { file: await encodeFile(file), ...(png ? { png } : {}) }),
+  removeRankBadge: (id: number) => request<Rank>('DELETE', `/ranks/${id}/badge`),
   myRank: () => request<RankStatus & { ranks: Rank[]; history: RankHistoryEntry[] }>('GET', '/me/rank'),
 
   // Dokumente (Issue #2)

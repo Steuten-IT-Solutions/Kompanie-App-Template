@@ -517,10 +517,40 @@ final class ApiScenario
         [, $me] = $this->req('GET', '/me/rank');
         $c->ok(($me['rank']['id'] ?? 0) === ($a['id'] ?? -1) && ($me['next_rank']['id'] ?? 0) === ($b['id'] ?? -1) && count((array) ($me['history'] ?? [])) === 1, 'Eigener Dienstgrad, nächster und Verlauf');
 
+        // Abzeichen (Issue #17): hochladen und entfernen mit „Dienstgrade verwalten“, badge_url überall, wo der Dienstgrad steht
+        $badge = '/ranks/' . ($a['id'] ?? 0) . '/badge';
+        $png = ['name' => 'abzeichen.png', 'data' => self::pngBase64()];
+        $c->ok($this->req('POST', $badge, ['file' => $png])[0] === 403, 'Mitglied lädt kein Abzeichen hoch → 403');
+        $this->d->actAs($admin);
+        [$s, $r] = $this->req('POST', $badge, ['file' => $png]);
+        $c->ok($s === 200 && str_contains((string) ($r['badge_url'] ?? ''), 'abzeichen') && ($r['badge_type'] ?? '') === 'png' && ($r['badge_push'] ?? false) === true, 'Abzeichen (PNG) hochladen');
+        $script = base64_encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+        $c->ok($this->req('POST', $badge, ['file' => ['name' => 'a.svg', 'data' => $script]])[0] === 400, 'SVG, von dem nach der Bereinigung nichts bleibt → 400');
+        $c->ok($this->req('POST', $badge, ['file' => ['name' => 'a.png', 'data' => $script]])[0] === 400, 'Falsche Signatur → 400');
+        $this->d->actAs($m);
+        [, $me] = $this->req('GET', '/me/rank');
+        $c->ok(($me['rank']['badge_url'] ?? null) === ($r['badge_url'] ?? '') && array_key_exists('badge_url', (array) ($me['next_rank'] ?? [])), 'Eigener Dienstgrad mit Abzeichen');
+        $this->d->actAs($admin);
+        [$s, $r] = $this->req('DELETE', $badge);
+        $c->ok($s === 200 && array_key_exists('badge_url', (array) $r) && $r['badge_url'] === null, 'Abzeichen entfernen');
+
         $this->d->actAs($admin);
         foreach ([$a, $b] as $r) {
             $this->req('PATCH', '/ranks/' . ($r['id'] ?? 0), ['active' => false]);
         }
+    }
+
+    /** Kleines PNG mit transparentem Rand (Base64), für Abzeichen. */
+    private static function pngBase64(): string
+    {
+        $im = imagecreatetruecolor(40, 20);
+        imagealphablending($im, false);
+        imagesavealpha($im, true);
+        imagefill($im, 0, 0, (int) imagecolorallocatealpha($im, 0, 0, 0, 127));
+        imagefilledrectangle($im, 10, 5, 30, 15, (int) imagecolorallocate($im, 200, 30, 30));
+        ob_start();
+        imagepng($im);
+        return base64_encode((string) ob_get_clean());
     }
 
     /** Titel (Issue #22): mehrere je Mitglied, Löschschutz, Rechte, Anzeige. */
