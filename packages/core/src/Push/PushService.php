@@ -463,16 +463,43 @@ final class PushService
      */
     public function notifyUser(int $userId, string $type, array $message, ?array $detail = null): int
     {
-        if (!$this->typeEnabled($type)) {
+        return $this->notifyUsers($type, [[$userId, $message, $detail]]);
+    }
+
+    /**
+     * Je Konto eine eigene Nachricht (z. B. Punkte für viele Personen auf einmal): die Abos aller Konten mit einer
+     * Abfrage, die Warteschlange mit einem gesammelten INSERT (Issue #18).
+     *
+     * @param list<array{0: int, 1: Message, 2?: Message|null}> $messages [Benutzer-ID, Nachricht, Variante mit Einzelheiten]
+     */
+    public function notifyUsers(string $type, array $messages): int
+    {
+        if ($messages === [] || !$this->typeEnabled($type)) {
             return 0;
         }
+        $subs = $this->repository()->forUsers(array_map(static fn (array $m): int => $m[0], $messages));
         $items = [];
-        foreach ($this->repository()->forUser($userId) as $sub) {
-            if (in_array($type, $sub['types'], true)) {
-                $items[] = ['subscription_id' => $sub['id'], 'payload' => $this->json($detail !== null && $sub['details'] ? $detail : $message)];
+        foreach ($messages as $m) {
+            [$userId, $message] = $m;
+            $detail = $m[2] ?? null;
+            foreach ($subs[$userId] ?? [] as $sub) {
+                if (in_array($type, $sub['types'], true)) {
+                    $items[] = ['subscription_id' => $sub['id'], 'payload' => $this->json($detail !== null && $sub['details'] ? $detail : $message)];
+                }
             }
         }
         return $this->enqueue($items);
+    }
+
+    /**
+     * Konten der Abos vorab mit einer Abfrage laden (für die Prüfung des Empfängerkreises).
+     *
+     * @param list<Subscription> $subs
+     * @return array<int, User> Benutzer-ID => Konto
+     */
+    private function accountsOf(array $subs): array
+    {
+        return $this->app->users->findMany(array_values(array_unique(array_filter(array_column($subs, 'user_id'), static fn (int $id): bool => $id > 0))));
     }
 
     /**
@@ -489,13 +516,12 @@ final class PushService
         $json = $this->json($message);
         $items = [];
         $calendarUsers = [];
-        foreach ($this->repository()->all() as $sub) {
-            if (!in_array($type, $sub['types'], true)) {
-                continue;
-            }
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => in_array($type, $sub['types'], true)));
+        $accounts = $calendar !== null ? $this->accountsOf($subs) : [];
+        foreach ($subs as $sub) {
             if ($calendar !== null) {
                 $uid = $sub['user_id'];
-                $calendarUsers[$uid] ??= $uid > 0 && $this->usesCalendar($this->app->users->find($uid));
+                $calendarUsers[$uid] ??= $uid > 0 && $this->usesCalendar($accounts[$uid] ?? null);
                 if ($calendarUsers[$uid] !== $calendar) {
                     continue;
                 }
@@ -534,12 +560,11 @@ final class PushService
         $json = $this->json($message);
         $items = [];
         $recipients = [];
-        foreach ($this->repository()->all() as $sub) {
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => $sub['user_id'] > 0 && in_array($type, $sub['types'], true)));
+        $accounts = $this->accountsOf($subs);
+        foreach ($subs as $sub) {
             $uid = $sub['user_id'];
-            if ($uid <= 0 || !in_array($type, $sub['types'], true)) {
-                continue;
-            }
-            $recipients[$uid] ??= $include($uid) && $this->inAudience($audience, $this->app->users->find($uid));
+            $recipients[$uid] ??= $include($uid) && $this->inAudience($audience, $accounts[$uid] ?? null);
             if ($recipients[$uid]) {
                 $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
             }
@@ -575,12 +600,11 @@ final class PushService
         $order = array_flip(array_keys($this->types()));
         $recipients = [];
         $count = 0;
-        foreach ($this->repository()->all() as $sub) {
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => $sub['user_id'] > 0 && !in_array($type, $sub['types'], true)));
+        $accounts = $this->accountsOf($subs);
+        foreach ($subs as $sub) {
             $uid = $sub['user_id'];
-            if ($uid <= 0 || in_array($type, $sub['types'], true)) {
-                continue;
-            }
-            $recipients[$uid] ??= $this->inAudience($definition['audience'], $this->app->users->find($uid));
+            $recipients[$uid] ??= $this->inAudience($definition['audience'], $accounts[$uid] ?? null);
             if ($recipients[$uid]) {
                 // In der üblichen Reihenfolge der Arten (wie bei neuen Abos).
                 $types = [...$sub['types'], $type];
@@ -640,6 +664,7 @@ final class PushService
         $rows = $repo->claim($now, gmdate('Y-m-d H:i:s', $ts + self::LEASE), $parallel ? $limit : min($limit, self::BATCH_SEQUENTIAL));
         $keys = $this->vapid();
         $sent = 0;
+        $tokens = []; // VAPID-Token je Push-Dienst, einmal je Lauf signiert
         // In Teilen senden und jeden Teil gleich abschließen: Bricht der Lauf ab, kommt höchstens ein Teil doppelt.
         foreach (array_chunk($rows, $parallel ? 25 : 5) as $chunk) {
             $done = [];
@@ -651,7 +676,7 @@ final class PushService
                     continue;
                 }
                 try {
-                    $requests[$row['id']] = $this->request(['ttl' => $row['ttl'] - $age] + $row, $keys);
+                    $requests[$row['id']] = $this->request(['ttl' => $row['ttl'] - $age] + $row, $keys, $tokens);
                 } catch (\RuntimeException $e) {
                     error_log('Kompanie-App: Push nicht vorbereitet: ' . $e->getMessage());
                     $done[] = $row['id'];
@@ -665,6 +690,7 @@ final class PushService
                 $fcmAccepts = $fcmAccepts || (is_array($res) && $res['status'] >= 200 && $res['status'] < 300
                     && parse_url($requests[$id]['url'], PHP_URL_HOST) === 'fcm.googleapis.com');
             }
+            $delivered = [];
             foreach ($chunk as $row) {
                 if (!isset($requests[$row['id']])) {
                     continue;
@@ -673,7 +699,7 @@ final class PushService
                 if ($status === 'ok') {
                     $sent++;
                     $done[] = $row['id'];
-                    $repo->markSent($row['subscription_id'], $now);
+                    $delivered[] = $row['subscription_id'];
                 } elseif ($status === 'gone') {
                     $repo->delete($row['subscription_id']);
                 } elseif ($status === 'retry' && $row['attempts'] < self::MAX_ATTEMPTS) {
@@ -682,6 +708,7 @@ final class PushService
                     $done[] = $row['id'];
                 }
             }
+            $repo->markSentMany($delivered, $now);
             $repo->dequeue($done);
         }
         // Noch mehr fällig (größer als ein Durchgang): gleich weitermachen.
@@ -702,7 +729,8 @@ final class PushService
         $keys = $this->vapid() ?? throw new ApiError(501, 'push_unsupported', 'Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.');
         $row = ['id' => 0, 'subscription_id' => $sub['id'], 'payload' => self::json(self::message($this->app->config->name(), 'Benachrichtigungen funktionieren.', 'benachrichtigungen', 'test')),
             'urgency' => 'high', 'ttl' => 300, 'attempts' => 0, 'created_at' => '', 'endpoint' => $sub['endpoint'], 'p256dh' => $sub['p256dh'], 'auth' => $sub['auth']];
-        $res = $this->sendAll([0 => $this->request($row, $keys)])[0] ?? new \RuntimeException('keine Antwort');
+        $tokens = [];
+        $res = $this->sendAll([0 => $this->request($row, $keys, $tokens)])[0] ?? new \RuntimeException('keine Antwort');
         $status = self::classify($res, $sub['endpoint']);
         if ($status === 'gone') {
             $this->repository()->delete($sub['id']);
@@ -721,13 +749,16 @@ final class PushService
     /**
      * @param QueueItem $row
      * @param array{public: string, private: string} $keys
+     * @param array<string, string> $tokens VAPID-Token je Push-Dienst (Ursprung des Endpoints), für den ganzen Lauf: Das
+     *        Token gilt 12 Stunden und hängt nur vom Dienst ab; eine Signatur je Dienst statt je Nachricht.
      * @return array{method: string, url: string, headers: array<string, string>, body: string}
      */
-    private function request(array $row, array $keys): array
+    private function request(array $row, array $keys, array &$tokens): array
     {
         $endpoint = (string) $row['endpoint'];
         $body = WebPushCrypto::encrypt($row['payload'], (string) WebPushCrypto::b64uDecode((string) $row['p256dh']), (string) WebPushCrypto::b64uDecode((string) $row['auth']));
-        $jwt = WebPushCrypto::vapidToken($endpoint, $keys['private'], $this->subject(), $this->app->time()->timestamp());
+        $audience = WebPushCrypto::audience($endpoint);
+        $jwt = $tokens[$audience] ??= WebPushCrypto::vapidToken($endpoint, $keys['private'], $this->subject(), $this->app->time()->timestamp());
         return ['method' => 'POST', 'url' => $endpoint, 'body' => $body, 'headers' => [
             'Content-Type' => 'application/octet-stream',
             'Content-Encoding' => 'aes128gcm',

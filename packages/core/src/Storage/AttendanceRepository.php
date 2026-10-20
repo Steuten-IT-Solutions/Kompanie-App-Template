@@ -92,23 +92,54 @@ final class AttendanceRepository
 
     /**
      * Status setzen (null = Eintrag entfernen). Unveränderte Einträge behalten, wer sie eingetragen hat.
+     * Gesammelt geschrieben (Issue #18): ein DELETE, ein INSERT und je Status ein UPDATE, nicht eine Abfrage je Person.
      *
      * @param array<int, string|null> $changes Benutzer-ID => Status
      */
     public function setEntries(int $listId, array $changes, int $by, string $now): void
     {
         $current = $this->entries($listId);
+        $delete = [];
+        $insert = [];
+        $update = [];
         foreach ($changes as $userId => $status) {
             if ($status === null) {
                 if (isset($current[$userId])) {
-                    $this->db->execute('DELETE FROM {attendance_entries} WHERE list_id = ? AND user_id = ?', [$listId, $userId]);
+                    $delete[] = $userId;
                 }
             } elseif (!isset($current[$userId])) {
-                $this->db->insert('attendance_entries', ['list_id' => $listId, 'user_id' => $userId, 'status' => $status, 'updated_by' => $by, 'updated_at' => $now]);
+                $insert[] = [$userId, $status];
             } elseif ($current[$userId]['status'] !== $status) {
-                $this->db->update('attendance_entries', ['status' => $status, 'updated_by' => $by, 'updated_at' => $now], ['list_id' => $listId, 'user_id' => $userId]);
+                $update[$status][] = $userId;
             }
         }
+        foreach (array_chunk($delete, 200) as $chunk) {
+            $this->db->execute('DELETE FROM {attendance_entries} WHERE list_id = ? AND user_id IN (' . self::marks($chunk) . ')', [$listId, ...$chunk]);
+        }
+        foreach ($update as $status => $ids) {
+            foreach (array_chunk($ids, 200) as $chunk) {
+                $this->db->execute(
+                    'UPDATE {attendance_entries} SET status = ?, updated_by = ?, updated_at = ? WHERE list_id = ? AND user_id IN (' . self::marks($chunk) . ')',
+                    [$status, $by, $now, $listId, ...$chunk],
+                );
+            }
+        }
+        foreach (array_chunk($insert, 200) as $chunk) {
+            $params = [];
+            foreach ($chunk as [$userId, $status]) {
+                array_push($params, $listId, $userId, $status, $by, $now);
+            }
+            $this->db->execute(
+                'INSERT INTO {attendance_entries} (list_id, user_id, status, updated_by, updated_at) VALUES ' . implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?)')),
+                $params,
+            );
+        }
+    }
+
+    /** @param list<mixed> $values */
+    private static function marks(array $values): string
+    {
+        return implode(', ', array_fill(0, count($values), '?'));
     }
 
     /**

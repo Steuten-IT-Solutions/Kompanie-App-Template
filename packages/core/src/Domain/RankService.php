@@ -79,9 +79,8 @@ final class RankService
      */
     public function list(bool $all): array
     {
-        if ($all) {
-            $this->forgetUnknownUsers();
-        }
+        // Zahl der Träger je Dienstgrad aus einer Abfrage (nicht eine je Dienstgrad)
+        $assigned = $all ? array_count_values($this->forgetUnknownUsers()) : [];
         $points = $this->usesPoints();
         return array_map(fn (array $r): array => [
             'id' => $r['id'],
@@ -90,7 +89,7 @@ final class RankService
             'min_points' => $points || $all ? $r['min_points'] : null,
             'active' => $r['active'],
             'badge_url' => $this->badgeUrl($r),
-        ] + ($all ? ['assigned' => $this->repository()->assignedCount($r['id'])] + $this->badgeInfo($r) : []), $this->repository()->all(!$all));
+        ] + ($all ? ['assigned' => $assigned[$r['id']] ?? 0] + $this->badgeInfo($r) : []), $this->repository()->all(!$all));
     }
 
     /**
@@ -434,6 +433,18 @@ final class RankService
     /* ---------------------------------------------------------------- */
 
     /**
+     * Nur der aktuelle Dienstgrad (z. B. für /me): ohne die Buchungen für Schwellen und Fortschritt, die status()
+     * dafür liest.
+     *
+     * @return array{id: int, title: string, badge_url: string|null}|null
+     */
+    public function current(int $userId): ?array
+    {
+        $rankId = $this->repository()->rankOf($userId);
+        return $rankId === null ? null : $this->ref($this->byId($this->repository()->all(false), $rankId));
+    }
+
+    /**
      * Dienstgrad eines Mitglieds; mit Punkten zusätzlich nächster Dienstgrad, fehlende Punkte und Schwellen.
      *
      * @return array<string, mixed>
@@ -475,7 +486,8 @@ final class RankService
     /** @return list<array<string, mixed>> neueste zuerst */
     public function history(int $userId): array
     {
-        $names = new UserNames($this->app->users);
+        $rows = $this->repository()->history($userId);
+        $names = (new UserNames($this->app->users))->prime(array_column($rows, 'changed_by'));
         $ranks = [];
         foreach ($this->repository()->all(false) as $r) {
             $ranks[$r['id']] = $r;
@@ -490,7 +502,7 @@ final class RankService
             'reason' => $h['reason'],
             'changed_by_name' => $names->name($h['changed_by']),
             'changed_at' => $h['changed_at'],
-        ], $this->repository()->history($userId));
+        ], $rows);
     }
 
     /**
@@ -744,15 +756,21 @@ final class RankService
 
     /**
      * Zuweisungen an Konten, die es nicht mehr gibt (z. B. bei WordPress gelöscht, während das Plugin aus war), entfernen:
-     * Sie ließen sich nirgends lösen und blockierten das Löschen des Dienstgrads.
+     * Sie ließen sich nirgends lösen und blockierten das Löschen des Dienstgrads. Die Konten werden gemeinsam geprüft.
+     *
+     * @return array<int, int> die verbleibenden Zuweisungen, Benutzer-ID => Dienstgrad-ID
      */
-    private function forgetUnknownUsers(): void
+    private function forgetUnknownUsers(): array
     {
-        foreach (array_keys($this->repository()->assignments()) as $userId) {
-            if ($this->app->users->find($userId) === null) {
+        $assignments = $this->repository()->assignments();
+        $known = $this->app->users->findMany(array_keys($assignments));
+        foreach (array_keys($assignments) as $userId) {
+            if (!isset($known[$userId])) {
                 $this->app->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
+                unset($assignments[$userId]);
             }
         }
+        return $assignments;
     }
 
     /**

@@ -520,4 +520,31 @@ final class PushServiceTest extends TestCase
         $this->assertSame('Morgen: Vereinsabend', $msg['title']);
         $this->assertSame('Vereinsabend (19:00 Uhr)', $msg['body']);
     }
+
+    /** Issue #18: ein VAPID-Token je Push-Dienst und Lauf, alle Personen einer Buchung gemeinsam eingereiht. */
+    public function testOneVapidTokenPerServiceAndBatchedQueue(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $rows = [];
+        foreach (['a', 'b', 'c'] as $i => $name) {
+            $m = $this->users->find($this->users->add($name, Roles::MEMBER));
+            $device = self::device($name);
+            $p->subscribe($m, $device['endpoint'], $device['keys'], ['points'], null, '');
+            $rows[] = ['id' => $i + 1, 'user_id' => $m->id, 'points' => 2, 'reason' => 'Fest'];
+        }
+        $moz = self::device('m');
+        $p->subscribe($this->users->find($rows[0]['user_id']), 'https://updates.push.services.mozilla.com/wpush/v2/m', $moz['keys'], ['points'], null, '');
+        $app->pushTriggers()->pointsAdded($rows);
+        $this->assertSame(4, $p->repository()->counts()['queued'], 'je Gerät ein Eintrag');
+        $this->assertSame(4, $p->processQueue());
+        $tokens = [];
+        foreach ($this->http->calls as $call) {
+            $tokens[(string) parse_url($call['url'], PHP_URL_HOST)][] = $call['headers']['Authorization'] ?? '';
+        }
+        $this->assertCount(3, $tokens['fcm.googleapis.com']);
+        $this->assertCount(1, array_unique($tokens['fcm.googleapis.com']), 'ein Token für alle Nachrichten an denselben Dienst');
+        $this->assertNotSame($tokens['fcm.googleapis.com'][0], $tokens['updates.push.services.mozilla.com'][0], 'eigenes Token je Dienst (Audience)');
+        $this->assertSame(4, (int) $app->db->scalar('SELECT COUNT(*) FROM {push_subscriptions} WHERE last_sent_at IS NOT NULL'), 'Zustellung bei allen vermerkt');
+    }
 }

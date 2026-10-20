@@ -35,12 +35,15 @@ final class PushTriggers
     public function pointsAdded(array $rows): void
     {
         $label = $this->app->config->sectionLabel('points', 'Punkte');
+        $messages = [];
         foreach ($rows as $r) {
             $value = (float) $r['points'];
             $title = $value < 0 ? $label . ' abgezogen' : $label . ' erhalten';
             $body = ($value > 0 ? '+' : '−') . self::number(abs($value)) . ' – ' . (string) $r['reason'];
-            $this->push->notifyUser((int) $r['user_id'], PushService::TYPE_POINTS, PushService::message($title, $body, 'meins/punkte', 'punkte-' . $r['id']));
+            $messages[] = [(int) $r['user_id'], PushService::message($title, $body, 'meins/punkte', 'punkte-' . $r['id'])];
         }
+        // Alle Personen einer Buchung gemeinsam (Abos mit einer Abfrage, ein INSERT in die Warteschlange)
+        $this->push->notifyUsers(PushService::TYPE_POINTS, $messages);
     }
 
     /**
@@ -150,15 +153,16 @@ final class PushTriggers
     public function penaltiesAdded(array $rows): void
     {
         $title = $this->app->config->sectionLabel('penalties', 'Strafen') . ': neuer Eintrag';
+        $messages = [];
         foreach ($rows as $r) {
             $tag = 'strafe-' . $r['id'];
-            $this->push->notifyUser(
+            $messages[] = [
                 (int) $r['user_id'],
-                PushService::TYPE_PENALTIES,
                 PushService::message($title, 'Tippen zum Ansehen.', 'meins/strafen', $tag),
                 PushService::message($title, self::euro((int) $r['amount_cents']) . ' – ' . (string) $r['reason'], 'meins/strafen', $tag),
-            );
+            ];
         }
+        $this->push->notifyUsers(PushService::TYPE_PENALTIES, $messages);
     }
 
     /**

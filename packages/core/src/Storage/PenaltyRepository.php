@@ -40,6 +40,23 @@ final class PenaltyRepository
     }
 
     /**
+     * Mehrere Einträge mit einer Abfrage, in der Reihenfolge von $ids (z. B. die gerade gebuchten).
+     *
+     * @param list<int> $ids
+     * @return list<array<string, mixed>>
+     */
+    public function findMany(array $ids): array
+    {
+        $rows = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            foreach ($this->db->select('SELECT * FROM {penalties} WHERE id IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ')', $chunk) as $r) {
+                $rows[(int) $r['id']] = $r;
+            }
+        }
+        return array_values(array_filter(array_map(static fn (int $id): ?array => $rows[$id] ?? null, $ids)));
+    }
+
+    /**
      * @param int[] $userIds
      * @return int[]
      */

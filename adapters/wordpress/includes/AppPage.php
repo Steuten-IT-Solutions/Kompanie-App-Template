@@ -117,6 +117,11 @@ final class AppPage
         header('Content-Type: application/javascript; charset=utf-8');
         header('Cache-Control: no-cache');
         header('Service-Worker-Allowed: ' . (string) wp_parse_url($app->env->appUrl(), PHP_URL_PATH));
+        // Der Browser prüft sw.js bei jedem Start der App: mit ETag meist nur 304 ohne Inhalt (Issue #18).
+        if (self::notModified(FileCache::etag('sw.js', $file))) {
+            return;
+        }
+        header('Content-Length: ' . filesize($file));
         readfile($file);
     }
 
@@ -211,7 +216,7 @@ final class AppPage
     /** Dokument (Issue #2): PDFs und Bilder inline, Office-Dateien als Download. */
     private static function sendDocument(App $app, int $id): void
     {
-        $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id);
+        $res = $app->documents()->forDelivery($app->authContext->currentUser(), $id, is_string($_GET['v'] ?? null) ? wp_unslash($_GET['v']) : null);
         // Nie in einen Seiten-Cache, nicht in Ausgabepuffer (Dateien bis 20 MB).
         if (!defined('DONOTCACHEPAGE')) {
             define('DONOTCACHEPAGE', true);
@@ -224,8 +229,15 @@ final class AppPage
             status_header($res['status']);
             return;
         }
-        // Privat und jedes Mal prüfen; offline hält der Service Worker die Datei (die Adresse wechselt mit der Fassung).
-        header('Cache-Control: private, no-cache');
+        // Privat; die aktuelle Fassung ein Jahr ohne Nachfrage (die Adresse wechselt mit jeder Fassung), sonst jedes Mal
+        // prüfen. Offline hält der Service Worker die Datei.
+        $cacheControl = $res['cache_control'] ?? 'private, no-cache';
+        header('Cache-Control: ' . $cacheControl);
+        if ($cacheControl !== 'private, no-cache') {
+            // nocache_headers() von oben zurücknehmen (Expires in der Vergangenheit)
+            header_remove('Expires');
+            header_remove('Pragma');
+        }
         header('X-Content-Type-Options: nosniff');
         header('X-Robots-Tag: noindex');
         if (self::notModified($res['etag'] ?? null)) {

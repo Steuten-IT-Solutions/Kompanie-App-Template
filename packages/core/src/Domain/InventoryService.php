@@ -60,8 +60,9 @@ final class InventoryService
     /** @return list<array<string, mixed>> alle Einträge, nach Bezeichnung und Ort (gruppiert wird in der App) */
     public function list(): array
     {
-        $names = new UserNames($this->app->users);
-        return array_map(fn (array $i): array => self::format($i, $names), $this->repository()->active());
+        $items = $this->repository()->active();
+        $names = (new UserNames($this->app->users))->prime([...array_column($items, 'created_by'), ...array_column($items, 'updated_by')]);
+        return array_map(fn (array $i): array => self::format($i, $names), $items);
     }
 
     /** @return list<string> bekannte Orte (der vorhandenen Einträge), alphabetisch, ohne Dubletten in anderer Schreibweise */
@@ -351,7 +352,7 @@ final class InventoryService
      */
     private function formatLog(array $rows): array
     {
-        $names = new UserNames($this->app->users);
+        $names = (new UserNames($this->app->users))->prime(array_column($rows, 'user_id'));
         return array_map(static fn (array $r): array => [
             'id' => $r['id'],
             'item_id' => $r['item_id'],

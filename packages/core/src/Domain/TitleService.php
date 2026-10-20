@@ -201,8 +201,11 @@ final class TitleService
      */
     private function forgetUnknownUsers(): void
     {
-        foreach (array_keys($this->repository()->assignments()) as $userId) {
-            if ($this->app->users->find($userId) === null) {
+        $assignments = $this->repository()->assignments();
+        // Alle Konten gemeinsam prüfen (eine Abfrage statt einer je Träger)
+        $known = $this->app->users->findMany(array_keys($assignments));
+        foreach (array_keys($assignments) as $userId) {
+            if (!isset($known[$userId])) {
                 $this->app->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
             }
         }

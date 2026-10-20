@@ -346,8 +346,10 @@ final class Api
             }),
 
             // Eigene Daten
+            // Punkte und offene Strafen einmal (me()); vom Dienstgrad nur die Bezeichnung, ohne die Buchungen für den
+            // Fortschritt erneut zu lesen (der steht unter /me/rank).
             new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
-                + ($a->features()->enabled('ranks') && $this->user()->isMember() ? ['rank' => $a->ranks()->status($this->user()->id)['rank']] : [])
+                + ($a->features()->enabled('ranks') && $this->user()->isMember() ? ['rank' => $a->ranks()->current($this->user()->id)] : [])
                 + ($a->features()->enabled('titles') && $this->user()->isMember() ? ['titles' => $a->titles()->of($this->user()->id)] : [])),
             // Dienstgrade (Issue #9): eigener Stand und Verlauf, die Liste mit Schwellen (mit Punkten)
             new Route('GET', '/me/rank', Cap::Member, fn () => $a->ranks()->status($this->user()->id)

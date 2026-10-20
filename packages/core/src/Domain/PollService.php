@@ -387,7 +387,14 @@ final class PollService
         $answers = $this->repository()->answers($ids);
         $voted = array_flip($this->repository()->votedPolls($user->id));
         $ref = $this->ref($user->id);
-        $names = new UserNames($this->app->users);
+        // Alle Namen (Ersteller, Teilnehmende namentlicher Umfragen) mit einer Abfrage; ausgegeben wird nur, was sichtbar ist.
+        $people = array_column($polls, 'created_by');
+        foreach ($polls as $p) {
+            if (!$p['anonymous']) {
+                array_push($people, ...array_column($answers[$p['id']] ?? [], 'user_id'));
+            }
+        }
+        $names = (new UserNames($this->app->users))->prime($people);
         $manager = self::canManage($user);
         $out = [];
         foreach ($polls as $p) {

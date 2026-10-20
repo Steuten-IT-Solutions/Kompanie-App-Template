@@ -46,7 +46,17 @@ final class ScoreService
     /** @return array<int, array<string, mixed>> */
     public function pointsFor(int $userId): array
     {
-        return array_map([$this, 'formatPoints'], $this->points->forUser($userId));
+        return $this->formatPointRows($this->points->forUser($userId));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function formatPointRows(array $rows): array
+    {
+        $this->names->prime(array_column($rows, 'created_by'));
+        return array_map([$this, 'formatPoints'], $rows);
     }
 
     public function pointsTotal(int $userId): int|float
@@ -95,7 +105,7 @@ final class ScoreService
 
         $attendanceId = Input::integer($in['attendance_id'] ?? null) ?: null;
         $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc(), $attendanceId);
-        return array_map(fn (int $id): array => $this->formatPoints((array) $this->points->find($id)), $ids);
+        return $this->formatPointRows($this->points->findMany($ids));
     }
 
     public function cancelPoints(int $id, int $by): void
@@ -114,7 +124,9 @@ final class ScoreService
     /** @return array<int, array<string, mixed>> */
     public function penaltiesFor(int $userId): array
     {
-        return array_map([$this, 'formatPenalty'], $this->penalties->forUser($userId));
+        $rows = $this->penalties->forUser($userId);
+        $this->names->prime(array_column($rows, 'created_by'));
+        return array_map([$this, 'formatPenalty'], $rows);
     }
 
     public function openCents(int $userId): int
@@ -139,7 +151,9 @@ final class ScoreService
             throw ApiError::invalid('Bitte einen Grund angeben.');
         }
         $ids = $this->penalties->add($userIds, $cents, $reason, $date, $by, $this->time->nowUtc());
-        return array_map(fn (int $id): array => $this->formatPenalty((array) $this->penalties->find($id)), $ids);
+        $rows = $this->penalties->findMany($ids);
+        $this->names->prime(array_column($rows, 'created_by'));
+        return array_map([$this, 'formatPenalty'], $rows);
     }
 
     public function setPenaltyStatus(int $id, mixed $status, int $by): array
@@ -253,9 +267,11 @@ final class ScoreService
             }
             $ids[$id] = $id;
         }
+        // Alle ausgewählten Konten mit einer Abfrage (Issue #18: nicht eine je Person)
+        $found = $this->users->findMany(array_values($ids));
         $users = [];
         foreach ($ids as $id) {
-            $user = $this->users->find($id);
+            $user = $found[$id] ?? null;
             if (!$user) {
                 throw ApiError::invalid('Unbekanntes Mitglied.');
             }

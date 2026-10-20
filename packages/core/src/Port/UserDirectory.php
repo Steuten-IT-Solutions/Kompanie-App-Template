@@ -18,6 +18,15 @@ interface UserDirectory
     public function find(int $id): ?User;
 
     /**
+     * Mehrere Konten auf einmal, für Listen (Namen, Empfänger, Prüfung ausgewählter Mitglieder): eine feste Zahl von
+     * Abfragen statt einer je Konto. Gleiche Regeln wie find(); unbekannte IDs fehlen im Ergebnis.
+     *
+     * @param array<int> $ids
+     * @return array<int, User> ID => Benutzer
+     */
+    public function findMany(array $ids): array;
+
+    /**
      * Nach Anzeigename sortiert.
      *
      * @param bool $includeGuests auch Konten ohne Rolle in der App
