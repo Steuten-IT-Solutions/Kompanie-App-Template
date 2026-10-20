@@ -6,7 +6,9 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
+import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
+import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { MemberTitles, TitleBadges, TitleList } from './TitelVerwalten';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
@@ -21,7 +23,7 @@ const canTitles = (): boolean => !!config?.features.titles && can('manage_titles
 const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -60,6 +62,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <MemberDetailView id={Number(arg)} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
+      ) : sub === 'neu-mehrere' && can('create_users') ? (
+        <BulkNewMembers canPoints={canPoints()} />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -204,6 +208,7 @@ function MemberDetailView({ id, onToast }: { id: number; onToast: (msg: string) 
         </button>
       )}
       <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
+      {can('create_users') && m.id !== config?.user?.id && <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />}
       <div className="stats">
         {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
         {canPenalties() && (
@@ -410,6 +415,9 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
         <p className="credentials-password" data-testid="reset-password">
           {password}
         </p>
+        <p className="small">
+          App noch nicht installiert? Anleitung: <span className="credentials-url">{installUrl()}</span>
+        </p>
       </div>
     );
   }
@@ -438,7 +446,6 @@ function NewMember() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
-  const [copied, setCopied] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -464,55 +471,22 @@ function NewMember() {
   }
 
   if (created) {
-    const text = `${brand.name} – App: ${config?.appUrl ?? ''}\nBenutzername: ${created.username}\nPasswort: ${created.password}`;
-    const copy = async () => {
-      try {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-      } catch {
-        setCopied(false);
-      }
-    };
     return (
-      <div className="card created">
-        <h2>{created.name} ist angelegt</h2>
-        {created.warning && (
-          <p className="form-error" role="alert">
-            {created.warning}
-          </p>
-        )}
-        <p className="muted">
-          Das Startpasswort wird <strong>nur jetzt</strong> angezeigt. Bitte notieren oder kopieren und persönlich weitergeben.
-        </p>
-        <dl className="credentials">
-          <dt>App</dt>
-          <dd>{config?.appUrl}</dd>
-          <dt>Benutzername</dt>
-          <dd data-testid="new-username">{created.username}</dd>
-          <dt>Passwort</dt>
-          <dd data-testid="new-password">{created.password}</dd>
-        </dl>
-        <div className="button-row">
-          <button className="btn" onClick={copy}>
-            {copied ? 'Kopiert ✓' : 'Zugangsdaten kopieren'}
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setCreated(null);
-              setCopied(false);
-              setName('');
-              setUsername('');
-              setEmail('');
-              setInitialPoints('');
-              setRankId('');
-            }}
-          >
-            Weiteres Mitglied
-          </button>
-        </div>
-        <button className="btn btn-link" onClick={() => navigate('verwaltung/mitglieder')}>
-          ‹ Zur Mitgliederliste
+      <div>
+        <h2 className="member-name no-print">{created.name} ist angelegt</h2>
+        <Credentials people={[created]} onDone={() => navigate('verwaltung/mitglieder')} />
+        <button
+          className="btn btn-secondary btn-block no-print"
+          onClick={() => {
+            setCreated(null);
+            setName('');
+            setUsername('');
+            setEmail('');
+            setInitialPoints('');
+            setRankId('');
+          }}
+        >
+          Weiteres Mitglied
         </button>
       </div>
     );
@@ -522,6 +496,9 @@ function NewMember() {
     <form className="form" onSubmit={submit}>
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
         ‹ Alle Mitglieder
+      </button>
+      <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
+        Mehrere auf einmal anlegen
       </button>
       <label className="field">
         <span>Name</span>

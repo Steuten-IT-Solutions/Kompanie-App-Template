@@ -445,7 +445,7 @@ final class Api
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
-            new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id()), null, $denyUsers),
+            new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
                 $a->members()->removeAccount($this->user(), $r->id());

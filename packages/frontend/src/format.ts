@@ -53,7 +53,8 @@ export function formatEventWhen(ev: { start: string; end: string; all_day: boole
   const e = eventEnd(ev);
   const sameDay = s.toDateString() === e.toDateString();
   if (ev.all_day) {
-    return sameDay ? `${weekdayFmt.format(s)} · ganztägig` : `${weekdayFmt.format(s)} – ${weekdayFmt.format(e)}`;
+    // Eintägig ohne Uhrzeit: nur das Datum (ohne Zusatz „ganztägig“).
+    return sameDay ? weekdayFmt.format(s) : `${weekdayFmt.format(s)} – ${weekdayFmt.format(e)}`;
   }
   if (e.getTime() <= s.getTime()) return `${weekdayFmt.format(s)} · ${timeFmt.format(s)} Uhr`;
   return sameDay

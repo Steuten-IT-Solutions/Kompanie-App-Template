@@ -451,6 +451,26 @@ export interface CreatedUser {
   password: string;
 }
 
+/** Ergebnis je Person beim Anlegen mehrerer (Issue #24): angelegt oder mit Grund nicht. */
+export type BulkResult = CreatedUser | { name: string; username: string; error: string };
+
+export interface NewPerson {
+  name: string;
+  username?: string;
+  email?: string;
+  initial_points?: number;
+  initial_points_date?: string;
+  rank_id?: number;
+}
+
+export interface AccountProfile {
+  name: string;
+  login: string;
+  email: string;
+  /** WordPress: Benutzernamen lassen sich nicht ändern */
+  can_change_login: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -597,6 +617,11 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
+  createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
+  updateAccount: (id: number, data: { name?: string; email?: string; username?: string }) =>
+    request<AccountProfile>('PATCH', `/members/${id}/account`, data),
+  deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   createUser: (data: {
     name: string;
     username?: string;

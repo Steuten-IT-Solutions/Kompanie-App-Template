@@ -1319,6 +1319,20 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+    delete:
+      tags: [Verwaltung]
+      summary: Konto löschen mit allen eigenen Daten (Issue #24)
+      description: |
+        Standalone: Das Konto wird gelöscht. WordPress: Der Benutzer der Webseite bleibt, verliert aber seine Rolle in der
+        App. In beiden Fällen werden Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel und Push-Abos der Person
+        gelöscht und alle Sitzungen beendet; was sie für andere eingetragen hat, bleibt. Nicht das eigene Konto, nicht der
+        letzte Admin; Grenzen wie beim Passwort-Zurücksetzen.
+      x-capability: create_users
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /members/{id}/role:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -1371,6 +1385,38 @@ paths:
                 properties:
                   id: { type: integer }
                   level: { $ref: '#/components/schemas/Level' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/account:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Verwaltung]
+      summary: Angaben eines Kontos zum Bearbeiten (Issue #24)
+      description: Mit denselben Grenzen wie beim Passwort-Zurücksetzen (Admins nur für Admins usw.).
+      x-capability: create_users
+      responses:
+        '200': { $ref: '#/components/responses/AccountProfile' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Name, E-Mail und (nicht bei WordPress) Benutzername ändern
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                email: { type: string }
+                username: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AccountProfile' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -1428,6 +1474,55 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CreatedUser' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /users/bulk:
+    post:
+      tags: [Verwaltung]
+      summary: Mehrere Mitglieder bzw. Anwärter auf einmal anlegen (Issue #24)
+      description: |
+        Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
+        Anfangspunkte, Dienstgrad); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile. Scheitert danach
+        doch eines, steht es mit `error` im Ergebnis.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [people]
+              properties:
+                level: { type: string, enum: [member, candidate], default: member }
+                people:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name: { type: string }
+                      username: { type: string }
+                      email: { type: string, format: email }
+                      initial_points: { type: integer, minimum: 0 }
+                      initial_points_date: { type: string, format: date }
+                      rank_id: { type: integer }
+      responses:
+        '201':
+          description: Ergebnis je Person (angelegt mit Startpasswort oder mit Grund nicht)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/CreatedUser'
+                    - type: object
+                      properties:
+                        name: { type: string }
+                        username: { type: string }
+                        error: { type: string }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -2099,6 +2194,17 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    AccountProfile:
+      description: Angaben eines Kontos
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name: { type: string }
+              login: { type: string }
+              email: { type: string }
+              can_change_login: { type: boolean, description: 'false bei WordPress' }
     AttendanceGroups:
       description: Je Rolle (ohne Gast), als welche sie im Zähler zählt
       content:

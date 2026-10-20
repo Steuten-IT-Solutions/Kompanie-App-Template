@@ -301,8 +301,12 @@ final class MemberService
      *
      * @return array{name: string, login: string, email: string, can_change_login: bool}
      */
-    public function profile(int $id): array
+    public function profile(int $id, ?User $actor = null): array
     {
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        if ($actor !== null && $actor->id !== $id) {
+            $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht sehen.');
+        }
         $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         return $p + ['can_change_login' => $this->users->canChangeLogin()];
     }

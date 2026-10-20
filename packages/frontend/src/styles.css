@@ -43,7 +43,8 @@ select {
 /* ------------------------------------------------------------------ */
 
 .app {
-  min-height: 100vh;
+  /* --kompanie-zoom: Ausgleich für die Desktop-Ansicht im Handy-Browser (viewport.ts) */
+  min-height: calc(100vh / var(--kompanie-zoom, 1));
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
@@ -1207,8 +1208,8 @@ code {
   touch-action: pan-y;
 }
 .lightbox img {
-  max-width: 100vw;
-  max-height: 86vh;
+  max-width: calc(100vw / var(--kompanie-zoom, 1));
+  max-height: calc(86vh / var(--kompanie-zoom, 1));
   object-fit: contain;
 }
 .lb-btn {
@@ -1861,4 +1862,55 @@ fieldset.feature-list legend {
   .tabbar button {
     letter-spacing: 0.02em;
   }
+}
+
+/* Konten (Issue #24): Zugangsdaten, mehrere anlegen, Druckzettel */
+.credentials-url {
+  overflow-wrap: anywhere;
+}
+.bulk-row {
+  margin-bottom: 12px;
+}
+.bulk-link {
+  margin-bottom: 14px;
+}
+.print-sheets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.print-only {
+  display: none;
+}
+@media print {
+  .topbar,
+  .tabbar,
+  .segmented,
+  .install-hint,
+  .offline,
+  .back,
+  .no-print {
+    display: none !important;
+  }
+  body,
+  .app,
+  .content {
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+  }
+  .print-only {
+    display: block;
+  }
+  .print-sheet {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px dashed #000;
+    margin-bottom: 12mm;
+  }
+}
+
+.install-chrome {
+  margin: 12px 0;
+  text-decoration: none;
 }

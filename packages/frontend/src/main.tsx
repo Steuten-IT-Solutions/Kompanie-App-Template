@@ -1,3 +1,5 @@
+// Zuerst: Desktop-Ansicht im Handy-Browser ausgleichen.
+import './viewport';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 // Früh laden: fängt das Android-Installationsangebot ab, bevor React startet.

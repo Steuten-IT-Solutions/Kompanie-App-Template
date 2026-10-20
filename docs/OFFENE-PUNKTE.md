@@ -106,7 +106,7 @@ und Videos je Hoster, sobald eine Kompanie dort installiert; Erkennen des Hoster
 - Den Rest trägt die Kompanie im Einrichtungsassistenten ein: Anschrift, Vorstand, Kontakt. Wer schon eine Webseite hat, gibt stattdessen die Links an.
 - **Sichtbar** auf der Anmeldeseite, im Konto-Bereich und auf der Download-Seite.
 - **Statusseite:** gelb, solange Impressum oder Datenschutz fehlen.
-- **Lösch- und Exportfunktion** je Mitglied (Auskunft nach Art. 15 DSGVO, Löschung), falls die Prüfung das verlangt.
+- **Löschung** je Mitglied gibt es seit Issue #24 (*Verwaltung → Mitglied → Konto löschen*, entfernt alle eigenen Daten). Offen ist noch ein **Export** der eigenen Daten (Auskunft nach Art. 15 DSGVO), falls die Prüfung das verlangt.
 - Die Vorlagen liegen **im Kern**, damit eine Änderung über ein Update alle Kompanien erreicht.
 
 **Schritte:** Prüfung beauftragen (vor der ersten neuen Kompanie) → Vorlagen schreiben → in Phase 5 einbauen.
