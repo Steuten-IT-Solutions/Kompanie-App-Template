@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { api, can, config, levelLabel } from '../api';
 import { isStandalone } from '../install';
+import { canPostBoard } from '../board';
+import brand from '../generated/brand';
 import { navigate } from '../router';
 
 const MIN_LENGTH = 8;
@@ -46,6 +48,16 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           <p className="muted small">Zustand der App, Updates, Datensicherung, Kalender, Galerie und Neuigkeiten.</p>
           <button className="btn btn-secondary btn-block" onClick={() => navigate('einstellungen')}>
             Einstellungen öffnen
+          </button>
+        </div>
+      )}
+
+      {canPostBoard() && (
+        <div className="card account-card">
+          <h3>{brand.labels.sections.board}</h3>
+          <p className="muted small">Dringende Nachrichten für alle Mitglieder und Anwärter, 24 Stunden oben auf jeder Seite.</p>
+          <button className="btn btn-secondary btn-block board-konto" onClick={() => navigate('brett')}>
+            Nachricht schreiben
           </button>
         </div>
       )}

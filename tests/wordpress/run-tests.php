@@ -261,6 +261,13 @@ $c->ok(!wp_next_scheduled($hook, $task), 'Normaler Seitenaufruf plant keine Aufg
 delete_option('kompanie_app_' . \KompanieApp\Core\App::PLAN_SETTING);
 Plugin::upgrade(); // nach einem Update passt die vermerkte Version nicht mehr
 $c->ok((bool) wp_next_scheduled($hook, $task), 'Nach einem Update werden die Aufgaben neu eingeplant');
+// Schwarzes Brett (Issue #5): stündlich über WP-Cron; der Hook löscht abgelaufene Nachrichten.
+$boardTask = \KompanieApp\Core\Domain\BoardService::TASK;
+$c->ok(wp_get_schedule($hook, [$boardTask]) === 'hourly', 'Schwarzes Brett: Aufräumen stündlich über WP-Cron');
+$past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
+$db->insert('board_messages', ['body' => 'Kpwp abgelaufen', 'author_id' => 1, 'created_at' => $past(90000), 'updated_at' => $past(90000), 'expires_at' => $past(3600)]);
+do_action($hook, $boardTask);
+$c->ok((int) $db->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpwp abgelaufen']) === 0, 'Aufgabe über den Hook löscht abgelaufene Nachrichten');
 
 $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);

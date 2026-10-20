@@ -32,6 +32,7 @@ final class ApiScenario
             $this->titles();
             $this->attendance();
             $this->documents();
+            $this->board();
             $this->accounts();
             $this->events();
             $this->push();
@@ -81,7 +82,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -653,6 +654,45 @@ final class ApiScenario
             $ok = $this->req('DELETE', '/documents/' . ($doc['id'] ?? 0))[0] === 200 && $ok;
         }
         $c->ok($ok, 'Dokumente löschen');
+    }
+
+    /** Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, post_board schreibt; Prüfung, Ablauf bleibt beim Ändern. */
+    private function board(): void
+    {
+        $c = $this->c;
+        $c->section('Schwarzes Brett');
+        $admin = $this->user('kptest_brett_admin', 'admin');
+        $m = $this->user('kptest_brett_m', 'member');
+        $cand = $this->user('kptest_brett_anw', 'candidate');
+        $guest = $this->user('kptest_brett_gast', 'guest');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/board')[0] === 401, 'GET /board ohne Anmeldung → 401');
+        $this->d->actAs($guest);
+        $c->ok($this->req('GET', '/board')[0] === 403, 'Gast-Konto: GET /board → 403');
+        $this->d->actAs($m);
+        $c->ok($this->req('POST', '/board', ['text' => 'Kptest'])[0] === 403, 'Mitglied ohne Recht schreibt nicht → 403');
+        $this->d->actAs($admin);
+        $c->ok($this->req('POST', '/board', ['text' => '  '])[0] === 400, 'Leerer Text → 400');
+        $c->ok($this->req('POST', '/board', ['text' => str_repeat('x', 501)])[0] === 400, 'Mehr als 500 Zeichen → 400');
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [$s, $item] = $this->req('POST', '/board', ['text' => "Kptest Brett $sfx\nzweite Zeile"]);
+        $id = (int) ($item['id'] ?? 0);
+        $c->ok($s === 201 && ($item['kind'] ?? '') === 'message' && ($item['text'] ?? '') === "Kptest Brett $sfx\nzweite Zeile" && is_string($item['expires_at'] ?? null), 'Nachricht schreiben (Zeilenumbruch bleibt)');
+        $c->ok(((int) strtotime((string) ($item['expires_at'] ?? ''))) - ((int) strtotime((string) ($item['created_at'] ?? ''))) === 86400, 'Gültig genau 24 Stunden');
+        foreach ([$m => 'Mitglied', $cand => 'Anwärter'] as $who => $label) {
+            $this->d->actAs($who);
+            [$s, $d] = $this->req('GET', '/board');
+            $c->ok($s === 200 && in_array($id, array_column((array) ($d['items'] ?? []), 'id'), true), "$label sieht die Nachricht");
+        }
+        $this->d->actAs($admin);
+        [$s, $edited] = $this->req('PATCH', "/board/$id", ['text' => "Kptest Brett $sfx geändert"]);
+        $c->ok($s === 200 && ($edited['expires_at'] ?? null) === ($item['expires_at'] ?? '') && ($edited['text'] ?? '') === "Kptest Brett $sfx geändert", 'Ändern: Ablaufzeit bleibt');
+        $this->req('PUT', '/admin/features', ['board' => false]);
+        [$s, $d] = $this->req('GET', '/board');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['board' => true]);
+        $c->ok($this->req('DELETE', "/board/$id")[0] === 200, 'Vorzeitig löschen');
+        $c->ok($this->req('DELETE', "/board/$id")[0] === 404, 'Gelöschte Nachricht → 404');
     }
 
     /** Konten verwalten (Issue #24): mehrere anlegen, Angaben ändern, aus der App entfernen mit allen eigenen Daten. */

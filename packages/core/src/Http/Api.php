@@ -285,6 +285,7 @@ final class Api
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
+        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
@@ -424,6 +425,21 @@ final class Api
                 $a->documents()->deleteCategory($r->id());
                 return ['deleted' => true];
             }, 'documents', $denyRights),
+
+            // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen (BoardService::isRecipient), post_board schreibt,
+            // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
+            new Route('GET', '/board', [Cap::Member, Cap::Calendar, Cap::PostBoard], fn () => $a->board()->list(), 'board', $denyBoard),
+            new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
+                $item = $a->board()->create($this->user(), $r->input('text'));
+                $author = $this->user()->id;
+                $this->notify(static fn () => $a->pushTriggers()->boardPosted($item, $author));
+                return Response::created($item);
+            }, 'board', $denyRights),
+            new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($r->id(), $r->input('text')), 'board', $denyRights),
+            new Route('DELETE', '/board/{id}', Cap::PostBoard, function (Request $r) use ($a) {
+                $a->board()->delete($r->id());
+                return ['deleted' => true];
+            }, 'board', $denyRights),
 
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
             new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),

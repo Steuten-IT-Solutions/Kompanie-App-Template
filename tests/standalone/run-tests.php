@@ -235,6 +235,19 @@ try {
     $c->ok($sw[0] === 200 && str_contains((string) ($sw[2]['content-type'] ?? ''), 'javascript'), 'sw.js liegt neben index.php (Bereich: ganze App)');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron&key=falsch', [], null)[0] === 403, 'Cron mit falschem Schlüssel → 403');
     $c->ok($d->send('GET', $kernel->cronUrl(), [], null)[0] === 200, 'Cron mit Schlüssel → 200');
+    // Schwarzes Brett (Issue #5): Der Cron führt das Aufräumen aus und löscht abgelaufene Nachrichten.
+    $kdb = $kernel->db();
+    $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
+    $kdb->insert('board_messages', ['body' => 'Kpsa abgelaufen', 'author_id' => 1, 'created_at' => $past(90000), 'updated_at' => $past(90000), 'expires_at' => $past(3600)]);
+    $kdb->execute('UPDATE {tasks} SET next_run = ? WHERE name = ?', [time() - 1, \KompanieApp\Core\Domain\BoardService::TASK]);
+    $kdb->execute('DELETE FROM {settings} WHERE name = ?', [KompanieApp\Standalone\PseudoScheduler::NEXT_SETTING]); // nächsten Lauf neu lesen
+    $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {tasks} WHERE name = ?', [\KompanieApp\Core\Domain\BoardService::TASK]) === 1, 'Schwarzes Brett: Aufräumen eingeplant');
+    $d->send('GET', $kernel->cronUrl(), [], null);
+    // Der Cron antwortet sofort und arbeitet danach: kurz warten.
+    for ($i = 0; $i < 50 && (int) $kdb->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpsa abgelaufen']) > 0; $i++) {
+        usleep(100000);
+    }
+    $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpsa abgelaufen']) === 0, 'Cron löscht abgelaufene Nachrichten am Brett');
     $c->ok($d->send('GET', $base . 'index.php?r=/foto/999/thumb', [], null)[0] === 404, 'Unbekanntes Foto → 404');
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');

@@ -170,6 +170,14 @@ final class Features
                 $this->app->roles()->featureChanged($key, $on, $this->roleLabel($key), $caps);
             }
         }
+        // Schwarzes Brett (Issue #5): Beim ersten Einschalten bekommen bestehende Abos die neue Art dazu.
+        if ($next['board'] && !($before['board'] ?? false)) {
+            try {
+                $this->app->push()->offerBoardToExisting();
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Benachrichtigungen für das Schwarze Brett nicht eingeschaltet: ' . $e->getMessage());
+            }
+        }
         return $next;
     }
 

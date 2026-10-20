@@ -2045,3 +2045,80 @@ fieldset.feature-list legend {
 .maintenance-banner .btn {
   flex-shrink: 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Schwarzes Brett (Issue #5)                                          */
+/* ------------------------------------------------------------------ */
+
+.board-banner {
+  padding: 8px 16px 4px;
+  background: var(--warn-surface);
+  color: var(--on-warn);
+  border-bottom: 1px solid var(--warn-deep);
+  font-size: 0.92rem;
+}
+.board-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 4px 0;
+}
+.board-entry + .board-entry {
+  border-top: 1px solid color-mix(in srgb, var(--on-warn) 30%, transparent);
+  padding-top: 8px;
+}
+.board-entry-body {
+  flex: 1;
+  min-width: 0;
+}
+.board-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+}
+.board-banner .board-meta {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+.board-text {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.board-banner .btn-link {
+  color: var(--on-warn);
+}
+.board-dismiss {
+  flex: none;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.board-banner-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.board-banner-foot .btn-link {
+  padding: 6px 0;
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+.board-page-title {
+  margin: 18px 0 10px;
+  font-size: 1rem;
+}
+.board-card .board-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.board-card .board-text {
+  margin: 6px 0;
+}
+.board-counter {
+  align-self: flex-end;
+}

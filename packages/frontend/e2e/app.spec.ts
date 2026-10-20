@@ -460,6 +460,7 @@ test.describe('Android', () => {
     await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
     await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
     await expect(page.getByLabel('Kasse: neue Einträge')).toBeChecked();
+    await expect(page.getByLabel('Schwarzes Brett: dringende Nachrichten')).toBeChecked();
     await expect(page.getByLabel('Kasse: Betrag und Grund in der Nachricht zeigen')).not.toBeChecked();
     await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
     await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
@@ -476,7 +477,7 @@ test.describe('Android', () => {
         });
         return (await res.json()).subscription;
       }, device);
-    await expect.poll(status).toEqual({ types: ['penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
+    await expect.poll(status).toEqual({ types: ['board', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], details: true });
 
     // Abmelden meldet das Gerät beim Server ab.
     await page.getByRole('button', { name: 'Konto' }).click();
@@ -1203,6 +1204,95 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
+});
+
+test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Änderung zeigt es wieder, abgelaufen weg', async ({
+  page,
+  browser,
+}) => {
+  const id = Date.now().toString(36);
+  const first = `Heute kein Training ${id}`;
+  const second = `Treffpunkt Schützenhaus ${id}`;
+  // Admin schreibt (Recht post_board) über „Mein Konto“ → „Nachricht schreiben“.
+  const admin = await browser.newPage();
+  admin.on('dialog', (d) => d.accept());
+  await login(admin, 'admin', ADMIN_PASSWORD);
+  await admin.getByRole('button', { name: 'Konto' }).click();
+  await admin.getByRole('button', { name: 'Nachricht schreiben' }).click();
+  await expect(admin.locator('.topbar-title')).toHaveText('Schwarzes Brett');
+  const form = admin.locator('.board-form');
+  await form.getByLabel('Text').fill(`${first}\nHalle gesperrt.`);
+  await expect(form.getByText(`${first.length + 16}/500 Zeichen`)).toBeVisible();
+  await expect(form).toContainText('sofort eine Benachrichtigung');
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(admin.locator('.toast')).toHaveText('Nachricht veröffentlicht');
+  await expect(admin.locator('.board-card', { hasText: first })).toContainText('Halle gesperrt.');
+
+  // Mitglied: Banner oben auf jeder Seite.
+  await login(page, 'mitglied1');
+  const banner = page.locator('.board-banner');
+  await expect(banner).toContainText(first);
+  await expect(banner).toContainText('Halle gesperrt.');
+  await expect(banner).toContainText('Admin');
+  const tabs = page.locator('.tabbar button');
+  for (let i = 0; i < (await tabs.count()); i++) {
+    await tabs.nth(i).click();
+    await expect(banner).toContainText(first);
+  }
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await expect(banner).toContainText(first);
+  await expect(page.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
+  await shot(page, '33-schwarzes-brett');
+
+  // Zweite Nachricht: die neueste oben, „+1 weitere“ klappt die erste auf.
+  await admin.locator('.board-form').getByLabel('Text').fill(second);
+  await admin.locator('.board-form').getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(admin.locator('.board-card', { hasText: second })).toBeVisible();
+  await page.reload();
+  await expect(banner.locator('.board-entry')).toHaveCount(1);
+  await expect(banner.locator('.board-entry')).toContainText(second);
+  await banner.getByRole('button', { name: '+1 weitere' }).click();
+  await expect(banner.locator('.board-entry')).toHaveCount(2);
+  await expect(banner.locator('.board-entry').nth(1)).toContainText(first);
+
+  // „×“ blendet sie auf diesem Gerät dauerhaft aus.
+  await banner.locator('.board-entry', { hasText: first }).getByRole('button', { name: 'Nachricht ausblenden' }).click();
+  await expect(banner.locator('.board-entry')).toHaveCount(1);
+  await expect(banner.getByRole('button', { name: /weitere/ })).toHaveCount(0);
+  await page.reload();
+  await expect(banner).toContainText(second);
+  await expect(banner).not.toContainText(first);
+  // Auf der Seite des Bretts bleibt sie sichtbar.
+  await banner.getByRole('button', { name: 'Brett öffnen' }).click();
+  await expect(page.locator('.board-card', { hasText: first })).toBeVisible();
+  await expect(page.locator('.board-form')).toHaveCount(0);
+
+  // Geändert: Die ausgeblendete Nachricht erscheint wieder (ohne neue Benachrichtigung).
+  const card = admin.locator('.board-card', { hasText: first });
+  await card.getByRole('button', { name: 'Bearbeiten' }).click();
+  await card.getByLabel('Text').fill(`${first} – fällt aus, Halle gesperrt`);
+  await card.getByRole('button', { name: 'Speichern' }).click();
+  await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
+  await page.goto('/app/#/termine');
+  await page.reload();
+  await expect(banner.locator('.board-entry')).toHaveCount(1);
+  await banner.getByRole('button', { name: '+1 weitere' }).click();
+  await expect(banner).toContainText(`${first} – fällt aus, Halle gesperrt`);
+
+  // Nach 24 Stunden blendet die App sie selbst aus (Uhr des Browsers vorgestellt).
+  await page.clock.install({ time: new Date(Date.now() + 25 * 3600 * 1000) });
+  await page.reload();
+  await expect(page.locator('.topbar-title')).toHaveText('Termine');
+  await expect(page.getByText('Vereinsabend')).toBeVisible();
+  await expect(banner).toHaveCount(0);
+
+  // Aufräumen: vorzeitig löschen.
+  for (const text of [second, first]) {
+    await admin.locator('.board-card', { hasText: text }).getByRole('button', { name: 'Löschen' }).click();
+    await expect(admin.locator('.board-card', { hasText: text })).toHaveCount(0);
+  }
+  await expect(admin.getByText('Zurzeit gibt es keine Nachrichten.')).toBeVisible();
+  await admin.close();
 });
 
 test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wartungsseite, danach wieder normal', async ({

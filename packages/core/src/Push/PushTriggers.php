@@ -17,7 +17,9 @@ use KompanieApp\Core\Domain\RankService;
  *   Mitglieder mit Kalender, damit nichts doppelt kommt;
  * - neue Neuigkeiten (Abgleich mit dem letzten Stand): an alle Abonnenten;
  * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
- * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied.
+ * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied;
+ * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, dringend und
+ *   höchstens bis zum Ablauf der Nachricht zustellbar; Ändern löst nichts aus.
  */
 final class PushTriggers
 {
@@ -61,6 +63,17 @@ final class PushTriggers
             ? sprintf('Dir wurde der Titel „%s“ verliehen.', $titles[0])
             : sprintf('Dir wurden die Titel %s verliehen.', implode(', ', array_map(static fn (string $t): string => '„' . $t . '“', $titles)));
         $this->push->notifyUser($userId, PushService::TYPE_TITLES, PushService::message('Neuer Titel', $body, 'meins', 'titel'));
+    }
+
+    /**
+     * @param array{id: int, text: string, author_name: string|null, expires_at: string|null} $item neue Nachricht (BoardService::create)
+     */
+    public function boardPosted(array $item, int $authorId): int
+    {
+        $expires = $item['expires_at'] !== null ? (int) strtotime($item['expires_at']) : 0;
+        $ttl = $expires - $this->app->time()->timestamp();
+        $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
+        return $this->push->notifyBoard(PushService::message($title, $item['text'], 'brett', 'brett-' . $item['id']), $authorId, $ttl);
     }
 
     /** @param array<int, array<string, mixed>> $rows Strafen (ScoreService::givePenalty) */
