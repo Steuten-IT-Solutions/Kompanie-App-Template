@@ -42,6 +42,7 @@ final class Features
         'titles' => ['label' => 'Titel', 'description' => 'Ehrentitel und Ämter der Mitglieder, z. B. Ehrenmitglied, unabhängig von Dienstgrad und Punkten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_titles']],
         'attendance' => ['label' => 'Anwesenheit', 'description' => 'Anwesenheitslisten je Termin; zusammen mit Punkten und Strafen gesammelt buchen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_attendance']],
         'documents' => ['label' => 'Dokumente', 'description' => 'Dateien wie Satzung, Protokolle und Formulare für Mitglieder, nach Kategorien, auch offline.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_documents']],
+        'board' => ['label' => 'Schwarzes Brett', 'description' => 'Dringende Nachrichten für 24 Stunden oben auf jeder Seite, mit Benachrichtigung an alle Mitglieder und Anwärter.', 'requires' => [], 'setup' => null, 'role' => ['member', 'post_board']],
     ];
 
     /** @var array<string, bool>|null */
@@ -169,6 +170,14 @@ final class Features
                 $this->app->roles()->featureChanged($key, $on, $this->roleLabel($key), $caps);
             }
         }
+        // Schwarzes Brett (Issue #5): Beim ersten Einschalten bekommen bestehende Abos die neue Art dazu.
+        if ($next['board'] && !($before['board'] ?? false)) {
+            try {
+                $this->app->push()->offerBoardToExisting();
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Benachrichtigungen für das Schwarze Brett nicht eingeschaltet: ' . $e->getMessage());
+            }
+        }
         return $next;
     }
 
@@ -190,8 +199,9 @@ final class Features
         }
         $state = [];
         foreach (self::keys() as $key) {
-            // Dienstgrade, Titel, Anwesenheit und Dokumente gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents'], true) && $this->app->config->legacyFeature($key);
+            // Dienstgrade, Titel, Anwesenheit, Dokumente und das Schwarze Brett gab es in den alten Versionen nicht: nie aus
+            // kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

@@ -84,3 +84,11 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`;
 }
+
+/** Zeitpunkt (ISO 8601) kurz: heute „14:05 Uhr“, sonst „Mo., 19. Okt., 14:05 Uhr“. */
+export function formatShortTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const time = `${timeFmt.format(d)} Uhr`;
+  return d.toDateString() === new Date().toDateString() ? time : `${weekdayFmt.format(d)}, ${time}`;
+}

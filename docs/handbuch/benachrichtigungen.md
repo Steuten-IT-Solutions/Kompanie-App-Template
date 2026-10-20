@@ -13,6 +13,7 @@ Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas 
 Mit **Testnachricht senden** prüfst du, ob alles klappt. Die Einstellung gilt nur für das Gerät, auf dem du sie vornimmst; auf weiteren Geräten schaltest du sie dort ein.
 
 ## Was es gibt
+- **{bereich.board}: dringende Nachrichten**: nur mit Konto, für {rolle.member} und {rolle.candidate}, sobald jemand eine Nachricht ans {bereich.board} schreibt. Für neue Geräte ist das von Anfang an eingeschaltet.
 - **{bereich.points}: neue Einträge** und **{bereich.penalties}: neue Einträge**: nur mit Konto, nur deine eigenen. Bei {bereich.penalties} stehen Betrag und Grund nur mit dem Schalter **{bereich.penalties}: Betrag und Grund in der Nachricht zeigen** in der Nachricht, sonst nur ein Hinweis – gut, wenn andere deinen Sperrbildschirm sehen.
 - **{bereich.events}: neue und geänderte**: wenn ein Termin dazukommt oder sich Zeit oder Ort ändern.
 - **Erinnerung am Vortag**: einmal am Tag vor einem Termin, ab der Uhrzeit, die der Admin festlegt (üblich 18 Uhr), spätestens vier Stunden danach.

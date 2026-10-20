@@ -227,6 +227,17 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Zähler nach Gruppen: Einstellung `attendance_groups` (Rolle → Rolle, als die sie zählt; keine Ketten). Ohne Einstellung zählen Rollen mit Mitgliederbereich als Mitglied.
 - Feste Zahl von Abfragen je Liste, unabhängig von der Zahl der Personen (gemessen im Test mit 40 Personen).
 
+### Schwarzes Brett (Issue #5)
+
+- Bereich `board`, Recht `post_board` (Standardrolle „Schwarzes Brett verwalten“: `member`, `post_board`). Tabelle `board_messages` (`body`, `author_id`, `created_at`, `updated_at`, `expires_at`, Migration 10), in Sicherungen enthalten.
+- Empfänger sind Mitglieder und Anwärter: `BoardService::isRecipient` (`member` oder `calendar`, wie `/calendar`) ist die einzige Stelle dafür – für `GET /board`, die Push-Empfänger, die Art `board` in den Benachrichtigungen und (gespiegelt in `board.ts`) die App. Wer `post_board` hat, darf auch lesen.
+- Reiner Text (`Text::multiline`, höchstens 500 Zeichen, Zeilenumbrüche bleiben, HTML-Tags werden entfernt); die App zeigt ihn als Text (`white-space: pre-wrap`), Links sind nicht anklickbar.
+- Gültig genau 24 Stunden (`expires_at` aus `Time`, in Tests mit verschobener Uhr prüfbar). `GET` liefert nur gültige Einträge; die Aufgabe `board_cleanup` (stündlich, nur mit Bereich) löscht abgelaufene, ohne Verlauf. Ändern (`PATCH`) nur solange gültig, `expires_at` bleibt, `updated_at` wechselt nur bei neuem Text; Ändern und Löschen darf jede und jeder mit dem Recht.
+- Benachrichtigung nur beim Schreiben (`PushTriggers::boardPosted` → `PushService::notifyBoard`): an alle Geräte der Empfänger mit Art `board` außer denen des Verfassers, `Urgency: high`, TTL = Restlaufzeit der Nachricht (höchstens 24 Stunden), Versand sofort angestoßen; im Wartungsmodus wartet die Warteschlange wie sonst. Neue Abos bekommen `board` wie alle angebotenen Arten; beim ersten Einschalten des Bereichs auch die bestehenden Abos der Empfänger (`offerBoardToExisting`, einmalig, `push_board_offered`).
+- Die Liste besteht aus Einträgen mit `kind` (heute nur `message`), damit später weitere Arten dazukommen (z. B. laufende Umfragen, Issue #4); App und Banner überspringen unbekannte.
+- App: Banner oben auf jeder Seite (`BoardBanner`, neueste Nachricht, „+N weitere“), „×“ blendet je Gerät aus (`localStorage`, Schlüssel aus Art, ID und `updated_at`: geänderte Nachrichten erscheinen wieder). Laden beim Öffnen, bei `visibilitychange` und auf `#/brett` (Ziel der Benachrichtigung); abgelaufene blendet die App selbst aus, auch aus dem Offline-Speicher. Seite `#/brett` mit allen gültigen Nachrichten; Schreiben, Ändern, Löschen mit `post_board` (Einstieg: *Mein Konto* → *Nachricht schreiben* oder das Banner).
+- Gelöschte Konten: Nachrichten bleiben bis zum Ablauf, Verfasser „gelöschtes Konto“ (`UserNames`).
+
 ### Rechte und Rollen
 
 | Recht | Bedeutung |
@@ -240,6 +251,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_attendance` | Anwesenheitslisten je Termin führen |
 | `manage_events` | öffentliche Termine pflegen |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit |
+| `post_board` | Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
 | `promote_users` | Rollen vergeben (Einschränkungen siehe unten) |
 | `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |
@@ -265,6 +277,8 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Dienstgrade | Dienstgrade verwalten | `member`, `manage_ranks` |
   | Titel | Titel verwalten | `member`, `manage_titles` |
   | Anwesenheit | Anwesenheit verwalten | `member`, `manage_attendance` |
+  | Dokumente | Dokumente verwalten | `member`, `manage_documents` |
+  | Schwarzes Brett | Schwarzes Brett verwalten | `member`, `post_board` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.

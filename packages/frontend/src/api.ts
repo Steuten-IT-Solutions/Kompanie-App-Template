@@ -15,10 +15,22 @@ export type Capability =
   | 'manage_attendance'
   | 'manage_events'
   | 'manage_documents'
+  | 'post_board'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
-export type Feature = 'events' | 'calendar' | 'news' | 'gallery' | 'points' | 'penalties' | 'ranks' | 'titles' | 'attendance' | 'documents';
+export type Feature =
+  | 'events'
+  | 'calendar'
+  | 'news'
+  | 'gallery'
+  | 'points'
+  | 'penalties'
+  | 'ranks'
+  | 'titles'
+  | 'attendance'
+  | 'documents'
+  | 'board';
 
 export interface AppUser {
   id: number;
@@ -303,6 +315,23 @@ export interface Rank {
   badge_type?: 'png' | 'jpg' | 'webp' | 'svg' | null;
   /** Es gibt eine PNG-Fassung für Benachrichtigungen (nur in der Pflege) */
   badge_push?: boolean;
+}
+
+/**
+ * Eintrag am Schwarzen Brett (Issue #5). kind: heute nur „message“; später können weitere Arten dazukommen (z. B.
+ * laufende Umfragen), die App überspringt unbekannte.
+ */
+export interface BoardItem {
+  kind: 'message';
+  id: number;
+  /** Reiner Text mit Zeilenumbrüchen, nie HTML */
+  text: string;
+  /** null, wenn unbekannt; „gelöschtes Konto“, wenn das Konto gelöscht wurde */
+  author_name: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Genau 24 Stunden nach created_at; danach blendet die App den Eintrag aus, auch offline */
+  expires_at: string;
 }
 
 export type DocVisibility = 'members' | 'managers';
@@ -696,6 +725,12 @@ export const api = {
   deleteDocCategory: (id: number) => request<{ deleted: boolean }>('DELETE', `/document-categories/${id}`),
   reorderDocCategories: (ids: number[]) => request<DocCategory[]>('PUT', '/document-categories/order', { ids }),
 
+  // Schwarzes Brett (Issue #5)
+  board: () => request<{ items: BoardItem[] }>('GET', '/board'),
+  postBoard: (text: string) => request<BoardItem>('POST', '/board', { text }),
+  updateBoard: (id: number, text: string) => request<BoardItem>('PATCH', `/board/${id}`, { text }),
+  deleteBoard: (id: number) => request<{ deleted: boolean }>('DELETE', `/board/${id}`),
+
   // Anwesenheit (Issue #21)
   attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),
   attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
@@ -793,7 +828,7 @@ export const api = {
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
 
-export type PushType = 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
+export type PushType = 'board' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {

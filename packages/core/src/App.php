@@ -6,6 +6,7 @@ namespace KompanieApp\Core;
 
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
+use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
@@ -69,6 +70,7 @@ final class App
         StatusReporter::TASK => StatusReporter::INTERVAL,
         PushService::TASK_SEND => 3600,
         PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
+        BoardService::TASK => 3600,
     ];
 
     /**
@@ -167,6 +169,8 @@ final class App
             PushService::TASK_SEND => $this->push()->supported(),
             PushService::TASK_WATCH => $this->push()->supported()
                 && ($this->features()->enabled('calendar') || $this->features()->enabled('news') || $this->features()->enabled('events')),
+            // Schwarzes Brett: abgelaufene Nachrichten stündlich löschen (die API liefert sie ohnehin nicht mehr).
+            BoardService::TASK => $this->features()->enabled('board'),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -216,6 +220,8 @@ final class App
                 $this->push()->processQueue();
             } elseif ($task === PushService::TASK_WATCH) {
                 $this->pushTriggers()->watch();
+            } elseif ($task === BoardService::TASK) {
+                $this->board()->cleanup();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -292,7 +298,8 @@ final class App
     /**
      * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
      * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
-     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“).
+     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
+     * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
     {
@@ -361,6 +368,11 @@ final class App
     public function attendance(): AttendanceService
     {
         return $this->service(AttendanceService::class, fn () => new AttendanceService($this));
+    }
+
+    public function board(): BoardService
+    {
+        return $this->service(BoardService::class, fn () => new BoardService($this));
     }
 
     public function titles(): TitleService

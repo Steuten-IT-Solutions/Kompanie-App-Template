@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Push;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Storage\PushRepository;
@@ -21,6 +22,9 @@ use KompanieApp\Core\Storage\PushRepository;
  *   wenn der HTTP-Client das kann; 404/410 löscht das Abo, 429/5xx wird begrenzt wiederholt.
  * - Abgleich alle 15 Minuten (push_watch): interner Kalender und Neuigkeiten gegen den letzten Stand (beim ersten
  *   Lauf nur merken), Erinnerung an die Termine von morgen ab der eingestellten Uhrzeit, einmal am Tag.
+ *
+ * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit Urgency high und einer TTL höchstens bis zum
+ *   Ablauf der Nachricht.
  *
  * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
  * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
@@ -40,6 +44,8 @@ final class PushService
     public const VAPID_SETTING = 'push_vapid';
     public const CALENDAR_SETTING = 'push_calendar_seen';
     public const NEWS_SETTING = 'push_news_seen';
+    /** Neue Art „Schwarzes Brett“ den bestehenden Abos schon einmal hinzugefügt (beim ersten Einschalten des Bereichs). */
+    public const BOARD_OFFERED_SETTING = 'push_board_offered';
     public const REMINDER_DATE_SETTING = 'push_reminder_date';
     /** Uhrzeit der Erinnerung (Stunde 0–23, Zeitzone der Kompanie); Einstellung der Admins. */
     public const REMINDER_HOUR_SETTING = 'push_reminder_hour';
@@ -54,6 +60,7 @@ final class PushService
     public const TYPE_EVENTS = 'events';
     public const TYPE_REMINDER = 'reminder';
     public const TYPE_NEWS = 'news';
+    public const TYPE_BOARD = 'board';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -125,31 +132,34 @@ final class PushService
     /* ---------------------------------------------------------------- */
 
     /**
-     * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und ob nur Mitglieder sie bekommen.
+     * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: members = nur
+     * Mitglieder, board = Empfänger des Schwarzen Bretts (Mitglieder und Anwärter, BoardService::isRecipient),
+     * all = alle einschließlich Gästen.
      *
-     * @return array<string, array{label: string, features: list<string>, members: bool}>
+     * @return array<string, array{label: string, features: list<string>, audience: 'members'|'board'|'all'}>
      */
     public function types(): array
     {
         $c = $this->app->config;
         return [
-            self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'members' => true],
-            self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'members' => true],
-            self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'members' => true],
-            self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'members' => true],
-            self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'members' => false],
-            self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'members' => false],
-            self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'members' => false],
+            self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'board'],
+            self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'members'],
+            self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'members'],
+            self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'members'],
+            self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'audience' => 'members'],
+            self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'audience' => 'all'],
+            self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'audience' => 'all'],
+            self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'audience' => 'all'],
         ];
     }
 
     /** @return list<string> Typen, die dieses Konto (null = Gast) abonnieren kann */
     public function availableTypes(?User $user): array
     {
-        $member = $user !== null && $user->isMember();
+        $allowed = ['all' => true, 'members' => $user !== null && $user->isMember(), 'board' => BoardService::isRecipient($user)];
         $out = [];
         foreach ($this->types() as $key => $type) {
-            if (($type['members'] && !$member) || !$this->anyEnabled($type['features'])) {
+            if (!$allowed[$type['audience']] || !$this->anyEnabled($type['features'])) {
                 continue;
             }
             // Termine und Erinnerungen: Mitglieder mit Kalender bekommen sie aus dem Kalender, alle anderen aus
@@ -484,6 +494,62 @@ final class PushService
         return $this->enqueue($items);
     }
 
+    /**
+     * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, außer denen des Verfassers. Dringend
+     * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt.
+     *
+     * @param Message $message
+     * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens TTL)
+     */
+    public function notifyBoard(array $message, int $authorId, int $ttl): int
+    {
+        if (!$this->typeEnabled(self::TYPE_BOARD) || $ttl <= 0) {
+            return 0;
+        }
+        $json = $this->json($message);
+        $items = [];
+        $recipients = [];
+        foreach ($this->repository()->all() as $sub) {
+            $uid = $sub['user_id'];
+            if ($uid <= 0 || $uid === $authorId || !in_array(self::TYPE_BOARD, $sub['types'], true)) {
+                continue;
+            }
+            $recipients[$uid] ??= BoardService::isRecipient($this->app->users->find($uid));
+            if ($recipients[$uid]) {
+                $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
+            }
+        }
+        return $this->enqueue($items, 'high', min(self::TTL, $ttl));
+    }
+
+    /**
+     * Beim ersten Einschalten des Schwarzen Bretts: Die neue Art bei allen bestehenden Abos der Empfänger einschalten
+     * (wie bei neuen Abos, die alle angebotenen Arten bekommen). Danach entscheidet jedes Gerät selbst; erneutes
+     * Ein- und Ausschalten des Bereichs ändert die Abos nicht mehr.
+     */
+    public function offerBoardToExisting(): int
+    {
+        if ($this->app->settings->get(self::BOARD_OFFERED_SETTING, false)) {
+            return 0;
+        }
+        $this->app->settings->set(self::BOARD_OFFERED_SETTING, true);
+        $now = $this->app->time()->nowUtc();
+        $recipients = [];
+        $count = 0;
+        foreach ($this->repository()->all() as $sub) {
+            $uid = $sub['user_id'];
+            if ($uid <= 0 || in_array(self::TYPE_BOARD, $sub['types'], true)) {
+                continue;
+            }
+            $recipients[$uid] ??= BoardService::isRecipient($this->app->users->find($uid));
+            if ($recipients[$uid]) {
+                $this->repository()->update($sub['id'], ['types' => array_merge([self::TYPE_BOARD], $sub['types'])], $now);
+                $count++;
+            }
+        }
+        return $count;
+    }
+
     private function typeEnabled(string $type): bool
     {
         $t = $this->types()[$type] ?? null;
@@ -491,12 +557,12 @@ final class PushService
     }
 
     /** @param list<array{subscription_id: int, payload: string}> $items */
-    private function enqueue(array $items, string $urgency = 'normal'): int
+    private function enqueue(array $items, string $urgency = 'normal', int $ttl = self::TTL): int
     {
         if ($items === []) {
             return 0;
         }
-        $this->repository()->enqueue($items, $urgency, self::TTL, $this->app->time()->nowUtc());
+        $this->repository()->enqueue($items, $urgency, $ttl, $this->app->time()->nowUtc());
         $this->app->scheduler->runSoon(self::TASK_SEND);
         return count($items);
     }

@@ -479,6 +479,32 @@ final class Migrations
                     "ALTER TABLE {ranks} ADD COLUMN badge_version TEXT NOT NULL DEFAULT ''",
                 ],
             ],
+            // Schwarzes Brett (Issue #5): dringende Nachrichten, je 24 Stunden gültig (expires_at), danach gelöscht.
+            10 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {board_messages} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  body text NOT NULL,
+  author_id bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  expires_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY expires_at (expires_at)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {board_messages} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  body TEXT NOT NULL,
+  author_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {board_messages}_expires_at ON {board_messages} (expires_at)',
+                ],
+            ],
         ];
     }
 

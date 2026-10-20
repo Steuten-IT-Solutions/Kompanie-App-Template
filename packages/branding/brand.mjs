@@ -61,6 +61,7 @@ const DEFAULTS = {
     titles: 'Titel',
     attendance: 'Anwesenheit',
     documents: 'Dokumente',
+    board: 'Schwarzes Brett',
   },
   rank: 'Dienstgrad',
 };

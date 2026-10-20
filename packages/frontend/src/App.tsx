@@ -4,6 +4,8 @@ import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
+import BoardBanner from './BoardBanner';
+import { boardVisible, canPostBoard } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
 import { MaintenanceBanner, MaintenancePage } from './maintenance';
 import { forgetPushOnLogout } from './push';
@@ -25,9 +27,10 @@ const Hilfe = lazyView(() => import('./views/Hilfe'));
 const Benachrichtigungen = lazyView(() => import('./views/Benachrichtigungen'));
 const Dokumente = lazyView(() => import('./views/Dokumente'));
 const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
+const Brett = lazyView(() => import('./views/Brett'));
 
 type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'meins' | 'verwaltung';
-type View = Tab | 'konto' | 'benachrichtigungen' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
+type View = Tab | 'brett' | 'konto' | 'benachrichtigungen' | 'installieren' | 'anmelden' | 'einstellungen' | 'einrichtung' | 'hilfe';
 
 const VIEWS: View[] = [
   'termine',
@@ -36,6 +39,7 @@ const VIEWS: View[] = [
   'dokumente',
   'meins',
   'verwaltung',
+  'brett',
   'konto',
   'benachrichtigungen',
   'installieren',
@@ -68,6 +72,7 @@ const titles = (): Record<View, string> => ({
   ...tabLabels(),
   // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
   news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
+  brett: sec.board,
   konto: 'Mein Konto',
   benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
@@ -204,6 +209,8 @@ export default function App() {
       (!!features?.attendance && can('manage_attendance')) ||
       can('create_users') ||
       can('promote_users'),
+    // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
+    brett: boardVisible() || canPostBoard(),
     konto: !!user,
     benachrichtigungen: true,
     installieren: true,
@@ -302,6 +309,7 @@ export default function App() {
       </header>
 
       {maintenance && <MaintenanceBanner reason={maintenance.reason} onToast={showToast} />}
+      {boardVisible() && tab !== 'brett' && <BoardBanner />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
@@ -336,6 +344,7 @@ export default function App() {
               ))}
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
+            {tab === 'brett' && <Brett onToast={showToast} />}
             {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}

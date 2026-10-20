@@ -42,6 +42,8 @@ function labels(): Record<string, string> {
     'bereich.ranks': sec.ranks,
     'bereich.titles': sec.titles,
     'bereich.attendance': sec.attendance,
+    'bereich.documents': sec.documents,
+    'bereich.board': sec.board,
     'begriff.rank': brand.labels.rank,
     'rolle.guest': levelLabel('guest'),
     'rolle.candidate': levelLabel('candidate'),
