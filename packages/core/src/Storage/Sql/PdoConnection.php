@@ -27,6 +27,9 @@ final class PdoConnection implements Connection
         $pdo->setAttribute(\PDO::ATTR_TIMEOUT, 10);
         // WAL erlaubt Lesen während eines Schreibvorgangs; bei Sperren bis 10 s warten.
         $pdo->exec('PRAGMA journal_mode = WAL');
+        // Mit WAL ist NORMAL sicher gegen Beschädigung und spart ein fsync je Commit (sonst FULL). Bei einem
+        // Stromausfall können die letzten Transaktionen fehlen; die Datei bleibt aber in sich stimmig.
+        $pdo->exec('PRAGMA synchronous = NORMAL');
         $pdo->exec('PRAGMA busy_timeout = 10000');
         $pdo->exec('PRAGMA foreign_keys = ON');
         return new self($pdo, $prefix);

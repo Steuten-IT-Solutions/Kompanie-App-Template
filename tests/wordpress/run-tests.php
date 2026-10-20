@@ -250,6 +250,43 @@ $db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['pending', $intern[
 $pending = $gallery->photoForDelivery($intern['id'] ?? 0, 'thumb', true, true);
 $c->ok($pending['status'] === 202 && str_starts_with($pending['placeholder'] ?? '', '<svg') && ($pending['retryAfter'] ?? 0) > 0, 'Noch nicht aufbereitetes Bild: 202 mit Platzhalter, ohne Erzeugung während der Anfrage');
 $db->execute('UPDATE {photos} SET status = ? WHERE id = ?', ['ready', $intern['id'] ?? 0]);
+// ETag und 304 (Issue #18): Rechte vor dem Vergleich, Konto nur bei internen Bildern.
+wp_set_current_user(0);
+$c->ok(KompanieApp\WordPress\AppPage::photoResponse($app, $intern['id'] ?? 0, 'thumb')['status'] === 401, 'Auslieferung: Gast bekommt kein internes Bild');
+wp_set_current_user($member);
+$photoRes = KompanieApp\WordPress\AppPage::photoResponse($app, $intern['id'] ?? 0, 'thumb');
+$etag = (string) ($photoRes['etag'] ?? '');
+$c->ok($photoRes['status'] === 200 && preg_match('/^"[a-f0-9]{32}"$/', $etag) === 1, 'Internes Bild mit ETag');
+$_SERVER['HTTP_IF_NONE_MATCH'] = $etag;
+$c->ok(KompanieApp\Core\Http\FileCache::matches($etag, KompanieApp\WordPress\AppPage::ifNoneMatch()), 'If-None-Match mit gleichem ETag → 304');
+$_SERVER['HTTP_IF_NONE_MATCH'] = '"anders"';
+$c->ok(!KompanieApp\Core\Http\FileCache::matches($etag, KompanieApp\WordPress\AppPage::ifNoneMatch()), 'Anderer ETag → Bild neu senden');
+unset($_SERVER['HTTP_IF_NONE_MATCH']);
+$c->ok(KompanieApp\WordPress\AppPage::photoResponse($app, $public['id'] ?? 0, 'thumb')['status'] === 200, 'Öffentliches Bild über /app/foto/');
+wp_set_current_user(0);
+
+$c->section('Einstellungen ohne unnötige Abfragen');
+$wpSettings = new KompanieApp\WordPress\WpSettings();
+$wpdb = $GLOBALS['wpdb'];
+$before = $wpdb->num_queries;
+$c->ok($wpSettings->get('kp_gibt_es_nicht', 'standard') === 'standard' && $wpSettings->get('kp_auch_nicht') === null, 'Fehlende Einstellung: Standardwert');
+$c->ok($wpdb->num_queries === $before, 'Fehlende Einstellungen ohne Datenbankabfrage (Autoload)');
+foreach (KompanieApp\WordPress\WpSettings::NO_AUTOLOAD as $k) {
+    wp_cache_delete(KompanieApp\WordPress\WpSettings::PREFIX . $k, 'options');
+}
+wp_cache_delete('notoptions', 'options');
+$before = $wpdb->num_queries;
+$hasDrive = $app->drive()->hasCredentials();
+$wpSettings->get('gallery_status');
+$c->ok($hasDrive && $wpdb->num_queries - $before <= 1, 'Zugang zu Google und Galerie-Status mit höchstens einer Abfrage (' . ($wpdb->num_queries - $before) . ')');
+// Einstellung einer Vorversion ohne Autoload: nach dem Update wieder sichtbar (vor dem ersten Lesen umgestellt).
+add_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_alt', 'aus der Vorversion', '', false);
+$rolesVersion = get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'roles_version');
+update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'roles_version', '0.0.0-alt', true);
+Plugin::upgrade();
+$c->ok($wpSettings->get('kp_alt') === 'aus der Vorversion', 'Einstellung ohne Autoload aus einer Vorversion nach dem Update lesbar');
+$c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'roles_version') === $rolesVersion, 'Update-Schritt einmal je Version');
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_alt');
 
 $c->section('Aufgaben');
 $task = [\KompanieApp\Core\Domain\GalleryService::TASK];

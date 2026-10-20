@@ -11,3 +11,6 @@ Die App wird ein Teil der Webseite. Benutzer, Anmeldung und Neuigkeiten kommen a
 3. Die App ist dann unter `eure-webseite.de/app/` erreichbar. Als WordPress-Administrator führt sie dich durch die [Ersteinrichtung](seite:admin-einrichtung).
 
 > Admin in der App ist, wer in WordPress Administrator ist. Die Rolle in der App lässt sich auch im WordPress-Benutzerprofil wählen.
+
+## Server mit nginx
+Auf Apache und LiteSpeed sorgt das Plugin selbst dafür, dass die Dateien der App lange im Browser bleiben und komprimiert ankommen (über `.htaccess`). Läuft die Webseite mit **nginx**, bittet den Hoster, die Dateien unter `wp-content/plugins/kompanie-app/app/assets/` ein Jahr zwischenspeichern zu lassen (`Cache-Control: public, max-age=31536000, immutable`; ihr Name ändert sich mit jeder neuen Version) und Text-Dateien komprimiert auszuliefern (gzip). Die App läuft auch ohne, lädt beim ersten Öffnen aber langsamer.

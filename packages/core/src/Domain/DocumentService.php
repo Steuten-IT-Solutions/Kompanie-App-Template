@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Storage\DocumentRepository;
 
 /**
@@ -86,7 +87,7 @@ final class DocumentService
     /**
      * Für die Auslieferung über documentUrl(): prüft Anmeldung und Sichtbarkeit.
      *
-     * @return array{status: int, path?: string, mime?: string, disposition?: string}
+     * @return array{status: int, path?: string, etag?: string|null, mime?: string, disposition?: string}
      */
     public function forDelivery(?User $user, int $id): array
     {
@@ -116,6 +117,8 @@ final class DocumentService
         return [
             'status' => 200,
             'path' => $path,
+            // Die Adresse bleibt je Fassung gleich, wird aber jedes Mal geprüft (no-cache): mit ETag meist nur 304.
+            'etag' => FileCache::etag($doc['file'], $path),
             'mime' => $mime,
             'disposition' => $mode . '; filename="' . self::asciiName($doc['title']) . '.' . $doc['ext'] . '"; filename*=UTF-8\'\'' . rawurlencode($name),
         ];

@@ -16,7 +16,19 @@ final class WpSettings implements Settings
 
     public function get(string $key, mixed $default = null): mixed
     {
-        return get_option(self::PREFIX . $key, $default);
+        $name = self::PREFIX . $key;
+        if (in_array($key, self::NO_AUTOLOAD, true)) {
+            // Die Werte ohne Autoload gemeinsam mit einer Abfrage laden (statt je einer; ab WordPress 6.4).
+            if (function_exists('wp_prime_option_caches')) {
+                wp_prime_option_caches(array_map(static fn (string $k): string => self::PREFIX . $k, self::NO_AUTOLOAD));
+            }
+        } elseif (!wp_installing() && !array_key_exists($name, wp_load_alloptions())) {
+            // Alle übrigen Einstellungen speichert set() mit Autoload: Was nicht in alloptions steht, gibt es nicht.
+            // Ohne diese Abkürzung fragte get_option() bei jedem Aufruf die Datenbank, ob es die Einstellung gibt
+            // (ohne dauerhaften Objekt-Cache), z. B. für den Wartungsmodus auf jeder App-Seite.
+            return $default;
+        }
+        return get_option($name, $default);
     }
 
     public function fresh(string $key, mixed $default = null): mixed

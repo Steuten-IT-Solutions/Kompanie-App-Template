@@ -137,8 +137,13 @@ final class Plugin
     public static function upgrade(): void
     {
         $app = self::app();
+        $updated = get_option(WpSettings::PREFIX . 'roles_version') !== KOMPANIE_APP_VERSION;
+        if ($updated) {
+            // Vor dem ersten Lesen: WpSettings::get() kennt nur Einstellungen mit Autoload (sonst z. B. kein Schema-Stand).
+            self::autoloadOptions();
+        }
         $app->upgrade();
-        if (get_option(WpSettings::PREFIX . 'roles_version') !== KOMPANIE_APP_VERSION) {
+        if ($updated) {
             // Frühere WP-Rollen Verwalter/Leitung nur, wo die App diese Rollen noch hat (ältere Installationen).
             Roles::install(
                 ['member' => $app->roles()->label('member'), 'organizer' => $app->roles()->label('organizer'), 'manager' => $app->roles()->label('manager')],
@@ -147,7 +152,6 @@ final class Plugin
             );
             Roles::migrateUsers(static fn (string $role): bool => $app->roles()->exists($role));
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
-            self::autoloadOptions();
         }
     }
 
