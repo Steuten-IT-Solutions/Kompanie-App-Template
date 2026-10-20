@@ -64,6 +64,18 @@ final class UpdateService
         return in_array($c, UpdateList::CHANNELS, true) ? $c : 'stable';
     }
 
+    /**
+     * Kanal wählen: stable (freigegebene Versionen) oder early (jede neue Version von develop, zum Testen). Zurück
+     * auf stable bleibt eine schon eingespielte early-Version, bis eine neuere freigegeben ist.
+     */
+    public function setChannel(string $channel): void
+    {
+        if (!in_array($channel, UpdateList::CHANNELS, true)) {
+            throw ApiError::invalid('Unbekannter Kanal: ' . $channel);
+        }
+        $this->settings->set(self::CHANNEL, $channel);
+    }
+
     public function auto(): bool
     {
         return (bool) $this->settings->get(self::AUTO, true);

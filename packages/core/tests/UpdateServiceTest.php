@@ -187,8 +187,10 @@ final class UpdateServiceTest extends TestCase
         $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.1']);
         $s = $this->service('1.0.0.1');
         $s->runTask();
-        $this->assertSame([], $this->installed, 'early ist nur für die Demo');
-        $this->settings->set('update_channel', 'early');
+        $this->assertSame([], $this->installed, 'early nur mit Vorabversionen');
+        $this->assertThrows(fn () => $s->setChannel('beta'), 'Unbekannter Kanal');
+        $s->setChannel('early');
+        $this->assertSame('early', $s->status()['channel']);
         $s->setAuto(false);
         $s->runTask();
         $this->assertSame([], $this->installed, 'automatische Updates aus');
