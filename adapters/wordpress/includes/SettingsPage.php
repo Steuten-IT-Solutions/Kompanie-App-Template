@@ -6,10 +6,11 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Http\ApiError;
 
-/** Einstellungen → <Name der Kompanie>: Bereiche, Kalender und Galerie. */
+/** Einstellungen → <Name der Kompanie>: Wartung, Bereiche, Google-Zugang, Kalender und Galerie. */
 final class SettingsPage
 {
     public const PAGE = 'kompanie-app';
@@ -29,6 +30,13 @@ final class SettingsPage
         add_action('admin_notices', [self::class, 'permalinkNotice']);
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
         add_action('admin_post_kompanie_app_gallery_sync', static fn () => self::syncGallery(Plugin::app()));
+        add_action('admin_post_kompanie_app_google_connect', static fn () => self::googleConnect(Plugin::app()));
+        add_action('admin_post_kompanie_app_google_disconnect', static fn () => self::googleDisconnect(Plugin::app()));
+        add_action('admin_post_kompanie_app_service_account', static fn () => self::saveServiceAccount(Plugin::app()));
+        // Rückkehr von Google: admin-post.php ohne „action“ (siehe WpEnvironment::googleRedirectUri). Auch ohne
+        // Anmeldung, damit eine verständliche Meldung kommt statt einer leeren Seite.
+        add_action('admin_post', static fn () => self::googleCallback(Plugin::app()));
+        add_action('admin_post_nopriv', static fn () => self::googleCallback(Plugin::app()));
         // Beim Öffnen der Einstellungsseite die Planung prüfen (falls WP-Cron-Einträge verloren gingen).
         add_action('load-settings_page_' . self::PAGE, static fn () => Plugin::app()->scheduleTasks());
     }
@@ -138,23 +146,26 @@ final class SettingsPage
             </form>
 
             <hr />
+            <?php self::renderGoogle($app); ?>
+
+            <hr />
             <h2 id="kalender">Kalender</h2>
             <p>Am einfachsten: In Google Kalender unter <em>Einstellungen → Kalender → Kalender integrieren</em> die
                <strong>„Privatadresse im iCal-Format“</strong> kopieren und hier einfügen.
-               Ein privater Kalender geht auch über seine Kalender-ID und den Google-Zugang der <a href="#galerie">Galerie</a>
+               Ein privater Kalender geht auch über seine Kalender-ID und den <a href="#google">Google-Zugang</a>
                (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist).
-               Reihenfolge: API-Schlüssel, dann Google-Zugang der Galerie, dann iCal-Link.</p>
+               Reihenfolge: API-Schlüssel, dann Google-Zugang, dann iCal-Link.</p>
             <?php
             $calendarSource = [
                 'google' => 'Google-API mit eigenem API-Schlüssel',
-                'google_connection' => 'Kalender-IDs über den Google-Zugang der Galerie',
+                'google_connection' => 'Kalender-IDs über den Google-Zugang',
                 'ics' => 'iCal-Link',
             ][$app->calendar()->source()] ?? '';
             ?>
             <p>Genutzt wird: <strong><?php echo esc_html($calendarSource !== '' ? $calendarSource : 'noch keine Quelle'); ?></strong></p>
             <?php if ($app->calendar()->connectionNeedsCalendarAccess()) : ?>
-                <div class="notice notice-info inline"><p>Die Google-Verbindung der Galerie darf den Kalender nicht lesen (beim Verbinden nicht erlaubt).
-                    Für die Kalender-IDs muss sie neu verbunden werden, mit Erlaubnis für den Kalender.</p></div>
+                <div class="notice notice-info inline"><p>Die Verbindung mit Google darf den Kalender nicht lesen (beim Verbinden nicht erlaubt).
+                    Für die Kalender-IDs unter <a href="#google">Google-Zugang</a> „Verbindung trennen“ und neu verbinden, dabei auch das Häkchen für den Kalender setzen.</p></div>
             <?php endif; ?>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_calendar" />
@@ -167,7 +178,7 @@ final class SettingsPage
                     <tr>
                         <th scope="row"><label for="calendar_ids">Oder: Google-Kalender-IDs</label></th>
                         <td><input type="text" class="regular-text" id="calendar_ids" name="calendar_ids" value="<?php echo esc_attr((string) $s->get('calendar_ids', '')); ?>" />
-                        <p class="description">Mit API-Schlüssel (nur öffentliche Kalender) oder über den Google-Zugang der Galerie (auch private). Mehrere durch Komma trennen.</p></td>
+                        <p class="description">Mit API-Schlüssel (nur öffentliche Kalender) oder über den <a href="#google">Google-Zugang</a> (auch private). Mehrere durch Komma trennen.</p></td>
                     </tr>
                     <tr>
                         <th scope="row"><label for="google_api_key">Google-API-Schlüssel</label></th>
@@ -183,26 +194,19 @@ final class SettingsPage
             <hr />
             <h2 id="galerie">Galerie (Google Drive)</h2>
             <p>Aufbau in Drive: <strong>Galerie-Ordner → Jahr → Album → Bilder</strong>. Bilder im Unterordner
-               <strong>„intern“</strong> eines Albums sehen nur angemeldete Mitglieder.</p>
+               <strong>„intern“</strong> eines Albums sehen nur angemeldete Mitglieder.
+               Gelesen wird über den <a href="#google">Google-Zugang</a>:
+               <?php if ($app->drive()->oauth() !== null) : ?>
+                   die Verbindung mit Google<?php echo $app->drive()->oauthEmail() !== '' ? ' (' . esc_html($app->drive()->oauthEmail()) . ')' : ''; ?>.
+               <?php elseif ($email !== '') : ?>
+                   das Dienstkonto <code><?php echo esc_html($email); ?></code>; gib den Galerie-Ordner für diese Adresse frei (Rolle „Betrachter“).
+               <?php else : ?>
+                   <strong>noch nicht eingerichtet</strong>, bitte zuerst oben mit Google verbinden.
+               <?php endif; ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_gallery" />
                 <?php wp_nonce_field('kompanie_app_gallery'); ?>
                 <table class="form-table" role="presentation">
-                    <tr>
-                        <th scope="row"><label for="drive_sa">Google-Zugang (JSON-Schlüssel)</label></th>
-                        <td>
-                            <?php if ($app->drive()->oauth() !== null) : ?>
-                                <p>Verbunden mit Google<?php echo $app->drive()->oauthEmail() !== '' ? ' als <code>' . esc_html($app->drive()->oauthEmail()) . '</code>' : ''; ?>;
-                                   diese Verbindung wird für den Abgleich genutzt. Trennen lässt sie sich in der App unter <em>Einstellungen → Galerie</em>.
-                                   <?php echo $app->drive()->calendarAccess() ? 'Sie darf auch den Kalender lesen.' : 'Den Kalender darf sie nicht lesen.'; ?></p>
-                            <?php endif; ?>
-                            <?php if ($email !== '') : ?>
-                                <p>Hinterlegt. Gib den Galerie-Ordner in Google Drive für <code><?php echo esc_html($email); ?></code> frei (Rolle „Betrachter“).
-                                   Für Termine über die Kalender-IDs den Kalender ebenfalls für diese Adresse freigeben („Alle Termindetails sehen“).</p>
-                            <?php endif; ?>
-                            <textarea id="drive_sa" name="drive_sa" rows="4" class="large-text code" placeholder="<?php echo esc_attr($email !== '' ? 'Nur ausfüllen, um den Schlüssel zu ersetzen' : 'Inhalt der JSON-Datei hier einfügen'); ?>"></textarea>
-                        </td>
-                    </tr>
                     <tr>
                         <th scope="row"><label for="gallery_root">Galerie-Ordner</label></th>
                         <td><input type="text" class="large-text" id="gallery_root" name="gallery_root" value="<?php echo esc_attr($app->gallery()->root()); ?>" placeholder="Link zum Ordner in Google Drive" /></td>
@@ -232,6 +236,180 @@ final class SettingsPage
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    /** Google-Zugang für Galerie und Kalender: „Mit Google verbinden“, darunter als Alternative das Dienstkonto. */
+    private static function renderGoogle(App $app): void
+    {
+        $drive = $app->drive();
+        $client = $drive->oauthClient();
+        $email = $drive->clientEmail();
+        $connected = $drive->oauth() !== null;
+        $post = esc_url(admin_url('admin-post.php'));
+        ?>
+        <h2 id="google">Google-Zugang</h2>
+        <p>Über diesen Zugang liest die App den Galerie-Ordner aus Google Drive und private Google Kalender (nur lesen).
+           Empfohlen: <strong>Mit Google verbinden</strong> über einen eigenen OAuth-Client. Die Anleitung steht im Handbuch
+           (Admin: Google einrichten).</p>
+        <table class="form-table" role="presentation">
+            <tr>
+                <th scope="row"><label for="google_redirect_uri">Weiterleitungs-URI</label></th>
+                <td><input type="text" readonly class="large-text code" id="google_redirect_uri" value="<?php echo esc_attr($app->env->googleRedirectUri()); ?>" />
+                <p class="description">Genau so im OAuth-Client bei Google unter „Autorisierte Weiterleitungs-URIs“ eintragen.</p></td>
+            </tr>
+        </table>
+        <?php if ($connected) : ?>
+            <p>✓ Verbunden mit Google<?php echo $drive->oauthEmail() !== '' ? ' als <strong>' . esc_html($drive->oauthEmail()) . '</strong>' : ''; ?>.
+               <?php echo $drive->calendarAccess()
+                   ? 'Es darf auch den Kalender lesen.'
+                   : 'Den Kalender darf es noch nicht lesen. Für einen privaten Kalender „Verbindung trennen“ und neu verbinden, dabei beide Häkchen setzen.'; ?></p>
+            <form method="post" action="<?php echo $post; ?>">
+                <input type="hidden" name="action" value="kompanie_app_google_disconnect" />
+                <?php wp_nonce_field('kompanie_app_google_disconnect'); ?>
+                <?php submit_button('Verbindung trennen', 'secondary', 'submit', false); ?>
+            </form>
+        <?php else : ?>
+            <form method="post" action="<?php echo $post; ?>">
+                <input type="hidden" name="action" value="kompanie_app_google_connect" />
+                <?php wp_nonce_field('kompanie_app_google_connect'); ?>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row"><label for="google_client_id">Client-ID</label></th>
+                        <td><input type="text" class="large-text code" id="google_client_id" name="client_id" autocomplete="off" placeholder="….apps.googleusercontent.com" value="<?php echo esc_attr($client['client_id']); ?>" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="google_client_secret">Clientschlüssel (Client-Secret)</label></th>
+                        <td><input type="password" class="regular-text code" id="google_client_secret" name="client_secret" autocomplete="off" value="" placeholder="<?php echo esc_attr($client['client_secret_set'] ? 'gespeichert – leer lassen, um ihn zu behalten' : ''); ?>" /></td>
+                    </tr>
+                </table>
+                <?php submit_button('Speichern und mit Google verbinden', 'primary', 'submit', false); ?>
+                <p class="description">Danach meldest du dich bei Google mit dem Konto an, das den Galerie-Ordner und den Kalender sehen kann.
+                   Zeigt Google „Google hat diese App nicht überprüft“, wähle „Erweitert“ und dann „Weiter zu …“ und setze beide Häkchen
+                   (Google Drive und Google Kalender).</p>
+            </form>
+        <?php endif; ?>
+
+        <h3>Alternative: Dienstkonto mit JSON-Schlüssel</h3>
+        <p>Nur nötig, wenn du nicht „Mit Google verbinden“ nutzt.
+            <?php if ($email !== '') : ?>
+                Hinterlegt: <code><?php echo esc_html($email); ?></code>. Gib den Galerie-Ordner in Google Drive für diese Adresse frei (Rolle „Betrachter“),
+                für Termine über die Kalender-IDs auch den Kalender („Alle Termindetails sehen“).
+                <?php if ($connected) : ?><em>Wird nicht genutzt, solange die Verbindung mit Google besteht.</em><?php endif; ?>
+            <?php endif; ?></p>
+        <form method="post" action="<?php echo $post; ?>">
+            <input type="hidden" name="action" value="kompanie_app_service_account" />
+            <?php wp_nonce_field('kompanie_app_service_account'); ?>
+            <p><label for="drive_sa">Schlüssel des Dienstkontos (JSON)</label><br />
+               <textarea id="drive_sa" name="drive_sa" rows="4" class="large-text code" placeholder="<?php echo esc_attr($email !== '' ? 'Nur ausfüllen, um den Schlüssel zu ersetzen' : 'Inhalt der JSON-Datei hier einfügen'); ?>"></textarea></p>
+            <?php submit_button('Schlüssel speichern', 'secondary', 'submit', false); ?>
+            <?php if ($email !== '') : ?>
+                <?php submit_button('Schlüssel entfernen', 'delete', 'remove', false); ?>
+            <?php endif; ?>
+        </form>
+        <?php
+    }
+
+    /** Client speichern und zu Google weiterleiten. */
+    private static function googleConnect(App $app): never
+    {
+        self::guard('kompanie_app_google_connect');
+        try {
+            $url = self::googleConnectUrl($app, $_POST);
+        } catch (ApiError $e) {
+            self::back($e->getMessage(), true, 'google');
+        }
+        // Externe Adresse: wp_safe_redirect() würde sie verwerfen.
+        wp_redirect($url); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+        exit;
+    }
+
+    /**
+     * Adresse der Anmeldung bei Google für das Formular (ohne Weiterleitung, damit testbar).
+     *
+     * @param array<string, mixed> $post
+     * @throws ApiError bei ungültigem Client oder ohne Admin
+     */
+    public static function googleConnectUrl(App $app, array $post): string
+    {
+        $id = isset($post['client_id']) ? sanitize_text_field(wp_unslash((string) $post['client_id'])) : '';
+        $secret = isset($post['client_secret']) ? sanitize_text_field(wp_unslash((string) $post['client_secret'])) : '';
+        return $app->googleConnect()->start($id, $secret, GoogleConnect::RETURN_ADMIN);
+    }
+
+    private static function googleDisconnect(App $app): never
+    {
+        self::guard('kompanie_app_google_disconnect');
+        try {
+            $app->googleConnect()->disconnect();
+        } catch (ApiError $e) {
+            self::back($e->getMessage(), true, 'google');
+        }
+        self::back('Die Verbindung zu Google wurde getrennt.', false, 'google');
+    }
+
+    /** Rückkehr von Google auf admin-post.php: nur wenn das state von dieser App stammt. */
+    private static function googleCallback(App $app): void
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Schutz über „state“ (an Benutzer und Sitzung gebunden)
+        $query = wp_unslash($_GET);
+        if (!is_array($query) || !GoogleConnect::isOwnState($query['state'] ?? null)) {
+            return; // Nicht für uns (z. B. ein anderes Plugin auf derselben Adresse).
+        }
+        $target = self::googleCallbackTarget($app, $query);
+        if ($target === null) {
+            wp_die(
+                esc_html('Bitte zuerst als Administrator in WordPress anmelden und die Verbindung mit Google dann erneut starten.'),
+                'Keine Berechtigung',
+                ['response' => 403],
+            );
+        }
+        // Ziel in der App bzw. im WP-Admin derselben Website.
+        wp_safe_redirect($target, 303);
+        exit;
+    }
+
+    /**
+     * Wertet die Rückkehr von Google aus und gibt das Ziel der Weiterleitung zurück (null ohne angemeldeten Admin).
+     *
+     * @param array<string, mixed> $query
+     */
+    public static function googleCallbackTarget(App $app, array $query): ?string
+    {
+        $query = array_map(static fn ($v) => is_string($v) ? sanitize_text_field($v) : '', $query);
+        try {
+            $result = $app->googleConnect()->callback($query);
+        } catch (ApiError) {
+            return null;
+        }
+        if ($result['return'] === GoogleConnect::RETURN_ADMIN) {
+            return self::url(['kompanie_msg' => rawurlencode($result['message']), 'kompanie_error' => $result['ok'] ? 0 : 1]) . '#google';
+        }
+        return $app->googleConnect()->appReturnUrl();
+    }
+
+    private static function saveServiceAccount(App $app): never
+    {
+        self::guard('kompanie_app_service_account');
+        $json = isset($_POST['drive_sa']) ? trim((string) wp_unslash($_POST['drive_sa'])) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- wird geprüft, nicht ausgegeben
+        $hadCalendarIds = $app->calendar()->calendarIds() !== [];
+        try {
+            if (isset($_POST['remove'])) {
+                $app->drive()->removeServiceAccount();
+                $message = 'Schlüssel des Dienstkontos entfernt.';
+            } elseif ($json !== '') {
+                $app->drive()->saveServiceAccount($json);
+                $message = 'Schlüssel des Dienstkontos gespeichert.';
+            } else {
+                self::back('Bitte den Inhalt der JSON-Datei einfügen.', true, 'google');
+            }
+        } catch (\RuntimeException $e) {
+            self::back($e->getMessage(), true, 'google');
+        }
+        if ($hadCalendarIds) {
+            $app->calendar()->clearCache();
+        }
+        $app->scheduleTasks();
+        self::back($message, false, 'google');
     }
 
     private static function renderCalendarTest(App $app): void
@@ -299,12 +477,7 @@ final class SettingsPage
         self::guard('kompanie_app_gallery');
         $messages = [];
         $error = false;
-        $json = isset($_POST['drive_sa']) ? trim((string) wp_unslash($_POST['drive_sa'])) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- wird geprüft, nicht ausgegeben
         try {
-            if ($json !== '') {
-                $app->drive()->saveServiceAccount($json);
-                $messages[] = 'Google-Zugang gespeichert.';
-            }
             $root = isset($_POST['gallery_root']) ? sanitize_text_field(wp_unslash($_POST['gallery_root'])) : '';
             $before = $app->gallery()->root();
             $app->gallery()->setRoot($root);

@@ -60,6 +60,15 @@ final class StandaloneEnvironment implements Environment
         return $this->appUrl() . 'sw.js';
     }
 
+    /**
+     * Eigene Adresse außerhalb der API (siehe Kernel::sendGoogleCallback): Google leitet den Browser dorthin zurück,
+     * die Antwort ist eine Weiterleitung in die App. Ohne URL-Umschreibung index.php?r=/google/callback.
+     */
+    public function googleRedirectUri(): string
+    {
+        return $this->route('google/callback');
+    }
+
     public function siteUrl(): ?string
     {
         return $this->siteUrl;

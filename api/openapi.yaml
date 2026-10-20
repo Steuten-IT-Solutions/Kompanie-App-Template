@@ -2442,8 +2442,8 @@ paths:
   /admin/settings:
     get:
       tags: [Einstellungen]
-      summary: Einstellungen für Kalender, Galerie und Neuigkeiten
-      description: Geheime Werte (iCal-Adresse, API-Schlüssel, Dienstkonto) werden nie zurückgegeben, nur ob sie gesetzt sind.
+      summary: Einstellungen für Google-Zugang, Kalender, Galerie und Neuigkeiten
+      description: Geheime Werte (iCal-Adresse, API-Schlüssel, Dienstkonto, Client-Secret, Refresh-Token) werden nie zurückgegeben, nur ob sie gesetzt sind.
       x-capability: manage_settings
       responses:
         '200':
@@ -2467,10 +2467,10 @@ paths:
               properties:
                 calendar_ics_url: { type: string, description: 'Geheime iCal-Adresse; webcal:// wird als https:// gespeichert' }
                 google_api_key: { type: string }
-                calendar_ids: { type: string, description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang der Galerie' }
+                calendar_ids: { type: string, description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang' }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
-                drive_oauth: { type: string, enum: [''], description: Leer trennt eine bestehende OAuth-Verbindung zu Google (etwa aus einer Übernahme) }
+                drive_oauth: { type: string, enum: [''], description: 'Leer trennt die OAuth-Verbindung zu Google wie POST /admin/google/disconnect (Widerruf bei Google, der Client bleibt gespeichert)' }
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
@@ -2531,6 +2531,62 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+
+  /admin/google/connect:
+    post:
+      tags: [Einstellungen]
+      summary: „Mit Google verbinden“ beginnen
+      description: |
+        Speichert den eigenen OAuth-Client der Installation (Client-ID und Client-Secret aus der Google Cloud Console,
+        Typ „Webanwendung“) und liefert die Adresse der Anmeldung bei Google. Die App leitet den Browser dorthin.
+        Angefragt werden `drive.readonly` und `calendar.readonly` mit `access_type=offline`, `prompt=consent` und
+        `include_granted_scopes=true`. Das `state` gilt 15 Minuten, einmal, nur für diesen Admin in dieser Sitzung.
+
+        Google leitet danach an die Weiterleitungs-URI der Installation zurück (`google.redirect_uri` in
+        `GET /admin/settings`; eigenständig `<App>/google/callback` bzw. `<App>/index.php?r=/google/callback`, WordPress
+        `wp-admin/admin-post.php`). Diese Adresse gehört nicht zur API: Sie tauscht den Code ein, speichert die Verbindung
+        und leitet in die App weiter (`<App>?google=1#/einstellungen`); das Ergebnis steht in `google.last_result`.
+
+        Ein anderer Client als bisher trennt eine bestehende Verbindung (Refresh-Token, E-Mail und `scope` werden geleert).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id]
+              properties:
+                client_id: { type: string, description: 'Endet auf .apps.googleusercontent.com' }
+                client_secret: { type: string, description: 'Leer oder fehlend behält das gespeicherte (nur bei gleicher Client-ID)' }
+      responses:
+        '200':
+          description: Adresse der Anmeldung bei Google
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/google/disconnect:
+    post:
+      tags: [Einstellungen]
+      summary: Verbindung mit Google trennen
+      description: Widerruft das Refresh-Token bei Google (Fehler dabei werden ignoriert) und löscht es; Client-ID, Client-Secret und Dienstkonto bleiben.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
 
   /admin/gallery/sync:
     post:
@@ -3198,8 +3254,27 @@ components:
 
     AdminSettings:
       type: object
-      required: [calendar, gallery, news]
+      required: [google, calendar, gallery, news]
       properties:
+        google:
+          type: object
+          description: Gemeinsamer Google-Zugang für Galerie und Kalender („Mit Google verbinden“ oder Dienstkonto)
+          required: [redirect_uri, client_id, client_secret_set, connected, email, calendar_access, service_account_email, last_result]
+          properties:
+            redirect_uri: { type: string, format: uri, description: 'Weiterleitungs-URI, die der Admin im OAuth-Client bei Google einträgt' }
+            client_id: { type: string, description: Gespeicherte Client-ID (auch ohne Verbindung) }
+            client_secret_set: { type: boolean }
+            connected: { type: boolean, description: OAuth-Verbindung besteht (geht dem Dienstkonto vor) }
+            email: { type: string, description: 'Google-Konto der Verbindung, leer wenn unbekannt' }
+            calendar_access: { type: boolean, description: wie gallery.calendar_access }
+            service_account_email: { type: string }
+            last_result:
+              type: [object, 'null']
+              description: Ergebnis der letzten Rückkehr von Google (nach dem Trennen null)
+              properties:
+                ok: { type: boolean }
+                message: { type: string, description: Meldung für den Admin }
+                at: { type: integer, description: Unix-Zeit }
         calendar:
           type: object
           properties:
@@ -3208,7 +3283,7 @@ components:
               enum: [ics, google, google_connection, none]
               description: >-
                 Genutzte Quelle, in dieser Reihenfolge: `google` (Kalender-IDs mit eigenem API-Schlüssel),
-                `google_connection` (Kalender-IDs über den Google-Zugang der Galerie: OAuth-Verbindung mit
+                `google_connection` (Kalender-IDs über den Google-Zugang: OAuth-Verbindung mit
                 `calendar.readonly` oder Dienstkonto), `ics` (geheime iCal-Adresse), sonst `none`.
             connection_needs_calendar_access:
               type: boolean
@@ -3222,8 +3297,8 @@ components:
           properties:
             configured: { type: boolean }
             root: { type: string }
-            service_account_email: { type: string }
-            oauth_connected: { type: boolean, description: Bestehende OAuth-Verbindung zu Google (geht dem Dienstkonto vor) }
+            service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
+            oauth_connected: { type: boolean, description: 'wie google.connected: OAuth-Verbindung zu Google (geht dem Dienstkonto vor)' }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
             calendar_access: { type: boolean, description: 'Darf der Google-Zugang auch den Kalender lesen? OAuth nur mit erlaubtem calendar.readonly; Dienstkonto immer (Kalender muss freigegeben sein)' }
             status:

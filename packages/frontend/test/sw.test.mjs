@@ -213,3 +213,12 @@ test('Verwaltung (/admin/) wird nie gespeichert', async () => {
   assert.equal(await sw.request(`${API}admin/backup`), undefined);
   assert.equal((await (await sw.storage.open('kompanie-data-v2')).keys()).length, 0);
 });
+
+test('Rückkehr von Google wird nie aus dem Speicher beantwortet', async () => {
+  const net = { [SCOPE]: () => response('<html>app</html>', 'text/html') };
+  const sw = load({ net });
+  await sw.request(SCOPE, 'navigate'); // App-Seite gespeichert
+  assert.equal(await sw.request(`${SCOPE}google/callback?state=s&code=c`, 'navigate'), undefined);
+  assert.equal(await sw.request(`${SCOPE}index.php?r=/google/callback&state=s&code=c`, 'navigate'), undefined);
+  assert.ok(await sw.request(`${SCOPE}google?x=1`, 'navigate'), 'andere Adressen wie bisher');
+});

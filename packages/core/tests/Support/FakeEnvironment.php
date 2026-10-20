@@ -33,6 +33,11 @@ final class FakeEnvironment implements Environment
         return 'https://example.org/app/sw.js';
     }
 
+    public function googleRedirectUri(): string
+    {
+        return 'https://example.org/app/google/callback';
+    }
+
     public function siteUrl(): ?string
     {
         return null;

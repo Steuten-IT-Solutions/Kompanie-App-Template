@@ -29,6 +29,20 @@ final class DriveMock
     public ?array $refreshForm = null;
     /** Refresh-Token, das der Token-Endpunkt annimmt (sonst invalid_grant). */
     public string $validRefreshToken = 'REFRESH1';
+    /** „Mit Google verbinden“: Code, den der Token-Endpunkt annimmt (sonst invalid_grant). */
+    public string $validCode = 'CODE1';
+    /** Erlaubte Berechtigungen in der Antwort auf den Code (Häkchen bei Google); null = Feld fehlt. */
+    public ?string $grantedScope = DriveClient::SCOPE . ' ' . DriveClient::CALENDAR_SCOPE;
+    /** Refresh-Token in der Antwort auf den Code; '' = keines. */
+    public string $issuedRefreshToken = 'REFRESH1';
+    /** Fehler des Token-Endpunkts beim Code (z. B. invalid_client); '' = keiner. */
+    public string $codeError = '';
+    /** @var array<string, mixed>|null Formular der letzten Token-Anfrage mit Code */
+    public ?array $codeForm = null;
+    /** Konto, das Drive (about.user) meldet. */
+    public string $aboutEmail = 'kompanie@example.org';
+    /** @var string[] beim Widerruf übergebene Tokens */
+    public array $revoked = [];
     public bool $paged = false;
     public int $downloads = 0;
     /** Downloads scheitern (HTTP 500), z. B. bei einer Störung. */
@@ -93,6 +107,23 @@ final class DriveMock
             if (str_starts_with($url, DriveClient::TOKEN_URI)) {
                 $this->tokens++;
                 parse_str((string) $body, $form);
+                if (($form['grant_type'] ?? '') === 'authorization_code') {
+                    $this->codeForm = $form;
+                    if ($this->codeError !== '') {
+                        return ['status' => 401, 'body' => (string) json_encode(['error' => $this->codeError, 'error_description' => 'Unauthorized'])];
+                    }
+                    if (($form['code'] ?? '') !== $this->validCode) {
+                        return ['status' => 400, 'body' => '{"error":"invalid_grant","error_description":"Bad Request"}'];
+                    }
+                    $token = ['access_token' => 'TOKEN123', 'expires_in' => 3599, 'token_type' => 'Bearer'];
+                    if ($this->issuedRefreshToken !== '') {
+                        $token['refresh_token'] = $this->issuedRefreshToken;
+                    }
+                    if ($this->grantedScope !== null) {
+                        $token['scope'] = $this->grantedScope;
+                    }
+                    return ['status' => 200, 'body' => (string) json_encode($token)];
+                }
                 if (($form['grant_type'] ?? '') === 'refresh_token') {
                     $this->refreshForm = $form;
                     return ($form['refresh_token'] ?? '') === $this->validRefreshToken
@@ -107,6 +138,16 @@ final class DriveMock
                     && ($claim['iss'] ?? '') === 'galerie@test.iam.gserviceaccount.com'
                     && $this->jwtScope === DriveClient::scopes();
                 return ['status' => 200, 'body' => (string) json_encode(['access_token' => 'TOKEN123', 'expires_in' => 3600])];
+            }
+            if (str_starts_with($url, DriveClient::REVOKE_URL)) {
+                parse_str((string) $body, $form);
+                $this->revoked[] = (string) ($form['token'] ?? '');
+                return ['status' => 200, 'body' => ''];
+            }
+            if (str_starts_with($url, DriveClient::ABOUT_URL)) {
+                return ($headers['Authorization'] ?? '') === 'Bearer TOKEN123'
+                    ? ['status' => 200, 'body' => (string) json_encode(['user' => ['emailAddress' => $this->aboutEmail]])]
+                    : ['status' => 401, 'body' => '{"error":{"message":"Kein Token"}}'];
             }
             if (str_starts_with($url, 'https://www.googleapis.com/calendar/v3/')) {
                 $this->calendarRequests[] = ['url' => $url, 'headers' => $headers];

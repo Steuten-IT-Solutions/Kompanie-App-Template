@@ -974,6 +974,10 @@ export const api = {
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
   config: () => request<AppConfig>('GET', '/config'),
   updateSettings: (data: AdminSettingsInput) => request<AdminSettings>('PATCH', '/admin/settings', data),
+  /** „Mit Google verbinden“: speichert den Client und liefert die Adresse der Anmeldung bei Google. */
+  googleConnect: (clientId: string, clientSecret: string) =>
+    request<{ url: string }>('POST', '/admin/google/connect', { client_id: clientId, client_secret: clientSecret }),
+  googleDisconnect: () => request<AdminSettings>('POST', '/admin/google/disconnect', {}),
   testCalendar: () => request<{ count: number; sample: { start: string; title: string }[] }>('POST', '/admin/calendar/test'),
   testNews: () => request<{ count: number }>('POST', '/admin/news/test'),
   syncGallery: (onlyProcess = false) =>
@@ -1098,8 +1102,21 @@ export interface AdminStatus {
 export type NewsSourceType = 'none' | 'wordpress' | 'rss';
 
 export interface AdminSettings {
+  /** Gemeinsamer Google-Zugang für Galerie und Kalender: „Mit Google verbinden“ oder Dienstkonto */
+  google: {
+    /** Weiterleitungs-URI, die der Admin im OAuth-Client bei Google einträgt */
+    redirect_uri: string;
+    client_id: string;
+    client_secret_set: boolean;
+    connected: boolean;
+    email: string;
+    calendar_access: boolean;
+    service_account_email: string;
+    /** Ergebnis der letzten Rückkehr von Google (Unix-Zeit in at) */
+    last_result: { ok: boolean; message: string; at: number } | null;
+  };
   calendar: {
-    /** google: eigener API-Schlüssel; google_connection: Google-Zugang der Galerie (OAuth mit Kalender-Berechtigung oder Dienstkonto) */
+    /** google: eigener API-Schlüssel; google_connection: Google-Zugang (OAuth mit Kalender-Berechtigung oder Dienstkonto) */
     source: 'ics' | 'google' | 'google_connection' | 'none';
     /** Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen (neu verbinden) */
     connection_needs_calendar_access: boolean;

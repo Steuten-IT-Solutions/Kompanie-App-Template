@@ -25,6 +25,12 @@ interface Environment
      */
     public function serviceWorkerUrl(): string;
 
+    /**
+     * Weiterleitungs-URI für „Mit Google verbinden“: Dorthin schickt Google den Admin nach der Anmeldung zurück. Sie muss
+     * fest sein, weil der Admin sie genau so im OAuth-Client bei Google einträgt.
+     */
+    public function googleRedirectUri(): string;
+
     /** Startseite der Webseite, falls es eine gibt. */
     public function siteUrl(): ?string;
 

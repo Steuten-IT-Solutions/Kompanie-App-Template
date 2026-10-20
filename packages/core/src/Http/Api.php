@@ -646,6 +646,12 @@ final class Api
             }, null, $denySettings),
             new Route('POST', '/admin/calendar/test', Cap::ManageSettings, fn () => $a->settingsService()->testCalendar(), null, $denySettings),
             new Route('POST', '/admin/news/test', Cap::ManageSettings, fn () => $a->settingsService()->testNews(), null, $denySettings),
+            // „Mit Google verbinden“: Client speichern, Adresse der Anmeldung bei Google; Rückkehr über die Weiterleitungs-URI des Adapters
+            new Route('POST', '/admin/google/connect', Cap::ManageSettings, fn (Request $r) => ['url' => $a->googleConnect()->start($r->input('client_id'), $r->input('client_secret'))], null, $denySettings),
+            new Route('POST', '/admin/google/disconnect', Cap::ManageSettings, function () use ($a) {
+                $a->googleConnect()->disconnect();
+                return $a->settingsService()->get();
+            }, null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)

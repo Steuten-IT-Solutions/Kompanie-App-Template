@@ -1,12 +1,12 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, applyFeatures, refreshRoles, type AdminSettings, type Feature, type FeatureInfo, type NewsSourceType } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 
 /**
- * Einstellungen für Admins (beide Varianten): Bereiche, Rollen, Zustand, Updates und Datensicherung, dann Kalender,
- * Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
+ * Einstellungen für Admins (beide Varianten): Bereiche, Rollen, Zustand, Updates und Datensicherung, dann Google-Zugang,
+ * Kalender, Galerie und Neuigkeiten. Geheime Werte zeigt der Server nie an, nur ob sie gesetzt sind.
  * Bei WordPress kommen die Neuigkeiten aus den Beiträgen der Website; dort gibt es keinen Abschnitt dafür.
  */
 export default function Einstellungen({ onToast }: { onToast: (msg: string) => void }) {
@@ -36,6 +36,7 @@ function Verbindungen({ onToast, onSetupSaved }: { onToast: (msg: string) => voi
   };
   return (
     <>
+      <GoogleAccess settings={s} onSaved={onSaved} onToast={onToast} />
       <Calendar settings={s} onSaved={onSaved} onToast={onToast} />
       <Gallery settings={s} onSaved={onSaved} onToast={onToast} />
       {s.news && <News settings={s} onSaved={onSaved} onToast={onToast} />}
@@ -271,16 +272,252 @@ function useSave(onSaved: (s: AdminSettings) => void, onToast: (msg: string) => 
   return { busy, error, setError, save };
 }
 
+/** Kehrt der Admin von Google zurück (?google=1)? Liest den Parameter einmal und entfernt ihn aus der Adresse. */
+function takeGoogleReturn(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('google')) return false;
+  params.delete('google');
+  const search = params.toString();
+  window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : '') + window.location.hash);
+  return true;
+}
+
+/**
+ * Google-Zugang für Galerie und Kalender: „Mit Google verbinden“ mit dem eigenen OAuth-Client der Installation,
+ * darunter als Alternative das Dienstkonto. Nach „Speichern und mit Google verbinden“ geht es zu Google; Google leitet
+ * an die Weiterleitungs-URI zurück, der Server danach hierher (?google=1) und das Ergebnis steht in last_result.
+ */
+export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
+  const g = settings.google;
+  const [returned] = useState(takeGoogleReturn);
+  const [clientId, setClientId] = useState(g.client_id);
+  const [secret, setSecret] = useState('');
+  const [key, setKey] = useState('');
+  const [replaceKey, setReplaceKey] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const { busy, error, save, setError } = useSave(onSaved, onToast);
+  // Ergebnis der Rückkehr von Google nur direkt danach zeigen (höchstens 15 Minuten alt).
+  const result = returned && g.last_result && Date.now() / 1000 - g.last_result.at < 900 ? g.last_result : null;
+  const showKeyField = !g.service_account_email || replaceKey;
+
+  useEffect(() => {
+    if (returned) document.getElementById('einstellungen-google')?.scrollIntoView({ block: 'start' });
+  }, [returned]);
+
+  async function connect(e: FormEvent) {
+    e.preventDefault();
+    if (!clientId.trim()) return setConnectError('Bitte die Client-ID eintragen.');
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const { url } = await api.googleConnect(clientId.trim(), secret.trim());
+      window.location.assign(url);
+    } catch (err) {
+      setConnectError((err as Error).message);
+      setConnecting(false);
+    }
+  }
+
+  async function disconnect() {
+    if (!window.confirm('Verbindung zu Google trennen? Galerie und Kalender lesen danach nur noch über ein Dienstkonto, falls hinterlegt.'))
+      return;
+    setConnectError(null);
+    try {
+      onSaved(await api.googleDisconnect());
+      onToast('Verbindung getrennt');
+    } catch (err) {
+      setConnectError((err as Error).message);
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(g.redirect_uri);
+      onToast('Kopiert');
+    } catch {
+      onToast('Bitte die Adresse markieren und kopieren.');
+    }
+  }
+
+  return (
+    <section className="card settings-section" id="einstellungen-google">
+      <h3>Google-Zugang</h3>
+      <p className="muted small">
+        Über diesen Zugang liest die App den Galerie-Ordner aus Google Drive und private Google Kalender (nur lesen). Empfohlen:{' '}
+        <strong>Mit Google verbinden</strong> über einen eigenen OAuth-Client. Wie du ihn anlegst, steht in der Hilfe unter „Google
+        einrichten“.
+      </p>
+      {result && (
+        <p className={result.ok ? 'small' : 'form-error small'} role={result.ok ? 'status' : 'alert'}>
+          {result.ok ? '✓ ' : ''}
+          {result.message}
+        </p>
+      )}
+      <label className="field">
+        <span>Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
+        <input type="text" readOnly value={g.redirect_uri} onFocus={(e) => e.currentTarget.select()} />
+      </label>
+      <div className="button-row">
+        <button type="button" className="btn btn-secondary" onClick={copy}>
+          Adresse kopieren
+        </button>
+      </div>
+      {g.connected ? (
+        <div className="small">
+          <p>
+            ✓ Verbunden mit Google
+            {g.email ? (
+              <>
+                {' '}
+                als <code>{g.email}</code>
+              </>
+            ) : (
+              ''
+            )}
+            .{' '}
+            {g.calendar_access
+              ? 'Es darf auch den Kalender lesen.'
+              : 'Den Kalender darf es noch nicht lesen. Für einen privaten Kalender: Verbindung trennen und neu verbinden, dabei beide Häkchen setzen.'}
+          </p>
+          <div className="button-row">
+            <button type="button" className="btn btn-link" onClick={disconnect}>
+              Verbindung trennen
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form className="form" onSubmit={connect}>
+          <label className="field">
+            <span>Client-ID</span>
+            <input
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="….apps.googleusercontent.com"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>Clientschlüssel (Client-Secret)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              placeholder={g.client_secret_set && clientId.trim() === g.client_id ? 'gespeichert – leer lassen, um ihn zu behalten' : ''}
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+            />
+          </label>
+          <button className="btn btn-block" type="submit" disabled={connecting}>
+            {connecting ? 'Weiter zu Google …' : 'Speichern und mit Google verbinden'}
+          </button>
+          <p className="muted small">
+            Danach meldest du dich bei Google mit dem Konto an, das den Galerie-Ordner und den Kalender sehen kann. Zeigt Google „Google hat
+            diese App nicht überprüft“, wähle „Erweitert“ und dann „Weiter zu …“ und setze beide Häkchen (Google Drive und Google Kalender).
+          </p>
+        </form>
+      )}
+      {connectError && (
+        <p className="form-error" role="alert">
+          {connectError}
+        </p>
+      )}
+      <details open={!!g.service_account_email && !g.connected}>
+        <summary>Alternative: Dienstkonto mit JSON-Schlüssel</summary>
+        <p className="muted small">
+          Nur nötig, wenn du nicht „Mit Google verbinden“ nutzt. Den Galerie-Ordner (Betrachter) und ggf. den Kalender („Alle Termindetails
+          sehen“) für die Adresse des Dienstkontos freigeben.
+        </p>
+        {g.service_account_email && (
+          <div className="small">
+            Dienstkonto: <code>{g.service_account_email}</code>
+            {g.connected ? ' (wird nicht genutzt, solange die Verbindung mit Google besteht)' : ''}
+            <div className="button-row">
+              <button type="button" className="btn btn-link" onClick={() => setReplaceKey(!replaceKey)}>
+                {replaceKey ? 'Schlüssel behalten' : 'Schlüssel ersetzen'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-link"
+                onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}
+              >
+                Schlüssel entfernen
+              </button>
+            </div>
+          </div>
+        )}
+        {showKeyField && (
+          <>
+            <label className="field">
+              <span>{g.service_account_email ? 'Neuer Schlüssel des Dienstkontos (JSON)' : 'Schlüssel des Dienstkontos (JSON)'}</span>
+              <textarea
+                rows={4}
+                spellCheck={false}
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder='{"type": "service_account", …}'
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() =>
+                key.trim()
+                  ? save({ drive_service_account: key.trim() }, () => {
+                      setKey('');
+                      setReplaceKey(false);
+                    })
+                  : setError('Bitte den Inhalt der JSON-Datei einfügen.')
+              }
+            >
+              {busy ? 'Speichert …' : 'Schlüssel speichern'}
+            </button>
+          </>
+        )}
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </details>
+    </section>
+  );
+}
+
+/** Kurzbeschreibung des Google-Zugangs für Kalender und Galerie ('' ohne Zugang). */
+function googleAccessLabel(g: AdminSettings['google']): string {
+  if (g.connected) return g.email ? `die Verbindung mit Google (${g.email})` : 'die Verbindung mit Google';
+  if (g.service_account_email) return `das Dienstkonto ${g.service_account_email}`;
+  return '';
+}
+
+/** Verweis auf den Abschnitt Google-Zugang (in den Einstellungen und im Assistenten darüber). */
+function GoogleLink() {
+  return (
+    <button
+      type="button"
+      className="btn btn-link btn-inline"
+      onClick={() => document.getElementById('einstellungen-google')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+    >
+      Google-Zugang
+    </button>
+  );
+}
+
 export function Calendar({ settings, onSaved, onToast }: SectionProps) {
+  const c = settings.calendar;
   const [url, setUrl] = useState('');
+  const [ids, setIds] = useState(c.calendar_ids);
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
-  const c = settings.calendar;
+  const access = googleAccessLabel(settings.google);
   const status = {
     ics: '✓ Eingerichtet über die geheime iCal-Adresse.',
     google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).',
-    google_connection: '✓ Eingerichtet über die Kalender-IDs und den Google-Zugang der Galerie.',
+    google_connection: `✓ Eingerichtet über die Kalender-IDs und ${access || 'den Google-Zugang'}.`,
     none: 'Noch kein Kalender eingerichtet.',
   }[c.source];
 
@@ -310,24 +547,42 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        if (!url.trim()) return setError('Bitte zuerst die iCal-Adresse einfügen.');
-        save({ calendar_ics_url: url.trim() }, () => setUrl(''));
+        const idsChanged = ids.trim() !== c.calendar_ids;
+        if (!url.trim() && !idsChanged) return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
+        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim() }, () => setUrl(''));
       }}
     >
       <p className="muted small">
-        In Google Kalender unter <em>Einstellungen → Kalender auswählen → Kalender integrieren</em> die{' '}
-        <strong>geheime Adresse im iCal-Format</strong> kopieren und hier einfügen. Sie wird nicht wieder angezeigt.
+        Zwei Wege: Für einen privaten Google Kalender die <strong>Kalender-ID</strong> eintragen; gelesen wird über den <GoogleLink />{' '}
+        (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist). Oder ohne Google-Zugang die{' '}
+        <strong>geheime Adresse im iCal-Format</strong> einfügen. Sind Kalender-IDs eingetragen und darf der Google-Zugang den Kalender
+        lesen, gelten sie vor der iCal-Adresse.
       </p>
       <p className="small">{status}</p>
       {c.connection_needs_calendar_access && (
         <p className="small">
-          Die Kalender-IDs <code>{c.calendar_ids}</code> sind eingetragen, aber die Google-Verbindung der Galerie darf den Kalender nicht
-          lesen (beim Verbinden nicht erlaubt). Dafür muss sie neu verbunden werden, mit Erlaubnis für den Kalender
-          {c.source === 'ics' ? '; bis dahin gilt die iCal-Adresse' : ''}.
+          Die Kalender-IDs <code>{c.calendar_ids}</code> sind eingetragen, aber die Verbindung mit Google darf den Kalender nicht lesen
+          (beim Verbinden nicht erlaubt). Unter <GoogleLink /> die Verbindung trennen und neu verbinden, dabei auch das Häkchen für den
+          Kalender setzen{c.source === 'ics' ? '; bis dahin gilt die iCal-Adresse' : ''}.
         </p>
       )}
       <label className="field">
-        <span>{c.source === 'none' ? 'Geheime iCal-Adresse' : 'Neue iCal-Adresse (ersetzt die bisherige Einrichtung)'}</span>
+        <span>Google-Kalender-IDs</span>
+        <input
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="abc123@group.calendar.google.com"
+          value={ids}
+          onChange={(e) => setIds(e.target.value)}
+        />
+        <span className="small muted">
+          In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Kalender-ID. Mehrere durch Komma trennen.
+          {!access && ' Dafür zuerst den Google-Zugang einrichten.'}
+        </span>
+      </label>
+      <label className="field">
+        <span>{c.ics_url_set ? 'Neue iCal-Adresse (ersetzt die bisherige)' : 'Geheime iCal-Adresse'}</span>
         <input
           type="url"
           inputMode="url"
@@ -336,6 +591,10 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
+        <span className="small muted">
+          In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Geheime Adresse im iCal-Format. Sie wird nicht wieder
+          angezeigt.
+        </span>
       </label>
       {c.source !== 'none' && (
         <div className="button-row">
@@ -346,7 +605,8 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
             type="button"
             className="btn btn-link"
             onClick={() =>
-              window.confirm('Kalender wirklich entfernen?') && save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' })
+              window.confirm('Kalender wirklich entfernen?') &&
+              save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' }, () => setIds(''))
             }
           >
             Entfernen
@@ -365,12 +625,10 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
 export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
-  const [key, setKey] = useState('');
-  const [replaceKey, setReplaceKey] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
-  const showKeyField = !g.service_account_email || replaceKey;
+  const access = googleAccessLabel(settings.google);
 
   async function sync() {
     setSyncing(true);
@@ -404,72 +662,25 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        save({ gallery_root: root.trim(), ...(key.trim() ? { drive_service_account: key.trim() } : {}) }, () => {
-          setKey('');
-          setReplaceKey(false);
-        });
+        save({ gallery_root: root.trim() });
       }}
     >
       <p className="muted small">
-        Den Galerie-Ordner in Google Drive für das Dienstkonto freigeben (Betrachter) und hier den Link zum Ordner eintragen. Darin je Jahr
-        ein Ordner, darin je Album ein Ordner; Bilder im Unterordner <em>intern</em> sehen nur Mitglieder.
+        Hier den Link zum Galerie-Ordner in Google Drive eintragen. Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im
+        Unterordner <em>intern</em> sehen nur Mitglieder.
       </p>
-      {g.oauth_connected && (
-        <div className="small">
-          Verbunden mit Google
-          {g.oauth_email ? (
-            <>
-              {' '}
-              als <code>{g.oauth_email}</code>
-            </>
-          ) : (
-            ''
-          )}
-          . Diese Verbindung wird für den Abgleich genutzt
-          {g.service_account_email ? ', das Dienstkonto erst nach dem Trennen' : ''}.
-          {g.calendar_access ? ' Sie darf auch den Kalender lesen.' : ' Den Kalender darf sie nicht lesen.'}
-          <div className="button-row">
-            <button
-              type="button"
-              className="btn btn-link"
-              onClick={() =>
-                window.confirm('Verbindung zu Google trennen? Danach braucht der Abgleich ein Dienstkonto.') && save({ drive_oauth: '' })
-              }
-            >
-              Verbindung trennen
-            </button>
-          </div>
-        </div>
-      )}
-      {g.service_account_email && (
-        <div className="small">
-          Dienstkonto: <code>{g.service_account_email}</code>
-          <div className="button-row">
-            <button type="button" className="btn btn-link" onClick={() => setReplaceKey(!replaceKey)}>
-              {replaceKey ? 'Schlüssel behalten' : 'Schlüssel ersetzen'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-link"
-              onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}
-            >
-              Schlüssel entfernen
-            </button>
-          </div>
-        </div>
-      )}
-      {showKeyField && (
-        <label className="field">
-          <span>{g.service_account_email ? 'Neuer Schlüssel des Dienstkontos (JSON)' : 'Schlüssel des Dienstkontos (JSON)'}</span>
-          <textarea
-            rows={4}
-            spellCheck={false}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder='{"type": "service_account", …}'
-          />
-        </label>
-      )}
+      <p className="small">
+        {access ? (
+          <>
+            Gelesen wird über {access} (<GoogleLink />
+            ).
+          </>
+        ) : (
+          <>
+            Noch kein Zugang zu Google: zuerst unter <GoogleLink /> mit Google verbinden oder ein Dienstkonto hinterlegen.
+          </>
+        )}
+      </p>
       <label className="field">
         <span>Link zum Galerie-Ordner</span>
         <input

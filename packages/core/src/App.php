@@ -14,6 +14,7 @@ use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GalleryService;
+use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
@@ -428,6 +429,12 @@ final class App
     public function drive(): DriveClient
     {
         return $this->service(DriveClient::class, fn () => new DriveClient($this->settings, $this->http, $this->cache, $this->files, $this->time()));
+    }
+
+    /** „Mit Google verbinden“ (Beginn, Rückkehr von Google, Trennen) */
+    public function googleConnect(): GoogleConnect
+    {
+        return $this->service(GoogleConnect::class, fn () => new GoogleConnect($this));
     }
 
     public function maintenance(): MaintenanceService

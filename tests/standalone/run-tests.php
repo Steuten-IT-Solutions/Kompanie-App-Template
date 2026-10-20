@@ -498,6 +498,37 @@ try {
     $set = $d->request('GET', '/admin/settings')[1];
     $c->ok($set['calendar']['source'] === 'google_connection' && $set['calendar']['connection_needs_calendar_access'] === false && $set['gallery']['calendar_access'] === true, 'Verbindung mit Kalender-Berechtigung: Quelle google_connection');
     $c->ok($d->request('PATCH', '/admin/settings', ['drive_oauth' => '', 'calendar_ids' => ''])[1]['calendar']['source'] === 'none', 'Verbindung getrennt, Kalender-IDs geleert');
+
+    // „Mit Google verbinden“: Beginn über die API, Rückkehr über die eigene Weiterleitungs-URI (kein API-Pfad).
+    [$s, $set] = $d->request('GET', '/admin/settings');
+    $redirect = (string) ($set['google']['redirect_uri'] ?? '');
+    $c->ok($redirect === $base . 'index.php?r=/google/callback', 'Weiterleitungs-URI ohne URL-Umschreibung: index.php?r=/google/callback');
+    [$s, $start] = $d->request('POST', '/admin/google/connect', ['client_id' => '1-test.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-test']);
+    parse_str((string) parse_url((string) ($start['url'] ?? ''), PHP_URL_QUERY), $q);
+    $c->ok($s === 200 && ($q['redirect_uri'] ?? '') === $redirect && ($q['access_type'] ?? '') === 'offline' && str_starts_with((string) ($q['state'] ?? ''), 'kompanie_app_app_'), 'Admin beginnt „Mit Google verbinden“: Adresse der Anmeldung bei Google');
+    $d->actAs($max);
+    $c->ok($d->request('POST', '/admin/google/connect', ['client_id' => '1-test.apps.googleusercontent.com', 'client_secret' => 'x'])[0] === 403, 'Mitglied darf nicht verbinden → 403');
+    $back = $redirect . '&state=' . rawurlencode((string) $q['state']) . '&code=TESTCODE';
+    $c->ok($d->send('GET', $back, ['Cookie' => Sessions::COOKIE . '=' . $d->token($max)], null)[0] === 403, 'Rückkehr von Google als Mitglied → 403');
+    $c->ok($d->send('GET', $back, [], null)[0] === 401, 'Rückkehr von Google ohne Anmeldung → 401');
+    $d->actAs($anna);
+    $other = $d->send('GET', $redirect . '&state=kompanie_app_app_' . str_repeat('0', 48) . '&code=TESTCODE', ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)], null);
+    $c->ok($other[0] === 303 && ($other[2]['location'] ?? '') === $base . '?google=1#/einstellungen', 'Falsches state: Weiterleitung in die Einstellungen');
+    $set = $d->request('GET', '/admin/settings')[1];
+    $c->ok($set['google']['connected'] === false && ($set['google']['last_result']['ok'] ?? true) === false && str_contains((string) ($set['google']['last_result']['message'] ?? ''), 'abgelaufen oder ungültig'), 'Falsches state: nicht verbunden, Meldung');
+    [$s, $start] = $d->request('POST', '/admin/google/connect', ['client_id' => '1-test.apps.googleusercontent.com']);
+    parse_str((string) parse_url((string) ($start['url'] ?? ''), PHP_URL_QUERY), $q);
+    // Gültiges state: Der Server tauscht den Code bei Google ein. Google selbst ist hier nicht erreichbar bzw. kennt den
+    // Test-Client nicht; die gelungene Verbindung prüfen Kern- und E2E-Tests mit simuliertem Google.
+    $ok = $d->send('GET', $redirect . '&state=' . rawurlencode((string) $q['state']) . '&code=TESTCODE', ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)], null);
+    $set = $d->request('GET', '/admin/settings')[1];
+    $c->ok($ok[0] === 303 && $set['google']['connected'] === false && str_contains((string) ($set['google']['last_result']['message'] ?? ''), 'Die Verbindung mit Google ist fehlgeschlagen'), 'Gültiges state: Code wird bei Google eingetauscht (Fehler verständlich gemeldet)');
+    $c->ok(!str_contains((string) json_encode($set), 'GOCSPX'), 'Client-Secret wird nie ausgeliefert');
+    $kernel->app()->settings->set('drive_oauth', ['client_id' => '1-test.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-test', 'refresh_token' => 'TESTREFRESH', 'email' => 'kompanie@example.org', 'scope' => 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/calendar.readonly']);
+    [$s, $set] = $d->request('POST', '/admin/google/disconnect');
+    $c->ok($s === 200 && $set['google']['connected'] === false && $set['google']['client_id'] === '1-test.apps.googleusercontent.com', 'Verbindung getrennt, Client bleibt');
+    $kernel->app()->settings->delete('drive_oauth');
+
     $settings = $kernel->app()->settings;
     $settings->set('kptest_frisch', ['a']);
     $kernel->db()->execute("UPDATE {settings} SET value = ? WHERE name = 'kptest_frisch'", [json_encode(['a', 'b'])]); // wie eine andere Anfrage
@@ -573,6 +604,9 @@ try {
     $c->ok($d->send('GET', $base . 'installieren', [], null)[0] === 200, 'Teilbarer Link /installieren liefert die App');
     $c->ok($d->send('GET', $base . 'data/config.php', [], null)[0] === 403 && $d->send('GET', $base . 'src/Kernel.php', [], null)[0] === 403, 'Daten und Programmcode gesperrt');
     $c->ok(json_decode((string) file_get_contents($base . 'index.php?r=/api/v1/config'), true)['variant'] === 'standalone', 'index.php?r=… funktioniert weiterhin');
+    $d->actAs($anna);
+    $c->ok(($d->request('GET', '/admin/settings')[1]['google']['redirect_uri'] ?? '') === $base . 'google/callback', 'Weiterleitungs-URI mit URL-Umschreibung: /google/callback');
+    $c->ok($d->send('GET', $base . 'google/callback?state=x&code=y', [], null)[0] === 401, '/google/callback erreichbar (ohne Anmeldung 401)');
 } catch (Throwable $e) {
     echo 'ABBRUCH: ', $e->getMessage(), ' in ', $e->getFile(), ':', $e->getLine(), "\n";
     $exit = 1;

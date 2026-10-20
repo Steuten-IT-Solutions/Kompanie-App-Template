@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, applyFeatures, config, refreshRoles, type AdminSettings, type Feature } from '../api';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
-import { Calendar, FeatureSwitches, Gallery, News } from './Einstellungen';
+import { Calendar, FeatureSwitches, Gallery, GoogleAccess, News } from './Einstellungen';
 
 type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'fertig';
 
@@ -108,6 +108,8 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
           </button>
         </section>
       )}
+      {/* Google-Zugang beim ersten Schritt, der ihn braucht: Galerie, sonst Kalender (für Kalender-IDs). */}
+      {(step === 'galerie' || (step === 'kalender' && !value.gallery)) && <GoogleAccess settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'kalender' && <Calendar settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'galerie' && <Gallery settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'news' && <News settings={s} onSaved={onSaved} onToast={onToast} />}

@@ -15,6 +15,8 @@
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
  * - Abzeichen der Dienstgrade (<App>/abzeichen/<id>?v=<Fassung>&s=<Größe>, Issue #17) → zuerst aus dem Speicher,
  *   ebenso versioniert; je Dienstgrad und Größe nur die aktuelle Fassung. Einmal geladen, sind sie offline da.
+ * - Rückkehr von Google („Mit Google verbinden“, <App>/google/callback bzw. ?r=/google/callback) → durchreichen: Der
+ *   Server tauscht dort den Code ein und leitet weiter; eine gespeicherte App-Seite nach dem Zeitlimit wäre falsch.
  * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
@@ -104,6 +106,13 @@ function isAdmin(url) {
     // unvollständig kodiert: wie angegeben prüfen
   }
   return href.includes('/admin/');
+}
+
+/** Rückkehr von Google nach „Mit Google verbinden“: <App>/google/callback oder ?r=/google/callback */
+function isGoogleCallback(url) {
+  const scope = new URL(self.registration.scope);
+  if (url.pathname.startsWith(scope.pathname) && /^google\/callback\/?$/.test(url.pathname.slice(scope.pathname.length))) return true;
+  return /^\/?google\/callback$/.test(url.searchParams.get('r') || '');
 }
 
 /** Kennung eines Dokuments aus seiner Adresse: <App>/dokument/<id>, ?kompanie_app=dokument/<id> oder ?r=/dokument/<id> */
@@ -234,6 +243,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (isGoogleCallback(url)) return;
 
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;

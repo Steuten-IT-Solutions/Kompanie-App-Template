@@ -563,7 +563,7 @@ final class CalendarTest extends TestCase
         $item = array_values(array_filter($app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'calendar'))[0];
         $this->assertSame('ok', $item['level']);
         $this->assertStringContainsString('über die iCal-Adresse', $item['text']);
-        $this->assertStringContainsString('neu verbunden', $item['text']);
+        $this->assertStringContainsString('neu verbinden', $item['text']);
 
         // Ohne iCal-Adresse: nicht eingerichtet, gelber Hinweis.
         $app->settingsService()->update(['calendar_ics_url' => '', 'calendar_ids' => 'a@group.calendar.google.com']);
@@ -578,6 +578,6 @@ final class CalendarTest extends TestCase
         $this->assertSame(['Probe'], array_column($app->calendar()->events(), 'title'));
         $item = array_values(array_filter($app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'calendar'))[0];
         $this->assertSame('ok', $item['level']);
-        $this->assertStringContainsString('über den Google-Zugang der Galerie', $item['text']);
+        $this->assertStringContainsString('über die Kalender-IDs und den Google-Zugang', $item['text']);
     }
 }
