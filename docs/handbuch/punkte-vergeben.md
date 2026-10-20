@@ -18,4 +18,4 @@ Unter **Verwaltung → {bereich.points}katalog** legst du häufige Anlässe mit 
 Hat eine Rolle einen anderen Faktor als 1, steht er beim Namen, z. B. „×0,5“. Er gilt beim Vergeben und wird mit dem Eintrag gespeichert. Mit **Punktefaktor der Rolle anwenden** lässt er sich für diesen Eintrag ausschalten.
 
 ## Stornieren
-Im Mitglied unter **Verwaltung → Mitglieder** beim Eintrag auf **Stornieren**. Der Eintrag zählt dann nicht mehr; gespeichert bleibt, wer ihn angelegt und storniert hat.
+Unter **Verwaltung → Mitglieder** das Mitglied öffnen, im Menü unter dem Namen **{bereich.points}** wählen und beim Eintrag auf **Stornieren** tippen. Der Eintrag zählt dann nicht mehr; gespeichert bleibt, wer ihn angelegt und storniert hat.

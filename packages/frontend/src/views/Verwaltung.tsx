@@ -3,7 +3,7 @@ import { api, can, config, levelLabel, roleFactor, type CatalogItem, type Create
 import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
-import { AdminNav, adminTabs, memberListAllowed } from '../adminNav';
+import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
 import { RankLabel } from '../RankBadge';
@@ -44,7 +44,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
     <div>
       <AdminNav active={active} />
       {sub === 'mitglied' && arg ? (
-        <MemberDetailView id={Number(arg)} focus={path[2]} onToast={onToast} />
+        <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
@@ -157,7 +157,11 @@ function Members() {
 
 /* ------------------------------------------------------------------ */
 
-function MemberDetailView({ id, focus, onToast }: { id: number; focus?: string; onToast: (msg: string) => void }) {
+/**
+ * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
+ * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht.
+ */
+function MemberDetailView({ id, page, onToast }: { id: number; page?: string; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => api.member(id), [id]);
   const [busy, setBusy] = useState(false);
 
@@ -178,53 +182,172 @@ function MemberDetailView({ id, focus, onToast }: { id: number; focus?: string; 
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const m = data!;
 
+  const pages = [
+    { id: 'uebersicht', label: 'Übersicht', on: true },
+    { id: 'konto', label: 'Konto und Rolle', on: true },
+    { id: 'punkte', label: sec.points, on: canPoints() },
+    { id: 'strafen', label: sec.penalties, on: canPenalties() },
+    { id: 'dienstgrad', label: brand.labels.rank, on: !!m.rank && (m.member || !!m.rank.rank) },
+    { id: 'titel', label: sec.titles, on: !!m.titles && (m.member || m.titles.length > 0) },
+    {
+      id: 'geburtstag',
+      label: 'Geburtstag',
+      on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
+    },
+  ].filter((p) => p.on);
+  const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
+
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
         ‹ Alle Mitglieder
       </button>
       <h2 className="member-name">{m.name}</h2>
-      <RoleControl id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
-      {m.level === 'candidate' && can('create_users') && (
-        <button
-          className="btn btn-block promote-candidate"
-          disabled={busy}
-          onClick={() =>
-            window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
-            run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
-          }
-        >
-          Als {levelLabel('member')} aufnehmen
-        </button>
-      )}
-      <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
-      {can('create_users') && m.id !== config?.user?.id && <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />}
-      <div className="stats">
-        {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
-        {canPenalties() && (
-          <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
-        )}
-      </div>
-      {m.member && (
-        <div className="button-row">
-          {canPoints() && (
-            <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
-              {sec.points} vergeben
-            </button>
+      <MenuNav
+        label="Mitglied"
+        className="member-menu"
+        active={active}
+        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/mitglied/${m.id}/${p.id}`) }))}
+      />
+
+      {active === 'uebersicht' && (
+        <>
+          <p className="muted small member-level">Rolle: {levelLabel(m.level)}</p>
+          <div className="stats">
+            {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
+            {canPenalties() && (
+              <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
+            )}
+          </div>
+          {m.member && (
+            <div className="button-row">
+              {canPoints() && (
+                <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
+                  {sec.points} vergeben
+                </button>
+              )}
+              {canPenalties() && (
+                <button className="btn btn-warn" onClick={() => navigate(`verwaltung/strafe/${m.id}`)}>
+                  {sec.penalties}: Eintrag
+                </button>
+              )}
+            </div>
           )}
-          {canPenalties() && (
-            <button className="btn btn-warn" onClick={() => navigate(`verwaltung/strafe/${m.id}`)}>
-              {sec.penalties}: Eintrag
-            </button>
-          )}
-        </div>
+        </>
       )}
 
-      {m.titles && (m.member || m.titles.length > 0) && (
+      {active === 'konto' && (
+        <>
+          <RoleControl id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+          {m.level === 'candidate' && can('create_users') && (
+            <button
+              className="btn btn-block promote-candidate"
+              disabled={busy}
+              onClick={() =>
+                window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
+                run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
+              }
+            >
+              Als {levelLabel('member')} aufnehmen
+            </button>
+          )}
+          <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
+          {can('create_users') && m.id !== config?.user?.id && (
+            <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+          )}
+        </>
+      )}
+
+      {active === 'punkte' && (
+        <>
+          {canPoints() && <h3 className="section-title">{sec.points}</h3>}
+          {!canPoints() ? null : m.point_list.length === 0 ? (
+            <Empty>Keine Einträge.</Empty>
+          ) : (
+            <ul className="card-list">
+              {m.point_list.map((p) => (
+                <li key={p.id} className="card row">
+                  <div className="row-main">
+                    <div className="row-title">{p.reason}</div>
+                    <div className="row-sub">
+                      {formatDate(p.date)}
+                      {p.created_by_name && ` · von ${p.created_by_name}`}
+                    </div>
+                    <div className="row-actions">
+                      <button
+                        className="btn btn-small btn-danger"
+                        disabled={busy}
+                        onClick={() =>
+                          window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
+                          run(() => api.deletePoints(p.id), 'Storniert')
+                        }
+                      >
+                        Stornieren
+                      </button>
+                    </div>
+                  </div>
+                  <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {active === 'strafen' && (
+        <>
+          {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
+          {!canPenalties() ? null : m.penalties.length === 0 ? (
+            <Empty>Keine Einträge.</Empty>
+          ) : (
+            <ul className="card-list">
+              {m.penalties.map((p) => (
+                <PenaltyRow
+                  key={p.id}
+                  p={p}
+                  actions={
+                    <>
+                      {p.status === 'open' ? (
+                        <button
+                          className="btn btn-small"
+                          disabled={busy}
+                          onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
+                        >
+                          Bezahlt
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-small btn-secondary"
+                          disabled={busy}
+                          onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
+                        >
+                          Doch offen
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-small btn-danger"
+                        disabled={busy}
+                        onClick={() =>
+                          window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
+                          run(() => api.deletePenalty(p.id), 'Storniert')
+                        }
+                      >
+                        Stornieren
+                      </button>
+                    </>
+                  }
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {active === 'titel' && m.titles && (
         <MemberTitles key={m.id} id={m.id} member={m.member} titles={m.titles} onChanged={reload} onToast={onToast} />
       )}
 
-      {m.rank && (m.member || m.rank.rank) && (
+      {active === 'dienstgrad' && m.rank && (
         <MemberRank
           id={m.id}
           member={m.member}
@@ -232,89 +355,12 @@ function MemberDetailView({ id, focus, onToast }: { id: number; focus?: string; 
           history={m.rank_history ?? []}
           onChanged={reload}
           onToast={onToast}
-          focus={focus === 'dienstgrad'}
+          focus={page === 'dienstgrad'}
         />
       )}
 
-      {m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()) && (
+      {active === 'geburtstag' && m.birthday !== undefined && (
         <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
-      )}
-
-      {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
-      {!canPenalties() ? null : m.penalties.length === 0 ? (
-        <Empty>Keine Einträge.</Empty>
-      ) : (
-        <ul className="card-list">
-          {m.penalties.map((p) => (
-            <PenaltyRow
-              key={p.id}
-              p={p}
-              actions={
-                <>
-                  {p.status === 'open' ? (
-                    <button
-                      className="btn btn-small"
-                      disabled={busy}
-                      onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
-                    >
-                      Bezahlt
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy}
-                      onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
-                    >
-                      Doch offen
-                    </button>
-                  )}
-                  <button
-                    className="btn btn-small btn-danger"
-                    disabled={busy}
-                    onClick={() =>
-                      window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
-                      run(() => api.deletePenalty(p.id), 'Storniert')
-                    }
-                  >
-                    Stornieren
-                  </button>
-                </>
-              }
-            />
-          ))}
-        </ul>
-      )}
-
-      {canPoints() && <h3 className="section-title">{sec.points}</h3>}
-      {!canPoints() ? null : m.point_list.length === 0 ? (
-        <Empty>Keine Einträge.</Empty>
-      ) : (
-        <ul className="card-list">
-          {m.point_list.map((p) => (
-            <li key={p.id} className="card row">
-              <div className="row-main">
-                <div className="row-title">{p.reason}</div>
-                <div className="row-sub">
-                  {formatDate(p.date)}
-                  {p.created_by_name && ` · von ${p.created_by_name}`}
-                </div>
-                <div className="row-actions">
-                  <button
-                    className="btn btn-small btn-danger"
-                    disabled={busy}
-                    onClick={() =>
-                      window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
-                      run(() => api.deletePoints(p.id), 'Storniert')
-                    }
-                  >
-                    Stornieren
-                  </button>
-                </div>
-              </div>
-              <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
