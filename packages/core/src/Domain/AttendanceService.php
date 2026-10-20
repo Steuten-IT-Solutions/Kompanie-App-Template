@@ -60,7 +60,11 @@ final class AttendanceService
     public function lists(): array
     {
         $lists = $this->repository()->recent(self::RECENT);
-        $counts = $this->repository()->counts(array_column($lists, 'id'));
+        $people = [];
+        foreach ($this->people() as $u) {
+            $people[$u->id] = true;
+        }
+        $counts = $this->repository()->counts(array_column($lists, 'id'), $people);
         return array_map(static fn (array $l): array => [
             'id' => $l['id'],
             'source' => $l['source'],
@@ -182,8 +186,13 @@ final class AttendanceService
                 $list = $key === '' ? null : $repo->findByEvent(self::SOURCE_CALENDAR, $key);
                 if ($list === null) {
                     $event = $this->calendarEvent($key);
-                    $id = $repo->insert(self::SOURCE_CALENDAR, $key, mb_substr(Text::line($event['title'], self::TITLE_MAX + 1), 0, self::TITLE_MAX), $this->localDate((string) $event['start']), $actor->id, $now);
-                    $created = true;
+                    try {
+                        $id = $repo->insert(self::SOURCE_CALENDAR, $key, mb_substr(Text::line($event['title'], self::TITLE_MAX + 1), 0, self::TITLE_MAX), $this->localDate((string) $event['start']), $actor->id, $now);
+                        $created = true;
+                    } catch (\RuntimeException $e) {
+                        // Gleichzeitig angelegt (eindeutig je Termin): die andere Liste nehmen.
+                        $id = ($repo->findByEvent(self::SOURCE_CALENDAR, $key) ?? throw $e)['id'];
+                    }
                 } else {
                     $id = $list['id'];
                 }

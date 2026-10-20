@@ -147,6 +147,16 @@ final class AttendanceServiceTest extends TestCase
         // Storniert: wieder buchbar.
         $this->call('DELETE', '/points/' . $res->data[0]['id']);
         $this->assertFalse(array_column($this->call('GET', '/attendance/' . $list['id'])->data['people'], 'booked', 'id')[$other]);
+        // Liste gelöscht: Punkte bleiben, ohne Verbindung zur Liste.
+        $this->assertSame(200, $this->call('DELETE', '/attendance/' . $list['id'])->status);
+        $this->assertSame([], $this->app->db->select('SELECT id FROM {points} WHERE attendance_id IS NOT NULL'));
+        $this->assertCount(1, $this->app->db->select('SELECT id FROM {points} WHERE deleted_at IS NULL'), 'die nicht stornierte Buchung bleibt');
+
+        // Übersicht zählt nur, wer heute in den Listen steht (keine Gäste).
+        $list = $this->createForEvent();
+        $this->call('PUT', '/attendance', ['id' => $list['id'], 'entries' => [$this->m => 'present', $other => 'present']]);
+        $this->users->setRole($other, Roles::GUEST);
+        $this->assertSame(1, $this->call('GET', '/attendance')->data[0]['counts']['present']);
     }
 
     public function testGroupsForCounter(): void

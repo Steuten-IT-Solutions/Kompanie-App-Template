@@ -74,6 +74,9 @@ final class AttendanceRepository
         $this->db->transaction(function () use ($id): void {
             $this->db->execute('DELETE FROM {attendance_entries} WHERE list_id = ?', [$id]);
             $this->db->execute('DELETE FROM {attendance_lists} WHERE id = ?', [$id]);
+            // Die Punkte bleiben; ihre Verbindung zur Liste nicht. Sonst erbte eine neue Liste mit derselben ID
+            // (MySQL kann IDs nach einem Neustart wieder vergeben) die Markierung „Punkte gebucht“.
+            $this->db->execute('UPDATE {points} SET attendance_id = NULL WHERE attendance_id = ?', [$id]);
         });
     }
 
@@ -109,20 +112,25 @@ final class AttendanceRepository
     }
 
     /**
-     * Anzahl je Status für mehrere Listen in einer Abfrage.
+     * Anzahl je Status für mehrere Listen in einer Abfrage, nur für die genannten Personen (wer heute in den Listen steht).
      *
      * @param list<int> $listIds
+     * @param array<int, mixed> $people Benutzer-ID => beliebig
      * @return array<int, array<string, int>> Liste => Status => Anzahl
      */
-    public function counts(array $listIds): array
+    public function counts(array $listIds, array $people): array
     {
         if ($listIds === []) {
             return [];
         }
         $marks = implode(', ', array_fill(0, count($listIds), '?'));
         $out = [];
-        foreach ($this->db->select("SELECT list_id, status, COUNT(*) AS n FROM {attendance_entries} WHERE list_id IN ($marks) GROUP BY list_id, status", $listIds) as $r) {
-            $out[(int) $r['list_id']][(string) $r['status']] = (int) $r['n'];
+        foreach ($this->db->select("SELECT list_id, user_id, status FROM {attendance_entries} WHERE list_id IN ($marks)", $listIds) as $r) {
+            if (isset($people[(int) $r['user_id']])) {
+                $l = (int) $r['list_id'];
+                $s = (string) $r['status'];
+                $out[$l][$s] = ($out[$l][$s] ?? 0) + 1;
+            }
         }
         return $out;
     }

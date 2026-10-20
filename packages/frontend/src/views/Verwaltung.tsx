@@ -623,7 +623,7 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
       <p className="muted small">
         {kind === 'punkte'
           ? `Vorschlag: alle Anwesenden, die für „${list.title}“ noch keine ${sec.points} haben.`
-          : `Vorschlag: alle, die bei „${list.title}“ gefehlt haben.`}
+          : `Vorschlag: alle, die bei „${list.title}“ gefehlt haben. Anders als bei ${sec.points} merkt sich die Liste nicht, wer schon einen Eintrag hat.`}
       </p>
       {kind === 'punkte' ? (
         <GivePoints preselect={ids} attendance={list} onToast={onToast} onDone={back} />
@@ -683,7 +683,7 @@ function GivePoints({
     if (!reason.trim()) return setFormError('Bitte einen Grund angeben.');
     setBusy(true);
     try {
-      await api.givePoints({
+      const rows = await api.givePoints({
         user_ids: selected,
         points: n,
         reason: reason.trim(),
@@ -692,7 +692,8 @@ function GivePoints({
         ...(catalogId ? { catalog_id: Number(catalogId) } : {}),
         ...(attendance ? { attendance_id: attendance.id } : {}),
       });
-      onToast(`${formatPoints(n)} ${sec.points} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
+      // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
+      onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
       setSelected([]);
       onDone?.();
     } catch (err) {

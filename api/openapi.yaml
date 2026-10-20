@@ -2196,6 +2196,7 @@ components:
         factor: { type: number, description: Punktefaktor der Rolle beim Buchen }
         reason: { type: string }
         catalog_id: { type: [integer, 'null'] }
+        attendance_id: { type: [integer, 'null'], description: 'Anwesenheitsliste, aus deren Vorschlag gebucht wurde (Issue #21)' }
         date: { type: string, format: date }
         created_by_name: { type: [string, 'null'] }
 
