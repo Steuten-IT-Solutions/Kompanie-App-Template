@@ -51,7 +51,8 @@ const FONT_STACK = {
 const DEFAULTS = {
   greeting: 'Hallo, {name}',
   roles: { guest: 'Gast', candidate: 'Anwärter', member: 'Mitglied', organizer: 'Verwalter', manager: 'Leitung', admin: 'Admin' },
-  sections: { events: 'Termine', news: 'News', gallery: 'Galerie', points: 'Punkte', penalties: 'Strafen' },
+  sections: { events: 'Termine', news: 'News', gallery: 'Galerie', points: 'Punkte', penalties: 'Strafen', ranks: 'Dienstgrade' },
+  rank: 'Dienstgrad',
 };
 
 export class BrandError extends Error {}
@@ -89,6 +90,7 @@ export function loadConfig(file) {
     labels: {
       roles: { ...DEFAULTS.roles, ...(data.labels?.roles ?? {}) },
       sections: { ...DEFAULTS.sections, ...(data.labels?.sections ?? {}) },
+      rank: data.labels?.rank ?? DEFAULTS.rank,
     },
     // Veraltet (Bereiche schaltet der Admin in der App); nur für den Hinweis beim Build.
     legacyFeatures: data.features !== undefined,

@@ -11,7 +11,7 @@ namespace KompanieApp\Core\Config;
 final class KompanieConfig
 {
     private const ROLE_LABELS = ['guest' => 'Gast', 'candidate' => 'Anwärter', 'member' => 'Mitglied', 'organizer' => 'Verwalter', 'manager' => 'Leitung', 'admin' => 'Admin'];
-    private const SECTION_LABELS = ['events' => 'Termine', 'news' => 'News', 'gallery' => 'Galerie', 'points' => 'Punkte', 'penalties' => 'Strafen'];
+    private const SECTION_LABELS = ['events' => 'Termine', 'news' => 'News', 'gallery' => 'Galerie', 'points' => 'Punkte', 'penalties' => 'Strafen', 'ranks' => 'Dienstgrade'];
 
     /** @param array<string, mixed> $data */
     public function __construct(private readonly array $data)
@@ -67,6 +67,13 @@ final class KompanieConfig
         return is_array($labels) && is_string($labels[$section] ?? null) && $labels[$section] !== ''
             ? $labels[$section]
             : (self::SECTION_LABELS[$section] ?? $default ?? $section);
+    }
+
+    /** Ein einzelner Dienstgrad (Einzahl zum Bereich ranks), z. B. „Dienstgrad“ oder „Rang“. */
+    public function rankLabel(): string
+    {
+        $label = $this->data['labels']['rank'] ?? null;
+        return is_string($label) && trim($label) !== '' ? $label : 'Dienstgrad';
     }
 
     public function primaryColor(): string

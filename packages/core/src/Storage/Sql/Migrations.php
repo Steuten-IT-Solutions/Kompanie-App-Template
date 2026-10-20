@@ -256,6 +256,71 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {push_queue}_subscription_id ON {push_queue} (subscription_id)',
                 ],
             ],
+            // Dienstgrade (Issue #9): Liste mit Reihenfolge und optionaler Punkteschwelle, zugewiesener Dienstgrad je
+            // Mitglied (der Kern hat keine Benutzer-Optionen) und Verlauf mit den Titeln als Momentaufnahme.
+            5 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {ranks} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(60) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  min_points int(11) DEFAULT NULL,
+  active tinyint(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {member_ranks} (
+  user_id bigint(20) unsigned NOT NULL,
+  rank_id bigint(20) unsigned NOT NULL,
+  assigned_at datetime NOT NULL,
+  PRIMARY KEY (user_id),
+  KEY rank_id (rank_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {rank_history} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  from_rank_id bigint(20) unsigned DEFAULT NULL,
+  to_rank_id bigint(20) unsigned DEFAULT NULL,
+  from_title varchar(60) NOT NULL DEFAULT \'\',
+  to_title varchar(60) NOT NULL DEFAULT \'\',
+  kind varchar(12) NOT NULL,
+  points_at_change decimal(10,2) DEFAULT NULL,
+  reason varchar(255) NOT NULL DEFAULT \'\',
+  changed_by bigint(20) unsigned NOT NULL,
+  changed_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY user_id (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {ranks} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  min_points INTEGER DEFAULT NULL,
+  active INTEGER NOT NULL DEFAULT 1
+)',
+                    'CREATE TABLE IF NOT EXISTS {member_ranks} (
+  user_id INTEGER PRIMARY KEY,
+  rank_id INTEGER NOT NULL,
+  assigned_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {member_ranks}_rank_id ON {member_ranks} (rank_id)',
+                    'CREATE TABLE IF NOT EXISTS {rank_history} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  from_rank_id INTEGER DEFAULT NULL,
+  to_rank_id INTEGER DEFAULT NULL,
+  from_title TEXT NOT NULL DEFAULT \'\',
+  to_title TEXT NOT NULL DEFAULT \'\',
+  kind TEXT NOT NULL,
+  points_at_change REAL DEFAULT NULL,
+  reason TEXT NOT NULL DEFAULT \'\',
+  changed_by INTEGER NOT NULL,
+  changed_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {rank_history}_user_id ON {rank_history} (user_id)',
+                ],
+            ],
         ];
     }
 

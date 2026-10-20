@@ -122,6 +122,12 @@ final class Api
         ];
     }
 
+    /** Dienstgrade in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    private function showRanks(): bool
+    {
+        return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
+    }
+
     private function authorize(Route $route): void
     {
         if ($route->access === Route::PUBLIC) {
@@ -202,9 +208,10 @@ final class Api
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
+        $denyRanks = 'Dafür fehlen dir die Rechte.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
-        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::CreateUsers, Cap::PromoteUsers];
+        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::CreateUsers, Cap::PromoteUsers];
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [
@@ -225,7 +232,11 @@ final class Api
             }),
 
             // Eigene Daten
-            new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())),
+            new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
+                + ($a->features()->enabled('ranks') && $this->user()->isMember() ? ['rank' => $a->ranks()->status($this->user()->id)['rank']] : [])),
+            // Dienstgrade (Issue #9): eigener Stand und Verlauf, die Liste mit Schwellen (mit Punkten)
+            new Route('GET', '/me/rank', Cap::Member, fn () => $a->ranks()->status($this->user()->id)
+                + ['ranks' => $a->ranks()->list(false), 'history' => $a->ranks()->history($this->user()->id)], 'ranks', $denyMember),
             new Route('GET', '/me/points', Cap::Member, fn () => $a->scores()->pointsFor($this->user()->id), 'points', $denyMember),
             new Route('GET', '/me/penalties', Cap::Member, fn () => $a->scores()->penaltiesFor($this->user()->id), 'penalties', $denyMember),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
@@ -293,13 +304,47 @@ final class Api
             new Route('POST', '/catalog', Cap::ManagePoints, fn (Request $r) => Response::created($a->scores()->createCatalogItem($r->body)), 'points', $denyManage),
             new Route('PATCH', '/catalog/{id}', Cap::ManagePoints, fn (Request $r) => $a->scores()->updateCatalogItem($r->id(), $r->body), 'points', $denyManage),
 
+            // Dienstgrade: Liste für Mitglieder, Pflege, Befördern und Degradieren, Beförderungsübersicht
+            new Route('GET', '/ranks', Cap::Member, fn (Request $r) => $a->ranks()->list($r->queryFlag('all') && $this->can(Cap::ManageRanks)), 'ranks', $denyMember),
+            new Route('POST', '/ranks', Cap::ManageRanks, fn (Request $r) => Response::created($a->ranks()->create($r->body)), 'ranks', $denyRanks),
+            new Route('PUT', '/ranks/order', Cap::ManageRanks, fn (Request $r) => $a->ranks()->reorder($r->input('ids')), 'ranks', $denyRanks),
+            new Route('PATCH', '/ranks/{id}', Cap::ManageRanks, fn (Request $r) => $a->ranks()->update($r->id(), $r->body), 'ranks', $denyRanks),
+            new Route('DELETE', '/ranks/{id}', Cap::ManageRanks, function (Request $r) use ($a) {
+                $a->ranks()->delete($r->id());
+                return ['deleted' => true];
+            }, 'ranks', $denyRanks),
+            new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason')), 'ranks', $denyRanks),
+            new Route('GET', '/promotions', Cap::ManageRanks, fn () => $a->ranks()->promotions(), 'ranks', $denyRanks),
+
             // Mitglieder
-            new Route('GET', '/members', $manage, fn (Request $r) => $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates')), null, $denyManage),
-            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user()), null, $denyManage),
+            new Route('GET', '/members', $manage, function (Request $r) use ($a) {
+                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'));
+                if (!$this->showRanks()) {
+                    return $list;
+                }
+                $titles = $a->ranks()->titles();
+                return array_map(static fn (array $m): array => $m + ['rank_title' => $titles[$m['id']] ?? null], $list);
+            }, null, $denyManage),
+            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
+                + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : []), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
-            new Route('POST', '/users', Cap::CreateUsers, fn (Request $r) => Response::created($a->members()->create($r->body)), null, $denyUsers),
+            new Route('POST', '/users', Cap::CreateUsers, function (Request $r) use ($a) {
+                // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.
+                $initial = $a->ranks()->prepareInitial($this->user(), $r->body);
+                if (($initial['points'] > 0 || $initial['rank'] !== null) && ($r->input('level') ?? 'member') !== 'member') {
+                    throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
+                }
+                $created = $a->members()->create($r->body);
+                try {
+                    $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
+                } catch (\Throwable $e) {
+                    error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
+                    $created['warning'] = 'Das Konto ist angelegt, aber Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.';
+                }
+                return Response::created($created);
+            }, null, $denyUsers),
 
             // Einstellungen (Admins)
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),

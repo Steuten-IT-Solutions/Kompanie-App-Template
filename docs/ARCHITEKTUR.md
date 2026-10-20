@@ -170,6 +170,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Sonst ruft er die eigene Cron-Adresse auf, **ohne auf die Antwort zu warten**: Verbindung aufbauen (Zeitgrenze 250 ms, bei https auch für TLS), Anfrage schreiben, schließen. Nur an die fest eingetragene Adresse, der Schlüssel geht im Header. Die Cron-Adresse schickt ihr „OK“ mit `Content-Length` und `Connection: close`, bevor sie arbeitet.
 - Höchstens ein Versuch pro Minute. Kommt ein Selbstaufruf nicht an (keine Verbindung, oder er vermerkt sich nicht innerhalb einer Minute in `cron_runs`), zählt das als Fehlschlag (`cron_spawn`); danach wird es seltener versucht (1, 2, 4 … bis 60 Minuten). Ab drei Fehlschlägen in Folge zeigt die Statusseite Rot und empfiehlt einen Cronjob mit der Cron-Adresse. Läuft ein Cronjob beim Hoster (Cron-Adresse oder `bin/kompanie.php cron`), zeigt sie Grün.
 
+### Dienstgrade (Issue #9)
+
+- Bereich `ranks`, unabhängig von Punkten und Strafen; arbeitet mit Punkten zusammen, wenn beide an sind (`Features::ranksUsePoints()`, die einzige Stelle für die Kopplung).
+- Tabellen `ranks` (`title`, `sort`, `min_points` nullable, `active`), `member_ranks` (zugewiesener Dienstgrad je Benutzer; der Kern hat keine Benutzer-Optionen) und `rank_history` (Titel als Momentaufnahme, `kind`, `points_at_change`). Felder wie in Lank (`wp_mkl_ranks`, `wp_mkl_rank_history`, Meta `mkl_rank_id`), damit die Lanker Daten übernommen werden können.
+- Eine Reihenfolge (`sort`, der niedrigste zuerst). Der Dienstgrad ändert sich nie von selbst; Schwellen ändern nur die Hinweise.
+- **Ohne Punkte:** frei befördern und degradieren. **Mit Punkten** (Lank #16, für alle, auch Admins): befördern erst ab der Schwelle des Ziels, degradieren nur unter der Schwelle des aktuellen; Dienstgrade ohne Schwelle frei. Gesetzte Schwellen aktiver Dienstgrade müssen mit `sort` streng steigen. Nächster Dienstgrad, fehlende Punkte, erreichbarer Dienstgrad und „Schwelle erreicht seit“ werden berechnet (Beförderungsübersicht in einem Durchlauf über alle Buchungen).
+- Anlegen eines Mitglieds mit Anfangspunkten (`manage_points`) und Dienstgrad (`manage_ranks`): alles wird vor dem Anlegen des Kontos geprüft.
+
 ### Rechte und Rollen
 
 | Recht | Bedeutung |
@@ -178,6 +186,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `calendar` | interner Kalender (allein z. B. für Anwärter) |
 | `manage_points` | Punkte vergeben und stornieren, Katalog pflegen |
 | `manage_penalties` | Strafen vergeben, als bezahlt markieren, stornieren |
+| `manage_ranks` | Dienstgradliste pflegen, befördern und degradieren |
 | `manage_events` | öffentliche Termine pflegen |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit (die Dokumente selbst kommen mit #2) |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen |
@@ -202,6 +211,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Termine | Termine verwalten | `member`, `manage_events` |
   | Punkte | Punkte verwalten | `member`, `manage_points` |
   | Strafen | Strafen verwalten | `member`, `manage_penalties` |
+  | Dienstgrade | Dienstgrade verwalten | `member`, `manage_ranks` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.

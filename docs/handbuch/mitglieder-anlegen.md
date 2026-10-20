@@ -8,7 +8,7 @@ Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), fi
 ## Neues Mitglied
 1. **Verwaltung → Mitglieder → + Mitglied anlegen** öffnen.
 2. Den Namen eintragen. **Benutzername** und **E-Mail** sind freiwillig; ohne Benutzernamen bildet die App ihn aus dem Namen.
-3. Bei **Rolle** {rolle.member} oder {rolle.candidate} wählen.
+3. Bei **Rolle** {rolle.member} oder {rolle.candidate} wählen. Wer auch {bereich.points} bzw. {bereich.ranks} verwalten darf, kann für Mitglieder gleich den Anfangsbestand an {bereich.points} (mit Datum) und den {begriff.rank} eintragen – gedacht für die Übernahme bestehender Mitglieder.
 4. Nach dem Anlegen zeigt die App Benutzername und Startpasswort. Das Startpasswort steht **nur dieses eine Mal** da: notieren oder mit **Zugangsdaten kopieren** übernehmen und persönlich weitergeben.
 
 Andere Rollen vergibt danach, wer Rollen vergeben darf.

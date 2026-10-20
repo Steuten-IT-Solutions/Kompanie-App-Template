@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Push;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\RankService;
 
 /**
  * Wann eine Benachrichtigung entsteht (Issue #19):
@@ -33,6 +34,15 @@ final class PushTriggers
             $body = ($value > 0 ? '+' : '−') . self::number(abs($value)) . ' – ' . (string) $r['reason'];
             $this->push->notifyUser((int) $r['user_id'], PushService::TYPE_POINTS, PushService::message($title, $body, 'meins/punkte', 'punkte-' . $r['id']));
         }
+    }
+
+    /** @param array{to_title: string, kind: string} $entry Verlaufseintrag (RankService::change) */
+    public function rankChanged(int $userId, array $entry): void
+    {
+        $label = $this->app->config->rankLabel();
+        $title = $entry['kind'] === RankService::KIND_PROMOTION ? 'Beförderung' : $label . ' geändert';
+        $body = $entry['to_title'] !== '' ? sprintf('Dein %s: %s', $label, $entry['to_title']) : sprintf('Du hast keinen %s mehr.', $label);
+        $this->push->notifyUser($userId, PushService::TYPE_RANKS, PushService::message($title, $body, 'meins/dienstgrad', 'dienstgrad'));
     }
 
     /** @param array<int, array<string, mixed>> $rows Strafen (ScoreService::givePenalty) */

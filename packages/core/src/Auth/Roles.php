@@ -59,6 +59,7 @@ final class Roles
         Capability::Calendar,
         Capability::ManagePoints,
         Capability::ManagePenalties,
+        Capability::ManageRanks,
         Capability::ManageEvents,
         Capability::ManageDocuments,
         Capability::CreateUsers,

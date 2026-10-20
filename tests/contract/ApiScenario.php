@@ -28,6 +28,7 @@ final class ApiScenario
             $this->roles();
             $this->customRoles();
             $this->candidates();
+            $this->ranks();
             $this->events();
             $this->push();
             $this->config();
@@ -76,7 +77,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -467,6 +468,54 @@ final class ApiScenario
         $nur = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Nur Kalender'] ?? '');
         if ($nur !== '') {
             $this->req('DELETE', '/admin/roles/' . $nur, [], ['replacement' => 'member']);
+        }
+    }
+
+    /** Dienstgrade (Issue #9) mit Punkten: Schwellen gelten für alle, Übersicht, eigener Stand. */
+    private function ranks(): void
+    {
+        $c = $this->c;
+        $c->section('Dienstgrade');
+        $admin = $this->user('kptest_rang_admin', 'admin');
+        $m = $this->user('kptest_rang_m', 'member');
+        $guest = $this->user('kptest_rang_gast', 'guest');
+        $this->d->actAs($admin);
+        // Wiederholte Läufe auf derselben Installation: frühere Testeinträge deaktivieren (vergebene lassen sich nicht löschen).
+        foreach ((array) $this->req('GET', '/ranks', [], ['all' => '1'])[1] as $r) {
+            if (str_starts_with((string) ($r['title'] ?? ''), 'Kptest') && ($r['active'] ?? false)) {
+                $this->req('PATCH', '/ranks/' . $r['id'], ['active' => false]);
+            }
+        }
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [$s, $a] = $this->req('POST', '/ranks', ['title' => "Kptest Gefreiter $sfx", 'min_points' => 10]);
+        [, $b] = $this->req('POST', '/ranks', ['title' => "Kptest Unteroffizier $sfx", 'min_points' => 30]);
+        $c->ok($s === 201 && ($a['min_points'] ?? null) === 10, 'Dienstgrad mit Schwelle anlegen');
+        $c->ok($this->req('POST', '/ranks', ['title' => "Kptest Falsch $sfx", 'min_points' => 20])[0] === 400, 'Schwelle unter dem vorigen Dienstgrad → 400');
+
+        $this->d->actAs($guest);
+        $c->ok($this->req('GET', '/ranks')[0] === 403, 'Gast: GET /ranks → 403');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/ranks')[0] === 200, 'Mitglied: GET /ranks');
+        $c->ok($this->req('PUT', "/members/$m/rank", ['rank_id' => $a['id'] ?? 0])[0] === 403, 'Mitglied befördert nicht → 403');
+        $this->d->actAs($this->spiess);
+        $c->ok($this->req('GET', '/promotions')[0] === 403, 'Ohne „Dienstgrade verwalten“: keine Übersicht → 403');
+
+        $this->d->actAs($admin);
+        $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 5, 'reason' => 'Kptest Rang']);
+        $c->ok($this->req('PUT', "/members/$m/rank", ['rank_id' => $a['id'] ?? 0])[0] === 400, 'Befördern unter der Schwelle → 400, auch als Admin');
+        $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 10, 'reason' => 'Kptest Rang']);
+        [$s, $d] = $this->req('PUT', "/members/$m/rank", ['rank_id' => $a['id'] ?? 0, 'reason' => 'Kptest']);
+        $c->ok($s === 200 && ($d['rank']['id'] ?? 0) === ($a['id'] ?? -1) && ($d['points_to_next'] ?? null) === 15, 'Befördert; noch 15 Punkte bis zum nächsten');
+        $c->ok($this->req('PUT', "/members/$m/rank", ['rank_id' => null])[0] === 400, 'Degradieren über der Schwelle → 400');
+        $rows = array_column((array) $this->req('GET', '/promotions')[1], null, 'user_id');
+        $c->ok(isset($rows[$m]) && !isset($rows[$guest]) && $rows[$m]['points_to_next'] === 15, 'Beförderungsübersicht ohne Gäste');
+        $this->d->actAs($m);
+        [, $me] = $this->req('GET', '/me/rank');
+        $c->ok(($me['rank']['id'] ?? 0) === ($a['id'] ?? -1) && ($me['next_rank']['id'] ?? 0) === ($b['id'] ?? -1) && count((array) ($me['history'] ?? [])) === 1, 'Eigener Dienstgrad, nächster und Verlauf');
+
+        $this->d->actAs($admin);
+        foreach ([$a, $b] as $r) {
+            $this->req('PATCH', '/ranks/' . ($r['id'] ?? 0), ['active' => false]);
         }
     }
 

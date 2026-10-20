@@ -185,12 +185,13 @@ export default function App() {
     termine: !!(features?.events || (features?.calendar && can('calendar'))),
     news: !!features?.news,
     galerie: !!features?.gallery,
-    meins: isMember() && !!(features?.points || features?.penalties),
+    meins: isMember() && !!(features?.points || features?.penalties || features?.ranks),
     // Die Verwaltung beginnt mit der Mitgliederliste: für alle, die Punkte oder Strafen vergeben,
     // Mitglieder anlegen oder Rollen vergeben (auch wenn Punkte und Strafen aus sind).
     verwaltung:
       (!!features?.points && can('manage_points')) ||
       (!!features?.penalties && can('manage_penalties')) ||
+      (!!features?.ranks && can('manage_ranks')) ||
       can('create_users') ||
       can('promote_users'),
     konto: !!user,

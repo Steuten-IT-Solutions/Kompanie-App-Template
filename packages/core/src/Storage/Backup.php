@@ -35,7 +35,7 @@ final class Backup
         'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history'];
 
     public function __construct(private readonly Connection $db)
     {
@@ -63,10 +63,11 @@ final class Backup
     public function restore(array $tables, array $allowed): void
     {
         $this->db->transaction(function () use ($tables, $allowed): void {
+            // Auch Tabellen leeren, die eine ältere Sicherung noch nicht kannte (z. B. Dienstgrade): Zurückspielen ersetzt
+            // alle Daten durch den Stand der Sicherung. In der eigenständigen Version gehörten die Zeilen sonst womöglich
+            // anderen Personen (gleiche IDs, andere Konten).
             foreach (array_reverse($allowed) as $t) {
-                if (array_key_exists($t, $tables)) {
-                    $this->db->execute('DELETE FROM {' . $t . '}');
-                }
+                $this->db->execute('DELETE FROM {' . $t . '}');
             }
             foreach ($allowed as $t) {
                 if (!isset($tables[$t]) || !is_array($tables[$t])) {

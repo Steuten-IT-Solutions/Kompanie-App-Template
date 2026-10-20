@@ -136,8 +136,23 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "ranks": {
+              "type": "string",
+              "default": "Dienstgrade",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
+        },
+        "rank": {
+          "description": "Ein einzelner Dienstgrad (Einzahl zu labels.sections.ranks), z. B. „Dienstgrad“ oder „Rang“.",
+          "type": "string",
+          "default": "Dienstgrad",
+          "minLength": 1,
+          "maxLength": 30,
+          "pattern": "\\S"
         }
       }
     },
