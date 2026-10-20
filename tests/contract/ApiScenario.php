@@ -35,6 +35,7 @@ final class ApiScenario
             $this->board();
             $this->polls();
             $this->birthdays();
+            $this->inventory();
             $this->accounts();
             $this->events();
             $this->push();
@@ -84,7 +85,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -851,6 +852,72 @@ final class ApiScenario
     }
 
     /** Konten verwalten (Issue #24): mehrere anlegen, Angaben ändern, aus der App entfernen mit allen eigenen Daten. */
+    /**
+     * Inventar (Issue #6): nur mit manage_inventory (Standardrolle und Admin), Prüfung, Orte ohne Unterschied in Groß- und
+     * Kleinschreibung, Umlagern (Teil, Zusammenführen, alles, zu viel ohne Teiländerung), genau ein Verlaufseintrag je
+     * Änderung und betroffenem Eintrag, Verlauf nach dem Löschen lesbar, Bereich aus → 403.
+     */
+    private function inventory(): void
+    {
+        $c = $this->c;
+        $c->section('Inventar');
+        $admin = $this->user('kptest_inv_admin', 'admin');
+        $keeper = $this->user('kptest_inv_wart', 'inventory');
+        $m = $this->user('kptest_inv_m', 'member');
+        $guest = $this->user('kptest_inv_gast', 'guest');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/inventory')[0] === 401, 'GET /inventory ohne Anmeldung → 401');
+        foreach ([$m => 'Mitglied', $guest => 'Gast-Konto'] as $who => $label) {
+            $this->d->actAs($who);
+            $c->ok($this->req('GET', '/inventory')[0] === 403 && $this->req('POST', '/inventory', ['title' => 'x', 'location' => 'y'])[0] === 403 && $this->req('GET', '/inventory/log')[0] === 403, "$label: Inventar → 403");
+        }
+        $this->d->actAs($keeper);
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        $c->ok($this->req('POST', '/inventory', ['quantity' => 1, 'location' => "Kptest Lager $sfx"])[0] === 400, 'Ohne Bezeichnung → 400');
+        $c->ok($this->req('POST', '/inventory', ['title' => "Kptest Bank $sfx", 'quantity' => 1])[0] === 400, 'Ohne Ort → 400');
+        $c->ok($this->req('POST', '/inventory', ['title' => "Kptest Bank $sfx", 'quantity' => -1, 'location' => "Kptest Lager $sfx"])[0] === 400, 'Negative Menge → 400');
+        [$s, $item] = $this->req('POST', '/inventory', ['title' => "Kptest Bank $sfx", 'quantity' => '10', 'unit' => 'Stück', 'location' => "Kptest Lager $sfx", 'reason' => 'Inventur']);
+        $id = (int) ($item['id'] ?? 0);
+        $c->ok($s === 201 && ($item['quantity'] ?? null) === 10 && ($item['created_by_name'] ?? '') === 'Kptest_inv_wart', 'Standardrolle legt einen Eintrag an');
+        [$s, $d] = $this->req('POST', '/inventory', ['title' => "Kptest Seil $sfx", 'quantity' => '2,5', 'unit' => 'm', 'location' => "kptest lager $sfx"]);
+        $rope = (int) ($d['id'] ?? 0);
+        $c->ok($s === 201 && ($d['quantity'] ?? null) === 2.5 && ($d['location'] ?? '') === "Kptest Lager $sfx", 'Dezimalzahl; Ort in der bekannten Schreibweise');
+        $c->ok(in_array("Kptest Lager $sfx", (array) $this->req('GET', '/inventory/locations')[1], true), 'Ort unter den Vorschlägen');
+
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PATCH', "/inventory/$id", ['quantity' => 12, 'reason' => 'Nachgezählt']);
+        $c->ok($s === 200 && ($d['quantity'] ?? null) === 12, 'Admin ändert die Menge');
+        $c->ok(($this->req('PATCH', "/inventory/$id", ['adjust' => -1])[1]['quantity'] ?? null) === 11, 'Minus-Knopf (adjust)');
+        $c->ok($this->req('PATCH', "/inventory/$id", ['adjust' => -100])[0] === 400, 'Unter 0 → 400');
+        $c->ok($this->req('POST', "/inventory/$id/move", ['quantity' => 12, 'location' => "Kptest Halle $sfx"])[0] === 400, 'Mehr umlagern als vorhanden → 400');
+        $c->ok(count((array) $this->req('GET', "/inventory/$id/log")[1]) === 3 && ($this->req('GET', '/inventory')[0] === 200), 'Zu viel: keine Teiländerung, kein Verlauf');
+        [$s, $d] = $this->req('POST', "/inventory/$id/move", ['quantity' => 4, 'location' => "Kptest Halle $sfx", 'reason' => 'Fest']);
+        $target = (int) ($d['target']['id'] ?? 0);
+        $c->ok($s === 200 && ($d['source']['quantity'] ?? null) === 7 && ($d['target']['quantity'] ?? null) === 4 && $target !== $id, 'Teilmenge umlagern → neuer Eintrag am Zielort');
+        [$s, $d] = $this->req('POST', "/inventory/$id/move", ['quantity' => 7, 'location' => "KPTEST HALLE $sfx"]);
+        $c->ok($s === 200 && is_array($d) && array_key_exists('source', $d) && $d['source'] === null && ($d['target']['id'] ?? 0) === $target && ($d['target']['quantity'] ?? null) === 11, 'Alles umlagern, gleiche Bezeichnung und Einheit → zusammengeführt, Quelle weg');
+        [, $log] = $this->req('GET', "/inventory/$id/log");
+        $actions = array_column((array) $log, 'action');
+        $c->ok($actions === ['move', 'move', 'update', 'update', 'create'], 'Verlauf der Quelle: genau ein Eintrag je Änderung, auch nach dem Wegfallen');
+        $c->ok(($log[0]['changes']['move']['source_removed'] ?? null) === true && ($log[0]['user_name'] ?? '') === 'Kptest_inv_admin' && ($log[4]['user_name'] ?? '') === 'Kptest_inv_wart' && ($log[3]['reason'] ?? '') === 'Nachgezählt', 'Verlauf mit Namen, Grund und Umlagern');
+        $c->ok(array_column((array) $this->req('GET', "/inventory/$target/log")[1], 'action') === ['move', 'move'], 'Verlauf des Ziels: je Umlagern ein Eintrag');
+        [, $all] = $this->req('GET', '/inventory/log', [], ['limit' => '500']);
+        $c->ok(count(array_filter((array) $all, static fn (mixed $e): bool => is_array($e) && in_array($e['item_id'] ?? 0, [$id, $target, $rope], true))) === 8, 'Gesamtverlauf');
+        [$s, $d] = $this->req('POST', "/inventory/$rope/move", ['quantity' => '2,5', 'location' => "Kptest Halle $sfx"]);
+        $c->ok($s === 200 && ($d['target']['id'] ?? 0) === $rope && ($d['target']['location'] ?? '') === "Kptest Halle $sfx", 'Alles ohne passendes Ziel (andere Einheit): nur der Ort ändert sich');
+
+        $this->req('PUT', '/admin/features', ['inventory' => false]);
+        [$s, $d] = $this->req('GET', '/inventory');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['inventory' => true]);
+        $ok = true;
+        foreach ([$target, $rope] as $del) {
+            $ok = $this->req('DELETE', "/inventory/$del", ['reason' => 'Kptest aufräumen'])[0] === 200 && $ok;
+        }
+        $c->ok($ok && $this->req('DELETE', "/inventory/$target")[0] === 404, 'Einträge löschen');
+        $c->ok((array_column((array) $this->req('GET', "/inventory/$target/log")[1], 'action')[0] ?? '') === 'delete', 'Verlauf nach dem Löschen lesbar');
+    }
+
     private function accounts(): void
     {
         $c = $this->c;

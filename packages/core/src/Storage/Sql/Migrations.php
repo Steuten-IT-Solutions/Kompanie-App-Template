@@ -631,6 +631,76 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {birthdays}_month_day ON {birthdays} (month, day)',
                 ],
             ],
+            // Inventar (Issue #6): ein Ort je Eintrag (gleiches Material an zwei Orten = zwei Einträge). quantity mit drei
+            // Nachkommastellen; optionale Texte leer statt NULL. Gelöschte Einträge bleiben mit deleted_at stehen, damit der
+            // Verlauf lesbar bleibt. inventory_log: genau ein Eintrag je Änderung und betroffenem Eintrag; changes als JSON
+            // (Feld => {old, new}, beim Umlagern zusätzlich move), title, unit und location als Momentaufnahme.
+            13 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {inventory_items} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(100) NOT NULL,
+  category varchar(100) NOT NULL DEFAULT \'\',
+  quantity decimal(15,3) NOT NULL DEFAULT 0,
+  unit varchar(20) NOT NULL DEFAULT \'\',
+  location varchar(100) NOT NULL,
+  note text NOT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  deleted_at datetime DEFAULT NULL,
+  deleted_by bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY deleted_at (deleted_at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {inventory_log} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  item_id bigint(20) unsigned NOT NULL,
+  action varchar(10) NOT NULL,
+  changes text NOT NULL,
+  reason varchar(255) NOT NULL DEFAULT \'\',
+  title varchar(100) NOT NULL,
+  unit varchar(20) NOT NULL DEFAULT \'\',
+  location varchar(100) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY item_id (item_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {inventory_items} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT \'\',
+  quantity NUMERIC NOT NULL DEFAULT 0,
+  unit TEXT NOT NULL DEFAULT \'\',
+  location TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT \'\',
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT DEFAULT NULL,
+  deleted_by INTEGER DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {inventory_items}_deleted_at ON {inventory_items} (deleted_at)',
+                    'CREATE TABLE IF NOT EXISTS {inventory_log} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  changes TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT \'\',
+  title TEXT NOT NULL,
+  unit TEXT NOT NULL DEFAULT \'\',
+  location TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {inventory_log}_item_id ON {inventory_log} (item_id)',
+                ],
+            ],
         ];
     }
 

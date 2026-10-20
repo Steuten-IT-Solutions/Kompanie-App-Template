@@ -185,6 +185,13 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "inventory": {
+              "type": "string",
+              "default": "Inventar",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },

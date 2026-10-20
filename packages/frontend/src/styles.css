@@ -2359,3 +2359,155 @@ fieldset.feature-list legend {
   margin: 0 0 12px;
   min-width: 0;
 }
+
+/* Inventar (Issue #6): nach Material gruppiert, aufklappbar zu den Einträgen je Ort; Verlauf */
+.inventory-group {
+  overflow: hidden;
+}
+.inventory-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.inventory-group-arrow {
+  flex: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--accent-dark);
+  transition: transform 0.15s ease;
+}
+.inventory-group-head[aria-expanded='true'] .inventory-group-arrow {
+  transform: rotate(90deg);
+}
+.inventory-group-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.inventory-group-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.inventory-group-places {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.inventory-sum {
+  flex: none;
+  max-width: 45%;
+  text-align: right;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.inventory-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 4px;
+  border-top: 1px solid var(--line);
+}
+.inventory-entry {
+  padding: 12px 0;
+}
+.inventory-entry + .inventory-entry {
+  border-top: 1px solid var(--line);
+}
+.inventory-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.inventory-entry-main {
+  flex: 1;
+  min-width: 0;
+}
+.inventory-location {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.inventory-entry-meta {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.inventory-qty {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inventory-qty .btn-small {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 1.1rem;
+}
+.inventory-qty-value {
+  min-width: 4.5em;
+  text-align: center;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.inventory-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+@media (min-width: 560px) {
+  .inventory-actions {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.inventory-form {
+  margin: 12px 0 4px;
+}
+.inventory-history-title {
+  margin: 4px 0 14px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+.inventory-log-entry {
+  padding: 12px 14px;
+}
+.inventory-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.inventory-log-head .badge {
+  margin-left: 0;
+}
+.inventory-log-item {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.inventory-log-line {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+.inventory-log-reason {
+  margin-top: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inventory-group-arrow {
+    transition: none;
+  }
+}
+@media (min-width: 900px) {
+  .inventory-page,
+  .inventory-history {
+    max-width: 760px;
+  }
+}

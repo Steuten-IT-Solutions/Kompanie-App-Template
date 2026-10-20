@@ -75,6 +75,16 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         </div>
       )}
 
+      {!!config?.features.inventory && can('manage_inventory') && (
+        <div className="card account-card">
+          <h3>{brand.labels.sections.inventory}</h3>
+          <p className="muted small">Was die Kompanie besitzt, wie viel und wo: pflegen, umlagern und den Verlauf ansehen.</p>
+          <button className="btn btn-secondary btn-block inventory-konto" onClick={() => navigate('inventar')}>
+            {brand.labels.sections.inventory} öffnen
+          </button>
+        </div>
+      )}
+
       <div className="card account-card">
         <h3>Benachrichtigungen</h3>
         <p className="muted small">Auf diesem Gerät benachrichtigt werden, wenn es Neues für dich gibt.</p>

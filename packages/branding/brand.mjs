@@ -64,6 +64,7 @@ const DEFAULTS = {
     board: 'Schwarzes Brett',
     polls: 'Umfragen',
     birthdays: 'Geburtstage',
+    inventory: 'Inventar',
   },
   rank: 'Dienstgrad',
 };

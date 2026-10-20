@@ -1436,6 +1436,91 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await member.close();
 });
 
+test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle Schritte mit Namen', async ({ page }) => {
+  const title = `Bierbank ${Date.now().toString(36)}`;
+  page.on('dialog', (d) => d.accept());
+  // Mitglieder ohne das Recht sehen das Inventar nicht.
+  await login(page, 'mitglied1');
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await expect(page.locator('.inventory-konto')).toHaveCount(0);
+  await page.goto('/app/#/inventar');
+  await expect(page.locator('.topbar-title')).not.toHaveText('Inventar');
+
+  // Admin (hat manage_inventory) öffnet es über „Mein Konto“.
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await page.getByRole('button', { name: 'Inventar öffnen' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Inventar');
+  await page.getByRole('button', { name: '+ Eintrag anlegen' }).click();
+  const form = page.locator('.inventory-form');
+  await form.getByLabel('Bezeichnung').fill(title);
+  await form.getByLabel('Menge').fill('10');
+  await form.getByLabel('Einheit').fill('Stück');
+  await form.getByLabel('Ort').fill('Lager');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Eintrag angelegt');
+  const group = page.locator('.inventory-group', { hasText: title });
+  await expect(group.locator('.inventory-sum')).toHaveText('10 Stück');
+
+  // Umlagern: 4 in die Halle → zwei Einträge, die Summe bleibt.
+  const lager = group.locator('.inventory-entry[data-location="Lager"]');
+  await lager.getByRole('button', { name: 'Umlagern' }).click();
+  const move = lager.locator('.inventory-move');
+  await move.getByLabel('Menge').fill('4');
+  await move.getByLabel('Zielort').fill('Halle');
+  await move.getByLabel(/Grund/).fill('Sommerfest');
+  await move.getByRole('button', { name: 'Umlagern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Umgelagert');
+  await expect(group.locator('.inventory-group-places')).toHaveText('an 2 Orten');
+  await expect(group.locator('.inventory-sum')).toHaveText('10 Stück');
+  await expect(group.locator('.inventory-entry[data-location="Halle"] .inventory-qty-value')).toHaveText('4 Stück');
+  await expect(lager.locator('.inventory-qty-value')).toHaveText('6 Stück');
+
+  // Menge mit Grund ändern; −/+ ändern um eins.
+  await lager.getByRole('button', { name: 'Bearbeiten' }).click();
+  const edit = lager.locator('.inventory-form');
+  await edit.getByLabel('Menge').fill('5');
+  await edit.getByLabel(/Grund/).fill('Inventur');
+  await edit.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Eintrag gespeichert');
+  await expect(group.locator('.inventory-sum')).toHaveText('9 Stück');
+  await group
+    .locator('.inventory-entry[data-location="Halle"]')
+    .getByRole('button', { name: /eins mehr/ })
+    .click();
+  await expect(group.locator('.inventory-sum')).toHaveText('10 Stück');
+  await shot(page, '37-inventar');
+
+  // Verlauf des Eintrags im Lager: angelegt, umgelagert, geändert – mit Namen und Gründen.
+  await lager.getByRole('button', { name: 'Verlauf' }).click();
+  await expect(page).toHaveURL(/#\/inventar\/verlauf\/\d+$/);
+  const log = page.locator('.inventory-log-entry');
+  await expect(log).toHaveCount(3);
+  await expect(log.nth(0)).toContainText('Menge: 6 Stück → 5 Stück');
+  await expect(log.nth(0)).toContainText('Grund: Inventur');
+  await expect(log.nth(1)).toContainText('Umgelagert: 4 Stück von Lager nach Halle');
+  await expect(log.nth(1)).toContainText('Grund: Sommerfest');
+  await expect(log.nth(2)).toContainText('Angelegt mit 10 Stück in Lager');
+  for (let i = 0; i < 3; i++) await expect(log.nth(i).locator('.inventory-log-user')).toHaveText(/admin/i);
+
+  // Gesamter Verlauf: auch der neue Eintrag in der Halle (Umlagern und +1).
+  await page.getByRole('button', { name: /Zurück zum Inventar/ }).click();
+  await page.getByRole('button', { name: 'Gesamter Verlauf' }).click();
+  const all = page.locator('.inventory-log-entry', { hasText: title });
+  await expect(all).toHaveCount(5);
+  await expect(all.filter({ hasText: 'Halle' }).first()).toContainText('Menge: 4 Stück → 5 Stück');
+
+  // Aufräumen
+  await page.getByRole('button', { name: /Zurück zum Inventar/ }).click();
+  await group.locator('.inventory-group-head').click();
+  for (const place of ['Halle', 'Lager']) {
+    await group.locator(`.inventory-entry[data-location="${place}"]`).getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Eintrag gelöscht');
+    await expect(group.locator(`.inventory-entry[data-location="${place}"]`)).toHaveCount(0);
+  }
+  await expect(page.locator('.inventory-group', { hasText: title })).toHaveCount(0);
+});
+
 test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wartungsseite, danach wieder normal', async ({
   page,
   browser,
