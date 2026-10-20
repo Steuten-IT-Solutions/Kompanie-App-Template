@@ -682,6 +682,7 @@ paths:
       description: |
         Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels,
         degradieren nur unter der Schwelle des aktuellen Dienstgrads; Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
+        Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren (`rank_id: null`, ohne Punkteregeln).
       x-capability: manage_ranks
       requestBody:
         required: true
@@ -830,8 +831,8 @@ paths:
       tags: [Verwaltung]
       summary: Titel eines Mitglieds ersetzen
       description: |
-        Nur Mitglieder. Neu vergeben werden nur aktive Titel; deaktivierte, die das Mitglied schon hat, darf es
-        behalten. Neu verliehene Titel lösen eine Benachrichtigung (Art `titles`) aus, entfernte nicht.
+        Neu vergeben werden nur aktive Titel und nur an Mitglieder; deaktivierte, die das Mitglied schon hat, darf es
+        behalten. Wer kein Mitglied mehr ist (z. B. Gast), kann Titel nur verlieren. Neu verliehene Titel lösen eine Benachrichtigung (Art `titles`) aus, entfernte nicht.
       x-capability: manage_titles
       requestBody:
         required: true
@@ -929,6 +930,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
+      description: Wer Dienstgrade bzw. Titel verwaltet, sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
       x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
       parameters:
         - name: all

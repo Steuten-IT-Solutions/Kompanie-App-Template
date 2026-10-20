@@ -136,6 +136,10 @@ final class TitleServiceTest extends TestCase
         $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$t['Ehrenmitglied']]]);
         $this->users->setRole($this->m, Roles::GUEST);
         $this->assertSame(['Ehrenmitglied'], array_column($this->call('GET', "/members/{$this->m}")->data['titles'], 'title'));
+        $listed = array_column($this->call('GET', '/members')->data, null, 'id');
+        $this->assertArrayHasKey($this->m, $listed, 'früheres Mitglied mit Titel bleibt in der Liste');
+        $this->assertArrayNotHasKey($guest, $listed);
+        $this->assertFalse($listed[$this->m]['member']);
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => []])->status);
         $this->assertSame(200, $this->call('DELETE', "/titles/{$t['Ehrenmitglied']}")->status);
         $t = $this->titles('Ehrenmitglied');
@@ -181,6 +185,11 @@ final class TitleServiceTest extends TestCase
         $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$t['Ehrenmitglied']]]);
         $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $rank]);
         $this->app->userDeleted($this->m);
+        // Verwaist (Konto ohne Hook gelöscht): blockiert das Löschen nicht.
+        $orphan = $this->users->add('weg', Roles::MEMBER);
+        $this->call('PUT', "/members/$orphan/titles", ['title_ids' => [$t['Ehrenmitglied']]]);
+        $this->call('PUT', "/members/$orphan/rank", ['rank_id' => $rank]);
+        unset($this->users->users[$orphan]);
         $this->assertSame(200, $this->call('DELETE', "/titles/{$t['Ehrenmitglied']}")->status);
         $this->assertSame(200, $this->call('DELETE', "/ranks/$rank")->status);
     }

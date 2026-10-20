@@ -336,7 +336,12 @@ final class Api
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {
-                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'));
+                // Wer Dienstgrade bzw. Titel verwaltet, sieht auch frühere Mitglieder, die noch welche haben.
+                $holders = array_merge(
+                    $this->showRanks() ? array_keys($a->ranks()->repository()->assignments()) : [],
+                    $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
+                );
+                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
                 if ($this->showRanks()) {
                     $rankTitles = $a->ranks()->titles();
                     $list = array_map(static fn (array $m): array => $m + ['rank_title' => $rankTitles[$m['id']] ?? null], $list);

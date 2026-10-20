@@ -584,7 +584,7 @@ export const api = {
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
 };
 
-export type PushType = 'penalties' | 'points' | 'events' | 'reminder' | 'news';
+export type PushType = 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {

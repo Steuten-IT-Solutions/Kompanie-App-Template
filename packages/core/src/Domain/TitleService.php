@@ -42,6 +42,7 @@ final class TitleService
      */
     public function list(): array
     {
+        $this->forgetUnknownUsers();
         $counts = $this->repository()->assignedCounts();
         return array_map(static fn (array $t): array => $t + ['assigned' => $counts[$t['id']] ?? 0], $this->repository()->all(false));
     }
@@ -84,6 +85,7 @@ final class TitleService
     {
         $repo = $this->repository();
         $repo->find($id) ?? throw ApiError::notFound('Titel nicht gefunden.');
+        $this->forgetUnknownUsers();
         $count = $repo->assignedCount($id);
         if ($count > 0) {
             throw ApiError::invalid(sprintf(
@@ -190,6 +192,20 @@ final class TitleService
             error_log('Kompanie-App: Benachrichtigung zum Titel nicht eingereiht: ' . $e->getMessage());
         }
         return $this->of($userId);
+    }
+
+    /**
+     * Zuweisungen an Konten, die es nicht mehr gibt (z. B. bei WordPress gelöscht, während das Plugin aus war, oder
+     * eine Sicherung von einer anderen Seite), entfernen: Sie ließen sich sonst nirgends lösen und blockierten das
+     * Löschen des Titels.
+     */
+    private function forgetUnknownUsers(): void
+    {
+        foreach (array_keys($this->repository()->assignments()) as $userId) {
+            if ($this->app->users->find($userId) === null) {
+                $this->app->db->execute('DELETE FROM {member_titles} WHERE user_id = ?', [$userId]);
+            }
+        }
     }
 
     /**

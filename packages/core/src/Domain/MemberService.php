@@ -41,18 +41,29 @@ final class MemberService
 
     /**
      * Mitglieder mit Summen; mit $includeCandidates auch Anwärter (nur interner Kalender), mit $includeGuests
-     * alle Konten.
+     * alle Konten. $alsoIds: Konten, die zusätzlich dazugehören, auch wenn sie keine Mitglieder (mehr) sind, z. B. weil
+     * sie noch einen Dienstgrad oder Titel haben, der sich nur bei ihnen entfernen lässt.
      *
+     * @param list<int> $alsoIds
      * @return array<int, array<string, mixed>>
      */
-    public function list(bool $includeGuests, ?User $viewer = null, bool $includeCandidates = false): array
+    public function list(bool $includeGuests, ?User $viewer = null, bool $includeCandidates = false, array $alsoIds = []): array
     {
         $totals = $this->scores->totalsByUser();
         [$points, $penalties] = self::visibleParts($viewer);
         $out = [];
         // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
-        foreach ($this->users->list($includeGuests) as $u) {
-            if (!$includeGuests && !$u->isMember() && !($includeCandidates && self::calendarOnly($u))) {
+        $users = $this->users->list($includeGuests);
+        $seen = array_map(static fn (User $u): int => $u->id, $users);
+        foreach (array_diff(array_unique($alsoIds), $seen) as $id) {
+            $u = $this->users->find($id);
+            if ($u !== null) {
+                $users[] = $u;
+                usort($users, static fn (User $a, User $b): int => strcasecmp($a->name, $b->name));
+            }
+        }
+        foreach ($users as $u) {
+            if (!$includeGuests && !$u->isMember() && !($includeCandidates && self::calendarOnly($u)) && !in_array($u->id, $alsoIds, true)) {
                 continue;
             }
             $out[] = [

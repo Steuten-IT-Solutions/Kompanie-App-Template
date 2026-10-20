@@ -60,6 +60,9 @@ final class RankService
      */
     public function list(bool $all): array
     {
+        if ($all) {
+            $this->forgetUnknownUsers();
+        }
         $points = $this->usesPoints();
         return array_map(fn (array $r): array => [
             'id' => $r['id'],
@@ -117,6 +120,7 @@ final class RankService
     {
         $repo = $this->repository();
         $repo->find($id) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel()));
+        $this->forgetUnknownUsers();
         if ($repo->assignedCount($id) > 0) {
             throw ApiError::invalid(sprintf('Dieser %s ist vergeben und lässt sich nur deaktivieren.', $this->app->config->rankLabel()));
         }
@@ -451,6 +455,19 @@ final class RankService
                 ));
             }
             $prev = $r;
+        }
+    }
+
+    /**
+     * Zuweisungen an Konten, die es nicht mehr gibt (z. B. bei WordPress gelöscht, während das Plugin aus war), entfernen:
+     * Sie ließen sich nirgends lösen und blockierten das Löschen des Dienstgrads.
+     */
+    private function forgetUnknownUsers(): void
+    {
+        foreach (array_keys($this->repository()->assignments()) as $userId) {
+            if ($this->app->users->find($userId) === null) {
+                $this->app->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
+            }
         }
     }
 
