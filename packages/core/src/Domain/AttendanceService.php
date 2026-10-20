@@ -12,7 +12,7 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\AttendanceRepository;
 
 /**
- * Anwesenheit (Issue #21, Vorbild Lank).
+ * Anwesenheit (Issue #21).
  *
  * - Eine Liste je Termin: aus dem internen Kalender (source calendar, event_key = ID des Termins) oder frei angelegt
  *   (source free). Titel und Datum sind eine Momentaufnahme; die Liste bleibt, auch wenn der Termin verschwindet.
