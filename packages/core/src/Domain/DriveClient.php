@@ -22,6 +22,12 @@ use KompanieApp\Core\Port\Settings;
 final class DriveClient
 {
     public const SETTING = 'drive_service_account';
+    /**
+     * Bestehende Verbindung über OAuth (client_id, client_secret, refresh_token, email), etwa aus der Übernahme
+     * einer früheren App. Sie geht dem Dienstkonto vor. Neu verbinden lässt sich so (noch) nicht, siehe
+     * OFFENE-PUNKTE.md, Abschnitt 5; nur trennen.
+     */
+    public const OAUTH_SETTING = 'drive_oauth';
     public const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
     public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
     public const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
@@ -47,6 +53,59 @@ final class DriveClient
     public function clientEmail(): string
     {
         return $this->serviceAccount()['client_email'] ?? '';
+    }
+
+    /** @return array{client_id: string, client_secret: string, refresh_token: string, email: string}|null */
+    public function oauth(): ?array
+    {
+        $o = $this->settings->get(self::OAUTH_SETTING);
+        if (!is_array($o)) {
+            return null;
+        }
+        foreach (['client_id', 'client_secret', 'refresh_token'] as $k) {
+            if (!is_string($o[$k] ?? null) || $o[$k] === '') {
+                return null;
+            }
+        }
+        return ['client_id' => $o['client_id'], 'client_secret' => $o['client_secret'], 'refresh_token' => $o['refresh_token'], 'email' => is_string($o['email'] ?? null) ? $o['email'] : ''];
+    }
+
+    /** Google-Konto der OAuth-Verbindung ('' ohne Verbindung oder wenn es unbekannt ist). */
+    public function oauthEmail(): string
+    {
+        return $this->oauth()['email'] ?? '';
+    }
+
+    /** Ist ein Google-Zugang hinterlegt (OAuth-Verbindung oder Dienstkonto)? */
+    public function hasCredentials(): bool
+    {
+        return $this->oauth() !== null || $this->serviceAccount() !== null;
+    }
+
+    /**
+     * Speichert eine bestehende OAuth-Verbindung.
+     *
+     * @param array<string, mixed> $o client_id, client_secret, refresh_token, email
+     * @throws \RuntimeException wenn ein Pflichtfeld fehlt
+     */
+    public function saveOAuth(array $o): void
+    {
+        $clean = [];
+        foreach (['client_id', 'client_secret', 'refresh_token', 'email'] as $k) {
+            $clean[$k] = is_string($o[$k] ?? null) ? trim($o[$k]) : '';
+            if ($clean[$k] === '' && $k !== 'email') {
+                throw new \RuntimeException('Für die Verbindung zu Google fehlt ' . $k . '.');
+            }
+        }
+        $this->settings->set(self::OAUTH_SETTING, $clean);
+        $this->cache->delete(self::TOKEN_CACHE);
+    }
+
+    /** Trennt die OAuth-Verbindung (das Dienstkonto bleibt, falls hinterlegt). */
+    public function removeOAuth(): void
+    {
+        $this->settings->delete(self::OAUTH_SETTING);
+        $this->cache->delete(self::TOKEN_CACHE);
     }
 
     /**
@@ -109,27 +168,36 @@ final class DriveClient
 
     public function accessToken(): string
     {
-        $sa = $this->serviceAccount();
-        if (!$sa) {
+        $oauth = $this->oauth();
+        $sa = $oauth === null ? $this->serviceAccount() : null;
+        if ($oauth === null && $sa === null) {
             throw new \RuntimeException('Es ist noch kein Google-Zugang hinterlegt.');
         }
+        // Der Zwischenspeicher gehört zu genau diesem Zugang (nach einem Wechsel nicht weiterverwenden).
+        $owner = $oauth !== null ? 'oauth:' . hash('sha256', $oauth['refresh_token']) : $sa['client_email'];
         $cached = $this->cache->get(self::TOKEN_CACHE);
-        if (is_array($cached) && ($cached['email'] ?? '') === $sa['client_email']) {
+        if (is_array($cached) && ($cached['email'] ?? '') === $owner) {
             return (string) $cached['token'];
         }
+        $form = $oauth !== null
+            ? ['grant_type' => 'refresh_token', 'refresh_token' => $oauth['refresh_token'], 'client_id' => $oauth['client_id'], 'client_secret' => $oauth['client_secret']]
+            : ['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $this->buildJwt($sa)];
         $res = $this->http->request(
             'POST',
             $sa['token_uri'] ?? self::TOKEN_URI,
             ['Content-Type' => 'application/x-www-form-urlencoded'],
-            http_build_query(['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $this->buildJwt($sa)]),
+            http_build_query($form),
             20,
         );
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || empty($body['access_token'])) {
+            if ($oauth !== null && is_array($body) && ($body['error'] ?? '') === 'invalid_grant') {
+                throw new \RuntimeException('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Trenne sie und hinterlege ein Dienstkonto.');
+            }
             throw new \RuntimeException('Die Anmeldung bei Google ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));
         }
         $ttl = max(60, (int) ($body['expires_in'] ?? 3600) - 300);
-        $this->cache->set(self::TOKEN_CACHE, ['email' => $sa['client_email'], 'token' => $body['access_token']], $ttl);
+        $this->cache->set(self::TOKEN_CACHE, ['email' => $owner, 'token' => $body['access_token']], $ttl);
         return (string) $body['access_token'];
     }
 

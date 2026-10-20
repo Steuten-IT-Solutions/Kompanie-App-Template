@@ -14,7 +14,7 @@ Bereiche mit eigenen Aufgaben bringen beim Einschalten eine **Standardrolle** mi
 Für den Bereich {bereich.calendar}: in Google Kalender beim Kalender der Kompanie unter **Einstellungen → Kalender integrieren** die **geheime Adresse im iCal-Format** kopieren und einfügen. **Kalender testen** zeigt die ersten Termine.
 
 ## {bereich.gallery}
-Für den Bereich {bereich.gallery}: Die App zeigt Fotos aus einem Google-Drive-Ordner. Ordnerstruktur: Galerie-Ordner → Jahr → Album → Bilder; Bilder im Unterordner `intern` eines Albums sehen nur Mitglieder. Dafür braucht es ein Dienstkonto bei Google: Dessen Schlüssel (JSON) fügst du ein, gibst den Galerie-Ordner in Google Drive für das Dienstkonto frei (Betrachter) und trägst den Link zum Ordner ein.
+Für den Bereich {bereich.gallery}: Die App zeigt Fotos aus einem Google-Drive-Ordner. Ordnerstruktur: Galerie-Ordner → Jahr → Album → Bilder; Bilder im Unterordner `intern` eines Albums sehen nur Mitglieder. Dafür braucht es ein Dienstkonto bei Google: Dessen Schlüssel (JSON) fügst du ein, gibst den Galerie-Ordner in Google Drive für das Dienstkonto frei (Betrachter) und trägst den Link zum Ordner ein. Wurde eine bestehende Verbindung zu Google aus einer früheren App übernommen, steht dort „Verbunden mit Google“; sie wird genutzt, bis du sie trennst.
 
 ## {bereich.news}
 Mit WordPress kommen sie aus den Beiträgen der Webseite. Sonst gebt ihr die Adresse eines RSS- oder Atom-Feeds an (oder einer anderen WordPress-Webseite).

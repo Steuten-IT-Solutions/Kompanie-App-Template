@@ -836,6 +836,8 @@ export interface AdminSettings {
     configured: boolean;
     root: string;
     service_account_email: string;
+    oauth_connected: boolean;
+    oauth_email: string;
     status: { albums?: number; photos?: number; pending?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;
@@ -847,6 +849,7 @@ export interface AdminSettingsInput {
   calendar_ids?: string;
   calendar_cache_minutes?: number;
   drive_service_account?: string;
+  drive_oauth?: '';
   gallery_root?: string;
   news_source?: NewsSourceType;
   news_url?: string;

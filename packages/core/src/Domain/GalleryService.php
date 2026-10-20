@@ -58,7 +58,7 @@ final class GalleryService
 
     public function isConfigured(): bool
     {
-        return $this->root() !== '' && $this->drive->serviceAccount() !== null;
+        return $this->root() !== '' && $this->drive->hasCredentials();
     }
 
     public function root(): string

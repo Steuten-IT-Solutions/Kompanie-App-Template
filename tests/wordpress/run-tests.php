@@ -345,6 +345,13 @@ $cache = new KompanieApp\WordPress\WpCache();
 $key = 'test_' . wp_generate_password(6, false);
 $c->ok($cache->increment($key, 900) === 1 && $cache->increment($key, 900) === 2 && $cache->increment($key . 'x', 900) === 1, 'Zähler im Cache zählt atomar je Schlüssel');
 
+$c->section('Alias-Namensraum (Übernahme einer früheren App)');
+KompanieApp\WordPress\RestBridge::register($app, 'kpwp-alt/v1');
+$res = rest_do_request(new WP_REST_Request('GET', '/kpwp-alt/v1/config'));
+$c->ok($res->get_status() === 200 && isset($res->get_data()['features']), 'Routen des Kerns auch unter einem zusätzlichen Namensraum');
+$res = rest_do_request(new WP_REST_Request('POST', '/kpwp-alt/v1/push/status'));
+$c->ok($res->get_status() !== 404, 'Push-Routen im Alias erreichbar (Status ' . $res->get_status() . ')');
+
 $c->section('Datensicherung und Update');
 $backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name());
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'vorher');

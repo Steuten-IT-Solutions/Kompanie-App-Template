@@ -66,6 +66,41 @@ final class GalleryTest extends TestCase
         $this->assertTrue($this->app->gallery()->isConfigured());
     }
 
+    public function testExistingOAuthConnectionIsUsedBeforeServiceAccount(): void
+    {
+        $drive = $this->app->drive();
+        $drive->saveServiceAccount($this->drive->serviceAccountJson());
+        $drive->saveOAuth(['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'REFRESH1', 'email' => 'galerie@example.org']);
+        $this->assertSame('galerie@example.org', $drive->oauthEmail());
+        $this->app->gallery()->setRoot('ROOT');
+        $this->assertSame(5, $this->app->gallery()->sync()['photos']);
+        $this->assertSame(['grant_type' => 'refresh_token', 'refresh_token' => 'REFRESH1', 'client_id' => 'CID', 'client_secret' => 'SECRET'], $this->drive->refreshForm);
+        $this->assertFalse($this->drive->jwtValid, 'Dienstkonto nicht genutzt');
+
+        // Widerrufen: verständliche Meldung; nach dem Trennen übernimmt das Dienstkonto (eigener Zwischenspeicher).
+        $this->drive->validRefreshToken = 'anderes';
+        $drive->saveOAuth(['client_id' => 'CID', 'client_secret' => 'SECRET', 'refresh_token' => 'REFRESH2']);
+        try {
+            $drive->accessToken();
+            $this->fail('Widerrufene Verbindung wurde angenommen');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('abgelaufen oder wurde widerrufen', $e->getMessage());
+        }
+        $settings = $this->app->settingsService()->update(['drive_oauth' => '']);
+        $this->assertFalse($settings['gallery']['oauth_connected']);
+        $this->assertSame('TOKEN123', $drive->accessToken());
+        $this->assertTrue($this->drive->jwtValid);
+        $this->assertTrue($this->app->gallery()->isConfigured());
+
+        $drive->removeServiceAccount();
+        $this->assertFalse($this->app->gallery()->isConfigured());
+        try {
+            $drive->saveOAuth(['client_id' => 'CID', 'refresh_token' => 'R']);
+            $this->fail('Ohne client_secret angenommen');
+        } catch (\RuntimeException) {
+        }
+    }
+
     public function testSyncVisibilityProcessingAndChanges(): void
     {
         $gallery = $this->app->gallery();

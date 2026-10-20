@@ -1791,6 +1791,7 @@ paths:
                 calendar_ids: { type: string, description: Kommagetrennte Kalender-IDs (nur mit API-Schlüssel) }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
+                drive_oauth: { type: string, enum: [''], description: Leer trennt eine bestehende OAuth-Verbindung zu Google (etwa aus einer Übernahme) }
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
@@ -2305,6 +2306,8 @@ components:
             configured: { type: boolean }
             root: { type: string }
             service_account_email: { type: string }
+            oauth_connected: { type: boolean, description: Bestehende OAuth-Verbindung zu Google (geht dem Dienstkonto vor) }
+            oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
             status:
               type: object
               description: Stand des letzten Abgleichs (albums, photos, new, pending, last_sync, error)

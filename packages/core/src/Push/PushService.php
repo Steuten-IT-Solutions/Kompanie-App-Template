@@ -445,7 +445,7 @@ final class PushService
         $items = [];
         foreach ($this->repository()->forUser($userId) as $sub) {
             if (in_array($type, $sub['types'], true)) {
-                $items[] = ['subscription_id' => $sub['id'], 'payload' => self::json($detail !== null && $sub['details'] ? $detail : $message)];
+                $items[] = ['subscription_id' => $sub['id'], 'payload' => $this->json($detail !== null && $sub['details'] ? $detail : $message)];
             }
         }
         return $this->enqueue($items);
@@ -462,7 +462,7 @@ final class PushService
         if (!$this->typeEnabled($type)) {
             return 0;
         }
-        $json = self::json($message);
+        $json = $this->json($message);
         $items = [];
         $calendarUsers = [];
         foreach ($this->repository()->all() as $sub) {
@@ -498,9 +498,15 @@ final class PushService
         return count($items);
     }
 
-    /** @param Message $message */
-    private static function json(array $message): string
+    /**
+     * Nutzlast als JSON. „url“ (vollständige Adresse) zusätzlich zu „route“: für Service Worker, die noch von einer
+     * früheren App stammen und bis zu ihrem Austausch Nachrichten anzeigen (etwa nach einer Übernahme).
+     *
+     * @param Message $message
+     */
+    private function json(array $message): string
     {
+        $message['url'] = $this->app->env->appUrl() . '#/' . ltrim($message['route'], '#/');
         return (string) json_encode($message, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
