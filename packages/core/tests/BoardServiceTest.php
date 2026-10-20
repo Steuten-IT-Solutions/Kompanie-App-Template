@@ -233,10 +233,16 @@ final class BoardServiceTest extends TestCase
             $this->assertLessThanOrEqual(23 * 3600, (int) $p['headers']['TTL']);
         }
 
+        // Ohne Haken „Benachrichtigung senden“: veröffentlicht, aber kein Push; push nur als true/false.
+        $queued = $this->app->push()->repository()->counts()['queued'];
+        $this->assertSame(201, $this->call('POST', '/board', ['text' => 'Leise Nachricht', 'push' => false])->status);
+        $this->assertSame($queued, $this->app->push()->repository()->counts()['queued'], 'kein Push mit push=false');
+        $this->assertSame(400, $this->call('POST', '/board', ['text' => 'x', 'push' => 'nein'])->status);
+
         // Ändern verschickt nichts.
         $this->http->calls = [];
         $this->call('PATCH', "/board/{$item['id']}", ['text' => 'Doch Training']);
-        $this->assertSame(0, $this->app->push()->repository()->counts()['queued'], 'kein Push beim Ändern');
+        $this->assertSame($queued, $this->app->push()->repository()->counts()['queued'], 'kein Push beim Ändern');
 
         // Schreibt jemand anderes mit dem Recht, bekommt auch der Admin eine Benachrichtigung.
         $poster = $this->users->add('schreiber', 'board');

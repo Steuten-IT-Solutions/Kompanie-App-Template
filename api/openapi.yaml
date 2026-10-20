@@ -1085,7 +1085,8 @@ paths:
       summary: Nachricht ans Schwarze Brett schreiben
       description: |
         Gültig genau 24 Stunden ab jetzt. Alle Mitglieder und Anwärter außer dem Verfasser bekommen eine Benachrichtigung
-        (Art `board`, Urgency high, TTL höchstens bis `expires_at`), sofern sie die Art für das Gerät eingeschaltet haben.
+        (Art `board`, Urgency high, TTL höchstens bis `expires_at`), sofern sie die Art für das Gerät eingeschaltet haben
+        und `push` nicht false ist.
       x-capability: post_board
       requestBody:
         required: true
@@ -3049,6 +3050,10 @@ components:
           type: string
           maxLength: 500
           description: Reiner Text, Zeilenumbrüche bleiben; HTML-Tags werden entfernt. Leer oder länger als 500 Zeichen → 400.
+        push:
+          type: boolean
+          default: true
+          description: Nur beim Schreiben (POST); false veröffentlicht ohne Benachrichtigung. Beim Ändern ohne Wirkung.
     BoardItem:
       type: object
       required: [kind, id, text, author_name, created_at, updated_at, expires_at]

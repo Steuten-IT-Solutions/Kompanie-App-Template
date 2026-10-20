@@ -476,9 +476,16 @@ final class Api
             // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
             new Route('GET', '/board', [Cap::Member, Cap::Calendar, Cap::PostBoard], fn () => $a->board()->list($this->user()), 'board', $denyBoard),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
+                // push: ob Mitglieder und Anwärter benachrichtigt werden (Standard ja, Haken beim Schreiben)
+                $push = $r->input('push') ?? true;
+                if (!is_bool($push)) {
+                    throw ApiError::invalid('push muss true oder false sein.');
+                }
                 $item = $a->board()->create($this->user(), $r->input('text'));
                 $author = $this->user()->id;
-                $this->notify(static fn () => $a->pushTriggers()->boardPosted($item, $author));
+                if ($push) {
+                    $this->notify(static fn () => $a->pushTriggers()->boardPosted($item, $author));
+                }
                 return Response::created($item);
             }, 'board', $denyRights),
             new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($r->id(), $r->input('text')), 'board', $denyRights),
