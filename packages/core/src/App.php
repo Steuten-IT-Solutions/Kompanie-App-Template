@@ -28,6 +28,7 @@ use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\MaintenanceService;
+use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
@@ -445,6 +446,11 @@ final class App
     public function birthdays(): BirthdayService
     {
         return $this->service(BirthdayService::class, fn () => new BirthdayService($this));
+    }
+
+    public function memberPhotos(): MemberPhotoService
+    {
+        return $this->service(MemberPhotoService::class, fn () => new MemberPhotoService($this));
     }
 
     public function inventory(): InventoryService

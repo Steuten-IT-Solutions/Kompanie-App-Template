@@ -658,10 +658,12 @@ $c->ok(str_contains($env->appUrl('csrf'), 'kompanie_app=csrf') && str_contains($
 $c->ok(str_contains($env->serviceWorkerUrl(), 'kompanie_app=sw.js'), 'Einfache Permalinks: Service Worker über Parameter (nicht /sw.js)');
 $c->ok((bool) preg_match('#kompanie_app=dokument(/|%2F)7&v=abc$#', $env->documentUrl(7, 'abc')), 'Einfache Permalinks: Dokument-Adresse mit &v=');
 $c->ok((bool) preg_match('#kompanie_app=abzeichen(/|%2F)7&v=abc&s=64$#', $env->badgeUrl(7, 'abc', 64)), 'Einfache Permalinks: Abzeichen-Adresse mit &v= und &s=');
+$c->ok((bool) preg_match('#kompanie_app=mitgliedsfoto(/|%2F)7&v=abc&s=128$#', $env->memberPhotoUrl(7, 'abc', 128)), 'Einfache Permalinks: Foto-Adresse mit &v= und &s=');
 update_option('permalink_structure', $structure);
 $c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
 $c->ok(str_ends_with($env->documentUrl(7, 'abc'), '/app/dokument/7?v=abc'), 'Schöne Permalinks: /app/dokument/7?v=…');
 $c->ok(str_ends_with($env->badgeUrl(7, 'abc', 128), '/app/abzeichen/7?v=abc&s=128'), 'Schöne Permalinks: /app/abzeichen/7?v=…&s=…');
+$c->ok(str_ends_with($env->memberPhotoUrl(7, 'abc', 480), '/app/mitgliedsfoto/7?v=abc&s=480'), 'Schöne Permalinks: /app/mitgliedsfoto/7?v=…&s=…');
 // Deaktivieren entfernt die /app/-Regeln.
 global $wp_rewrite;
 KompanieApp\WordPress\AppPage::addRewriteRules();
@@ -732,6 +734,28 @@ unset($_GET['v'], $_GET['s']);
 wp_set_current_user($admin);
 $app->ranks()->removeBadge($rank['id']);
 $app->ranks()->delete($rank['id']);
+
+$c->section('Fotos der Mitglieder');
+wp_set_current_user($admin);
+$im = imagecreatetruecolor(1200, 800);
+ob_start();
+imagepng($im);
+$photo = $app->memberPhotos()->upload($app->users->find($admin), $member, ['name' => 'foto.png', 'data' => base64_encode((string) ob_get_clean())]);
+parse_str((string) wp_parse_url((string) $photo['photo_url'], PHP_URL_QUERY), $q);
+$_GET['v'] = (string) ($q['v'] ?? '');
+$_GET['s'] = '480';
+wp_set_current_user(0);
+$res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
+$c->ok($res['status'] === 401 && !isset($res['body']), 'Foto ohne Anmeldung → 401');
+wp_set_current_user($member);
+$res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
+$size = getimagesizefromstring((string) ($res['body'] ?? ''));
+$c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/jpeg' && $size !== false && [$size[0], $size[1], $size['mime']] === [480, 320, 'image/jpeg'], 'Eigenes Foto: JPEG in 480 Pixeln über den Bildeditor von WordPress');
+unset($_GET['v'], $_GET['s']);
+$c->ok(($app->api()->config()['user']['photo_url'] ?? null) === $photo['photo_url'], '/config: eigenes Foto');
+wp_set_current_user($admin);
+$app->memberPhotos()->remove($app->users->find($admin), $member);
+$c->ok($app->memberPhotos()->url($member) === null, 'Foto entfernt');
 
 $c->section('Wartungsmodus');
 wp_set_current_user($admin);

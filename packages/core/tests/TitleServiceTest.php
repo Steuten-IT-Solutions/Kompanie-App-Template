@@ -122,7 +122,8 @@ final class TitleServiceTest extends TestCase
         $this->assertSame(200, $this->call('GET', '/titles')->status);
         $members = $this->call('GET', '/members')->data;
         $this->assertArrayHasKey('titles', $members[0]);
-        $this->assertArrayNotHasKey('rank_title', $members[0], 'Dienstgrade nur mit deren Recht');
+        $this->assertArrayHasKey('rank_title', $members[0], 'Dienstgrad mit Abzeichen auch ohne dessen Recht');
+        $this->assertArrayNotHasKey('rank', $this->call('GET', "/members/{$this->m}")->data, 'Stand und Verlauf nur mit dessen Recht');
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => []])->status);
     }
 

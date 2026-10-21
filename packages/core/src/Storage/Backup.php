@@ -18,7 +18,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Galeriebilder sind nicht enthalten; sie werden nach dem Wiederherstellen neu aus Drive erzeugt.
  * Dateien der Dokumente und Abzeichen der Dienstgrade sind ebenfalls nicht enthalten, nur ihre Zeilen (mit dem Namen
  * der Datei); die Dateien bleiben in der geschützten Dateiablage. Fehlt ein Abzeichen nach dem Einspielen auf einem
- * anderen Server, liefert die API badge_url = null.
+ * anderen Server, liefert die API badge_url = null. Die Fotos der Mitglieder liegen in der Datenbank (member_photos) und
+ * sind deshalb enthalten.
  * Nicht enthalten sind außerdem Push-Abos samt Warteschlange und wartende Fehlermeldungen (bug_reports, Issue #64): Sie
  * gehören zur Installation, und Meldungen mit Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  */
@@ -42,7 +43,7 @@ final class Backup
         'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log', 'member_photos'];
 
     public function __construct(private readonly Connection $db)
     {

@@ -17,6 +17,7 @@ use KompanieApp\Core\Http\FileCache;
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
+ * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -65,7 +66,7 @@ final class AppPage
         if ($path === '') {
             return;
         }
-        if (preg_match('#^(foto|dokument|abzeichen)/#', $path)) {
+        if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto)/#', $path)) {
             // Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
             // der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
             $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
@@ -85,6 +86,8 @@ final class AppPage
             self::sendDocument($app, (int) $m[1]);
         } elseif (preg_match('#^abzeichen/(\d+)/?$#', $path, $m)) {
             self::sendBadge($app, (int) $m[1]);
+        } elseif (preg_match('#^mitgliedsfoto/(\d+)/?$#', $path, $m)) {
+            self::sendMemberPhoto($app, (int) $m[1]);
         } else {
             self::sendApp($app);
         }
@@ -293,6 +296,44 @@ final class AppPage
         if ($res['status'] === 200 && isset($res['path'])) {
             header('Content-Length: ' . filesize($res['path']));
             readfile($res['path']);
+        }
+    }
+
+    /**
+     * Foto eines Mitglieds: Status, Header und Inhalt wie im Kern festgelegt.
+     *
+     * @return array{status: int, headers: array<string, string>, body?: string}
+     */
+    public static function memberPhotoResponse(App $app, int $id): array
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, Rechte prüft der Kern
+        $v = isset($_GET['v']) && is_string($_GET['v']) ? $_GET['v'] : null;
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $s = isset($_GET['s']) && is_string($_GET['s']) ? $_GET['s'] : null;
+        return $app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s);
+    }
+
+    private static function sendMemberPhoto(App $app, int $id): void
+    {
+        $res = self::memberPhotoResponse($app, $id);
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        status_header($res['status']);
+        foreach ($res['headers'] as $name => $value) {
+            header($name . ': ' . $value);
+        }
+        if ($res['status'] === 200 && FileCache::matches($res['headers']['ETag'] ?? null, self::ifNoneMatch())) {
+            status_header(304);
+            return;
+        }
+        if ($res['status'] === 200 && isset($res['body'])) {
+            header('Content-Length: ' . strlen($res['body']));
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG, vom Kern neu erzeugt
+            echo $res['body'];
         }
     }
 

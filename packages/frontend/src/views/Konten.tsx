@@ -6,6 +6,7 @@ import { installUrl } from '../install';
 import { navigate } from '../router';
 import { Loading, NameFields, trimName, useAsync } from '../ui';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
+import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
@@ -100,13 +101,14 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
   );
 }
 
-type Row = NewPerson & { points: string; bday: BirthdayValue };
+type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null };
 
-const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', email: '', points: '', bday: emptyBirthday() });
+const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', email: '', points: '', bday: emptyBirthday(), picture: null });
 
 /**
- * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, optional Benutzername, E-Mail und Anfangspunkte;
- * Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt.
+ * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, optional Benutzername, E-Mail, Anfangspunkte,
+ * Geburtstag und Foto; Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt. Die Fotos (im
+ * Browser schon gelesen und verkleinert) kommen danach einzeln: Alle in einer Anfrage würden zu groß für viele Server.
  */
 export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   const [rows, setRows] = useState([emptyRow(), emptyRow(), emptyRow()]);
@@ -117,7 +119,8 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   const [results, setResults] = useState<BulkResult[] | null>(null);
   const points = canPoints && level === 'member';
 
-  const update = (i: number, patch: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  // Mit dem aktuellen Stand: Ein Foto wird erst nach dem Lesen übernommen, inzwischen kann sich anderes geändert haben.
+  const update = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const birthdays = canSetBirthdays();
 
   async function submit(e: FormEvent) {
@@ -125,6 +128,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
     setFormError(null);
     const filled = rows.filter((r) => `${r.first_name}${r.last_name}`.trim() !== '');
     const people: NewPerson[] = [];
+    const pictures = filled.map((r) => r.picture);
     for (const [i, r] of filled.entries()) {
       const name = trimName(r);
       const bday = birthdays ? readBirthday(r.bday) : null;
@@ -140,7 +144,18 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
     if (people.length === 0) return setFormError('Bitte mindestens einen Namen eintragen.');
     setBusy(true);
     try {
-      setResults(await api.createUsers(level, people));
+      const out = await api.createUsers(level, people);
+      // Ein Ergebnis je Person, in derselben Reihenfolge (angelegt oder mit Grund nicht).
+      for (const [i, r] of out.entries()) {
+        const picture = pictures[i];
+        if (!picture || !('password' in r)) continue;
+        try {
+          r.photo_url = (await api.uploadMemberPhoto(r.id, picture.file)).photo_url;
+        } catch (err) {
+          r.warning = `${r.warning ? `${r.warning} ` : ''}Das Foto fehlt noch (${(err as Error).message}). Bitte in den Mitgliedsdetails nachtragen.`;
+        }
+      }
+      setResults(out);
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -215,6 +230,15 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
               <BirthdayFields value={r.bday} onChange={(bday) => update(i, { bday })} />
             </div>
           )}
+          <div className="bulk-photo">
+            <span className="field-label">Foto (optional)</span>
+            <PhotoPicker
+              name={`${r.first_name} ${r.last_name}`.trim()}
+              value={r.picture}
+              onChange={(picture) => update(i, { picture })}
+              onError={setFormError}
+            />
+          </div>
         </fieldset>
       ))}
       <button

@@ -344,6 +344,27 @@ try {
     $old = $d->send('GET', $badgeUrl, $cookie, null);
     $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
 
+    $c->section('Fotos der Mitglieder (Auslieferung)');
+    $mona = $users->add('Mona Foto', 'mona', 'mona@example.org', 'mona-passwort', Roles::MEMBER);
+    $otto = $users->add('Otto Anders', 'otto', 'otto@example.org', 'otto-passwort', Roles::MEMBER);
+    $im = imagecreatetruecolor(900, 600);
+    ob_start();
+    imagejpeg($im);
+    [$s, $monaPhoto] = $d->request('PUT', '/members/' . $mona . '/photo', ['file' => ['name' => 'mona.jpg', 'data' => base64_encode((string) ob_get_clean())]]);
+    $monaUrl = (string) ($monaPhoto['photo_url'] ?? '');
+    $c->ok($s === 200 && str_starts_with($monaUrl, $base . 'index.php?r=/mitgliedsfoto/' . $mona . '&v=') && str_ends_with($monaUrl, '&s=128'), 'Foto hochgeladen, Adresse im Bereich der App');
+    $c->ok($d->send('GET', $monaUrl, [], null)[0] === 401, 'Foto ohne Anmeldung → 401');
+    $monaCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($mona)];
+    $own = $d->send('GET', $monaUrl, $monaCookie, null);
+    $c->ok($own[0] === 200 && ($own[2]['content-type'] ?? '') === 'image/jpeg' && ($own[2]['x-content-type-options'] ?? '') === 'nosniff' && ($own[2]['cache-control'] ?? '') === 'private, max-age=86400', 'Eigenes Foto: image/jpeg, nosniff, einen Tag privat');
+    $c->ok($d->send('GET', $monaUrl, $monaCookie + ['If-None-Match' => (string) ($own[2]['etag'] ?? '-')], null)[0] === 304, 'Foto: passender ETag → 304');
+    $large = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=480', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
+    $c->ok(($large[0] ?? 0) === 480 && ($large[1] ?? 0) === 320 && ($large['mime'] ?? '') === 'image/jpeg', 'Wer Mitglieder verwaltet, sieht das Foto; s=480 liefert 480 Pixel');
+    $c->ok($d->send('GET', $monaUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)], null)[0] === 403, 'Andere Mitglieder sehen das Foto nicht → 403');
+    $c->ok($d->send('GET', $monaUrl . '&vorschau=member', $cookie, null)[0] === 403, 'Vorschau als Mitglied: fremdes Foto → 403');
+    [$s] = $d->request('DELETE', '/members/' . $mona);
+    $c->ok($s === 200 && $d->send('GET', $monaUrl, $cookie, null)[0] === 404, 'Konto gelöscht: Foto weg (404)');
+
     $c->section('Dokumente: Fassung in der Adresse, Prüfung per ETag');
     [$s, $upDoc] = $d->request('POST', '/documents', ['title' => 'Kpsa Satzung', 'date' => '2026-10-01', 'file' => ['name' => 'satzung.pdf', 'data' => base64_encode("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")]]);
     $docUrl = (string) ($upDoc['url'] ?? '');

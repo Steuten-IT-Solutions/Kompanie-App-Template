@@ -169,6 +169,11 @@ grep -q "keine geprüfte Version" <<< "$(checked)" && [ -f "$T/releases/v$CORE.2
 # „Kernversion freigeben“: geprüfter Code als STABLE_CORE_VALUE (Kern-Version und Prüfsumme wie beim Veröffentlichen),
 # gilt vor der Datei (die hier noch einen anderen Code enthält)
 CHECKED="$CORE $(php scripts/package.php --code-hash)"
+# Die Kern-Version gehört zum Programmcode: Erhöhen ergibt einen neuen Stand (sonst baut der Abgleich nichts Neues)
+cp VERSION "$T/VERSION.bak" && echo 9.9.9 > VERSION
+OTHER="$(php scripts/package.php --code-hash || true)"
+cp "$T/VERSION.bak" VERSION
+[ -n "$OTHER" ] && [ "$OTHER" != "${CHECKED#* }" ] && ok "Andere Kern-Version, anderer coreCode" || fail "coreCode hängt nicht von VERSION ab"
 grep -q "gebe $CORE.2 frei" <<< "$(STABLE_CORE_VALUE="$CHECKED" checked)" && pages && [ ! -f "$T/releases/v$CORE.2/PRERELEASE" ] && grep -q "\"stable\": \"$CORE.2\"" <<< "$(list)" \
   && ok "promote-checked gibt die neueste geprüfte Version frei" || fail "promote-checked: $(list | grep -A3 channels)"
 echo "$CHECKED" > "$T/STABLE_CORE"

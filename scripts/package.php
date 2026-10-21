@@ -156,6 +156,8 @@ function kompanie_code_hash(string $root): string
             'package-lock.json' => $root . '/package-lock.json',
             'build-frontend.sh' => $root . '/scripts/build-frontend.sh',
             'package.php' => $root . '/scripts/package.php',
+            // Kern-Version: Eine neue Version ergibt einen neuen Stand, auch ohne andere Änderung am Code.
+            'VERSION' => $root . '/VERSION',
         ],
         'shared' => $f('adapters/shared'),
     ];

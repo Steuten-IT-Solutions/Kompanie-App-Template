@@ -2180,6 +2180,58 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/photo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: Foto eines Mitglieds hochladen oder ersetzen
+      description: |
+        JPG, PNG oder WebP, höchstens 5 MB und 4096 × 4096 Pixel, Base64 im JSON. Geprüft werden Endung und Signatur.
+        Gespeichert werden nur neu erzeugte JPEGs in 128 und 480 Pixeln (längere Kante, nie vergrößert, nach EXIF
+        gedreht, ohne Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
+        `photo_url`) ändert sich. Wer kein Admin ist, nur bei Konten, die er verwalten darf (wie `PATCH
+        /members/{id}/account`).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { $ref: '#/components/schemas/PhotoFile' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photo_url]
+                properties:
+                  photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Foto eines Mitglieds entfernen
+      x-capability: create_users
+      responses:
+        '200':
+          description: Entfernt (`photo_url` ist null)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photo_url]
+                properties:
+                  photo_url: { type: 'null' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/birthday:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -2247,6 +2299,10 @@ paths:
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
                 rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
                 birthday: { $ref: '#/components/schemas/BirthdayString' }
+                photo:
+                  description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
+                  allOf:
+                    - $ref: '#/components/schemas/PhotoFile'
       responses:
         '201':
           description: Angelegt
@@ -2262,8 +2318,10 @@ paths:
       summary: Mehrere Mitglieder bzw. Anwärter auf einmal anlegen (Issue #24)
       description: |
         Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
-        Anfangspunkte, Dienstgrad); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile. Scheitert danach
-        doch eines, steht es mit `error` im Ergebnis.
+        Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
+        Scheitert danach doch eines, steht es mit `error` im Ergebnis. Die Ergebnisse stehen in der Reihenfolge von
+        `people`. Fotos lassen sich je Person mitschicken; die App lädt sie stattdessen danach einzeln mit `PUT
+        /members/{id}/photo` hoch, damit die Anfrage nicht größer wird, als der Server annimmt (`post_max_size`).
       x-capability: create_users
       requestBody:
         required: true
@@ -2290,6 +2348,7 @@ paths:
                       initial_points_date: { type: string, format: date }
                       rank_id: { type: integer }
                       birthday: { $ref: '#/components/schemas/BirthdayString' }
+                      photo: { $ref: '#/components/schemas/PhotoFile' }
       responses:
         '201':
           description: Ergebnis je Person (angelegt mit Startpasswort oder mit Grund nicht)
@@ -3617,6 +3676,7 @@ components:
         login: { type: string }
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
+        photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         capabilities:
           type: array
           items:
@@ -3911,10 +3971,12 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
+        group: { type: [string, 'null'], description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
-        rank_title: { type: [string, 'null'], description: 'Dienstgrad (nur mit Bereich Dienstgrade und Recht manage_ranks)' }
+        rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
+        photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
           type: array
@@ -3931,7 +3993,7 @@ components:
             penalties:
               type: array
               items: { $ref: '#/components/schemas/Penalty' }
-            rank: { $ref: '#/components/schemas/RankStatus' }
+            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht manage_ranks)' }
             rank_history:
               type: array
               items: { $ref: '#/components/schemas/RankHistoryEntry' }
@@ -3951,6 +4013,7 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
+            photo_editable: { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
 
     GrantableCapability:
       type: string
@@ -4031,12 +4094,29 @@ components:
         badge_type: { type: [string, 'null'], enum: [png, jpg, webp, svg, null], description: 'Format des hochgeladenen Abzeichens (nur mit all=1)' }
         badge_push: { type: boolean, description: 'Es gibt eine PNG-Fassung für Benachrichtigungen (nur mit all=1; bei SVG nur, wenn die App eine mitgeschickt hat)' }
 
+    PhotoFile:
+      type: object
+      required: [name, data]
+      properties:
+        name: { type: string, description: 'Dateiname; die Endung (.jpg, .jpeg, .png, .webp) bestimmt das Format' }
+        data: { type: string, description: 'Inhalt Base64-kodiert (auch als data:-Adresse)' }
+
+    PhotoUrl:
+      type: [string, 'null']
+      description: |
+        Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
+        durch 480. Ausgeliefert als image/jpeg nur an angemeldete Personen: die Person selbst und wer die Mitglieder in
+        der Verwaltung sieht (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder
+        promote_users); sonst 401/403, im Wartungsmodus 503. `Cache-Control: private`, bei passender Fassung einen Tag.
+        Die Adresse wechselt mit jedem Foto.
+
     BadgeUrl:
       type: [string, 'null']
       description: |
         Abzeichen des Dienstgrads (Issue #17) oder null: `<App>/abzeichen/<id>?v=<Fassung>&s=128`. Die App ersetzt
         `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert nur an angemeldete
-        Personen mit Mitgliederbereich oder internem Kalender (sonst 401/403, im Wartungsmodus 503, Bereich aus 404);
+        Personen mit Mitgliederbereich oder internem Kalender und an alle mit Zugang zur Mitgliederliste (sonst
+        401/403, im Wartungsmodus 503, Bereich aus 404);
         SVG als image/svg+xml mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
         und `X-Content-Type-Options: nosniff`, sonst image/png. Die Adresse wechselt mit jeder Fassung.
 
@@ -4204,5 +4284,6 @@ components:
         username: { type: string }
         email: { type: string }
         level: { type: string, enum: [member, candidate] }
-        warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte bzw. Dienstgrad nicht übernommen' }
+        warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
+        photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort }

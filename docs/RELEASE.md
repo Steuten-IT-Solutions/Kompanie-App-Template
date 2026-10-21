@@ -100,7 +100,8 @@ Im Kern-Repo *Issues → New issue*:
 | geprüfter Kern | `1.4.0 3f2a…` | Datei [`STABLE_CORE`](../STABLE_CORE): Kern-Version und `coreCode` aus der `release.json` der auf der Demo geprüften Version |
 
 `coreCode` ist eine Prüfsumme über alle versionierten Dateien, die in die Pakete eingehen: Kern, Adapter,
-Installer, Oberfläche, Branding, Build- und Paket-Skripte, `package.json`/`package-lock.json`; ohne Daten der
+Installer, Oberfläche, Branding, Build- und Paket-Skripte, `package.json`/`package-lock.json` und `VERSION` (eine
+höhere Kern-Version ergibt also auch ohne andere Änderung eine neue Version in `early`); ohne Daten der
 Kompanie, Tests und Doku (`php scripts/package.php --code-hash`, braucht einen Git-Arbeitsbaum).
 `STABLE_CORE` gilt nur, wenn beides passt: Ein Commit nach dem Test, der den Code ändert, landet also
 wieder zuerst in `early`.
@@ -120,8 +121,11 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
   bekommen sie direkt als `stable` gebaut.
 - Pull Requests nach `main` von einem anderen Branch als `develop` macht der Check **Quelle ist develop** rot
   ([`main-nur-aus-develop.yml`](../.github/workflows/main-nur-aus-develop.yml)). Damit er den Merge sperrt, muss er
-  im Branch-Schutz von `main` als Pflicht-Check eingetragen sein (Settings → Branches bzw. Rulesets → Require
-  status checks).
+  im Branch-Schutz von `main` als Pflicht-Check eingetragen sein (Settings → Rules → Rulesets → Ruleset für den
+  Default-Branch → Require status checks to pass). „Kernversion freigeben“ pusht `STABLE_CORE` direkt auf `main`,
+  und zwar als GitHub App (`KOMPANIE_APP_ID`); diese App unter **Bypass list** des Rulesets eintragen, sonst lehnt
+  GitHub den Push ab (die Action meldet es als Warnung, dann `STABLE_CORE` per Pull Request über `develop`). Der
+  Commit trägt `[skip ci]`, damit der Push der App keine Workflows startet.
 - Nach einem Release `main` zurück nach `develop` mergen (nimmt den `STABLE_CORE`-Eintrag mit).
 - Der Zeitplan von „Kompanien abgleichen“ läuft auf `main`: Änderungen eines Kompanie-Repos (Logo, Farben) kommen
   mit dem freigegebenen Kern, also direkt als `stable`.
