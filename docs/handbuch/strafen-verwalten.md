@@ -13,4 +13,4 @@ Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Rec
 ## Bezahlt markieren
 Unter **Verwaltung → Mitglieder** das Mitglied öffnen, im Menü unter dem Namen **{bereich.penalties}** wählen und beim Eintrag **Bezahlt** tippen. Versehentlich markiert? **Doch offen** setzt ihn zurück.
 
-Oben in der Mitgliederliste steht, wie viel insgesamt offen ist.
+Oben unter **Verwaltung → {bereich.penalties} +** steht, wie viel insgesamt offen ist.
