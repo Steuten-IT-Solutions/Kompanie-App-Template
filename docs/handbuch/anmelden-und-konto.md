@@ -12,7 +12,7 @@ Ohne Anmeldung siehst du alles, was öffentlich ist, z. B. die öffentlichen {be
 
 ## Dein Konto
 Bist du angemeldet, steht oben rechts **Konto**. Dort findest du:
-- deinen Namen und deine Rolle, z. B. {rolle.member} oder {rolle.candidate},
+- deinen Namen und deine Rolle, z. B. {rolle.member} oder {rolle.candidate}, und dein Foto, wenn jemand eines hochgeladen hat (ändern kann es, wer Mitglieder anlegt),
 - als {rolle.member} die Karte **Geburtstag**, wenn die Kompanie {bereich.birthdays} nutzt,
 - **Benachrichtigungen einstellen**, siehe [Benachrichtigungen](seite:benachrichtigungen),
 - **App installieren**, solange du die App im Browser benutzt, siehe [Die App aufs Handy holen](seite:app-installieren),

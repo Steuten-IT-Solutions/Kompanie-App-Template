@@ -36,6 +36,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /foto/<id>/<größe>       Galeriebild      (index.php?r=/foto/…)
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
+ *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
@@ -334,6 +335,9 @@ final class Kernel
         } elseif (preg_match('#^/abzeichen/(\d+)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendBadge((int) $m[1]);
+        } elseif (preg_match('#^/mitgliedsfoto/(\d+)$#', $path, $m)) {
+            $this->beginPreview();
+            $this->sendMemberPhoto((int) $m[1]);
         } elseif ($path === '/google/callback') {
             $this->sendGoogleCallback();
         } elseif ($path === '/cron') {
@@ -548,6 +552,28 @@ final class Kernel
         if ($res['status'] === 200 && isset($res['path'])) {
             header('Content-Length: ' . filesize($res['path']));
             readfile($res['path']);
+        }
+    }
+
+    /** Foto eines Mitglieds: Status, Header und Inhalt wie im Kern festgelegt. */
+    private function sendMemberPhoto(int $id): void
+    {
+        $app = $this->app();
+        $v = is_string($_GET['v'] ?? null) ? $_GET['v'] : null;
+        $s = is_string($_GET['s'] ?? null) ? $_GET['s'] : null;
+        $res = $app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s);
+        $this->securityHeaders();
+        http_response_code($res['status']);
+        foreach ($res['headers'] as $name => $value) {
+            header($name . ': ' . $value);
+        }
+        if ($res['status'] === 200 && FileCache::matches($res['headers']['ETag'] ?? null, $this->http->header('If-None-Match'))) {
+            http_response_code(304);
+            return;
+        }
+        if ($res['status'] === 200 && isset($res['body'])) {
+            header('Content-Length: ' . strlen($res['body']));
+            echo $res['body'];
         }
     }
 

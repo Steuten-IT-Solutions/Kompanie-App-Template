@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 require_once ABSPATH . 'wp-admin/includes/user.php';
 
 $db = KompanieApp\WordPress\Plugin::app()->db;
-foreach (['points', 'penalties', 'point_catalog', 'events', 'rank_history', 'member_ranks', 'ranks', 'member_titles', 'titles', 'member_roles', 'attendance_entries', 'attendance_lists', 'documents', 'doc_categories', 'board_messages', 'poll_answers', 'poll_votes', 'poll_options', 'polls', 'birthdays', 'inventory_log', 'inventory_items'] as $table) {
+foreach (['points', 'penalties', 'point_catalog', 'events', 'rank_history', 'member_ranks', 'ranks', 'member_titles', 'titles', 'member_roles', 'attendance_entries', 'attendance_lists', 'documents', 'doc_categories', 'board_messages', 'poll_answers', 'poll_votes', 'poll_options', 'polls', 'birthdays', 'member_photos', 'inventory_log', 'inventory_items'] as $table) {
     $db->execute('DELETE FROM {' . $table . '}');
 }
 foreach (get_users(['search' => 'neue.testperson*', 'search_columns' => ['user_login']]) as $u) {

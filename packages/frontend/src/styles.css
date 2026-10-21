@@ -1858,6 +1858,47 @@ fieldset.feature-list legend {
   opacity: 1;
 }
 
+/* Fotos der Mitglieder: rund, Bildausschnitt mittig; ohne Foto die Anfangsbuchstaben. */
+.member-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  color: var(--ink);
+  font-family: var(--font-head);
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+.member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.member-avatar-small {
+  width: 40px;
+  height: 40px;
+  font-size: 0.9rem;
+}
+.member-avatar-large {
+  width: 128px;
+  height: 128px;
+  font-size: 2.2rem;
+}
+.member-photo,
+.photo-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+.account-card .member-avatar-large {
+  margin-bottom: 8px;
+}
+
 /* Abzeichen der Dienstgrade (Issue #17): ohne eigenen Hintergrund, Rahmen oder Farbfilter, damit transparente
  * Abzeichen direkt auf der Fläche dahinter stehen (hell wie dunkel). Höhe fest, Breite nach Seitenverhältnis. */
 .rank-badge {

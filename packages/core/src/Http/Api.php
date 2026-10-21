@@ -184,16 +184,17 @@ final class Api
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
                 }
                 $birthday = $this->birthdayInput($p['birthday'] ?? null);
+                $photo = $this->photoInput($p['photo'] ?? null);
             } catch (ApiError $e) {
                 $label = PersonName::join(Text::line($p['first_name'] ?? '', PersonName::MAX), Text::line($p['last_name'] ?? '', PersonName::MAX));
                 $label = $label !== '' ? $label : Text::line($p['name'] ?? '', PersonName::MAX);
                 $who = $label !== '' ? ' (' . $label . ')' : '';
                 throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
             }
-            $plans[] = [$prepared, $initial, $birthday];
+            $plans[] = [$prepared, $initial, $birthday, $photo];
         }
         $out = [];
-        foreach ($plans as [$prepared, $initial, $birthday]) {
+        foreach ($plans as [$prepared, $initial, $birthday, $photo]) {
             try {
                 $created = $this->app->members()->insert($prepared);
             } catch (\Throwable $e) {
@@ -207,6 +208,7 @@ final class Api
                 $created['warning'] = 'Angelegt, aber Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
             }
             $this->storeBirthday((int) $created['id'], $birthday, $created);
+            $this->storePhoto((int) $created['id'], $photo, $created);
             $out[] = $created;
         }
         return $out;
@@ -242,6 +244,35 @@ final class Api
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Geburtstag nicht übernommen: ' . $e->getMessage());
             $created['warning'] = trim(($created['warning'] ?? '') . ' Der Geburtstag fehlt noch. Bitte in den Mitgliedsdetails nachtragen.');
+        }
+    }
+
+    /**
+     * Foto beim Anlegen: {name, data (Base64)}, vorab geprüft (MemberPhotoService::parse).
+     *
+     * @return array{bytes: string, ext: string}|null
+     */
+    private function photoInput(mixed $value): ?array
+    {
+        return $value === null || $value === '' ? null : $this->app->memberPhotos()->parse($value);
+    }
+
+    /**
+     * @param array{bytes: string, ext: string}|null $photo
+     * @param array<string, mixed> $created
+     */
+    private function storePhoto(int $userId, ?array $photo, array &$created): void
+    {
+        $created['photo_url'] = null;
+        if ($photo === null) {
+            return;
+        }
+        try {
+            $this->app->memberPhotos()->store($this->user(), $userId, $photo);
+            $created['photo_url'] = $this->app->memberPhotos()->url($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Foto nicht übernommen: ' . $e->getMessage());
+            $created['warning'] = trim(($created['warning'] ?? '') . ' Das Foto fehlt noch. Bitte in den Mitgliedsdetails nachtragen.');
         }
     }
 
@@ -317,7 +348,8 @@ final class Api
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
             // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
-            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user)] : null,
+            // photo_url: eigenes Foto (Konto), null ohne
+            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id)] : null,
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
@@ -605,6 +637,8 @@ final class Api
                     $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
                 );
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
+                $photos = $a->memberPhotos()->urls();
+                $list = array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $list);
                 if ($this->showRanks()) {
                     $ranks = $a->ranks()->assigned();
                     $list = array_map(static fn (array $m): array => $m + [
@@ -619,6 +653,8 @@ final class Api
                 return $list;
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
+                // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
+                + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
                 + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
@@ -637,6 +673,9 @@ final class Api
                 $a->userDeleted($r->id());
                 return ['deleted' => true];
             }, null, $denyUsers),
+            // Foto des Mitglieds: hochladen bzw. ersetzen und entfernen
+            new Route('PUT', '/members/{id}/photo', Cap::CreateUsers, fn (Request $r) => $a->memberPhotos()->upload($this->user(), $r->id(), $r->input('file')), null, $denyUsers),
+            new Route('DELETE', '/members/{id}/photo', Cap::CreateUsers, fn (Request $r) => $a->memberPhotos()->remove($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, function (Request $r) use ($a) {
                 // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.
@@ -645,6 +684,7 @@ final class Api
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
                 }
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
+                $photo = $this->photoInput($r->body['photo'] ?? null);
                 $created = $a->members()->create($r->body);
                 try {
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
@@ -653,6 +693,7 @@ final class Api
                     $created['warning'] = 'Das Konto ist angelegt, aber Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.';
                 }
                 $this->storeBirthday((int) $created['id'], $birthday, $created);
+                $this->storePhoto((int) $created['id'], $photo, $created);
                 return Response::created($created);
             }, null, $denyUsers),
             // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.
