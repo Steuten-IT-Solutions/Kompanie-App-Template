@@ -47,7 +47,22 @@ export function BirthdayRow({ b }: { b: BirthdayEntry }) {
  * anstehende erscheint sie nicht (außer mit `always`, wenn es sonst nichts zu sehen gibt).
  */
 export function UpcomingBirthdays({ always = false }: { always?: boolean }) {
-  const { data, error } = useAsync(() => api.birthdays(7), [], 'geburtstage-anstehend');
+  return <UpcomingBirthdaysCard state={useUpcomingBirthdays(true)} always={always} />;
+}
+
+/** Lädt die anstehenden Geburtstage (nur mit `on`), z. B. gleichzeitig mit den Terminen. */
+export function useUpcomingBirthdays(on: boolean) {
+  return useAsync(() => (on ? api.birthdays(7) : Promise.resolve(null)), [], 'geburtstage-anstehend');
+}
+
+/** Die Karte zu schon geladenen Daten (useUpcomingBirthdays). */
+export function UpcomingBirthdaysCard({
+  state: { data, error },
+  always = false,
+}: {
+  state: { data: BirthdayEntry[] | null; error: string | null };
+  always?: boolean;
+}) {
   if (!data) return error && always ? <ErrorBox message={error} /> : null;
   if (data.length === 0 && !always) return null;
   return (

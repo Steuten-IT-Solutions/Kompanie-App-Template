@@ -1399,13 +1399,15 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await news.getByRole('button', { name: 'Neuigkeiten testen' }).click();
   await expect(news.getByText('2 Beiträge gefunden.')).toBeVisible();
   await page.goto('/app/#/einstellungen');
+  await expect(page.locator('.settings-link').first()).toBeVisible();
   await shot(page, '18-einstellungen');
 });
 
 test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/einstellungen');
-  // In der Übersicht über Kalender und Galerie
+  // In der Übersicht über Kalender und Galerie (die Übersicht erscheint erst nach dem Laden)
+  await expect(page.locator('.settings-link', { hasText: 'Google-Zugang' })).toBeVisible();
   const order = await page.locator('.settings-link .row-title').allTextContents();
   expect(order.indexOf('Google-Zugang')).toBeLessThan(order.indexOf('Kalender'));
   expect(order.indexOf('Google-Zugang')).toBeLessThan(order.indexOf('Galerie'));

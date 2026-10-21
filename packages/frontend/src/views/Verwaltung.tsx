@@ -722,6 +722,8 @@ function NewMember() {
       </div>
     );
   }
+  // Erst mit den Dienstgraden zeigen: Sonst taucht das Feld dafür später auf und schiebt den Rest des Formulars nach unten.
+  if (canRanks() && ranks.loading && !ranks.data) return <Loading />;
 
   return (
     <form className="form" onSubmit={submit}>
@@ -985,16 +987,19 @@ function GivePenalty({
   onDone?: () => void;
 }) {
   const { data, error, loading, reload } = useAsync(api.members);
+  // Summe aller offenen Strafen (Mitglieder und Anwärter, ohne Gast-Konten): gleichzeitig mit der Auswahl geladen und
+  // gemerkt, damit die Karte zusammen mit dem Formular erscheint. Beim Eintragen aus einer Anwesenheitsliste nicht.
+  const total = useAsync(() => (attendance ? Promise.resolve(null) : api.members(false, true)), [], 'penalty-total');
   const [selected, setSelected] = useState<number[]>(preselect);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState(attendance ? `Gefehlt: ${attendance.title}` : '');
   const [date, setDate] = useState(attendance?.date ?? todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(0);
 
-  if (loading && !data) return <Loading />;
+  if ((loading && !data) || (total.loading && !total.data && !attendance)) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const totalOpen = total.data?.filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -1011,7 +1016,7 @@ function GivePenalty({
       setSelected([]);
       setAmount('');
       setReason('');
-      setSaved((n) => n + 1);
+      total.reload();
       onDone?.();
     } catch (err) {
       setFormError((err as Error).message);
@@ -1022,7 +1027,9 @@ function GivePenalty({
 
   return (
     <form className="form" onSubmit={submit}>
-      {!attendance && <OpenPenaltyTotal key={saved} />}
+      {!attendance && totalOpen !== undefined && (
+        <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />
+      )}
       <div className="field-row">
         <label className="field">
           <span>Betrag in €</span>
@@ -1058,14 +1065,6 @@ function GivePenalty({
       </button>
     </form>
   );
-}
-
-/** Summe aller offenen Strafen (Mitglieder und Anwärter, ohne Gast-Konten). */
-function OpenPenaltyTotal() {
-  const { data } = useAsync(() => api.members(false, true));
-  if (!data) return null;
-  const totalOpen = data.filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
-  return <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />;
 }
 
 /* ------------------------------------------------------------------ */
