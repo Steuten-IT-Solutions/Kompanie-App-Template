@@ -1561,6 +1561,43 @@ test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach de
   expect(await order()).toEqual([names[0], names[2], names[1]]);
 });
 
+test('Titel: beim Ziehen an den unteren Rand scrollt die Seite mit', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const names = Array.from({ length: 8 }, (_, i) => `Lang ${i + 1} ${id}`);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Titel');
+  for (const name of names) {
+    await page.getByLabel('Bezeichnung').fill(name);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.title-list .row', { hasText: name })).toBeVisible();
+  }
+  const order = async () => (await page.locator('.title-list .row-title').allTextContents()).filter((t) => t.includes(id));
+
+  // Ersten Titel knapp unter die Kopfleiste holen; der letzte liegt dann weit außerhalb des Bildes
+  const first = page.locator('.title-list .row', { hasText: names[0] });
+  await first.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 120));
+  const scrolled = await page.evaluate(() => window.scrollY);
+  const handle = (await first.getByRole('button', { name: /verschieben/ }).boundingBox())!;
+  const tabbar = (await page.locator('.tabbar').boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  // Knapp über der Tab-Leiste halten, bis die Seite unten angekommen ist
+  await page.mouse.move(handle.x + handle.width / 2, tabbar.y - 10, { steps: 10 });
+  await expect
+    .poll(() => page.evaluate(() => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 2), {
+      timeout: 10_000,
+    })
+    .toBe(true);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(scrolled);
+  await page.mouse.up();
+  await expect.poll(order).toEqual([...names.slice(1), names[0]]);
+
+  await page.reload();
+  await expect(page.locator('.title-list .row', { hasText: names[0] })).toBeVisible();
+  expect(await order()).toEqual([...names.slice(1), names[0]]);
+});
+
 test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Änderung zeigt es wieder, abgelaufen weg', async ({
   page,
   browser,

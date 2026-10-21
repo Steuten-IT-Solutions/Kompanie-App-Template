@@ -1,22 +1,60 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 
 /** Laufender Zug: welcher Eintrag, wohin er fiele und wie weit er verschoben ist (Bildschirm-Pixel). */
 type Drag = { from: number; to: number; dy: number };
+
+/** Maße beim Anfassen, relativ zur Oberkante der Liste – so stimmen sie auch, wenn die Seite beim Ziehen scrollt. */
+type Start = {
+  from: number;
+  to: number;
+  list: HTMLElement;
+  /** Abstand des Zeigers zur Oberkante der Liste beim Anfassen */
+  y: number;
+  rects: { top: number; height: number }[];
+  /** Platz, den der gezogene Eintrag freimacht: seine Höhe plus Abstand zum Nachbarn */
+  shift: number;
+  /** Letzte Zeigerposition (Bildschirm) */
+  pointerY: number;
+  frame: number;
+};
 
 /** „zoom“ der Seite (viewport.ts): Pointer und Maße sind in Bildschirm-Pixeln, transform rechnet in Seiten-Pixeln. */
 function zoom(): number {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kompanie-zoom')) || 1;
 }
 
+/** Randzone, in der die Seite mitscrollt, und Höchstgeschwindigkeit (Pixel je Bild) */
+const EDGE = 56;
+const MAX_SPEED = 14;
+
+/**
+ * Scrollgeschwindigkeit für die Zeigerposition: in der Randzone unter der Kopfleiste nach oben, über der Tab-Leiste
+ * nach unten, je näher am Rand, desto schneller. Kopf- und Tab-Leiste bleiben stehen und verdecken die Seite.
+ */
+function scrollSpeed(y: number): number {
+  const bar = (sel: string) => {
+    const r = document.querySelector(sel)?.getBoundingClientRect();
+    return r && r.height > 0 ? r : null;
+  };
+  const top = Math.max(0, bar('.topbar')?.bottom ?? 0);
+  const bottom = Math.min(window.innerHeight, bar('.tabbar')?.top ?? window.innerHeight);
+  if (y < top + EDGE) return -Math.ceil(MAX_SPEED * Math.min(1, (top + EDGE - y) / EDGE));
+  if (y > bottom - EDGE) return Math.ceil(MAX_SPEED * Math.min(1, (y - bottom + EDGE) / EDGE));
+  return 0;
+}
+
 /**
  * Reihenfolge einer Liste per Ziehen am Griff ändern, mit Maus und Finger (Pointer-Events statt HTML-Drag-and-drop,
- * das auf Touch-Geräten nicht geht). Der Eintrag folgt dem Finger, die anderen rücken zur Seite; beim Loslassen
- * bekommt onMove die neue Reihenfolge. Am fokussierten Griff verschieben Pfeil hoch/runter um eine Stelle.
+ * das auf Touch-Geräten nicht geht). Der Eintrag folgt dem Finger, die anderen rücken zur Seite; nahe an Kopf- oder
+ * Tab-Leiste scrollt die Seite mit. Beim Loslassen bekommt onMove die neue Reihenfolge. Am fokussierten Griff
+ * verschieben Pfeil hoch/runter um eine Stelle.
  */
 export function useDragSort<T>(items: T[], onMove: (next: T[]) => void, disabled = false) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const els = useRef<(HTMLElement | null)[]>([]);
-  const start = useRef<{ y: number; rects: DOMRect[]; shift: number } | null>(null);
+  const start = useRef<Start | null>(null);
+
+  useEffect(() => () => cancelAnimationFrame(start.current?.frame ?? 0), []);
 
   function moved(from: number, to: number): T[] {
     const next = items.slice();
@@ -24,39 +62,80 @@ export function useDragSort<T>(items: T[], onMove: (next: T[]) => void, disabled
     return next;
   }
 
+  /** Lage des gezogenen Eintrags und Zielplatz aus der letzten Zeigerposition neu berechnen. */
+  function update() {
+    const s = start.current;
+    if (!s) return;
+    const dy = s.pointerY - s.list.getBoundingClientRect().top - s.y;
+    const { rects, from } = s;
+    const centre = rects[from].top + rects[from].height / 2 + dy;
+    const mid = (i: number) => rects[i].top + rects[i].height / 2;
+    let to = from;
+    while (to < rects.length - 1 && centre > mid(to + 1)) to++;
+    while (to > 0 && centre < mid(to - 1)) to--;
+    s.to = to;
+    setDrag({ from, to, dy });
+  }
+
+  /** Läuft während des Ziehens: scrollt in der Randzone, auch wenn der Finger stillhält. */
+  function autoScroll() {
+    const s = start.current;
+    if (!s) return;
+    const speed = scrollSpeed(s.pointerY);
+    if (speed) {
+      window.scrollBy(0, speed);
+      update();
+    }
+    s.frame = requestAnimationFrame(autoScroll);
+  }
+
   function onPointerDown(index: number, e: PointerEvent<HTMLElement>) {
-    if (disabled || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const list = els.current[index]?.parentElement;
+    if (disabled || !list || (e.pointerType === 'mouse' && e.button !== 0)) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    const rects = els.current.slice(0, items.length).map((el) => el!.getBoundingClientRect());
-    // Platz, den der gezogene Eintrag freimacht: seine Höhe plus Abstand zum Nachbarn
-    const gap = rects.length > 1 ? rects[1].top - rects[0].bottom : 0;
-    start.current = { y: e.clientY, rects, shift: rects[index].height + gap };
+    const listTop = list.getBoundingClientRect().top;
+    const rects = els.current.slice(0, items.length).map((el) => {
+      const r = el!.getBoundingClientRect();
+      return { top: r.top - listTop, height: r.height };
+    });
+    const gap = rects.length > 1 ? rects[1].top - (rects[0].top + rects[0].height) : 0;
+    start.current = {
+      from: index,
+      to: index,
+      list,
+      y: e.clientY - listTop,
+      rects,
+      shift: rects[index].height + gap,
+      pointerY: e.clientY,
+      frame: 0,
+    };
     setDrag({ from: index, to: index, dy: 0 });
+    start.current.frame = requestAnimationFrame(autoScroll);
   }
 
   function onPointerMove(e: PointerEvent<HTMLElement>) {
-    if (!drag || !start.current) return;
-    const { rects, y } = start.current;
-    const dy = e.clientY - y;
-    const centre = rects[drag.from].top + rects[drag.from].height / 2 + dy;
-    const mid = (i: number) => rects[i].top + rects[i].height / 2;
-    let to = drag.from;
-    while (to < rects.length - 1 && centre > mid(to + 1)) to++;
-    while (to > 0 && centre < mid(to - 1)) to--;
-    setDrag({ ...drag, to, dy });
+    if (!start.current) return;
+    start.current.pointerY = e.clientY;
+    update();
+  }
+
+  /** Ziehen beenden; gibt den Zug zurück, falls einer lief. */
+  function stop() {
+    const s = start.current;
+    if (s) cancelAnimationFrame(s.frame);
+    start.current = null;
+    setDrag(null);
+    return s;
   }
 
   function onPointerUp() {
-    if (!drag) return;
-    setDrag(null);
-    start.current = null;
-    if (drag.to !== drag.from) onMove(moved(drag.from, drag.to));
+    const s = stop();
+    if (s && s.to !== s.from) onMove(moved(s.from, s.to));
   }
 
   function onPointerCancel() {
-    setDrag(null);
-    start.current = null;
+    stop();
   }
 
   function onKeyDown(index: number, e: KeyboardEvent<HTMLElement>) {
