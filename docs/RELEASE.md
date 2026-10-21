@@ -100,7 +100,8 @@ Im Kern-Repo *Issues → New issue*:
 | geprüfter Kern | `1.4.0 3f2a…` | Datei [`STABLE_CORE`](../STABLE_CORE): Kern-Version und `coreCode` aus der `release.json` der auf der Demo geprüften Version |
 
 `coreCode` ist eine Prüfsumme über alle versionierten Dateien, die in die Pakete eingehen: Kern, Adapter,
-Installer, Oberfläche, Branding, Build- und Paket-Skripte, `package.json`/`package-lock.json`; ohne Daten der
+Installer, Oberfläche, Branding, Build- und Paket-Skripte, `package.json`/`package-lock.json` und `VERSION` (eine
+höhere Kern-Version ergibt also auch ohne andere Änderung eine neue Version in `early`); ohne Daten der
 Kompanie, Tests und Doku (`php scripts/package.php --code-hash`, braucht einen Git-Arbeitsbaum).
 `STABLE_CORE` gilt nur, wenn beides passt: Ein Commit nach dem Test, der den Code ändert, landet also
 wieder zuerst in `early`.
