@@ -2301,10 +2301,20 @@ fieldset.feature-list legend {
   justify-content: space-between;
   gap: 4px 12px;
 }
-.board-banner-foot .btn-link {
+.board-banner-foot .btn-link,
+.board-banner-collapsed .btn-link {
   padding: 6px 0;
   font-size: 0.85rem;
   text-decoration: underline;
+}
+.board-banner-collapsed {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0 12px;
+  padding: 2px 16px;
+  font-size: 0.85rem;
 }
 .board-page-title {
   margin: 18px 0 10px;

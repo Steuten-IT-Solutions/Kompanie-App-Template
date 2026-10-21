@@ -1572,6 +1572,19 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await banner.getByRole('button', { name: '+1 weitere' }).click();
   await expect(banner).toContainText(`${first} – fällt aus, Halle gesperrt`);
 
+  // Alle ausgeblendet: Eine schmale Zeile führt weiter zum Brett, auch nach dem Neuladen.
+  for (const text of [first, second]) {
+    await banner.locator('.board-entry', { hasText: text }).getByRole('button', { name: 'Nachricht ausblenden' }).click();
+  }
+  await expect(banner.locator('.board-entry')).toHaveCount(0);
+  await expect(banner).toContainText('Schwarzes Brett · 2 ausgeblendet');
+  await page.reload();
+  await expect(banner).toContainText('2 ausgeblendet');
+  await banner.getByRole('button', { name: 'Brett öffnen' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Schwarzes Brett');
+  for (const text of [first, second]) await expect(page.locator('.board-card', { hasText: text })).toBeVisible();
+  await page.goto('/app/#/termine');
+
   // Nach 24 Stunden blendet die App sie selbst aus (Uhr des Browsers vorgestellt).
   await page.clock.install({ time: new Date(Date.now() + 25 * 3600 * 1000) });
   await page.reload();
