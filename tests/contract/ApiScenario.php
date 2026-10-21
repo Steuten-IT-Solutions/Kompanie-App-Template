@@ -695,7 +695,6 @@ final class ApiScenario
         $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 10, 'reason' => 'Kptest Rang']);
         [$s, $d] = $this->req('PUT', "/members/$m/rank", ['rank_id' => $a['id'] ?? 0, 'reason' => 'Kptest']);
         $c->ok($s === 200 && ($d['rank']['id'] ?? 0) === ($a['id'] ?? -1) && ($d['points_to_next'] ?? null) === 15, 'Befördert; noch 15 Punkte bis zum nächsten');
-        $c->ok($this->req('PUT', "/members/$m/rank", ['rank_id' => null])[0] === 400, 'Degradieren über der Schwelle → 400');
         $rows = array_column((array) $this->req('GET', '/promotions')[1], null, 'user_id');
         $c->ok(isset($rows[$m]) && !isset($rows[$guest]) && $rows[$m]['points_to_next'] === 15, 'Beförderungsübersicht ohne Gäste');
         $this->d->actAs($m);

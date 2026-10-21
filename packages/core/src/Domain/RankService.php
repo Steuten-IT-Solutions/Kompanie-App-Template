@@ -19,8 +19,8 @@ use KompanieApp\Core\Storage\RankRepository;
  *
  * - Ohne den Bereich Punkte: frei befördern und degradieren, mit optionaler Begründung und Verlauf.
  * - Mit Punkten (Features::ranksUsePoints): Punkteschwellen. Befördern nur, wenn die Schwelle des Ziels erreicht ist;
- *   degradieren nur, wenn die Punkte unter der Schwelle des aktuellen Dienstgrads liegen. Das gilt für alle, auch
- *   Admins. Dienstgrade ohne Schwelle sind frei (bis eine eingetragen ist). Dazu „noch N Punkte bis …“,
+ *   das gilt für alle, auch Admins. Degradieren geht immer, auch über der Schwelle (z. B. um eine zu hohe Einstufung
+ *   zu korrigieren). Dienstgrade ohne Schwelle sind frei (bis eine eingetragen ist). Dazu „noch N Punkte bis …“,
  *   „Schwelle erreicht seit“ und die Beförderungsübersicht.
  * - Abzeichen (Issue #17): optional ein Bild je Dienstgrad (PNG, JPG, WebP oder SVG, höchstens 1 MB), hochladen und
  *   entfernen mit „Dienstgrade verwalten“. Rasterbilder werden zu PNG in 64/128/256 Pixeln (mit Transparenz), SVGs
@@ -658,9 +658,6 @@ final class RankService
                 $target['title'],
                 self::number($target['min_points'] - $total),
             ));
-        }
-        if (!$promotion && $current !== null && $current['min_points'] !== null && $total >= $current['min_points']) {
-            throw ApiError::invalid(sprintf('Degradieren ist nur möglich, wenn die Punkte unter der Schwelle von „%s“ liegen.', $current['title']));
         }
         return $promotion ? self::KIND_PROMOTION : self::KIND_DEMOTION;
     }

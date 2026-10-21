@@ -903,8 +903,8 @@ paths:
       tags: [Verwaltung]
       summary: Befördern oder degradieren
       description: |
-        Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels,
-        degradieren nur unter der Schwelle des aktuellen Dienstgrads; Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
+        Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels;
+        degradieren immer, auch über der Schwelle. Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
         Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren (`rank_id: null`, ohne Punkteregeln).
       x-capability: manage_ranks
       requestBody:

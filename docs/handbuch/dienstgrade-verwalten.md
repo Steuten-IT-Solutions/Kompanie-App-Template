@@ -22,7 +22,7 @@ Einen {begriff.rank} bekommen nur Mitglieder. Wer kein Mitglied mehr ist (z. B. 
 ## Zusammen mit {bereich.points}
 Jeder {begriff.rank} kann eine **{bereich.points}schwelle** haben (eine ganze Zahl ab 0, leer = ohne). Sie wirkt nur, wenn auch {bereich.points} eingeschaltet ist. Die Schwellen müssen mit der Reihenfolge steigen. Dann gilt für alle, auch für {rolle.admin}s:
 - **Befördern** erst, wenn die {bereich.points} des Mitglieds die Schwelle des neuen {begriff.rank}s erreichen. Mehrere {bereich.ranks} auf einmal zu überspringen ist erlaubt.
-- **Degradieren** nur, wenn die {bereich.points} unter der Schwelle des aktuellen {begriff.rank}s liegen, also nachdem {bereich.points} abgezogen wurden.
+- **Degradieren** geht immer, auch wenn die {bereich.points} die Schwelle des aktuellen {begriff.rank}s noch erreichen, z. B. um eine zu hohe Einstufung zu korrigieren. Wer danach die Schwelle eines höheren {begriff.rank}s erreicht, steht unter **Beförderungen** oben.
 - Für {bereich.ranks} ohne Schwelle gelten diese Regeln nicht; trage die Schwellen nach, wenn ihr sie nutzen wollt.
 
 Die Auswahl unter **Neuer {begriff.rank}** bietet nur an, was nach diesen Regeln erlaubt ist. Wer {bereich.ranks} verwaltet, sieht dafür die Punktestände der Mitglieder, auch ohne selbst {bereich.points} vergeben zu dürfen.

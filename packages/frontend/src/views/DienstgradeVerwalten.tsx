@@ -163,7 +163,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
       <p className="muted small">
         Vom niedrigsten zum höchsten {rank}.{' '}
         {points
-          ? `Mit ${sec.points}schwelle: befördern erst ab der Schwelle, degradieren nur darunter. Ohne Schwelle frei.`
+          ? `Mit ${sec.points}schwelle: befördern erst ab der Schwelle, degradieren jederzeit. Ohne Schwelle frei.`
           : `Befördern und degradieren geht frei; mit dem Bereich ${sec.points} kommen ${sec.points}schwellen dazu.`}
       </p>
       {missing && (
@@ -437,14 +437,12 @@ export function MemberRank({
   const list = ranks.data ?? [];
   const currentIndex = list.findIndex((r) => r.id === status.rank?.id);
   const total = status.points ?? 0;
-  const currentMin = list[currentIndex]?.min_points ?? null;
-  const canDemote = !member || !points || currentMin === null || total < currentMin;
-  // Mit Punkten nur Ziele anbieten, die die Regeln erlauben (der Server prüft trotzdem).
+  // Mit Punkten nur Ziele anbieten, die die Regeln erlauben (der Server prüft trotzdem); degradieren geht immer.
   const options = list.filter((r, i) => {
     if (!member || r.id === status.rank?.id || !r.active) return false;
     const up = currentIndex === -1 || i > currentIndex;
-    if (!points) return true;
-    return up ? r.min_points === null || total >= r.min_points : canDemote;
+    if (!points || !up) return true;
+    return r.min_points === null || total >= r.min_points;
   });
   const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -505,7 +503,7 @@ export function MemberRank({
                 {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString('de-DE')})` : ''}
               </option>
             ))}
-            {status.rank && canDemote && <option value="none">Kein {rank}</option>}
+            {status.rank && <option value="none">Kein {rank}</option>}
           </select>
         </label>
         <label className="field">
@@ -520,8 +518,8 @@ export function MemberRank({
         <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
           {rank} ändern
         </button>
-        {points && options.length === 0 && !(status.rank && canDemote) && (
-          <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle, degradieren nur darunter.</p>
+        {points && options.length === 0 && !status.rank && (
+          <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.</p>
         )}
       </form>
       <RankHistory entries={history} />
