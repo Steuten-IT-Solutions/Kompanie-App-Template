@@ -2957,7 +2957,7 @@ components:
               name: { type: string }
               login: { type: string }
               email: { type: string }
-              can_change_login: { type: boolean, description: 'false bei WordPress' }
+              can_change_login: { type: boolean, description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)' }
     AttendanceGroups:
       description: Je Rolle (ohne Gast), als welche sie im Zähler zählt
       content:

@@ -20,7 +20,7 @@ Andere Rollen vergibt danach, wer Rollen vergeben darf.
 {rolle.candidate} nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen den internen Kalender, aber nicht den Mitgliederbereich. In der Mitgliederliste erscheinen sie, wenn **Auch {rolle.candidate} anzeigen** angehakt ist. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Das geht nur von {rolle.candidate} zu {rolle.member}.
 
 ## Angaben ändern und Konto löschen
-Im Mitglied unter **Konto und Rolle**: **Angaben ändern** für Name, E-Mail und (nicht mit WordPress) Benutzername.
+Im Mitglied unter **Konto und Rolle**: **Angaben ändern** für Name, E-Mail und Benutzername. Alle Daten bleiben erhalten. Nach einem neuen Benutzernamen ist die Person auf allen Geräten abgemeldet und meldet sich mit dem neuen Namen wieder an. Mit WordPress ändert den Benutzernamen von Benutzern der Webseite (z. B. Redakteure, Administratoren) nur, wer sie in WordPress bearbeiten darf.
 
 **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, Titel und Benachrichtigungen; alle Geräte werden abgemeldet. Was die Person für andere eingetragen hat, bleibt; dort steht dann „eingetragen von: gelöschtes Konto“. Zur Sicherheit fragt die App nach und lässt den Namen eintippen. Mit WordPress heißt der Knopf **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Ein Konto ganz löschen geht dort im WordPress-Backend unter *Benutzer*; auch dann löscht die App alle seine Daten.
 

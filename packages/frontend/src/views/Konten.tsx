@@ -343,7 +343,11 @@ export function AccountPanel({
               onChange={(e) => setEditing({ ...editing, login: e.target.value })}
             />
           </label>
-          {!p.can_change_login && <p className="muted small">Benutzernamen lassen sich in WordPress nicht ändern.</p>}
+          {p.can_change_login ? (
+            <p className="muted small">Ein neuer Benutzername meldet die Person auf allen Geräten ab.</p>
+          ) : (
+            <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
+          )}
           <label className="field">
             <span>E-Mail (optional)</span>
             <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />

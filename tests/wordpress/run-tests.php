@@ -197,6 +197,56 @@ $c->ok($d->request('POST', '/users', ['name' => 'X', 'email' => 'kpwp-neu@exampl
 $c->ok(wp_authenticate($u['username'], $u['password']) instanceof WP_User, 'Anmeldung mit Startpasswort bei WordPress');
 wp_delete_user($u['id']);
 
+$c->section('Benutzername ändern');
+// WordPress schreibt user_login bei wp_update_user() nicht; die App ändert ihn direkt, ID und Daten bleiben.
+$d->actAs($admin);
+[, $alt] = $d->request('POST', '/users', ['name' => 'Kpwp Umbenennen', 'username' => 'kpwp.alt']);
+$rid = (int) $alt['id'];
+$d->request('POST', '/points', ['user_ids' => [$rid], 'points' => 5, 'reason' => 'Kpwp vor dem Umbenennen']);
+$sessions = WP_Session_Tokens::get_instance($rid);
+$sessions->create(time() + HOUR_IN_SECONDS);
+[$s, $p] = $d->request('GET', "/members/$rid/account");
+$c->ok($s === 200 && $p['can_change_login'] === true, 'WordPress: Benutzername änderbar');
+[$s, $p] = $d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.neu']);
+clean_user_cache($rid);
+$renamed = get_userdata($rid);
+$c->ok($s === 200 && $p['login'] === 'kpwp.neu' && $renamed->user_login === 'kpwp.neu', 'Neuer Benutzername gespeichert, gleiche ID');
+$c->ok($renamed->user_nicename === 'kpwp-neu', 'Aus dem alten Benutzernamen gebildeter Name in Adressen folgt dem neuen');
+$c->ok(get_user_by('login', 'kpwp.alt') === false && (int) username_exists('kpwp.neu') === $rid, 'Alter Benutzername frei, neuer gehört zum Konto (Cache geleert)');
+$c->ok(wp_authenticate('kpwp.neu', $alt['password']) instanceof WP_User && is_wp_error(wp_authenticate('kpwp.alt', $alt['password'])), 'Anmeldung nur mit dem neuen Benutzernamen');
+$c->ok((int) $app->db->scalar('SELECT COALESCE(SUM(points), 0) FROM {points} WHERE user_id = ?', [$rid]) === 5, 'Daten in der App bleiben erhalten');
+$c->ok(WP_Session_Tokens::get_instance($rid)->get_all() === [], 'Neuer Benutzername meldet auf allen Geräten ab');
+$c->ok($d->request('PATCH', "/members/$rid/account", ['username' => 'admin'])[0] === 400, 'Vergebener Benutzername → 400');
+$c->ok($d->request('PATCH', "/members/$rid/account", ['username' => 'mit leerzeichen'])[0] === 400, 'Ungültiger Benutzername → 400');
+$illegal = static fn (): array => ['kpwp.verboten'];
+add_filter('illegal_user_logins', $illegal);
+$c->ok($d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.verboten'])[0] === 403 && get_userdata($rid)->user_login === 'kpwp.neu', 'Von WordPress verbotener Benutzername wird abgelehnt');
+remove_filter('illegal_user_logins', $illegal);
+// Eigener Name in Adressen (nicht aus dem Benutzernamen gebildet) bleibt.
+$GLOBALS['wpdb']->update($GLOBALS['wpdb']->users, ['user_nicename' => 'kpwp-eigen'], ['ID' => $rid]);
+clean_user_cache($rid);
+$d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.dritter']);
+clean_user_cache($rid);
+$c->ok(get_userdata($rid)->user_login === 'kpwp.dritter' && get_userdata($rid)->user_nicename === 'kpwp-eigen', 'Eigener Name in Adressen bleibt');
+// Benutzer der Webseite (z. B. Redakteur): nur mit dem Recht aus WordPress, nicht über „Mitglieder anlegen“ der App.
+$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => ['member', 'create_users']]);
+$kontenpfleger = $d->createUser('kpwp_kontenpfleger', 'member');
+$app->users->setRole($kontenpfleger, $umbenenner['key']);
+$redakteur = wp_insert_user(['user_login' => 'kpwp_red', 'user_pass' => wp_generate_password(), 'role' => 'editor']);
+$app->users->setRole($redakteur, 'member');
+clean_user_cache($kontenpfleger);
+clean_user_cache($redakteur);
+$d->actAs($kontenpfleger);
+$c->ok($d->request('PATCH', "/members/$redakteur/account", ['username' => 'kpwp_red_neu'])[0] === 403 && get_userdata($redakteur)->user_login === 'kpwp_red', 'Redakteur umbenennen nur mit WP-Recht');
+$c->ok($d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.vierter'])[0] === 200, 'Konto der Kompanie umbenennen mit „Mitglieder anlegen“');
+$d->actAs($admin);
+$c->ok($d->request('PATCH', "/members/$redakteur/account", ['username' => 'kpwp_red_neu'])[0] === 200 && get_userdata($redakteur)->user_login === 'kpwp_red_neu', 'WordPress-Admin benennt Redakteur um');
+$d->actAs(null);
+foreach ([$rid, $kontenpfleger, $redakteur] as $id) {
+    wp_delete_user($id);
+}
+$app->roles()->delete($umbenenner['key'], 'member');
+
 $c->section('Neuigkeiten aus Beiträgen');
 $pub = wp_insert_post(['post_title' => 'Kpwp Beitrag', 'post_content' => '<p>Hallo <strong>Verein</strong></p>', 'post_status' => 'publish']);
 $draft = wp_insert_post(['post_title' => 'Kpwp Entwurf', 'post_content' => 'geheim', 'post_status' => 'draft']);

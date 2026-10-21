@@ -218,7 +218,7 @@ final class WpUsers implements UserDirectory, AuthContext
 
     public function canChangeLogin(): bool
     {
-        return false;
+        return true;
     }
 
     public function updateProfile(int $id, string $name, string $email, ?string $login): void
@@ -227,16 +227,54 @@ final class WpUsers implements UserDirectory, AuthContext
         if (!$user || $this->find($id) === null) {
             throw new \DomainException('Benutzer nicht gefunden.');
         }
-        if ($login !== null && $login !== $user->user_login) {
-            throw new \DomainException('Benutzernamen lassen sich in WordPress nicht ändern.');
-        }
         $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        $rename = $login !== null && $login !== $user->user_login;
+        if ($rename && in_array(strtolower($login), array_map('strtolower', (array) apply_filters('illegal_user_logins', [])), true)) {
+            throw new \DomainException('Dieser Benutzername ist in WordPress nicht erlaubt.');
+        }
         $parts = preg_split('/\s+/', $name, 2) ?: [$name];
         $res = wp_update_user(['ID' => $id, 'display_name' => $name, 'nickname' => $name, 'first_name' => $parts[0], 'last_name' => $parts[1] ?? '', 'user_email' => $email]);
         if (is_wp_error($res)) {
             throw new \DomainException($res->get_error_message());
         }
         clean_user_cache($id);
+        if ($rename) {
+            $this->rename($user, $login);
+        }
+    }
+
+    /**
+     * Benutzername ändern; die ID und damit alle Daten bleiben. wp_update_user() schreibt user_login nicht (nur beim
+     * Anlegen), daher direkt in der Tabelle. Hat WordPress den Namen in Adressen (user_nicename, z. B. /author/…) aus dem
+     * alten Benutzernamen gebildet, wird er wie beim Anlegen neu gebildet. Danach sind alle Sitzungen beendet (das
+     * Anmelde-Cookie enthält den Benutzernamen); dieses Gerät erneuert der Kern über afterPasswordChange().
+     */
+    private function rename(\WP_User $old, string $login): void
+    {
+        global $wpdb;
+        $data = ['user_login' => $login];
+        $derived = sanitize_title(mb_substr((string) $old->user_login, 0, 50));
+        if (preg_match('/^' . preg_quote($derived, '/') . '(-\d+)?$/', (string) $old->user_nicename) === 1) {
+            $data['user_nicename'] = $this->uniqueNicename(sanitize_title(mb_substr($login, 0, 50)), (int) $old->ID);
+        }
+        if ($wpdb->update($wpdb->users, $data, ['ID' => (int) $old->ID]) === false) {
+            throw new \DomainException('Der Benutzername ließ sich nicht speichern.');
+        }
+        // Mit dem alten Objekt: clean_user_cache() entfernt auch die Zuordnung alter Benutzername → ID.
+        clean_user_cache($old);
+        \WP_Session_Tokens::get_instance((int) $old->ID)->destroy_all();
+    }
+
+    /** Wie wp_insert_user(): bei Bedarf mit -2, -3 … */
+    private function uniqueNicename(string $base, int $id): string
+    {
+        global $wpdb;
+        $taken = static fn (string $n): bool => (bool) $wpdb->get_var($wpdb->prepare("SELECT ID FROM $wpdb->users WHERE user_nicename = %s AND ID <> %d LIMIT 1", $n, $id));
+        $nicename = $base;
+        for ($suffix = 2; $taken($nicename); $suffix++) {
+            $nicename = mb_substr($base, 0, 49 - strlen((string) $suffix)) . "-$suffix";
+        }
+        return $nicename;
     }
 
     /**

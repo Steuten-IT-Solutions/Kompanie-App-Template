@@ -49,7 +49,13 @@ final class AccountsTest extends TestCase
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['email' => 'Max@Example.org'])->status, 'E-Mail nur Groß-/Kleinschreibung');
         $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['email' => str_repeat('a', 95) . '@example.org'])->status, 'zu lang für WordPress');
 
-        // WordPress: Benutzernamen fest.
+        $this->assertSame(0, $this->users->passwordChanges, 'fremdes Konto: diese Sitzung bleibt, wie sie ist');
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->admin}/account", ['username' => 'chef'])->status);
+        $this->assertSame(1, $this->users->passwordChanges, 'eigener Benutzername: dieses Gerät bleibt angemeldet');
+        $this->call('PATCH', "/members/{$this->admin}/account", ['name' => 'Chef']);
+        $this->assertSame(1, $this->users->passwordChanges, 'ohne neuen Benutzernamen keine neue Sitzung');
+
+        // Umgebung ohne änderbare Benutzernamen.
         $this->users->adminsAssignable = false;
         $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['username' => 'moritz'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['name' => 'Moritz'])->status);

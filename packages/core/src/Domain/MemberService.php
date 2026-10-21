@@ -313,7 +313,8 @@ final class MemberService
     }
 
     /**
-     * Name, E-Mail und (nicht bei WordPress) Benutzername ändern (Issue #24).
+     * Name, E-Mail und Benutzername ändern (Issue #24). Ein neuer Benutzername beendet alle Sitzungen des Kontos; ändert
+     * jemand den eigenen, bleibt dieses Gerät angemeldet.
      *
      * @param array<string, mixed> $in name, email, username
      * @return array{name: string, login: string, email: string, can_change_login: bool}
@@ -344,7 +345,7 @@ final class MemberService
             $wanted = trim(is_string($in['username']) ? $in['username'] : '');
             if ($wanted !== $current['login']) {
                 if (!$this->users->canChangeLogin()) {
-                    throw ApiError::invalid('Benutzernamen lassen sich in WordPress nicht ändern.');
+                    throw ApiError::invalid('Benutzernamen lassen sich hier nicht ändern.');
                 }
                 if (!Passwords::validLogin($wanted)) {
                     throw ApiError::invalid('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.');
@@ -359,6 +360,9 @@ final class MemberService
             $this->users->updateProfile($id, $name, $email, $login);
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
+        }
+        if ($login !== null && $actor->id === $id) {
+            $this->auth->afterPasswordChange($id);
         }
         return $this->profile($id);
     }

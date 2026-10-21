@@ -146,6 +146,9 @@ final class PdoUsers implements UserDirectory
     public function updateProfile(int $id, string $name, string $email, ?string $login): void
     {
         $this->db->update('users', ['name' => $name, 'email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')] + ($login !== null ? ['login' => $login] : []), ['id' => $id]);
+        if ($login !== null) {
+            $this->sessions?->destroyAllFor($id);
+        }
     }
 
     /** Konto löschen und alle Sitzungen beenden. */
