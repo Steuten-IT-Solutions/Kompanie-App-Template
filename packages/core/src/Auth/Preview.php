@@ -114,7 +114,7 @@ final class Preview implements AuthContext
         $key = $real->id . ':' . $role;
         if ($this->substitute === null || $this->substitute[0] !== $key) {
             // Nur die Rechte der Rolle selbst, nicht capabilitiesFor (das nähme gespeicherte Zusatzrollen des Kontos dazu).
-            $this->substitute = [$key, new User($real->id, $real->name, $real->login, $role, ($this->roles)()->capabilities($role), true)];
+            $this->substitute = [$key, new User($real->id, $real->name, $real->login, $role, ($this->roles)()->capabilities($role), $real->firstName, $real->lastName, true)];
         }
         return $this->substitute[1];
     }

@@ -15,7 +15,7 @@ import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
-import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
+import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
 import { RankLabel } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
@@ -24,6 +24,18 @@ import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
+import {
+  DEFAULT_MEMBER_SORT,
+  defaultDir,
+  dirLabel,
+  listName,
+  loadMemberOrder,
+  MEMBER_SORT_LABELS,
+  saveMemberOrder,
+  sortMembers,
+  type MemberOrder,
+  type MemberSort,
+} from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
@@ -92,16 +104,30 @@ function Members() {
   const [showCandidates, setShowCandidates] = useState(can('create_users'));
   const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates]);
   const [query, setQuery] = useState('');
+  const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
+  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
+  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
+  const order: MemberOrder = sortOptions.includes(stored.sort)
+    ? stored
+    : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const changeOrder = (next: MemberOrder) => {
+    setStored(next);
+    saveMemberOrder(next);
+  };
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66)
   const [role, setRole] = useState<Level>('');
   const list = useMemo(
     () =>
-      (data ?? []).filter(
-        (m) =>
-          m.name.toLowerCase().includes(query.trim().toLowerCase()) &&
-          (role === '' || m.level === role || (m.extra_roles ?? []).includes(role)),
+      sortMembers(
+        (data ?? []).filter(
+          (m) =>
+            m.name.toLowerCase().includes(query.trim().toLowerCase()) &&
+            (role === '' || m.level === role || (m.extra_roles ?? []).includes(role)),
+        ),
+        order,
       ),
-    [data, query, role],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, query, role, order.sort, order.dir],
   );
   // Nur Rollen, die in der Liste vorkommen
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
@@ -140,6 +166,39 @@ function Members() {
           ))}
         </select>
       )}
+      <div className="field-row member-sort">
+        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+        <div className="field">
+          <span id="member-sort-label">Sortierung</span>
+          <select
+            aria-labelledby="member-sort-label"
+            value={order.sort}
+            // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
+            onChange={(e) => {
+              const sort = e.target.value as MemberSort;
+              changeOrder({ sort, dir: defaultDir(sort) });
+            }}
+          >
+            {sortOptions.map((s) => (
+              <option key={s} value={s}>
+                {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field member-sort-dir">
+          <span id="member-sort-dir-label">Reihenfolge</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-labelledby="member-sort-dir-label member-sort-dir-value"
+            title="Reihenfolge umkehren"
+            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+          >
+            <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+          </button>
+        </div>
+      </div>
       <label className="toggle">
         <input
           type="checkbox"
@@ -160,7 +219,7 @@ function Members() {
           <li key={m.id} className="card row clickable" onClick={() => navigate(`verwaltung/mitglied/${m.id}`)}>
             <div className="row-main">
               <div className="row-title">
-                {m.name}{' '}
+                {listName(m, order.sort)}{' '}
                 {m.level !== 'member' && (
                   <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
                 )}
@@ -566,7 +625,7 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 /* ------------------------------------------------------------------ */
 
 function NewMember() {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(emptyName());
   const [level, setLevel] = useState<'member' | 'candidate'>('member');
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
@@ -586,14 +645,14 @@ function NewMember() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!name.trim()) return setFormError('Bitte einen Namen angeben.');
+    if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
     const bday = canSetBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
       setCreated(
         await api.createUser({
-          name: name.trim(),
+          ...trimName(name),
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(email.trim() ? { email: email.trim() } : {}),
           level,
@@ -618,7 +677,7 @@ function NewMember() {
           className="btn btn-secondary btn-block no-print"
           onClick={() => {
             setCreated(null);
-            setName('');
+            setName(emptyName());
             setUsername('');
             setEmail('');
             setInitialPoints('');
@@ -640,17 +699,7 @@ function NewMember() {
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
         Mehrere auf einmal anlegen
       </button>
-      <label className="field">
-        <span>Name</span>
-        <input
-          type="text"
-          autoComplete="off"
-          placeholder="Vorname Nachname"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-      </label>
+      <NameFields value={name} onChange={setName} />
       <label className="field">
         <span>Benutzername (optional)</span>
         <input

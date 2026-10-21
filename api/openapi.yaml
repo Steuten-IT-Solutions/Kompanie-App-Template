@@ -2096,7 +2096,8 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Verwaltung]
-      summary: Name, E-Mail und (nicht bei WordPress) Benutzername ändern
+      summary: Vor- und Nachname, E-Mail und (nicht bei WordPress) Benutzername ändern
+      description: Der Anzeigename wird „Vorname Nachname“. Felder, die fehlen, bleiben.
       x-capability: create_users
       requestBody:
         required: true
@@ -2105,7 +2106,9 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string }
+                first_name: { type: string, description: 'Vorname (Pflicht)' }
+                last_name: { type: string, description: 'Nachname (darf leer sein)' }
+                name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
                 email: { type: string }
                 username: { type: string }
       responses:
@@ -2195,9 +2198,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
+              required: [first_name]
               properties:
-                name: { type: string }
+                first_name: { type: string, description: 'Vorname (Pflicht)' }
+                last_name: { type: string, description: 'Nachname (darf leer sein)' }
+                name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
                 level: { type: string, enum: [member, candidate], default: member }
@@ -2237,9 +2242,11 @@ paths:
                   maxItems: 50
                   items:
                     type: object
-                    required: [name]
+                    required: [first_name]
                     properties:
-                      name: { type: string }
+                      first_name: { type: string, description: 'Vorname (Pflicht)' }
+                      last_name: { type: string, description: 'Nachname (darf leer sein)' }
+                      name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet' }
                       username: { type: string }
                       email: { type: string, format: email }
                       initial_points: { type: integer, minimum: 0 }
@@ -3126,7 +3133,9 @@ components:
           schema:
             type: object
             properties:
-              name: { type: string }
+              name: { type: string, description: 'Anzeigename „Vorname Nachname“' }
+              first_name: { type: string }
+              last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
               login: { type: string }
               email: { type: string }
               can_change_login: { type: boolean, description: 'false bei WordPress' }
@@ -3823,7 +3832,9 @@ components:
       type: object
       properties:
         id: { type: integer }
-        name: { type: string }
+        name: { type: string, description: 'Anzeigename „Vorname Nachname“' }
+        first_name: { type: string, description: 'Konten von früher (ein Namensfeld): aus name geteilt, das letzte Wort ist der Nachname' }
+        last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
@@ -4082,6 +4093,8 @@ components:
       properties:
         id: { type: integer }
         name: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
         username: { type: string }
         email: { type: string }
         level: { type: string, enum: [member, candidate] }

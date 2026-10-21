@@ -11,7 +11,9 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
+use KompanieApp\Core\Domain\PersonName;
 use KompanieApp\Core\Domain\StatusService;
+use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
@@ -180,7 +182,9 @@ final class Api
                 }
                 $birthday = $this->birthdayInput($p['birthday'] ?? null);
             } catch (ApiError $e) {
-                $who = is_string($p['name'] ?? null) && trim($p['name']) !== '' ? ' (' . trim($p['name']) . ')' : '';
+                $label = PersonName::join(Text::line($p['first_name'] ?? '', PersonName::MAX), Text::line($p['last_name'] ?? '', PersonName::MAX));
+                $label = $label !== '' ? $label : Text::line($p['name'] ?? '', PersonName::MAX);
+                $who = $label !== '' ? ' (' . $label . ')' : '';
                 throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
             }
             $plans[] = [$prepared, $initial, $birthday];

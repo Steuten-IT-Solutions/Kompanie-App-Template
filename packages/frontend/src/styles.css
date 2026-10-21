@@ -2116,6 +2116,16 @@ fieldset.feature-list legend {
 .doc-sort {
   margin: 0 0 6px;
 }
+.member-sort {
+  margin: -4px 0 14px;
+}
+.member-sort-dir {
+  flex: 0 0 auto;
+}
+.member-sort-dir .btn {
+  min-height: 46px;
+  white-space: nowrap;
+}
 .doc-group + .doc-group {
   margin-top: 6px;
 }

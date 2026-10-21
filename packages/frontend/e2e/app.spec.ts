@@ -155,7 +155,8 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
-  await page.getByPlaceholder('Vorname Nachname').fill('Neue Testperson');
+  await page.getByLabel('Vorname').fill('Neue');
+  await page.getByLabel('Nachname').fill('Testperson');
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
   await expect(page.getByText('Neue Testperson ist angelegt')).toBeVisible();
   const username = (await page.getByTestId('new-username').textContent())!.trim();
@@ -165,7 +166,8 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await shot(page, '8-mitglied-angelegt');
 
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
-  await page.locator('.row', { hasText: 'Neue Testperson' }).first().click();
+  // Standard-Sortierung nach Nachname: „Nachname, Vorname“.
+  await page.locator('.row', { hasText: 'Testperson, Neue' }).first().click();
   await memberMenu(page, 'Konto und Rolle');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Neues Startpasswort erzeugen/ }).click();
@@ -185,8 +187,10 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByRole('button', { name: 'Mehrere auf einmal anlegen' }).click();
   const rows = page.locator('.bulk-row');
-  await rows.nth(0).getByLabel('Name', { exact: true }).fill(`Ida ${id}`);
-  await rows.nth(1).getByLabel('Name', { exact: true }).fill(`Jan ${id}`);
+  await rows.nth(0).getByLabel('Vorname').fill('Ida');
+  await rows.nth(0).getByLabel('Nachname').fill(id);
+  await rows.nth(1).getByLabel('Vorname').fill('Jan');
+  await rows.nth(1).getByLabel('Nachname').fill(id);
   await page.getByRole('button', { name: 'Alle anlegen' }).click();
   await expect(page.getByRole('heading', { name: '2 Konten angelegt' })).toBeVisible();
   await expect(page.locator('.print-sheet')).toHaveCount(2);
@@ -194,17 +198,19 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
   await expect(page.getByRole('button', { name: 'Ausdrucken' })).toBeVisible();
 
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
-  await page.locator('.row', { hasText: `Ida ${id}` }).click();
+  await page.locator('.row', { hasText: `${id}, Ida` }).click();
   await memberMenu(page, 'Konto und Rolle');
   await page.getByRole('button', { name: 'Angaben ändern' }).click();
-  await page.locator('.account-edit').getByLabel('Name', { exact: true }).fill(`Ida Neu ${id}`);
+  await expect(page.locator('.account-edit').getByLabel('Vorname')).toHaveValue('Ida');
+  await expect(page.locator('.account-edit').getByLabel('Nachname')).toHaveValue(id);
+  await page.locator('.account-edit').getByLabel('Vorname').fill('Ida Neu');
   await page.locator('.account-edit').getByLabel('E-Mail (optional)').fill(`ida-${id}@example.org`);
   await page.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(page.locator('.member-name')).toHaveText(`Ida Neu ${id}`);
   await expect(page.locator('.account-panel')).toContainText(`ida-${id}@example.org`);
 
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
-  await page.locator('.row', { hasText: `Jan ${id}` }).click();
+  await page.locator('.row', { hasText: `${id}, Jan` }).click();
   await memberMenu(page, 'Konto und Rolle');
   await page
     .locator('.account-panel')
@@ -215,16 +221,18 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
   await page.getByLabel('Zur Bestätigung den Namen eintippen').fill(`jan ${id}`);
   await confirm.click();
   await expect(page.locator('.toast')).toContainText(`Jan ${id}`);
-  await expect(page.locator('.row', { hasText: `Jan ${id}` })).toHaveCount(0);
+  await expect(page.locator('.row', { hasText: `${id}, Jan` })).toHaveCount(0);
 });
 
 test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis er aufgenommen ist', async ({ page }) => {
   // Eindeutiger Name: Bei WordPress bleiben Konten früherer Läufe bestehen.
-  const name = `Anna Anwärterin ${Date.now() % 1000000}`;
+  const last = `Anwärterin ${Date.now() % 1000000}`;
+  const name = `Anna ${last}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
-  await page.getByPlaceholder('Vorname Nachname').fill(name);
+  await page.getByLabel('Vorname').fill('Anna');
+  await page.getByLabel('Nachname').fill(last);
   await page.getByLabel('Rolle').selectOption('candidate');
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
   const username = (await page.getByTestId('new-username').textContent())!.trim();
@@ -238,7 +246,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await expect(page.getByLabel('Auch Anwärter anzeigen')).toBeChecked();
-  await page.locator('.row', { hasText: name }).click();
+  await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberMenu(page, 'Konto und Rolle');
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();

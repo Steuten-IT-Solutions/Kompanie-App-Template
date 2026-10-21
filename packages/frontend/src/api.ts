@@ -310,7 +310,11 @@ export interface GalleryAlbum {
 
 export interface MemberSummary {
   id: number;
+  /** Anzeigename „Vorname Nachname“ */
   name: string;
+  /** Vor- und Nachname (Nachname kann leer sein); fehlen bei einem Server vor der Trennung */
+  first_name?: string;
+  last_name?: string;
   /** Grundrolle */
   level: Level;
   /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
@@ -685,6 +689,8 @@ export interface Promotion extends Required<Omit<RankStatus, 'rank'>> {
 export interface CreatedUser {
   id: number;
   name: string;
+  first_name?: string;
+  last_name?: string;
   username: string;
   email: string;
   level: Level;
@@ -697,8 +703,13 @@ export interface CreatedUser {
 /** Ergebnis je Person beim Anlegen mehrerer (Issue #24): angelegt oder mit Grund nicht. */
 export type BulkResult = CreatedUser | { name: string; username: string; error: string };
 
-export interface NewPerson {
-  name: string;
+/** Vor- und Nachname; nur der Vorname ist Pflicht. */
+export interface PersonName {
+  first_name: string;
+  last_name: string;
+}
+
+export interface NewPerson extends PersonName {
   username?: string;
   email?: string;
   initial_points?: number;
@@ -708,7 +719,7 @@ export interface NewPerson {
   birthday?: string;
 }
 
-export interface AccountProfile {
+export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
@@ -904,19 +915,20 @@ export const api = {
   },
   createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  updateAccount: (id: number, data: { name?: string; email?: string; username?: string }) =>
+  updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
-  createUser: (data: {
-    name: string;
-    username?: string;
-    email?: string;
-    level?: 'member' | 'candidate';
-    initial_points?: number;
-    initial_points_date?: string;
-    rank_id?: number;
-    birthday?: string;
-  }) => request<CreatedUser>('POST', '/users', data),
+  createUser: (
+    data: PersonName & {
+      username?: string;
+      email?: string;
+      level?: 'member' | 'candidate';
+      initial_points?: number;
+      initial_points_date?: string;
+      rank_id?: number;
+      birthday?: string;
+    },
+  ) => request<CreatedUser>('POST', '/users', data),
 
   // Dienstgrade (Issue #9)
   ranks: (all = false) => request<Rank[]>('GET', '/ranks', undefined, all ? { all: '1' } : undefined),

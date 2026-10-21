@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Tests\Support;
 
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\PersonName;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\Authenticator;
@@ -17,7 +18,7 @@ use KompanieApp\Core\Port\UserDirectory;
  */
 final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 {
-    /** @var array<int, array{name: string, login: string, email: string, level: string, password: string}> */
+    /** @var array<int, array{name: string, first?: string, last?: string, login: string, email: string, level: string, password: string}> Ohne first/last: aus name geteilt (wie Konten von früher) */
     public array $users = [];
     public ?int $current = null;
     public int $passwordChanges = 0;
@@ -62,7 +63,18 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     {
         $u = $this->users[$id] ?? null;
         $caps = $u === null ? [] : ($this->capabilities !== null ? ($this->capabilities)($u['level'], $id) : Roles::templateCapabilities($u['level']));
-        return $u ? new User($id, $u['name'], $u['login'], $u['level'], $caps) : null;
+        if ($u === null) {
+            return null;
+        }
+        [$first, $last] = $this->names($id);
+        return new User($id, $u['name'], $u['login'], $u['level'], $caps, $first, $last);
+    }
+
+    /** @return array{0: string, 1: string} */
+    private function names(int $id): array
+    {
+        $u = $this->users[$id];
+        return isset($u['first'], $u['last']) ? [$u['first'], $u['last']] : PersonName::split($u['name']);
     }
 
     public function list(bool $includeGuests): array
@@ -79,10 +91,12 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $out;
     }
 
-    public function create(string $name, string $login, string $email, string $password, string $role = Roles::MEMBER): int
+    public function create(string $firstName, string $lastName, string $login, string $email, string $password, string $role = Roles::MEMBER): int
     {
         $id = $this->add($login, $role, $password);
-        $this->users[$id]['name'] = $name;
+        $this->users[$id]['name'] = PersonName::join($firstName, $lastName);
+        $this->users[$id]['first'] = $firstName;
+        $this->users[$id]['last'] = $lastName;
         $this->users[$id]['email'] = $email;
         return $id;
     }
@@ -199,7 +213,11 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     public function profile(int $id): ?array
     {
         $u = $this->users[$id] ?? null;
-        return $u === null ? null : ['name' => $u['name'], 'login' => $u['login'], 'email' => $u['email']];
+        if ($u === null) {
+            return null;
+        }
+        [$first, $last] = $this->names($id);
+        return ['name' => $u['name'], 'first_name' => $first, 'last_name' => $last, 'login' => $u['login'], 'email' => $u['email']];
     }
 
     public function canChangeLogin(): bool
@@ -207,9 +225,11 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $this->adminsAssignable;
     }
 
-    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    public function updateProfile(int $id, string $firstName, string $lastName, string $email, ?string $login): void
     {
-        $this->users[$id]['name'] = $name;
+        $this->users[$id]['name'] = PersonName::join($firstName, $lastName);
+        $this->users[$id]['first'] = $firstName;
+        $this->users[$id]['last'] = $lastName;
         $this->users[$id]['email'] = $email;
         if ($login !== null) {
             $this->users[$id]['login'] = $login;
