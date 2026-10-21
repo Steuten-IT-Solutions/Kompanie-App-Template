@@ -161,6 +161,9 @@ final class PdoUsers implements UserDirectory
     {
         $names = ['name' => PersonName::join($firstName, $lastName), 'first_name' => $firstName, 'last_name' => $lastName];
         $this->db->update('users', $names + ['email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')] + ($login !== null ? ['login' => $login] : []), ['id' => $id]);
+        if ($login !== null) {
+            $this->sessions?->destroyAllFor($id);
+        }
     }
 
     /** Konto löschen und alle Sitzungen beenden. */

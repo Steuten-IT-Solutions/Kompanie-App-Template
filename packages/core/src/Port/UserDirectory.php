@@ -68,11 +68,12 @@ interface UserDirectory
      */
     public function profile(int $id): ?array;
 
-    /** Ob sich der Benutzername ändern lässt (WordPress: nein). */
+    /** Ob sich der Benutzername ändern lässt. */
     public function canChangeLogin(): bool;
 
     /**
-     * Vor- und Nachname, E-Mail und (wo möglich) Benutzername ändern; geprüft hat der Kern.
+     * Vor- und Nachname, E-Mail und (wo möglich) Benutzername ändern; geprüft hat der Kern. Ein neuer Benutzername
+     * beendet alle Sitzungen des Kontos (wie setPassword()).
      *
      * @throws \DomainException wenn es so nicht geht
      */

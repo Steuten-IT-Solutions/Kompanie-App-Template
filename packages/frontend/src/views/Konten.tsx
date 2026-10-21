@@ -251,7 +251,7 @@ function plainName(s: string): string {
   return t.value;
 }
 
-/** Mitgliedsdetails: Vor- und Nachname, Benutzername (nicht bei WordPress) und E-Mail ändern, Konto löschen (Issue #24). */
+/** Mitgliedsdetails: Vor- und Nachname, Benutzername und E-Mail ändern, Konto löschen (Issue #24). */
 export function AccountPanel({
   id,
   level,
@@ -332,7 +332,11 @@ export function AccountPanel({
               onChange={(e) => setEditing({ ...editing, login: e.target.value })}
             />
           </label>
-          {!p.can_change_login && <p className="muted small">Benutzernamen lassen sich in WordPress nicht ändern.</p>}
+          {p.can_change_login ? (
+            <p className="muted small">Ein neuer Benutzername meldet die Person auf allen Geräten ab.</p>
+          ) : (
+            <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
+          )}
           <label className="field">
             <span>E-Mail (optional)</span>
             <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />

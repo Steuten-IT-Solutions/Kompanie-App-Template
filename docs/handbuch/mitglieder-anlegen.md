@@ -33,7 +33,7 @@ Andere Rollen vergibt danach, wer Rollen vergeben darf.
 {rolle.candidate} nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen den internen Kalender, aber nicht den Mitgliederbereich. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Das geht nur von {rolle.candidate} zu {rolle.member}.
 
 ## Angaben ändern und Konto löschen
-Im Mitglied unter **Konto und Rolle**, Abschnitt **Konto**: **Angaben ändern** für Vor- und Nachname, E-Mail und (nicht mit WordPress) Benutzername. Mit WordPress stehen Vor- und Nachname auch im Profil des Benutzers der Webseite.
+Im Mitglied unter **Konto und Rolle**, Abschnitt **Konto**: **Angaben ändern** für Vor- und Nachname, E-Mail und Benutzername. Mit WordPress stehen Vor- und Nachname auch im Profil des Benutzers der Webseite. Alle Daten bleiben erhalten. Nach einem neuen Benutzernamen ist die Person auf allen Geräten abgemeldet und meldet sich mit dem neuen Namen wieder an. Mit WordPress ändert den Benutzernamen von Benutzern der Webseite (z. B. Redakteure, Administratoren) nur, wer sie in WordPress bearbeiten darf.
 
 Konten aus der Zeit, als es nur ein Namensfeld gab, hat die App beim Update geteilt: Das letzte Wort ist der Nachname, der Rest der Vorname. Bei Namen wie „Maria von Berg“ stimmt das nicht; dann hier korrigieren. Mit WordPress bleiben Vor- und Nachnamen, die schon im Profil gepflegt waren.
 
