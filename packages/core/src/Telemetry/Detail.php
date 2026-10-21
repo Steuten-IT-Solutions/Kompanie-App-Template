@@ -14,7 +14,7 @@ namespace KompanieApp\Core\Telemetry;
  */
 final class Detail
 {
-    /** Erlaubte Form (auch so beim Empfänger geprüft) */
+    /** Erlaubte Form (so in docs/STATUSMELDUNGEN.md beschrieben, für die Prüfung beim Empfänger) */
     public const PATTERN = '/^[a-z][a-z0-9_]{0,63}$/D';
 
     /**
