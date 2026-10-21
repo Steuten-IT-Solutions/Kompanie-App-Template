@@ -804,8 +804,16 @@ select {
 .member-name.with-rank {
   margin-bottom: 4px;
 }
-/* Dienstgrad mit Abzeichen unter dem Namen in den Mitgliedsdetails */
+/* Mitgliedsdetails: Name mittig */
+.member-name-centered {
+  text-align: center;
+}
+/* Dienstgrad mit Abzeichen und rechts daneben das Foto unter dem Namen in den Mitgliedsdetails */
 .member-rank-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   margin: 0 0 14px;
   color: var(--muted);
 }
@@ -1889,6 +1897,11 @@ fieldset.feature-list legend {
   width: 40px;
   height: 40px;
   font-size: 0.9rem;
+}
+.member-avatar-medium {
+  width: 48px;
+  height: 48px;
+  font-size: 1rem;
 }
 .member-avatar-large {
   width: 128px;

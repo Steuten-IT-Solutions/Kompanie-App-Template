@@ -17,7 +17,7 @@ import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
-import { RankLabel } from '../RankBadge';
+import { RankBadge, RankLabel } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
@@ -343,16 +343,21 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
     },
   ].filter((p) => p.on);
   const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
+  // Foto steht oben neben dem Dienstgrad; ohne Foto die Anfangsbuchstaben, wenn es hochgeladen werden darf.
+  const avatar = !!m.photo_url || !!m.photo_editable;
 
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
         ‹ Alle Mitglieder
       </button>
-      <h2 className={`member-name${m.rank_title ? ' with-rank' : ''}`}>{m.name}</h2>
-      {m.rank_title && (
+      <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
+      {(m.rank_title || avatar) && (
         <p className="member-rank-line">
-          <RankLabel url={m.rank_badge_url} title={m.rank_title} size="medium" />
+          {/* Foto rechts neben dem Abzeichen, gleich hoch wie das Abzeichen */}
+          {m.rank_title && <RankBadge url={m.rank_badge_url} title={m.rank_title} size="medium" />}
+          {avatar && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
+          {m.rank_title && <span>{m.rank_title}</span>}
         </p>
       )}
       <MenuNav
@@ -369,6 +374,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
             name={m.name}
             url={m.photo_url ?? null}
             editable={!!m.photo_editable}
+            showAvatar={false}
             onChanged={reload}
             onToast={onToast}
           />
