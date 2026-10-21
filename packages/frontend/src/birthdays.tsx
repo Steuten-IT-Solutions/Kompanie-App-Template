@@ -151,7 +151,7 @@ export default function BirthdayPage() {
 
 /** „Mein Konto“: eigener Geburtstag mit Jahr und den beiden Schaltern. */
 export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.myBirthday(), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.myBirthday(), [], 'me/birthday');
   const [value, setValue] = useState<BirthdayValue | null>(null);
   const [visible, setVisible] = useState<boolean | null>(null);
   const [showAge, setShowAge] = useState<boolean | null>(null);

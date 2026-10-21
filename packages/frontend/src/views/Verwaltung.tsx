@@ -309,7 +309,7 @@ function Members() {
  * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht.
  */
 function MemberDetailView({ id, page, onToast }: { id: number; page?: string; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.member(id), [id]);
+  const { data, error, loading, reload } = useAsync(() => api.member(id), [id], 'member');
   const [busy, setBusy] = useState(false);
 
   async function run(action: () => Promise<unknown>, msg: string) {
@@ -519,7 +519,14 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
       )}
 
       {active === 'titel' && m.titles && (
-        <MemberTitles key={m.id} id={m.id} member={m.member} titles={m.titles} onChanged={reload} onToast={onToast} />
+        <MemberTitles
+          key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
+          id={m.id}
+          member={m.member}
+          titles={m.titles}
+          onChanged={reload}
+          onToast={onToast}
+        />
       )}
 
       {active === 'dienstgrad' && m.rank && (
@@ -706,7 +713,7 @@ function NewMember() {
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
   const [rankId, setRankId] = useState('');
-  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), []);
+  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), [], 'new-member-ranks');
   const extras = level === 'member';
   const pointsNum = Number(initialPoints || 0);
   const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
@@ -860,12 +867,12 @@ function NewMember() {
 /* ------------------------------------------------------------------ */
 
 function useMembersAndCatalog() {
-  return useAsync(() => Promise.all([api.members(), api.catalog()]));
+  return useAsync(() => Promise.all([api.members(), api.catalog()]), [], 'members-catalog');
 }
 
 /** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
 function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId]);
+  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId], 'attendance');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
@@ -1036,7 +1043,7 @@ function GivePenalty({
   onToast: (msg: string) => void;
   onDone?: () => void;
 }) {
-  const { data, error, loading, reload } = useAsync(api.members);
+  const { data, error, loading, reload } = useAsync(api.members, [], 'penalty-members');
   // Summe aller offenen Strafen (Mitglieder und Anwärter, ohne Gast-Konten): gleichzeitig mit der Auswahl geladen und
   // gemerkt, damit die Karte zusammen mit dem Formular erscheint. Beim Eintragen aus einer Anwesenheitsliste nicht.
   const total = useAsync(() => (attendance ? Promise.resolve(null) : api.members(false, true)), [], 'penalty-total');
@@ -1120,7 +1127,7 @@ function GivePenalty({
 /* ------------------------------------------------------------------ */
 
 function Catalog({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.catalog(true));
+  const { data, error, loading, reload } = useAsync(() => api.catalog(true), [], 'catalog-all');
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('');
   const [busy, setBusy] = useState(false);

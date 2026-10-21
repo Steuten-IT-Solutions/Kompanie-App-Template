@@ -35,7 +35,7 @@ async function loadOverview(): Promise<[AttendanceEvent[] | string, AttendanceSu
 }
 
 function Overview({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(loadOverview);
+  const { data, error, loading, reload } = useAsync(loadOverview, [], 'attendance-overview');
   const [showAll, setShowAll] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
@@ -153,7 +153,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 /* ------------------------------------------------------------------ */
 
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.attendance(id), [id]);
+  const { data, error, loading, reload, setData } = useAsync(() => api.attendance(id), [id], 'attendance');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <Editor key={data!.updated_at} list={data!} onSaved={setData} onToast={onToast} />;

@@ -210,7 +210,7 @@ function ImageView({ doc }: { doc: DocumentInfo }) {
 }
 
 export default function Dokumente({ docId, onToast }: { docId?: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(api.documents);
+  const { data, error, loading, reload } = useAsync(api.documents, [], 'documents');
   const [offline, setOffline] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [sort, setSort] = useDocSort();

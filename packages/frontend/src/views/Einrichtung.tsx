@@ -14,9 +14,9 @@ type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'fertig';
  * Einstellungen ändern.
  */
 export default function Einrichtung({ onToast }: { onToast: (msg: string) => void }) {
-  const settings = useAsync(() => api.settings(), []);
-  const status = useAsync(() => api.status(), []);
-  const features = useAsync(() => api.features(), []);
+  const settings = useAsync(() => api.settings(), [], 'settings');
+  const status = useAsync(() => api.status(), [], 'admin/status');
+  const features = useAsync(() => api.features(), [], 'features');
   const [chosen, setChosen] = useState<Record<Feature, boolean> | null>(null);
   const [index, setIndex] = useState(0);
   // Statusmeldungen sind vorausgewählt; der Admin kann den Haken vor dem Abschluss entfernen.
@@ -110,10 +110,13 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
         </section>
       )}
       {/* Google-Zugang beim ersten Schritt, der ihn braucht: Galerie, sonst Kalender (für Kalender-IDs). */}
-      {(step === 'galerie' || (step === 'kalender' && !value.gallery)) && <GoogleAccess settings={s} onSaved={onSaved} onToast={onToast} />}
-      {step === 'kalender' && <Calendar settings={s} onSaved={onSaved} onToast={onToast} />}
-      {step === 'galerie' && <Gallery settings={s} onSaved={onSaved} onToast={onToast} />}
-      {step === 'news' && <News settings={s} onSaved={onSaved} onToast={onToast} />}
+      {/* key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen. */}
+      {(step === 'galerie' || (step === 'kalender' && !value.gallery)) && (
+        <GoogleAccess key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />
+      )}
+      {step === 'kalender' && <Calendar key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
+      {step === 'galerie' && <Gallery key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
+      {step === 'news' && <News key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'fertig' && (
         <section className="card settings-section">
           <h3>Fast fertig</h3>
