@@ -49,4 +49,10 @@ interface Environment
      * (64, 128 oder 256 Pixel; bei SVG dieselbe Datei).
      */
     public function badgeUrl(int $rankId, string $version, int $size): string;
+
+    /**
+     * Adresse des Fotos eines Mitglieds, ausgeliefert nach Prüfung der Anmeldung: <App>/mitgliedsfoto/<id>?v=…&s=…
+     * Die Fassung (v) wechselt mit jedem Hochladen, s ist die Größe (128 oder 480 Pixel).
+     */
+    public function memberPhotoUrl(int $userId, string $version, int $size): string;
 }

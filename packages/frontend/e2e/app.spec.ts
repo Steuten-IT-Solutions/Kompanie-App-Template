@@ -262,6 +262,62 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
   await expect(page.locator('.row', { hasText: `${id}, Jan` })).toHaveCount(0);
 });
 
+/** Kleines gültiges PNG (1 × 1 Pixel) zum Hochladen. */
+const PNG = {
+  name: 'foto.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'),
+};
+
+test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, entfernen; Mitglied sieht sein Foto', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
+  await page.getByLabel('Vorname').fill('Fiona');
+  await page.getByLabel('Nachname').fill(id);
+  await page.locator('.new-member-photo').getByLabel('Foto-Datei').setInputFiles(PNG);
+  await expect(page.locator('.new-member-photo .member-avatar img')).toBeVisible();
+  await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
+  await expect(page.getByText(`Fiona ${id} ist angelegt`)).toBeVisible();
+  await expect(page.locator('.print-sheet .form-error')).toHaveCount(0);
+  const username = (await page.getByTestId('new-username').textContent())!.trim();
+  const password = (await page.getByTestId('new-password').textContent())!.trim();
+
+  // Mehrere: Foto nur bei der zweiten Person
+  await page.getByRole('button', { name: 'Weiteres Mitglied' }).click();
+  await page.getByRole('button', { name: 'Mehrere auf einmal anlegen' }).click();
+  const rows = page.locator('.bulk-row');
+  await rows.nth(0).getByLabel('Vorname').fill('Gerd');
+  await rows.nth(0).getByLabel('Nachname').fill(id);
+  await rows.nth(1).getByLabel('Vorname').fill('Hanna');
+  await rows.nth(1).getByLabel('Nachname').fill(id);
+  await rows.nth(1).getByLabel('Foto-Datei').setInputFiles(PNG);
+  await expect(rows.nth(1).locator('.member-avatar img')).toBeVisible();
+  await page.getByRole('button', { name: 'Alle anlegen' }).click();
+  await expect(page.getByRole('heading', { name: '2 Konten angelegt' })).toBeVisible();
+  await expect(page.locator('.print-sheet .form-error')).toHaveCount(0);
+
+  // Liste: Foto bzw. Anfangsbuchstaben; Details: großes Foto, entfernen
+  await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
+  await page.getByLabel('Mitglied suchen').fill(id);
+  await expect(page.locator('.row', { hasText: `${id}, Hanna` }).locator('.member-avatar img')).toBeVisible();
+  await expect(page.locator('.row', { hasText: `${id}, Gerd` }).locator('.member-avatar-initials')).toHaveText(`G${id[0].toUpperCase()}`);
+  await page.locator('.row', { hasText: `${id}, Hanna` }).click();
+  await expect(page.locator('.member-photo .member-avatar-large img')).toBeVisible();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Foto entfernen' }).click();
+  await expect(page.locator('.toast')).toContainText('Foto entfernt');
+  await expect(page.getByRole('button', { name: 'Foto hochladen' })).toBeVisible();
+  await expect(page.locator('.member-photo .member-avatar-initials')).toBeVisible();
+
+  // Das Mitglied sieht sein Foto unter „Konto“, kann es dort aber nicht ändern.
+  await login(page, username, password);
+  await page.locator('.topbar-account').click();
+  await expect(page.locator('.account-card .member-avatar-large img')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Foto/ })).toHaveCount(0);
+});
+
 test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis er aufgenommen ist', async ({ page }) => {
   // Eindeutiger Name: Bei WordPress bleiben Konten früherer Läufe bestehen.
   const last = `Anwärterin ${Date.now() % 1000000}`;
@@ -715,9 +771,7 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
 });
 
-test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Liste und Filter zeigen sie', async ({
-  page,
-}) => {
+test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Filter findet sie', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
@@ -730,9 +784,9 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await expect(page.locator('.role-control').getByLabel('Grundrolle')).toHaveValue('member');
   await shot(page, '21-zusatzrollen');
 
-  // Liste zeigt alle Rollen, Filter findet die Person über die Zusatzrolle.
+  // Liste zeigt keine Rollen, Filter findet die Person über die Zusatzrolle.
   await page.getByRole('button', { name: '‹ Alle Mitglieder' }).click();
-  await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-extra-role')).toHaveText('Termine verwalten');
+  await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-role')).toHaveCount(0);
   await page.getByLabel('Nach Rolle filtern').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied1' })).toHaveCount(0);

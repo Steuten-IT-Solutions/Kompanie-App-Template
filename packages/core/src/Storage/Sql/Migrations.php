@@ -764,6 +764,32 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {bug_reports}_created_at ON {bug_reports} (created_at)',
                 ],
             ],
+            // Fotos der Mitglieder: eines je Konto, als JPEG (Base64) in 128 (small) und 480 Pixeln (large). In der Datenbank
+            // statt in der Dateiablage, damit das Löschen eines Kontos (UserData::purge, auch im WordPress-Netzwerk) sie
+            // sicher mitnimmt und die Sicherung sie enthält. version wechselt mit jedem Hochladen (Adresse des Fotos).
+            16 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {member_photos} (
+  user_id bigint(20) unsigned NOT NULL,
+  version varchar(32) NOT NULL,
+  small mediumtext NOT NULL,
+  large mediumtext NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {member_photos} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  version TEXT NOT NULL,
+  small TEXT NOT NULL,
+  large TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

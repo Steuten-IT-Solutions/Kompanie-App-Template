@@ -3,6 +3,7 @@ import { api, config, roleLabels } from '../api';
 import { isStandalone } from '../install';
 import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import { navigate } from '../router';
+import { MemberAvatar } from '../memberPhoto';
 
 const MIN_LENGTH = 8;
 
@@ -37,6 +38,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
   return (
     <div>
       <div className="card account-card">
+        {/* Eigenes Foto: hochladen und ändern nur, wer Mitglieder anlegt (in der Verwaltung). */}
+        {config?.user?.photo_url && <MemberAvatar url={config.user.photo_url} name={config.user.name} size="large" />}
         <h2 className="account-name">{config?.user?.name}</h2>
         <p className="muted small">
           {(config?.user?.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(config?.user ?? { level: 'guest' })}

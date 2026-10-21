@@ -1,0 +1,240 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Core\Domain;
+
+use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
+use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\MemberPhotoRepository;
+
+/**
+ * Fotos der Mitglieder.
+ *
+ * - Hochladen, ersetzen und entfernen nur, wer Konten anlegen darf (create_users), und nur bei Konten, die er verwalten
+ *   darf (MemberService::guardAccount); optional schon beim Anlegen (auch mehrere auf einmal).
+ * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
+ *   gedreht, ohne Metadaten wie GPS) in 128 und 480 Pixeln an der längeren Kante, in der Datenbank
+ *   (MemberPhotoRepository).
+ * - Sehen: die Person selbst (Konto) und alle, die die Mitglieder in der Verwaltung sehen (VIEWERS). Ausgeliefert
+ *   über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide Adapter gleich
+ *   antworten.
+ */
+final class MemberPhotoService
+{
+    public const MAX_BYTES = 5 * 1024 * 1024;
+    /** Größte Kantenlänge eines hochgeladenen Bilds (schützt den Arbeitsspeicher beim Verkleinern). */
+    public const MAX_EDGE = 4096;
+    public const SIZES = [128, 480];
+    /** photo_url zeigt auf diese Größe; die App ändert s bei Bedarf. */
+    public const DEFAULT_SIZE = 128;
+    public const QUALITY = 82;
+    /** Endung => Signatur; bei WebP steht „WEBP“ zusätzlich ab Byte 8. */
+    public const TYPES = ['jpg' => "\xFF\xD8\xFF", 'jpeg' => "\xFF\xD8\xFF", 'png' => "\x89PNG\r\n\x1A\n", 'webp' => 'RIFF'];
+    /** Wer die Mitgliederliste der Verwaltung sieht (wie dort), sieht auch die Fotos. */
+    public const VIEWERS = [Capability::ManagePoints, Capability::ManagePenalties, Capability::ManageRanks, Capability::ManageTitles, Capability::CreateUsers, Capability::PromoteUsers];
+
+    private ?MemberPhotoRepository $repo = null;
+
+    public function __construct(private readonly App $app)
+    {
+    }
+
+    public function repository(): MemberPhotoRepository
+    {
+        return $this->repo ??= new MemberPhotoRepository($this->app->db);
+    }
+
+    /**
+     * Foto hochladen oder ersetzen (PUT /members/{id}/photo).
+     *
+     * @param mixed $file {name, data (Base64)}
+     * @return array{photo_url: string|null}
+     */
+    public function upload(User $actor, int $userId, mixed $file): array
+    {
+        $this->guard($actor, $userId, 'Das Foto dieser Person darfst du nicht ändern.');
+        $this->store($actor, $userId, $this->parse($file));
+        return ['photo_url' => $this->url($userId)];
+    }
+
+    /** @return array{photo_url: null} */
+    public function remove(User $actor, int $userId): array
+    {
+        $this->guard($actor, $userId, 'Das Foto dieser Person darfst du nicht entfernen.');
+        $this->repository()->delete($userId);
+        return ['photo_url' => null];
+    }
+
+    /**
+     * Hochgeladene Datei prüfen, ohne etwas zu speichern (auch vor dem Anlegen eines Kontos).
+     *
+     * @param mixed $file {name, data (Base64, auch als data:-Adresse)}
+     * @return array{bytes: string, ext: string}
+     */
+    public function parse(mixed $file): array
+    {
+        $name = is_array($file) && is_string($file['name'] ?? null) ? $file['name'] : '';
+        $data = is_array($file) && is_string($file['data'] ?? null) ? $file['data'] : '';
+        if (str_starts_with($data, 'data:') && ($comma = strpos($data, ',')) !== false) {
+            $data = substr($data, $comma + 1);
+        }
+        // Vor dem Dekodieren: Base64 ist ein Drittel größer als die Datei.
+        if (strlen($data) > intdiv(self::MAX_BYTES * 4, 3) + 4) {
+            throw ApiError::invalid('Das Foto darf höchstens 5 MB groß sein.');
+        }
+        $bytes = $data === '' ? false : base64_decode($data, true);
+        if ($bytes === false || $bytes === '') {
+            throw ApiError::invalid('Es ist kein Foto angekommen.');
+        }
+        if (strlen($bytes) > self::MAX_BYTES) {
+            throw ApiError::invalid('Das Foto darf höchstens 5 MB groß sein.');
+        }
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if (!isset(self::TYPES[$ext])) {
+            throw ApiError::invalid('Erlaubt sind Fotos als JPG, PNG oder WebP.');
+        }
+        $signature = self::TYPES[$ext];
+        $ok = strncmp($bytes, $signature, strlen($signature)) === 0 && ($ext !== 'webp' || substr($bytes, 8, 4) === 'WEBP');
+        $info = $ok ? @getimagesizefromstring($bytes) : false;
+        if ($info === false) {
+            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+        }
+        if ($info[0] < 1 || $info[1] < 1 || $info[0] > self::MAX_EDGE || $info[1] > self::MAX_EDGE) {
+            throw ApiError::invalid(sprintf('Das Foto darf höchstens %d × %d Pixel groß sein.', self::MAX_EDGE, self::MAX_EDGE));
+        }
+        return ['bytes' => $bytes, 'ext' => $ext === 'jpeg' ? 'jpg' : $ext];
+    }
+
+    /**
+     * Geprüftes Foto (parse) in allen Größen erzeugen und speichern; ein vorhandenes wird ersetzt.
+     *
+     * @param array{bytes: string, ext: string} $photo
+     */
+    public function store(User $actor, int $userId, array $photo): void
+    {
+        $images = [];
+        $tmp = $this->app->files->tempFile();
+        // Mit Endung: Der Bildeditor von WordPress erkennt das Format daran.
+        $source = $tmp . '.' . $photo['ext'];
+        $target = $tmp . '-out.jpg';
+        try {
+            if (@file_put_contents($source, $photo['bytes']) === false) {
+                throw new ApiError(500, 'storage_failed', 'Das Foto konnte nicht gespeichert werden.');
+            }
+            foreach (self::SIZES as $size) {
+                try {
+                    $this->app->images->resizeToJpeg($source, $target, $size, self::QUALITY);
+                } catch (\RuntimeException $e) {
+                    throw ApiError::invalid('Das Foto kann nicht verarbeitet werden: ' . $e->getMessage());
+                }
+                $jpeg = @file_get_contents($target);
+                if ($jpeg === false || $jpeg === '') {
+                    throw new ApiError(500, 'storage_failed', 'Das Foto konnte nicht gespeichert werden.');
+                }
+                $images[$size] = $jpeg;
+            }
+        } finally {
+            @unlink($source);
+            @unlink($target);
+            @unlink($tmp);
+        }
+        $version = substr(hash('sha256', $images[self::SIZES[0]] . $images[self::SIZES[1]] . random_bytes(8)), 0, 16);
+        $this->repository()->save($userId, $images, $version, $actor->id, $this->app->time()->nowUtc());
+    }
+
+    /** Adresse des Fotos (128 Pixel) oder null. */
+    public function url(int $userId): ?string
+    {
+        $photo = $this->repository()->find($userId);
+        return $photo === null ? null : $this->app->env->memberPhotoUrl($userId, $photo['version'], self::DEFAULT_SIZE);
+    }
+
+    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel), für Listen mit einer Abfrage */
+    public function urls(): array
+    {
+        $out = [];
+        foreach ($this->repository()->versions() as $userId => $version) {
+            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, self::DEFAULT_SIZE);
+        }
+        return $out;
+    }
+
+    /** Ob $viewer Fotos anderer sieht (sonst nur das eigene). */
+    public static function canSeeOthers(User $viewer): bool
+    {
+        foreach (self::VIEWERS as $cap) {
+            if ($viewer->can($cap)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */
+    public function canEdit(User $actor, int $userId): bool
+    {
+        if (!$actor->can(Capability::CreateUsers)) {
+            return false;
+        }
+        // Admins verwalten jedes Konto (ohne das Konto noch einmal zu laden).
+        if ($actor->isAdmin()) {
+            return true;
+        }
+        try {
+            $this->guard($actor, $userId, '');
+            return true;
+        } catch (ApiError) {
+            return false;
+        }
+    }
+
+    /**
+     * Für die Auslieferung über memberPhotoUrl(): Status, Header und Inhalt.
+     *
+     * @return array{status: int, headers: array<string, string>, body?: string}
+     */
+    public function forDelivery(?User $viewer, int $userId, mixed $version, mixed $size): array
+    {
+        $deny = static fn (int $status): array => ['status' => $status, 'headers' => ['Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']];
+        if ($this->app->maintenance()->blocks($viewer)) {
+            return $deny(503);
+        }
+        if ($viewer === null) {
+            return $deny(401);
+        }
+        if ($viewer->id !== $userId && !self::canSeeOthers($viewer)) {
+            return $deny(403);
+        }
+        $size = Input::integer($size) ?? self::DEFAULT_SIZE;
+        $photo = $this->repository()->find($userId);
+        $body = $photo !== null && in_array($size, self::SIZES, true) ? $this->repository()->image($userId, $size) : null;
+        if ($photo === null || $body === null) {
+            return $deny(404);
+        }
+        $current = is_string($version) && hash_equals($photo['version'], $version);
+        return ['status' => 200, 'headers' => [
+            'Content-Type' => 'image/jpeg',
+            'X-Content-Type-Options' => 'nosniff',
+            // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag und nur im Browser speichern: Ein entferntes Foto
+            // oder entzogene Rechte gelten so bald auch auf Geräten, die es schon geladen haben. In der Vorschau (Issue #63)
+            // nie speichern.
+            'Cache-Control' => $this->app->preview()->cacheControl($current ? 'private, max-age=86400' : 'private, no-cache'),
+            'X-Robots-Tag' => 'noindex',
+            'ETag' => '"' . $photo['version'] . '-' . $size . '"',
+        ], 'body' => $body];
+    }
+
+    private function guard(User $actor, int $userId, string $message): void
+    {
+        $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        if (!$actor->can(Capability::CreateUsers)) {
+            throw ApiError::forbidden('Fotos ändert, wer Mitglieder anlegen darf.');
+        }
+        if ($actor->id !== $userId) {
+            $this->app->members()->guardAccount($actor, $target, $message);
+        }
+    }
+}

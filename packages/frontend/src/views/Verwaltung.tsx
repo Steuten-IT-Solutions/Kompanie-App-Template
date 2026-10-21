@@ -12,7 +12,7 @@ import {
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
+import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
@@ -38,6 +38,7 @@ import {
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
+import { MemberAvatar, MemberPhotoPanel, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -99,7 +100,14 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 /* ------------------------------------------------------------------ */
 
 /** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
-type MembersState = { query: string; role: Level; showGuests: boolean; showCandidates: boolean; scrollY: number };
+type MembersState = {
+  query: string;
+  role: Level;
+  title: number | null;
+  showGuests: boolean;
+  showCandidates: boolean;
+  scrollY: number;
+};
 let savedMembers: MembersState | null = null;
 
 function Members() {
@@ -113,7 +121,13 @@ function Members() {
   const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
   // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
   const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
-  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates], 'members');
+  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste und Anwärter lassen sich auch ohne Häkchen wählen.
+  const [role, setRole] = useState<Level>(restore?.role ?? '');
+  const loadGuests = showGuests || (canPromote && role === 'guest');
+  const loadCandidates = showCandidates || role === 'candidate';
+  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, loadCandidates), [loadGuests, loadCandidates], 'members');
+  // Filter nach Titel (nur, wer Titel sieht)
+  const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
@@ -125,24 +139,33 @@ function Members() {
     setStored(next);
     saveMemberOrder(next);
   };
-  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66)
-  const [role, setRole] = useState<Level>(restore?.role ?? '');
+  // Gemerkter Titel, den niemand mehr trägt: nicht still weiterfiltern.
+  const activeTitle = title !== null && (data ?? []).some((m) => (m.titles ?? []).some((t) => t.id === title)) ? title : null;
   const list = useMemo(
     () =>
       sortMembers(
         (data ?? []).filter(
           (m) =>
             m.name.toLowerCase().includes(query.trim().toLowerCase()) &&
-            (role === '' || m.level === role || (m.extra_roles ?? []).includes(role)),
+            (role === '' || m.level === role || (m.extra_roles ?? []).includes(role)) &&
+            (activeTitle === null || (m.titles ?? []).some((t) => t.id === activeTitle)),
         ),
         order,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, query, role, order.sort, order.dir],
+    [data, query, role, activeTitle, order.sort, order.dir],
   );
-  // Nur Rollen, die in der Liste vorkommen
+  // Rollen, die in der Liste vorkommen, dazu immer Anwärter und (wer Rollen vergibt) Gäste
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
+  present.add('candidate');
+  if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+  // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
+  const withPhotos = (data ?? []).some((m) => m.photo_url);
+  // Titel, die in der Liste vorkommen, alphabetisch
+  const titleOptions = [...new Map((data ?? []).flatMap((m) => m.titles ?? []).map((t) => [t.id, t])).values()].sort((a, b) =>
+    a.title.localeCompare(b.title, 'de'),
+  );
 
   // Scrollen, sobald die Liste steht (aus dem Speicher sofort, sonst nach dem Laden).
   const pendingScroll = useRef(restore?.scrollY ?? null);
@@ -153,7 +176,7 @@ function Members() {
   }, [data]);
 
   function open(id: number) {
-    savedMembers = { query, role, showGuests, showCandidates, scrollY: window.scrollY };
+    savedMembers = { query, role, title, showGuests, showCandidates, scrollY: window.scrollY };
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -181,6 +204,21 @@ function Members() {
           {roleOptions.map((r) => (
             <option key={r.key} value={r.key}>
               {r.label}
+            </option>
+          ))}
+        </select>
+      )}
+      {titleOptions.length > 0 && (
+        <select
+          className="role-filter"
+          value={activeTitle ?? ''}
+          onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
+          aria-label={`Nach ${sec.titles} filtern`}
+        >
+          <option value="">Alle {sec.titles}</option>
+          {titleOptions.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
             </option>
           ))}
         </select>
@@ -236,18 +274,10 @@ function Members() {
       <ul className="card-list">
         {list.map((m) => (
           <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
+            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} />}
             <div className="row-main">
               <div className="row-title">
-                {listName(m, order.sort)}{' '}
-                {m.level !== 'member' && (
-                  <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
-                )}
-                {(m.extra_roles ?? []).map((r) => (
-                  <span key={r} className="badge badge-role badge-extra-role">
-                    {caps(levelLabel(r))}
-                  </span>
-                ))}
-                <TitleBadges titles={m.titles} />
+                {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
                 {m.rank_title !== undefined && (
@@ -329,6 +359,14 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'uebersicht' && (
         <>
+          <MemberPhotoPanel
+            id={m.id}
+            name={m.name}
+            url={m.photo_url ?? null}
+            editable={!!m.photo_editable}
+            onChanged={reload}
+            onToast={onToast}
+          />
           <p className="muted small member-level">
             {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
             {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
@@ -670,6 +708,7 @@ function NewMember() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState(emptyBirthday());
+  const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
@@ -691,6 +730,7 @@ function NewMember() {
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
           ...(bday ? { birthday: birthdayString(bday) } : {}),
+          ...(photo ? { photo: photo.file } : {}),
         }),
       );
     } catch (err) {
@@ -715,6 +755,7 @@ function NewMember() {
             setInitialPoints('');
             setRankId('');
             setBirthday(emptyBirthday());
+            setPhoto(null);
           }}
         >
           Weiteres Mitglied
@@ -792,6 +833,10 @@ function NewMember() {
           <BirthdayFields value={birthday} onChange={setBirthday} />
         </fieldset>
       )}
+      <fieldset className="fieldset new-member-photo">
+        <legend>Foto (optional)</legend>
+        <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
+      </fieldset>
       <p className="muted small">
         Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
       </p>
