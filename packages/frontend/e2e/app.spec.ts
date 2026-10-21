@@ -715,9 +715,7 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
 });
 
-test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Liste und Filter zeigen sie', async ({
-  page,
-}) => {
+test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Filter findet sie', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
@@ -730,9 +728,9 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await expect(page.locator('.role-control').getByLabel('Grundrolle')).toHaveValue('member');
   await shot(page, '21-zusatzrollen');
 
-  // Liste zeigt alle Rollen, Filter findet die Person über die Zusatzrolle.
+  // Liste zeigt keine Rollen, Filter findet die Person über die Zusatzrolle.
   await page.getByRole('button', { name: '‹ Alle Mitglieder' }).click();
-  await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-extra-role')).toHaveText('Termine verwalten');
+  await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-role')).toHaveCount(0);
   await page.getByLabel('Nach Rolle filtern').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied1' })).toHaveCount(0);
