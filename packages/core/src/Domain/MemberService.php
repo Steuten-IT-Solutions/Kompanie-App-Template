@@ -70,6 +70,8 @@ final class MemberService
             $out[] = [
                 'id' => $u->id,
                 'name' => $u->name,
+                'first_name' => $u->firstName,
+                'last_name' => $u->lastName,
                 'level' => $u->role,
                 // Mit Mitgliederbereich (Punkte und Strafen möglich); sonst nur Kalender oder Gast.
                 'member' => $u->isMember(),
@@ -91,6 +93,8 @@ final class MemberService
         return [
             'id' => $u->id,
             'name' => $u->name,
+            'first_name' => $u->firstName,
+            'last_name' => $u->lastName,
             'level' => $u->role,
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
@@ -181,7 +185,7 @@ final class MemberService
      * Legt ein Konto mit zufälligem Startpasswort an, als Mitglied oder als Anwärter. Das Passwort steht nur
      * in dieser Antwort; es wird keine E-Mail verschickt.
      *
-     * @param array<string, mixed> $in name, username, email, level (member oder candidate)
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (member oder candidate)
      * @return array<string, mixed>
      */
     public function create(array $in): array
@@ -194,16 +198,14 @@ final class MemberService
      * Angaben eines neuen Kontos prüfen; $taken sammelt Benutzernamen und E-Mail-Adressen, die schon für andere
      * Einträge derselben Anfrage vorgesehen sind (mehrere anlegen).
      *
-     * @param array<string, mixed> $in name, username, email, level
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level
      * @param array<string, true> $taken
-     * @return array{name: string, login: string, email: string, level: string}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string}
      */
     public function prepare(array $in, array &$taken): array
     {
-        $name = Text::line($in['name'] ?? '', 100);
-        if ($name === '') {
-            throw ApiError::invalid('Bitte einen Namen angeben.');
-        }
+        [$first, $last] = self::names($in, ['', '']);
+        $name = self::checkNames($first, $last);
         $level = $in['level'] ?? Roles::MEMBER;
         if ($level !== Roles::MEMBER && $level !== Roles::CANDIDATE) {
             throw ApiError::invalid('Neue Konten sind Mitglieder oder Anwärter; andere Rollen danach vergeben.');
@@ -237,25 +239,57 @@ final class MemberService
             $taken['email:' . mb_strtolower($email)] = true;
         }
         $taken['login:' . mb_strtolower($login)] = true;
-        return ['name' => $name, 'login' => $login, 'email' => $email, 'level' => (string) $level];
+        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level];
+    }
+
+    /**
+     * Vor- und Nachname aus der Anfrage: first_name/last_name, sonst name (ein Feld wie früher, z. B. eine noch nicht
+     * aktualisierte App; das letzte Wort ist der Nachname). Was fehlt, kommt aus $current.
+     *
+     * @param array<string, mixed> $in
+     * @param array{0: string, 1: string} $current Vor- und Nachname bisher
+     * @return array{0: string, 1: string}
+     */
+    private static function names(array $in, array $current): array
+    {
+        if (array_key_exists('first_name', $in) || array_key_exists('last_name', $in)) {
+            return [
+                array_key_exists('first_name', $in) ? Text::line($in['first_name'], PersonName::MAX) : $current[0],
+                array_key_exists('last_name', $in) ? Text::line($in['last_name'], PersonName::MAX) : $current[1],
+            ];
+        }
+        return array_key_exists('name', $in) ? PersonName::split(Text::line($in['name'], PersonName::MAX)) : $current;
+    }
+
+    /** Vorname ist Pflicht, der Nachname nicht. Gibt den Anzeigenamen zurück. */
+    private static function checkNames(string $first, string $last): string
+    {
+        if ($first === '') {
+            throw ApiError::invalid('Bitte einen Vornamen angeben.');
+        }
+        $name = PersonName::join($first, $last);
+        if (mb_strlen($name) > PersonName::MAX) {
+            throw ApiError::invalid(sprintf('Vor- und Nachname sind zusammen zu lang (höchstens %d Zeichen).', PersonName::MAX));
+        }
+        return $name;
     }
 
     /**
      * Konto mit zufälligem Startpasswort anlegen (geprüft mit prepare()).
      *
-     * @param array{name: string, login: string, email: string, level: string} $p
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string} $p
      * @return array<string, mixed>
      */
     public function insert(array $p): array
     {
-        ['name' => $name, 'login' => $login, 'email' => $email, 'level' => $level] = $p;
+        ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => $level] = $p;
         $password = Passwords::readable(12);
         try {
-            $id = $this->users->create($name, $login, $email, $password, $level);
+            $id = $this->users->create($first, $last, $login, $email, $password, $level);
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
-        return ['id' => $id, 'name' => $name, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
+        return ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
     }
 
     /** Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. */
@@ -300,7 +334,7 @@ final class MemberService
     /**
      * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt).
      *
-     * @return array{name: string, login: string, email: string, can_change_login: bool}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
      */
     public function profile(int $id, ?User $actor = null): array
     {
@@ -313,10 +347,10 @@ final class MemberService
     }
 
     /**
-     * Name, E-Mail und (nicht bei WordPress) Benutzername ändern (Issue #24).
+     * Vor- und Nachname, E-Mail und (nicht bei WordPress) Benutzername ändern (Issue #24).
      *
-     * @param array<string, mixed> $in name, email, username
-     * @return array{name: string, login: string, email: string, can_change_login: bool}
+     * @param array<string, mixed> $in first_name, last_name (oder name), email, username
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
      */
     public function updateProfile(User $actor, int $id, array $in): array
     {
@@ -325,10 +359,8 @@ final class MemberService
             $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht ändern.');
         }
         $current = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        $name = array_key_exists('name', $in) ? Text::line($in['name'] ?? '', 100) : $current['name'];
-        if ($name === '') {
-            throw ApiError::invalid('Bitte einen Namen angeben.');
-        }
+        [$first, $last] = self::names($in, [$current['first_name'], $current['last_name']]);
+        self::checkNames($first, $last);
         $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
         // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
         if (mb_strtolower($email) !== mb_strtolower($current['email']) && $email !== '') {
@@ -356,7 +388,7 @@ final class MemberService
             }
         }
         try {
-            $this->users->updateProfile($id, $name, $email, $login);
+            $this->users->updateProfile($id, $first, $last, $email, $login);
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }

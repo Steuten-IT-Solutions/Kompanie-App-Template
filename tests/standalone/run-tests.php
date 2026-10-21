@@ -460,6 +460,19 @@ try {
         $c->ok(count($pdo->log) === 1 && $found === $ids, sprintf('Mehrere Konten mit einer Abfrage (%d Konten, %d Abfrage)', count($ids), count($pdo->log)));
         $pdo->log = [];
         $c->ok($k->users()->findMany([]) === [] && $pdo->log === [], 'Keine Konten: keine Abfrage');
+
+        // Vor- und Nachname: Konten von früher (Spalten leer) werden am letzten Wort geteilt, neue gespeichert.
+        $users = $kernel->users();
+        $hans = $users->add('Hans  Peter Schulz', 'kptest_hans', '', 'hans-passwort', 'member');
+        $u = $users->find($hans);
+        $c->ok($u !== null && [$u->name, $u->firstName, $u->lastName] === ['Hans Peter Schulz', 'Hans Peter', 'Schulz'], 'Ganzer Name: das letzte Wort ist der Nachname');
+        $kernel->db()->update('users', ['first_name' => '', 'last_name' => ''], ['id' => $hans]);
+        $p = $users->profile($hans);
+        $c->ok([$p['first_name'] ?? null, $p['last_name'] ?? null] === ['Hans Peter', 'Schulz'], 'Konto von früher (ohne Vor- und Nachname): aus dem Namen geteilt');
+        $users->updateProfile($hans, 'Maria', 'von Berg', '', null);
+        $u = $users->find($hans);
+        $c->ok($u !== null && [$u->name, $u->firstName, $u->lastName] === ['Maria von Berg', 'Maria', 'von Berg'], 'Geänderter Vor- und Nachname, Anzeigename folgt');
+        $users->removeAccount($hans);
     }
     $redirect = $d->send('GET', $base, ['Host' => "localhost:$port"], null);
     $c->ok($redirect[0] === 302 && ($redirect[2]['location'] ?? '') === $base, 'Andere Schreibweise der Adresse wird (vorläufig) auf die eingetragene umgeleitet');

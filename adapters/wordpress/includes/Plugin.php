@@ -151,6 +151,10 @@ final class Plugin
                 $app->roles()->exists('manager'),
             );
             Roles::migrateUsers(static fn (string $role): bool => $app->roles()->exists($role));
+            if (get_option(WpSettings::PREFIX . 'names_split') !== '1') {
+                WpUsers::splitLegacyNames();
+                update_option(WpSettings::PREFIX . 'names_split', '1', false);
+            }
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
         }
     }

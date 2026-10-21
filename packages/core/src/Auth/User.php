@@ -15,6 +15,9 @@ final class User
         /** Schlüssel der Rolle (Auth\Roles bzw. vom Admin angelegt) */
         public readonly string $role,
         public readonly array $capabilities,
+        /** Vor- und Nachname (Domain\PersonName); $name ist der Anzeigename */
+        public readonly string $firstName = '',
+        public readonly string $lastName = '',
     ) {
     }
 
