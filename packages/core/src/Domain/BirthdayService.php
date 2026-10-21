@@ -331,7 +331,9 @@ final class BirthdayService
             throw ApiError::invalid('Bitte eine volle Stunde von 0 bis 23 angeben.');
         }
         if ($enabled !== null) {
-            $this->app->settings->set(self::NOTIFY_SETTING, $enabled);
+            // Als 1/0: WordPress speichert false nicht, solange es die Option noch nicht gibt (update_option vergleicht
+            // mit dem Standardwert false), dann bliebe es beim Standard „an“.
+            $this->app->settings->set(self::NOTIFY_SETTING, $enabled ? 1 : 0);
         }
         if ($hour !== null) {
             $this->app->settings->set(self::NOTIFY_HOUR_SETTING, (int) $hour);
