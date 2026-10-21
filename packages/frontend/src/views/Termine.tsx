@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api, can, config, type CalendarEvent } from '../api';
 import GuestPushButton from '../GuestPushButton';
-import { birthdaysVisible, UpcomingBirthdays } from '../upcomingBirthdays';
+import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
@@ -27,7 +27,11 @@ export default function Termine() {
 
 function EventList() {
   const { data, error, loading, reload } = useAsync(loadEvents, [], 'termine');
-  const birthdays = birthdaysVisible() ? <UpcomingBirthdays /> : null;
+  // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
+  // schiebt die Liste nach unten.
+  const showBirthdays = birthdaysVisible();
+  const upcoming = useUpcomingBirthdays(showBirthdays);
+  const birthdays = showBirthdays ? <UpcomingBirthdaysCard state={upcoming} /> : null;
   const [open, setOpen] = useState<string | null>(null);
 
   const groups = useMemo(() => {
@@ -53,13 +57,7 @@ function EventList() {
 
   const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
 
-  if (loading && !data)
-    return (
-      <>
-        {birthdays}
-        <Loading />
-      </>
-    );
+  if ((loading && !data) || (showBirthdays && upcoming.loading && !upcoming.data)) return <Loading />;
   if (error)
     return (
       <>

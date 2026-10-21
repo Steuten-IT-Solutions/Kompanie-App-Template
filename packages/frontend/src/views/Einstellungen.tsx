@@ -67,7 +67,10 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
 
 /** Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat. */
 function Overview() {
-  const { data } = useAsync(() => api.settings(), []);
+  // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
+  // ein und schiebt die Zeilen darunter weg.
+  const { data, loading } = useAsync(() => api.settings(), [], 'settings');
+  if (loading && !data) return <Loading />;
   const pages = PAGES.filter((p) => p.id !== 'news' || !!data?.news);
   return (
     <ul className="card-list settings-overview">
