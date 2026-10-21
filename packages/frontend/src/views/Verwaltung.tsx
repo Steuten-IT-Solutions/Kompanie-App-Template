@@ -354,10 +354,14 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
       <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
       {(m.rank_title || avatar) && (
         <p className="member-rank-line">
-          {/* Foto rechts neben dem Abzeichen, gleich hoch wie das Abzeichen */}
-          {m.rank_title && <RankBadge url={m.rank_badge_url} title={m.rank_title} size="medium" />}
+          {/* Abzeichen mit dem Dienstgrad darunter, rechts daneben das Foto (gleich hoch wie das Abzeichen) */}
+          {m.rank_title && (
+            <span className="member-rank-badge">
+              <RankBadge url={m.rank_badge_url} title={m.rank_title} size="medium" />
+              <span>{m.rank_title}</span>
+            </span>
+          )}
           {avatar && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
-          {m.rank_title && <span>{m.rank_title}</span>}
         </p>
       )}
       <MenuNav
