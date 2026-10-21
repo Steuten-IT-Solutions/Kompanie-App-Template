@@ -24,7 +24,7 @@ export function ReportButton() {
  * heißt es „angekommen“.
  */
 export default function FehlerMelden() {
-  const form = useAsync(() => api.reportForm(), []);
+  const form = useAsync(() => api.reportForm(), [], 'report-form');
   const opened = useRef(Date.now());
   const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');

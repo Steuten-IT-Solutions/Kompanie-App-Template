@@ -7,6 +7,10 @@ import { noteError } from './lastError';
  * Lädt Daten asynchron; reload() lädt neu.
  * Mit `key` zeigt die Ansicht beim nächsten Öffnen sofort die zuletzt geladenen Daten und
  * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs; siehe dataCache.ts).
+ * `revision` zählt hoch, wenn die frischen Daten anders sind als die sofort gezeigten aus dem Speicher: Formulare, die
+ * ihre Felder einmal aus den Daten übernehmen, damit als `key` neu aufbauen.
+ * Gab es während des Ladens eine eigene Änderung, ist die Antwort vielleicht veraltet und überschriebe den gespeicherten
+ * Stand (setData): Dann einmal neu laden.
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
   const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
@@ -15,6 +19,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const [revision, setRevision] = useState(0);
 
   const setData = useCallback(
     (d: T | null) => {
@@ -29,18 +34,28 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
     setLoading(true);
     const hit = cached();
     if (hit !== null) setDataState(hit);
-    const since = dataCache.generation();
-    fn()
-      .then((d) => {
-        if (alive) {
-          setDataState(d);
-          setError(null);
-        }
-        // Auch wenn die Ansicht schon geschlossen ist: Beim nächsten Öffnen sind die Daten dann aktuell.
-        if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since);
-      })
-      .catch((e: Error) => alive && setError(e.message))
-      .finally(() => alive && setLoading(false));
+    const load = (retry: boolean) => {
+      const since = dataCache.generation();
+      fn()
+        .then((d) => {
+          if (alive && retry && since !== dataCache.generation()) return load(false);
+          if (alive) {
+            if (hit !== null && JSON.stringify(hit) !== JSON.stringify(d)) setRevision((r) => r + 1);
+            setDataState(d);
+            setError(null);
+            setLoading(false);
+          }
+          // Auch wenn die Ansicht schon geschlossen ist: Beim nächsten Öffnen sind die Daten dann aktuell.
+          if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since);
+        })
+        .catch((e: Error) => {
+          if (alive) {
+            setError(e.message);
+            setLoading(false);
+          }
+        });
+    };
+    load(true);
     return () => {
       alive = false;
     };
@@ -48,7 +63,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   }, [...deps, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
-  return { data, error, loading, reload, setData };
+  return { data, error, loading, reload, setData, revision };
 }
 
 export function Loading() {

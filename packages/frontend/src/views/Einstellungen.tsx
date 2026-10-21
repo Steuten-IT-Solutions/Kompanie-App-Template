@@ -93,15 +93,16 @@ function Overview() {
 
 /** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
 function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
+  const { data, error, loading, reload, setData, revision } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
+  // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
   const props = { settings: s, onSaved: setData, onToast };
-  if (page === 'google') return <GoogleAccess {...props} />;
-  if (page === 'kalender') return <Calendar {...props} />;
-  if (page === 'galerie') return <Gallery {...props} />;
-  return s.news ? <News {...props} /> : null;
+  if (page === 'google') return <GoogleAccess key={revision} {...props} />;
+  if (page === 'kalender') return <Calendar key={revision} {...props} />;
+  if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  return s.news ? <News key={revision} {...props} /> : null;
 }
 
 /**
@@ -109,7 +110,7 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
  * wann am Geburtstag benachrichtigt wird.
  */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
@@ -274,6 +275,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
         return list;
       }),
     [],
+    'features',
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);

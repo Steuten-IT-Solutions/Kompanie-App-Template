@@ -14,7 +14,7 @@ const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
  * löschen. Gast und Admin sind fest (nur umbenennen), Mitglied ist die Rolle neuer Konten.
  */
 export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string) => void; refresh?: number }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.roles(), [refresh]);
+  const { data, error, loading, reload, setData } = useAsync(() => api.roles(), [refresh], 'admin/roles');
   const [editing, setEditing] = useState<Level | 'neu' | null>(null);
 
   if (loading && !data) return <Loading />;
@@ -111,7 +111,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
  * eine andere Rolle; Ketten gibt es nicht.
  */
 function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.attendanceGroups(), [roles]);
+  const { data, error, loading, reload, setData } = useAsync(() => api.attendanceGroups(), [roles], 'attendance-groups');
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);

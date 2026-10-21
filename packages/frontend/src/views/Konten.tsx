@@ -287,7 +287,7 @@ export function AccountPanel({
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
-  const { data, error, loading, setData } = useAsync(() => api.account(id), [id]);
+  const { data, error, loading, setData } = useAsync(() => api.account(id), [id], 'account');
   const [editing, setEditing] = useState<AccountProfile | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState('');
