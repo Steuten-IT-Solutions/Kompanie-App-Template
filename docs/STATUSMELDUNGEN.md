@@ -5,6 +5,9 @@ Installation läuft, aber nur, wenn ein Admin zugestimmt hat (Einrichtungsassist
 *Einstellungen → Updates*). Ohne Zustimmung wird nichts gesendet und nichts gezählt. Issue #20, Gegenseite
 im Cockpit: project-cockpit#12.
 
+Fehlermeldungen aus der App (Issue #64) gehen über denselben Weg (gleiche Installations-ID und Signatur, eigener
+Empfänger), brauchen aber keine Zustimmung zu den Statusmeldungen: [FEHLERMELDUNGEN.md](FEHLERMELDUNGEN.md).
+
 Der Empfänger steht in der Repo-Variable `KOMPANIE_STATUS_URL` (nur `https://`) und kommt als
 `statusUrl` in die `update.json` des Pakets.
 

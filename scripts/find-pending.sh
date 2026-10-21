@@ -3,7 +3,7 @@
 # veröffentlicht ist (aus .github/workflows/kompanien-abgleichen.yml). Ausgabe: repos=["Org/Name", …]
 #
 # Umgebung: GH_TOKEN (nur Lesen), optional ONLY (nur dieses Repo), ORG (Standard Steuten-IT-Solutions),
-#   STATUS_URL und SUPPORT wie beim Veröffentlichen (gehen in die Prüfsumme der Paket-Konfiguration ein).
+#   STATUS_URL, REPORT_URL und SUPPORT wie beim Veröffentlichen (gehen in die Prüfsumme der Paket-Konfiguration ein).
 # Die Update-Liste wird hier nur gelesen, nicht geprüft: Sie entscheidet nur, ob ein Lauf nötig ist;
 # der Veröffentlichungs-Job prüft selbst noch einmal (mit Signatur) und tut nichts doppelt.
 set -euo pipefail
@@ -30,7 +30,7 @@ while IFS= read -r repo; do
     echo "Übersprungen (main nicht erreichbar): $repo" >&2
     continue
   fi
-  CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$repo" --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}")"   # eigene Zuweisung: Fehler brechen ab
+  CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$repo" --status-url="${STATUS_URL:-}" --report-url="${REPORT_URL:-}" --support="${SUPPORT:-}")"   # eigene Zuweisung: Fehler brechen ab
   # Liste als Datei (kann über 100 KB groß sein, zu groß für ein Argument)
   curl -fsSL --max-time 20 -o "$WORK/list.json" "https://raw.githubusercontent.com/$repo/gh-pages/updates.json" 2> /dev/null || echo '{}' > "$WORK/list.json"
   # Nur die neueste Version zählt (wie updates.php --find): Ein Revert ist ein neuer Stand.

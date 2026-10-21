@@ -388,7 +388,7 @@ final class PushService
      * IPv6: das ganze /64-Netz zählt als ein Anfragender (so viele Adressen hat jeder Anschluss). IPv4 in IPv6-Form
      * (::ffff:a.b.c.d, manche Server melden IPv4 so) zählt als die IPv4-Adresse.
      */
-    private static function clientKey(string $client): string
+    public static function clientKey(string $client): string
     {
         $bin = filter_var($client, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? inet_pton($client) : false;
         if ($bin === false) {

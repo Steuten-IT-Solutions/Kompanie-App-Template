@@ -12,6 +12,7 @@ import { forgetPushOnLogout } from './push';
 import { navigate, useRoute } from './router';
 import { AdminNav, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
+import { setReportOrigin } from './lastError';
 import News from './views/News';
 import Termine from './views/Termine';
 
@@ -322,6 +323,8 @@ export default function App() {
         <button
           className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
           onClick={() => {
+            // Für „Fehler melden“ (Issue #64): die Seite, auf der jemand Hilfe sucht
+            if (tab !== 'hilfe') setReportOrigin('#/' + [tab, ...path.slice(1)].join('/'));
             const slug = helpSlug([tab, ...path.slice(1)], { boardWriter: canPostBoard(), meinsFirst: meinsFirst() });
             navigate(slug ? `hilfe/${slug}` : 'hilfe');
           }}

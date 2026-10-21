@@ -281,6 +281,8 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
+            // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
+            'reports' => $a->bugReports()->available(),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
@@ -369,6 +371,9 @@ final class Api
                 return ['changed' => true];
             }),
             // Web Push (Issue #19): Konten über /me/push, Gäste über /push (Ändern und Löschen nur mit dem auth-Geheimnis).
+            // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
+            new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
+            new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
             new Route('GET', '/push/key', $P, fn () => ['supported' => $a->push()->supported(), 'publicKey' => $a->push()->publicKey()]),
             new Route('POST', '/me/push/status', $L, fn (Request $r) => $this->pushStatus($r, $this->user())),
             new Route('POST', '/push/status', $P, fn (Request $r) => $this->pushStatus($r, null)),

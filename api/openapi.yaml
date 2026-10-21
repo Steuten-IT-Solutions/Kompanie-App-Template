@@ -44,6 +44,7 @@ tags:
   - name: Inventar
   - name: Einstellungen
   - name: Wartung
+  - name: Fehlermeldungen
 
 paths:
   /config:
@@ -265,6 +266,81 @@ paths:
                   changed: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+
+  /reports/form:
+    get:
+      tags: [Fehlermeldungen]
+      summary: Formular „Fehler melden“ öffnen (auch ohne Anmeldung)
+      description: |
+        Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden) und die Angaben,
+        die der Server der Meldung beifügt. Ohne Empfänger (reportUrl) 404 `reports_unavailable`. Format der
+        Weitergabe an die Betreuer: docs/FEHLERMELDUNGEN.md.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, minSeconds, maxBytes, details]
+                properties:
+                  token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
+                  minSeconds: { type: integer }
+                  maxBytes: { type: integer, description: Höchstgröße des Bildschirmfotos (dekodiert) }
+                  details:
+                    type: object
+                    required: [version, role]
+                    properties:
+                      version: { type: string }
+                      role: { type: string, description: 'Bezeichnung der Rolle oder „ohne Anmeldung“' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /reports:
+    post:
+      tags: [Fehlermeldungen]
+      summary: Fehler melden (auch ohne Anmeldung)
+      description: |
+        Reiht die Meldung für den Versand an die Betreuer der App ein; 201 erst, wenn sie gespeichert ist. Die
+        Einwilligung (`consent: true`) ist Pflicht. Begrenzt je Anfragendem (IPv6: je /64) und Stunde, je Installation
+        und Tag und durch die Größe der Warteschlange. Ist `website` (verstecktes Feld) gefüllt, antwortet der Server
+        wie bei Erfolg, speichert aber nichts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, consent, description]
+              properties:
+                token: { type: string, description: Zeitmarke aus GET /reports/form }
+                consent: { type: boolean, const: true }
+                description: { type: string, maxLength: 2000 }
+                expected: { type: string, maxLength: 2000 }
+                page: { type: string, maxLength: 200, description: 'Seite in der App, z. B. #/termine/verwalten' }
+                userAgent: { type: string, maxLength: 400 }
+                lastError: { type: [string, 'null'], maxLength: 500, description: Letzte Fehlermeldung der App }
+                includeName: { type: boolean, description: Nur angemeldet; dann geht der Name mit }
+                screenshot:
+                  type: [object, 'null']
+                  properties:
+                    type: { type: string, enum: [image/png, image/jpeg, image/webp] }
+                    data: { type: string, description: 'Base64 (auch als data:-Adresse), dekodiert höchstens 2 MB, höchstens 10000 Pixel je Kante' }
+                website: { type: string, description: Verstecktes Feld; muss leer bleiben }
+      responses:
+        '201':
+          description: Gespeichert, wird im Hintergrund versandt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
 
   /push/key:
     get:
@@ -3428,6 +3504,7 @@ components:
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
+        reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         csrf:

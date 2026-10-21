@@ -3,6 +3,7 @@
 
 import { dataCache } from './dataCache';
 import brand from './generated/brand';
+import { noteError } from './lastError';
 
 /** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -58,6 +59,8 @@ export interface AppConfig {
   features: Record<Feature, boolean>;
   /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
   handbookUrl?: string | null;
+  /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
+  reports?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -524,7 +527,7 @@ export interface DocumentsResponse {
 }
 
 /** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
-async function encodeFile(file: File): Promise<{ name: string; data: string }> {
+export async function encodeFile(file: File): Promise<{ name: string; data: string }> {
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
@@ -765,6 +768,7 @@ async function requestFull<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    if (!path.startsWith('/reports')) noteError('Keine Verbindung zum Server');
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
@@ -785,7 +789,10 @@ async function requestFull<T>(
     applyMaintenance({ on: true, reason: String(data.reason ?? ''), since: config.maintenance?.since ?? 0 });
   }
   if (!res.ok) {
-    throw new ApiError(data?.message ?? `Fehler ${res.status}`, res.status, data?.code ?? '');
+    const message: string = data?.message ?? `Fehler ${res.status}`;
+    // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
+    if (!path.startsWith('/reports')) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
+    throw new ApiError(message, res.status, data?.code ?? '');
   }
   return { data: data as T, headers: res.headers };
 }
@@ -1025,7 +1032,35 @@ export const api = {
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
   setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
+
+  // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
+  reportForm: () => request<ReportForm>('GET', '/reports/form'),
+  sendReport: (data: ReportInput) => request<{ queued: boolean }>('POST', '/reports', data),
 };
+
+/** Formular „Fehler melden“: Zeitmarke (Zeitfalle) und die Angaben, die der Server beifügt. */
+export interface ReportForm {
+  token: string;
+  /** Frühestens so viele Sekunden nach dem Öffnen absendbar */
+  minSeconds: number;
+  /** Höchstgröße des Bildschirmfotos in Bytes */
+  maxBytes: number;
+  details: { version: string; role: string };
+}
+
+export interface ReportInput {
+  token: string;
+  consent: boolean;
+  description: string;
+  expected?: string;
+  page: string;
+  userAgent: string;
+  lastError?: string | null;
+  includeName?: boolean;
+  screenshot?: { type: string; data: string } | null;
+  /** Verstecktes Feld gegen Programme (bleibt leer) */
+  website?: string;
+}
 
 export type PushType = 'board' | 'polls' | 'birthdays' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 

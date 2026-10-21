@@ -19,6 +19,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Dateien der Dokumente und Abzeichen der Dienstgrade sind ebenfalls nicht enthalten, nur ihre Zeilen (mit dem Namen
  * der Datei); die Dateien bleiben in der geschützten Dateiablage. Fehlt ein Abzeichen nach dem Einspielen auf einem
  * anderen Server, liefert die API badge_url = null.
+ * Nicht enthalten sind außerdem Push-Abos samt Warteschlange und wartende Fehlermeldungen (bug_reports, Issue #64): Sie
+ * gehören zur Installation, und Meldungen mit Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  */
 final class Backup
 {
@@ -34,6 +36,8 @@ final class Backup
         'schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq',
         'tasks_last_run', 'installation_id', 'installation_secret', 'telemetry_registered', 'telemetry_last', 'telemetry_heartbeat', 'telemetry_checks',
         'telemetry_errors', 'telemetry_pending', 'telemetry_events',
+        // Fehlermeldungen (Issue #64): Bestätigung durch den Empfänger. Die Warteschlange (bug_reports) ist keine Kerntabelle der Sicherung.
+        'bug_reports_registered',
         // Web Push: Schlüssel und Stand der Abgleiche gehören zu dieser Installation (Abos sind nicht in Sicherungen).
         'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];

@@ -39,6 +39,7 @@ final class ApiScenario
             $this->accounts();
             $this->events();
             $this->push();
+            $this->reports();
             $this->config();
         } finally {
             $this->d->actAs(null);
@@ -1058,6 +1059,48 @@ final class ApiScenario
             $c->ok($s === 200 && $d['birthdays'] === ['enabled' => false, 'hour' => 9], 'Benachrichtigung am Geburtstag ausschalten und Stunde ändern');
             $this->req('PATCH', '/admin/push', ['birthday_notify' => $before['enabled'], 'birthday_hour' => $before['hour']]);
         }
+    }
+
+    /**
+     * Fehlermeldungen (Issue #64): nur mit Empfänger (reportUrl in update.json); auch für Gäste, mit Zeitfalle,
+     * Honeypot und Einwilligung. Ohne Empfänger antworten die Routen 404, und /config blendet den Knopf aus.
+     */
+    private function reports(): void
+    {
+        $c = $this->c;
+        $c->section('Fehlermeldungen');
+        $this->d->actAs(null);
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(is_bool($config['reports'] ?? null), '/config sagt, ob Fehlermeldungen möglich sind');
+        if (!$config['reports']) {
+            [$s, $d] = $this->req('GET', '/reports/form');
+            $c->ok($s === 404 && ($d['code'] ?? '') === 'reports_unavailable', 'Ohne Empfänger kein Formular (404)');
+            $c->ok($this->req('POST', '/reports', ['description' => 'x', 'consent' => true])[0] === 404, 'Ohne Empfänger keine Meldung (404)');
+            return;
+        }
+        [$s, $form] = $this->req('GET', '/reports/form');
+        $c->ok($s === 200 && is_string($form['token'] ?? null) && ($form['details']['role'] ?? '') === 'ohne Anmeldung' && is_string($form['details']['version'] ?? null),
+            'Formular für Gäste mit Zeitmarke und den beigefügten Angaben');
+        $body = ['token' => $form['token'], 'consent' => true, 'description' => 'Test aus dem Vertragstest', 'page' => '#/termine', 'userAgent' => 'Vertragstest'];
+        [$s, $d] = $this->req('POST', '/reports', $body);
+        $c->ok($s === 429 && ($d['code'] ?? '') === 'too_fast', 'Sofort abgeschickt → 429 too_fast (Zeitfalle)');
+        // Die Zeitmarke gehört zu keinem Konto; das Formular eines Mitglieds nennt dessen Rolle.
+        $this->d->actAs($this->m1);
+        [, $memberForm] = $this->req('GET', '/reports/form');
+        $c->ok(($memberForm['details']['role'] ?? '') !== 'ohne Anmeldung' && ($memberForm['details']['role'] ?? '') !== '', 'Formular nennt die Rolle des Kontos');
+        $this->d->actAs(null);
+        sleep((int) ($form['minSeconds'] ?? 3));
+        $c->ok(($this->req('POST', '/reports', ['consent' => false] + $body)[0]) === 400, 'Ohne Einwilligung → 400');
+        $c->ok(($this->req('POST', '/reports', ['description' => ' '] + $body)[0]) === 400, 'Ohne Beschreibung → 400');
+        $c->ok(($this->req('POST', '/reports', ['includeName' => true] + $body)[0]) === 400, 'Gast mit Namen → 400');
+        $c->ok(($this->req('POST', '/reports', ['screenshot' => ['type' => 'image/png', 'data' => base64_encode('kein Bild')]] + $body)[0]) === 400, 'Kein echtes Bild → 400');
+        $c->ok(($this->req('POST', '/reports', ['token' => 'x'] + $body)[1]['code'] ?? '') === 'form_expired', 'Ungültige Zeitmarke → form_expired');
+        [$s, $d] = $this->req('POST', '/reports', $body + ['screenshot' => ['type' => 'image/png', 'data' => self::pngBase64()]]);
+        $c->ok($s === 201 && ($d['queued'] ?? false) === true, 'Gast meldet einen Fehler mit Bildschirmfoto → 201');
+        $this->d->actAs($this->m1);
+        [$s] = $this->req('POST', '/reports', ['token' => $memberForm['token'], 'includeName' => true] + $body);
+        $c->ok($s === 201, 'Mitglied meldet mit Namen → 201');
+        $this->d->actAs(null);
     }
 
     private function config(): void

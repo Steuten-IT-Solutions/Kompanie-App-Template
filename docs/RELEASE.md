@@ -64,8 +64,9 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
 5. Im Kern-Repo die Labels `neue-kompanie` und `kompanie-aendern` anlegen (die Formulare setzen sie).
 6. Optional als **Variablen des Kern-Repos** (nicht der Environment, sonst sieht sie der Abgleich nicht;
    gleichnamige Variablen der Environment hätten beim Veröffentlichen Vorrang, also dort keine anlegen):
-   `KOMPANIE_STATUS_URL` (Empfang der Statusmeldungen im Cockpit, https, siehe [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md))
-   und `KOMPANIE_SUPPORT` (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
+   `KOMPANIE_STATUS_URL` (Empfang der Statusmeldungen im Cockpit, https, siehe [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)),
+   `KOMPANIE_REPORT_URL` (Empfang der Fehlermeldungen im Cockpit, https, siehe [FEHLERMELDUNGEN.md](FEHLERMELDUNGEN.md);
+   ohne sie gibt es in der App keinen Knopf „Fehler melden“) und `KOMPANIE_SUPPORT` (E-Mail-Adresse oder https-Adresse für Hilfe; erscheint in der App und im Installer).
    Eine Änderung daran (wie an `TrustedKeys`) ergibt beim nächsten Abgleich für jede Kompanie eine neue
    Version: Die Prüfsumme der Paket-Konfiguration (`configHash`) gehört zum veröffentlichten Stand.
    Ausnahme: Ist die neueste Version einer Kompanie zurückgezogen, wird derselbe Stand nicht neu
