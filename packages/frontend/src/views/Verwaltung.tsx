@@ -12,7 +12,7 @@ import {
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
+import { formatDate, formatEuro, formatPoints, parseEuroToCents, roleCount, todayYmd } from '../format';
 import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
@@ -171,7 +171,7 @@ function Members() {
     return (config?.roles ?? [])
       .filter((r) => n.has(r.key))
       .sort((a, b) => rank(a.key) - rank(b.key))
-      .map((r) => `${r.label} ${n.get(r.key)}`);
+      .map((r) => roleCount(r.label, n.get(r.key) ?? 0));
   }, [data]);
   // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
   const withPhotos = (data ?? []).some((m) => m.photo_url);
@@ -298,7 +298,7 @@ function Members() {
       <ul className="card-list">
         {list.map((m) => (
           <li key={m.id} className="card row clickable member-row" onClick={() => open(m.id)}>
-            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} />}
+            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
@@ -380,11 +380,11 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
           {/* Abzeichen mit dem Dienstgrad darunter, rechts daneben das Foto (gleich hoch wie das Abzeichen) */}
           {m.rank_title && (
             <span className="member-rank-badge">
-              <RankBadge url={m.rank_badge_url} title={m.rank_title} size="medium" />
+              <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
               <span>{m.rank_title}</span>
             </span>
           )}
-          {avatar && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
+          {avatar && <MemberAvatar url={m.photo_url} name={m.name} size="large" />}
         </p>
       )}
       <MenuNav
