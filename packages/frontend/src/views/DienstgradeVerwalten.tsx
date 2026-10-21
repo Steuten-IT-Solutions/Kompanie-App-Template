@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, config, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
 import brand from '../generated/brand';
 import { formatDate } from '../format';
@@ -363,7 +363,12 @@ export function Promotions() {
   const [below, setBelow] = useState(false);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const list = (data ?? []).filter((p) => !below || p.below_current_threshold);
+  // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
+  // Nach Abschnitten gruppiert; innerhalb eines Abschnitts bleibt die Reihenfolge des Servers (sort ist stabil).
+  const list = (data ?? [])
+    .filter((p) => (below ? p.below_current_threshold : p.next_rank !== null))
+    .sort((a, b) => section(a) - section(b));
+  const headings = ['Schwelle erreicht', 'Noch nicht erreicht', `Höchster ${rank}`];
   return (
     <div>
       <label className="toggle">
@@ -374,37 +379,50 @@ export function Promotions() {
         <Empty>Niemand gefunden.</Empty>
       ) : (
         <ul className="card-list promotions">
-          {list.map((p) => {
-            const due = p.points_to_next !== null && p.points_to_next <= 0;
+          {list.map((p, i) => {
+            const due = isDue(p);
+            // Überschrift vor dem ersten Eintrag jedes Abschnitts.
+            const heading = i === 0 || section(list[i - 1]) !== section(p) ? headings[section(p)] : null;
             return (
-              <li
-                key={p.user_id}
-                className={`card row clickable ${due ? 'due' : ''}`}
-                onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
-              >
-                <div className="row-main">
-                  <div className="row-title">{p.name}</div>
-                  <div className="row-sub">
-                    {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
-                    {p.points.toLocaleString('de-DE')} {sec.points}
-                    {p.next_rank &&
-                      p.points_to_next !== null &&
-                      (due
-                        ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
-                        : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
-                    {p.below_current_threshold && ' · unter der Schwelle'}
+              <Fragment key={p.user_id}>
+                {heading && <li className="section-title list-divider">{heading}</li>}
+                <li
+                  className={`card row clickable ${due ? 'due' : ''}`}
+                  onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
+                >
+                  <div className="row-main">
+                    <div className="row-title">{p.name}</div>
+                    <div className="row-sub">
+                      {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
+                      {p.points.toLocaleString('de-DE')} {sec.points}
+                      {p.next_rank &&
+                        p.points_to_next !== null &&
+                        (due
+                          ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
+                          : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
+                      {p.below_current_threshold && ' · unter der Schwelle'}
+                    </div>
                   </div>
-                </div>
-                <span className="chevron" aria-hidden="true">
-                  ›
-                </span>
-              </li>
+                  <span className="chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </li>
+              </Fragment>
             );
           })}
         </ul>
       )}
     </div>
   );
+}
+
+function isDue(p: { points_to_next: number | null }): boolean {
+  return p.points_to_next !== null && p.points_to_next <= 0;
+}
+
+/** Abschnitt der Beförderungsliste: 0 Schwelle erreicht, 1 noch nicht erreicht, 2 kein höherer Dienstgrad. */
+function section(p: { points_to_next: number | null; next_rank: unknown }): number {
+  return isDue(p) ? 0 : p.next_rank === null ? 2 : 1;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
