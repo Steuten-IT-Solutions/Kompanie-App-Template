@@ -33,6 +33,14 @@ async function memberMenu(page: Page, name: string) {
   await nav.locator('.admin-menu-toggle').click();
   await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
 }
+/** Zählt beantwortete Aufrufe zum Speichern einer Reihenfolge (PUT …/order), um vor dem Neuladen darauf zu warten. */
+function countOrderSaves(page: Page, path: string) {
+  let n = 0;
+  page.on('response', (r) => {
+    if (r.request().method() === 'PUT' && decodeURIComponent(r.url()).includes(path)) n++;
+  });
+  return () => n;
+}
 /** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
 const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
@@ -1736,6 +1744,7 @@ test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach de
   const order = async () => (await page.locator('.title-list .row-title').allTextContents()).filter((t) => t.includes(id));
   expect(await order()).toEqual(names);
 
+  const saves = countOrderSaves(page, 'titles/order');
   // C am Griff über A ziehen
   const handle = page.getByRole('button', { name: `${names[2]} verschieben (ziehen oder Pfeiltasten)` });
   const from = (await handle.boundingBox())!;
@@ -1746,13 +1755,15 @@ test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach de
   await page.mouse.up();
   await expect.poll(order).toEqual([names[2], names[0], names[1]]);
 
-  // A mit Pfeil hoch vor C, der Griff behält den Fokus
+  // A mit Pfeil hoch vor C, gleich danach, während das Ziehen noch gespeichert wird; der Griff behält den Fokus
   const handleA = page.getByRole('button', { name: `${names[0]} verschieben (ziehen oder Pfeiltasten)` });
   await handleA.focus();
   await page.keyboard.press('ArrowUp');
   await expect.poll(order).toEqual([names[0], names[2], names[1]]);
   await expect(handleA).toBeFocused();
 
+  // Beide Züge gespeichert (das Speichern läuft im Hintergrund), dann neu laden
+  await expect.poll(saves).toBe(2);
   await page.reload();
   await expect(page.locator('.title-list .row', { hasText: names[1] })).toBeVisible();
   expect(await order()).toEqual([names[0], names[2], names[1]]);
@@ -1777,6 +1788,7 @@ test('Titel: beim Ziehen an den unteren Rand scrollt die Seite mit', async ({ pa
   const scrolled = await page.evaluate(() => window.scrollY);
   const handle = (await first.getByRole('button', { name: /verschieben/ }).boundingBox())!;
   const tabbar = (await page.locator('.tabbar').boundingBox())!;
+  const saves = countOrderSaves(page, 'titles/order');
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   // Knapp über der Tab-Leiste halten, bis die Seite unten angekommen ist
@@ -1790,6 +1802,7 @@ test('Titel: beim Ziehen an den unteren Rand scrollt die Seite mit', async ({ pa
   await page.mouse.up();
   await expect.poll(order).toEqual([...names.slice(1), names[0]]);
 
+  await expect.poll(saves).toBe(1);
   await page.reload();
   await expect(page.locator('.title-list .row', { hasText: names[0] })).toBeVisible();
   expect(await order()).toEqual([...names.slice(1), names[0]]);

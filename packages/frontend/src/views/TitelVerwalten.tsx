@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, type Title, type TitleRef } from '../api';
-import { useDragSort } from '../dragSort';
+import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
@@ -39,22 +39,22 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
     if (await run(() => api.createTitle(title.trim()), 'Titel angelegt')) setTitle('');
   }
 
-  async function reorder(next: Title[]) {
+  const saveOrder = useSaveQueue();
+  function reorder(next: Title[]) {
     // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
     setData(next);
-    setBusy(true);
     setFormError(null);
-    try {
-      setData(await api.reorderTitles(next.map((t) => t.id)));
-    } catch (e) {
-      setFormError((e as Error).message);
-      reload();
-    } finally {
-      setBusy(false);
-    }
+    saveOrder(
+      () => api.reorderTitles(next.map((t) => t.id)),
+      setData,
+      (e) => {
+        setFormError(e.message);
+        reload();
+      },
+    );
   }
 
-  const sort = useDragSort(data ?? [], reorder, busy || editing !== null);
+  const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;

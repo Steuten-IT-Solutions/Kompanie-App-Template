@@ -44,6 +44,26 @@ function scrollSpeed(y: number): number {
 }
 
 /**
+ * Speichert Reihenfolgen nacheinander; nur das Ergebnis des zuletzt gestarteten Aufrufs zählt. So bleibt Verschieben
+ * auch möglich, während noch gespeichert wird, und eine ältere Antwort überschreibt keine neuere Reihenfolge.
+ */
+export function useSaveQueue() {
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const latest = useRef(0);
+  return function queue<R>(save: () => Promise<R>, onSaved: (result: R) => void, onError: (e: Error) => void) {
+    const n = ++latest.current;
+    chain.current = chain.current.then(async () => {
+      try {
+        const result = await save();
+        if (n === latest.current) onSaved(result);
+      } catch (e) {
+        if (n === latest.current) onError(e as Error);
+      }
+    });
+  };
+}
+
+/**
  * Reihenfolge einer Liste per Ziehen am Griff ändern, mit Maus und Finger (Pointer-Events statt HTML-Drag-and-drop,
  * das auf Touch-Geräten nicht geht). Der Eintrag folgt dem Finger, die anderen rücken zur Seite; nahe an Kopf- oder
  * Tab-Leiste scrollt die Seite mit. Beim Loslassen bekommt onMove die neue Reihenfolge. Am fokussierten Griff

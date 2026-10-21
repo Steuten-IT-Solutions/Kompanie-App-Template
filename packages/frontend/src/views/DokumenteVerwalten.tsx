@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { useDragSort } from '../dragSort';
+import { useDragSort, useSaveQueue } from '../dragSort';
 import { api, type DocCategory, type DocumentInfo, type DocumentMeta, type DocVisibility } from '../api';
 import brand from '../generated/brand';
 import { formatBytes, formatDate, todayYmd } from '../format';
@@ -95,7 +95,8 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
   const [formError, setFormError] = useState<string | null>(null);
   const [sort, setSort] = useDocSort();
   const { isOpen, toggle, show } = useOpenGroups();
-  const sortCategories = useDragSort(data?.categories ?? [], reorderCategories, busy);
+  const saveOrder = useSaveQueue();
+  const sortCategories = useDragSort(data?.categories ?? [], reorderCategories);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -118,10 +119,20 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
     }
   }
 
-  async function reorderCategories(next: DocCategory[]) {
+  function reorderCategories(next: DocCategory[]) {
     // Gleich in der neuen Reihenfolge zeigen, damit die Kategorie nach dem Loslassen nicht zurückspringt
     setData({ ...data!, categories: next });
-    if (!(await run(() => api.reorderDocCategories(next.map((c) => c.id)), 'Reihenfolge gespeichert'))) reload();
+    saveOrder(
+      () => api.reorderDocCategories(next.map((c) => c.id)),
+      () => {
+        onToast('Reihenfolge gespeichert');
+        reload();
+      },
+      (e) => {
+        onToast(e.message);
+        reload();
+      },
+    );
   }
 
   async function upload(e: FormEvent) {
