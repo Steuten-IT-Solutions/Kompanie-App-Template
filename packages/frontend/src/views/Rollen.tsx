@@ -7,15 +7,15 @@ const sec = brand.labels.sections;
 
 /** Rechte, die der Admin einer Rolle geben kann (Einstellungen bleiben den Admins vorbehalten). */
 const CAPABILITIES: { key: Capability; label: string }[] = [
-  { key: 'member', label: 'Mitgliederbereich: eigene Punkte und Strafen, interner Kalender, interne Galerie' },
+  { key: 'member', label: `Mitgliederbereich: eigene ${sec.points} und ${sec.penalties}, interner Kalender, interne ${sec.gallery}` },
   { key: 'calendar', label: 'Interner Kalender (ohne Mitgliederbereich, z. B. für Anwärter)' },
   { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen` },
   { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
   { key: 'manage_ranks', label: `${sec.ranks} pflegen, befördern und degradieren` },
   { key: 'manage_titles', label: `${sec.titles} pflegen und vergeben` },
   { key: 'manage_attendance', label: `${sec.attendance}: Listen je Termin führen` },
-  { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
-  { key: 'manage_documents', label: 'Dokumente pflegen und alle Dokumente sehen' },
+  { key: 'manage_events', label: `Öffentliche ${sec.events} pflegen` },
+  { key: 'manage_documents', label: `${sec.documents} pflegen und alle ${sec.documents} sehen` },
   { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben` },
   { key: 'manage_polls', label: `${sec.polls}: anlegen, beenden und alle Ergebnisse sehen` },
   { key: 'manage_inventory', label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf` },
@@ -49,7 +49,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
       <h3>Rollen</h3>
       <p className="small muted">
         Jede Person hat eine Rolle. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
-        {config?.features.points && 'Der Punktefaktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder.'}
+        {config?.features.points && `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder.`}
       </p>
       <ul className="card-list role-list">
         {roles.map((r) =>
@@ -195,6 +195,9 @@ function RoleForm({
     );
   };
 
+  // Punkte bekommen nur Personen mit Mitgliederbereich: Faktor nur für „Mitglied“ und eigene Rollen mit Mitgliederbereich.
+  const withFactor = !!config?.features.points && (fixed ? role?.key === 'member' : capabilities.includes('member'));
+
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
     setBusy(true);
     setFormError(null);
@@ -209,7 +212,6 @@ function RoleForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const withFactor = config?.features.points && (!fixed || role?.key === 'member');
     const data = { label, ...(fixed ? {} : { capabilities }), ...(withFactor ? { points_factor: factor } : {}) };
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
   }
@@ -256,9 +258,9 @@ function RoleForm({
           ))}
         </fieldset>
       )}
-      {config?.features.points && (!fixed || role?.key === 'member') && (
+      {withFactor && (
         <label className="field">
-          <span>Punktefaktor (z. B. 0,5 für halbe Punkte)</span>
+          <span>{sec.points}faktor (z. B. 0,5 für die Hälfte)</span>
           <input type="text" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} />
         </label>
       )}
