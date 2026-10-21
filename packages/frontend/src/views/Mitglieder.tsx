@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api } from '../api';
-import { MemberAvatar } from '../memberPhoto';
+import { ZoomableAvatar } from '../memberPhoto';
 import { RankStack } from '../RankBadge';
 import { TitleBadges } from '../TitleBadges';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -96,7 +96,7 @@ export default function Mitglieder() {
       <ul className="card-list">
         {list.map((m) => (
           <li key={m.id} className="card row member-row">
-            <MemberAvatar url={m.photo_url} name={m.name} size="medium" />
+            <ZoomableAvatar url={m.photo_url} name={m.name} size="medium" />
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />

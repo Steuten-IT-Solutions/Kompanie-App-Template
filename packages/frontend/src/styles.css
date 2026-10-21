@@ -1967,6 +1967,44 @@ fieldset.feature-list legend {
   gap: 12px 16px;
   margin-bottom: 12px;
 }
+/* Antippen des Fotos in den Details vergrößert es (ganzes Bild statt runder Ausschnitt). */
+.member-photo-open {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: zoom-in;
+}
+.member-photo-open .member-avatar img {
+  pointer-events: none;
+}
+.member-photo-zoom {
+  touch-action: auto;
+}
+.member-photo-zoom figure {
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+/* Feste Breite statt Bildgröße: Auch kleine hochgeladene Fotos erscheinen groß; Hochformat passt per contain. */
+.member-photo-zoom img {
+  width: min(480px, calc((100vw - 32px) / var(--kompanie-zoom, 1)));
+  height: auto;
+  max-width: none;
+  max-height: calc(78vh / var(--kompanie-zoom, 1));
+  object-fit: contain;
+}
+.member-photo-zoom figcaption {
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
 .account-card .member-avatar-large {
   margin-bottom: 8px;
 }

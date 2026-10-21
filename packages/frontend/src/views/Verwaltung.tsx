@@ -38,7 +38,7 @@ import {
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
-import { MemberAvatar, MemberPhotoPanel, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
+import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -384,7 +384,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               <span>{m.rank_title}</span>
             </span>
           )}
-          {avatar && <MemberAvatar url={m.photo_url} name={m.name} size="large" />}
+          {avatar && <ZoomableAvatar url={m.photo_url} name={m.name} />}
         </p>
       )}
       <MenuNav

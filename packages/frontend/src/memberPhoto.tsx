@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, type EncodedFile } from './api';
 import { badgeSrc } from './RankBadge';
 
@@ -79,6 +80,59 @@ export function MemberAvatar({ url, name, size = 'small' }: { url?: string | nul
         <span className="member-avatar-initials">{initials(name)}</span>
       )}
     </span>
+  );
+}
+
+/**
+ * Foto vergrößert über der Seite (480-Pixel-Fassung, ganzes Bild statt runder Ausschnitt), damit sich neue Mitglieder
+ * die Gesichter einprägen können. Schließen mit ✕, Escape oder Tippen neben das Bild. Im body, damit es nicht im
+ * Absatz der Dienstgrad-Zeile steht und deren Farbe erbt.
+ */
+function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div
+      className="lightbox member-photo-zoom"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Foto von ${name}`}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <figure onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <img src={url.startsWith('data:') ? url : badgeSrc(url, PIXELS.large)} alt={`Foto von ${name}`} decoding="async" />
+        <figcaption>{name}</figcaption>
+      </figure>
+      <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
+        ✕
+      </button>
+    </div>,
+    document.body,
+  );
+}
+
+/** Foto in den Mitgliedsdetails und der Mitgliederliste: Antippen vergrößert es; ohne Foto nur die Anfangsbuchstaben. */
+export function ZoomableAvatar({ url, name, size = 'large' }: { url?: string | null; name: string; size?: AvatarSize }) {
+  const [zoomed, setZoomed] = useState(false);
+  const close = useCallback(() => setZoomed(false), []);
+  if (!url) return <MemberAvatar url={url} name={name} size={size} />;
+  return (
+    <>
+      <button type="button" className="member-photo-open" onClick={() => setZoomed(true)} aria-label={`Foto von ${name} vergrößern`}>
+        <MemberAvatar url={url} name={name} size={size} />
+      </button>
+      {zoomed && <PhotoZoom url={url} name={name} onClose={close} />}
+    </>
   );
 }
 
