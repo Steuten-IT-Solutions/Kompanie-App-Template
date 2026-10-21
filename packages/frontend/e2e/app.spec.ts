@@ -305,6 +305,15 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.locator('.row', { hasText: `${id}, Gerd` }).locator('.member-avatar-initials')).toHaveText(`G${id[0].toUpperCase()}`);
   await page.locator('.row', { hasText: `${id}, Hanna` }).click();
   await expect(page.locator('.member-rank-line .member-avatar img')).toBeVisible();
+  // Antippen vergrößert das Foto; Escape und ✕ schließen die Ansicht
+  await page.getByRole('button', { name: /vergrößern/ }).click();
+  const zoom = page.getByRole('dialog', { name: /^Foto von / });
+  await expect(zoom.locator('img')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(zoom).toHaveCount(0);
+  await page.getByRole('button', { name: /vergrößern/ }).click();
+  await zoom.getByRole('button', { name: 'Schließen' }).click();
+  await expect(zoom).toHaveCount(0);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Foto entfernen' }).click();
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
@@ -316,6 +325,19 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await page.locator('.topbar-account').click();
   await expect(page.locator('.account-card .member-avatar-large img')).toBeVisible();
   await expect(page.getByRole('button', { name: /Foto/ })).toHaveCount(0);
+
+  // In der Mitgliederliste („Mitglieder“) vergrößert auch ein Mitglied ohne Verwaltungsrechte ein Foto.
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByLabel('Mitglied suchen').fill(id);
+  await page
+    .locator('.directory .member-row', { hasText: 'Fiona' })
+    .getByRole('button', { name: /vergrößern/ })
+    .click();
+  const big = page.getByRole('dialog', { name: `Foto von Fiona ${id}` }).locator('img');
+  await expect(big).toBeVisible();
+  await expect.poll(() => big.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await expect(big).toHaveCount(0);
 });
 
 test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis er aufgenommen ist', async ({ page }) => {
