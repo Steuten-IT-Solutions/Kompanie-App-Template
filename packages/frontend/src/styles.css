@@ -2050,6 +2050,9 @@ fieldset.feature-list legend {
 .doc-sort {
   margin: 0 0 6px;
 }
+.member-sort {
+  margin: -4px 0 14px;
+}
 .doc-group + .doc-group {
   margin-top: 6px;
 }

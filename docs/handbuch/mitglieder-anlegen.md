@@ -16,6 +16,9 @@ Unter **+ Mitglied anlegen → Mehrere auf einmal anlegen** trägst du je Person
 
 Andere Rollen vergibt danach, wer Rollen vergeben darf.
 
+## Mitgliederliste sortieren
+Unter **Verwaltung → Mitglieder** wählst du oben die **Sortierung**: nach Nachname, nach Vorname oder (wer {bereich.points} vergeben darf) nach {bereich.points}, die meisten zuerst. Als Nachname gilt das letzte Wort des Namens. Dein Gerät merkt sich die Wahl.
+
 ## {rolle.candidate} aufnehmen
 {rolle.candidate} nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen den internen Kalender, aber nicht den Mitgliederbereich. In der Mitgliederliste erscheinen sie, wenn **Auch {rolle.candidate} anzeigen** angehakt ist. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Das geht nur von {rolle.candidate} zu {rolle.member}.
 

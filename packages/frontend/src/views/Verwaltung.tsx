@@ -13,6 +13,7 @@ import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
+import { DEFAULT_MEMBER_SORT, loadMemberSort, MEMBER_SORT_LABELS, saveMemberSort, sortMembers, type MemberSort } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
@@ -81,7 +82,14 @@ function Members() {
   const [showCandidates, setShowCandidates] = useState(can('create_users'));
   const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates]);
   const [query, setQuery] = useState('');
-  const list = useMemo(() => (data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())), [data, query]);
+  const [sort, setSort] = useState<MemberSort>(loadMemberSort);
+  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
+  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
+  const activeSort = sortOptions.includes(sort) ? sort : DEFAULT_MEMBER_SORT;
+  const list = useMemo(
+    () => sortMembers((data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())), activeSort),
+    [data, query, activeSort],
+  );
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -106,6 +114,25 @@ function Members() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Mitglied suchen"
       />
+      {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+      <div className="field member-sort">
+        <span id="member-sort-label">Sortierung</span>
+        <select
+          aria-labelledby="member-sort-label"
+          value={activeSort}
+          onChange={(e) => {
+            const next = e.target.value as MemberSort;
+            setSort(next);
+            saveMemberSort(next);
+          }}
+        >
+          {sortOptions.map((s) => (
+            <option key={s} value={s}>
+              {s === 'points' ? `${sec.points} (meiste zuerst)` : MEMBER_SORT_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </div>
       <label className="toggle">
         <input
           type="checkbox"
