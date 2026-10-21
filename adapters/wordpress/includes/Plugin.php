@@ -34,9 +34,10 @@ final class Plugin
         if (self::$app === null) {
             global $wpdb;
             $env = new WpEnvironment();
-            // Rechte je Rolle aus der App (Einstellungen → Rollen); erst beim ersten Benutzer abgefragt.
+            // Rechte je Rolle aus der App (Einstellungen → Rollen), mit den Zusatzrollen und Ausnahmen der Person; erst beim
+            // ersten Benutzer abgefragt.
             $users = new WpUsers(
-                static fn (string $role): array => self::app()->roles()->capabilities($role),
+                static fn (string $role, int $id): array => self::app()->roles()->capabilitiesFor($id, $role),
                 static fn (string $role): bool => self::app()->roles()->exists($role),
             );
             $settings = new WpSettings();
@@ -151,6 +152,10 @@ final class Plugin
                 $app->roles()->exists('manager'),
             );
             Roles::migrateUsers(static fn (string $role): bool => $app->roles()->exists($role));
+            if (get_option(WpSettings::PREFIX . 'names_split') !== '1') {
+                WpUsers::splitLegacyNames();
+                update_option(WpSettings::PREFIX . 'names_split', '1', false);
+            }
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
         }
     }

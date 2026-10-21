@@ -10,6 +10,8 @@ use KompanieApp\WordPress\Roles;
 
 final class WpDriver implements ApiDriver
 {
+    private ?string $preview = null;
+
     public function request(string $method, string $path, array $body = [], array $query = []): array
     {
         $req = new \WP_REST_Request($method, '/kompanie-app/v1' . $path);
@@ -17,6 +19,9 @@ final class WpDriver implements ApiDriver
         if ($body !== []) {
             $req->set_header('content-type', 'application/json');
             $req->set_body((string) wp_json_encode($body));
+        }
+        if ($this->preview !== null) {
+            $req->set_header('X-Kompanie-Preview', $this->preview);
         }
         $res = rest_do_request($req);
         $data = json_decode((string) wp_json_encode(rest_get_server()->response_to_data($res, false)), true);
@@ -26,6 +31,11 @@ final class WpDriver implements ApiDriver
     public function actAs(?int $userId): void
     {
         wp_set_current_user($userId ?? 0);
+    }
+
+    public function preview(?string $value): void
+    {
+        $this->preview = $value;
     }
 
     public function createUser(string $login, string $level): int

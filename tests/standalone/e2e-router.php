@@ -27,4 +27,5 @@ header('Vary: accept,content-type');
 $_SERVER['SCRIPT_NAME'] = '/app/index.php';
 require $root . '/autoload.php';
 require __DIR__ . '/MockHttp.php';
-(new KompanieApp\Standalone\Kernel($root, null, new KompanieApp\Contract\MockHttp()))->handleHttp();
+// Fehlermeldungen (Issue #64) an einen simulierten Empfänger (MockHttp), damit der Knopf „Fehler melden“ erscheint.
+(new KompanieApp\Standalone\Kernel($root, null, new KompanieApp\Contract\MockHttp(), KompanieApp\Contract\MockHttp::PACKAGE))->handleHttp();

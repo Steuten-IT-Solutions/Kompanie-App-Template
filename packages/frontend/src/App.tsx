@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin, newsTitle, type Capability } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -9,9 +9,11 @@ import { boardVisible, canManagePolls, canPostBoard, pollsVisible } from './boar
 import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
+import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
 import { navigate, useRoute } from './router';
 import { AdminNav, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
+import { setReportOrigin } from './lastError';
 import News from './views/News';
 import Termine from './views/Termine';
 
@@ -91,8 +93,7 @@ const tabLabels = (): Record<Tab, string> => ({
 
 const titles = (): Record<View, string> => ({
   ...tabLabels(),
-  // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
-  news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
+  news: newsTitle(),
   brett: sec.board,
   umfragen: sec.polls,
   inventar: sec.inventory,
@@ -178,6 +179,25 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/**
+ * Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit „Beenden“ (zurück zu Einstellungen → Rollen).
+ * Änderungen lehnt der Server in der Vorschau ab; die Knöpfe bleiben, wie die Rolle sie sieht.
+ */
+function PreviewBanner() {
+  const p = config?.preview;
+  if (!p) return null;
+  return (
+    <div className="preview-banner" role="status">
+      <span>
+        <strong>{p.role === PUBLIC_PREVIEW ? 'Vorschau ohne Anmeldung' : `Vorschau als ${p.label}`}</strong> – nur ansehen
+      </span>
+      <button className="btn btn-small" onClick={endPreview}>
+        Beenden
+      </button>
+    </div>
+  );
+}
+
 /** Beim Abmelden: alle gespeicherten Daten löschen. Die Programmdateien bleiben (sie enthalten keine Daten), damit die
  * App weiter offline startet. */
 async function clearCaches() {
@@ -192,6 +212,8 @@ async function clearCaches() {
  * bleibt alles, wie es ist – sonst sähe die App abgemeldet aus, die Sitzung bestünde aber weiter.
  */
 async function logout(onError: (msg: string) => void) {
+  // In der Vorschau: erst beenden, sonst lehnte der Server das Abmelden der Benachrichtigungen ab.
+  if (previewRole()) stopPreview();
   // Solange die Sitzung noch gilt: Dieses Gerät bekommt keine Nachrichten des Kontos mehr.
   const finishPush = await forgetPushOnLogout();
   if (config?.auth.mode === 'form') {
@@ -220,7 +242,7 @@ export function greeting(name: string): string {
   return brand.greeting.replace('{name}', () => name);
 }
 
-export default function App() {
+export default function App({ notice = null }: { notice?: string | null }) {
   const rawPath = useRoute();
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
@@ -237,7 +259,7 @@ export default function App() {
     brett: boardVisible() || canPostBoard(),
     // Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; laufende stehen am Brett.
     umfragen: pollsVisible() || canManagePolls(),
-    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über „Mein Konto“.
+    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('manage_inventory'),
     konto: !!user,
     benachrichtigungen: true,
@@ -257,7 +279,7 @@ export default function App() {
   const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
   const activeTab: View = adminView ? 'verwaltung' : tab;
 
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
   const showToast = useCallback((msg: string) => setToast(msg), []);
   // Bereiche wurden ein- oder ausgeschaltet: Tabs und Ansichten neu bestimmen.
@@ -298,6 +320,7 @@ export default function App() {
   if (maintenance && !can('manage_settings') && tab !== 'anmelden') {
     return (
       <div className="app">
+        <PreviewBanner />
         <ErrorBoundary>
           <Suspense fallback={<Loading />}>
             <MaintenancePage reason={maintenance.reason} />
@@ -311,41 +334,60 @@ export default function App() {
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
+  const head = (
+    <header className="topbar">
+      <img src={logoUrl} alt="" className="logo" />
+      <div className="topbar-text">
+        <div className="topbar-title">{caps(titles()[tab])}</div>
+        <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
+      </div>
+      <button
+        className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
+        onClick={() => {
+          // Für „Fehler melden“ (Issue #64): die Seite, auf der jemand Hilfe sucht
+          if (tab !== 'hilfe') setReportOrigin('#/' + [tab, ...path.slice(1)].join('/'));
+          const slug = helpSlug([tab, ...path.slice(1)], {
+            boardWriter: canPostBoard(),
+            meinsFirst: meinsFirst(),
+            can: (c) => can(c as Capability),
+            features: config?.features ?? {},
+          });
+          navigate(slug ? `hilfe/${slug}` : 'hilfe');
+        }}
+        aria-label="Hilfe"
+        aria-current={tab === 'hilfe' ? 'page' : undefined}
+      >
+        ?
+      </button>
+      {user ? (
+        <button
+          className={`btn btn-link topbar-account ${tab === 'konto' ? 'active' : ''}`}
+          onClick={() => navigate('konto')}
+          aria-current={tab === 'konto' ? 'page' : undefined}
+        >
+          Konto
+        </button>
+      ) : (
+        tab !== 'anmelden' && (
+          <button className="btn btn-link topbar-account" onClick={toLogin}>
+            Anmelden
+          </button>
+        )
+      )}
+    </header>
+  );
+
   return (
     <div className="app">
-      <header className="topbar">
-        <img src={logoUrl} alt="" className="logo" />
-        <div className="topbar-text">
-          <div className="topbar-title">{caps(titles()[tab])}</div>
-          <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
+      {config.preview ? (
+        // In der Vorschau bleibt das Banner mit der Kopfzeile oben stehen.
+        <div className="preview-sticky">
+          <PreviewBanner />
+          {head}
         </div>
-        <button
-          className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
-          onClick={() => {
-            const slug = helpSlug([tab, ...path.slice(1)], { boardWriter: canPostBoard(), meinsFirst: meinsFirst() });
-            navigate(slug ? `hilfe/${slug}` : 'hilfe');
-          }}
-          aria-label="Hilfe"
-          aria-current={tab === 'hilfe' ? 'page' : undefined}
-        >
-          ?
-        </button>
-        {user ? (
-          <button
-            className={`btn btn-link topbar-account ${tab === 'konto' ? 'active' : ''}`}
-            onClick={() => navigate('konto')}
-            aria-current={tab === 'konto' ? 'page' : undefined}
-          >
-            Konto
-          </button>
-        ) : (
-          tab !== 'anmelden' && (
-            <button className="btn btn-link topbar-account" onClick={toLogin}>
-              Anmelden
-            </button>
-          )
-        )}
-      </header>
+      ) : (
+        head
+      )}
 
       {maintenance && (
         <ErrorBoundary>

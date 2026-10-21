@@ -145,6 +145,15 @@ final class BoardServiceTest extends TestCase
         $this->move('+1 minute');
         $this->assertSame($edited['updated_at'], $this->call('PATCH', "/board/{$a['id']}", ['text' => 'Erste (geändert)'])->data['updated_at']);
 
+        // Zweimal in derselben Sekunde geändert (Issue #68): updated_at wird trotzdem später, sonst bliebe eine auf dem
+        // Gerät ausgeblendete Fassung ausgeblendet.
+        $first = $this->call('PATCH', "/board/{$a['id']}", ['text' => 'Erste (noch einmal)'])->data['updated_at'];
+        $second = $this->call('PATCH', "/board/{$a['id']}", ['text' => 'Erste (und noch einmal)'])->data['updated_at'];
+        $this->assertSame(['2026-10-20T11:31:00+00:00', '2026-10-20T11:31:01+00:00'], [$first, $second]);
+        $this->assertSame('2026-10-20T11:31:02+00:00', $this->call('PATCH', "/board/{$a['id']}", ['text' => 'Erste (geändert)'])->data['updated_at'], 'auch vor der Uhr: immer eine Sekunde weiter');
+        $this->move('+1 minute');
+        $this->assertSame('2026-10-20T11:32:00+00:00', $this->call('PATCH', "/board/{$a['id']}", ['text' => 'Erste (wieder)'])->data['updated_at'], 'danach wieder die Uhrzeit');
+
         // Nach 24 Stunden: nicht mehr geliefert, nicht mehr änderbar; die Aufgabe löscht sie.
         $this->clock->at = new \DateTimeImmutable('2026-10-21 12:00:00', new \DateTimeZone('Europe/Berlin'));
         $this->assertSame(['Zweite'], array_column($this->call('GET', '/board')->data['items'], 'text'));

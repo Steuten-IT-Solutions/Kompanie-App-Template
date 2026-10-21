@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core;
 
+use KompanieApp\Core\Auth\Preview;
+use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardService;
+use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
@@ -49,12 +52,14 @@ use KompanieApp\Core\Push\PushTriggers;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
+use KompanieApp\Core\Storage\MemberRoleRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
 use KompanieApp\Core\Storage\UserData;
 use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateService;
@@ -77,6 +82,7 @@ final class App
         BoardService::TASK => 3600,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
+        BugReportService::TASK => BugReportService::INTERVAL,
     ];
 
     /**
@@ -92,6 +98,14 @@ final class App
     /** @var array<string, object> */
     private array $services = [];
 
+    /** Adressen und Eckdaten; Adressen geschützter Dateien tragen in der Vorschau deren Parameter (PreviewEnvironment). */
+    public readonly Environment $env;
+
+    /** Wer die Anfrage stellt – in der Vorschau die gewählte Rolle (Auth\Preview); ohne Vorschau der Adapter selbst. */
+    public readonly AuthContext $authContext;
+
+    private readonly Preview $preview;
+
     public function __construct(
         public readonly Connection $db,
         public readonly Settings $settings,
@@ -102,8 +116,8 @@ final class App
         public readonly Scheduler $scheduler,
         public readonly NewsSource $news,
         public readonly Clock $clock,
-        public readonly Environment $env,
-        public readonly AuthContext $authContext,
+        Environment $env,
+        AuthContext $authContext,
         public readonly Authenticator $authenticator,
         public readonly UserDirectory $users,
         public readonly KompanieConfig $config,
@@ -113,6 +127,17 @@ final class App
         /** @var array<string, mixed> update.json des Pakets: updatesUrl, trustedKeys, statusUrl, kompanie, support */
         public readonly array $packageConfig = [],
     ) {
+        // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
+        // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
+        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
+        $this->authContext = $this->preview;
+        $this->env = new PreviewEnvironment($env, $this->preview);
+    }
+
+    /** Vorschau „App als Rolle ansehen“ der laufenden Anfrage (Issue #63). */
+    public function preview(): Preview
+    {
+        return $this->preview;
     }
 
     public function migrator(): Migrator
@@ -179,8 +204,10 @@ final class App
             BoardService::TASK => $this->features()->enabled('board'),
             // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
             PollService::TASK => $this->features()->enabled('polls'),
-            // Geburtstage: stündlich, benachrichtigt aber erst ab 7 Uhr Ortszeit und je Geburtstag einmal am Tag.
+            // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
+            // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Einreihen vorgezogen; nur mit Empfänger.
+            BugReportService::TASK => $this->bugReports()->available(),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -213,14 +240,16 @@ final class App
             }
             if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
-                if ((string) ($this->gallery()->status()['error'] ?? '') !== '') {
-                    $this->telemetry()->record(Code::GallerySync);
+                $error = (string) ($this->gallery()->status()['error'] ?? '');
+                if ($error !== '') {
+                    $this->telemetry()->record(Code::GallerySync, Detail::fromMessage($error), $error);
                 }
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
-                if (!$this->calendar()->refreshIfStale()) {
-                    $this->telemetry()->record(Code::CalendarFetch);
+                $error = $this->calendar()->refreshIfStale();
+                if ($error !== null) {
+                    $this->telemetry()->record(Code::CalendarFetch, Detail::of($this->calendar()->source(), Detail::fromMessage($error)), $error);
                 }
             } elseif ($task === UpdateService::TASK) {
                 $this->updates()->runTask();
@@ -236,13 +265,16 @@ final class App
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
                 $this->birthdays()->notifyToday();
+            } elseif ($task === BugReportService::TASK) {
+                $this->bugReports()->runTask();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
             // Die Statusmeldung selbst nicht zählen (sonst meldete sie beim nächsten Mal ihr eigenes Scheitern),
             // Fehler der Update-Liste zählt UpdateService schon.
-            if ($task !== StatusReporter::TASK && !($task === UpdateService::TASK && $e instanceof ApiError)) {
-                $this->telemetry()->record(Code::TaskFailed);
+            // Ebenso nicht zugestellte Fehlermeldungen (das Cockpit war nicht erreichbar, kein Fehler der App).
+            if (!in_array($task, [StatusReporter::TASK, BugReportService::TASK], true) && !($task === UpdateService::TASK && $e instanceof ApiError)) {
+                $this->telemetry()->record(Code::TaskFailed, Detail::of($task, Detail::className($e)), Detail::describe($e));
             }
         }
     }
@@ -262,7 +294,8 @@ final class App
     }
 
     /**
-     * Schwere PHP-Fehler in der App als Fehlercode zählen (nur der Code, kein Text). Ruft der Adapter
+     * Schwere PHP-Fehler in der App als Fehlercode zählen (in der Statusmeldung nur Code und Ursache, der Text
+     * nur im Fehlerprotokoll). Ruft der Adapter
      * einmal je Anfrage auf; Fehler anderer Plugins oder Programme zählen nicht. Bei WordPress läuft vorher
      * dessen eigener Fehler-Handler (Fehlerseite ohne exit), danach diese Funktion.
      */
@@ -284,7 +317,7 @@ final class App
     /**
      * Zählt einen schweren PHP-Fehler, wenn er in der App passiert ist (höchstens einmal je Anfrage).
      *
-     * @param array{type?: int, file?: string} $error wie error_get_last()
+     * @param array{type?: int, file?: string, line?: int, message?: string} $error wie error_get_last()
      */
     public function recordFatal(array $error): void
     {
@@ -299,7 +332,18 @@ final class App
         $recorded = true;
         // Bei zu wenig Speicher scheitert auch das Zählen; dann eben nicht.
         try {
-            $this->telemetry()->record(Code::PhpFatal);
+            $message = (string) ($error['message'] ?? '');
+            $kind = match (true) {
+                str_contains($message, 'Allowed memory size') => 'memory',
+                str_contains($message, 'Maximum execution time') => 'time_limit',
+                default => pathinfo((string) $error['file'], PATHINFO_FILENAME),
+            };
+            $type = match ($error['type']) {
+                E_PARSE => 'parse',
+                E_COMPILE_ERROR => 'compile',
+                default => 'error',
+            };
+            $this->telemetry()->record(Code::PhpFatal, Detail::of($type, $kind), $message . ' (' . basename((string) $error['file']) . ':' . (int) ($error['line'] ?? 0) . ')');
         } catch (\Throwable) {
         }
     }
@@ -311,15 +355,17 @@ final class App
 
     /**
      * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
-     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
+     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
      * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
-     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht. Inventar
-     * und sein Verlauf bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
+     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag und ihre Ausnahmen bei
+     * den Rechten werden gelöscht, ebenso noch nicht versandte Fehlermeldungen mit ihrem Namen. Inventar und sein Verlauf
+     * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
     {
         UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
+        $this->roles()->forget($userId);
     }
 
     public function pushTriggers(): PushTriggers
@@ -418,7 +464,7 @@ final class App
 
     public function roles(): RoleService
     {
-        return $this->service(RoleService::class, fn () => new RoleService($this->settings, $this->config, $this->users));
+        return $this->service(RoleService::class, fn () => new RoleService($this->settings, $this->config, $this->users, new MemberRoleRepository($this->db), $this->time()));
     }
 
     public function calendar(): CalendarService
@@ -465,6 +511,12 @@ final class App
     public function status(): StatusService
     {
         return $this->service(StatusService::class, fn () => new StatusService($this));
+    }
+
+    /** Fehlermeldungen an die Betreuer der App (Issue #64) */
+    public function bugReports(): BugReportService
+    {
+        return $this->service(BugReportService::class, fn () => new BugReportService($this));
     }
 
     public function statusReporter(): StatusReporter

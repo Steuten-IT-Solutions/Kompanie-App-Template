@@ -1,27 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
+import { CAPABILITIES } from '../capabilities';
 import brand from '../generated/brand';
+import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 const sec = brand.labels.sections;
-
-/** Rechte, die der Admin einer Rolle geben kann (Einstellungen bleiben den Admins vorbehalten). */
-const CAPABILITIES: { key: Capability; label: string }[] = [
-  { key: 'member', label: 'Mitgliederbereich: eigene Punkte und Strafen, interner Kalender, interne Galerie' },
-  { key: 'calendar', label: 'Interner Kalender (ohne Mitgliederbereich, z. B. für Anwärter)' },
-  { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen` },
-  { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
-  { key: 'manage_ranks', label: `${sec.ranks} pflegen, befördern und degradieren` },
-  { key: 'manage_titles', label: `${sec.titles} pflegen und vergeben` },
-  { key: 'manage_attendance', label: `${sec.attendance}: Listen je Termin führen` },
-  { key: 'manage_events', label: 'Öffentliche Termine pflegen' },
-  { key: 'manage_documents', label: 'Dokumente pflegen und alle Dokumente sehen' },
-  { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben` },
-  { key: 'manage_polls', label: `${sec.polls}: anlegen, beenden und alle Ergebnisse sehen` },
-  { key: 'manage_inventory', label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf` },
-  { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
-  { key: 'promote_users', label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)' },
-];
 
 const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
 
@@ -48,8 +32,10 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
     <section className="card settings-section" id="einstellungen-rollen">
       <h3>Rollen</h3>
       <p className="small muted">
-        Jede Person hat eine Rolle. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
-        {config?.features.points && 'Der Punktefaktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder.'}
+        Jede Person hat eine Grundrolle und auf Wunsch weitere eigene Rollen als Zusatzrollen; sie hat dann die Rechte aller ihrer Rollen
+        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
+        {config?.features.points &&
+          `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder; bei mehreren Rollen der kleinste.`}
       </p>
       <ul className="card-list role-list">
         {roles.map((r) =>
@@ -68,6 +54,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                 </div>
                 <div className="row-sub">
                   {r.users === 1 ? '1 Person' : `${r.users} Personen`}
+                  {(r.extra_users ?? 0) > 0 && ` (davon ${r.extra_users} als Zusatzrolle)`}
                   {' · '}
                   {r.key === 'admin'
                     ? 'alle Rechte'
@@ -78,9 +65,22 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                           .join(', ')}
                 </div>
               </div>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(r.key)} aria-label={`${r.label} bearbeiten`}>
-                Bearbeiten
-              </button>
+              <div className="role-actions">
+                {r.key !== 'admin' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => startPreview(r.key)}
+                    aria-label={`App als ${r.label} ansehen`}
+                    title="App als diese Rolle ansehen"
+                  >
+                    Ansehen
+                  </button>
+                )}
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(r.key)} aria-label={`${r.label} bearbeiten`}>
+                  Bearbeiten
+                </button>
+              </div>
             </li>
           ),
         )}
@@ -92,6 +92,15 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
           + Neue Rolle
         </button>
       )}
+      <div className="role-preview">
+        <p className="small muted">
+          „Ansehen“ zeigt die App, wie eine Person mit genau dieser Rolle sie sieht (ohne Zusatzrollen) – mit deinen eigenen Daten, nur zum
+          Ansehen. Beenden über das Banner oben.
+        </p>
+        <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
+          App ohne Anmeldung ansehen
+        </button>
+      </div>
       {config?.features.attendance && <AttendanceGroups roles={roles} onToast={onToast} />}
     </section>
   );
@@ -195,6 +204,9 @@ function RoleForm({
     );
   };
 
+  // Punkte bekommen nur Personen mit Mitgliederbereich: Faktor nur für „Mitglied“ und eigene Rollen mit Mitgliederbereich.
+  const withFactor = !!config?.features.points && (fixed ? role?.key === 'member' : capabilities.includes('member'));
+
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
     setBusy(true);
     setFormError(null);
@@ -209,7 +221,6 @@ function RoleForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const withFactor = config?.features.points && (!fixed || role?.key === 'member');
     const data = { label, ...(fixed ? {} : { capabilities }), ...(withFactor ? { points_factor: factor } : {}) };
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
   }
@@ -218,7 +229,7 @@ function RoleForm({
     if (!role) return;
     const others =
       role.users > 0
-        ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
+        ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} stattdessen die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
         : '';
     if (!window.confirm(`Rolle „${role.label}“ löschen?${others}`)) return;
     void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), 'Rolle gelöscht');
@@ -256,9 +267,9 @@ function RoleForm({
           ))}
         </fieldset>
       )}
-      {config?.features.points && (!fixed || role?.key === 'member') && (
+      {withFactor && (
         <label className="field">
-          <span>Punktefaktor (z. B. 0,5 für halbe Punkte)</span>
+          <span>{sec.points}faktor (z. B. 0,5 für die Hälfte)</span>
           <input type="text" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} />
         </label>
       )}

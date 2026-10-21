@@ -105,7 +105,6 @@ final class RankServiceTest extends TestCase
 
         $this->points($this->m, 5, '2026-02-01');
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status);
-        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null])->status, 'degradieren nur unter der Schwelle');
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Ehrenrang']])->status, 'ohne Schwelle frei');
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status, 'von einem Rang ohne Schwelle frei zurück');
 
@@ -116,10 +115,14 @@ final class RankServiceTest extends TestCase
         $this->assertSame(13, $detail['rank']['points']);
         $this->assertSame(13, $detail['rank_history'][0]['points_at_change']);
 
-        // Minusbuchung unter die Schwelle: degradieren möglich.
+        // Degradieren auch über der Schwelle (z. B. zu hoch eingestuft), als Degradierung im Verlauf.
+        $this->assertFalse($this->call('GET', "/members/{$this->m}")->data['rank']['below_current_threshold']);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null])->status, 'degradieren über der Schwelle');
+        $this->assertSame('demotion', $this->call('GET', "/members/{$this->m}")->data['rank_history'][0]['kind']);
+
+        // Danach gilt fürs Befördern wieder die Schwelle.
         $this->points($this->m, -5, '2026-03-01');
-        $this->assertTrue($this->call('GET', "/members/{$this->m}")->data['rank']['below_current_threshold']);
-        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null])->status);
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status);
     }
 
     public function testProgressAndPromotionOverview(): void
@@ -236,7 +239,7 @@ final class RankServiceTest extends TestCase
         $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']]);
         $this->users->setRole($this->m, Roles::GUEST);
         $this->assertSame(400, $this->call('DELETE', "/ranks/{$r['Gefreiter']}")->status, 'noch vergeben');
-        // Über der Schwelle: Mitglieder würden nicht degradiert, frühere Mitglieder verlieren den Dienstgrad trotzdem.
+        // Über der Schwelle verlieren auch frühere Mitglieder den Dienstgrad.
         $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null]);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $this->assertSame(200, $this->call('DELETE', "/ranks/{$r['Gefreiter']}")->status);

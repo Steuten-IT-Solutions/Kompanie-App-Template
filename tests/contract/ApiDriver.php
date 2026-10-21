@@ -20,6 +20,12 @@ interface ApiDriver
     /** null = nicht angemeldet */
     public function actAs(?int $userId): void;
 
+    /**
+     * Vorschau „App als Rolle ansehen“ (Issue #63): Header X-Kompanie-Preview für die folgenden Anfragen
+     * (Schlüssel einer Rolle oder @public); null = ohne.
+     */
+    public function preview(?string $value): void;
+
     /** @param string $level guest|member|manager|admin */
     public function createUser(string $login, string $level): int;
 

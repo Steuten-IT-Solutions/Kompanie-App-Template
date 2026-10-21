@@ -149,11 +149,14 @@ final class UpdateServiceTest extends TestCase
         $this->assertThrows(fn () => $s->install('1.0.0.2'), 'bisherige Version läuft weiter');
         $this->assertSame(['UPDATE_FAILED' => 1], $t->errors());
         $this->assertSame([Code::UpdateFailed], $t->pending());
+        $this->assertSame(['UPDATE_FAILED' => 'install'], $t->pendingDetails(), 'Ursache: der Schritt');
         $this->assertSame([StatusReporter::TASK], $scheduler->soon, 'Versand vorgezogen');
+        $this->assertStringContainsString('1.0.0.1 → 1.0.0.2: Schreibrechte fehlen.', $t->log()[0]['message']);
 
         $this->listJson = 'kaputt';
         $this->assertThrows(fn () => $s->check(), '');
         $this->assertSame(1, $t->errors()['UPDATE_CHECK'] ?? 0);
+        $this->assertSame(['signature' => 1], $t->details()['UPDATE_CHECK'] ?? []);
 
         $this->failInstall = false;
         $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);

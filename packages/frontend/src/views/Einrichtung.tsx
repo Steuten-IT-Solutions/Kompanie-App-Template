@@ -19,7 +19,8 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
   const features = useAsync(() => api.features(), []);
   const [chosen, setChosen] = useState<Record<Feature, boolean> | null>(null);
   const [index, setIndex] = useState(0);
-  const [reports, setReports] = useState(false);
+  // Statusmeldungen sind vorausgewählt; der Admin kann den Haken vor dem Abschluss entfernen.
+  const [reports, setReports] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stepRef = useRef<HTMLParagraphElement>(null);
@@ -125,7 +126,9 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
               <input type="checkbox" checked={reports} onChange={(e) => setReports(e.target.checked)} />
               <span>
                 Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen (Version, PHP-Version, Ampel je Bereich,
-                Fehlercodes), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So fallen Probleme früher auf.
+                Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So
+                fallen Probleme früher auf. Die Fehlertexte bleiben auf eurem Server (Einstellungen → Zustand und Updates →
+                Fehlerprotokoll).
               </span>
             </label>
           )}

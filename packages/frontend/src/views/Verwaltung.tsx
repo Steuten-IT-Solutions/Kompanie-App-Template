@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { api, can, config, levelLabel, roleFactor, type CatalogItem, type CreatedUser, type Level, type MemberSummary } from '../api';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import {
+  api,
+  can,
+  config,
+  levelLabel,
+  personFactor,
+  roleLabels,
+  type CatalogItem,
+  type CreatedUser,
+  type Level,
+  type MemberSummary,
+} from '../api';
 import brand from '../generated/brand';
 import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
-import { Empty, ErrorBox, Loading, MemberPicker, StatCard, useAsync } from '../ui';
+import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
 import { RankLabel } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
@@ -13,7 +24,20 @@ import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
+import {
+  DEFAULT_MEMBER_SORT,
+  defaultDir,
+  dirLabel,
+  listName,
+  loadMemberOrder,
+  MEMBER_SORT_LABELS,
+  saveMemberOrder,
+  sortMembers,
+  type MemberOrder,
+  type MemberSort,
+} from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { hasOverrides, MemberRightsPanel } from './Rechte';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -74,14 +98,64 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 
 /* ------------------------------------------------------------------ */
 
+/** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
+type MembersState = { query: string; role: Level; showGuests: boolean; showCandidates: boolean; scrollY: number };
+let savedMembers: MembersState | null = null;
+
 function Members() {
   const canPromote = can('promote_users');
-  const [showGuests, setShowGuests] = useState(false);
+  // Nur einmal übernehmen: Wer die Liste danach neu öffnet, fängt wieder oben an.
+  const [restore] = useState(() => {
+    const s = savedMembers;
+    savedMembers = null;
+    return s;
+  });
+  const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
   // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
-  const [showCandidates, setShowCandidates] = useState(can('create_users'));
-  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates]);
-  const [query, setQuery] = useState('');
-  const list = useMemo(() => (data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())), [data, query]);
+  const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
+  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates], 'members');
+  const [query, setQuery] = useState(restore?.query ?? '');
+  const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
+  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
+  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
+  const order: MemberOrder = sortOptions.includes(stored.sort)
+    ? stored
+    : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const changeOrder = (next: MemberOrder) => {
+    setStored(next);
+    saveMemberOrder(next);
+  };
+  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66)
+  const [role, setRole] = useState<Level>(restore?.role ?? '');
+  const list = useMemo(
+    () =>
+      sortMembers(
+        (data ?? []).filter(
+          (m) =>
+            m.name.toLowerCase().includes(query.trim().toLowerCase()) &&
+            (role === '' || m.level === role || (m.extra_roles ?? []).includes(role)),
+        ),
+        order,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, query, role, order.sort, order.dir],
+  );
+  // Nur Rollen, die in der Liste vorkommen
+  const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
+  const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+
+  // Scrollen, sobald die Liste steht (aus dem Speicher sofort, sonst nach dem Laden).
+  const pendingScroll = useRef(restore?.scrollY ?? null);
+  useLayoutEffect(() => {
+    if (pendingScroll.current === null || !data) return;
+    window.scrollTo(0, pendingScroll.current);
+    pendingScroll.current = null;
+  }, [data]);
+
+  function open(id: number) {
+    savedMembers = { query, role, showGuests, showCandidates, scrollY: window.scrollY };
+    navigate(`verwaltung/mitglied/${id}`);
+  }
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -101,6 +175,49 @@ function Members() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Mitglied suchen"
       />
+      {roleOptions.length > 1 && (
+        <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
+          <option value="">Alle Rollen</option>
+          {roleOptions.map((r) => (
+            <option key={r.key} value={r.key}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="field-row member-sort">
+        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+        <div className="field">
+          <span id="member-sort-label">Sortierung</span>
+          <select
+            aria-labelledby="member-sort-label"
+            value={order.sort}
+            // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
+            onChange={(e) => {
+              const sort = e.target.value as MemberSort;
+              changeOrder({ sort, dir: defaultDir(sort) });
+            }}
+          >
+            {sortOptions.map((s) => (
+              <option key={s} value={s}>
+                {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field member-sort-dir">
+          <span id="member-sort-dir-label">Reihenfolge</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-labelledby="member-sort-dir-label member-sort-dir-value"
+            title="Reihenfolge umkehren"
+            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+          >
+            <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+          </button>
+        </div>
+      </div>
       <label className="toggle">
         <input
           type="checkbox"
@@ -118,13 +235,18 @@ function Members() {
       )}
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row clickable" onClick={() => navigate(`verwaltung/mitglied/${m.id}`)}>
+          <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
             <div className="row-main">
               <div className="row-title">
-                {m.name}{' '}
+                {listName(m, order.sort)}{' '}
                 {m.level !== 'member' && (
                   <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
                 )}
+                {(m.extra_roles ?? []).map((r) => (
+                  <span key={r} className="badge badge-role badge-extra-role">
+                    {caps(levelLabel(r))}
+                  </span>
+                ))}
                 <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
@@ -207,7 +329,10 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'uebersicht' && (
         <>
-          <p className="muted small member-level">Rolle: {levelLabel(m.level)}</p>
+          <p className="muted small member-level">
+            {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
+            {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
+          </p>
           <div className="stats">
             {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
             {canPenalties() && (
@@ -233,7 +358,19 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'konto' && (
         <>
-          <RoleControl id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+          <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          {m.rights && (
+            <MemberRightsPanel
+              key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
+              id={m.id}
+              name={m.name}
+              roles={roleLabels(m)}
+              plural={(m.extra_roles ?? []).length > 0}
+              rights={m.rights}
+              onChanged={reload}
+              onToast={onToast}
+            />
+          )}
           {m.level === 'candidate' && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"
@@ -361,33 +498,60 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
   );
 }
 
-/** Admins legen hier die Rolle in der App fest. */
+/**
+ * Wer Rollen vergeben darf, legt hier die Grundrolle und die Zusatzrollen fest (Issue #66): genau eine Grundrolle,
+ * dazu beliebig viele eigene Rollen zum Ankreuzen; die Rechte sind die aller Rollen zusammen. Zusatzrollen gibt es nur
+ * zu einer Grundrolle mit Mitgliederbereich und nicht für Admins.
+ */
 function RoleControl({
   id,
   level,
+  extra,
+  member,
   onChanged,
   onToast,
 }: {
   id: number;
   level: Level;
+  extra: Level[];
+  member: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  // Angekreuzte Zusatzrollen gleich zeigen, nicht erst nach dem Neuladen; bei einem Fehler wieder der Stand des Servers.
+  const [checked, setChecked] = useState<Level[]>(extra);
+  const saved = extra.join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setChecked(extra), [saved]);
   // Admins ernennen geht nur in der eigenständigen Version; bei WordPress im WP-Backend.
   const adminsHere = config?.variant === 'standalone';
-  if (!can('promote_users')) {
-    return <p className="muted small member-level">Rolle: {levelLabel(level)}</p>;
-  }
-  if ((level === 'admin' && !adminsHere) || id === config?.user?.id) {
-    return (
+  const readOnly = (
+    <>
       <p className="muted small member-level">
-        Rolle: {levelLabel(level)}
+        {extra.length > 0 ? 'Grundrolle' : 'Rolle'}: {levelLabel(level)}
         {level === 'admin' && !adminsHere && ' (wird im WordPress-Backend verwaltet)'}
       </p>
-    );
+      {extra.length > 0 && <p className="muted small member-level">Zusatzrollen: {extra.map(levelLabel).join(', ')}</p>}
+    </>
+  );
+  if (!can('promote_users') || (level === 'admin' && !adminsHere) || id === config?.user?.id) {
+    return readOnly;
   }
-  async function change(next: Level) {
+  async function save(action: () => Promise<unknown>, msg: string) {
+    setBusy(true);
+    try {
+      await action();
+      onToast(msg);
+      onChanged();
+    } catch (e) {
+      setChecked(extra);
+      onToast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function change(next: Level) {
     if (next === level) return;
     if (
       next === 'admin' &&
@@ -395,35 +559,54 @@ function RoleControl({
     ) {
       return;
     }
-    setBusy(true);
-    try {
-      await api.setRole(id, next);
-      onToast(`Rolle geändert: ${levelLabel(next)}`);
-      onChanged();
-    } catch (e) {
-      onToast((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    void save(() => api.setRole(id, next), `Grundrolle geändert: ${levelLabel(next)}`);
+  }
+  function toggle(key: Level, on: boolean) {
+    // In der Reihenfolge der Rollen speichern, wie der Server sie zurückgibt.
+    const next = (config?.roles ?? []).map((r) => r.key).filter((k) => (k === key ? on : checked.includes(k)));
+    setChecked(next);
+    void save(
+      () => api.setExtraRoles(id, next),
+      on ? `Zusatzrolle vergeben: ${levelLabel(key)}` : `Zusatzrolle entfernt: ${levelLabel(key)}`,
+    );
   }
   // Rollen der Installation (Einstellungen → Rollen); Admin nur, wo Admins in der App ernannt werden.
   const levels: Level[] = (config?.roles ?? []).map((r) => r.key).filter((k) => k !== 'admin' || adminsHere);
+  // Zusatzrollen: nur eigene Rollen, nicht die Grundrolle selbst.
+  const extras = (config?.roles ?? []).filter((r) => r.extra && r.key !== level);
   return (
-    <label className="field role-control">
-      <span className="field-label">Rolle in der App</span>
-      <select value={level} disabled={busy} onChange={(e) => change(e.target.value)}>
-        {!levels.includes(level) && (
-          <option value={level} disabled>
-            Unbekannte Rolle – bitte wählen
-          </option>
-        )}
-        {levels.map((l) => (
-          <option key={l} value={l}>
-            {levelLabel(l)}
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      <label className="field role-control">
+        <span className="field-label">Grundrolle</span>
+        <select value={level} disabled={busy} onChange={(e) => change(e.target.value)}>
+          {!levels.includes(level) && (
+            <option value={level} disabled>
+              Unbekannte Rolle – bitte wählen
+            </option>
+          )}
+          {levels.map((l) => (
+            <option key={l} value={l}>
+              {levelLabel(l)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {member && level !== 'admin' && extras.length > 0 && (
+        <fieldset className="field role-control extra-roles">
+          <legend className="field-label">Zusatzrollen</legend>
+          <p className="muted small">Die Person hat die Rechte aller ihrer Rollen zusammen.</p>
+          {extras.map((r) => (
+            <label key={r.key} className="toggle">
+              <input type="checkbox" checked={checked.includes(r.key)} disabled={busy} onChange={(e) => toggle(r.key, e.target.checked)} />
+              {r.label}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {!member && extra.length === 0 && level !== 'admin' && level !== 'guest' && (
+        <p className="muted small">Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich.</p>
+      )}
+    </>
   );
 }
 
@@ -474,7 +657,7 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 /* ------------------------------------------------------------------ */
 
 function NewMember() {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(emptyName());
   const [level, setLevel] = useState<'member' | 'candidate'>('member');
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
@@ -494,14 +677,14 @@ function NewMember() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!name.trim()) return setFormError('Bitte einen Namen angeben.');
+    if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
     const bday = canSetBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
       setCreated(
         await api.createUser({
-          name: name.trim(),
+          ...trimName(name),
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(email.trim() ? { email: email.trim() } : {}),
           level,
@@ -526,7 +709,7 @@ function NewMember() {
           className="btn btn-secondary btn-block no-print"
           onClick={() => {
             setCreated(null);
-            setName('');
+            setName(emptyName());
             setUsername('');
             setEmail('');
             setInitialPoints('');
@@ -548,17 +731,7 @@ function NewMember() {
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
         Mehrere auf einmal anlegen
       </button>
-      <label className="field">
-        <span>Name</span>
-        <input
-          type="text"
-          autoComplete="off"
-          placeholder="Vorname Nachname"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-      </label>
+      <NameFields value={name} onChange={setName} />
       <label className="field">
         <span>Benutzername (optional)</span>
         <input
@@ -607,7 +780,9 @@ function NewMember() {
         </label>
       )}
       {extras && (canPoints() || canRanks()) && (
-        <p className="muted small">Für die Übernahme bestehender Mitglieder: aktuellen Punktestand und {brand.labels.rank} eintragen.</p>
+        <p className="muted small">
+          Für die Übernahme bestehender Mitglieder: aktuellen Stand an {sec.points} und {brand.labels.rank} eintragen.
+        </p>
       )}
       {canSetBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
@@ -689,10 +864,15 @@ function GivePoints({
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [members, catalog] = data as [MemberSummary[], CatalogItem[]];
-  // Punktefaktor der Rolle (z. B. 0,5 für junge Mitglieder): gilt beim Buchen, lässt sich übergehen.
-  const withFactor = selected.filter((id) => roleFactor(members.find((m) => m.id === id)?.level ?? 'member') !== 1);
+  // Punktefaktor der Rollen (z. B. 0,5 für junge Mitglieder; bei Zusatzrollen der kleinste): gilt beim Buchen, lässt
+  // sich übergehen.
+  const factorOf = (id: number): number => {
+    const m = members.find((x) => x.id === id);
+    return m ? personFactor(m) : 1;
+  };
+  const withFactor = selected.filter((id) => factorOf(id) !== 1);
   const factorNote = (m: MemberSummary) => {
-    const f = roleFactor(m.level);
+    const f = personFactor(m);
     return f !== 1 ? `×${f.toLocaleString('de-DE')}` : null;
   };
 
@@ -769,12 +949,12 @@ function GivePoints({
         <label className="toggle">
           <input type="checkbox" checked={applyFactor} onChange={(e) => setApplyFactor(e.target.checked)} />
           <span>
-            Punktefaktor der Rolle anwenden
+            {sec.points}faktor der Rolle anwenden
             <span className="small muted feature-desc">
               {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen
               anderen Faktor als 1
               {Number(points) && applyFactor
-                ? `, z. B. ×${roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member').toLocaleString('de-DE')} → ${(Number(points) * roleFactor(members.find((m) => m.id === withFactor[0])?.level ?? 'member')).toLocaleString('de-DE')} ${sec.points}`
+                ? `, z. B. ×${factorOf(withFactor[0]).toLocaleString('de-DE')} → ${(Number(points) * factorOf(withFactor[0])).toLocaleString('de-DE')} ${sec.points}`
                 : ''}
               .
             </span>

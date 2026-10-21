@@ -2,8 +2,11 @@
 
 Die App meldet dem **Steuten IT Solutions Cockpit** (Repo `Steuten-IT-Solutions/project-cockpit`), ob eine
 Installation läuft, aber nur, wenn ein Admin zugestimmt hat (Einrichtungsassistent bzw.
-*Einstellungen → Updates*). Ohne Zustimmung wird nichts gesendet und nichts gezählt. Issue #20, Gegenseite
+*Einstellungen → Zustand und Updates*). Ohne Zustimmung wird nichts gesendet und nichts gezählt. Issue #20, Gegenseite
 im Cockpit: project-cockpit#12.
+
+Fehlermeldungen aus der App (Issue #64) gehen über denselben Weg (gleiche Installations-ID und Signatur, eigener
+Empfänger), brauchen aber keine Zustimmung zu den Statusmeldungen: [FEHLERMELDUNGEN.md](FEHLERMELDUNGEN.md).
 
 Der Empfänger steht in der Repo-Variable `KOMPANIE_STATUS_URL` (nur `https://`) und kommt als
 `statusUrl` in die `update.json` des Pakets.
@@ -41,6 +44,7 @@ durch das ausbleibende Lebenszeichen auf.
   "kind": "heartbeat",
   "checks": { "updates": "ok", "gallery": "error", "calendar": "off", "backup": "warn", "server": "ok", "cron": "ok" },
   "errors": { "CALENDAR_FETCH": 3, "UPDATE_FAILED": 1 },
+  "details": { "CALENDAR_FETCH": { "ics_http_404": 2, "ics_timeout": 1 }, "UPDATE_FAILED": { "download_http_503": 1 } },
   "cron": { "kind": "real", "last": 1790000000 },
   "features": ["events", "calendar", "points"],
   "update": { "ok": false, "at": 1790000000, "to": "1.4.0.4" },
@@ -50,6 +54,7 @@ durch das ausbleibende Lebenszeichen auf.
   "sent": 1790000300,
   "nonce": "a1b2c3d4e5f60718",
   "event": "UPDATE_FAILED",
+  "detail": "download_http_503",
   "key": "…(64 Hex-Zeichen, nur bis zur Bestätigung)"
 }
 ```
@@ -57,6 +62,28 @@ durch das ausbleibende Lebenszeichen auf.
 - `checks`: Ampel der Statusseite je Bereich, nur Schlüssel (`^[a-z][a-z0-9_]{0,31}$`) und Stufe
   (`ok`, `warn`, `error`, `off`), **keine Texte**.
 - `errors`: Fehlercodes der letzten 24 Stunden mit Anzahl. `event`: nur bei `kind = event`.
+- `details`: Ursachen je Fehlercode in den letzten 24 Stunden mit Anzahl (nur Codes mit bekannter Ursache);
+  `detail`: Ursache des Ereignisses, nur bei `kind = event` und wenn bekannt. Form
+  `^[a-z][a-z0-9_]{0,63}$`, höchstens 10 verschiedene je Code und Stunde, weitere zählen als `other`. Eine
+  Ursache setzt sich nur aus Angaben zusammen, die der Code festlegt, und aus festen Mustern in der
+  Fehlermeldung (`Telemetry\Detail`), nie aus deren Text:
+
+  | Code | Ursache | Beispiele |
+  |---|---|---|
+  | `CALENDAR_FETCH` | Quelle (`google`, `google_connection`, `ics`), dazu die Art | `ics_http_404`, `google_http_403`, `ics_timeout` |
+  | `GALLERY_SYNC` | Art | `http_403`, `timeout` |
+  | `UPDATE_CHECK` | Schritt | `network_dns`, `http_404`, `signature`, `invalid_list`, `other_kompanie`, `older_list` |
+  | `UPDATE_FAILED` | Schritt (`download`, `backup`, `install`), dazu die Art | `download_http_503`, `install` |
+  | `ROLLBACK` | `rollback` oder `withdrawn` | |
+  | `TASK_FAILED` | Aufgabe und Klasse der Ausnahme | `push_send_typeerror` |
+  | `SERVER_ERROR` | Klasse der Ausnahme, Methode und Route (mit Platzhaltern) | `typeerror_get_events_id` |
+  | `DB_ERROR` | SQLSTATE (WordPress: `wpdb`), Methode und Route | `sqlstate_42s02_get_points` |
+  | `PHP_FATAL` | Art (`error`, `parse`, `compile`), dazu `memory`, `time_limit` oder die Datei ohne Endung | `error_memory`, `error_calendarservice` |
+  | `CHECK_ERROR` | Schlüssel der Ampel | `backup`, `gallery` |
+  | `DISK_LOW` | – | |
+
+  Art aus der Meldung: `http_<Status>`, `timeout`, `dns`, `tls`, `connect`; sonst entfällt sie. Empfänger,
+  die `details` und `detail` nicht kennen, ignorieren sie (das Cockpit übernimmt nur bekannte Felder).
 - Codes (`Telemetry\Code`, Muster `^[A-Z0-9_]{1,40}$`): `UPDATE_FAILED`*, `ROLLBACK`*, `UPDATE_CHECK`,
   `CALENDAR_FETCH`, `GALLERY_SYNC`, `TASK_FAILED`, `SERVER_ERROR`, `DB_ERROR`*, `PHP_FATAL`*, `DISK_LOW`*,
   `CHECK_ERROR`* (eine Ampel ist auf Rot gesprungen). * = schwer, wird sofort als Ereignis gesendet.
@@ -67,8 +94,13 @@ durch das ausbleibende Lebenszeichen auf.
 - `maintenance`: ob der Wartungsmodus an ist (Issue #42), ohne Begründung. Das Cockpit zeigt die Installation dann als „in Wartung“, nicht als Fehler.
 
 **Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. Was genau gesendet wird, sehen
-Admins unter *Einstellungen → Updates* (Beispiel eines Lebenszeichens, ohne `key`), dazu den Zeitpunkt der
+Admins unter *Einstellungen → Zustand und Updates* (Beispiel eines Lebenszeichens, ohne `key`), dazu den Zeitpunkt der
 letzten Meldung.
+
+Die Fehlertexte stehen nur im **Fehlerprotokoll** der Installation (*Einstellungen → Zustand und Updates*,
+Einstellung `error_log`): die letzten 50 Fehler der letzten 14 Tage mit Code, Ursache und Text, auch ohne
+Zustimmung, nicht in Sicherungen. Adressen darin sind auf den Server gekürzt, Dateien ohne Verzeichnis.
+Admins können es kopieren und bei Bedarf an uns schicken.
 
 ## Signatur und erste Meldung
 
