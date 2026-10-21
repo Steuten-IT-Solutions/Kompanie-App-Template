@@ -951,6 +951,8 @@ export const api = {
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
 
   directory: () => request<DirectoryEntry[]>('GET', '/directory'),
+  /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
+  directoryCounts: () => request<{ group: Level; count: number }[]>('GET', '/directory/counts'),
   members: (all = false, candidates = false) =>
     request<MemberSummary[]>('GET', '/members', undefined, {
       ...(all ? { all: '1' } : {}),
