@@ -34,9 +34,9 @@ final class Plugin
         if (self::$app === null) {
             global $wpdb;
             $env = new WpEnvironment();
-            // Rechte je Rolle aus der App (Einstellungen → Rollen); erst beim ersten Benutzer abgefragt.
+            // Rechte je Rolle aus der App (Einstellungen → Rollen) mit den Ausnahmen der Person; erst beim ersten Benutzer abgefragt.
             $users = new WpUsers(
-                static fn (string $role): array => self::app()->roles()->capabilities($role),
+                static fn (string $role, int $id): array => self::app()->roles()->capabilitiesFor($role, $id),
                 static fn (string $role): bool => self::app()->roles()->exists($role),
             );
             $settings = new WpSettings();

@@ -24,10 +24,18 @@ use KompanieApp\Core\Port\UserDirectory;
  *
  * Eine Person hat genau eine Rolle. Der Punktefaktor (z. B. 0,5 für junge Mitglieder) gilt beim
  * Buchen und wird mit dem Eintrag gespeichert; eine spätere Änderung ändert alte Einträge nicht.
+ *
+ * Einzelnen Personen lassen sich Rechte zusätzlich geben oder entziehen (Ausnahmen), ohne dafür eine eigene
+ * Rolle anzulegen. Sie gelten zusätzlich zur Rolle und bleiben bei einem Rollenwechsel bestehen; was die neue
+ * Rolle schon regelt, fällt dabei weg. Admins haben immer alle Rechte, Gäste keine: Für sie gibt es keine
+ * Ausnahmen. Gespeichert wie die Rollen als eine Einstellung.
  */
 final class RoleService
 {
     public const SETTING = 'roles';
+    /** Ausnahmen einzelner Personen: Liste von {user, grant, revoke}. */
+    public const OVERRIDES_SETTING = 'capability_overrides';
+    private const NO_OVERRIDES = ['grant' => [], 'revoke' => []];
     /** Zuletzt vergebene Nummer eigener Rollen (r1, r2, …); Schlüssel gelöschter Rollen werden nie wieder vergeben. */
     public const SEQ_SETTING = 'roles_seq';
     public const LABEL_MAX = 30;
@@ -36,6 +44,9 @@ final class RoleService
 
     /** @var array<string, array{key: string, label: string, capabilities: string[], points_factor: float}>|null */
     private ?array $roles = null;
+
+    /** @var array<int, array{grant: string[], revoke: string[]}>|null Benutzer-ID => Ausnahmen */
+    private ?array $overrides = null;
 
     public function __construct(
         private readonly Settings $settings,
@@ -98,6 +109,259 @@ final class RoleService
             }
         }
         return $out;
+    }
+
+    /**
+     * Rechte einer Person: die ihrer Rolle mit ihren Ausnahmen (für die Adapter beim Laden eines Benutzers).
+     *
+     * @return Capability[]
+     */
+    public function capabilitiesFor(string $key, int $userId): array
+    {
+        $o = $this->loadOverrides()[$userId] ?? null;
+        if ($o === null || !self::overridable($key)) {
+            return $this->capabilities($key);
+        }
+        return self::effective($this->granted($key), $o);
+    }
+
+    /**
+     * Für die Seite eines Mitglieds: Rechte der Rolle, Ausnahmen und welche Rechte $actor ändern darf.
+     * null, wenn es für die Person keine Ausnahmen gibt (Admin, Gast) oder $actor sie nicht ändern darf.
+     *
+     * @return array{role: string[], grant: string[], revoke: string[], editable: string[]}|null
+     */
+    public function overridesView(User $actor, User $target): ?array
+    {
+        if (!$actor->can(Capability::PromoteUsers) || $actor->id === $target->id || !self::overridable($target->role)
+            || !$this->canHandleUser($actor, $target)) {
+            return null;
+        }
+        $base = $this->granted($target->role);
+        return $this->view($actor, $base, self::normalized($base, $this->loadOverrides()[$target->id] ?? self::NO_OVERRIDES));
+    }
+
+    /**
+     * Rechte einer Person übersteuern. $grant: Rechte zusätzlich zur Rolle, $revoke: Rechte der Rolle, die sie
+     * nicht haben soll; was die Rolle ohnehin regelt, fällt weg. Admins ändern jedes Recht. Wer Rollen vergeben
+     * darf, ändert nur Rechte, die er selbst hat, und nicht „Mitglieder anlegen“ oder „Rollen vergeben“ (wie
+     * canHandle).
+     *
+     * @return array{role: string[], grant: string[], revoke: string[], editable: string[]}
+     */
+    public function setOverrides(User $actor, int $id, mixed $grant, mixed $revoke): array
+    {
+        if ($actor->id === $id) {
+            throw ApiError::invalid('Die eigenen Rechte kann man nicht selbst ändern.');
+        }
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Benutzer nicht gefunden.');
+        if ($target->isAdmin()) {
+            throw ApiError::invalid('Admins haben immer alle Rechte.');
+        }
+        if (!self::overridable($target->role)) {
+            throw ApiError::invalid('Gäste haben keine Rechte in der App. Bitte zuerst eine Rolle geben.');
+        }
+        if (!$this->canHandleUser($actor, $target)) {
+            throw ApiError::forbidden('Die Rechte dieser Person darfst du nicht ändern.');
+        }
+        $grant = self::validCapabilityList($grant);
+        $revoke = self::validCapabilityList($revoke);
+        if (array_intersect($grant, $revoke) !== []) {
+            throw ApiError::invalid('Ein Recht lässt sich nicht zugleich geben und entziehen.');
+        }
+        $base = $this->granted($target->role);
+        $next = self::normalized($base, ['grant' => $grant, 'revoke' => $revoke]);
+        $caps = array_diff(array_merge(self::values($base), $next['grant']), $next['revoke']);
+        if (in_array(Capability::Calendar->value, $revoke, true) && in_array(Capability::Member->value, $caps, true)) {
+            throw ApiError::invalid('Der interne Kalender gehört zum Mitgliederbereich und lässt sich nur mit ihm entziehen.');
+        }
+        if (!in_array(Capability::Member->value, $caps, true) && array_diff($caps, [Capability::Calendar->value]) !== []) {
+            throw ApiError::invalid('Rechte zum Verwalten brauchen auch den Mitgliederbereich.');
+        }
+        $old = self::normalized($base, $this->loadOverrides()[$id] ?? self::NO_OVERRIDES);
+        $changed = array_merge(
+            array_diff($next['grant'], $old['grant']),
+            array_diff($old['grant'], $next['grant']),
+            array_diff($next['revoke'], $old['revoke']),
+            array_diff($old['revoke'], $next['revoke']),
+        );
+        $editable = self::values($this->editableBy($actor));
+        if (array_diff($changed, $editable) !== []) {
+            throw ApiError::forbidden('Rechte, die du selbst nicht hast, sowie „Mitglieder anlegen“ und „Rollen vergeben“ ändert nur ein Admin.');
+        }
+        $this->storeOverrides($id, $next);
+        return $this->view($actor, $base, $next);
+    }
+
+    /** Nach einem Rollenwechsel: Was die neue Rolle schon regelt, fällt weg; Admins und Gäste haben keine Ausnahmen. */
+    public function roleChanged(int $id, string $key): void
+    {
+        $o = $this->loadOverrides()[$id] ?? null;
+        if ($o !== null) {
+            $this->storeOverrides($id, self::overridable($key) ? self::normalized($this->granted($key), $o) : self::NO_OVERRIDES);
+        }
+    }
+
+    /** Konto entfernt: Ausnahmen löschen (sonst bekäme sie eine spätere Person mit derselben ID). */
+    public function forget(int $id): void
+    {
+        if (isset($this->loadOverrides()[$id])) {
+            $this->storeOverrides($id, self::NO_OVERRIDES);
+        }
+    }
+
+    private static function overridable(string $key): bool
+    {
+        return $key !== Roles::ADMIN && $key !== Roles::GUEST;
+    }
+
+    /**
+     * Rechte der Rolle mit den Ausnahmen. Ohne Mitgliederbereich bleibt höchstens der interne Kalender: Verwalten
+     * setzt ihn voraus, auch wenn ein Rollenwechsel die Ausnahmen so zusammenbringt.
+     *
+     * @param Capability[] $base Rechte der Rolle (ohne den im Mitgliederbereich enthaltenen Kalender)
+     * @param array{grant: string[], revoke: string[]} $o
+     * @return Capability[]
+     */
+    private static function effective(array $base, array $o): array
+    {
+        $caps = [];
+        foreach (array_merge(self::values($base), $o['grant']) as $c) {
+            $cap = Capability::from($c);
+            if (!in_array($cap, $caps, true) && !in_array($c, $o['revoke'], true)) {
+                $caps[] = $cap;
+            }
+        }
+        if (!in_array(Capability::Member, $caps, true)) {
+            return in_array(Capability::Calendar, $caps, true) ? [Capability::Calendar] : [];
+        }
+        return Roles::withImplied($caps);
+    }
+
+    /**
+     * Ausnahmen ohne das, was die Rolle schon regelt: zusätzlich nur Rechte, die sie nicht hat, entzogen nur
+     * Rechte, die sie hat. Den Kalender zusätzlich zu geben ist neben dem Mitgliederbereich überflüssig.
+     *
+     * @param Capability[] $base
+     * @param array{grant: string[], revoke: string[]} $o
+     * @return array{grant: string[], revoke: string[]}
+     */
+    private static function normalized(array $base, array $o): array
+    {
+        $values = self::values($base);
+        $grant = array_diff($o['grant'], $values);
+        $revoke = array_intersect($o['revoke'], $values);
+        if (in_array(Capability::Member->value, array_diff(array_merge($values, $grant), $revoke), true)) {
+            $grant = array_diff($grant, [Capability::Calendar->value]);
+        }
+        return ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)];
+    }
+
+    /**
+     * @param Capability[] $base
+     * @param array{grant: string[], revoke: string[]} $o
+     * @return array{role: string[], grant: string[], revoke: string[], editable: string[]}
+     */
+    private function view(User $actor, array $base, array $o): array
+    {
+        return [
+            'role' => self::values(Roles::withImplied($base)),
+            'grant' => $o['grant'],
+            'revoke' => $o['revoke'],
+            'editable' => self::values($this->editableBy($actor)),
+        ];
+    }
+
+    /** @return Capability[] */
+    private function editableBy(User $actor): array
+    {
+        if ($actor->isAdmin()) {
+            return Roles::GRANTABLE;
+        }
+        return array_values(array_filter(
+            Roles::GRANTABLE,
+            static fn (Capability $c): bool => $actor->can($c) && $c !== Capability::PromoteUsers && $c !== Capability::CreateUsers,
+        ));
+    }
+
+    /** @return array<int, array{grant: string[], revoke: string[]}> */
+    private function loadOverrides(): array
+    {
+        if ($this->overrides === null) {
+            $this->overrides = [];
+            $saved = $this->settings->get(self::OVERRIDES_SETTING);
+            foreach (is_array($saved) ? $saved : [] as $o) {
+                if (!is_array($o) || !is_numeric($o['user'] ?? null)) {
+                    continue;
+                }
+                $entry = [
+                    'grant' => self::ordered(array_filter((array) ($o['grant'] ?? []), 'is_string')),
+                    'revoke' => self::ordered(array_filter((array) ($o['revoke'] ?? []), 'is_string')),
+                ];
+                if ($entry['grant'] !== [] || $entry['revoke'] !== []) {
+                    $this->overrides[(int) $o['user']] = $entry;
+                }
+            }
+        }
+        return $this->overrides;
+    }
+
+    /** @param array{grant: string[], revoke: string[]} $o leer: Ausnahmen der Person entfernen */
+    private function storeOverrides(int $id, array $o): void
+    {
+        $all = $this->loadOverrides();
+        if ($o['grant'] === [] && $o['revoke'] === []) {
+            unset($all[$id]);
+        } else {
+            $all[$id] = $o;
+        }
+        $list = [];
+        foreach ($all as $user => $entry) {
+            $list[] = ['user' => $user] + $entry;
+        }
+        $this->settings->set(self::OVERRIDES_SETTING, $list);
+        $this->overrides = $all;
+    }
+
+    /**
+     * Vergebbare Rechte in fester Reihenfolge, ohne Doppelte und Unbekannte.
+     *
+     * @param string[] $values
+     * @return string[]
+     */
+    private static function ordered(array $values): array
+    {
+        return array_values(array_filter(
+            self::values(Roles::GRANTABLE),
+            static fn (string $v): bool => in_array($v, $values, true),
+        ));
+    }
+
+    /**
+     * @param Capability[] $caps
+     * @return string[]
+     */
+    private static function values(array $caps): array
+    {
+        return array_map(static fn (Capability $c): string => $c->value, $caps);
+    }
+
+    /** @return string[] */
+    private static function validCapabilityList(mixed $raw): array
+    {
+        if ($raw === null) {
+            return [];
+        }
+        if (!is_array($raw)) {
+            throw ApiError::invalid('Rechte als Liste angeben.');
+        }
+        foreach ($raw as $c) {
+            $cap = is_string($c) ? Capability::tryFrom($c) : null;
+            if ($cap === null || !in_array($cap, Roles::GRANTABLE, true)) {
+                throw ApiError::invalid('Unbekanntes oder nicht vergebbares Recht: ' . (is_scalar($c) ? (string) $c : '?') . '.');
+            }
+        }
+        return self::ordered($raw);
     }
 
     public function label(string $key): string
@@ -293,6 +557,7 @@ final class RoleService
             foreach ($assigned as $u) {
                 try {
                     $this->users->setRole($u->id, $replacement);
+                    $this->roleChanged($u->id, $replacement);
                 } catch (\DomainException $e) {
                     // Nicht abbrechen: Der Schlüssel wird nie wieder vergeben, die Person hat danach keine Rechte.
                     error_log('Kompanie-App: Rolle von ' . $u->name . ' nicht geändert: ' . $e->getMessage());

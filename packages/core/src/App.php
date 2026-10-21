@@ -314,12 +314,14 @@ final class App
      * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
      * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
-     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht. Inventar
-     * und sein Verlauf bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
+     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag und ihre Ausnahmen bei
+     * den Rechten werden gelöscht. Inventar und sein Verlauf bleiben (dort steht nur, wer etwas geändert hat; angezeigt
+     * dann als „gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
     {
         UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
+        $this->roles()->forget($userId);
     }
 
     public function pushTriggers(): PushTriggers

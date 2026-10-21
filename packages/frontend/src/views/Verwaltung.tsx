@@ -14,6 +14,7 @@ import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { hasOverrides, MemberRightsPanel } from './Rechte';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -212,7 +213,10 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'uebersicht' && (
         <>
-          <p className="muted small member-level">Rolle: {levelLabel(m.level)}</p>
+          <p className="muted small member-level">
+            Rolle: {levelLabel(m.level)}
+            {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
+          </p>
           <div className="stats">
             {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
             {canPenalties() && (
@@ -239,6 +243,17 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
       {active === 'konto' && (
         <>
           <RoleControl id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+          {m.rights && (
+            <MemberRightsPanel
+              key={`${m.level}:${JSON.stringify(m.rights)}`}
+              id={m.id}
+              name={m.name}
+              level={m.level}
+              rights={m.rights}
+              onChanged={reload}
+              onToast={onToast}
+            />
+          )}
           {m.level === 'candidate' && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"

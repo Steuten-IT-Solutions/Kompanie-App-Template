@@ -27,6 +27,7 @@ final class ApiScenario
             $this->password();
             $this->roles();
             $this->customRoles();
+            $this->rightOverrides();
             $this->candidates();
             $this->ranks();
             $this->titles();
@@ -417,6 +418,41 @@ final class ApiScenario
         $c->ok($this->req('POST', "/members/$admin/password")[0] === 403, 'Kontenpflege: Passwort eines Admins → 403');
         $this->d->actAs($admin);
         $this->req('DELETE', '/admin/roles/' . $pflege, [], ['replacement' => 'member']);
+    }
+
+    /** Rechte einzelner Personen zusätzlich zur Rolle geben oder entziehen (über das Benutzerverzeichnis des Adapters). */
+    private function rightOverrides(): void
+    {
+        $c = $this->c;
+        $c->section('Ausnahmen bei den Rechten');
+        $admin = $this->user('kptest_rechte_admin', 'admin');
+        $m = $this->user('kptest_rechte_m', 'member');
+        $caps = function () use ($m): array {
+            $this->d->actAs($m);
+            $caps = (array) ($this->req('GET', '/config')[1]['user']['capabilities'] ?? []);
+            $this->d->actAs(null);
+            return $caps;
+        };
+
+        $this->d->actAs($m);
+        $c->ok($this->req('PUT', "/members/$m/rights", ['grant' => ['manage_points']])[0] === 403, 'Ohne „Rollen vergeben“ → 403');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', "/members/$m/rights", ['grant' => ['manage_points'], 'revoke' => []]);
+        $c->ok($s === 200 && ($d['grant'] ?? null) === ['manage_points'], 'Recht zusätzlich gegeben');
+        $c->ok(in_array('manage_points', $caps(), true), 'Gilt sofort für die Person');
+        $this->d->actAs($admin);
+        $c->ok(($this->req('GET', "/members/$m")[1]['rights']['grant'] ?? null) === ['manage_points'], 'Steht bei der Person');
+
+        $this->d->actAs($admin);
+        [$s] = $this->req('PUT', "/members/$m/rights", ['grant' => [], 'revoke' => ['member']]);
+        $this->d->actAs($m);
+        $c->ok($s === 200 && $this->req('GET', '/me/points')[0] === 403, 'Mitgliederbereich entzogen → kein Zugriff');
+        $this->d->actAs($admin);
+        [$s] = $this->req('PATCH', "/members/$m/role", ['level' => 'guest']);
+        [, $d] = $this->req('PATCH', "/members/$m/role", ['level' => 'member']);
+        $c->ok($s === 200 && ($d['level'] ?? '') === 'member' && in_array('member', $caps(), true), 'Als Gast verfallen die Ausnahmen');
+        $this->d->actAs($admin);
+        $c->ok($this->req('PUT', "/members/$admin/rights", ['grant' => ['manage_points']])[0] === 400, 'Nicht für Admins → 400');
     }
 
     /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */

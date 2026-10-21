@@ -22,4 +22,4 @@ Mit **+ Neue Rolle** legst du weitere Rollen an, z. B. eine Leitung, die {bereic
 > Einstellungen, Updates und Datensicherung bleiben immer den Admins vorbehalten. Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die nicht mehr Rechte haben als er.
 
 ## Mitglieder und ihre Rollen
-Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben).
+Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben). Braucht nur eine einzelne Person ein Recht mehr oder weniger als ihre Rolle, legst du dafür keine eigene Rolle an: Du gibst oder entziehst es direkt bei der Person (dort unter „Einzelne Rechte geben oder entziehen“).

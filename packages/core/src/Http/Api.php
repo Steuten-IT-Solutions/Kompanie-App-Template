@@ -588,6 +588,8 @@ final class Api
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
                 + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
+            // Rechte einzelner Personen zusätzlich zur Rolle geben oder entziehen
+            new Route('PUT', '/members/{id}/rights', Cap::PromoteUsers, fn (Request $r) => $a->roles()->setOverrides($this->user(), $r->id(), $r->input('grant'), $r->input('revoke')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),

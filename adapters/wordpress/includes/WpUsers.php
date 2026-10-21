@@ -49,7 +49,7 @@ final class WpUsers implements UserDirectory, AuthContext
     private const LEGACY_WP_ROLES = [AppRoles::MEMBER => Roles::ROLE_MEMBER, AppRoles::ORGANIZER => Roles::ROLE_ORGANIZER, AppRoles::MANAGER => Roles::ROLE_MANAGER];
 
     /**
-     * @param (\Closure(string): array<int, Capability>)|null $capabilities Rechte je Rolle (Domain\RoleService)
+     * @param (\Closure(string, int): array<int, Capability>)|null $capabilities Rechte je Rolle und Person (Domain\RoleService)
      * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? (für frühere WP-Rollen)
      */
     public function __construct(private readonly ?\Closure $capabilities = null, private readonly ?\Closure $known = null)
@@ -362,7 +362,7 @@ final class WpUsers implements UserDirectory, AuthContext
         if ($this->known !== null && !($this->known)($role) && self::hasNoMeta($u) && $role !== AppRoles::GUEST) {
             $role = AppRoles::MEMBER;
         }
-        $caps = $this->capabilities !== null ? ($this->capabilities)($role) : AppRoles::templateCapabilities($role);
+        $caps = $this->capabilities !== null ? ($this->capabilities)($role, (int) $u->ID) : AppRoles::templateCapabilities($role);
         // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter.
         $wp = ['create_users' => Capability::CreateUsers, 'promote_users' => Capability::PromoteUsers, 'manage_options' => Capability::ManageSettings];
         foreach ($wp as $wpCap => $cap) {
