@@ -16,4 +16,4 @@ Einträge gibt es nur für Mitglieder, nicht für {rolle.candidate} oder Gäste.
 ## Bezahlt markieren und stornieren
 Unter **Verwaltung → Mitglieder** das Mitglied öffnen, im Menü unter dem Namen **{bereich.penalties}** wählen und beim Eintrag **Bezahlt** tippen. Versehentlich markiert? **Doch offen** setzt ihn zurück. Ein falscher Eintrag verschwindet mit **Stornieren**.
 
-Oben in der Mitgliederliste steht, wie viel insgesamt offen ist, und bei jedem Mitglied, wie viel bei ihm noch offen ist.
+Oben unter **Verwaltung → {bereich.penalties} +** steht, wie viel insgesamt offen ist; in der Mitgliederliste steht bei jedem Mitglied, wie viel bei ihm noch offen ist.

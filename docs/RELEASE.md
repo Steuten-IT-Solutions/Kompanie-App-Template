@@ -118,6 +118,10 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
   Push auf `main` startet „Kernversion freigeben“: Die getestete early-Version mit genau diesem Programmcode wird
   bei allen Kompanien `stable`, der Code kommt in `STABLE_CORE`, und Kompanien ohne Version mit diesem Code
   bekommen sie direkt als `stable` gebaut.
+- Pull Requests nach `main` von einem anderen Branch als `develop` macht der Check **Quelle ist develop** rot
+  ([`main-nur-aus-develop.yml`](../.github/workflows/main-nur-aus-develop.yml)). Damit er den Merge sperrt, muss er
+  im Branch-Schutz von `main` als Pflicht-Check eingetragen sein (Settings → Branches bzw. Rulesets → Require
+  status checks).
 - Nach einem Release `main` zurück nach `develop` mergen (nimmt den `STABLE_CORE`-Eintrag mit).
 - Der Zeitplan von „Kompanien abgleichen“ läuft auf `main`: Änderungen eines Kompanie-Repos (Logo, Farben) kommen
   mit dem freigegebenen Kern, also direkt als `stable`.

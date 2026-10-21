@@ -147,8 +147,12 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await page.getByLabel('Mitglied1').check();
   await page.getByRole('button', { name: 'Eintragen' }).click();
   await expect(page.locator('.toast')).toContainText('5,00');
+  // Die Summe aller offenen Einträge steht im Bereich zum Eintragen, nicht in der Mitgliederliste.
+  await expect(page.locator('.stat', { hasText: 'Offen gesamt' }).locator('.stat-value')).toContainText('7,50');
 
   await adminMenu(page, 'Mitglieder');
+  await expect(page.locator('.row', { hasText: 'Mitglied1' })).toBeVisible();
+  await expect(page.locator('.stat', { hasText: 'Offen gesamt' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
   await memberMenu(page, 'Kasse');
@@ -294,7 +298,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
   await login(page, 'verwalter');
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await expect(page.locator('.stat').first()).toBeVisible();
+  await expect(page.locator('.row', { hasText: 'Mitglied1' })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Mitglied anlegen' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await memberMenu(page, 'Konto und Rolle');
