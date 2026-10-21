@@ -109,12 +109,6 @@ const titles = (): Record<View, string> => ({
   hilfe: 'Hilfe',
 });
 
-/** Erste Unterseite von „Meins“ (wie in Meins.tsx), für die Hilfe zu #/meins ohne Unterseite. */
-function meinsFirst(): string | undefined {
-  const f = config?.features;
-  return f?.points ? 'punkte' : f?.penalties ? 'strafen' : f?.ranks ? 'dienstgrad' : f?.attendance ? 'anwesenheit' : undefined;
-}
-
 function Icon({ name }: { name: Tab }) {
   const paths: Record<Tab, string> = {
     termine: 'M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9z',
@@ -355,7 +349,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
           if (tab !== 'hilfe') setReportOrigin('#/' + [tab, ...path.slice(1)].join('/'));
           const slug = helpSlug([tab, ...path.slice(1)], {
             boardWriter: canPostBoard(),
-            meinsFirst: meinsFirst(),
             can: (c) => can(c as Capability),
             features: config?.features ?? {},
           });

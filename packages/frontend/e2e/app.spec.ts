@@ -404,6 +404,15 @@ test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async 
 test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Meins' }).click();
+  // Übersicht zuerst: Name, Rolle und beide Summen
+  const overview = page.locator('.my-overview');
+  await expect(overview.locator('.account-name')).toBeVisible();
+  await expect(overview.locator('.stat-value')).toHaveText(['5', /2,50/]);
+  await shot(page, 'meins-uebersicht');
+
+  await meinsMenu(page, 'Punkte');
+  // Erst wenn die Übersicht weg ist, gibt es nur noch eine Kachel.
+  await expect(overview).toHaveCount(0);
   await expect(page.locator('.stat-value')).toHaveText('5');
   await expect(page.getByText('Teilnahme Sommerfest')).toBeVisible();
   await shot(page, '2-punkte');
@@ -419,6 +428,7 @@ test('Mitglied 2 sieht keine fremden Einträge und keine Verwaltungsdaten', asyn
   await login(page, 'mitglied2');
   await page.getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Kasse');
+  await expect(page.locator('.my-overview')).toHaveCount(0);
   await expect(page.locator('.stat-value')).toContainText('0,00');
   await expect(page.getByText('Zu spät gekommen')).toHaveCount(0);
 
@@ -477,7 +487,7 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
 
   // Sitzung bleibt gültig: Daten laden weiterhin (neues Token wurde geholt).
   await page.getByRole('button', { name: 'Meins' }).click();
-  await expect(page.locator('.stat-label')).toHaveText('Meine Punkte');
+  await expect(page.locator('.stat-label').first()).toHaveText('Meine Punkte');
 
   await login(page, 'mitglied2', NEW);
   await page.getByRole('button', { name: 'Konto' }).click();
@@ -1888,6 +1898,7 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
+  await shot(page, 'meins-titel');
 });
 
 test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach dem Neuladen', async ({ page }) => {
