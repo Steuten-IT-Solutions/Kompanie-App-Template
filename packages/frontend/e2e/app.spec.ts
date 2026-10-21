@@ -464,18 +464,25 @@ test.describe('Android', () => {
     cdp.on('ServiceWorker.workerRegistrationUpdated', (e) => regs.push(...e.registrations.map((r) => r.registrationId)));
     await cdp.send('ServiceWorker.enable');
     await expect.poll(() => regs.length).toBeGreaterThan(0);
-    await cdp.send('ServiceWorker.deliverPushMessage', {
-      origin: new URL(page.url()).origin,
-      registrationId: regs[0],
-      data: JSON.stringify({ title: 'Neuer Termin', body: 'Sommerfest', route: 'termine', tag: 'termin-1' }),
-    });
-    await expect
-      .poll(() =>
-        page.evaluate(async () =>
-          (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => [n.title, n.body, n.tag, n.data.route, n.icon]),
-        ),
-      )
-      .toEqual([['Neuer Termin', 'Sommerfest', 'termin-1', 'termine', expect.stringMatching(/icons\/icon-192\.png$/)]]);
+    // Headless-Chromium verwirft gelegentlich eine angezeigte Benachrichtigung: Das Push-Ereignis kommt an und
+    // showNotification() meldet Erfolg, getNotifications() liefert direkt danach aber nichts (Issue #68, etwa jeder
+    // zehnte Lauf). Dann noch einmal zustellen; dieselbe Kennung (tag) ersetzt die vorige, es bleibt eine.
+    await expect(async () => {
+      await cdp.send('ServiceWorker.deliverPushMessage', {
+        origin: new URL(page.url()).origin,
+        registrationId: regs[0],
+        data: JSON.stringify({ title: 'Neuer Termin', body: 'Sommerfest', route: 'termine', tag: 'termin-1' }),
+      });
+      await expect
+        .poll(
+          () =>
+            page.evaluate(async () =>
+              (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => [n.title, n.body, n.tag, n.data.route, n.icon]),
+            ),
+          { timeout: 3000 },
+        )
+        .toEqual([['Neuer Termin', 'Sommerfest', 'termin-1', 'termine', expect.stringMatching(/icons\/icon-192\.png$/)]]);
+    }).toPass({ timeout: 15_000 });
     // Der Server kennt das Abo samt Auswahl (auch nach dem Neuladen).
     await page.reload();
     await expect(page.getByRole('button', { name: 'Testnachricht senden' })).toBeVisible();
@@ -672,8 +679,8 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
 test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ansehen, danach wieder als Admin', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   const openRoles = async () => {
-    await page.getByRole('button', { name: 'Konto' }).click();
-    await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+    await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+    await adminMenu(page, 'Einstellungen');
     await page
       .locator('.settings-link')
       .filter({ has: page.getByText('Rollen', { exact: true }) })
@@ -709,7 +716,6 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
 
   // Nur ansehen: Der Server lehnt Änderungen ab, die App zeigt die Meldung.
   await page.getByRole('button', { name: 'Konto' }).click();
-  await expect(page.getByRole('button', { name: 'Einstellungen öffnen' })).toHaveCount(0);
   await page.getByLabel('Aktuelles Passwort').fill(ADMIN_PASSWORD);
   await page.getByLabel(/^Neues Passwort \(/).fill('Vorschau-Passwort-1');
   await page.getByLabel('Neues Passwort wiederholen').fill('Vorschau-Passwort-1');
