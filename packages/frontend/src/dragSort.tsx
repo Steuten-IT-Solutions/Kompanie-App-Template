@@ -82,16 +82,31 @@ export function useDragSort<T>(items: T[], onMove: (next: T[]) => void, disabled
     return { ref, style: { transform: `translateY(${offset / z}px)` }, className: `${className} drag-shift` };
   }
 
-  /** Für den Griff. */
-  function handleProps(index: number) {
-    return {
-      onPointerDown: (e: PointerEvent<HTMLElement>) => onPointerDown(index, e),
-      onPointerMove,
-      onPointerUp,
-      onPointerCancel,
-      onKeyDown: (e: KeyboardEvent<HTMLElement>) => onKeyDown(index, e),
-    };
+  /** Griff (sechs Punkte) zum Ziehen; name für die Beschriftung, z. B. der Titel des Eintrags. */
+  function handle(index: number, name: string) {
+    return (
+      <button
+        type="button"
+        className="drag-handle"
+        aria-label={`${name} verschieben (ziehen oder Pfeiltasten)`}
+        title="Zum Verschieben ziehen"
+        onPointerDown={(e) => onPointerDown(index, e)}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onKeyDown={(e) => onKeyDown(index, e)}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <circle cx="9" cy="6" r="1.6" />
+          <circle cx="15" cy="6" r="1.6" />
+          <circle cx="9" cy="12" r="1.6" />
+          <circle cx="15" cy="12" r="1.6" />
+          <circle cx="9" cy="18" r="1.6" />
+          <circle cx="15" cy="18" r="1.6" />
+        </svg>
+      </button>
+    );
   }
 
-  return { itemProps, handleProps, dragging: drag !== null };
+  return { itemProps, handle, dragging: drag !== null };
 }

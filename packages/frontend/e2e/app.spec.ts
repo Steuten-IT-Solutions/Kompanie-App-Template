@@ -1407,6 +1407,39 @@ test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gem
   }
 });
 
+test('Dokumente: Kategorien per Ziehen am Griff umsortieren, bleibt nach dem Neuladen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const names = ['A', 'B', 'C'].map((n) => `Ordner ${n} ${id}`);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
+  for (const name of names) {
+    await page.getByLabel('Neue Kategorie').fill(name);
+    await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
+    await expect(page.locator('.doc-categories .row', { hasText: name })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: /nach oben/ })).toHaveCount(0);
+  const order = async () => (await page.locator('.doc-categories .row-title').allTextContents()).filter((t) => t.includes(id));
+  expect(await order()).toEqual(names);
+
+  // C am Griff über A ziehen
+  const handle = page.getByRole('button', { name: `${names[2]} verschieben (ziehen oder Pfeiltasten)` });
+  // Liste knapp unter die Kopfleiste scrollen, damit alle drei Griffe im Bild sind
+  await page.evaluate(() => window.scrollBy(0, document.querySelector('.doc-categories')!.getBoundingClientRect().top - 100));
+  const from = (await handle.boundingBox())!;
+  const to = (await page.locator('.doc-categories .row', { hasText: names[0] }).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + 5, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator('.toast')).toHaveText('Reihenfolge gespeichert');
+  expect(await order()).toEqual([names[2], names[0], names[1]]);
+
+  await page.reload();
+  await expect(page.locator('.doc-categories .row', { hasText: names[1] })).toBeVisible();
+  expect(await order()).toEqual([names[2], names[0], names[1]]);
+});
+
 test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({ page }) => {
   const id = Date.now().toString(36);
   // Zehn A4-Seiten mit je einer Zeile Text

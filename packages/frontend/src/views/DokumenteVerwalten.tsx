@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
+import { useDragSort } from '../dragSort';
 import { api, type DocCategory, type DocumentInfo, type DocumentMeta, type DocVisibility } from '../api';
 import brand from '../generated/brand';
 import { formatBytes, formatDate, todayYmd } from '../format';
@@ -82,7 +83,7 @@ const titleFromFile = (name: string) =>
 
 /** Wer Dokumente pflegt (manage_documents), verwaltet hier alle Dokumente und ihre Kategorien. */
 export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(api.documents);
+  const { data, error, loading, reload, setData } = useAsync(api.documents);
   const fileInput = useRef<HTMLInputElement>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -94,6 +95,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
   const [formError, setFormError] = useState<string | null>(null);
   const [sort, setSort] = useDocSort();
   const { isOpen, toggle, show } = useOpenGroups();
+  const sortCategories = useDragSort(data?.categories ?? [], reorderCategories, busy);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -114,6 +116,12 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
     } finally {
       setBusy(false);
     }
+  }
+
+  async function reorderCategories(next: DocCategory[]) {
+    // Gleich in der neuen Reihenfolge zeigen, damit die Kategorie nach dem Loslassen nicht zurückspringt
+    setData({ ...data!, categories: next });
+    if (!(await run(() => api.reorderDocCategories(next.map((c) => c.id)), 'Reihenfolge gespeichert'))) reload();
   }
 
   async function upload(e: FormEvent) {
@@ -297,33 +305,13 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
       <ul className="card-list doc-categories">
         {categories.map((c, i) => {
           const count = docs.filter((d) => d.category_id === c.id).length;
-          const move = (dir: -1 | 1) => {
-            const ids = categories.map((x) => x.id);
-            [ids[i], ids[i + dir]] = [ids[i + dir], ids[i]];
-            run(() => api.reorderDocCategories(ids), 'Reihenfolge gespeichert');
-          };
           return (
-            <li key={c.id} className="card row">
+            <li key={c.id} {...sortCategories.itemProps(i, 'card row')}>
+              {categories.length > 1 && sortCategories.handle(i, c.title)}
               <div className="row-main">
                 <div className="row-title">{c.title}</div>
                 <div className="row-sub">{count === 1 ? '1 Dokument' : `${count} Dokumente`}</div>
                 <div className="row-actions">
-                  <button
-                    className="btn btn-small btn-secondary"
-                    disabled={busy || i === 0}
-                    onClick={() => move(-1)}
-                    aria-label={`${c.title} nach oben`}
-                  >
-                    nach oben
-                  </button>
-                  <button
-                    className="btn btn-small btn-secondary"
-                    disabled={busy || i === categories.length - 1}
-                    onClick={() => move(1)}
-                    aria-label={`${c.title} nach unten`}
-                  >
-                    nach unten
-                  </button>
                   <button
                     className="btn btn-small btn-secondary"
                     disabled={busy}

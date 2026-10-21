@@ -19,4 +19,4 @@ Datei wählen, Titel, Kategorie, **Stand** (das Datum des Dokuments) und **Sicht
 - **Löschen** entfernt das Dokument und seine Datei.
 
 ## Kategorien
-Unten legst du Kategorien an, benennst sie um und änderst mit **nach oben** und **nach unten** ihre Reihenfolge. Wird eine Kategorie gelöscht, stehen ihre {bereich.documents} danach unter „Weitere Dokumente“. {bereich.documents} ohne Kategorie stehen immer am Ende.
+Unten legst du Kategorien an und benennst sie um. Die Reihenfolge änderst du, indem du eine Kategorie am Griff links (sechs Punkte) an die gewünschte Stelle ziehst – mit dem Finger oder der Maus; am Computer auch mit der Tastatur: Griff mit Tab auswählen, dann Pfeil hoch oder runter. Wird eine Kategorie gelöscht, stehen ihre {bereich.documents} danach unter „Weitere Dokumente“. {bereich.documents} ohne Kategorie stehen immer am Ende.

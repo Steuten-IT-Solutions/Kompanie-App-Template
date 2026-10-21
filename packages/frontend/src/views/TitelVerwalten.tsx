@@ -101,24 +101,7 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
               </li>
             ) : (
               <li key={t.id} {...sort.itemProps(i, `card row ${t.active ? '' : 'inactive'}`)}>
-                {list.length > 1 && (
-                  <button
-                    type="button"
-                    className="drag-handle"
-                    aria-label={`${t.title} verschieben (ziehen oder Pfeiltasten)`}
-                    title="Zum Verschieben ziehen"
-                    {...sort.handleProps(i)}
-                  >
-                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                      <circle cx="9" cy="6" r="1.6" />
-                      <circle cx="15" cy="6" r="1.6" />
-                      <circle cx="9" cy="12" r="1.6" />
-                      <circle cx="15" cy="12" r="1.6" />
-                      <circle cx="9" cy="18" r="1.6" />
-                      <circle cx="15" cy="18" r="1.6" />
-                    </svg>
-                  </button>
-                )}
+                {list.length > 1 && sort.handle(i, t.title)}
                 <div className="row-main">
                   <div className="row-title">
                     {t.title}
