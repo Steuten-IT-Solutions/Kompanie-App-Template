@@ -33,6 +33,14 @@ async function memberMenu(page: Page, name: string) {
   await nav.locator('.admin-menu-toggle').click();
   await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
 }
+/** Zählt beantwortete Aufrufe zum Speichern einer Reihenfolge (PUT …/order), um vor dem Neuladen darauf zu warten. */
+function countOrderSaves(page: Page, path: string) {
+  let n = 0;
+  page.on('response', (r) => {
+    if (r.request().method() === 'PUT' && decodeURIComponent(r.url()).includes(path)) n++;
+  });
+  return () => n;
+}
 /** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
 const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
@@ -1663,6 +1671,39 @@ test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gem
   }
 });
 
+test('Dokumente: Kategorien per Ziehen am Griff umsortieren, bleibt nach dem Neuladen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const names = ['A', 'B', 'C'].map((n) => `Ordner ${n} ${id}`);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
+  for (const name of names) {
+    await page.getByLabel('Neue Kategorie').fill(name);
+    await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
+    await expect(page.locator('.doc-categories .row', { hasText: name })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: /nach oben/ })).toHaveCount(0);
+  const order = async () => (await page.locator('.doc-categories .row-title').allTextContents()).filter((t) => t.includes(id));
+  expect(await order()).toEqual(names);
+
+  // C am Griff über A ziehen
+  const handle = page.getByRole('button', { name: `${names[2]} verschieben (ziehen oder Pfeiltasten)` });
+  // Liste knapp unter die Kopfleiste scrollen, damit alle drei Griffe im Bild sind
+  await page.evaluate(() => window.scrollBy(0, document.querySelector('.doc-categories')!.getBoundingClientRect().top - 100));
+  const from = (await handle.boundingBox())!;
+  const to = (await page.locator('.doc-categories .row', { hasText: names[0] }).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + 5, { steps: 10 });
+  await page.mouse.up();
+  await expect(page.locator('.toast')).toHaveText('Reihenfolge gespeichert');
+  expect(await order()).toEqual([names[2], names[0], names[1]]);
+
+  await page.reload();
+  await expect(page.locator('.doc-categories .row', { hasText: names[1] })).toBeVisible();
+  expect(await order()).toEqual([names[2], names[0], names[1]]);
+});
+
 test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({ page }) => {
   const id = Date.now().toString(36);
   // Zehn A4-Seiten mit je einer Zeile Text
@@ -1745,6 +1786,85 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
+});
+
+test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach dem Neuladen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const names = ['A', 'B', 'C'].map((n) => `Reihe ${n} ${id}`);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Titel');
+  for (const name of names) {
+    await page.getByLabel('Bezeichnung').fill(name);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.title-list .row', { hasText: name })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: /nach oben/ })).toHaveCount(0);
+  const order = async () => (await page.locator('.title-list .row-title').allTextContents()).filter((t) => t.includes(id));
+  expect(await order()).toEqual(names);
+
+  const saves = countOrderSaves(page, 'titles/order');
+  // C am Griff über A ziehen
+  const handle = page.getByRole('button', { name: `${names[2]} verschieben (ziehen oder Pfeiltasten)` });
+  const from = (await handle.boundingBox())!;
+  const to = (await page.locator('.title-list .row', { hasText: names[0] }).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + 5, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(order).toEqual([names[2], names[0], names[1]]);
+
+  // A mit Pfeil hoch vor C, gleich danach, während das Ziehen noch gespeichert wird; der Griff behält den Fokus
+  const handleA = page.getByRole('button', { name: `${names[0]} verschieben (ziehen oder Pfeiltasten)` });
+  await handleA.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(order).toEqual([names[0], names[2], names[1]]);
+  await expect(handleA).toBeFocused();
+
+  // Beide Züge gespeichert (das Speichern läuft im Hintergrund), dann neu laden
+  await expect.poll(saves).toBe(2);
+  await page.reload();
+  await expect(page.locator('.title-list .row', { hasText: names[1] })).toBeVisible();
+  expect(await order()).toEqual([names[0], names[2], names[1]]);
+});
+
+test('Titel: beim Ziehen an den unteren Rand scrollt die Seite mit', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const names = Array.from({ length: 8 }, (_, i) => `Lang ${i + 1} ${id}`);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Titel');
+  for (const name of names) {
+    await page.getByLabel('Bezeichnung').fill(name);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.title-list .row', { hasText: name })).toBeVisible();
+  }
+  const order = async () => (await page.locator('.title-list .row-title').allTextContents()).filter((t) => t.includes(id));
+
+  // Ersten Titel knapp unter die Kopfleiste holen; der letzte liegt dann weit außerhalb des Bildes
+  const first = page.locator('.title-list .row', { hasText: names[0] });
+  await first.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 120));
+  const scrolled = await page.evaluate(() => window.scrollY);
+  const handle = (await first.getByRole('button', { name: /verschieben/ }).boundingBox())!;
+  const tabbar = (await page.locator('.tabbar').boundingBox())!;
+  const saves = countOrderSaves(page, 'titles/order');
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  // Knapp über der Tab-Leiste halten, bis die Seite unten angekommen ist
+  await page.mouse.move(handle.x + handle.width / 2, tabbar.y - 10, { steps: 10 });
+  await expect
+    .poll(() => page.evaluate(() => Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 2), {
+      timeout: 10_000,
+    })
+    .toBe(true);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(scrolled);
+  await page.mouse.up();
+  await expect.poll(order).toEqual([...names.slice(1), names[0]]);
+
+  await expect.poll(saves).toBe(1);
+  await page.reload();
+  await expect(page.locator('.title-list .row', { hasText: names[0] })).toBeVisible();
+  expect(await order()).toEqual([...names.slice(1), names[0]]);
 });
 
 test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Änderung zeigt es wieder, abgelaufen weg', async ({

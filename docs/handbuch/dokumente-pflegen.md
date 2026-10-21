@@ -22,4 +22,4 @@ Darunter stehen alle {bereich.documents}, nach Kategorien gruppiert. Mit **Sorti
 - **Löschen** entfernt das Dokument und seine Datei.
 
 ## Kategorien
-Ganz unten legst du mit **Kategorie hinzufügen** Kategorien an, benennst sie mit **Umbenennen** um und änderst mit **nach oben** und **nach unten** ihre Reihenfolge. Wird eine Kategorie gelöscht, stehen ihre {bereich.documents} danach ohne Kategorie da. {bereich.documents} ohne Kategorie stehen immer am Ende unter „Weitere {bereich.documents}“.
+Ganz unten legst du mit **Kategorie hinzufügen** Kategorien an und benennst sie mit **Umbenennen** um. Die Reihenfolge änderst du, indem du eine Kategorie am Griff links (sechs Punkte) an die gewünschte Stelle ziehst – mit dem Finger oder der Maus; am Computer auch mit der Tastatur: Griff mit Tab auswählen, dann Pfeil hoch oder runter. Wird eine Kategorie gelöscht, stehen ihre {bereich.documents} danach ohne Kategorie da. {bereich.documents} ohne Kategorie stehen immer am Ende unter „Weitere {bereich.documents}“.
