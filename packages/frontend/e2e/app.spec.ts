@@ -151,6 +151,32 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await shot(page, '7-verwaltung-mitglied');
 });
 
+test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stelle', async ({ page }) => {
+  await login(page, 'verwalter');
+  // Niedriges Fenster, damit die wenigen Testmitglieder schon scrollen.
+  await page.setViewportSize({ width: 390, height: 360 });
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  const row = page.locator('.row', { hasText: 'Mitglied2' });
+  await row.scrollIntoViewIfNeeded();
+  const y = await page.evaluate(() => window.scrollY);
+  expect(y).toBeGreaterThan(0);
+
+  for (const back of [() => page.getByRole('button', { name: '‹ Alle Mitglieder' }).click(), () => page.goBack()]) {
+    await row.click();
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await back();
+    await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(y);
+  }
+
+  // Neu geöffnet beginnt die Liste wieder oben.
+  await page.locator('.tabbar').getByRole('button', { name: 'Termine' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(page.getByLabel('Mitglied suchen')).toHaveValue('');
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();

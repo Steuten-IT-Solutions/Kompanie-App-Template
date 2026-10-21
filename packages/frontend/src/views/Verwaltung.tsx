@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   api,
   can,
@@ -97,13 +97,23 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 
 /* ------------------------------------------------------------------ */
 
+/** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
+type MembersState = { query: string; role: Level; showGuests: boolean; showCandidates: boolean; scrollY: number };
+let savedMembers: MembersState | null = null;
+
 function Members() {
   const canPromote = can('promote_users');
-  const [showGuests, setShowGuests] = useState(false);
+  // Nur einmal übernehmen: Wer die Liste danach neu öffnet, fängt wieder oben an.
+  const [restore] = useState(() => {
+    const s = savedMembers;
+    savedMembers = null;
+    return s;
+  });
+  const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
   // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
-  const [showCandidates, setShowCandidates] = useState(can('create_users'));
-  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates]);
-  const [query, setQuery] = useState('');
+  const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
+  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates], 'members');
+  const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
   const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
@@ -115,7 +125,7 @@ function Members() {
     saveMemberOrder(next);
   };
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66)
-  const [role, setRole] = useState<Level>('');
+  const [role, setRole] = useState<Level>(restore?.role ?? '');
   const list = useMemo(
     () =>
       sortMembers(
@@ -132,6 +142,19 @@ function Members() {
   // Nur Rollen, die in der Liste vorkommen
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+
+  // Scrollen, sobald die Liste steht (aus dem Speicher sofort, sonst nach dem Laden).
+  const pendingScroll = useRef(restore?.scrollY ?? null);
+  useLayoutEffect(() => {
+    if (pendingScroll.current === null || !data) return;
+    window.scrollTo(0, pendingScroll.current);
+    pendingScroll.current = null;
+  }, [data]);
+
+  function open(id: number) {
+    savedMembers = { query, role, showGuests, showCandidates, scrollY: window.scrollY };
+    navigate(`verwaltung/mitglied/${id}`);
+  }
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -216,7 +239,7 @@ function Members() {
       )}
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row clickable" onClick={() => navigate(`verwaltung/mitglied/${m.id}`)}>
+          <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)}{' '}
