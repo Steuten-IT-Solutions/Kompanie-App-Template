@@ -2094,6 +2094,11 @@ fieldset.feature-list legend {
   color: var(--primary-text);
   border: 1px solid currentColor;
 }
+/* Titel und Rollen wie eingegeben: in Großbuchstaben würde aus „ß“ ein „SS“. */
+.badge-title,
+.badge-name {
+  text-transform: none;
+}
 .my-titles {
   margin: 0 0 12px;
 }
