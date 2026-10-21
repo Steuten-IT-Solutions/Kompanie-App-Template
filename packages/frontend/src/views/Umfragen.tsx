@@ -8,7 +8,8 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 // Umfragen (Issue #4): #/umfragen (alle, auch beendete), #/umfragen/<id> (antworten, ändern, zurückziehen, Ergebnisse)
 // und #/umfragen/verwalten (anlegen, ändern, beenden, löschen; nur mit manage_polls). Laufende Umfragen stehen am
-// Schwarzen Brett; diese Seiten erreicht man von dort, über die Benachrichtigung und über „Mein Konto“.
+// Schwarzen Brett; diese Seiten erreicht man von dort (auch über das Banner), über die Benachrichtigung und mit
+// manage_polls über das Menü der Verwaltung.
 
 const sec = brand.labels.sections;
 /** Grenzen wie im Kern (PollService). */

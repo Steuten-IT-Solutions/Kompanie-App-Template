@@ -1,4 +1,5 @@
 import type { DocCategory, DocumentInfo } from './api';
+import brand from './generated/brand';
 
 /** Sortierung der Dokumente innerhalb einer Kategorie. */
 export type DocSort = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
@@ -58,7 +59,7 @@ export interface DocGroup {
 
 /**
  * Gruppiert nach Kategorie (in deren festgelegter Reihenfolge) und sortiert innerhalb jeder Gruppe.
- * Dokumente ohne oder mit unbekannter Kategorie stehen zuletzt unter „Weitere Dokumente“.
+ * Dokumente ohne oder mit unbekannter Kategorie stehen zuletzt unter „Weitere <Dokumente>“ (Bezeichnung der Kompanie).
  */
 export function groupDocuments(docs: DocumentInfo[], categories: DocCategory[], sort: DocSort = DEFAULT_DOC_SORT): DocGroup[] {
   const sorted = [...docs].sort(COMPARE[sort]);
@@ -69,7 +70,7 @@ export function groupDocuments(docs: DocumentInfo[], categories: DocCategory[], 
   }
   const known = new Set(categories.map((c) => c.id));
   const rest = sorted.filter((d) => d.category_id === null || !known.has(d.category_id));
-  if (rest.length > 0) groups.push({ id: null, title: groups.length > 0 ? 'Weitere Dokumente' : '', docs: rest });
+  if (rest.length > 0) groups.push({ id: null, title: groups.length > 0 ? `Weitere ${brand.labels.sections.documents}` : '', docs: rest });
   return groups;
 }
 

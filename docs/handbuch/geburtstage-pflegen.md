@@ -4,15 +4,15 @@ reihenfolge: 72
 rechte: [create_users]
 bereiche: [birthdays]
 ---
-Jedes Mitglied trägt seinen Geburtstag selbst unter **Mein Konto** ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
+Jedes Mitglied trägt seinen Geburtstag selbst unter **Konto** (oben rechts) ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
 
 ## In den Mitgliedsdetails
-**Verwaltung → Mitglieder →** Mitglied antippen und im Menü unter dem Namen **Geburtstag** wählen. Dort steht das eingetragene Datum. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn.
+**Verwaltung → Mitglieder →** Mitglied antippen und im Menü unter dem Namen **Geburtstag** wählen (wie die Mitgliederliste aufgebaut ist, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen)). Dort steht das eingetragene Datum oder „Nicht eingetragen.“. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn nach einer Rückfrage.
 
-Die beiden Schalter **Anderen Mitgliedern zeigen** und **Alter anzeigen** siehst du dort nur zur Information. Sie gehören der Person selbst: Du kannst sie nicht ändern, und ein neu eingetragener Geburtstag ist zunächst sichtbar und ohne Alter.
+Ob **Anderen Mitgliedern zeigen** und **Alter anzeigen** an oder aus sind, siehst du dort nur zur Information. Sie gehören der Person selbst: Du kannst sie nicht ändern, und ein neu eingetragener Geburtstag ist zunächst sichtbar und ohne Alter.
 
 ## Beim Anlegen
-Bei **+ Mitglied anlegen** und bei **Mehrere auf einmal anlegen** gibt es je Person ein freiwilliges Feld **Geburtstag** (Tag, Monat, Jahr optional). Ein ungültiges Datum (z. B. 31. Februar oder ein Tag in der Zukunft) meldet die App, bevor jemand angelegt wird.
+Bei **+ Mitglied anlegen** und bei **Mehrere auf einmal anlegen** gibt es je Person ein freiwilliges Feld **Geburtstag** (Tag, Monat, Jahr freiwillig). Ein ungültiges Datum (z. B. 31. Februar oder ein Tag in der Zukunft) meldet die App, bevor jemand angelegt wird.
 
 ## Gut zu wissen
 - Erlaubt sind nur echte Daten: der 29. Februar nur in einem Schaltjahr (oder ohne Jahr), Jahre ab 1900 und nichts in der Zukunft.

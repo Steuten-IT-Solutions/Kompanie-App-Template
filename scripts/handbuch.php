@@ -29,6 +29,8 @@ const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties',
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
 const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory'];
+/** Bereiche, die andere voraussetzen (wie Domain\Features, Feld requires): Ist der erste an, sind es auch diese. */
+const FEATURE_REQUIRES = ['polls' => ['board']];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
 const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
 const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'begriff.rank', 'rolle.guest', 'rolle.candidate', 'rolle.member', 'rolle.admin'];
@@ -145,7 +147,7 @@ function load(string $dir): array
 
 /**
  * Sieht jeder, der $from sieht, auch $to? Admins (manage_settings) haben alle Rechte. Bereiche und
- * Variante des Ziels dürfen nicht enger sein.
+ * Variante des Ziels dürfen nicht enger sein; vorausgesetzte Bereiche (FEATURE_REQUIRES) zählen als eingeschaltet.
  */
 function reachable(array $from, array $to): bool
 {
@@ -154,8 +156,12 @@ function reachable(array $from, array $to): bool
     if (in_array('member', $held, true)) {
         $held[] = 'calendar';
     }
+    $features = $from['bereiche'];
+    foreach ($from['bereiche'] as $f) {
+        $features = [...$features, ...(FEATURE_REQUIRES[$f] ?? [])];
+    }
     return array_diff($to['rechte'], $held) === []
-        && array_diff($to['bereiche'], $from['bereiche']) === []
+        && array_diff($to['bereiche'], $features) === []
         && ($to['variante'] === '' || $to['variante'] === $from['variante']);
 }
 

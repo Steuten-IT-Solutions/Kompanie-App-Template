@@ -124,7 +124,8 @@ final class DocumentService
             'etag' => FileCache::etag($doc['file'], $path),
             // Bewusst nicht lange im HTTP-Cache des Browsers: Den leert das Abmelden nicht, und auf geteilten Geräten bliebe
             // ein geschütztes Dokument sonst ohne Rechteprüfung abrufbar. Die Prüfung per ETag/304 kostet keine Übertragung.
-            'cache_control' => 'private, no-cache',
+            // In der Vorschau (Issue #63) gar nicht: Die Antwort gilt nur für diese Ansicht.
+            'cache_control' => $this->app->preview()->cacheControl('private, no-cache'),
             'mime' => $mime,
             'disposition' => $mode . '; filename="' . self::asciiName($doc['title']) . '.' . $doc['ext'] . '"; filename*=UTF-8\'\'' . rawurlencode($name),
         ];

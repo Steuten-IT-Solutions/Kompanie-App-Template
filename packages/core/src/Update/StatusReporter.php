@@ -102,7 +102,7 @@ final class StatusReporter
         return $data;
     }
 
-    /** Zeitpunkt der letzten Meldung und ob sie angenommen wurde (für Einstellungen → Updates). */
+    /** Zeitpunkt der letzten Meldung und ob sie angenommen wurde (für Einstellungen → Zustand und Updates). */
     public function last(): ?array
     {
         $last = $this->app->settings->get(self::LAST_SETTING);
@@ -257,7 +257,8 @@ final class StatusReporter
         return is_numeric($v) ? (int) $v : 0;
     }
 
-    private function installationId(): string
+    /** Zufällige Kennung der Installation (beim ersten Bedarf erzeugt); auch für Fehlermeldungen (Issue #64). */
+    public function installationId(): string
     {
         $id = $this->app->settings->get(self::ID_SETTING);
         if (!is_string($id) || !preg_match('/^[0-9a-f]{32}$/', $id)) {
@@ -267,7 +268,8 @@ final class StatusReporter
         return $id;
     }
 
-    private function secret(): string
+    /** Geheimnis der Installation für die Signatur (beim ersten Bedarf erzeugt); auch für Fehlermeldungen. */
+    public function secret(): string
     {
         $secret = $this->app->settings->get(self::SECRET_SETTING);
         if (!is_string($secret) || !preg_match('/^[0-9a-f]{64}$/', $secret)) {
@@ -279,7 +281,13 @@ final class StatusReporter
 
     private function url(): string
     {
-        $url = trim((string) ($this->app->packageConfig['statusUrl'] ?? ''));
+        return self::safeUrl($this->app->packageConfig['statusUrl'] ?? '');
+    }
+
+    /** Adresse eines Empfängers im Cockpit, nur https (für Tests auch http auf dem eigenen Rechner); sonst leer. */
+    public static function safeUrl(mixed $value): string
+    {
+        $url = trim(is_string($value) ? $value : '');
         $parts = parse_url($url);
         if (!is_array($parts) || isset($parts['user']) || isset($parts['pass']) || ($parts['host'] ?? '') === '') {
             return '';

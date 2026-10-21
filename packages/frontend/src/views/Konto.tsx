@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, levelLabel } from '../api';
+import { api, config, roleLabels } from '../api';
 import { isStandalone } from '../install';
 import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import { navigate } from '../router';
@@ -38,7 +38,9 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
     <div>
       <div className="card account-card">
         <h2 className="account-name">{config?.user?.name}</h2>
-        <p className="muted small">Rolle: {levelLabel(config?.user?.level ?? 'guest')}</p>
+        <p className="muted small">
+          {(config?.user?.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(config?.user ?? { level: 'guest' })}
+        </p>
       </div>
 
       {birthdaysVisible() && <OwnBirthdayCard onToast={onToast} />}

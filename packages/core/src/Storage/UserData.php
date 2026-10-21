@@ -9,10 +9,11 @@ use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
  * Alle eigenen Daten einer Person löschen (Issue #24, Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit
- * Verlauf, Titel, Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen (namentliche über user_id, anonyme
- * über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag. Was sie für andere eingetragen hat (created_by,
- * updated_by), bleibt; ebenso Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“).
- * Ohne App: WordPress-Multisite löscht damit auch in den Tabellen anderer Seiten des Netzwerks.
+ * Verlauf, Titel, Zusatzrollen (Issue #66), Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen
+ * (namentliche über user_id, anonyme über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag, wartende
+ * Fehlermeldungen mit ihrem Namen (Issue #64). Was sie für andere eingetragen hat (created_by, updated_by), bleibt; ebenso
+ * Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“). Ohne App: WordPress-Multisite löscht
+ * damit auch in den Tabellen anderer Seiten des Netzwerks.
  */
 final class UserData
 {
@@ -23,10 +24,13 @@ final class UserData
         'rank_history' => 'user_id',
         'member_ranks' => 'user_id',
         'member_titles' => 'user_id',
+        'member_roles' => 'user_id',
         'attendance_entries' => 'user_id',
         'poll_votes' => 'user_id',
         'poll_answers' => 'user_id',
         'birthdays' => 'user_id',
+        // Fehlermeldungen (Issue #64) mit Namen, die noch nicht versandt sind; ohne Namen steht dort 0.
+        'bug_reports' => 'user_id',
     ];
 
     /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */

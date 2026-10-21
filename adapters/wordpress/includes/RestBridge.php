@@ -59,7 +59,9 @@ final class RestBridge
         }
         // REMOTE_ADDR nur für Begrenzungen (z. B. neue Gast-Abos für Push); Weiterleitungs-Header kann jeder setzen.
         $client = isset($_SERVER['REMOTE_ADDR']) && is_string($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
-        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client);
+        // Vorschau „App als Rolle ansehen“ (Issue #63): Header der App; ob er gilt, entscheidet der Kern.
+        $preview = $wp->get_header('X-Kompanie-Preview');
+        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null);
         $res = $app->api()->dispatch($route, $request);
         $out = new \WP_REST_Response($res->data, $res->status);
         foreach ($res->headers as $name => $value) {

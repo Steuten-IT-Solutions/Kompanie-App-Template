@@ -4,6 +4,7 @@ import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
 import { navigate } from '../router';
 import { Empty } from '../ui';
+import FehlerMelden, { ReportButton } from './FehlerMelden';
 
 interface Seite {
   slug: string;
@@ -81,6 +82,9 @@ export default function Hilfe({ slug }: { slug?: string }) {
   const [suche, setSuche] = useState('');
   const seite = slug ? seiten.find((s) => s.slug === slug) : undefined;
 
+  // „Fehler melden“ (Issue #64): #/hilfe/melden (keine Handbuchseite heißt so)
+  if (slug === 'melden') return <FehlerMelden />;
+
   if (seite) {
     return (
       <article className="hilfe-seite">
@@ -89,6 +93,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
         </button>
         <h2 className="news-headline">{fill(seite.titel, map, false)}</h2>
         <div className="hilfe-text" dangerouslySetInnerHTML={{ __html: fill(seite.html, map, true) }} />
+        <ReportButton />
       </article>
     );
   }
@@ -127,6 +132,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
           </section>
         );
       })}
+      <ReportButton />
       {config?.handbookUrl && (
         <p className="small muted hilfe-web">
           Das ganze Handbuch, auch für Bereiche, die eure Kompanie nicht nutzt:{' '}

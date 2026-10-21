@@ -388,7 +388,7 @@ final class PushService
      * IPv6: das ganze /64-Netz zählt als ein Anfragender (so viele Adressen hat jeder Anschluss). IPv4 in IPv6-Form
      * (::ffff:a.b.c.d, manche Server melden IPv4 so) zählt als die IPv4-Adresse.
      */
-    private static function clientKey(string $client): string
+    public static function clientKey(string $client): string
     {
         $bin = filter_var($client, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? inet_pton($client) : false;
         if ($bin === false) {
@@ -826,10 +826,17 @@ final class PushService
         return str_starts_with($support, 'https://') ? $support : $this->app->env->appUrl();
     }
 
-    /** @return array{supported: bool, missing: string[], devices: int, accounts: int, guests: int, queued: int, reminderHour: int} */
+    /**
+     * birthdays: Benachrichtigung am Geburtstag (an/aus, ab welcher Stunde); null ohne den Bereich Geburtstage.
+     *
+     * @return array{supported: bool, missing: string[], devices: int, accounts: int, guests: int, queued: int, reminderHour: int, birthdays: array{enabled: bool, hour: int}|null}
+     */
     public function adminStatus(): array
     {
-        return ['supported' => $this->supported(), 'missing' => $this->requirements()] + $this->repository()->counts() + ['reminderHour' => $this->reminderHour()];
+        return ['supported' => $this->supported(), 'missing' => $this->requirements()] + $this->repository()->counts() + [
+            'reminderHour' => $this->reminderHour(),
+            'birthdays' => $this->app->features()->enabled('birthdays') ? $this->app->birthdays()->notifySettings() : null,
+        ];
     }
 
     public function reminderHour(): int
