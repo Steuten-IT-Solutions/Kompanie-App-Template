@@ -19,7 +19,7 @@ export function memberListAllowed(): boolean {
 
 type AdminTab = { id: string; label: string; on: boolean; route?: string };
 
-/** Reiter der Verwaltung; Schwarzes Brett, Umfragen und Inventar sind eigene Seiten (route), stehen aber hier mit. */
+/** Reiter der Verwaltung; Schwarzes Brett, Umfragen, Inventar und Einstellungen sind eigene Seiten (route), stehen aber hier mit. */
 export function adminTabs(): AdminTab[] {
   const points = canPoints();
   return (
@@ -35,6 +35,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
+      { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
 }

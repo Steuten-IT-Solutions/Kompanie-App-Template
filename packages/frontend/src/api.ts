@@ -994,7 +994,8 @@ export const api = {
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
   installUpdate: (version: string, major = false) => request<{ installed: string }>('POST', '/admin/update/install', { version, major }),
   rollback: (version: string) => request<{ installed: string }>('POST', '/admin/update/rollback', { version }),
-  updateOptions: (data: { auto?: boolean; status_reports?: boolean }) => request<UpdateStatus>('PATCH', '/admin/update', data),
+  updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
+    request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),

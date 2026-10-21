@@ -1,5 +1,5 @@
 node_modules
-vendor/
+/vendor
 dist/
 .DS_Store
 .phpunit.cache/

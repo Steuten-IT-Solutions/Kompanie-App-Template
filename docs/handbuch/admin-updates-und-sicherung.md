@@ -4,7 +4,7 @@ reihenfolge: 130
 rechte: [manage_settings]
 ---
 ## Updates
-Unter **Konto → Einstellungen → Zustand und Updates** siehst du die installierte Version und wann zuletzt nach Updates gesucht wurde. Die App sucht einmal am Tag selbst; mit **Nach Updates suchen** geht es sofort.
+Unter **Verwaltung → Einstellungen → Zustand und Updates** siehst du die installierte Version und wann zuletzt nach Updates gesucht wurde. Die App sucht einmal am Tag selbst; mit **Nach Updates suchen** geht es sofort.
 
 Neue Versionen spielt die App automatisch ein, solange **Updates automatisch einspielen (empfohlen)** eingeschaltet ist. Ausnahmen:
 - Eine neue Hauptversion spielt die App nie automatisch ein. Lies vorher die Hinweise zur Version und tippe dann auf **Hauptversion einspielen**.
@@ -19,8 +19,11 @@ Wird eine fehlerhafte Version zurückgezogen, wechselt die App von selbst auf ei
 ### Auf eine ältere Version zurück
 Klappt nach einem Update etwas nicht mehr, öffnest du **Auf eine ältere Version zurück**, wählst eine frühere Version derselben Hauptversion und tippst auf **Zurückrollen**. Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein, erst wieder die nächste neuere. Hinter eine neue Hauptversion zurück geht es nicht per Klick, sondern nur mit Hilfe der Betreuer der App.
 
+### Vorabversionen
+Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist – noch bevor sie für alle freigegeben wird. Beim Einschalten fragt die App nach. Das ist für eine Testseite gedacht: Vorabversionen können noch Fehler enthalten. Schaltest du es wieder aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
+
 ## Datensicherung
-Unter **Konto → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen und Zugangsschlüssel, ohne WordPress auch die Konten. Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf. Die Ampel unter **Zustand und Updates** wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
+Unter **Verwaltung → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen und Zugangsschlüssel, ohne WordPress auch die Konten. Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf. Die Ampel unter **Zustand und Updates** wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
 
 ### Wiederherstellen
 Mit **Sicherung wiederherstellen …** wählst du eine Sicherungsdatei. Nach einer Rückfrage ersetzt sie **alle** Daten der App; rückgängig machen lässt sich das nur mit einer anderen Sicherung.

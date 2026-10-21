@@ -107,19 +107,33 @@ wieder zuerst in `early`.
 Innerhalb einer Hauptversion (`1.x`) ändern Migrationen nur additiv, damit Zurückrollen ohne Datenverlust geht.
 Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle bisherigen.
 
+## Branches: develop und main
+
+- **develop**: Alle Änderungen kommen per Pull Request nach `develop`. Jeder Merge startet „Kompanien
+  abgleichen“ auf `develop`: Alle Kompanien bekommen eine neue Version mit dem Kern von `develop` im Kanal
+  `early` (Vorabversion). Installationen mit dem Schalter **Vorabversionen erhalten** (Einstellungen → Zustand und
+  Updates) spielen sie ein; dort wird getestet.
+- **main**: Ein Release ist ein Pull Request `develop → main` (als Merge-Commit, nicht zusammengefasst). Jeder
+  Push auf `main` startet „Kernversion freigeben“: Die getestete early-Version mit genau diesem Programmcode wird
+  bei allen Kompanien `stable`, der Code kommt in `STABLE_CORE`, und Kompanien ohne Version mit diesem Code
+  bekommen sie direkt als `stable` gebaut.
+- Nach einem Release `main` zurück nach `develop` mergen (nimmt den `STABLE_CORE`-Eintrag mit).
+- Der Zeitplan von „Kompanien abgleichen“ läuft auf `main`: Änderungen eines Kompanie-Repos (Logo, Farben) kommen
+  mit dem freigegebenen Kern, also direkt als `stable`.
+- „Kompanien abgleichen“ vergleicht je Programmcode mit dessen neuester Version (`find-pending.sh`,
+  `updates.php --find`): Versionen von `develop` und `main` stoßen sich so nicht gegenseitig neu an.
+- Die Environment `veroeffentlichen` muss Deployments von `main` **und** `develop` erlauben
+  (Settings → Environments → veroeffentlichen → Deployment branches).
+
 ## Einen Kern veröffentlichen
 
-1. `VERSION` erhöhen, Pull Request, CI grün, zusammenführen.
-2. Tags setzen: `git tag v1.4.0 && git tag -f v1 && git push origin v1.4.0 && git push -f origin v1`.
-3. Innerhalb von 30 Minuten baut „Kompanien abgleichen“ für jede Kompanie eine neue Version (oder sofort:
-   *Actions → Kompanien abgleichen → Run workflow*). Jede Änderung am Programmcode auf `main` führt so zu
-   neuen Versionen für alle Kompanien, zuerst im Kanal `early`.
-4. Nach dem Test: *Actions → Kernversion freigeben → Run workflow* (ohne Eingaben; freigegeben wird der aktuelle
-   Stand von `main`, also direkt nach dem Test starten). Die Action bestimmt den Programmcode von `main` (Kern-Version und `coreCode`), gibt bei allen
-   Kompanien die neueste Version mit genau diesem Code frei (nicht zurückgezogen, Kern nicht gesperrt, neuer als die
-   freigegebene), trägt den Code in `STABLE_CORE` auf `main` ein und startet „Kompanien abgleichen“: Kompanien ohne
-   Version mit diesem Code bekommen sie dabei gebaut und direkt als `stable` veröffentlicht. Lässt der Branch-Schutz
-   das Eintragen nicht zu, meldet sie es als Warnung; dann `STABLE_CORE` per Pull Request eintragen.
+1. `VERSION` erhöhen (Pull Request nach `develop`). Für das Release Tags setzen:
+   `git tag v1.4.0 && git tag -f v1 && git push origin v1.4.0 && git push -f origin v1`.
+2. Jeder Merge nach `develop` baut für jede Kompanie eine neue Version im Kanal `early`.
+3. Auf einer Installation mit **Vorabversionen erhalten** testen.
+4. Release: Pull Request `develop → main` zusammenführen. „Kernversion freigeben“ läuft dann von selbst (siehe oben).
+   Als Notfall-Knopf: *Actions → Kernversion freigeben → Run workflow* (gibt den Stand von `main` frei). Lässt der
+   Branch-Schutz das Eintragen von `STABLE_CORE` nicht zu, meldet die Action es als Warnung; dann per Pull Request.
    Einzelne Kompanie oder bestimmte Version: *Actions → Versionen steuern* (`promote`, `withdraw`,
    `promote-checked` mit der Datei `STABLE_CORE`).
 

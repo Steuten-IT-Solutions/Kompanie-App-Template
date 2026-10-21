@@ -18,7 +18,7 @@ Bist du angemeldet, steht oben rechts **Konto**. Dort findest du:
 - **App installieren**, solange du die App im Browser benutzt, siehe [Die App aufs Handy holen](seite:app-installieren),
 - **Passwort ändern** und **Abmelden**.
 
-{rolle.admin} sehen hier außerdem **Einstellungen öffnen**.
+Die Einstellungen der App finden {rolle.admin}s nicht hier, sondern in der **Verwaltung**.
 
 ## Passwort ändern
 Unter **Konto → Passwort ändern** das aktuelle Passwort und zweimal das neue eingeben (mindestens 8 Zeichen, anders als das bisherige) und **Passwort ändern** tippen. Du bleibst auf diesem Gerät angemeldet, alle anderen Geräte werden abgemeldet.

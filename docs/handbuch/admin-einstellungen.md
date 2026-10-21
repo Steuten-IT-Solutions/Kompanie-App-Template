@@ -3,7 +3,7 @@ titel: Einstellungen im Überblick
 reihenfolge: 112
 rechte: [manage_settings]
 ---
-Die Einstellungen erreichst du über **Konto → Einstellungen öffnen**. Die Übersicht zeigt je Thema eine Zeile; ein Tipp öffnet die Seite dazu, **‹ Einstellungen** führt zurück. Die Einstellungen sehen nur {rolle.admin}s.
+Die Einstellungen erreichst du unter **Verwaltung → Einstellungen**: im Bereich **Verwaltung** (unten in der Leiste) oben das Menü aufklappen und **Einstellungen** wählen. Die Übersicht zeigt je Thema eine Zeile; ein Tipp öffnet die Seite dazu, **‹ Einstellungen** führt zurück. Die Einstellungen sehen nur {rolle.admin}s.
 
 ## Die Seiten
 - **Bereiche**: welche Bereiche die App für alle hat. Siehe [Ersteinrichtung und Bereiche](seite:admin-einrichtung).

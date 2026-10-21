@@ -9,7 +9,7 @@ Wer Rollen vergeben darf ({rolle.admin} oder eine Rolle mit diesem Recht), finde
 Das Suchfeld **Mitglied suchen …** filtert die Liste nach dem Namen. Ein Tipp auf eine Person öffnet ihre Seite; unter dem Namen wählst du im Menü die Unterseite (**Übersicht**, **Konto und Rolle** und je nach deinen Rechten weitere). **‹ Alle Mitglieder** führt zurück.
 
 ## Rolle ändern
-Unter **Verwaltung → Mitglieder** die Person öffnen, im Menü unter dem Namen **Konto und Rolle** wählen und unter **Rolle in der App** die Rolle auswählen. Die Änderung gilt sofort. Welche Rollen es gibt und was sie dürfen, legen die Admins unter **Konto → Einstellungen → Rollen** fest.
+Unter **Verwaltung → Mitglieder** die Person öffnen, im Menü unter dem Namen **Konto und Rolle** wählen und unter **Rolle in der App** die Rolle auswählen. Die Änderung gilt sofort. Welche Rollen es gibt und was sie dürfen, legen die Admins unter **Verwaltung → Einstellungen → Rollen** fest.
 
 - Die eigene Rolle ändert niemand selbst.
 - Der letzte {rolle.admin} kann nicht herabgestuft werden.

@@ -3,7 +3,7 @@ titel: Rollen und Mitglieder
 reihenfolge: 120
 rechte: [manage_settings]
 ---
-Jede Person hat genau eine Rolle. Welche Rollen es gibt und was sie dürfen, legst du unter **Konto → Einstellungen → Rollen** fest. Dort siehst du je Rolle, wie viele Personen sie haben und welche Rechte sie hat.
+Jede Person hat genau eine Rolle. Welche Rollen es gibt und was sie dürfen, legst du unter **Verwaltung → Einstellungen → Rollen** fest. Dort siehst du je Rolle, wie viele Personen sie haben und welche Rechte sie hat.
 
 ## Feste Rollen
 - **{rolle.guest}**: sieht nur öffentliche Inhalte.

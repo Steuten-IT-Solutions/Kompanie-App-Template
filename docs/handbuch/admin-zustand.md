@@ -3,7 +3,7 @@ titel: Zustand und Statusmeldungen
 reihenfolge: 140
 rechte: [manage_settings]
 ---
-Unter **Konto → Einstellungen → Zustand und Updates** zeigt die Karte **Zustand der App** mit einer Ampel, ob alles läuft. Jede Zeile hat einen kurzen Text, der sagt, was los ist und was zu tun ist. Mit **Zustand neu laden** holst du den aktuellen Stand.
+Unter **Verwaltung → Einstellungen → Zustand und Updates** zeigt die Karte **Zustand der App** mit einer Ampel, ob alles läuft. Jede Zeile hat einen kurzen Text, der sagt, was los ist und was zu tun ist. Mit **Zustand neu laden** holst du den aktuellen Stand.
 
 ## Die Zeilen
 - **Updates**: ob die App aktuell ist, ob ein Update ansteht oder fehlgeschlagen ist. Mehr unter [Updates und Datensicherung](seite:admin-updates-und-sicherung).

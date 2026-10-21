@@ -12,7 +12,7 @@ Die App wird ein Teil der Webseite. Benutzer, Anmeldung und Neuigkeiten kommen a
 
 Ohne „schöne“ Permalinks läuft die App unter einer längeren Adresse; WordPress zeigt sie dann oben im WP-Admin an. Für die kurze Adresse `/app/` unter **Einstellungen → Permalinks** z. B. „Beitragsname“ wählen.
 
-Die Einstellungen der App gibt es in der App unter **Konto → Einstellungen** und zusätzlich im WP-Admin unter *Einstellungen* auf der Seite der App (Wartungsmodus, Bereiche, Google-Zugang, {bereich.calendar} und {bereich.gallery}).
+Die Einstellungen der App gibt es in der App unter **Verwaltung → Einstellungen** und zusätzlich im WP-Admin unter *Einstellungen* auf der Seite der App (Wartungsmodus, Bereiche, Google-Zugang, {bereich.calendar} und {bereich.gallery}).
 
 > Admin in der App ist, wer in WordPress Administrator ist; diese Rolle wird nur in WordPress vergeben. Die Rolle anderer Personen lässt sich in der App wählen oder im WordPress-Benutzerprofil unter **Rolle in der App** (siehe [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder)).
 
