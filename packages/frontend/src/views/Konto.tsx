@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, can, config, roleLabels } from '../api';
+import { api, config, roleLabels } from '../api';
 import { isStandalone } from '../install';
 import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import { navigate } from '../router';
@@ -44,16 +44,6 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       </div>
 
       {birthdaysVisible() && <OwnBirthdayCard onToast={onToast} />}
-
-      {can('manage_settings') && (
-        <div className="card account-card">
-          <h3>Einstellungen</h3>
-          <p className="muted small">Zustand der App, Updates, Datensicherung, Kalender, Galerie und Neuigkeiten.</p>
-          <button className="btn btn-secondary btn-block" onClick={() => navigate('einstellungen')}>
-            Einstellungen öffnen
-          </button>
-        </div>
-      )}
 
       <div className="card account-card">
         <h3>Benachrichtigungen</h3>

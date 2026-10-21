@@ -3,7 +3,7 @@
 # - Job „build“ ohne Geheimnisse: npm, Branding aus kompanie.json und Logo, Bildschirmfotos.
 #   Sein Ergebnis gilt als nicht vertrauenswürdig (hier laufen fremde Pakete und Daten der Kompanie).
 # - Job „publish“ hinter der Environment „veroeffentlichen“ (Secrets KOMPANIE_SIGNING_KEY und
-#   KOMPANIE_APP_KEY, Variable KOMPANIE_APP_ID; nur Branch main), ohne npm: übernimmt aus „build“ nur
+#   KOMPANIE_APP_KEY, Variable KOMPANIE_APP_ID; nur Branches main und develop), ohne npm: übernimmt aus „build“ nur
 #   die gebaute Oberfläche und Bilder (erlaubte Dateitypen), baut Pakete, install.php und release.json
 #   selbst aus dem eigenen Checkout, signiert und veröffentlicht (scripts/publish-release.sh).
 name: Kompanie veröffentlichen
@@ -120,7 +120,7 @@ jobs:
 
   publish:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     environment: veroeffentlichen
     # Zusätzlich zur Gruppe des Workflows: Nie zwei Veröffentlichungen derselben Kompanie gleichzeitig

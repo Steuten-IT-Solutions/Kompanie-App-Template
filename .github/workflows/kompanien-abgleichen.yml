@@ -1,4 +1,5 @@
 # Veröffentlicht neue Versionen für alle Kompanien (Repos der Organisation mit dem Topic kompanie-app),
+# vom Stand des Branches, auf dem er läuft (develop → early; main → stable, wenn der Code freigegeben ist),
 # deren Stand noch nicht veröffentlicht ist: nach einer Änderung im Kompanie-Repo (kompanie.json, Logo)
 # und nach einer Änderung am Programmcode des Kerns (dann für alle Kompanien, zuerst im Kanal early).
 # Läuft alle 30 Minuten und von Hand. Veröffentlicht wird nur, was sich geändert hat (kein erzwungener
@@ -8,8 +9,12 @@
 name: Kompanien abgleichen
 
 on:
+  # main (Zeitplan, von Hand, nach einer Freigabe): Änderungen der Kompanie-Repos mit dem freigegebenen Kern.
   schedule:
     - cron: '17,47 * * * *'
+  # develop: jeder Merge baut neue Versionen mit dem Kern von develop (Kanal early, Vorabversionen zum Testen).
+  push:
+    branches: [develop]
   workflow_dispatch:
     inputs:
       repo:
@@ -26,7 +31,7 @@ concurrency:
 
 jobs:
   finden:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     outputs:
       repos: ${{ steps.finden.outputs.repos }}

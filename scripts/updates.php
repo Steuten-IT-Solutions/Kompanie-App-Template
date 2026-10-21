@@ -73,10 +73,17 @@ try {
         exit(0);
     }
     if (isset($opt['find'])) {
-        // Nur die neueste Version zählt (auch eine zurückgezogene): Ein Revert auf einen früheren Stand
-        // ist ein neuer Stand und wird neu veröffentlicht; ein zurückgezogener nicht still erneut.
-        $e = $list->toArray()['versions'][0] ?? null;
+        // Je Programmcode zählt nur dessen neueste Version (auch eine zurückgezogene): Ein Revert auf einen früheren
+        // Stand ist ein neuer Stand und wird neu veröffentlicht, ein zurückgezogener nicht still erneut. Versionen
+        // mit anderem Code (develop → early, main → stable) stören sich so nicht gegenseitig.
         $code = (string) ($opt['core-code'] ?? '');
+        $e = null;
+        foreach ($list->toArray()['versions'] as $v) {
+            if ($code !== '' && ($v['coreCode'] ?? '') === $code) {
+                $e = $v;
+                break;
+            }
+        }
         $config = (string) ($opt['config-hash'] ?? '');
         $same = is_array($e) && $opt['find'] !== '' && ($e['kompanieCommit'] ?? '') === $opt['find'] && $code !== '' && ($e['coreCode'] ?? '') === $code;
         if ($same && $list->isWithdrawn($e['version'])) {

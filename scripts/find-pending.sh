@@ -33,11 +33,15 @@ while IFS= read -r repo; do
   CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$repo" --status-url="${STATUS_URL:-}" --report-url="${REPORT_URL:-}" --support="${SUPPORT:-}")"   # eigene Zuweisung: Fehler brechen ab
   # Liste als Datei (kann über 100 KB groß sein, zu groß für ein Argument)
   curl -fsSL --max-time 20 -o "$WORK/list.json" "https://raw.githubusercontent.com/$repo/gh-pages/updates.json" 2> /dev/null || echo '{}' > "$WORK/list.json"
-  # Nur die neueste Version zählt (wie updates.php --find): Ein Revert ist ein neuer Stand.
   latest="$(php -r '
     $env = json_decode((string) file_get_contents($argv[1]), true);
     $list = is_array($env) ? json_decode((string) base64_decode((string) ($env["payload"] ?? ""), true), true) : null;
-    $e = $list["versions"][0] ?? null;
+    // Je Programmcode zählt nur dessen neueste Version (wie updates.php --find): So stören sich Versionen von
+    // develop (early) und main nicht gegenseitig, und ein Revert des Kompanie-Repos ist trotzdem ein neuer Stand.
+    $e = null;
+    foreach ((array) ($list["versions"] ?? []) as $v) {
+        if (is_array($v) && ($v["coreCode"] ?? "") === $argv[3]) { $e = $v; break; }
+    }
     $same = is_array($e) && ($e["kompanieCommit"] ?? "") === $argv[2] && ($e["coreCode"] ?? "") === $argv[3] && preg_match("/^[0-9.]+$/", (string) $e["version"]);
     // Zurückgezogener Stand: nicht neu veröffentlichen (wie updates.php --find), auch bei anderer Konfiguration;
     // „-“ heißt: aktuell, ohne die Prüfung auf ein öffentliches Release (ein Entwurf darf es hier bleiben).

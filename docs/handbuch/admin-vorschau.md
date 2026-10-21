@@ -3,7 +3,7 @@ titel: App als Rolle ansehen (Vorschau)
 reihenfolge: 125
 rechte: [manage_settings]
 ---
-Mit der Vorschau prüfst du, was eine Rolle in der App sieht – welche Tabs, Bereiche, Knöpfe und Inhalte –, ohne dich mit einem anderen Konto anzumelden. Du findest sie unter **Konto → Einstellungen → Rollen**.
+Mit der Vorschau prüfst du, was eine Rolle in der App sieht – welche Tabs, Bereiche, Knöpfe und Inhalte –, ohne dich mit einem anderen Konto anzumelden. Du findest sie unter **Verwaltung → Einstellungen → Rollen**.
 
 ## Vorschau starten
 - **Ansehen** neben einer Rolle zeigt die App, wie eine Person mit genau dieser Rolle sie sieht. {rolle.admin} selbst lässt sich nicht ansehen.

@@ -3,7 +3,7 @@ titel: Ersteinrichtung und Bereiche
 reihenfolge: 110
 rechte: [manage_settings]
 ---
-Beim ersten Öffnen führt die App durch die Einrichtung (so lange, bis ein {rolle.admin} sie einmal abgeschlossen hat). Alles lässt sich später unter **Konto → Einstellungen** ändern.
+Beim ersten Öffnen führt die App durch die Einrichtung (so lange, bis ein {rolle.admin} sie einmal abgeschlossen hat). Alles lässt sich später unter **Verwaltung → Einstellungen** ändern.
 
 ## Bereiche wählen
 Eine neue Installation hat keine Bereiche. Wähle, was eure Kompanie nutzt: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}. Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.

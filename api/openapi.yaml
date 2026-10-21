@@ -2923,7 +2923,7 @@ paths:
   /admin/update:
     patch:
       tags: [Wartung]
-      summary: Automatische Updates und Statusmeldungen ein- oder ausschalten
+      summary: Automatische Updates, Kanal und Statusmeldungen einstellen
       x-capability: manage_settings
       requestBody:
         required: true
@@ -2933,6 +2933,10 @@ paths:
               type: object
               properties:
                 auto: { type: boolean }
+                channel:
+                  type: string
+                  enum: [stable, early]
+                  description: stable = freigegebene Versionen; early = jede neue Version von develop (Vorabversionen zum Testen)
                 status_reports: { type: boolean, description: Zustimmung zu täglichen Statusmeldungen }
       responses:
         '200':
