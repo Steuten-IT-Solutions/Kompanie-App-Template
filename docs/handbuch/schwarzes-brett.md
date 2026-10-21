@@ -14,6 +14,8 @@ Jede Nachricht steht genau **24 Stunden** und verschwindet dann von selbst – a
 ## Ausblenden
 Mit **×** blendest du eine Nachricht auf diesem Gerät aus; sie bleibt auf der Seite **Brett öffnen** sichtbar. Wird sie danach noch geändert, erscheint sie wieder im Banner, damit du die Änderung mitbekommst. Auf anderen Geräten blendest du sie dort aus.
 
+Hast du alle aktuellen Einträge ausgeblendet, bleibt oben eine schmale Zeile, z. B. **{bereich.board} · 2 ausgeblendet**. Über **Brett öffnen** liest du sie dort jederzeit nach. Die Zeile verschwindet, sobald die Einträge abgelaufen sind.
+
 ## Benachrichtigung
 Bei einer neuen Nachricht kommt eine Benachrichtigung, wenn du sie für das Gerät eingeschaltet hast (Art **{bereich.board}: dringende Nachrichten**, siehe [Benachrichtigungen](seite:benachrichtigungen)). Wer schreibt, kann die Benachrichtigung auch weglassen; dann steht die Nachricht nur in der App. Ein Tipp auf die Benachrichtigung öffnet das Brett. Wird eine Nachricht nur geändert, kommt keine neue Benachrichtigung.
 
