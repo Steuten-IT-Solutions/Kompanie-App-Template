@@ -12,7 +12,7 @@ import {
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro, formatPoints, parseEuroToCents, roleCount, todayYmd } from '../format';
+import { formatDate, formatEuro, formatPoints, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
@@ -167,11 +167,7 @@ function Members() {
   const groupCounts = useMemo(() => {
     const n = new Map<Level, number>();
     for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
-    const rank = (key: Level) => (key === 'member' ? 0 : key === 'candidate' ? 2 : 1);
-    return (config?.roles ?? [])
-      .filter((r) => n.has(r.key))
-      .sort((a, b) => rank(a.key) - rank(b.key))
-      .map((r) => roleCount(r.label, n.get(r.key) ?? 0));
+    return countLabels(config?.roles ?? [], n);
   }, [data]);
   // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
   const withPhotos = (data ?? []).some((m) => m.photo_url);

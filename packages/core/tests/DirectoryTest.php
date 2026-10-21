@@ -76,6 +76,31 @@ final class DirectoryTest extends TestCase
         $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad und keine Titel');
     }
 
+    public function testCountsPerGroupWithoutRolesPerPerson(): void
+    {
+        $young = $this->app->roles()->create(['label' => 'Jungmariner', 'capabilities' => ['member']])['key'];
+        $this->users->add('jung', $young);
+        $counts = fn (int $viewer): array => array_column($this->countsAs($viewer)->data, 'count', 'group');
+
+        // Ohne eigene Gruppe zählen Jungmariner (und Admins) als Mitglieder, wie in der Anwesenheit; Gäste nie.
+        $this->assertEquals([Roles::MEMBER => 3, Roles::CANDIDATE => 1], $counts($this->candidate));
+        $this->app->attendance()->setGroups([$young => '']);
+        $this->assertEquals([Roles::MEMBER => 2, $young => 1, Roles::CANDIDATE => 1], $counts($this->m));
+        $this->assertSame(['group', 'count'], array_keys($this->countsAs($this->m)->data[0]), 'nur Summen');
+
+        $this->assertSame(403, $this->countsAs($this->guest)->status);
+        $this->assertSame(401, $this->countsAs(null)->status);
+        $this->users->current = $this->admin;
+        $this->app->features()->update(['directory' => false]);
+        $this->assertSame(403, $this->countsAs($this->m)->status);
+    }
+
+    private function countsAs(?int $id): Response
+    {
+        $this->users->current = $id;
+        return $this->call('GET', '/directory/counts');
+    }
+
     public function testFeatureSwitch(): void
     {
         $this->app->features()->update(['directory' => false]);

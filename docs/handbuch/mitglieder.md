@@ -12,7 +12,7 @@ Jede Zeile zeigt den Namen und vorn ein kleines rundes Foto; wer keines hat, bek
 Mehr zeigt die Liste nicht: keine Rollen, keine {bereich.points} oder {bereich.penalties}, keine E-Mail-Adressen oder Benutzernamen.
 
 ## Suchen und sortieren
-Über der Liste steht oben, wie viele Personen darin stehen. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**. Die Sortierung merkt sich die App auf diesem Gerät.
+Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: zuerst {rolle.member}, dann eigene Rollen, die gesondert zählen, zuletzt {rolle.candidate}. Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**. Die Sortierung merkt sich die App auf diesem Gerät.
 
 ## Fotos
 Die Fotos laden die zuständigen Personen in der Verwaltung hoch (siehe **Mitglieder anlegen**). Dein eigenes Foto siehst du unter **Konto**. Möchtest du ein anderes Foto oder keines, sprich die Verwaltung an.

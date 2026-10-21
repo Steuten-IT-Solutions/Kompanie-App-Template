@@ -1,7 +1,7 @@
 // Zähler je Rolle (src/format.ts): ab 2 und bei 0 im Plural, eigene Bezeichnungen unverändert.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { roleCount } from '../src/format.ts';
+import { groupCounts, roleCount } from '../src/format.ts';
 
 test('Standardbezeichnungen stehen ab 2 im Plural', () => {
   assert.equal(roleCount('Mitglied', 1), 'Mitglied 1');
@@ -13,4 +13,20 @@ test('Standardbezeichnungen stehen ab 2 im Plural', () => {
 
 test('eigene Bezeichnungen bleiben unverändert', () => {
   assert.equal(roleCount('Jungmariner', 3), 'Jungmariner 3');
+});
+
+test('Gruppen: Mitglieder zuerst, eigene Rollen dazwischen, Anwärter zuletzt, leere fehlen', () => {
+  const roles = [
+    { key: 'admin', label: 'Admin' },
+    { key: 'candidate', label: 'Anwärter' },
+    { key: 'jung', label: 'Jungmariner' },
+    { key: 'member', label: 'Mitglied' },
+  ];
+  const counts = new Map([
+    ['candidate', 5],
+    ['jung', 3],
+    ['member', 45],
+    ['admin', 0],
+  ]);
+  assert.deepEqual(groupCounts(roles, counts), ['Mitglieder 45', 'Jungmariner 3', 'Anwärter 5']);
 });

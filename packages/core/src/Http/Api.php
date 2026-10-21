@@ -667,6 +667,7 @@ final class Api
 
             // Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Namen, Fotos, Dienstgrade und Titel
             new Route('GET', '/directory', [Cap::Member, Cap::Calendar], fn () => $this->directory(), 'directory', $denyDirectory),
+            new Route('GET', '/directory/counts', [Cap::Member, Cap::Calendar], fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory', $denyDirectory),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {

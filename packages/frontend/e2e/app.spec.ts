@@ -384,7 +384,8 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   const list = page.locator('.directory .card-list');
   await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(list.locator('.member-row', { hasText: 'Verwalter' })).toBeVisible();
-  await expect(page.locator('.directory .member-counts')).toHaveText(/\d+ Personen/);
+  // Zähler je Gruppe wie in der Verwaltung
+  await expect(page.locator('.directory .member-counts')).toHaveText(/^Mitglieder? \d+/);
   await expect(list).not.toContainText(/Punkte|offen/);
   await page.getByLabel('Mitglied suchen').fill('mitglied2');
   await expect(list.locator('.member-row')).toHaveCount(1);
