@@ -2709,3 +2709,16 @@ fieldset.feature-list legend {
     max-width: 760px;
   }
 }
+
+/* Zusatzrollen (Issue #66): Filter der Mitgliederliste, Ankreuzen im Mitglied */
+.role-filter {
+  width: 100%;
+  margin: 0 0 14px;
+}
+.extra-roles {
+  border: 0;
+  padding: 0;
+}
+.extra-roles .toggle {
+  margin-bottom: 8px;
+}
