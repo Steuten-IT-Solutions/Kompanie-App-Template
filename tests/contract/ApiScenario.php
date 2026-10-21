@@ -978,6 +978,12 @@ final class ApiScenario
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
         $c->ok(is_string($entry['name'] ?? null) && array_key_exists('photo_url', $entry) && array_key_exists('rank_title', $entry) && is_array($entry['titles'] ?? null), 'Name, Foto, Dienstgrad und Titel');
         $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
+        [$s, $d] = $this->req('GET', '/directory/counts');
+        $groups = array_column((array) $d, 'count', 'group');
+        $c->ok($s === 200 && ($groups['member'] ?? 0) >= 1 && ($groups['candidate'] ?? 0) >= 1 && !isset($groups['guest']), 'GET /directory/counts: Anzahl je Gruppe, ohne Gäste');
+        $c->ok(array_filter((array) $d, static fn (mixed $e): bool => array_keys((array) $e) !== ['group', 'count']) === [], 'Zähler: nur Gruppe und Anzahl');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/directory/counts')[0] === 200, 'Ohne Anmeldung: GET /directory/counts → 200 (öffentlich wie die Liste)');
         $this->d->actAs($admin);
         $this->req('PUT', '/admin/features', ['directory' => false]);
         $this->d->actAs(null);

@@ -901,6 +901,9 @@ function url(path: string, query?: Record<string, string>): string {
 }
 
 const CSRF_ERRORS = ['csrf_invalid', 'rest_cookie_invalid_nonce'];
+/** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
+const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
+const USER_HEADER = 'X-Kompanie-User';
 
 async function requestFull<T>(
   method: string,
@@ -915,12 +918,19 @@ async function requestFull<T>(
     throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
   }
   let res: Response;
+  // Service Worker (Issue #108): gespeicherte Antwort sofort, die aus dem Netz kommt im Hintergrund nach. Was vor der
+  // letzten eigenen Änderung gespeichert wurde, holt er zuerst aus dem Netz (public/sw.js). Nicht /config: Damit prüft
+  // die App den aktuellen Stand (z. B. „Erneut versuchen“ auf der Wartungsseite).
+  const staleOk = method === 'GET' && !previewRole() && path !== '/config';
   try {
     res = await fetch(url(path, query), {
       method,
       credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
+        // Für wen die Antwort gilt: Nur dieselbe Person bekommt sie später sofort aus dem Speicher.
+        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) } : {}),
+        ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
@@ -1017,6 +1027,8 @@ export const api = {
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
 
   directory: () => request<DirectoryEntry[]>('GET', '/directory'),
+  /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
+  directoryCounts: () => request<{ group: Level; count: number }[]>('GET', '/directory/counts'),
   members: (all = false, candidates = false) =>
     request<MemberSummary[]>('GET', '/members', undefined, {
       ...(all ? { all: '1' } : {}),

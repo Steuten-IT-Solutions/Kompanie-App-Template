@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { isStandalone } from './install';
 import App from './App';
 import { config, preparePreview } from './api';
+import { dataUpdated } from './dataCache';
 import { previewRole } from './preview';
 import { checkPushOnStart } from './push';
 import { watchRuntimeErrors } from './lastError';
@@ -44,6 +45,10 @@ void preparePreview().then((notice) =>
 
 const cfg = config;
 if ('serviceWorker' in navigator && cfg) {
+  // Neue Daten aus dem Hintergrund (public/sw.js, Issue #108): offene Ansichten neu laden.
+  navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
+    if (e.data?.type === 'kompanie-data') dataUpdated();
+  });
   window.addEventListener('load', () => {
     // Der Service Worker erfährt so, wo API und Programmdateien liegen.
     const src = document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? location.href;

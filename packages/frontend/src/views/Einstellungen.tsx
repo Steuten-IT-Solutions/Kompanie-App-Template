@@ -838,9 +838,9 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
     <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
       <p className="small muted">
-        Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein Bild, das für den Speicher des
-        Servers zu groß ist, oder eine beschädigte Datei. Abhilfe: das Bild als JPG in denselben Ordner in Google Drive legen (das alte
-        entfernen); der nächste Abgleich nimmt es neu auf.
+        Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das
+        Vorschaubild von Google. Hier stehen Bilder, bei denen auch das nicht ging, z. B. beschädigte Dateien. Abhilfe: das Bild als JPG in
+        denselben Ordner in Google Drive legen (das alte entfernen); der nächste Abgleich nimmt es neu auf.
       </p>
       {error && (
         <p className="form-error small" role="alert">

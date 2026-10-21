@@ -384,7 +384,8 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   const list = page.locator('.directory .card-list');
   await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(list.locator('.member-row', { hasText: 'Verwalter' })).toBeVisible();
-  await expect(page.locator('.directory .member-counts')).toHaveText(/\d+ Personen/);
+  // Zähler je Gruppe wie in der Verwaltung
+  await expect(page.locator('.directory .member-counts')).toHaveText(/^Mitglieder? \d+/);
   await expect(list).not.toContainText(/Punkte|offen/);
   await page.getByLabel('Mitglied suchen').fill('mitglied2');
   await expect(list.locator('.member-row')).toHaveCount(1);
@@ -495,6 +496,15 @@ test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async 
 test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Meins' }).click();
+  // Übersicht zuerst: Name, Rolle und beide Summen
+  const overview = page.locator('.my-overview');
+  await expect(overview.locator('.account-name')).toBeVisible();
+  await expect(overview.locator('.stat-value')).toHaveText(['5', /2,50/]);
+  await shot(page, 'meins-uebersicht');
+
+  await meinsMenu(page, 'Punkte');
+  // Erst wenn die Übersicht weg ist, gibt es nur noch eine Kachel.
+  await expect(overview).toHaveCount(0);
   await expect(page.locator('.stat-value')).toHaveText('5');
   await expect(page.getByText('Teilnahme Sommerfest')).toBeVisible();
   await shot(page, '2-punkte');
@@ -510,6 +520,7 @@ test('Mitglied 2 sieht keine fremden Einträge und keine Verwaltungsdaten', asyn
   await login(page, 'mitglied2');
   await page.getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Kasse');
+  await expect(page.locator('.my-overview')).toHaveCount(0);
   await expect(page.locator('.stat-value')).toContainText('0,00');
   await expect(page.getByText('Zu spät gekommen')).toHaveCount(0);
 
@@ -568,7 +579,7 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
 
   // Sitzung bleibt gültig: Daten laden weiterhin (neues Token wurde geholt).
   await page.getByRole('button', { name: 'Meins' }).click();
-  await expect(page.locator('.stat-label')).toHaveText('Meine Punkte');
+  await expect(page.locator('.stat-label').first()).toHaveText('Meine Punkte');
 
   await login(page, 'mitglied2', NEW);
   await page.getByRole('button', { name: 'Konto' }).click();
@@ -1979,6 +1990,7 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
+  await shot(page, 'meins-titel');
 });
 
 test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach dem Neuladen', async ({ page }) => {
@@ -2135,17 +2147,11 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await card.getByLabel('Text').fill(`${first} – fällt aus, Halle gesperrt`);
   await card.getByRole('button', { name: 'Speichern' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
-  // Erst weiter, wenn das Mitglied die geänderte Fassung geladen hat (Issue #68): Kommt die Antwort auf /board nach dem
-  // Neuladen veraltet an (z. B. aus einem Speicher), schlägt der Test hier mit einer klaren Meldung fehl statt später am
-  // fehlenden „+1 weitere“.
+  // Nach dem Neuladen kommt zuerst der gespeicherte Stand (Issue #108), die geänderte Fassung folgt, sobald das Netz
+  // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');
-  const boardAfterReload = page.waitForResponse((r) => r.request().method() === 'GET' && /\/board(\?|$|&)/.test(r.url()));
   await page.reload();
-  const loaded = await boardAfterReload;
-  const texts = ((await loaded.json()) as { items: { text: string }[] }).items.map((i) => i.text);
-  expect(texts, `Brett nach dem Neuladen${loaded.fromServiceWorker() ? ' (über den Service Worker)' : ''}`).toContain(
-    `${first} – fällt aus, Halle gesperrt`,
-  );
+  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible();
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await banner.getByRole('button', { name: '+1 weitere' }).click();
   await expect(banner).toContainText(`${first} – fällt aus, Halle gesperrt`);

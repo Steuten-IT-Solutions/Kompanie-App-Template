@@ -696,6 +696,7 @@ final class Api
 
             // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und Titel
             new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
+            new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {

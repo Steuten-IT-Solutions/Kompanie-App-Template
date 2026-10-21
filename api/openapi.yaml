@@ -1982,6 +1982,31 @@ paths:
                 items: { $ref: '#/components/schemas/DirectoryEntry' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /directory/counts:
+    get:
+      tags: [Mitgliederliste]
+      summary: Zähler über der Mitgliederliste (Anzahl je Gruppe)
+      description: |
+        Gleiche Rechte wie `GET /directory` (öffentlich, Issue #112). Anzahl der Personen dieser Liste je Gruppe wie im
+        Zähler der Anwesenheit (Einstellungen → Rollen, `GET /attendance/groups`), ohne Gäste. Nur die Summen, keine Rolle
+        je Person; Gruppen ohne Personen fehlen.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [group, count]
+                  properties:
+                    group: { type: string, description: Rollenschlüssel der Gruppe }
+                    count: { type: integer, minimum: 1 }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /offices:
     get:
       tags: [Ämter]

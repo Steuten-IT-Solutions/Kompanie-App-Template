@@ -102,6 +102,29 @@ final class MemberService
         return $out;
     }
 
+    /**
+     * Zähler über der Mitgliederliste für Mitglieder und Anwärter: Anzahl je Gruppe wie in der Anwesenheit
+     * (Einstellungen → Rollen), nur die Summen, keine Rolle je Person.
+     *
+     * @param array<string, string> $groups Rolle => Gruppe (AttendanceService::groupMap)
+     * @return list<array{group: string, count: int}>
+     */
+    public function directoryCounts(array $groups): array
+    {
+        $n = [];
+        foreach ($this->users->list(false) as $u) {
+            $group = $groups[$u->role] ?? null;
+            if ($group !== null && self::inDirectory($u)) {
+                $n[$group] = ($n[$group] ?? 0) + 1;
+            }
+        }
+        $out = [];
+        foreach ($n as $group => $count) {
+            $out[] = ['group' => (string) $group, 'count' => $count];
+        }
+        return $out;
+    }
+
     /** Steht in der Mitgliederliste für Mitglieder und Anwärter (und darf sie sehen): Mitglied oder nur Kalender. */
     public static function inDirectory(User $u): bool
     {

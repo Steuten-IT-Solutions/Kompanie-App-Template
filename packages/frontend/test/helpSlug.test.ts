@@ -68,6 +68,7 @@ const PATHS = [
   ['mitglieder', 'aemter'],
   ['mitglieder', 'aemter', '7'],
   ['meins'],
+  ['meins', 'uebersicht'],
   ['meins', 'punkte'],
   ['meins', 'strafen'],
   ['meins', 'dienstgrad'],
@@ -125,10 +126,11 @@ test('Termine: passend zu Kalender, öffentlichen Terminen und Geburtstagen', ()
   assert.equal(helpSlug(['termine'], withRights(['member'], ['birthdays'])), 'geburtstage');
 });
 
-test('Meins: erste Unterseite, sonst die Titel', () => {
-  assert.equal(helpSlug(['meins'], withRights(['member'], ALL_FEATURES, { meinsFirst: 'strafen' })), 'meine-strafen');
-  assert.equal(helpSlug(['meins'], withRights(['member'], ['titles'])), 'meine-titel');
-  assert.equal(helpSlug(['meins'], withRights(['member'], [])), null);
+test('Meins: ohne Unterseite die Übersicht, sonst die Seite zur Unterseite', () => {
+  const member = withRights(['member'], ['titles']);
+  assert.equal(helpSlug(['meins'], member), 'meins-uebersicht');
+  assert.ok(sees('meins-uebersicht', member));
+  assert.equal(helpSlug(['meins', 'strafen'], withRights(['member'])), 'meine-strafen');
 });
 
 test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', () => {

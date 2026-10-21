@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api, config } from '../api';
 import brand from '../generated/brand';
+import { groupCounts } from '../format';
 import { ZoomableAvatar } from '../memberPhoto';
 import { RankStack } from '../RankBadge';
 import { TitleBadges } from '../TitleBadges';
@@ -82,6 +83,8 @@ function MemberList({ offices }: { offices: boolean }) {
   const { data, error, loading, reload } = useAsync(() => api.directory(), [], 'directory');
   const officeData = useOffices(offices);
   const holders = useMemo(() => holderIds(officeData.data), [officeData.data]);
+  // Zähler je Gruppe wie in der Verwaltung; ohne (ältere Server, Fehler) bleibt die Gesamtzahl.
+  const counts = useAsync(() => api.directoryCounts(), [], 'directory-counts');
   const [query, setQuery] = useState('');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Gemerkt ist vielleicht die Sortierung nach Punkten aus der Verwaltung: hier dann nach Nachname.
@@ -104,10 +107,11 @@ function MemberList({ offices }: { offices: boolean }) {
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
 
   const total = data?.length ?? 0;
+  const groups = groupCounts(config?.roles ?? [], new Map((counts.data ?? []).map((c) => [c.group, c.count])));
   return (
     <div className="directory">
       <p className="member-counts small muted" role="status">
-        {total === 1 ? '1 Person' : `${total} Personen`}
+        {groups.length > 0 ? groups.join(' · ') : total === 1 ? '1 Person' : `${total} Personen`}
       </p>
       <input
         className="search"

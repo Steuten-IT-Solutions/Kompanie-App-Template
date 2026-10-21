@@ -36,6 +36,18 @@ const ROLE_PLURALS: Record<string, string> = { Mitglied: 'Mitglieder', Gast: 'G�
 /** Rollenbezeichnung mit Anzahl, ab 2 (und bei 0) im Plural: „Mitglied 1“, „Mitglieder 45“. */
 export const roleCount = (label: string, count: number): string => `${count === 1 ? label : (ROLE_PLURALS[label] ?? label)} ${count}`;
 
+/**
+ * Zähler je Gruppe über Mitgliederlisten: Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner) in ihrer
+ * Reihenfolge, Anwärter zuletzt; Gruppen ohne Personen fehlen.
+ */
+export function groupCounts(roles: { key: string; label: string }[], counts: Map<string, number>): string[] {
+  const rank = (key: string) => (key === 'member' ? 0 : key === 'candidate' ? 2 : 1);
+  return roles
+    .filter((r) => (counts.get(r.key) ?? 0) > 0)
+    .sort((a, b) => rank(a.key) - rank(b.key))
+    .map((r) => roleCount(r.label, counts.get(r.key) ?? 0));
+}
+
 /** "2,50" / "2.50" / "2" → 250 Cent; null bei ungültiger Eingabe. */
 export function parseEuroToCents(input: string): number | null {
   const s = input.trim().replace(/\s|€/g, '').replace(',', '.');
