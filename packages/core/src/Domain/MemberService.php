@@ -105,6 +105,8 @@ final class MemberService
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
             'point_list' => $points ? $this->scores->pointsFor($u->id) : [],
             'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
+            // Ausnahmen bei den Rechten: nur für die, die sie ändern dürfen.
+            'rights' => $viewer !== null ? $this->roles?->overridesView($viewer, $u) : null,
         ];
     }
 
@@ -181,6 +183,7 @@ final class MemberService
         if ($this->roles !== null && $nextExtra !== $extra) {
             $this->roles->setExtraRoles($id, $nextExtra);
         }
+        $this->roles?->roleChanged($id, $new);
         $after = $this->users->find($id);
         return ['id' => $id, 'level' => $after?->role ?? $new, 'extra_roles' => $after !== null && $this->roles !== null ? $this->roles->extraRolesOf($after) : []];
     }
@@ -254,6 +257,7 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
+        $this->roles?->roleChanged($id, Roles::MEMBER);
         return ['id' => $id, 'level' => $this->users->find($id)?->role ?? Roles::MEMBER];
     }
 

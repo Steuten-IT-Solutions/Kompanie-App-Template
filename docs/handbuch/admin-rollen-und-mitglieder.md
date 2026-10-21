@@ -55,3 +55,5 @@ Was eine Rolle in der App sieht, zeigt dir **Ansehen** neben der Rolle, ohne and
 
 ## Mitglieder und ihre Rollen
 Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben). Sieht jemand etwas nicht, hilft [Häufige Probleme](seite:haeufige-probleme).
+
+Braucht nur eine einzelne Person ein Recht mehr oder weniger als ihre Rollen, legst du dafür keine eigene Rolle an: Du gibst oder entziehst es direkt bei der Person (unter „Rollen vergeben“, Abschnitt „Einzelne Rechte geben oder entziehen“).

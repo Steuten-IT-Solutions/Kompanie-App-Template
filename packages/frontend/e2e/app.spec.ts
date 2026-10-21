@@ -629,6 +629,37 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
 
+test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
+  const rechte = page.locator('.member-rights');
+  await expect(rechte.getByLabel(/^Mitgliederbereich/)).toBeChecked();
+  await rechte.getByLabel('Öffentliche Termine pflegen').check();
+  await expect(rechte.locator('.badge-override')).toHaveText('zusätzlich');
+  await rechte.getByRole('button', { name: 'Rechte speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rechte gespeichert');
+  await shot(page, '20b-rechte');
+
+  await login(page, 'mitglied2');
+  await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
+  await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await expect(page.locator('.member-level')).toContainText('mit Ausnahmen bei den Rechten');
+  await memberMenu(page, 'Konto und Rolle');
+  page.once('dialog', (d) => d.accept());
+  await rechte.getByRole('button', { name: 'Wie die Rolle' }).click();
+  await expect(page.locator('.toast')).toHaveText('Rechte wie die Rolle');
+  await expect(rechte.getByLabel('Öffentliche Termine pflegen')).not.toBeChecked();
+
+  await login(page, 'mitglied2');
+  await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toHaveCount(0);
+});
+
 test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();

@@ -22,6 +22,15 @@ In der Mitgliederliste stehen die Zusatzrollen neben dem Namen; über **Alle Rol
 - Mit WordPress wird {rolle.admin} nicht in der App vergeben oder entzogen, sondern im WordPress-Backend.
 - Wer kein {rolle.admin} ist, vergibt und entfernt (auch als Zusatzrolle) nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
 
+## Einzelne Rechte geben oder entziehen
+Soll eine Person ein Recht bekommen, das keine ihrer Rollen hat, oder ein Recht ihrer Rollen nicht haben, brauchst du dafür keine eigene Rolle. Unter **Konto und Rolle** stehen unter **Rechte** alle Rechte der Person. Setze oder entferne die Haken und tippe auf **Rechte speichern**. Was von ihren Rollen (Grundrolle und Zusatzrollen) abweicht, ist mit „zusätzlich“ oder „entzogen“ markiert; in der Übersicht der Person steht dann „mit Ausnahmen bei den Rechten“. **Wie die Rolle** entfernt alle Ausnahmen.
+
+- Die Ausnahmen bleiben bestehen, wenn sich die Grundrolle oder die Zusatzrollen ändern. Was die Rollen dann ohnehin regeln, fällt weg: ein zusätzlich gegebenes Recht, das die Rollen jetzt schon haben, und ein entzogenes Recht, das sie nicht mehr haben.
+- Rechte zum Verwalten brauchen den Mitgliederbereich. Der interne Kalender gehört zum Mitgliederbereich und lässt sich nur mit ihm entziehen.
+- Die Rolle {rolle.admin} hat immer alle Rechte, die Rolle {rolle.guest} keine: Für sie gibt es keine Ausnahmen. Bekommt jemand eine dieser beiden Rollen als Grundrolle, verfallen seine Ausnahmen.
+- Einstellungen, Updates und Datensicherung bleiben der Rolle {rolle.admin} vorbehalten.
+- Wer kein {rolle.admin} ist, ändert nur Rechte, die er selbst hat, nie „Mitglieder anlegen“ oder „Rollen vergeben“, und nur bei Personen, die er auch sonst verwalten darf. Die eigenen Rechte ändert niemand selbst.
+
 ## Gäste und {rolle.candidate}
 Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit dem Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** erscheinen sie (zusammen mit den {rolle.candidate}), und du kannst ihnen eine Rolle geben. {rolle.candidate} und Personen mit Rollen nur für den internen Kalender erscheinen mit **Auch {rolle.candidate} anzeigen**.
 

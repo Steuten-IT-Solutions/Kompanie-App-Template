@@ -37,6 +37,7 @@ import {
   type MemberSort,
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { hasOverrides, MemberRightsPanel } from './Rechte';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -335,6 +336,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
         <>
           <p className="muted small member-level">
             {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
+            {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
           </p>
           <div className="stats">
             {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
@@ -362,6 +364,18 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
       {active === 'konto' && (
         <>
           <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          {m.rights && (
+            <MemberRightsPanel
+              key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
+              id={m.id}
+              name={m.name}
+              roles={roleLabels(m)}
+              plural={(m.extra_roles ?? []).length > 0}
+              rights={m.rights}
+              onChanged={reload}
+              onToast={onToast}
+            />
+          )}
           {m.level === 'candidate' && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"

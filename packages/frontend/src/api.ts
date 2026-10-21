@@ -340,6 +340,20 @@ export interface MemberDetail extends MemberSummary {
   rank_history?: RankHistoryEntry[];
   /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
+  rights?: MemberRights | null;
+}
+
+/** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
+export interface MemberRights {
+  /** Rechte der Rolle (mit dem im Mitgliederbereich enthaltenen Kalender) */
+  role: Capability[];
+  /** zusätzlich zur Rolle gegeben */
+  grant: Capability[];
+  /** trotz der Rolle entzogen */
+  revoke: Capability[];
+  /** Rechte, die man hier ändern darf */
+  editable: Capability[];
 }
 
 /** Geburtstag mit Jahr und Schaltern: nur der eigene und in den Mitgliedsdetails (Issue #1). */
@@ -907,6 +921,9 @@ export const api = {
   setExtraRoles: (id: number, extra_roles: Level[]) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { extra_roles }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
+  /** Rechte einer Person zusätzlich zur Rolle geben bzw. entziehen; leere Listen: wie die Rolle. */
+  setRights: (id: number, grant: Capability[], revoke: Capability[]) =>
+    request<MemberRights>('PUT', `/members/${id}/rights`, { grant, revoke }),
   resetPassword: (id: number) => request<{ password: string }>('POST', `/members/${id}/password`),
   /** Ändert das eigene Passwort; danach gilt eine neue Sitzung, daher Token erneuern. */
   changePassword: async (current_password: string, new_password: string) => {

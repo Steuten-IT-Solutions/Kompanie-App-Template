@@ -164,7 +164,8 @@ final class Kernel
 
     public function users(): PdoUsers
     {
-        // Rechte je Rolle aus der App (Einstellungen → Rollen); erst beim ersten Benutzer abgefragt.
+        // Rechte je Rolle aus der App (Einstellungen → Rollen), mit den Zusatzrollen und Ausnahmen der Person; erst beim ersten
+        // Benutzer abgefragt.
         return new PdoUsers($this->db(), $this->sessions(), fn (string $role, int $id): array => $this->app()->roles()->capabilitiesFor($id, $role));
     }
 

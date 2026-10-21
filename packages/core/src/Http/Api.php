@@ -623,6 +623,8 @@ final class Api
                 + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
             // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
+            // Rechte einzelner Personen zusätzlich zu ihren Rollen geben oder entziehen
+            new Route('PUT', '/members/{id}/rights', Cap::PromoteUsers, fn (Request $r) => $a->roles()->setOverrides($this->user(), $r->id(), $r->input('grant'), $r->input('revoke')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),

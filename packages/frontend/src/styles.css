@@ -1629,6 +1629,22 @@ fieldset.feature-list legend {
 .role-list .role-item .row-title .badge {
   vertical-align: 1px;
 }
+/* Rechte einer Person: Abweichung von der Rolle */
+.badge-override {
+  background: var(--accent);
+  color: var(--on-accent);
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.member-rights {
+  margin: 16px 0;
+}
+.member-rights .card {
+  padding: 16px;
+}
+.member-rights .card > p {
+  margin-top: 0;
+}
 .role-form {
   margin: 4px 0 12px;
 }
