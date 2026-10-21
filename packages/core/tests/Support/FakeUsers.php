@@ -25,7 +25,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     public int $lookups = 0;
     private int $next = 1;
 
-    /** @var (\Closure(string): array<int, \KompanieApp\Core\Auth\Capability>)|null Rechte je Rolle (setzt TestApp: die der App) */
+    /** @var (\Closure(string, int): array<int, \KompanieApp\Core\Auth\Capability>)|null Rechte je Grundrolle und ID (setzt TestApp: die der App) */
     public ?\Closure $capabilities = null;
 
     public function __construct(public bool $adminsAssignable = true)
@@ -61,7 +61,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     private function user(int $id): ?User
     {
         $u = $this->users[$id] ?? null;
-        $caps = $u === null ? [] : ($this->capabilities !== null ? ($this->capabilities)($u['level']) : Roles::templateCapabilities($u['level']));
+        $caps = $u === null ? [] : ($this->capabilities !== null ? ($this->capabilities)($u['level'], $id) : Roles::templateCapabilities($u['level']));
         return $u ? new User($id, $u['name'], $u['login'], $u['level'], $caps) : null;
     }
 

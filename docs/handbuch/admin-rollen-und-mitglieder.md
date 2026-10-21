@@ -3,7 +3,7 @@ titel: Rollen und Mitglieder
 reihenfolge: 120
 rechte: [manage_settings]
 ---
-Jede Person hat genau eine Rolle. Welche Rollen es gibt und was sie dürfen, legst du unter **Verwaltung → Einstellungen → Rollen** fest. Dort siehst du je Rolle, wie viele Personen sie haben und welche Rechte sie hat.
+Jede Person hat genau eine **Grundrolle** und dazu beliebig viele **Zusatzrollen**; sie hat dann die Rechte aller ihrer Rollen zusammen. Welche Rollen es gibt und was sie dürfen, legst du unter **Verwaltung → Einstellungen → Rollen** fest. Dort siehst du je Rolle, wie viele Personen sie haben (davon als Zusatzrolle) und welche Rechte sie hat.
 
 ## Feste Rollen
 - **{rolle.guest}**: sieht nur öffentliche Inhalte.
@@ -39,6 +39,19 @@ Mit **Bearbeiten** änderst du eine Rolle, mit **Löschen** entfernst du eine ei
 Nutzt ihr {bereich.attendance}, legst du darunter unter **{bereich.attendance}: Gruppen im Zähler** fest, als was jede Rolle in den Anwesenheitslisten zählt.
 
 > Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbehalten. Wer Rollen vergeben darf, ohne {rolle.admin} zu sein, vergibt nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die nicht mehr Rechte haben als er.
+
+## Grundrolle und Zusatzrollen
+Die Grundrolle sagt, wer jemand in der Kompanie ist: {rolle.guest}, {rolle.candidate}, {rolle.member}, {rolle.admin} oder eine eigene Rolle. Zusatzrollen sind Aufgaben obendrauf, z. B. „{bereich.points} verwalten“ und eine eigene Rolle „Kassenwart“. So brauchst du keine eigene Rolle für jede Kombination.
+
+- Zusatzrollen können nur eigene Rollen und Standardrollen der Bereiche sein, nicht die vier festen Rollen.
+- Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich; {rolle.admin} braucht keine, er darf ohnehin alles. Bekommt jemand eine Grundrolle ohne Mitgliederbereich (z. B. {rolle.guest} oder {rolle.candidate}), fallen seine Zusatzrollen weg.
+- Was nach der Rolle geht und nicht nach den Rechten, richtet sich nur nach der Grundrolle: die Gruppe in den Zählern der Anwesenheit, **Als {rolle.member} aufnehmen** und mit WordPress die Administratoren.
+- Was jemand sieht und welche Benachrichtigungen er bekommt, richtet sich nach seinen Rechten, also nach allen Rollen zusammen.
+- **Punktefaktor:** Bei mehreren Rollen gilt der kleinste, z. B. ×0,5, wenn eine der Rollen ×0,5 hat.
+- Neben jeder Rolle steht, wie viele Personen sie haben, als Grund- oder als Zusatzrolle. Löschst du eine Rolle, die jemand als Zusatzrolle hat, bekommt er stattdessen die gewählte Ersatzrolle als Zusatzrolle, wenn das eine eigene Rolle ist; sonst fällt sie einfach weg.
+
+## Rollen ausprobieren
+Was eine Rolle in der App sieht, zeigt dir **Ansehen** neben der Rolle, ohne anderes Konto; siehe [App als Rolle ansehen](seite:admin-vorschau).
 
 ## Mitglieder und ihre Rollen
 Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben). Sieht jemand etwas nicht, hilft [Häufige Probleme](seite:haeufige-probleme).

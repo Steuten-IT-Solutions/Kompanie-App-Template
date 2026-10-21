@@ -29,7 +29,7 @@ Für {rolle.member} und {rolle.candidate}:
 
 Nur für {rolle.member}:
 - **{bereich.polls}: neue Umfrage und Erinnerung**: bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast.
-- **{bereich.birthdays}: am Tag selbst**: ab 7 Uhr am Geburtstag eines anderen Mitglieds, das seinen Geburtstag anderen zeigt (das Alter nur, wenn es freigegeben ist).
+- **{bereich.birthdays}: am Tag selbst**: am Geburtstag eines anderen Mitglieds, das seinen Geburtstag anderen zeigt, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 7 Uhr; ein {rolle.admin} kann sie auch ganz ausschalten). Das Alter steht nur darin, wenn es freigegeben ist.
 - **{bereich.points}: neue Einträge**: wenn du {bereich.points} bekommst oder sie dir abgezogen werden, mit Wert und Grund.
 - **{bereich.penalties}: neue Einträge**: bei einem neuen Eintrag für dich. Betrag und Grund stehen nur mit dem Schalter **{bereich.penalties}: Betrag und Grund in der Nachricht zeigen** in der Nachricht, sonst nur ein Hinweis – gut, wenn andere deinen Sperrbildschirm sehen.
 - **{begriff.rank}: Beförderung oder Änderung**: wenn sich dein {begriff.rank} ändert.

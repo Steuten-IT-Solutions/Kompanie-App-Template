@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import brand from '../generated/brand';
+import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 const sec = brand.labels.sections;
@@ -48,8 +49,10 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
     <section className="card settings-section" id="einstellungen-rollen">
       <h3>Rollen</h3>
       <p className="small muted">
-        Jede Person hat eine Rolle. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
-        {config?.features.points && `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder.`}
+        Jede Person hat eine Grundrolle und auf Wunsch weitere eigene Rollen als Zusatzrollen; sie hat dann die Rechte aller ihrer Rollen
+        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
+        {config?.features.points &&
+          `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder; bei mehreren Rollen der kleinste.`}
       </p>
       <ul className="card-list role-list">
         {roles.map((r) =>
@@ -68,6 +71,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                 </div>
                 <div className="row-sub">
                   {r.users === 1 ? '1 Person' : `${r.users} Personen`}
+                  {(r.extra_users ?? 0) > 0 && ` (davon ${r.extra_users} als Zusatzrolle)`}
                   {' · '}
                   {r.key === 'admin'
                     ? 'alle Rechte'
@@ -78,9 +82,22 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                           .join(', ')}
                 </div>
               </div>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(r.key)} aria-label={`${r.label} bearbeiten`}>
-                Bearbeiten
-              </button>
+              <div className="role-actions">
+                {r.key !== 'admin' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => startPreview(r.key)}
+                    aria-label={`App als ${r.label} ansehen`}
+                    title="App als diese Rolle ansehen"
+                  >
+                    Ansehen
+                  </button>
+                )}
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(r.key)} aria-label={`${r.label} bearbeiten`}>
+                  Bearbeiten
+                </button>
+              </div>
             </li>
           ),
         )}
@@ -92,6 +109,15 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
           + Neue Rolle
         </button>
       )}
+      <div className="role-preview">
+        <p className="small muted">
+          „Ansehen“ zeigt die App, wie eine Person mit genau dieser Rolle sie sieht (ohne Zusatzrollen) – mit deinen eigenen Daten, nur zum
+          Ansehen. Beenden über das Banner oben.
+        </p>
+        <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
+          App ohne Anmeldung ansehen
+        </button>
+      </div>
       {config?.features.attendance && <AttendanceGroups roles={roles} onToast={onToast} />}
     </section>
   );
@@ -220,7 +246,7 @@ function RoleForm({
     if (!role) return;
     const others =
       role.users > 0
-        ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
+        ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} stattdessen die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
         : '';
     if (!window.confirm(`Rolle „${role.label}“ löschen?${others}`)) return;
     void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), 'Rolle gelöscht');

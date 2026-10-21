@@ -6,6 +6,7 @@ import {
   newsTitle,
   refreshRoles,
   type AdminSettings,
+  type FailedPhoto,
   type Feature,
   type FeatureInfo,
   type NewsSourceType,
@@ -100,7 +101,10 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   return s.news ? <News {...props} /> : null;
 }
 
-/** Benachrichtigungen: wie viele Geräte angemeldet sind und wann die Erinnerung an Termine am nächsten Tag kommt. */
+/**
+ * Benachrichtigungen: wie viele Geräte angemeldet sind, wann die Erinnerung an Termine am nächsten Tag kommt und ob und ab
+ * wann am Geburtstag benachrichtigt wird.
+ */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
   const [busy, setBusy] = useState(false);
@@ -109,11 +113,11 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const p = data!;
 
-  async function setHour(hour: number) {
+  async function save(change: () => ReturnType<typeof api.pushAdmin>) {
     setBusy(true);
     setSaveError(null);
     try {
-      setData(await api.setPushReminderHour(hour));
+      setData(await change());
       onToast('Gespeichert');
     } catch (err) {
       setSaveError((err as Error).message);
@@ -139,14 +143,35 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <label className="field">
         <span>Erinnerung an Termine am nächsten Tag ab</span>
-        <select value={p.reminderHour} disabled={busy} onChange={(e) => setHour(Number(e.target.value))}>
-          {Array.from({ length: 24 }, (_, h) => (
-            <option key={h} value={h}>
-              {String(h).padStart(2, '0')}:00 Uhr
-            </option>
-          ))}
+        <select value={p.reminderHour} disabled={busy} onChange={(e) => save(() => api.setPushReminderHour(Number(e.target.value)))}>
+          <HourOptions />
         </select>
       </label>
+      {p.birthdays && (
+        <>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={p.birthdays.enabled}
+              disabled={busy}
+              onChange={(e) => save(() => api.setBirthdayNotify({ birthday_notify: e.target.checked }))}
+            />
+            Am Geburtstag eines Mitglieds alle anderen benachrichtigen
+          </label>
+          {p.birthdays.enabled && (
+            <label className="field">
+              <span>Benachrichtigung am Geburtstag ab</span>
+              <select
+                value={p.birthdays.hour}
+                disabled={busy}
+                onChange={(e) => save(() => api.setBirthdayNotify({ birthday_hour: Number(e.target.value) }))}
+              >
+                <HourOptions />
+              </select>
+            </label>
+          )}
+        </>
+      )}
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}
@@ -156,6 +181,19 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
       </p>
     </section>
+  );
+}
+
+/** Volle Stunden 00:00 bis 23:00 für die Auswahl einer Uhrzeit. */
+function HourOptions() {
+  return (
+    <>
+      {Array.from({ length: 24 }, (_, h) => (
+        <option key={h} value={h}>
+          {String(h).padStart(2, '0')}:00 Uhr
+        </option>
+      ))}
+    </>
   );
 }
 
@@ -702,7 +740,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       }
       const parts = [`${r.albums} Alben, ${r.photos} Bilder.`];
       if (r.pending > 0) parts.push(`${r.pending} Bilder werden stündlich automatisch weiter aufbereitet.`);
-      if (r.failed > 0) parts.push(`${r.failed} Bilder ließen sich nicht laden; sie werden beim nächsten Abgleich erneut versucht.`);
+      if (r.failed > 0) parts.push(`${r.failed} Bilder ließen sich nicht laden (Liste unten).`);
       setProgress((r.pending > 0 || r.failed > 0 ? 'Abgeglichen: ' : 'Fertig: ') + parts.join(' '));
       onSaved(await api.settings()); // Stand des Abgleichs (z. B. alte Fehlermeldung) aktualisieren
     } catch (err) {
@@ -761,7 +799,91 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           {progress}
         </p>
       )}
+      {(g.status.failed ?? 0) > 0 && (
+        <FailedPhotos
+          key={g.status.failed}
+          count={g.status.failed ?? 0}
+          disabled={syncing}
+          onRetry={async () => {
+            await api.retryGallery();
+            await sync();
+          }}
+        />
+      )}
     </Section>
+  );
+}
+
+/**
+ * Bilder, die sich nicht laden ließen: Dateiname, Album, Fehlermeldung und Link zur Datei in Google Drive. Die Liste
+ * lädt erst beim Aufklappen. „Erneut versuchen“ reiht alle wieder ein, auch nach mehreren gescheiterten Versuchen.
+ */
+function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: boolean; onRetry: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState<{ photos: FailedPhoto[]; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+
+  useEffect(() => {
+    if (!open || list) return;
+    api.galleryFailed().then(setList, (err: Error) => setError(err.message));
+  }, [open, list]);
+
+  return (
+    <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
+      <p className="small muted">
+        Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein Bild, das für den Speicher des
+        Servers zu groß ist, oder eine beschädigte Datei. Abhilfe: das Bild als JPG in denselben Ordner in Google Drive legen (das alte
+        entfernen); der nächste Abgleich nimmt es neu auf.
+      </p>
+      {error && (
+        <p className="form-error small" role="alert">
+          {error}
+        </p>
+      )}
+      {open && !list && !error && <Loading />}
+      {list && (
+        <>
+          <ul className="gallery-failed-list">
+            {list.photos.map((p) => (
+              <li key={p.id}>
+                <strong>{p.name}</strong>
+                <span className="small muted">
+                  {' '}
+                  {p.album || 'ohne Album'}
+                  {p.intern && ' (intern)'} · {p.attempts === 1 ? '1 Versuch' : `${p.attempts} Versuche`}
+                </span>
+                <br />
+                <span className="small">{p.error || 'ohne Fehlermeldung'}</span>{' '}
+                <a className="small" href={p.drive_url} target="_blank" rel="noopener noreferrer">
+                  In Google Drive öffnen
+                </a>
+              </li>
+            ))}
+          </ul>
+          {list.total > list.photos.length && (
+            <p className="small muted">
+              Gezeigt werden die ersten {list.photos.length} von {list.total}.
+            </p>
+          )}
+        </>
+      )}
+      <button
+        type="button"
+        className="btn btn-secondary"
+        disabled={disabled || retrying}
+        onClick={() => {
+          setRetrying(true);
+          setError(null);
+          onRetry()
+            .catch((err: Error) => setError(err.message))
+            .finally(() => setRetrying(false));
+        }}
+      >
+        {retrying ? 'Wird erneut versucht …' : 'Alle erneut versuchen'}
+      </button>
+    </details>
   );
 }
 

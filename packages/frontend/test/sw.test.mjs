@@ -88,6 +88,7 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
     URL,
     Request,
     Response,
+    Headers,
     Promise,
     setTimeout,
     decodeURIComponent,
@@ -109,11 +110,11 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   }
 
   /** fetch-Ereignis; gibt die Antwort des Service Workers zurück (undefined: durchgereicht). */
-  async function request(u, mode = 'cors') {
+  async function request(u, mode = 'cors', headers = {}) {
     let answer;
     const waits = [];
     listeners.fetch({
-      request: { url: u, method: 'GET', mode },
+      request: { url: u, method: 'GET', mode, headers: new Headers(headers) },
       respondWith: (p) => (answer = p),
       waitUntil: (p) => waits.push(p),
     });
@@ -221,4 +222,27 @@ test('Rückkehr von Google wird nie aus dem Speicher beantwortet', async () => {
   assert.equal(await sw.request(`${SCOPE}google/callback?state=s&code=c`, 'navigate'), undefined);
   assert.equal(await sw.request(`${SCOPE}index.php?r=/google/callback&state=s&code=c`, 'navigate'), undefined);
   assert.ok(await sw.request(`${SCOPE}google?x=1`, 'navigate'), 'andere Adressen wie bisher');
+});
+
+test('Vorschau „App als Rolle ansehen“ (Issue #63): weder gespeichert noch aus dem Speicher', async () => {
+  const doc = `${SCOPE}dokument/7?v=abc`;
+  const badge = `${SCOPE}abzeichen/2?v=x&s=128`;
+  const net = {
+    [`${API}events`]: () => response('[1]', 'application/json'),
+    [`${doc}&vorschau=member`]: () => response('pdf', 'application/pdf'),
+    [`${badge}&vorschau=member`]: () => response('png', 'image/png'),
+    [doc]: () => response('pdf-admin', 'application/pdf'),
+  };
+  const sw = load({ net });
+  // Admin-Ansicht gespeichert …
+  await sw.request(`${API}events`);
+  await sw.request(doc);
+  // … in der Vorschau nicht verwendet und nichts dazugelegt.
+  assert.equal(await sw.request(`${API}events`, 'cors', { 'X-Kompanie-Preview': 'member' }), undefined, 'API mit Header: durchgereicht');
+  assert.equal(await sw.request(`${doc}&vorschau=member`), undefined, 'Dokument mit Parameter: durchgereicht');
+  assert.equal(await sw.request(`${badge}&vorschau=member`), undefined, 'Abzeichen mit Parameter: durchgereicht');
+  assert.equal(await sw.request(`${ORIGIN}/index.php?r=/foto/3/thumb&vorschau=%40public`), undefined);
+  const docs = (await (await sw.storage.open('kompanie-docs-v1')).keys()).map((r) => r.url);
+  assert.deepEqual(docs, [doc], 'gespeichertes Dokument des Admins bleibt, keine Vorschau-Fassung');
+  assert.equal((await (await sw.storage.open('kompanie-badges-v1')).keys()).length, 0);
 });

@@ -157,6 +157,28 @@ final class GalleryRepository
         return $this->db->execute('UPDATE {photos} SET status = ? WHERE status = ? AND attempts < ?', [self::PENDING, self::FAILED, $max]);
     }
 
+    /**
+     * Bilder, die sich nicht aufbereiten ließen, mit Album und Fehlermeldung (Einstellungen → Galerie), neueste Alben
+     * zuerst.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function failedPhotos(int $limit): array
+    {
+        return $this->db->select(
+            'SELECT p.id, p.name, p.drive_file_id, p.is_intern, p.error, p.attempts, a.year AS album_year, a.title AS album_title
+             FROM {photos} p LEFT JOIN {albums} a ON a.id = p.album_id WHERE p.status = ?
+             ORDER BY a.year DESC, a.sort_date DESC, p.name ASC, p.id ASC LIMIT ' . max(1, $limit),
+            [self::FAILED],
+        );
+    }
+
+    /** Alle fehlgeschlagenen Bilder wieder einreihen, auch nach den Versuchen (Knopf „Erneut versuchen“). */
+    public function resetFailed(): int
+    {
+        return $this->db->execute('UPDATE {photos} SET status = ?, attempts = 0, error = ? WHERE status = ?', [self::PENDING, '', self::FAILED]);
+    }
+
     public function countFailed(): int
     {
         return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ?', [self::FAILED]);

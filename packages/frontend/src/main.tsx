@@ -5,8 +5,10 @@ import { createRoot } from 'react-dom/client';
 // Früh laden: fängt das Android-Installationsangebot ab, bevor React startet.
 import { isStandalone } from './install';
 import App from './App';
-import { config } from './api';
+import { config, preparePreview } from './api';
+import { previewRole } from './preview';
 import { checkPushOnStart } from './push';
+import { watchRuntimeErrors } from './lastError';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -28,10 +30,16 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
   history.replaceState(null, '', window.location.pathname);
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+// Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
+watchRuntimeErrors();
+
+// Vorschau „App als Rolle ansehen“ (Issue #63): erst die Konfiguration der Rolle holen, dann starten.
+void preparePreview().then((notice) =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App notice={notice} />
+    </StrictMode>,
+  ),
 );
 
 const cfg = config;
@@ -45,7 +53,8 @@ if ('serviceWorker' in navigator && cfg) {
     sw.searchParams.set('assets', assets);
     navigator.serviceWorker
       .register(sw.toString(), { scope: cfg.appUrl })
-      .then(() => checkPushOnStart())
+      // In der Vorschau nicht: Der Server lehnt dort jede Änderung ab (auch das Freigeben fremder Abos).
+      .then(() => (previewRole() ? undefined : checkPushOnStart()))
       .catch(() => {
         /* Ohne Service Worker läuft die App trotzdem, nur nicht offline. */
       });

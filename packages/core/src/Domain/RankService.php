@@ -271,8 +271,8 @@ final class RankService
             'Content-Type' => $svg ? 'image/svg+xml' : 'image/png',
             'X-Content-Type-Options' => 'nosniff',
             // Die Adresse wechselt mit jeder Fassung: lange speichern, aber nur im Browser. Eine veraltete Fassung
-            // (alte Adresse) jedes Mal neu prüfen lassen.
-            'Cache-Control' => is_string($version) && hash_equals($rank['badge_version'], $version) ? 'private, max-age=31536000, immutable' : 'private, no-cache',
+            // (alte Adresse) jedes Mal neu prüfen lassen; in der Vorschau (Issue #63) nie speichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(is_string($version) && hash_equals($rank['badge_version'], $version) ? 'private, max-age=31536000, immutable' : 'private, no-cache'),
             'X-Robots-Tag' => 'noindex',
         ];
         if ($svg) {
