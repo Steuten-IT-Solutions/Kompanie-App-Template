@@ -807,6 +807,9 @@ select {
 .add-member {
   margin-top: 14px;
 }
+.member-counts {
+  margin: 14px 2px 0;
+}
 
 .form {
   display: flex;

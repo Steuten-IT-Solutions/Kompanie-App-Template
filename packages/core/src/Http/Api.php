@@ -605,6 +605,9 @@ final class Api
                     $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
                 );
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
+                // Gruppe für den Zähler über der Liste, wie in der Anwesenheit (Einstellungen → Rollen); Gäste ohne.
+                $groups = $a->attendance()->groupMap();
+                $list = array_map(static fn (array $m): array => $m + ['group' => $groups[$m['level']] ?? null], $list);
                 if ($this->showRanks()) {
                     $ranks = $a->ranks()->assigned();
                     $list = array_map(static fn (array $m): array => $m + [

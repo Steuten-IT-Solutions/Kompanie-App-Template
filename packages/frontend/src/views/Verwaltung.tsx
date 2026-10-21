@@ -143,6 +143,12 @@ function Members() {
   // Nur Rollen, die in der Liste vorkommen
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+  // Zähler je Gruppe wie in der Anwesenheit: alle geladenen mit Rolle (ohne Gäste), unabhängig von Suche und Filter
+  const groupCounts = useMemo(() => {
+    const n = new Map<Level, number>();
+    for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
+    return (config?.roles ?? []).filter((r) => n.has(r.key)).map((r) => `${r.label} ${n.get(r.key)}`);
+  }, [data]);
 
   // Scrollen, sobald die Liste steht (aus dem Speicher sofort, sonst nach dem Laden).
   const pendingScroll = useRef(restore?.scrollY ?? null);
@@ -162,6 +168,11 @@ function Members() {
 
   return (
     <div>
+      {groupCounts.length > 0 && (
+        <p className="member-counts small muted" role="status">
+          {groupCounts.join(' · ')}
+        </p>
+      )}
       {can('create_users') && (
         <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
           + Mitglied anlegen
