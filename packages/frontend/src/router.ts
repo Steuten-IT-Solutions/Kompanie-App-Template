@@ -21,3 +21,13 @@ export function useRoute(): string[] {
   }, []);
   return path;
 }
+
+/**
+ * Schlüssel einer Ansicht: Wechselt er, baut die App die Ansicht neu auf (und lädt ihre Daten neu). Die Seiten eines
+ * Mitglieds und von „Meins“ teilen sich einen Schlüssel: Beim Umschalten bleiben Name, Menü und geladene Daten stehen.
+ */
+export function viewKey(path: string[]): string {
+  if (path[0] === 'verwaltung' && path[1] === 'mitglied' && path[2]) return path.slice(0, 3).join('/');
+  if (path[0] === 'meins') return 'meins';
+  return path.join('/');
+}

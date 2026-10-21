@@ -6,13 +6,15 @@ rechte: [create_users]
 Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort öffnet sich zuerst die **Mitgliederliste**. Hast du in der Verwaltung noch weitere Aufgaben, wechselst du über das Menü oben (es zeigt gerade **Mitglieder**).
 
 ## Die Mitgliederliste
-- Oben steht **+ Mitglied anlegen**, darunter das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
-- **Auch {rolle.candidate} anzeigen** nimmt {rolle.candidate} und Personen mit Rollen nur für den internen Kalender dazu. Wer Mitglieder anlegen darf, hat dieses Häkchen von Anfang an gesetzt.
+- Ganz oben steht, wie viele Personen es je Gruppe gibt (z. B. {rolle.member} und {rolle.candidate}; ohne Gäste). Die Gruppen sind dieselben wie im Zähler der {bereich.attendance} (Einstellungen → Rollen → {bereich.attendance}); Suche und Rollenfilter ändern den Zähler nicht.
+- Darunter steht **+ Mitglied anlegen**, dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
+- In der Liste stehen auch {rolle.candidate} und Personen mit Rollen nur für den internen Kalender.
+- **Filter und Sortierung** ist zunächst eingeklappt; ein Tipp klappt es auf. Darin stehen die Filter nach Rolle und {bereich.titles}, die Sortierung und das Häkchen für Gast-Konten. Ist ein Filter gesetzt, steht am eingeklappten Bereich **aktiv**.
 - **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** gibt es nur für alle, die auch Rollen vergeben dürfen.
 - **Sortierung**: nach Nachname, nach Vorname oder (wer {bereich.points} vergeben darf) nach {bereich.points}. Der Knopf **Reihenfolge** daneben dreht sie um: bei Namen A → Z oder Z → A, bei {bereich.points} die meisten oder die wenigsten zuerst. Eine neu gewählte Sortierung beginnt mit A → Z bzw. mit den meisten {bereich.points}. Dein Gerät merkt sich die Wahl.
 - Jede Zeile zeigt den Namen, nach Nachname sortiert als „Nachname, Vorname“; wer nicht {rolle.member} ist, hat ein Schild mit der Rolle. Dazu steht der {begriff.rank} mit Abzeichen (wenn der Bereich eingeschaltet ist), je nach deinen Rechten auch {bereich.titles}, {bereich.points} und offene {bereich.penalties}. Sobald es Fotos gibt, steht vorn ein kleines rundes Foto; wer keines hat, bekommt dort seine Anfangsbuchstaben.
 
-Ein Tipp auf eine Person öffnet ihre Seite. Unter dem Namen steht ihr {begriff.rank} mit Abzeichen, darunter wählst du im Menü die Unterseite: **Übersicht**, **Konto und Rolle**, {bereich.points}, {bereich.penalties}, {begriff.rank}, {bereich.titles} und **Geburtstag**. Du siehst nur die Unterseiten, für die du die Rechte hast und deren Bereich eingeschaltet ist. **‹ Alle Mitglieder** (oder die Zurück-Taste) führt zurück zur Liste, und zwar an dieselbe Stelle, mit demselben Suchbegriff und denselben Filtern. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
+Ein Tipp auf eine Person öffnet ihre Seite. Unter dem Namen steht mittig ihr Abzeichen mit dem {begriff.rank} darunter und rechts daneben ihr Foto (ohne Foto die Anfangsbuchstaben, wenn du Fotos hochladen darfst). Darunter wählst du im Menü die Unterseite: **Übersicht**, **Konto und Rolle**, {bereich.points}, {bereich.penalties}, {begriff.rank}, {bereich.titles} und **Geburtstag**. Du siehst nur die Unterseiten, für die du die Rechte hast und deren Bereich eingeschaltet ist. **‹ Alle Mitglieder** (oder die Zurück-Taste) führt zurück zur Liste, und zwar an dieselbe Stelle, mit demselben Suchbegriff und denselben Filtern. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
 
 ## Neues Mitglied
 1. In der Mitgliederliste **+ Mitglied anlegen** tippen.
@@ -35,7 +37,7 @@ Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mit
 - Beim Anlegen: im Formular unter **Foto (optional)** (einzeln oder bei **Mehrere auf einmal**).
 - Später: im Mitglied unter **Übersicht** **Foto hochladen**, **Foto ersetzen** oder **Foto entfernen**. Das gilt sofort.
 
-Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoauswahl. Die App verkleinert das Foto schon auf dem Gerät, der Server speichert es in zwei kleinen Größen und ohne Angaben wie den Aufnahmeort. Am besten wirkt ein Porträt mit dem Gesicht in der Mitte: Die App zeigt das Foto rund und schneidet es dafür zu.
+Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoauswahl. Die App verkleinert das Foto schon auf dem Gerät, der Server speichert es in zwei kleinen Größen und ohne Angaben wie den Aufnahmeort. Die App zeigt das Foto rund und schneidet es dafür zu: in der Breite aus der Mitte, bei Hochformat vom oberen Rand aus. Am besten wirkt deshalb ein Porträt mit dem Kopf mittig im oberen Teil des Bildes.
 
 Sehen kann das Foto nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Andere {rolle.member} sehen es nicht. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
 

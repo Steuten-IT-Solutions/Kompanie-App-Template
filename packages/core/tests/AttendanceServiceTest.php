@@ -179,6 +179,10 @@ final class AttendanceServiceTest extends TestCase
         $this->assertNull($list['points']);
         $this->assertSame(Roles::MEMBER, $list[Roles::CANDIDATE]);
 
+        // Mitgliederliste: dieselbe Gruppe je Person für den Zähler über der Liste.
+        $members = array_column($this->call('GET', '/members', [], ['candidates' => '1'])->data, 'group', 'id');
+        $this->assertSame(['points', Roles::MEMBER, Roles::MEMBER], [$members[$chief], $members[$this->cand], $members[$this->m]]);
+
         $this->users->current = $chief;
         $this->assertSame(403, $this->call('GET', '/attendance/groups')->status, 'nur Admins');
     }
