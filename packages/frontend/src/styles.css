@@ -825,6 +825,16 @@ select {
   gap: 4px;
   text-align: center;
 }
+/* Abzeichen und Foto im Profil gleich hoch, kleiner als die große Stufe (die hohe Auflösung bleibt scharf) */
+.member-rank-line .rank-badge-large {
+  height: 96px;
+  max-width: 192px;
+}
+.member-rank-line .member-avatar-large {
+  width: 96px;
+  height: 96px;
+  font-size: 1.8rem;
+}
 .back {
   margin-bottom: 4px;
 }
@@ -2002,7 +2012,7 @@ fieldset.feature-list legend {
 }
 .member-row-rank {
   flex: none;
-  width: 76px;
+  width: 88px;
   font-size: 0.75rem;
   line-height: 1.2;
   color: var(--muted);
@@ -2016,8 +2026,14 @@ fieldset.feature-list legend {
   gap: 4px;
 }
 .rank-stack .rank-badge-medium {
-  height: 40px;
-  max-width: 76px;
+  height: 56px;
+  max-width: 88px;
+}
+/* Foto in der Mitgliederliste so hoch wie das Abzeichen rechts */
+.member-row .member-avatar-medium {
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
 }
 .rank-badge-hero {
   display: flex;

@@ -27,6 +27,15 @@ export function formatPoints(points: number): string {
   return (points > 0 ? '+' : '') + points.toLocaleString('de-DE');
 }
 
+/**
+ * Pluralformen der Standardbezeichnungen für Rollen. Eigene Bezeichnungen lassen sich nicht sicher beugen und
+ * bleiben unverändert; Wörter auf -er oder -el (Anwärter, Verwalter, Jungmariner) heißen im Plural ohnehin gleich.
+ */
+const ROLE_PLURALS: Record<string, string> = { Mitglied: 'Mitglieder', Gast: 'Gäste', Admin: 'Admins' };
+
+/** Rollenbezeichnung mit Anzahl, ab 2 (und bei 0) im Plural: „Mitglied 1“, „Mitglieder 45“. */
+export const roleCount = (label: string, count: number): string => `${count === 1 ? label : (ROLE_PLURALS[label] ?? label)} ${count}`;
+
 /** "2,50" / "2.50" / "2" → 250 Cent; null bei ungültiger Eingabe. */
 export function parseEuroToCents(input: string): number | null {
   const s = input.trim().replace(/\s|€/g, '').replace(',', '.');
