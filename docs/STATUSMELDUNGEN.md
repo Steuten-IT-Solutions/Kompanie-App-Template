@@ -2,7 +2,7 @@
 
 Die App meldet dem **Steuten IT Solutions Cockpit** (Repo `Steuten-IT-Solutions/project-cockpit`), ob eine
 Installation läuft, aber nur, wenn ein Admin zugestimmt hat (Einrichtungsassistent bzw.
-*Einstellungen → Updates*). Ohne Zustimmung wird nichts gesendet und nichts gezählt. Issue #20, Gegenseite
+*Einstellungen → Zustand und Updates*). Ohne Zustimmung wird nichts gesendet und nichts gezählt. Issue #20, Gegenseite
 im Cockpit: project-cockpit#12.
 
 Fehlermeldungen aus der App (Issue #64) gehen über denselben Weg (gleiche Installations-ID und Signatur, eigener
@@ -70,7 +70,7 @@ durch das ausbleibende Lebenszeichen auf.
 - `maintenance`: ob der Wartungsmodus an ist (Issue #42), ohne Begründung. Das Cockpit zeigt die Installation dann als „in Wartung“, nicht als Fehler.
 
 **Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. Was genau gesendet wird, sehen
-Admins unter *Einstellungen → Updates* (Beispiel eines Lebenszeichens, ohne `key`), dazu den Zeitpunkt der
+Admins unter *Einstellungen → Zustand und Updates* (Beispiel eines Lebenszeichens, ohne `key`), dazu den Zeitpunkt der
 letzten Meldung.
 
 ## Signatur und erste Meldung

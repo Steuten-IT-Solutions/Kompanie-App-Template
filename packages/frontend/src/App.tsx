@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin, newsTitle, type Capability } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -93,8 +93,7 @@ const tabLabels = (): Record<Tab, string> => ({
 
 const titles = (): Record<View, string> => ({
   ...tabLabels(),
-  // Standardbezeichnung „News“ in der Überschrift ausgeschrieben; eigene Bezeichnungen unverändert.
-  news: sec.news === 'News' ? 'Neuigkeiten' : sec.news,
+  news: newsTitle(),
   brett: sec.board,
   umfragen: sec.polls,
   inventar: sec.inventory,
@@ -260,7 +259,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     brett: boardVisible() || canPostBoard(),
     // Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; laufende stehen am Brett.
     umfragen: pollsVisible() || canManagePolls(),
-    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über „Mein Konto“.
+    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('manage_inventory'),
     konto: !!user,
     benachrichtigungen: true,
@@ -347,7 +346,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
         onClick={() => {
           // Für „Fehler melden“ (Issue #64): die Seite, auf der jemand Hilfe sucht
           if (tab !== 'hilfe') setReportOrigin('#/' + [tab, ...path.slice(1)].join('/'));
-          const slug = helpSlug([tab, ...path.slice(1)], { boardWriter: canPostBoard(), meinsFirst: meinsFirst() });
+          const slug = helpSlug([tab, ...path.slice(1)], {
+            boardWriter: canPostBoard(),
+            meinsFirst: meinsFirst(),
+            can: (c) => can(c as Capability),
+            features: config?.features ?? {},
+          });
           navigate(slug ? `hilfe/${slug}` : 'hilfe');
         }}
         aria-label="Hilfe"

@@ -13,9 +13,11 @@ import {
   type AttendanceSummary,
 } from '../api';
 import { caps, formatDate, formatEventWhen, todayYmd } from '../format';
+import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
+const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
 const EVENTS_SHOWN = 8;
 
@@ -213,7 +215,7 @@ function Editor({
   }
 
   async function remove() {
-    if (!window.confirm(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte Punkte bleiben erhalten.`)) return;
+    if (!window.confirm(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte ${sec.points} bleiben erhalten.`)) return;
     setBusy(true);
     try {
       await api.deleteAttendance(list.id);
@@ -228,7 +230,7 @@ function Editor({
   return (
     <div className="attendance">
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/anwesenheit')}>
-        ‹ Anwesenheit
+        ‹ {sec.attendance}
       </button>
       {free ? (
         <div className="field-row attendance-meta">
@@ -287,7 +289,7 @@ function Editor({
                     <span className={`badge ${p.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(p.role))}</span>
                   )}
                 </span>
-                {p.booked && <span className="attendance-booked">Punkte gebucht</span>}
+                {p.booked && <span className="attendance-booked">{sec.points} gebucht</span>}
               </span>
               {STATUSES.map((st) => (
                 <span key={st} className="attendance-cell">
@@ -319,7 +321,7 @@ function Editor({
         <div className="button-row attendance-book">
           {points && (
             <button className="btn" disabled={busy || toBook === 0} onClick={() => saveAndGo('punkte')}>
-              Punkte für {toBook} {toBook === 1 ? 'Anwesenden' : 'Anwesende'}
+              {sec.points} für {toBook} {toBook === 1 ? 'Anwesenden' : 'Anwesende'}
             </button>
           )}
           {penalties && (
@@ -329,7 +331,7 @@ function Editor({
           )}
         </div>
       )}
-      {points && toBook === 0 && presentMembers > 0 && <p className="muted small">Punkte für alle Anwesenden bereits gebucht.</p>}
+      {points && toBook === 0 && presentMembers > 0 && <p className="muted small">{sec.points} für alle Anwesenden bereits gebucht.</p>}
       <p className="muted small">
         Tippe ein gesetztes Häkchen noch einmal an, um es zu entfernen.{' '}
         {list.updated_by_name && <>Zuletzt gespeichert von {list.updated_by_name}. </>}

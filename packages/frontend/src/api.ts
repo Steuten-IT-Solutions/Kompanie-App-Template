@@ -154,6 +154,9 @@ export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.f
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
 
+/** Überschrift für die Neuigkeiten: Standardbezeichnung „News“ ausgeschrieben, eigene Bezeichnungen unverändert. */
+export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? 'Neuigkeiten' : brand.labels.sections.news);
+
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
 

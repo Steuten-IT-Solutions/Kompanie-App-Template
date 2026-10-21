@@ -22,6 +22,14 @@ for want in 'unbekanntes Recht „darf_alles“' 'unbekannter Bereich „inventa
   grep -qF "$want" <<< "$OUT" || fail "Fehler nicht erkannt: $want – $OUT"
 done
 ok "Unbekannte Rechte, Bereiche, Platzhalter, Listen ohne [ ], tote oder nicht sichtbare Verweise und Rechte ohne Seite werden gemeldet"
+# Vorausgesetzte Bereiche: Wer Umfragen sieht, hat auch das Schwarze Brett (Umfragen brauchen es), umgekehrt nicht.
+cp -R docs/handbuch "$T/req"
+printf -- '---\ntitel: Umfrage\nreihenfolge: 4\nrechte: [member]\nbereiche: [polls]\n---\nSiehe [Brett](seite:schwarzes-brett).\n' > "$T/req/u.md"
+php scripts/handbuch.php --check --src="$T/req" > /dev/null || fail "Verweis von Umfragen aufs Brett abgelehnt: $(php scripts/handbuch.php --check --src="$T/req" 2>&1)"
+printf -- '---\ntitel: Brett\nreihenfolge: 5\nrechte: [member]\nbereiche: [board]\n---\nSiehe [Umfragen](seite:umfragen).\n' > "$T/req/b.md"
+OUT="$(php scripts/handbuch.php --check --src="$T/req" 2>&1 || true)"
+grep -qF 'b.md: Verweis auf „umfragen“, die nicht jeder sieht' <<< "$OUT" || fail "Verweis vom Brett auf Umfragen angenommen: $OUT"
+ok "Vorausgesetzte Bereiche gelten beim Verweis als eingeschaltet, nur in diese Richtung"
 if php scripts/handbuch.php --app="$T/x.json" --src="$T/src" 2> /dev/null; then fail "Fehlerhaftes Handbuch ausgegeben"; fi
 ok "Fehlerhaftes Handbuch wird nicht ausgegeben"
 

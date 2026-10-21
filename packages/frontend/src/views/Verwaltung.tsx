@@ -699,7 +699,9 @@ function NewMember() {
         </label>
       )}
       {extras && (canPoints() || canRanks()) && (
-        <p className="muted small">Für die Übernahme bestehender Mitglieder: aktuellen Punktestand und {brand.labels.rank} eintragen.</p>
+        <p className="muted small">
+          Für die Übernahme bestehender Mitglieder: aktuellen Stand an {sec.points} und {brand.labels.rank} eintragen.
+        </p>
       )}
       {canSetBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
@@ -866,7 +868,7 @@ function GivePoints({
         <label className="toggle">
           <input type="checkbox" checked={applyFactor} onChange={(e) => setApplyFactor(e.target.checked)} />
           <span>
-            Punktefaktor der Rolle anwenden
+            {sec.points}faktor der Rolle anwenden
             <span className="small muted feature-desc">
               {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen
               anderen Faktor als 1

@@ -395,8 +395,9 @@ final class RoleService
             $role['capabilities'] = self::validCapabilities($in['capabilities']);
         }
         if (array_key_exists('points_factor', $in)) {
-            if ($key === Roles::GUEST || $key === Roles::ADMIN) {
-                throw ApiError::invalid('Gast und Admin haben keinen eigenen Punktefaktor.');
+            // Punkte bekommen nur Personen mit Mitgliederbereich; Admins zählen immer voll.
+            if ($key === Roles::GUEST || $key === Roles::CANDIDATE || $key === Roles::ADMIN) {
+                throw ApiError::invalid('Gast, Anwärter und Admin haben keinen eigenen Punktefaktor.');
             }
             $role['points_factor'] = self::validFactor($in['points_factor']);
         }

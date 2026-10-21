@@ -210,7 +210,7 @@ function ki_stable_entry($installed = null)
             }
         }
         if ($stable === null) {
-            throw new RuntimeException('Für die installierte Hauptversion ' . $m[1] . ' gibt es gerade keine freigegebene Version zum Einspielen. Bitte bei uns melden; eine neue Hauptversion wird nur in der App unter Einstellungen → Updates eingespielt (dort wird vorher gesichert).');
+            throw new RuntimeException('Für die installierte Hauptversion ' . $m[1] . ' gibt es gerade keine freigegebene Version zum Einspielen. Bitte bei uns melden; eine neue Hauptversion wird nur in der App unter Einstellungen → Zustand und Updates eingespielt (dort wird vorher gesichert).');
         }
     }
     foreach (isset($list['versions']) ? $list['versions'] : array() as $e) {
@@ -610,7 +610,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ki_checks_ok($checks)) {
         $cron = '';
         try {
             $cron = '<p class="hint">Empfohlen: Die App erledigt Hintergrundaufgaben (Galerie, Kalender, Updates) auch ohne weiteres Zutun. Zuverlässiger geht es mit einem Cronjob im Kundenmenü des Hosters, der alle 15 Minuten diese Adresse aufruft: <code>'
-                . ki_h($kernel->cronUrl()) . '</code> (steht auch unter Einstellungen → Zustand der App).</p>';
+                . ki_h($kernel->cronUrl()) . '</code> (steht auch unter Einstellungen → Zustand und Updates).</p>';
         } catch (Exception $e) {
             // nur ein Hinweis
         } catch (Error $e) {

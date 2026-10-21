@@ -97,7 +97,7 @@ final class StatusReporter
         return $data;
     }
 
-    /** Zeitpunkt der letzten Meldung und ob sie angenommen wurde (für Einstellungen → Updates). */
+    /** Zeitpunkt der letzten Meldung und ob sie angenommen wurde (für Einstellungen → Zustand und Updates). */
     public function last(): ?array
     {
         $last = $this->app->settings->get(self::LAST_SETTING);
