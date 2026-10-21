@@ -99,7 +99,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 /* ------------------------------------------------------------------ */
 
 /** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
-type MembersState = { query: string; role: Level; showGuests: boolean; showCandidates: boolean; scrollY: number };
+type MembersState = { query: string; role: Level; showGuests: boolean; scrollY: number };
 let savedMembers: MembersState | null = null;
 
 function Members() {
@@ -111,9 +111,8 @@ function Members() {
     return s;
   });
   const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
-  // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
-  const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
-  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, showCandidates), [showGuests, showCandidates], 'members');
+  // Anwärter (und Rollen nur mit Kalender) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
+  const { data, error, loading, reload } = useAsync(() => api.members(showGuests, true), [showGuests], 'members');
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
@@ -143,7 +142,7 @@ function Members() {
   // Nur Rollen, die in der Liste vorkommen
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
-  // Zähler je Gruppe wie in der Anwesenheit: alle geladenen mit Rolle (ohne Gäste), unabhängig von Suche und Filter
+  // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter
   const groupCounts = useMemo(() => {
     const n = new Map<Level, number>();
     for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
@@ -159,7 +158,7 @@ function Members() {
   }, [data]);
 
   function open(id: number) {
-    savedMembers = { query, role, showGuests, showCandidates, scrollY: window.scrollY };
+    savedMembers = { query, role, showGuests, scrollY: window.scrollY };
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -229,15 +228,6 @@ function Members() {
           </button>
         </div>
       </div>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showCandidates || showGuests}
-          disabled={showGuests}
-          onChange={(e) => setShowCandidates(e.target.checked)}
-        />
-        Auch {levelLabel('candidate')} anzeigen
-      </label>
       {canPromote && (
         <label className="toggle">
           <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />

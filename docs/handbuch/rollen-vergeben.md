@@ -32,6 +32,6 @@ Soll eine Person ein Recht bekommen, das keine ihrer Rollen hat, oder ein Recht 
 - Wer kein {rolle.admin} ist, ändert nur Rechte, die er selbst hat, nie „Mitglieder anlegen“ oder „Rollen vergeben“, und nur bei Personen, die er auch sonst verwalten darf. Die eigenen Rechte ändert niemand selbst.
 
 ## Gäste und {rolle.candidate}
-Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit dem Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** erscheinen sie (zusammen mit den {rolle.candidate}), und du kannst ihnen eine Rolle geben. {rolle.candidate} und Personen mit Rollen nur für den internen Kalender erscheinen mit **Auch {rolle.candidate} anzeigen**.
+Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit dem Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** erscheinen sie, und du kannst ihnen eine Rolle geben. {rolle.candidate} und Personen mit Rollen nur für den internen Kalender stehen immer in der Liste.
 
 Neue Konten anlegen, Passwörter zurücksetzen und {rolle.candidate} mit **Als {rolle.member} aufnehmen** aufnehmen darf nur, wer Mitglieder anlegen darf.

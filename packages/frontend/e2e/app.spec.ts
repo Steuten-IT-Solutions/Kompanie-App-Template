@@ -283,7 +283,6 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await expect(page.getByLabel('Auch Anwärter anzeigen')).toBeChecked();
   // Zähler über „Mitglied anlegen“: Gruppen wie in der Anwesenheit
   await expect(page.locator('.member-counts')).toContainText(/Anwärter \d+/);
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
