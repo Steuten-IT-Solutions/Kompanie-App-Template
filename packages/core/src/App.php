@@ -8,6 +8,7 @@ use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardService;
+use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
@@ -78,6 +79,7 @@ final class App
         BoardService::TASK => 3600,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
+        BugReportService::TASK => BugReportService::INTERVAL,
     ];
 
     /**
@@ -182,6 +184,8 @@ final class App
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
+            // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Einreihen vorgezogen; nur mit Empfänger.
+            BugReportService::TASK => $this->bugReports()->available(),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -237,12 +241,15 @@ final class App
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
                 $this->birthdays()->notifyToday();
+            } elseif ($task === BugReportService::TASK) {
+                $this->bugReports()->runTask();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
             // Die Statusmeldung selbst nicht zählen (sonst meldete sie beim nächsten Mal ihr eigenes Scheitern),
             // Fehler der Update-Liste zählt UpdateService schon.
-            if ($task !== StatusReporter::TASK && !($task === UpdateService::TASK && $e instanceof ApiError)) {
+            // Ebenso nicht zugestellte Fehlermeldungen (das Cockpit war nicht erreichbar, kein Fehler der App).
+            if (!in_array($task, [StatusReporter::TASK, BugReportService::TASK], true) && !($task === UpdateService::TASK && $e instanceof ApiError)) {
                 $this->telemetry()->record(Code::TaskFailed);
             }
         }
@@ -315,7 +322,7 @@ final class App
      * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
      * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
-     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht. Inventar
+     * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht, ebenso noch nicht versandte Fehlermeldungen mit ihrem Namen. Inventar
      * und sein Verlauf bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
      */
     public function userDeleted(int $userId): void
@@ -466,6 +473,12 @@ final class App
     public function status(): StatusService
     {
         return $this->service(StatusService::class, fn () => new StatusService($this));
+    }
+
+    /** Fehlermeldungen an die Betreuer der App (Issue #64) */
+    public function bugReports(): BugReportService
+    {
+        return $this->service(BugReportService::class, fn () => new BugReportService($this));
     }
 
     public function statusReporter(): StatusReporter

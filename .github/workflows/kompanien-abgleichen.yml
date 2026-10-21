@@ -48,6 +48,7 @@ jobs:
           # Wie beim Veröffentlichen (Prüfsumme der Paket-Konfiguration). Variablen der Environment
           # „veroeffentlichen“ sind hier nicht sichtbar; deshalb als Variablen des Repos anlegen.
           STATUS_URL: ${{ vars.KOMPANIE_STATUS_URL }}
+          REPORT_URL: ${{ vars.KOMPANIE_REPORT_URL }}
           SUPPORT: ${{ vars.KOMPANIE_SUPPORT }}
         run: scripts/find-pending.sh >> "$GITHUB_OUTPUT"
 

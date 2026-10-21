@@ -30,7 +30,7 @@ exec('rm -rf ' . escapeshellarg($data));
 exec('rm -rf ' . escapeshellarg($root . '/media'));
 
 $u = parse_url($base);
-$kernel = new Kernel($root, new HttpContext([], ['HTTP_HOST' => $u['host'] . (isset($u['port']) ? ':' . $u['port'] : '')], (string) $u['path']), new MockHttp());
+$kernel = new Kernel($root, new HttpContext([], ['HTTP_HOST' => $u['host'] . (isset($u['port']) ? ':' . $u['port'] : '')], (string) $u['path']), new MockHttp(), MockHttp::PACKAGE);
 Setup::install($kernel, ['driver' => 'sqlite'], $base, 'rewrite');
 $users = $kernel->users();
 $demo = getenv('KOMPANIE_DEMO') === '1';

@@ -724,6 +724,46 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {member_roles}_role ON {member_roles} (role)',
                 ],
             ],
+            // Fehlermeldungen (Issue #64): Warteschlange bis zum Versand an die Betreuer (project-cockpit). report: die
+            // Angaben als JSON (Beschreibung, Erwartung, Seite, Version, Gerät, Rolle, ggf. Name, letzte Fehlermeldung).
+            // Das Bildschirmfoto als Base64 in derselben Zeile (höchstens 2 MB, ohne Dateien neben der Datenbank: Löschen
+            // nach dem Versand, nach 7 Tagen oder mit dem Konto entfernt alles auf einmal). user_id nur, wenn der Name
+            // mitgeschickt wird (sonst 0), damit die Meldung mit dem Konto gelöscht wird. Nicht in Sicherungen.
+            15 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {bug_reports} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  uuid char(32) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  report text NOT NULL,
+  screenshot mediumtext DEFAULT NULL,
+  screenshot_type varchar(20) NOT NULL DEFAULT \'\',
+  attempts int(11) NOT NULL DEFAULT 0,
+  last_error varchar(255) NOT NULL DEFAULT \'\',
+  created_at int(11) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uuid (uuid),
+  KEY user_id (user_id),
+  KEY created_at (created_at)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {bug_reports} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid TEXT NOT NULL,
+  user_id INTEGER NOT NULL DEFAULT 0,
+  report TEXT NOT NULL,
+  screenshot TEXT DEFAULT NULL,
+  screenshot_type TEXT NOT NULL DEFAULT \'\',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT NOT NULL DEFAULT \'\',
+  created_at INTEGER NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {bug_reports}_uuid ON {bug_reports} (uuid)',
+                    'CREATE INDEX IF NOT EXISTS {bug_reports}_user_id ON {bug_reports} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {bug_reports}_created_at ON {bug_reports} (created_at)',
+                ],
+            ],
         ];
     }
 

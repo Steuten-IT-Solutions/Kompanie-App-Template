@@ -62,9 +62,16 @@ final class Kernel
     private ?StandaloneEnvironment $env = null;
     private HttpContext $http;
 
-    /** @param HttpClient|null $httpClient für Tests (z. B. simuliertes Google Drive) */
-    public function __construct(public readonly string $root, ?HttpContext $http = null, private readonly ?HttpClient $httpClient = null)
-    {
+    /**
+     * @param HttpClient|null $httpClient für Tests (z. B. simuliertes Google Drive)
+     * @param array<string, mixed> $packageOverride für Tests: Werte, die update.json ergänzen (z. B. reportUrl)
+     */
+    public function __construct(
+        public readonly string $root,
+        ?HttpContext $http = null,
+        private readonly ?HttpClient $httpClient = null,
+        private readonly array $packageOverride = [],
+    ) {
         $this->http = $http ?? HttpContext::fromGlobals(self::basePath($_SERVER));
     }
 
@@ -103,7 +110,7 @@ final class Kernel
     public function packageConfig(): array
     {
         $data = json_decode((string) @file_get_contents($this->root . '/update.json'), true);
-        return is_array($data) ? $data : [];
+        return $this->packageOverride + (is_array($data) ? $data : []);
     }
 
     public function version(): string

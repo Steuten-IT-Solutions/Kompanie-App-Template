@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { devices, expect, test, type Page } from '@playwright/test';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
@@ -1109,6 +1110,84 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
     await expect(page.locator('.news-headline')).toHaveText('Die App aufs Handy holen');
   } finally {
     await page.context().setOffline(false);
+  }
+});
+
+test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angaben', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/#/termine');
+  // Nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten (tests/standalone/MockHttp.php).
+  const available = await page.evaluate(() => !!window.KOMPANIE_CONFIG?.reports);
+  test.skip(!available, 'Fehlermeldungen in dieser Testinstallation nicht eingerichtet');
+  const details = page.locator('.report-details');
+  // 1x1-PNG
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+
+  // Gast: über „?“ zur Hilfe, dort der Knopf; die Seite, von der aus gemeldet wird, steht in den Angaben.
+  await page.getByRole('button', { name: 'Hilfe' }).click();
+  await page.getByRole('button', { name: 'Fehler melden' }).click();
+  await expect(page.locator('.report-form h2')).toHaveText('Fehler melden');
+  await expect(details).toContainText('#/termine');
+  await expect(details).toContainText('ohne Anmeldung');
+  await expect(details.locator('dd').last()).toHaveText('keine');
+  await expect(page.getByText('Meinen Namen mitschicken')).toHaveCount(0);
+  await expect(page.locator('input[name="website"]')).not.toBeInViewport();
+  await page.getByRole('button', { name: 'Meldung senden' }).click();
+  await expect(page.locator('.form-error')).toHaveText('Bitte beschreibe kurz, was nicht klappt.');
+  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(`Gast-Test ${Date.now()}`);
+  await page.getByRole('button', { name: 'Meldung senden' }).click();
+  await expect(page.locator('.form-error')).toContainText('Bitte bestätige');
+  await page.getByLabel('Bildschirmfoto').setInputFiles({ name: 'bild.png', mimeType: 'image/png', buffer: png });
+  await expect(page.getByAltText('Gewähltes Bildschirmfoto')).toBeVisible();
+  await page.getByLabel(/Ich bin einverstanden/).check();
+  await expect(page.getByLabel(/Ich bin einverstanden/)).toBeChecked();
+  await expect(page.locator('.report-consent')).toContainText('Steuten IT Solutions');
+  await expect(page.locator('.report-consent')).toContainText('dem Bildschirmfoto');
+  await page.getByRole('button', { name: 'Meldung senden' }).click();
+  await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
+
+  // Mitglied: letzte Fehlermeldung der App und auf Wunsch der Name
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/news/gibt-es-nicht');
+  await expect(page.locator('.error')).toBeVisible();
+  // Zu Neuigkeiten gibt es keine eigene Hilfeseite: „?“ öffnet das Verzeichnis, auch dort steht der Knopf.
+  await page.getByRole('button', { name: 'Hilfe' }).click();
+  await page.getByRole('button', { name: 'Fehler melden' }).click();
+  await expect(details).toContainText('#/news/gibt-es-nicht');
+  await expect(details.locator('dd').last()).not.toHaveText('keine');
+  await expect(details).not.toContainText('ohne Anmeldung');
+  await expect(details).not.toContainText('Mitglied1');
+  await page.getByText('Meinen Namen mitschicken').click();
+  await expect(details).toContainText('Mitglied1');
+  const text = `Mitglied-Test ${Date.now()}`;
+  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(text);
+  await page.getByLabel('Was hast du erwartet? (freiwillig)').fill('Eine Neuigkeit');
+  await page.getByLabel(/Ich bin einverstanden/).check();
+  await page.getByRole('button', { name: 'Meldung senden' }).click();
+  await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
+
+  // Eigenständig: Die Hintergrundaufgabe schickt die Meldung an den simulierten Empfänger (mit Namen, signiert). Ohne
+  // Cronjob startet die Aufgabe über den Selbstaufruf, höchstens einmal pro Minute: Das kann etwas dauern.
+  test.setTimeout(180_000);
+  const log = process.env.KOMPANIE_DATA_DIR ? `${process.env.KOMPANIE_DATA_DIR}/mock-reports.jsonl` : '';
+  if (STANDALONE && log) {
+    await expect
+      .poll(
+        async () => {
+          await page.request.get('/app/');
+          return existsSync(log) ? readFileSync(log, 'utf8') : '';
+        },
+        { timeout: 100_000, intervals: [2000] },
+      )
+      .toContain(text);
+    const sent = readFileSync(log, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l))
+      .find((r) => r.report?.description === text);
+    expect(sent.report.name).toBe('Mitglied1');
+    expect(sent.report.expected).toBe('Eine Neuigkeit');
+    expect(sent.report.page).toBe('#/news/gibt-es-nicht');
   }
 });
 

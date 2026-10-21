@@ -7,6 +7,7 @@ import { isStandalone } from './install';
 import App from './App';
 import { config } from './api';
 import { checkPushOnStart } from './push';
+import { watchRuntimeErrors } from './lastError';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -27,6 +28,9 @@ if (config && sharedInstallLink()) {
 if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
   history.replaceState(null, '', window.location.pathname);
 }
+
+// Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
+watchRuntimeErrors();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
