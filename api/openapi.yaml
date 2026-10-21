@@ -21,6 +21,15 @@ info:
     **Rechte:** Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung.
     Mitglieder sehen nur ihre eigenen Punkte und Strafen.
 
+    **Vorschau „App als Rolle ansehen“ (Issue #63):** Ein Admin kann bei jeder Anfrage den Header
+    `X-Kompanie-Preview` (Parameter `Preview`) mit dem Schlüssel einer Rolle oder `@public` (ohne Anmeldung)
+    schicken; Dateien (Galeriebilder, Dokumente, Abzeichen) tragen ihn als Parameter `?vorschau=…` in der Adresse,
+    die der Server in der Vorschau selbst so erzeugt. Der Server antwortet dann mit den Rechten genau dieser Rolle
+    (dieselbe Person, ohne Zusatzrollen) bzw. wie ohne Anmeldung. Für Nicht-Admins, `admin` und unbekannte Rollen
+    wird die Vorschau ignoriert (`/config.preview` ist `null`). Jede Anfrage mit Header oder Parameter, die nicht
+    `GET`/`HEAD` ist, lehnt der Server mit 403 `preview_readonly` ab (Antwort `PreviewReadonly`), außer
+    `POST /auth/logout`.
+
     **Beträge** sind immer ganze Cent. **Datumsangaben** `YYYY-MM-DD`, Uhrzeiten `HH:MM`
     in der Zeitzone der Kompanie.
 servers:
@@ -44,6 +53,7 @@ tags:
   - name: Inventar
   - name: Einstellungen
   - name: Wartung
+  - name: Fehlermeldungen
 
 paths:
   /config:
@@ -51,6 +61,8 @@ paths:
       tags: [App]
       summary: Laufzeit-Konfiguration und angemeldeter Benutzer
       security: []
+      parameters:
+        - $ref: '#/components/parameters/Preview'
       responses:
         '200':
           description: OK
@@ -98,6 +110,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AppConfig' }
         '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/PreviewReadonly' }
         '429': { $ref: '#/components/responses/Error' }
 
   /auth/logout:
@@ -265,6 +278,81 @@ paths:
                   changed: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+
+  /reports/form:
+    get:
+      tags: [Fehlermeldungen]
+      summary: Formular „Fehler melden“ öffnen (auch ohne Anmeldung)
+      description: |
+        Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden) und die Angaben,
+        die der Server der Meldung beifügt. Ohne Empfänger (reportUrl) 404 `reports_unavailable`. Format der
+        Weitergabe an die Betreuer: docs/FEHLERMELDUNGEN.md.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, minSeconds, maxBytes, details]
+                properties:
+                  token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
+                  minSeconds: { type: integer }
+                  maxBytes: { type: integer, description: Höchstgröße des Bildschirmfotos (dekodiert) }
+                  details:
+                    type: object
+                    required: [version, role]
+                    properties:
+                      version: { type: string }
+                      role: { type: string, description: 'Bezeichnung der Rolle oder „ohne Anmeldung“' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /reports:
+    post:
+      tags: [Fehlermeldungen]
+      summary: Fehler melden (auch ohne Anmeldung)
+      description: |
+        Reiht die Meldung für den Versand an die Betreuer der App ein; 201 erst, wenn sie gespeichert ist. Die
+        Einwilligung (`consent: true`) ist Pflicht. Begrenzt je Anfragendem (IPv6: je /64) und Stunde, je Installation
+        und Tag und durch die Größe der Warteschlange. Ist `website` (verstecktes Feld) gefüllt, antwortet der Server
+        wie bei Erfolg, speichert aber nichts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, consent, description]
+              properties:
+                token: { type: string, description: Zeitmarke aus GET /reports/form }
+                consent: { type: boolean, const: true }
+                description: { type: string, maxLength: 2000 }
+                expected: { type: string, maxLength: 2000 }
+                page: { type: string, maxLength: 200, description: 'Seite in der App, z. B. #/termine/verwalten' }
+                userAgent: { type: string, maxLength: 400 }
+                lastError: { type: [string, 'null'], maxLength: 500, description: Letzte Fehlermeldung der App }
+                includeName: { type: boolean, description: Nur angemeldet; dann geht der Name mit }
+                screenshot:
+                  type: [object, 'null']
+                  properties:
+                    type: { type: string, enum: [image/png, image/jpeg, image/webp] }
+                    data: { type: string, description: 'Base64 (auch als data:-Adresse), dekodiert höchstens 2 MB, höchstens 10000 Pixel je Kante' }
+                website: { type: string, description: Verstecktes Feld; muss leer bleiben }
+      responses:
+        '201':
+          description: Gespeichert, wird im Hintergrund versandt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
 
   /push/key:
     get:
@@ -1933,11 +2021,17 @@ paths:
       - $ref: '#/components/parameters/Id'
     patch:
       tags: [Verwaltung]
-      summary: Rolle in der App setzen (nicht die eigene)
+      summary: Grundrolle und/oder Zusatzrollen setzen (nicht die eigenen)
       description: |
-        `admin` ist nur in der eigenständigen Version erlaubt; bei WordPress werden
-        Admin-Rechte nur im WP-Backend vergeben. Der letzte Admin kann nicht
-        herabgestuft werden.
+        `level` ist die Grundrolle. `admin` ist nur in der eigenständigen Version erlaubt; bei WordPress werden
+        Admin-Rechte nur im WP-Backend vergeben. Der letzte Admin kann nicht herabgestuft werden.
+
+        `extra_roles` (Issue #66) ersetzt die Zusatzrollen (leere Liste: keine). Nur eigene Rollen
+        (`/config` → `roles[].extra`), nicht `guest`, `candidate`, `member`, `admin`; nur zu einer Grundrolle mit
+        Mitgliederbereich und nicht für Admins (sonst 400). Mit `level` zusammen wird gegen die neue Grundrolle geprüft;
+        eine neue Grundrolle ohne Mitgliederbereich entfernt die Zusatzrollen. Wer kein Admin ist, vergibt und entfernt
+        nur Rollen, die er auch als Grundrolle vergeben dürfte, und nur bei Personen ohne mehr Rechte als er (sonst 403).
+        Mindestens eines der beiden Felder ist nötig.
       x-capability: promote_users
       requestBody:
         required: true
@@ -1945,9 +2039,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [level]
               properties:
                 level: { $ref: '#/components/schemas/Level' }
+                extra_roles:
+                  type: array
+                  items: { $ref: '#/components/schemas/Level' }
       responses:
         '200':
           description: OK
@@ -1955,9 +2051,11 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [id, level, extra_roles]
                 properties:
                   id: { type: integer }
                   level: { $ref: '#/components/schemas/Level' }
+                  extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -2623,8 +2721,60 @@ paths:
                   photos: { type: integer }
                   processed: { type: integer }
                   pending: { type: integer }
-                  failed: { type: integer, description: Bilder, die sich nicht laden ließen (werden beim nächsten Abgleich erneut versucht) }
+                  failed: { type: integer, description: 'Bilder, die sich nicht laden ließen (der nächste Abgleich versucht sie erneut, höchstens fünfmal; Liste unter /admin/gallery/failed)' }
                   error: { type: string, description: Fehler des Abgleichs, sonst leer }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/failed:
+    get:
+      tags: [Einstellungen]
+      summary: Bilder, die sich nicht laden ließen, mit Album und Fehlermeldung
+      description: Höchstens 200, neueste Alben zuerst; `total` ist die Gesamtzahl.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photos, total]
+                properties:
+                  total: { type: integer }
+                  photos:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, album, intern, error, attempts, drive_url]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string, description: Dateiname in Google Drive }
+                        album: { type: string, description: '„Jahr · Album“' }
+                        intern: { type: boolean }
+                        error: { type: string, description: Fehlermeldung der letzten Aufbereitung }
+                        attempts: { type: integer }
+                        drive_url: { type: string, description: Adresse der Datei in Google Drive }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/retry:
+    post:
+      tags: [Einstellungen]
+      summary: Alle Bilder, die sich nicht laden ließen, erneut aufbereiten
+      description: Reiht sie wieder ein, auch nach fünf gescheiterten Versuchen; aufbereitet wird wie sonst (Aufgabe bzw. /admin/gallery/sync).
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retried, pending]
+                properties:
+                  retried: { type: integer }
+                  pending: { type: integer }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
@@ -2641,7 +2791,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Einstellungen]
-      summary: Uhrzeit der Erinnerung an Termine am nächsten Tag ändern
+      summary: Uhrzeit der Erinnerung an Termine am nächsten Tag und Benachrichtigung am Geburtstag ändern
       x-capability: manage_settings
       requestBody:
         required: true
@@ -2651,6 +2801,8 @@ paths:
               type: object
               properties:
                 reminder_hour: { type: integer, minimum: 0, maximum: 23 }
+                birthday_notify: { type: boolean, description: 'Benachrichtigung am Geburtstag an oder aus (Standard an)' }
+                birthday_hour: { type: integer, minimum: 0, maximum: 23, description: 'Ab dieser Stunde (Ortszeit) am Geburtstag benachrichtigen (Standard 7)' }
       responses:
         '200': { $ref: '#/components/responses/PushAdmin' }
         '400': { $ref: '#/components/responses/Error' }
@@ -2879,6 +3031,14 @@ components:
       description: Name und Inhalt des Cookies hängen vom Adapter ab (WordPress-Anmelde-Cookie bzw. eigene Sitzung).
 
   parameters:
+    Preview:
+      name: X-Kompanie-Preview
+      in: header
+      required: false
+      description: |
+        Vorschau „App als Rolle ansehen“ (Issue #63): Schlüssel einer Rolle (nicht `admin`) oder `@public`. Gilt nur für
+        Admins und für jede Route; statt des Headers geht auch der Parameter `?vorschau=…` (so bei Dateien).
+      schema: { type: string, maxLength: 32 }
     Id:
       name: id
       in: path
@@ -2898,6 +3058,11 @@ components:
       schema: { type: integer, minimum: 1 }
 
   responses:
+    PreviewReadonly:
+      description: 'In der Vorschau (Header `X-Kompanie-Preview` oder Parameter `vorschau`) ist nur Ansehen möglich: `code: preview_readonly`, „In der Vorschau kannst du nichts ändern.“'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     PushStatus:
       description: OK
       content:
@@ -2940,7 +3105,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [supported, missing, devices, accounts, guests, queued, reminderHour]
+            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays]
             properties:
               supported: { type: boolean }
               missing: { type: array, items: { type: string }, description: Fehlende PHP-Voraussetzungen }
@@ -2949,6 +3114,13 @@ components:
               guests: { type: integer }
               queued: { type: integer, description: Nachrichten in der Warteschlange }
               reminderHour: { type: integer, minimum: 0, maximum: 23 }
+              birthdays:
+                type: [object, 'null']
+                description: Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage
+                required: [enabled, hour]
+                properties:
+                  enabled: { type: boolean }
+                  hour: { type: integer, minimum: 0, maximum: 23 }
     Error:
       description: Fehler
       content:
@@ -3336,7 +3508,15 @@ components:
         Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `candidate` (Anwärter: nur interner Kalender), `member`
         (Mitgliederbereich mit Kalender, Rolle neuer Konten) und `admin` (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
         `r1`, `r2`, …; ältere Installationen haben außerdem `organizer` und `manager`. Bezeichnungen und Punktefaktor stehen in
-        `/config` (`roles`), Rechte unter `/admin/roles`.
+        `/config` (`roles`), Rechte unter `/admin/roles`. `level` ist überall die Grundrolle; Zusatzrollen stehen in
+        `extra_roles` (Issue #66).
+
+    ExtraRoles:
+      type: array
+      items: { $ref: '#/components/schemas/Level' }
+      description: |
+        Zusatzrollen (Issue #66) in der Reihenfolge der Rollen, nur die wirksamen (eigene Rollen zu einer Grundrolle mit
+        Mitgliederbereich). Die Rechte der Person sind die aller Rollen zusammen; Punktefaktor ist der kleinste.
 
     RoleInfo:
       type: object
@@ -3344,7 +3524,8 @@ components:
       properties:
         key: { $ref: '#/components/schemas/Level' }
         label: { type: string }
-        points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5' }
+        points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5; bei mehreren Rollen der kleinste' }
+        extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, candidate, member, admin)' }
 
     RoleAdmin:
       allOf:
@@ -3356,7 +3537,8 @@ components:
               type: array
               items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
-            users: { type: integer, description: Anzahl der Personen mit dieser Rolle }
+            users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
+            extra_users: { type: integer, description: Davon als Zusatzrolle }
             system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
             deletable: { type: boolean, description: 'false für guest, candidate, member und admin' }
 
@@ -3378,12 +3560,13 @@ components:
         name: { type: string }
         login: { type: string }
         level: { $ref: '#/components/schemas/Level' }
+        extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         capabilities:
           type: array
           items:
             type: string
             enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings]
-          description: 'Wirksame Rechte; member bringt calendar mit.'
+          description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     UpdateStatus:
       type: object
@@ -3432,8 +3615,16 @@ components:
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
+        reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
+        preview:
+          type: [object, 'null']
+          description: 'Vorschau „App als Rolle ansehen“ (Issue #63), vom Server bestätigt; null ohne (gültige) Vorschau. user, capabilities und features sind dann die der Rolle.'
+          required: [role, label]
+          properties:
+            role: { type: string, description: 'Schlüssel der Rolle oder @public (ohne Anmeldung)' }
+            label: { type: string }
         csrf:
           type: object
           required: [header, token, refreshUrl]
@@ -3488,6 +3679,7 @@ components:
         id: { type: integer }
         name: { type: string }
         level: { $ref: '#/components/schemas/Level' }
+        extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         points: { type: number, description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen' }
         open_cents: { type: integer }
         rank:
@@ -3644,6 +3836,7 @@ components:
         first_name: { type: string, description: 'Konten von früher (ein Namensfeld): aus name geteilt, das letzte Wort ist der Nachname' }
         last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
         level: { $ref: '#/components/schemas/Level' }
+        extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }

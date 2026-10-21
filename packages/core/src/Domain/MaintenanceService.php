@@ -108,6 +108,6 @@ final class MaintenanceService
     /** Aufgaben, die auch während der Wartung laufen: Updates (sollen möglich bleiben) und Statusmeldungen. */
     public static function runsDuringMaintenance(string $task): bool
     {
-        return in_array($task, [\KompanieApp\Core\Update\UpdateService::TASK, \KompanieApp\Core\Update\StatusReporter::TASK], true);
+        return in_array($task, [\KompanieApp\Core\Update\UpdateService::TASK, \KompanieApp\Core\Update\StatusReporter::TASK, BugReportService::TASK], true);
     }
 }

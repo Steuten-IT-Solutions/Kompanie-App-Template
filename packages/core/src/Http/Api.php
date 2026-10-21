@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Http;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability as Cap;
+use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
@@ -33,6 +34,8 @@ final class Api
     public const SETUP_SETTING = 'setup_done';
     /** Bleiben im Wartungsmodus für alle erreichbar: Konfiguration (zeigt die Wartung an) und Anmeldung für Admins. */
     private const MAINTENANCE_OPEN = ['/config', '/auth/login', '/auth/logout', '/auth/csrf'];
+    /** In der Vorschau (Issue #63) trotz „nur ansehen“ erlaubt: Abmelden (die App beendet dabei auch die Vorschau). */
+    public const PREVIEW_OPEN = ['/auth/logout'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -65,10 +68,28 @@ final class Api
             : Response::error(ApiError::notFound('Unbekannte Adresse.'));
     }
 
-    /** Prüft Bereich und Rechte und führt eine Route aus. Fehler werden zu Fehlerantworten. */
+    /**
+     * Prüft Bereich und Rechte und führt eine Route aus. Fehler werden zu Fehlerantworten.
+     * Die Vorschau (Issue #63) gilt für genau diese Anfrage: aus dem Header bzw. ?vorschau=… gesetzt, danach wie vorher.
+     */
     public function dispatch(Route $route, Request $request): Response
     {
+        $preview = $this->app->preview();
+        $before = $preview->begin(Preview::valueFrom($request->preview, $request->query[Preview::QUERY] ?? null));
         try {
+            return $this->run($route, $request);
+        } finally {
+            $preview->begin($before);
+        }
+    }
+
+    private function run(Route $route, Request $request): Response
+    {
+        try {
+            // Vorschau: nur ansehen, auf dem Server erzwungen – auch bei ungültiger Vorschau oder ohne Admin.
+            if ($this->app->preview()->requested() && !in_array($request->method, ['GET', 'HEAD'], true) && !in_array($route->path, self::PREVIEW_OPEN, true)) {
+                throw Preview::readOnlyError();
+            }
             if ($route->feature !== null && !$this->app->features()->enabled($route->feature)) {
                 throw new ApiError(403, 'feature_disabled', 'Dieser Bereich ist ausgeschaltet.');
             }
@@ -267,6 +288,7 @@ final class Api
         foreach ($a->features()->all() as $key => $on) {
             $features[$key] = $on && $a->features()->configured($key);
         }
+        $user = $a->authContext->currentUser();
         return [
             'apiBase' => $a->env->apiBase(),
             'appUrl' => $a->env->appUrl(),
@@ -285,14 +307,19 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
+            // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
+            'reports' => $a->bugReports()->available(),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
-            'user' => $a->authContext->currentUser()?->toArray(),
+            // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
+            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user)] : null,
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
+            // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
+            'preview' => $a->preview()->info(),
         ];
     }
 
@@ -373,6 +400,9 @@ final class Api
                 return ['changed' => true];
             }),
             // Web Push (Issue #19): Konten über /me/push, Gäste über /push (Ändern und Löschen nur mit dem auth-Geheimnis).
+            // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
+            new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
+            new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
             new Route('GET', '/push/key', $P, fn () => ['supported' => $a->push()->supported(), 'publicKey' => $a->push()->publicKey()]),
             new Route('POST', '/me/push/status', $L, fn (Request $r) => $this->pushStatus($r, $this->user())),
             new Route('POST', '/push/status', $P, fn (Request $r) => $this->pushStatus($r, null)),
@@ -591,7 +621,8 @@ final class Api
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
                 + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
-            new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
+            // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
+            new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
@@ -626,11 +657,14 @@ final class Api
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
-            // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung
+            // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung; Benachrichtigung am Geburtstag
             new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),
             new Route('PATCH', '/admin/push', Cap::ManageSettings, function (Request $r) use ($a) {
                 if ($r->has('reminder_hour')) {
                     $a->push()->setReminderHour($r->input('reminder_hour'));
+                }
+                if ($r->has('birthday_notify') || $r->has('birthday_hour')) {
+                    $a->birthdays()->setNotify($r->input('birthday_notify'), $r->input('birthday_hour'));
                 }
                 return $a->push()->adminStatus();
             }, null, $denySettings),
@@ -663,6 +697,9 @@ final class Api
                 $a->googleConnect()->disconnect();
                 return $a->settingsService()->get();
             }, null, $denySettings),
+            // Bilder, die sich nicht laden ließen: Liste mit Fehlermeldung, alle erneut versuchen
+            new Route('GET', '/admin/gallery/failed', Cap::ManageSettings, fn () => ['photos' => $a->gallery()->failedPhotos(), 'total' => $a->gallery()->countFailed()], null, $denySettings),
+            new Route('POST', '/admin/gallery/retry', Cap::ManageSettings, fn () => ['retried' => $a->gallery()->retryFailedNow(), 'pending' => $a->gallery()->countPending()], null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)

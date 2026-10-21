@@ -37,6 +37,7 @@ final class MemberService
             'id' => $user->id,
             'name' => $user->name,
             'level' => $user->role,
+            'extra_roles' => $this->roles?->extraRolesOf($user) ?? [],
             'points' => $this->scores->pointsTotal($user->id),
             'open_cents' => $this->scores->openCents($user->id),
         ];
@@ -73,6 +74,8 @@ final class MemberService
                 'first_name' => $u->firstName,
                 'last_name' => $u->lastName,
                 'level' => $u->role,
+                // Zusatzrollen (Issue #66); level bleibt die Grundrolle
+                'extra_roles' => $this->roles?->extraRolesOf($u) ?? [],
                 // Mit Mitgliederbereich (Punkte und Strafen möglich); sonst nur Kalender oder Gast.
                 'member' => $u->isMember(),
                 'points' => $points ? ($totals[$u->id]['points'] ?? 0) : null,
@@ -96,6 +99,7 @@ final class MemberService
             'first_name' => $u->firstName,
             'last_name' => $u->lastName,
             'level' => $u->role,
+            'extra_roles' => $this->roles?->extraRolesOf($u) ?? [],
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
@@ -121,8 +125,16 @@ final class MemberService
         return $viewer === null ? [true, true] : [$viewer->can(Capability::ManagePoints), $viewer->can(Capability::ManagePenalties)];
     }
 
-    /** @return array{id: int, level: string} */
-    public function setLevel(User $actor, int $id, mixed $level): array
+    /**
+     * Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66) ändern. Beides wird erst vollständig geprüft,
+     * dann geschrieben. Zusatzrollen gelten dieselben Regeln wie der Grundrolle: Wer kein Admin ist, vergibt und
+     * entfernt nur Rollen, deren Rechte er selbst hat und die weder Konten anlegen noch Rollen vergeben dürfen, und nur
+     * bei Personen, die nicht mehr Rechte haben als er (RoleService::canHandle/canHandleUser).
+     *
+     * @param mixed $extraRoles Liste von Schlüsseln; null = unverändert
+     * @return array{id: int, level: string, extra_roles: list<string>}
+     */
+    public function setLevel(User $actor, int $id, mixed $level, mixed $extraRoles = null): array
     {
         if ($actor->id === $id) {
             throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
@@ -131,28 +143,92 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Benutzer nicht gefunden.');
         }
-        $new = is_string($level) ? $level : '';
-        $known = $this->roles !== null ? $this->roles->exists($new) : isset(Roles::TEMPLATES[$new]);
-        if (!$known) {
-            throw ApiError::invalid('Ungültige Rolle.');
+        if ($level === null && $extraRoles === null) {
+            throw ApiError::invalid('Bitte eine Rolle angeben.');
         }
-        if (($new === Roles::ADMIN || $target->isAdmin()) && !$this->users->canAssignAdmin()) {
-            throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
+        $new = $level === null ? $target->role : (is_string($level) ? $level : '');
+        if ($level !== null) {
+            $known = $this->roles !== null ? $this->roles->exists($new) : isset(Roles::TEMPLATES[$new]);
+            if (!$known) {
+                throw ApiError::invalid('Ungültige Rolle.');
+            }
+            if (($new === Roles::ADMIN || $target->isAdmin()) && !$this->users->canAssignAdmin()) {
+                throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
+            }
+            // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
+            if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandleUser($actor, $target))) {
+                throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
+            }
+            if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
+                throw ApiError::invalid('Der letzte Admin kann nicht herabgestuft werden.');
+            }
         }
-        // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
-        if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandleUser($actor, $target))) {
-            throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
+        $extra = $this->roles !== null ? $this->roles->extraRolesOf($target) : [];
+        $nextExtra = $extra;
+        if ($extraRoles !== null) {
+            $nextExtra = $this->checkExtraRoles($actor, $target, $new, $extraRoles, $extra);
+        } elseif ($this->roles !== null && !$this->roles->allowsExtraRoles($new)) {
+            // Neue Grundrolle ohne Mitgliederbereich (z. B. Anwärter, Gast) oder Admin: Zusatzrollen fallen weg.
+            $nextExtra = [];
         }
-        if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
-            throw ApiError::invalid('Der letzte Admin kann nicht herabgestuft werden.');
+        if ($level !== null) {
+            try {
+                $this->users->setRole($id, $new);
+            } catch (\DomainException $e) {
+                throw ApiError::invalid($e->getMessage());
+            }
         }
-        try {
-            $this->users->setRole($id, $new);
-        } catch (\DomainException $e) {
-            throw ApiError::invalid($e->getMessage());
+        if ($this->roles !== null && $nextExtra !== $extra) {
+            $this->roles->setExtraRoles($id, $nextExtra);
         }
         $after = $this->users->find($id);
-        return ['id' => $id, 'level' => $after?->role ?? $new];
+        return ['id' => $id, 'level' => $after?->role ?? $new, 'extra_roles' => $after !== null && $this->roles !== null ? $this->roles->extraRolesOf($after) : []];
+    }
+
+    /**
+     * Gewünschte Zusatzrollen prüfen (Issue #66): nur eigene Rollen, nur zu einer Grundrolle mit Mitgliederbereich, nicht
+     * für Admins; wer kein Admin ist, nur mit Rollen, die er auch als Grundrolle vergeben dürfte (hinzufügen wie
+     * entfernen). Die Grundrolle selbst als Zusatzrolle fällt still weg.
+     *
+     * @param list<string> $current wirksame Zusatzrollen bisher
+     * @return list<string> künftige Zusatzrollen, in der Reihenfolge der Rollen
+     */
+    private function checkExtraRoles(User $actor, User $target, string $base, mixed $raw, array $current): array
+    {
+        if ($this->roles === null) {
+            throw ApiError::invalid('Zusatzrollen gibt es hier nicht.');
+        }
+        if (!is_array($raw) || !array_is_list($raw)) {
+            throw ApiError::invalid('Zusatzrollen als Liste angeben.');
+        }
+        $wanted = [];
+        foreach ($raw as $key) {
+            if (!is_string($key) || !$this->roles->exists($key)) {
+                throw ApiError::invalid('Ungültige Zusatzrolle.');
+            }
+            if (!RoleService::canBeExtra($key)) {
+                throw ApiError::invalid(sprintf('„%s“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', $this->roles->label($key)));
+            }
+            if ($key !== $base) {
+                $wanted[$key] = true;
+            }
+        }
+        if ($wanted !== [] && ($target->isAdmin() || $base === Roles::ADMIN)) {
+            throw ApiError::invalid('Admins haben schon alle Rechte und bekommen keine Zusatzrollen.');
+        }
+        if ($wanted !== [] && !$this->roles->allowsExtraRoles($base)) {
+            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich, nicht zu „%s“.', $this->roles->label($base)));
+        }
+        $changed = array_merge(array_diff(array_keys($wanted), $current), array_diff($current, array_keys($wanted)));
+        if ($changed !== [] && !$this->roles->canHandleUser($actor, $target)) {
+            throw ApiError::forbidden('Die Rollen dieser Person darfst du nicht ändern.');
+        }
+        foreach ($changed as $key) {
+            if (!$this->roles->canHandle($actor, $key)) {
+                throw ApiError::forbidden(sprintf('Die Rolle „%s“ darfst du nicht vergeben bzw. entfernen.', $this->roles->label($key)));
+            }
+        }
+        return array_values(array_filter(array_keys($this->roles->all()), static fn (string $k): bool => isset($wanted[$k])));
     }
 
     /**

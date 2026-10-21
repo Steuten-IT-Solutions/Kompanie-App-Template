@@ -194,6 +194,31 @@ final class GalleryTest extends TestCase
         $this->app->db->execute("UPDATE {photos} SET status = 'error', attempts = 5 WHERE id = ?", [$intern['id']]);
         $gallery->sync();
         $this->assertSame('error', $this->app->db->scalar('SELECT status FROM {photos} WHERE id = ?', [$intern['id']]));
+
+        // Liste für Admins (Einstellungen → Galerie): Datei, Album, Fehlermeldung, Link zu Drive; „Erneut versuchen“
+        // reiht auch nach den fünf Versuchen wieder ein.
+        $this->app->db->execute("UPDATE {photos} SET error = 'Datei ist kein unterstütztes Bild' WHERE id = ?", [$intern['id']]);
+        $this->users->current = $this->users->add('mitglied-liste', Roles::MEMBER);
+        $this->assertSame(403, $this->app->api()->handle(new Request('GET', '/admin/gallery/failed'))->status);
+        $this->users->current = $this->users->add('admin-galerie', Roles::ADMIN);
+        $res = $this->app->api()->handle(new Request('GET', '/admin/gallery/failed'));
+        $this->assertSame(200, $res->status);
+        $this->assertSame(1, $res->data['total']);
+        $row = $this->app->db->selectOne('SELECT name, drive_file_id FROM {photos} WHERE id = ?', [$intern['id']]);
+        $this->assertSame([[
+            'id' => $intern['id'],
+            'name' => $row['name'],
+            'album' => '2026 · Sommerfest',
+            'intern' => true,
+            'error' => 'Datei ist kein unterstütztes Bild',
+            'attempts' => 5,
+            'drive_url' => 'https://drive.google.com/file/d/' . $row['drive_file_id'] . '/view',
+        ]], $res->data['photos']);
+        $this->assertSame(1, $this->app->settingsService()->get()['gallery']['status']['failed']);
+        $res = $this->app->api()->handle(new Request('POST', '/admin/gallery/retry'));
+        $this->assertSame(['retried' => 1, 'pending' => 1], $res->data);
+        $this->assertSame(['pending', 0, ''], array_values($this->app->db->selectOne('SELECT status, attempts, error FROM {photos} WHERE id = ?', [$intern['id']])));
+        $this->assertSame(['photos' => [], 'total' => 0], $this->app->api()->handle(new Request('GET', '/admin/gallery/failed'))->data);
         $this->app->db->execute("UPDATE {photos} SET status = 'ready', attempts = 0 WHERE id = ?", [$intern['id']]);
 
         // API: Gäste und Mitglieder

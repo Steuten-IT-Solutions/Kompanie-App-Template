@@ -20,6 +20,6 @@ Die Einstellungen erreichst du unter **Verwaltung → Einstellungen**: im Bereic
 ## Benachrichtigungen
 Hier steht, wie viele Geräte für Benachrichtigungen angemeldet sind (mit Konto und als Gast) und ob Nachrichten auf den Versand warten. Kann der Server keine Benachrichtigungen senden, nennt die Seite, was fehlt; das schaltet euer Hoster in den PHP-Einstellungen ein.
 
-Bei **Erinnerung an Termine am nächsten Tag ab** wählst du die Uhrzeit, ab der die Erinnerung an die Termine des Folgetags verschickt wird. Worüber jede Person benachrichtigt wird, wählt sie selbst auf ihrem Gerät, siehe [Benachrichtigungen](seite:benachrichtigungen).
+Bei **Erinnerung an Termine am nächsten Tag ab** wählst du die Uhrzeit, ab der die Erinnerung an die Termine des Folgetags verschickt wird. Ist der Bereich {bereich.birthdays} an, schaltest du darunter mit **Am Geburtstag eines Mitglieds alle anderen benachrichtigen** die Benachrichtigung am Geburtstag aus oder ein und wählst bei **Benachrichtigung am Geburtstag ab**, ab wann sie kommt (üblich 7 Uhr). Worüber jede Person benachrichtigt wird, wählt sie selbst auf ihrem Gerät, siehe [Benachrichtigungen](seite:benachrichtigungen).
 
 > Klappt etwas nicht, hilft oft [Häufige Probleme](seite:haeufige-probleme).

@@ -18,6 +18,8 @@ final class User
         /** Vor- und Nachname (Domain\PersonName); $name ist der Anzeigename */
         public readonly string $firstName = '',
         public readonly string $lastName = '',
+        /** Vorschau „App als Rolle ansehen“ (Issue #63, Auth\Preview): ein Admin mit genau dieser Rolle, ohne Zusatzrollen */
+        public readonly bool $preview = false,
     ) {
     }
 

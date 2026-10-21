@@ -22,7 +22,7 @@ use KompanieApp\Core\Domain\RankService;
  *   höchstens bis zum Ablauf der Nachricht zustellbar; Ändern löst nichts aus;
  * - neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem Ende an
  *   alle Mitglieder ohne Antwort (einmal je Umfrage, Aufgabe poll_reminders);
- * - Geburtstag (Issue #1): am Tag selbst ab 7 Uhr an alle Mitglieder außer dem Geburtstagskind, nur für Geburtstage,
+ * - Geburtstag (Issue #1): am Tag selbst ab der eingestellten Stunde (Standard 7 Uhr) an alle Mitglieder außer dem Geburtstagskind, nur für Geburtstage,
  *   die die Person anderen zeigt (einmal je Geburtstag und Tag, Aufgabe birthday_notifications).
  */
 final class PushTriggers

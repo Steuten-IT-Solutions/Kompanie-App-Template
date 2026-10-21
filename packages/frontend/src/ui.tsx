@@ -1,6 +1,7 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import type { MemberSummary, PersonName } from './api';
 import { dataCache } from './dataCache';
+import { noteError } from './lastError';
 
 /**
  * Lädt Daten asynchron; reload() lädt neu.
@@ -150,6 +151,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
 
   componentDidCatch(error: unknown) {
     console.error(error);
+    noteError(error instanceof Error ? error.message : 'Diese Ansicht konnte nicht angezeigt werden.');
   }
 
   render() {
