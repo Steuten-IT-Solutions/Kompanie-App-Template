@@ -7,7 +7,7 @@ namespace KompanieApp\Core\Storage;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
- * Fotos der Mitglieder: eines je Konto, als JPEG in zwei Größen (Base64) in der Datenbank. So löscht UserData::purge sie
+ * Fotos der Mitglieder: eines je Konto, als JPEG in drei Größen (Base64) in der Datenbank. So löscht UserData::purge sie
  * mit dem Konto (auch auf allen Seiten eines WordPress-Netzwerks), und die Sicherung enthält sie. version wechselt mit
  * jedem Hochladen (Adresse des Fotos); updated_at in UTC ('Y-m-d H:i:s').
  *
@@ -15,8 +15,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
  */
 final class MemberPhotoRepository
 {
-    /** Größen (längere Kante in Pixeln) => Spalte. */
-    public const COLUMNS = [128 => 'small', 480 => 'large'];
+    /** Größen (längere Kante in Pixeln) => Spalte; xlarge ist NULL bei Fotos, die vor Datenbankversion 17 hochgeladen wurden. */
+    public const COLUMNS = [128 => 'small', 480 => 'large', 1024 => 'xlarge'];
 
     public function __construct(private readonly Connection $db)
     {

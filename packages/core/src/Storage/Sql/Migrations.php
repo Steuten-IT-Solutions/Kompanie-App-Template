@@ -790,6 +790,12 @@ final class Migrations
 )',
                 ],
             ],
+            // Fotos der Mitglieder zusätzlich in 1024 Pixeln (xlarge) für die vergrößerte Ansicht. Ohne Vorgabe (NULL):
+            // Fotos von vorher haben diese Fassung erst nach erneutem Hochladen; die App nimmt bis dahin die 480er.
+            17 => [
+                'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge mediumtext DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

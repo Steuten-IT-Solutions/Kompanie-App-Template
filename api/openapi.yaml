@@ -2235,8 +2235,8 @@ paths:
       summary: Foto eines Mitglieds hochladen oder ersetzen
       description: |
         JPG, PNG oder WebP, höchstens 5 MB und 4096 × 4096 Pixel, Base64 im JSON. Geprüft werden Endung und Signatur.
-        Gespeichert werden nur neu erzeugte JPEGs in 128 und 480 Pixeln (längere Kante, nie vergrößert, nach EXIF
-        gedreht, ohne Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
+        Gespeichert werden nur neu erzeugte JPEGs in 128, 480 und 1024 Pixeln (längere Kante, nie vergrößert, nach
+        EXIF gedreht, ohne Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
         `photo_url`) ändert sich. Wer kein Admin ist, nur bei Konten, die er verwalten darf (wie `PATCH
         /members/{id}/account`).
       x-capability: create_users

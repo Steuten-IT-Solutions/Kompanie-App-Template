@@ -5,11 +5,13 @@ import { badgeSrc } from './RankBadge';
 
 /**
  * Fotos der Mitglieder. Hochladen, ersetzen und entfernen nur, wer Mitglieder anlegen darf; sehen die Person selbst
- * (Konto) und wer die Mitglieder in der Verwaltung sieht. Der Server speichert 128 und 480 Pixel.
+ * (Konto) und wer die Mitglieder in der Verwaltung sieht. Der Server speichert 128, 480 und 1024 Pixel.
  */
 
 /** Längere Kante beim Hochladen: genug für die große Fassung, und die Anfrage bleibt klein (Server-Grenzen). */
 const UPLOAD_EDGE = 1024;
+/** Fassung für die vergrößerte Ansicht (so groß wie hochgeladen); ältere Fotos haben sie nicht, dann die große. */
+const ZOOM_PIXELS = 1024;
 const UPLOAD_QUALITY = 0.9;
 
 /** Darstellungsgrößen; geladen wird die passende Fassung (128 oder 480 Pixel, für hochauflösende Displays reichlich). */
@@ -84,12 +86,15 @@ export function MemberAvatar({ url, name, size = 'small' }: { url?: string | nul
 }
 
 /**
- * Foto vergrößert über der Seite (480-Pixel-Fassung, ganzes Bild statt runder Ausschnitt), damit sich neue Mitglieder
- * die Gesichter einprägen können. Schließen mit ✕, Escape oder Tippen neben das Bild. Im body, damit es nicht im
- * Absatz der Dienstgrad-Zeile steht und deren Farbe erbt.
+ * Foto vergrößert über der Seite (1024-Pixel-Fassung, scharf auch bei hoher Pixeldichte; ganzes Bild statt runder
+ * Ausschnitt), damit sich neue Mitglieder die Gesichter einprägen können. Schließen mit ✕, Escape oder Tippen neben
+ * das Bild. Im body, damit es nicht im Absatz der Dienstgrad-Zeile steht und deren Farbe erbt.
  */
 function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  // Vor Datenbankversion 17 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
+  const [fallback, setFallback] = useState(false);
+  const src = url.startsWith('data:') ? url : badgeSrc(url, fallback ? PIXELS.large : ZOOM_PIXELS);
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -110,7 +115,7 @@ function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose:
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <figure onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <img src={url.startsWith('data:') ? url : badgeSrc(url, PIXELS.large)} alt={`Foto von ${name}`} decoding="async" />
+        <img src={src} alt={`Foto von ${name}`} decoding="async" onError={() => setFallback(true)} />
         <figcaption>{name}</figcaption>
       </figure>
       <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
