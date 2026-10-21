@@ -309,11 +309,10 @@ function Members() {
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
-            {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. */}
+            {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. Ohne Dienstgrad bleibt die
+                Spalte leer, damit der Text in allen Zeilen gleich mittig steht. */}
             {m.rank_title !== undefined && (
-              <div className="member-row-rank">
-                {m.rank_title ? <RankStack url={m.rank_badge_url} title={m.rank_title} /> : `Kein ${brand.labels.rank}`}
-              </div>
+              <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
             )}
             <span className="chevron" aria-hidden="true">
               ›
