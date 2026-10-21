@@ -1067,7 +1067,7 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await expect(item(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('Startpasswort');
   await expect(item('Mitglieder anlegen')).toBeVisible();
-  await expect(item('Häufige Probleme')).toHaveCount(0);
+  await expect(item('Wartungsmodus')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('');
   await item('Rollen und Mitglieder').click();
   await page.locator('.hilfe-text a', { hasText: 'Rollen vergeben' }).click(); // Verweis auf eine andere Seite

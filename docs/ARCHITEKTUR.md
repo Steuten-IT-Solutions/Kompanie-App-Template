@@ -464,7 +464,7 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 
 ### Zurückrollen
 
-Jede Kompanie kann in der App unter *Einstellungen → Updates* auf eine **ältere Version** zurückgehen, mit einem Klick und ohne Datenverlust:
+Jede Kompanie kann in der App unter *Einstellungen → Zustand und Updates* auf eine **ältere Version** zurückgehen, mit einem Klick und ohne Datenverlust:
 
 - **Innerhalb einer Hauptversion ändern Migrationen nur additiv:** neue Tabellen oder Spalten, nie Umbenennen oder Löschen. Ältere `1.x`-Versionen laufen deshalb auch mit dem neueren Datenbestand. Zurückrollen heißt nur, den Programmcode zu tauschen. (Geplant: Die CI prüft das, indem die Contract-Tests der vorigen Version gegen den Datenbestand der neuen laufen.)
 - Ältere Versionen lädt der Server bei Bedarf über die signierte Update-Liste nach (sie behält die letzten 60 Versionen und die zuletzt freigegebenen).
@@ -502,11 +502,12 @@ Eine einzelne Datei, auf die Kompanie zugeschnitten (Repo-Name und Signaturschl�
 
 Beim ersten Öffnen durch einen Admin bietet die App den Assistenten an:
 
-1. **Bereiche wählen** (Termine, Kalender, News, Galerie, Punkte, Strafen), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
-2. Kalender (nur wenn gewählt): geheime iCal-Adresse einfügen (mit Anleitung, wo man sie in Google findet), Testabruf
-3. Galerie (nur wenn gewählt): Google-Zugang („Mit Google verbinden“ oder Dienstkonto), Link zum Ordner, Abgleich mit Fortschritt
-4. News (nur wenn gewählt, nur eigenständige Version): Adresse einer vorhandenen Webseite oder eines Feeds, Testabruf
-5. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
+1. **Bereiche wählen** (alle 14 aus `Domain\Features`: Termine, Kalender, News, Galerie, Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, Dokumente, Schwarzes Brett, Umfragen, Geburtstage, Inventar), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
+2. Google-Zugang („Mit Google verbinden“ oder Dienstkonto) beim ersten Schritt, der ihn braucht: Galerie, sonst Kalender (für Kalender-IDs)
+3. Kalender (nur wenn gewählt): Kalender-IDs über den Google-Zugang oder geheime iCal-Adresse (mit Anleitung, wo man sie in Google findet), Testabruf
+4. Galerie (nur wenn gewählt): Link zum Ordner, Abgleich mit Fortschritt
+5. News (nur wenn gewählt, nur eigenständige Version): Adresse einer vorhandenen Webseite oder eines Feeds, Testabruf
+6. „Fast fertig“: optional Statusmeldungen an uns erlauben (siehe Abschnitt 13), dann „Einrichtung abschließen“
 
 Der erste Admin entsteht bei der eigenständigen Version im Installer, bei WordPress ist es ein WordPress-Administrator.
 

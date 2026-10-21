@@ -1,5 +1,5 @@
 ---
-titel: Google einrichten (Galerie und Kalender)
+titel: "Google einrichten ({bereich.gallery} und Kalender)"
 reihenfolge: 115
 rechte: [manage_settings]
 ---
@@ -7,7 +7,7 @@ Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender
 
 > Für den {bereich.calendar} allein brauchst du das nicht: Die **geheime Adresse im iCal-Format** geht ohne Google Cloud (siehe [Ersteinrichtung](seite:admin-einrichtung)).
 
-Den Google-Zugang findest du in der App unter **Verwaltung → Einstellungen → Google-Zugang**; {bereich.calendar} und {bereich.gallery} haben dort je eine eigene Seite. Mit WordPress gibt es ihn auch auf der Einstellungsseite der App im WP-Admin.
+Den Google-Zugang findest du in der App unter **Verwaltung → Einstellungen → Google-Zugang** (Menü oben in der Verwaltung). {bereich.calendar} und {bereich.gallery} haben dort je eine eigene Seite (**Kalender** und **{bereich.gallery}**). Mit WordPress gibt es den Google-Zugang auch im WP-Admin unter *Einstellungen* auf der Seite der App.
 
 ## 1. Projekt anlegen
 1. [console.cloud.google.com](https://console.cloud.google.com/) öffnen und mit dem Google-Konto der Kompanie anmelden. Beim ersten Mal die Nutzungsbedingungen bestätigen.
@@ -29,7 +29,7 @@ Im Projekt jeweils die Seite öffnen und **Aktivieren** klicken:
 > Unter **Datenzugriff** trägst du **nichts** ein. Dort eingetragene Berechtigungen verlangen eine Prüfung durch Google (mit Demo-Video). Die App fragt die beiden Lese-Berechtigungen beim Verbinden selbst an; das reicht.
 
 ## 4. OAuth-Client anlegen
-1. In der App auf der Seite **Google-Zugang** die **Weiterleitungs-URI** kopieren (Knopf **Adresse kopieren**). Sie ist für jede Installation anders: ohne WordPress endet sie auf `google/callback`, mit WordPress auf `wp-admin/admin-post.php`.
+1. In der App auf der Seite **Google-Zugang** die **Weiterleitungs-URI** kopieren (Knopf **Adresse kopieren**). Sie ist für jede Installation anders: ohne WordPress endet sie auf `google/callback`, mit WordPress auf `wp-admin/admin-post.php`. Mit WordPress steht dieselbe Adresse auch im WP-Admin im Feld „Weiterleitungs-URI“.
 2. In der Google Auth Platform links **Clients** öffnen → **Client erstellen**.
 3. **Anwendungstyp:** **Webanwendung**. Name z. B. „Kompanie-App“.
 4. Unter **Autorisierte Weiterleitungs-URIs** → **URI hinzufügen** die kopierte Adresse genau so einfügen (ohne Leerzeichen, mit `https://`). Dann **Erstellen**.
@@ -46,16 +46,18 @@ Im Projekt jeweils die Seite öffnen und **Aktivieren** klicken:
 
 Steht stattdessen, dass es den Kalender noch nicht lesen darf, wurde das Häkchen für den Kalender nicht gesetzt: **Verbindung trennen** und noch einmal verbinden. Client-ID und Clientschlüssel bleiben dabei gespeichert; den Clientschlüssel musst du nicht neu eintragen.
 
-Meldet die App einen Fehler, steht die Ursache dabei. Häufig: Die Weiterleitungs-URI bei Google weicht ab (genau die Adresse aus der App eintragen), der Clientschlüssel stimmt nicht oder die Anmeldung wurde abgebrochen.
+Meldet die App einen Fehler, steht die Ursache dabei. Häufig: Die Weiterleitungs-URI bei Google weicht ab (genau die Adresse aus der App eintragen), der Clientschlüssel stimmt nicht, das Häkchen für Google Drive fehlte oder die Anmeldung wurde abgebrochen. Die Client-ID muss auf `.apps.googleusercontent.com` enden.
 
 ## 6. {bereich.gallery} und {bereich.calendar} eintragen
-- **{bereich.gallery}:** Unter **Einstellungen → {bereich.gallery}** im Abschnitt **{bereich.gallery} aus Google Drive** bei **Link zum Galerie-Ordner** den Link des Ordners aus Google Drive eintragen (z. B. `https://drive.google.com/drive/folders/…`), **Speichern**, dann **Jetzt abgleichen**. Danach gleicht die App den Ordner stündlich im Hintergrund ab; neue Bilder erscheinen spätestens nach dem nächsten Abgleich. Mit WordPress heißen die Felder im WP-Admin „Galerie-Ordner“ und **Galerie speichern**.
-- **{bereich.calendar}:** Unter **Einstellungen → {bereich.calendar}** im Abschnitt **Kalender für Mitglieder** bei **Google-Kalender-IDs** die Kalender-ID eintragen (Google Kalender → beim Kalender **⋮ → Einstellungen und Freigabe** → **Kalender integrieren** → „Kalender-ID“; beim Hauptkalender eines Kontos ist das dessen E-Mail-Adresse; mehrere durch Komma trennen), **Speichern**, dann **Kalender testen**. Mit WordPress gibt es dafür im WP-Admin auch das Feld **„Oder: Google-Kalender-IDs“** und **Speichern und testen**. Das verbundene Google-Konto muss den Kalender sehen können.
+- **{bereich.gallery}:** Unter **Verwaltung → Einstellungen → Galerie** im Abschnitt **{bereich.gallery} aus Google Drive** bei **Link zum Galerie-Ordner** den Link des Ordners aus Google Drive eintragen (z. B. `https://drive.google.com/drive/folders/…`), **Speichern**, dann **Jetzt abgleichen**. Danach gleicht die App den Ordner stündlich im Hintergrund ab; neue Bilder erscheinen spätestens nach dem nächsten Abgleich. Mit WordPress heißen Feld und Knopf im WP-Admin „Galerie-Ordner“ und **Galerie speichern**.
+- **{bereich.calendar}:** Unter **Verwaltung → Einstellungen → Kalender** im Abschnitt **Kalender für Mitglieder** bei **Google-Kalender-IDs** die Kalender-ID eintragen (Google Kalender → beim Kalender **⋮ → Einstellungen und Freigabe** → **Kalender integrieren** → „Kalender-ID“; beim Hauptkalender eines Kontos ist das dessen E-Mail-Adresse; mehrere durch Komma trennen), **Speichern**, dann **Kalender testen**. Mit WordPress gibt es dafür im WP-Admin auch das Feld **„Oder: Google-Kalender-IDs“** und **Speichern und testen**. Das verbundene Google-Konto muss den Kalender sehen können.
+
+Mehr zu beiden Seiten (Reihenfolge der Quellen, iCal-Adresse, Abgleich): [Ersteinrichtung und Bereiche](seite:admin-einrichtung).
 
 ## Prüfen
 - **Jetzt abgleichen** zeigt, wie viele Alben und Bilder gefunden wurden.
 - **Kalender testen** zeigt die ersten Termine. Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache, z. B. Google Calendar API nicht aktiviert oder Kalender für das Konto nicht sichtbar.
-- Unter **Zustand der App** sind {bereich.gallery} und {bereich.calendar} grün.
+- Unter **Verwaltung → Einstellungen → Zustand und Updates** sind {bereich.gallery} und {bereich.calendar} grün (siehe [Zustand und Statusmeldungen](seite:admin-zustand)).
 
 ## Alternative: Dienstkonto mit JSON-Schlüssel
 Statt „Mit Google verbinden“ geht auch ein **Dienstkonto**. Es braucht keine Anmeldung bei Google, aber einen Schlüssel, den manche Google-Organisationen sperren. Schritte 1 und 2 wie oben, dann:
