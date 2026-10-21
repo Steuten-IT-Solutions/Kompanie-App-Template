@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, type Title, type TitleRef } from '../api';
+import { useDragSort } from '../dragSort';
 import brand from '../generated/brand';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
@@ -38,19 +39,22 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
     if (await run(() => api.createTitle(title.trim()), 'Titel angelegt')) setTitle('');
   }
 
-  async function move(list: Title[], index: number, dir: -1 | 1) {
-    const ids = list.map((t) => t.id);
-    [ids[index], ids[index + dir]] = [ids[index + dir], ids[index]];
+  async function reorder(next: Title[]) {
+    // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
+    setData(next);
     setBusy(true);
     setFormError(null);
     try {
-      setData(await api.reorderTitles(ids));
+      setData(await api.reorderTitles(next.map((t) => t.id)));
     } catch (e) {
       setFormError((e as Error).message);
+      reload();
     } finally {
       setBusy(false);
     }
   }
+
+  const sort = useDragSort(data ?? [], reorder, busy || editing !== null);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -60,7 +64,7 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
     <div>
       <p className="muted small">
         Ehrentitel und Ämter, unabhängig von {sec.ranks} und {sec.points}. Ein Mitglied kann mehrere haben; du vergibst sie in den
-        Mitgliedsdetails. Die Reihenfolge hier gilt auch für die Anzeige.
+        Mitgliedsdetails. Die Reihenfolge hier gilt auch für die Anzeige; zum Ändern einen Titel am Griff links ziehen.
       </p>
       {formError && (
         <p className="form-error" role="alert">
@@ -73,7 +77,7 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
         <ul className="card-list title-list">
           {list.map((t, i) =>
             editing === t.id ? (
-              <li key={t.id} className="card">
+              <li key={t.id} {...sort.itemProps(i, 'card')}>
                 <form
                   className="form"
                   onSubmit={async (e) => {
@@ -96,7 +100,25 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
                 </form>
               </li>
             ) : (
-              <li key={t.id} className={`card row ${t.active ? '' : 'inactive'}`}>
+              <li key={t.id} {...sort.itemProps(i, `card row ${t.active ? '' : 'inactive'}`)}>
+                {list.length > 1 && (
+                  <button
+                    type="button"
+                    className="drag-handle"
+                    aria-label={`${t.title} verschieben (ziehen oder Pfeiltasten)`}
+                    title="Zum Verschieben ziehen"
+                    {...sort.handleProps(i)}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <circle cx="9" cy="6" r="1.6" />
+                      <circle cx="15" cy="6" r="1.6" />
+                      <circle cx="9" cy="12" r="1.6" />
+                      <circle cx="15" cy="12" r="1.6" />
+                      <circle cx="9" cy="18" r="1.6" />
+                      <circle cx="15" cy="18" r="1.6" />
+                    </svg>
+                  </button>
+                )}
                 <div className="row-main">
                   <div className="row-title">
                     {t.title}
@@ -104,22 +126,6 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
                   </div>
                   <div className="row-sub">{t.assigned ? `${t.assigned}× vergeben` : 'nicht vergeben'}</div>
                   <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy || i === 0}
-                      onClick={() => move(list, i, -1)}
-                      aria-label={`${t.title} nach oben`}
-                    >
-                      nach oben
-                    </button>
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy || i === list.length - 1}
-                      onClick={() => move(list, i, 1)}
-                      aria-label={`${t.title} nach unten`}
-                    >
-                      nach unten
-                    </button>
                     <button
                       className="btn btn-small btn-secondary"
                       disabled={busy}

@@ -346,6 +346,33 @@ select {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* Griff zum Umsortieren per Ziehen (dragSort.ts); kein disabled, sonst verlöre er nach Pfeiltaste den Fokus */
+.drag-handle {
+  flex: none;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin: -13px 0 -13px -6px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  fill: currentColor;
+  cursor: grab;
+  /* Sonst scrollt der Browser die Seite, statt den Eintrag zu verschieben */
+  touch-action: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.dragging {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
+}
+.drag-shift {
+  transition: transform 0.15s ease;
+}
 .row-actions {
   display: flex;
   flex-wrap: wrap;

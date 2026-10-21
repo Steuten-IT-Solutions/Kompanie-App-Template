@@ -1491,6 +1491,43 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await expect(page.locator('.my-titles')).toContainText(title);
 });
 
+test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach dem Neuladen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const names = ['A', 'B', 'C'].map((n) => `Reihe ${n} ${id}`);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Titel');
+  for (const name of names) {
+    await page.getByLabel('Bezeichnung').fill(name);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.title-list .row', { hasText: name })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: /nach oben/ })).toHaveCount(0);
+  const order = async () => (await page.locator('.title-list .row-title').allTextContents()).filter((t) => t.includes(id));
+  expect(await order()).toEqual(names);
+
+  // C am Griff über A ziehen
+  const handle = page.getByRole('button', { name: `${names[2]} verschieben (ziehen oder Pfeiltasten)` });
+  const from = (await handle.boundingBox())!;
+  const to = (await page.locator('.title-list .row', { hasText: names[0] }).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + 5, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(order).toEqual([names[2], names[0], names[1]]);
+
+  // A mit Pfeil hoch vor C, der Griff behält den Fokus
+  const handleA = page.getByRole('button', { name: `${names[0]} verschieben (ziehen oder Pfeiltasten)` });
+  await handleA.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(order).toEqual([names[0], names[2], names[1]]);
+  await expect(handleA).toBeFocused();
+
+  await page.reload();
+  await expect(page.locator('.title-list .row', { hasText: names[1] })).toBeVisible();
+  expect(await order()).toEqual([names[0], names[2], names[1]]);
+});
+
 test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Änderung zeigt es wieder, abgelaufen weg', async ({
   page,
   browser,
