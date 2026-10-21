@@ -359,7 +359,8 @@ export function Promotions() {
   const [below, setBelow] = useState(false);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const list = (data ?? []).filter((p) => !below || p.below_current_threshold);
+  // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
+  const list = (data ?? []).filter((p) => (below ? p.below_current_threshold : p.next_rank !== null));
   return (
     <div>
       <label className="toggle">

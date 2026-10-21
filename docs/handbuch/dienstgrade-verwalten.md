@@ -22,7 +22,7 @@ Ist auch {bereich.points} eingeschaltet, kann jeder {begriff.rank} eine **Punkte
 
 Wer {bereich.ranks} verwaltet, sieht dafür die Punktestände der Mitglieder, auch ohne selbst {bereich.points} vergeben zu dürfen.
 
-Unter **Verwaltung → Beförderungen** stehen alle Mitglieder: zuerst die, deren Schwelle für den nächsten {begriff.rank} mit Schwelle erreicht ist (mit dem Datum, seit dem), dann nach fehlenden {bereich.points} sortiert. Ein Filter zeigt, wer unter der Schwelle seines aktuellen {begriff.rank}s liegt.
+Unter **Verwaltung → Beförderungen** stehen alle Mitglieder, die noch einen höheren {begriff.rank} erreichen können: zuerst die, deren Schwelle für den nächsten {begriff.rank} mit Schwelle erreicht ist (mit dem Datum, seit dem), dann – durch einen Trenner abgesetzt – nach fehlenden {bereich.points} sortiert. Ein Filter zeigt, wer unter der Schwelle seines aktuellen {begriff.rank}s liegt; dort erscheinen auch Mitglieder mit dem höchsten {begriff.rank}.
 
 ## Bestehende Mitglieder übernehmen
 Wer zusätzlich Mitglieder anlegen darf, kann beim Anlegen gleich den Anfangsbestand an {bereich.points} (mit Datum) und den {begriff.rank} eintragen; mit {bereich.points} nur einen {begriff.rank}, dessen Schwelle der Anfangsbestand erreicht.
