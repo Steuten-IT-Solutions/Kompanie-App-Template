@@ -2008,17 +2008,11 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await card.getByLabel('Text').fill(`${first} – fällt aus, Halle gesperrt`);
   await card.getByRole('button', { name: 'Speichern' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
-  // Erst weiter, wenn das Mitglied die geänderte Fassung geladen hat (Issue #68): Kommt die Antwort auf /board nach dem
-  // Neuladen veraltet an (z. B. aus einem Speicher), schlägt der Test hier mit einer klaren Meldung fehl statt später am
-  // fehlenden „+1 weitere“.
+  // Nach dem Neuladen kommt zuerst der gespeicherte Stand (Issue #108), die geänderte Fassung folgt, sobald das Netz
+  // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');
-  const boardAfterReload = page.waitForResponse((r) => r.request().method() === 'GET' && /\/board(\?|$|&)/.test(r.url()));
   await page.reload();
-  const loaded = await boardAfterReload;
-  const texts = ((await loaded.json()) as { items: { text: string }[] }).items.map((i) => i.text);
-  expect(texts, `Brett nach dem Neuladen${loaded.fromServiceWorker() ? ' (über den Service Worker)' : ''}`).toContain(
-    `${first} – fällt aus, Halle gesperrt`,
-  );
+  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible();
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await banner.getByRole('button', { name: '+1 weitere' }).click();
   await expect(banner).toContainText(`${first} – fällt aus, Halle gesperrt`);
