@@ -15,7 +15,7 @@ import { RankLabel } from '../RankBadge';
 const sec = brand.labels.sections;
 
 /**
- * „Meins“: eigene Titel oben, darunter Übersicht, Punkte, Strafen, Dienstgrad und Anwesenheit, umschaltbar. Die Summen
+ * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad und Anwesenheit, umschaltbar. Die Summen
  * (/me) lädt Meins einmal für alle.
  */
 export default function Meins({ sub }: { sub?: string }) {
@@ -30,14 +30,8 @@ export default function Meins({ sub }: { sub?: string }) {
     ] as const
   ).filter(([, , on]) => on);
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
-  const titles = me.data?.titles ?? [];
   return (
     <div>
-      {titles.length > 0 && (
-        <p className="my-titles" aria-label={sec.titles}>
-          <TitleBadges titles={titles} />
-        </p>
-      )}
       {parts.length > 1 && active && (
         <MenuNav
           label="Meine Daten"
@@ -96,6 +90,12 @@ function Uebersicht({ me }: { me: Me }) {
           {f.penalties && (
             <StatCard label={`Offen: ${sec.penalties}`} value={formatEuro(me.open_cents)} tone={me.open_cents > 0 ? 'warn' : 'good'} />
           )}
+        </div>
+      )}
+      {f?.titles && me.titles !== undefined && (
+        <div className="card account-card my-titles">
+          <h3>{sec.titles}</h3>
+          {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <p className="muted small">Du hast zurzeit keine {sec.titles}.</p>}
         </div>
       )}
     </div>

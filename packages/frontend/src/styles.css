@@ -2140,11 +2140,11 @@ fieldset.feature-list legend {
 .badge-name {
   text-transform: none;
 }
-.my-titles {
-  margin: 0 0 12px;
+.my-overview .stats {
+  margin-bottom: 16px;
 }
 .my-titles .title-badges {
-  margin-left: 0;
+  margin: 6px 0 0;
 }
 .my-titles .badge-title {
   font-size: 0.85rem;

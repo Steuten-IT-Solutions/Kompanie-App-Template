@@ -1895,6 +1895,7 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
+  await shot(page, 'meins-titel');
 });
 
 test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach dem Neuladen', async ({ page }) => {
