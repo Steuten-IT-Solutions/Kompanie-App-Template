@@ -28,6 +28,7 @@ final class ApiScenario
             $this->roles();
             $this->customRoles();
             $this->extraRoles();
+            $this->preview();
             $this->candidates();
             $this->ranks();
             $this->titles();
@@ -42,6 +43,7 @@ final class ApiScenario
             $this->push();
             $this->config();
         } finally {
+            $this->d->preview(null);
             $this->d->actAs(null);
             foreach (array_reverse($this->users) as $id) {
                 $this->d->deleteUser($id);
@@ -469,6 +471,88 @@ final class ApiScenario
         $c->ok($s === 200 && ($this->req('GET', "/members/$m")[1]['extra_roles'] ?? null) === ['penalties'], 'Gelöscht: als Zusatzrolle entfernt');
         [$s, $d] = $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
         $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Zusatzrollen entfernen');
+    }
+
+    /**
+     * Vorschau „App als Rolle ansehen“ (Issue #63): nur für Admins, mit genau den Rechten der Rolle (ohne Zusatzrollen),
+     * dieselbe Person; @public wie ohne Anmeldung; ändernde Anfragen immer 403 preview_readonly.
+     */
+    private function preview(): void
+    {
+        $c = $this->c;
+        $c->section('Vorschau als Rolle');
+        $admin = $this->user('kptest_vorschau_admin', 'admin');
+        $m = $this->user('kptest_vorschau_m', 'member');
+        $this->d->actAs($admin);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Vorschau Kasse', 'capabilities' => ['member', 'manage_points']]);
+        $cash = (string) (array_column((array) $d, 'key', 'label')['Kptest Vorschau Kasse'] ?? '');
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties']]);
+        $pdf = base64_encode("%PDF-1.4\n%%EOF\n");
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [, $all] = $this->req('POST', '/documents', ['title' => "Kptest Vorschau Alle $sfx", 'date' => '2026-10-01', 'file' => ['name' => 'a.pdf', 'data' => $pdf]]);
+        [, $mgr] = $this->req('POST', '/documents', ['title' => "Kptest Vorschau Vorstand $sfx", 'date' => '2026-10-01', 'visibility' => 'managers', 'file' => ['name' => 'b.pdf', 'data' => $pdf]]);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(array_key_exists('preview', (array) $d) && $d['preview'] === null, 'Ohne Header: preview null');
+
+        $this->d->preview('member');
+        [$s, $d] = $this->req('GET', '/config');
+        $caps = (array) ($d['user']['capabilities'] ?? []);
+        sort($caps);
+        $c->ok($s === 200 && ($d['preview']['role'] ?? '') === 'member' && is_string($d['preview']['label'] ?? null), '/config meldet die Vorschau mit Bezeichnung');
+        $c->ok(($d['user']['id'] ?? 0) === $admin && ($d['user']['level'] ?? '') === 'member' && ($d['user']['extra_roles'] ?? null) === [], 'Vorschau: dieselbe Person mit der Rolle, ohne Zusatzrollen');
+        $c->ok($caps === ['calendar', 'member'], 'Vorschau: genau die Rechte der Rolle');
+        $c->ok(($d['setupPending'] ?? null) === false, 'Vorschau: kein Einrichtungsassistent');
+        [$s, $me] = $this->req('GET', '/me');
+        $c->ok($s === 200 && ($me['id'] ?? 0) === $admin && ($me['level'] ?? '') === 'member', '/me: eigene Daten des Admins mit der Rolle');
+        $c->ok($this->req('GET', '/admin/roles')[0] === 403, 'Vorschau: Einstellungen → 403');
+        $c->ok($this->req('GET', '/members')[0] === 403, 'Vorschau: Mitgliederliste ohne Recht → 403');
+        $docs = array_column((array) ($this->req('GET', '/documents')[1]['documents'] ?? []), 'url', 'title');
+        $c->ok(isset($docs["Kptest Vorschau Alle $sfx"]) && !isset($docs["Kptest Vorschau Vorstand $sfx"]), 'Vorschau: Dokumente wie die Rolle');
+        $c->ok(str_contains((string) ($docs["Kptest Vorschau Alle $sfx"] ?? ''), 'vorschau=member'), 'Vorschau: Adressen der Dateien tragen die Vorschau');
+        [$s, $err] = $this->req('POST', '/board', ['text' => 'Kptest Vorschau', 'push' => false]);
+        $c->ok($s === 403 && ($err['code'] ?? '') === 'preview_readonly', 'Vorschau: Ändern → 403 preview_readonly');
+        $c->ok(($this->req('PUT', '/me/birthday', ['month' => 5, 'day' => 4])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: eigener Geburtstag nicht änderbar');
+        $c->ok(($this->req('POST', '/me/push/status', [])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Benachrichtigungen nicht änderbar');
+        $c->ok(($this->req('POST', '/me/password', ['current_password' => 'x', 'new_password' => 'y'])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Passwort nicht änderbar');
+        $c->ok(($this->req('PATCH', "/members/$m/role", ['extra_roles' => []])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Admin-Rechte wirken auch beim Ändern nicht');
+
+        $this->d->preview($cash);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(in_array('manage_points', (array) ($d['user']['capabilities'] ?? []), true) && !in_array('manage_settings', (array) ($d['user']['capabilities'] ?? []), true), 'Vorschau als eigene Rolle: deren Rechte');
+        $c->ok($this->req('GET', '/members')[0] === 200, 'Vorschau als eigene Rolle: Mitgliederliste mit deren Recht');
+
+        $this->d->preview('@public');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(($d['preview']['role'] ?? '') === '@public' && $d['user'] === null, 'Vorschau ohne Anmeldung: kein Benutzer');
+        $c->ok($this->req('GET', '/me')[0] === 401 && $this->req('GET', '/calendar')[0] === 401, 'Vorschau ohne Anmeldung: interne Inhalte → 401');
+        $c->ok($this->req('GET', '/events')[0] === 200, 'Vorschau ohne Anmeldung: öffentliche Inhalte');
+        $c->ok(($this->req('POST', '/push/status', [])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau ohne Anmeldung: nur ansehen');
+
+        $this->d->preview('admin');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Vorschau als Admin gibt es nicht (ignoriert)');
+        $this->d->preview('gibtesnicht');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Unbekannte Rolle: ignoriert');
+        $c->ok(($this->req('POST', '/board', ['text' => 'Kptest Vorschau', 'push' => false])[1]['code'] ?? '') === 'preview_readonly', 'Ungültige Vorschau bleibt trotzdem nur lesend');
+
+        $this->d->actAs($m);
+        $this->d->preview('member');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && in_array('manage_penalties', (array) ($d['user']['capabilities'] ?? []), true), 'Nicht-Admins: Vorschau ignoriert, eigene Rechte');
+        $this->d->preview('admin');
+        $c->ok($this->req('GET', '/admin/roles')[0] === 403, 'Nicht-Admins bekommen über die Vorschau keine Rechte');
+        $c->ok(($this->req('POST', '/penalties', ['user_ids' => [$m], 'amount_cents' => 100, 'reason' => 'Kptest'])[1]['code'] ?? '') === 'preview_readonly', 'Nicht-Admins mit Header: nur lesend');
+
+        $this->d->preview(null);
+        $this->d->actAs($admin);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Nach der Vorschau wieder Admin');
+        foreach ([$all, $mgr] as $doc) {
+            $this->req('DELETE', '/documents/' . ($doc['id'] ?? 0));
+        }
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
+        $c->ok($this->req('DELETE', '/admin/roles/' . $cash)[0] === 200, 'Aufräumen');
     }
 
     /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */

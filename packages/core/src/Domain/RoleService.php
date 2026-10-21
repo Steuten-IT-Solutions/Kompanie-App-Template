@@ -123,8 +123,8 @@ final class RoleService
 
     /**
      * Rechte einer Person: die ihrer Grundrolle und aller Zusatzrollen zusammen (Issue #66). Die einzige Stelle, die die
-     * Rechte einer Person ausrechnet (die Adapter rufen sie über ihre Closure auf); eine Vorschau „App als Rolle ansehen“
-     * (Issue #63) setzt hier andere Rollen ein. Die Zusatzrollen kosten für alle Benutzer einer Anfrage zusammen eine
+     * Rechte einer Person ausrechnet (die Adapter rufen sie über ihre Closure auf). Die Vorschau „App als Rolle ansehen“
+     * (Issue #63, Auth\Preview) ersetzt dagegen die angemeldete Person durch eine mit genau einer Rolle (capabilities()). Die Zusatzrollen kosten für alle Benutzer einer Anfrage zusammen eine
      * Abfrage, und nur, wenn die Grundrolle den Mitgliederbereich hat.
      *
      * @return Capability[]
@@ -184,7 +184,8 @@ final class RoleService
      */
     public function extraRolesOf(User $user): array
     {
-        return $this->extraRoles($user->id, $user->role);
+        // Vorschau (Issue #63): genau die gewählte Rolle, nicht die gespeicherten Zusatzrollen des Admin-Kontos.
+        return $user->preview ? [] : $this->extraRoles($user->id, $user->role);
     }
 
     /** Kann eine Person mit dieser Grundrolle Zusatzrollen haben? Nur mit Mitgliederbereich und nicht als Admin. */

@@ -15,6 +15,8 @@ final class User
         /** Schlüssel der Rolle (Auth\Roles bzw. vom Admin angelegt) */
         public readonly string $role,
         public readonly array $capabilities,
+        /** Vorschau „App als Rolle ansehen“ (Issue #63, Auth\Preview): ein Admin mit genau dieser Rolle, ohne Zusatzrollen */
+        public readonly bool $preview = false,
     ) {
     }
 

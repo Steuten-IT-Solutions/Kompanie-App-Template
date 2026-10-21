@@ -20,6 +20,8 @@ final class Request
         public array $params = [],
         /** Kennung des Anfragenden (z. B. die IP-Adresse), nur für Begrenzungen; leer, wenn unbekannt */
         public readonly string $client = '',
+        /** Header X-Kompanie-Preview der Anfrage (Vorschau „App als Rolle ansehen“, Issue #63); sonst gilt ?vorschau=… */
+        public readonly ?string $preview = null,
     ) {
     }
 

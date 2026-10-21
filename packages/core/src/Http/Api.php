@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Http;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability as Cap;
+use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\EventService;
@@ -31,6 +32,8 @@ final class Api
     public const SETUP_SETTING = 'setup_done';
     /** Bleiben im Wartungsmodus für alle erreichbar: Konfiguration (zeigt die Wartung an) und Anmeldung für Admins. */
     private const MAINTENANCE_OPEN = ['/config', '/auth/login', '/auth/logout', '/auth/csrf'];
+    /** In der Vorschau (Issue #63) trotz „nur ansehen“ erlaubt: Abmelden (die App beendet dabei auch die Vorschau). */
+    public const PREVIEW_OPEN = ['/auth/logout'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -63,10 +66,28 @@ final class Api
             : Response::error(ApiError::notFound('Unbekannte Adresse.'));
     }
 
-    /** Prüft Bereich und Rechte und führt eine Route aus. Fehler werden zu Fehlerantworten. */
+    /**
+     * Prüft Bereich und Rechte und führt eine Route aus. Fehler werden zu Fehlerantworten.
+     * Die Vorschau (Issue #63) gilt für genau diese Anfrage: aus dem Header bzw. ?vorschau=… gesetzt, danach wie vorher.
+     */
     public function dispatch(Route $route, Request $request): Response
     {
+        $preview = $this->app->preview();
+        $before = $preview->begin(Preview::valueFrom($request->preview, $request->query[Preview::QUERY] ?? null));
         try {
+            return $this->run($route, $request);
+        } finally {
+            $preview->begin($before);
+        }
+    }
+
+    private function run(Route $route, Request $request): Response
+    {
+        try {
+            // Vorschau: nur ansehen, auf dem Server erzwungen – auch bei ungültiger Vorschau oder ohne Admin.
+            if ($this->app->preview()->requested() && !in_array($request->method, ['GET', 'HEAD'], true) && !in_array($route->path, self::PREVIEW_OPEN, true)) {
+                throw Preview::readOnlyError();
+            }
             if ($route->feature !== null && !$this->app->features()->enabled($route->feature)) {
                 throw new ApiError(403, 'feature_disabled', 'Dieser Bereich ist ausgeschaltet.');
             }
@@ -291,6 +312,8 @@ final class Api
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
+            // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
+            'preview' => $a->preview()->info(),
         ];
     }
 
