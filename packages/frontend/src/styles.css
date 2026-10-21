@@ -3124,3 +3124,361 @@ fieldset.feature-list legend {
   border-top: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
+
+/* Ämter (Issue #112): Tab Mitglieder mit Umschalter, je Amt eine aufklappbare Karte mit Zeitstrahl */
+.members-switch {
+  margin-bottom: 14px;
+}
+.offices-tools {
+  justify-content: flex-end;
+  margin: 0 0 4px;
+}
+.office-group .section-title {
+  margin-top: 18px;
+}
+.office-card {
+  overflow: hidden;
+  margin-bottom: 10px;
+  border-left: 4px solid var(--line-strong);
+  transition: border-color 0.15s ease;
+}
+.office-card.open {
+  border-left-color: var(--primary-text);
+}
+.office-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.office-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.office-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+.office-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.office-summary-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Fotos der aktuellen Inhaber, leicht übereinander */
+.office-faces {
+  display: flex;
+  flex: none;
+}
+.office-faces .member-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 0.66rem;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.office-faces > * + * {
+  margin-left: -5px;
+}
+.office-faces-more {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary-text);
+  color: var(--card);
+  box-shadow: 0 0 0 2px var(--card);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.office-count {
+  flex: none;
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-text) 12%, transparent);
+  color: var(--primary-text);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.office-arrow {
+  flex: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--accent-dark);
+  transition: transform 0.15s ease;
+}
+.office-head[aria-expanded='true'] .office-arrow {
+  transform: rotate(90deg);
+}
+.office-body {
+  padding: 6px 14px 16px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card));
+}
+
+/* Zeitstrahl: Linie links mit einer Karte je Amtszeit; auf breiten Bildschirmen Linie in der Mitte, abwechselnd */
+.timeline {
+  --tl-x: 11px;
+  position: relative;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: calc(var(--tl-x) - 1px);
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--primary-text), var(--line-strong) 60%);
+}
+.timeline-item {
+  position: relative;
+  padding: 0 0 12px calc(var(--tl-x) * 2 + 10px);
+}
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+.timeline-marker {
+  position: absolute;
+  top: 14px;
+  left: calc(var(--tl-x) - 8px);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 3px solid var(--primary-text);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+.timeline-item.current .timeline-marker {
+  background: var(--primary-text);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+/* Einzelnes Jahr (z. B. eine Ehrung): Stern */
+.timeline-item.point .timeline-marker {
+  width: 22px;
+  height: 22px;
+  top: 11px;
+  left: calc(var(--tl-x) - 11px);
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.85rem;
+}
+.timeline-card {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+.timeline-item.current .timeline-card {
+  border-color: color-mix(in srgb, var(--primary-text) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary-text) 7%, var(--card));
+}
+.timeline-item.point .timeline-card {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+}
+.timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.timeline-years {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.timeline-now {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.timeline-honor {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent-text);
+}
+.timeline-duration {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.timeline-office {
+  font-weight: 600;
+  margin-top: 4px;
+}
+.timeline-holders {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.timeline-holders li {
+  min-width: 0;
+}
+.holder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 10px 2px 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.holder-chip .member-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.7rem;
+}
+.holder-chip-link {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--line));
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.holder-chip-link:hover,
+.holder-chip-link:focus-visible {
+  background: color-mix(in srgb, var(--primary-text) 12%, transparent);
+}
+.timeline-note {
+  margin-top: 6px;
+  font-size: 0.86rem;
+  font-style: italic;
+  color: var(--muted);
+}
+@media (min-width: 720px) {
+  .timeline {
+    --tl-x: 50%;
+  }
+  .timeline-item {
+    width: 50%;
+    padding: 0 26px 14px 0;
+  }
+  .timeline-item:nth-child(even) {
+    margin-left: 50%;
+    padding: 0 0 14px 26px;
+  }
+  /* Karten links: zur Linie hin ausgerichtet */
+  .timeline-item:not(:nth-child(even)) .timeline-card {
+    text-align: right;
+  }
+  .timeline-item:not(:nth-child(even)) .timeline-head,
+  .timeline-item:not(:nth-child(even)) .timeline-holders {
+    justify-content: flex-end;
+  }
+  .timeline-marker,
+  .timeline-item.point .timeline-marker {
+    left: auto;
+    right: -8px;
+  }
+  .timeline-item.point .timeline-marker {
+    right: -11px;
+  }
+  .timeline-item:nth-child(even) .timeline-marker {
+    right: auto;
+    left: -8px;
+  }
+  .timeline-item.point:nth-child(even) .timeline-marker {
+    left: -11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-arrow,
+  .office-card {
+    transition: none;
+  }
+}
+
+/* Mitgliederliste: Knopf „Ämter“ je Person; Pflege der Ämter */
+.member-row-offices {
+  flex: none;
+}
+.office-admin-group {
+  margin-bottom: 18px;
+}
+.office-admin-terms {
+  margin: 8px 0 0;
+}
+.office-term-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.office-term-row .row-actions {
+  margin-left: auto;
+}
+.office-holder-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+.office-holder-row .field {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.office-import textarea {
+  width: 100%;
+  min-height: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+.office-import-rows {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.office-import-rows li {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.office-import-rows .form-error {
+  margin: 2px 0 0;
+}

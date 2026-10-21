@@ -294,8 +294,8 @@ final class Api
     }
 
     /**
-     * Mitgliederliste für Mitglieder und Anwärter: Namen und Fotos, mit den Bereichen auch Dienstgrad (mit Abzeichen) und
-     * Titel. Keine Rollen, Punkte, Strafen oder Kontodaten.
+     * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
+     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten.
      *
      * @return list<array<string, mixed>>
      */
@@ -424,7 +424,6 @@ final class Api
         $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
         $denyPolls = 'Umfragen sind nur für Mitglieder.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
-        $denyDirectory = 'Die Mitgliederliste ist nur für Mitglieder und Anwärter.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = Cap::memberList();
@@ -560,6 +559,36 @@ final class Api
             }, 'titles', $denyRights),
             new Route('PUT', '/members/{id}/titles', Cap::ManageTitles, fn (Request $r) => ['titles' => $a->titles()->assign($r->id(), $r->input('title_ids'))], 'titles', $denyRights),
 
+            // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
+            new Route('GET', '/offices', $P, fn () => $a->offices()->overview($a->authContext->currentUser()), 'offices'),
+            new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->input('title'))), 'offices', $denyRights),
+            new Route('PUT', '/office-groups/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderGroups($r->input('ids')), 'offices', $denyRights),
+            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->input('title')), 'offices', $denyRights),
+            new Route('DELETE', '/office-groups/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteGroup($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+            new Route('POST', '/offices', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createOffice($r->body)), 'offices', $denyRights),
+            new Route('PUT', '/offices/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderOffices($r->input('ids')), 'offices', $denyRights),
+            // Import (Ersterfassung): ohne apply nur die Vorschau
+            new Route('POST', '/offices/import', Cap::ManageOffices, fn (Request $r) => $a->offices()->import(
+                $r->input('csv'),
+                $r->input('link') === null ? true : Input::bool($r->input('link')),
+                Input::bool($r->input('apply')),
+            ), 'offices', $denyRights),
+            new Route('PATCH', '/offices/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateOffice($r->id(), $r->body), 'offices', $denyRights),
+            new Route('DELETE', '/offices/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteOffice($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+            new Route('GET', '/offices/{id}/title-preview', Cap::ManageOffices, fn (Request $r) => $a->offices()->linkPreview($r->id(), $r->query['title_id'] ?? null), 'offices', $denyRights),
+            new Route('POST', '/offices/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createTerm($r->id(), $r->body)), 'offices', $denyRights),
+            new Route('PATCH', '/office-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateTerm($r->id(), $r->body), 'offices', $denyRights),
+            new Route('DELETE', '/office-terms/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteTerm($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+
             // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
             new Route('GET', '/documents', Cap::Member, fn () => $a->documents()->list($this->user()), 'documents', $denyMember),
             new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),
@@ -665,8 +694,8 @@ final class Api
                 return ['deleted' => true];
             }, 'attendance', $denyRights),
 
-            // Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Namen, Fotos, Dienstgrade und Titel
-            new Route('GET', '/directory', [Cap::Member, Cap::Calendar], fn () => $this->directory(), 'directory', $denyDirectory),
+            // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und Titel
+            new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {

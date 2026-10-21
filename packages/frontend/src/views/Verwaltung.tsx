@@ -24,6 +24,8 @@ import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
+import { OfficeAdmin } from './AemterVerwalten';
+import { PersonOffices } from './Aemter';
 import {
   DEFAULT_MEMBER_SORT,
   defaultDir,
@@ -40,7 +42,7 @@ import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberB
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
+type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'aemter' | 'anwesenheit';
 
 const sec = brand.labels.sections;
 
@@ -88,6 +90,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Promotions />
       ) : active === 'titel' ? (
         <TitleList onToast={onToast} />
+      ) : active === 'aemter' ? (
+        <OfficeAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : (
@@ -359,6 +363,8 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
     { id: 'strafen', label: sec.penalties, on: canPenalties() },
     { id: 'dienstgrad', label: brand.labels.rank, on: !!m.rank && (m.member || !!m.rank.rank) },
     { id: 'titel', label: sec.titles, on: !!m.titles && (m.member || m.titles.length > 0) },
+    // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
+    { id: 'aemter', label: sec.offices, on: !!config?.features.offices && (!!config.features.directory || can('manage_offices')) },
     {
       id: 'geburtstag',
       label: 'Geburtstag',
@@ -561,6 +567,8 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
           onToast={onToast}
         />
       )}
+
+      {active === 'aemter' && <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />}
 
       {active === 'dienstgrad' && m.rank && (
         <MemberRank

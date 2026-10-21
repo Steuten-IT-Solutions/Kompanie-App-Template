@@ -40,6 +40,7 @@ final class ApiScenario
             $this->birthdays();
             $this->inventory();
             $this->directory();
+            $this->offices();
             $this->accounts();
             $this->events();
             $this->push();
@@ -91,7 +92,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -959,21 +960,17 @@ final class ApiScenario
      * Geburtstage (Issue #1): eigener mit Schaltern, Pflege durch create_users (ohne die Schalter), nur Mitglieder sehen,
      * nie das Geburtsjahr, Konto löschen entfernt den Geburtstag, Bereich aus → 403.
      */
-    /** Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Namen, Fotos, Dienstgrade und Titel. */
+    /** Mitgliederliste (Bereich directory, Issue #112: öffentlich): nur Namen, Fotos, Dienstgrade und Titel. */
     private function directory(): void
     {
         $c = $this->c;
-        $c->section('Mitgliederliste für Mitglieder und Anwärter');
+        $c->section('Mitgliederliste für alle');
         $admin = $this->user('kptest_liste_admin', 'admin');
         $m = $this->user('kptest_liste_m', 'member');
         $cand = $this->user('kptest_liste_anw', 'candidate');
         $guest = $this->user('kptest_liste_gast', 'guest');
-        $this->d->actAs(null);
-        $c->ok($this->req('GET', '/directory')[0] === 401, 'GET /directory ohne Anmeldung → 401');
-        $this->d->actAs($guest);
-        $c->ok($this->req('GET', '/directory')[0] === 403, 'Gast-Konto: GET /directory → 403');
-        foreach ([$m => 'Mitglied', $cand => 'Anwärter'] as $who => $label) {
-            $this->d->actAs($who);
+        foreach ([$m => 'Mitglied', $cand => 'Anwärter', $guest => 'Gast-Konto', 0 => 'Ohne Anmeldung'] as $who => $label) {
+            $this->d->actAs($who === 0 ? null : $who);
             [$s, $d] = $this->req('GET', '/directory');
             $ids = array_column((array) $d, 'id');
             $c->ok($s === 200 && in_array($m, $ids, true) && in_array($cand, $ids, true) && !in_array($guest, $ids, true), "$label sieht Mitglieder und Anwärter, keine Gäste");
@@ -983,11 +980,75 @@ final class ApiScenario
         $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
         $this->d->actAs($admin);
         $this->req('PUT', '/admin/features', ['directory' => false]);
-        $this->d->actAs($m);
+        $this->d->actAs(null);
         [$s, $d] = $this->req('GET', '/directory');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
         $this->d->actAs($admin);
         $this->req('PUT', '/admin/features', ['directory' => true]);
+    }
+
+    /**
+     * Ämter (Issue #112): öffentlich lesen, Pflege mit manage_offices, Amtszeiten mit Konten und freien Namen, verknüpfter
+     * Titel folgt den laufenden Amtszeiten, gelöschtes Konto bleibt mit Namen stehen, Bereich aus → 403.
+     */
+    private function offices(): void
+    {
+        $c = $this->c;
+        $c->section('Ämter');
+        $admin = $this->user('kptest_amt_admin', 'admin');
+        $m = $this->user('kptest_amt_m', 'member');
+        $gone = $this->user('kptest_amt_weg', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('POST', '/office-groups', ['title' => 'Kptest Verein'])[0] === 403, 'Pflege ohne manage_offices → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('POST', '/offices', ['title' => 'Kptest'])[0] === 401, 'Pflege ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $group] = $this->req('POST', '/office-groups', ['title' => 'Kptest Verein']);
+        $c->ok($s === 201 && is_int($group['id'] ?? null), 'Gruppe anlegen → 201');
+        [$s, $office] = $this->req('POST', '/offices', ['title' => 'Kptest Vorsitz', 'group_id' => $group['id'] ?? null]);
+        $c->ok($s === 201 && ($office['group_id'] ?? null) === ($group['id'] ?? 0), 'Amt anlegen → 201');
+        $oid = (int) ($office['id'] ?? 0);
+        [$s, $title] = $this->req('POST', '/titles', ['title' => 'Kptest Vorsitz']);
+        $tid = (int) ($title['id'] ?? 0);
+        [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kptest Früher']]]);
+        $c->ok($s === 201 && ($d['current'] ?? null) === false, 'Amtszeit mit freiem Namen');
+        [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 2020, 'holders' => [['user_id' => $m], ['user_id' => $gone]]]);
+        $termId = (int) ($d['id'] ?? 0);
+        $c->ok($s === 201 && ($d['current'] ?? null) === true && array_column($d['holders'] ?? [], 'user_id') === [$m, $gone], 'Laufende Amtszeit mit zwei Konten');
+        $c->ok($this->req('POST', "/offices/$oid/terms", ['start_year' => 2000, 'end_year' => 1999, 'holders' => [['name' => 'X']]])[0] === 400, 'Ende vor Beginn → 400');
+        [$s, $d] = $this->req('GET', "/offices/$oid/title-preview", [], ['title_id' => (string) $tid]);
+        $c->ok($s === 200 && count($d['add'] ?? []) === 2 && ($d['remove'] ?? null) === [], 'Vorschau der Verknüpfung: zwei bekommen den Titel');
+        [$s, $d] = $this->req('PATCH', "/offices/$oid", ['title_id' => $tid]);
+        $c->ok($s === 200 && ($d['title_id'] ?? null) === $tid, 'Amt mit Titel verknüpfen');
+        [, $d] = $this->req('GET', "/members/$m");
+        $c->ok(in_array($tid, array_column($d['titles'] ?? [], 'id'), true), 'Laufende Amtszeit vergibt den Titel');
+        $c->ok($this->req('PUT', "/members/$m/titles", ['title_ids' => []])[0] === 400, 'Verknüpften Titel nicht von Hand entziehen → 400');
+
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/offices');
+        $o = array_values(array_filter((array) ($d['offices'] ?? []), static fn (mixed $x): bool => is_array($x) && ($x['id'] ?? 0) === $oid))[0] ?? [];
+        $c->ok($s === 200 && count($o['terms'] ?? []) === 2 && ($o['terms'][0]['current'] ?? null) === true, 'Öffentlich lesbar, laufende Amtszeit zuerst');
+        $holder = $o['terms'][0]['holders'][0] ?? [];
+        $c->ok(($holder['user_id'] ?? null) === $m && array_key_exists('photo_url', $holder) && !array_key_exists('title_id', $o), 'Personen der Mitgliederliste mit Konto und Foto, ohne Pflegeangaben');
+
+        $this->d->actAs($admin);
+        [$s] = $this->req('DELETE', "/members/$gone");
+        [, $d] = $this->req('GET', '/offices');
+        $o = array_values(array_filter((array) ($d['offices'] ?? []), static fn (mixed $x): bool => is_array($x) && ($x['id'] ?? 0) === $oid))[0] ?? [];
+        $kept = $o['terms'][0]['holders'][1] ?? [];
+        $c->ok($s === 200 && is_string($kept['name'] ?? null) && $kept['name'] !== '' && !array_key_exists('user_id', $kept), 'Gelöschtes Konto: Amtszeit bleibt mit Namen');
+        [$s, $d] = $this->req('PATCH', "/office-terms/$termId", ['end_year' => 2024]);
+        [, $member] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && !in_array($tid, array_column($member['titles'] ?? [], 'id'), true), 'Amtszeit beendet: Titel entzogen');
+
+        $this->req('PUT', '/admin/features', ['offices' => false]);
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/offices');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['offices' => true]);
+        $c->ok($this->req('DELETE', "/offices/$oid")[0] === 200 && $this->req('DELETE', '/office-groups/' . (int) ($group['id'] ?? 0))[0] === 200 && $this->req('DELETE', "/titles/$tid")[0] === 200, 'Aufräumen: Amt, Gruppe und Titel löschen');
     }
 
     private function birthdays(): void

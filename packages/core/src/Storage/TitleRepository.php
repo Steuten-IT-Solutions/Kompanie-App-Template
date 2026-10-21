@@ -106,6 +106,19 @@ final class TitleRepository
         });
     }
 
+    /** Eine Zuweisung hinzufügen (Abgleich mit den Ämtern, Issue #112); vorhandene bleibt mit ihrem Datum. */
+    public function assignOne(int $userId, int $titleId, string $now): void
+    {
+        if ((int) $this->db->scalar('SELECT COUNT(*) FROM {member_titles} WHERE user_id = ? AND title_id = ?', [$userId, $titleId]) === 0) {
+            $this->db->insert('member_titles', ['user_id' => $userId, 'title_id' => $titleId, 'assigned_at' => $now]);
+        }
+    }
+
+    public function unassign(int $userId, int $titleId): void
+    {
+        $this->db->execute('DELETE FROM {member_titles} WHERE user_id = ? AND title_id = ?', [$userId, $titleId]);
+    }
+
     /**
      * @param array<string, mixed> $r
      * @return Title

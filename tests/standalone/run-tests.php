@@ -318,6 +318,10 @@ try {
     [$s, $badge] = $d->request('POST', '/ranks/' . ($badgeRank['id'] ?? 0) . '/badge', ['file' => ['name' => 'abzeichen.svg', 'data' => base64_encode($svgBadge)]]);
     $badgeUrl = (string) ($badge['badge_url'] ?? '');
     $c->ok($s === 200 && str_starts_with($badgeUrl, $base . 'index.php?r=/abzeichen/' . ($badgeRank['id'] ?? 0) . '&v='), 'SVG-Abzeichen hochgeladen, Adresse im Bereich der App');
+    // Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen; ohne sie nur Mitglieder und Anwärter.
+    $anon = $d->send('GET', $badgeUrl, [], null);
+    $c->ok($anon[0] === 200 && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public'), 'Mit Mitgliederliste: Abzeichen ohne Anmeldung, öffentlich zu speichern');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
     $anon = $d->send('GET', $badgeUrl, [], null);
     $c->ok($anon[0] === 401 && ($anon[2]['x-content-type-options'] ?? '') === 'nosniff', 'Abzeichen ohne Anmeldung → 401');
     $cookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)];
@@ -343,6 +347,7 @@ try {
     $c->ok($pngRes[0] === 200 && ($pngRes[2]['content-type'] ?? '') === 'image/png' && !isset($pngRes[2]['content-security-policy']) && ($pngSize[0] ?? 0) === 64 && ($pngSize[1] ?? 0) === 32, 'PNG-Abzeichen: image/png, s=64 liefert 64 Pixel');
     $old = $d->send('GET', $badgeUrl, $cookie, null);
     $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
 
     $c->section('Fotos der Mitglieder (Auslieferung)');
     $mona = $users->add('Mona Foto', 'mona', 'mona@example.org', 'mona-passwort', Roles::MEMBER);
@@ -353,10 +358,15 @@ try {
     [$s, $monaPhoto] = $d->request('PUT', '/members/' . $mona . '/photo', ['file' => ['name' => 'mona.jpg', 'data' => base64_encode((string) ob_get_clean())]]);
     $monaUrl = (string) ($monaPhoto['photo_url'] ?? '');
     $c->ok($s === 200 && str_starts_with($monaUrl, $base . 'index.php?r=/mitgliedsfoto/' . $mona . '&v=') && str_ends_with($monaUrl, '&s=128'), 'Foto hochgeladen, Adresse im Bereich der App');
+    // Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung und privat.
+    $public = $d->send('GET', $monaUrl, [], null);
+    $c->ok($public[0] === 200 && ($public[2]['cache-control'] ?? '') === 'public, max-age=86400' && ($public[2]['x-robots-tag'] ?? '') === 'noindex', 'Mit Mitgliederliste: Foto ohne Anmeldung, einen Tag öffentlich, noindex');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
     $c->ok($d->send('GET', $monaUrl, [], null)[0] === 401, 'Foto ohne Anmeldung → 401');
     $monaCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($mona)];
     $own = $d->send('GET', $monaUrl, $monaCookie, null);
     $c->ok($own[0] === 200 && ($own[2]['content-type'] ?? '') === 'image/jpeg' && ($own[2]['x-content-type-options'] ?? '') === 'nosniff' && ($own[2]['cache-control'] ?? '') === 'private, max-age=86400', 'Eigenes Foto: image/jpeg, nosniff, einen Tag privat');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
     $c->ok($d->send('GET', $monaUrl, $monaCookie + ['If-None-Match' => (string) ($own[2]['etag'] ?? '-')], null)[0] === 304, 'Foto: passender ETag → 304');
     $large = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=480', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
     $c->ok(($large[0] ?? 0) === 480 && ($large[1] ?? 0) === 320 && ($large['mime'] ?? '') === 'image/jpeg', 'Wer Mitglieder verwaltet, sieht das Foto; s=480 liefert 480 Pixel');

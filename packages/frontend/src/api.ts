@@ -21,6 +21,7 @@ export type Capability =
   | 'post_board'
   | 'manage_polls'
   | 'manage_inventory'
+  | 'manage_offices'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
@@ -39,7 +40,8 @@ export type Feature =
   | 'polls'
   | 'birthdays'
   | 'inventory'
-  | 'directory';
+  | 'directory'
+  | 'offices';
 
 export interface AppUser {
   id: number;
@@ -339,7 +341,7 @@ export interface MemberSummary {
   open_cents: number | null;
 }
 
-/** Eintrag der Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Name, Foto, Dienstgrad, Titel. */
+/** Eintrag der Mitgliederliste (Bereich directory, öffentlich): nur Name, Foto, Dienstgrad, Titel. */
 export interface DirectoryEntry {
   id: number;
   name: string;
@@ -684,11 +686,85 @@ export interface Title {
   active: boolean;
   /** Wie vielen Mitgliedern zugewiesen */
   assigned: number;
+  /** Amt, das den Titel über die laufenden Amtszeiten vergibt (Issue #112); null ohne, fehlt bei älteren Servern */
+  office?: { id: number; title: string } | null;
 }
 
 export interface TitleRef {
   id: number;
   title: string;
+}
+
+/** Ämter (Issue #112): Gruppe der Anzeige */
+export interface OfficeGroup {
+  id: number;
+  title: string;
+}
+
+/** Inhaber einer Amtszeit: user_id und Foto nur bei Personen der Mitgliederliste (bzw. für die Pflege) */
+export interface OfficeHolder {
+  name: string;
+  user_id?: number | null;
+  photo_url?: string | null;
+}
+
+export type OfficeTermKind = 'period' | 'point';
+
+export interface OfficeTerm {
+  id: number;
+  /** period: Zeitraum (ohne Ende bis heute), point: ein einzelnes Jahr */
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  /** Zeitraum ohne Ende */
+  current: boolean;
+  holders: OfficeHolder[];
+}
+
+export interface Office {
+  id: number;
+  group_id: number | null;
+  title: string;
+  /** Laufende zuerst, dann nach Beginn absteigend */
+  terms: OfficeTerm[];
+  /** Nur für die Pflege: verknüpfter Titel */
+  title_id?: number | null;
+  linked_title?: string | null;
+}
+
+export interface OfficesOverview {
+  groups: OfficeGroup[];
+  offices: Office[];
+}
+
+export interface OfficeTermInput {
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  holders: ({ user_id: number } | { name: string })[];
+}
+
+export interface OfficeImportRow {
+  line: number;
+  group?: string;
+  office?: string;
+  kind?: OfficeTermKind;
+  start_year?: number;
+  end_year?: number | null;
+  note?: string;
+  holders?: { name: string; user_id: number | null }[];
+  duplicate?: boolean;
+  error?: string;
+}
+
+export interface OfficeImportResult {
+  rows: OfficeImportRow[];
+  groups_new: number;
+  offices_new: number;
+  terms_new: number;
+  applied: boolean;
 }
 
 export interface RankRef {
@@ -1070,6 +1146,29 @@ export const api = {
   deleteTitle: (id: number) => request<{ deleted: boolean }>('DELETE', `/titles/${id}`),
   reorderTitles: (ids: number[]) => request<Title[]>('PUT', '/titles/order', { ids }),
   setMemberTitles: (id: number, title_ids: number[]) => request<{ titles: TitleRef[] }>('PUT', `/members/${id}/titles`, { title_ids }),
+
+  // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
+  offices: () => request<OfficesOverview>('GET', '/offices'),
+  createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
+  updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
+  reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
+  createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),
+  updateOffice: (id: number, data: { title?: string; group_id?: number | null; title_id?: number | null }) =>
+    request<Office>('PATCH', `/offices/${id}`, data),
+  deleteOffice: (id: number) => request<{ deleted: boolean }>('DELETE', `/offices/${id}`),
+  reorderOffices: (ids: number[]) => request<Office[]>('PUT', '/offices/order', { ids }),
+  officeTitlePreview: (id: number, titleId: number | null) =>
+    request<{ add: { name: string; title: string }[]; remove: { name: string; title: string }[] }>(
+      'GET',
+      `/offices/${id}/title-preview`,
+      undefined,
+      titleId === null ? {} : { title_id: String(titleId) },
+    ),
+  createOfficeTerm: (officeId: number, data: OfficeTermInput) => request<OfficeTerm>('POST', `/offices/${officeId}/terms`, data),
+  updateOfficeTerm: (id: number, data: OfficeTermInput) => request<OfficeTerm>('PATCH', `/office-terms/${id}`, data),
+  deleteOfficeTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-terms/${id}`),
+  importOffices: (csv: string, apply: boolean, link = true) => request<OfficeImportResult>('POST', '/offices/import', { csv, apply, link }),
 
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),

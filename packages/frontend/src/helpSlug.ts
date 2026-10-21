@@ -35,12 +35,17 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : 'dokumente';
     case 'mitglieder':
-      return 'mitglieder';
+      // Ämter (Issue #112): eigener Abschnitt im Tab, ohne Mitgliederliste der ganze Tab
+      return on('offices') && (sub === 'aemter' || !on('directory')) ? 'aemter' : 'mitglieder';
     case 'meins':
       return (
-        { punkte: 'meine-punkte', strafen: 'meine-strafen', dienstgrad: 'mein-dienstgrad', anwesenheit: 'meine-anwesenheit' }[
-          sub ?? ctx.meinsFirst ?? ''
-        ] ?? (on('titles') ? 'meine-titel' : null)
+        {
+          punkte: 'meine-punkte',
+          strafen: 'meine-strafen',
+          dienstgrad: 'mein-dienstgrad',
+          anwesenheit: 'meine-anwesenheit',
+          aemter: 'aemter',
+        }[sub ?? ctx.meinsFirst ?? ''] ?? (on('titles') ? 'meine-titel' : null)
       );
     case 'verwaltung':
       return adminSlug(path.slice(1), ctx);
@@ -87,6 +92,7 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
     dienstgrade: 'dienstgrade-verwalten',
     befoerderungen: 'dienstgrade-verwalten',
     titel: 'titel-verwalten',
+    aemter: 'aemter-verwalten',
     anwesenheit: 'anwesenheit-erfassen',
   };
   if (sub && tabs[sub]) return tabs[sub];
@@ -97,6 +103,7 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
       strafen: 'strafen-verwalten',
       dienstgrad: 'dienstgrade-verwalten',
       titel: 'titel-verwalten',
+      aemter: 'aemter',
     };
     if (page && memberPages[page]) return memberPages[page];
     if (page === 'geburtstag' && ctx.can('create_users')) return 'geburtstage-pflegen';
@@ -110,6 +117,7 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
     ['manage_ranks', 'dienstgrade-verwalten', 'ranks'],
     ['manage_titles', 'titel-verwalten', 'titles'],
     ['manage_attendance', 'anwesenheit-erfassen', 'attendance'],
+    ['manage_offices', 'aemter-verwalten', 'offices'],
   ];
   return byRight.find(([cap, , feature]) => ctx.can(cap) && (feature === null || !!ctx.features[feature]))?.[1] ?? null;
 }

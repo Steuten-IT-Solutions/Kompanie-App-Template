@@ -12,7 +12,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Verlauf, Titel, Zusatzrollen (Issue #66), Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen
  * (namentliche über user_id, anonyme über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag, Foto, wartende
  * Fehlermeldungen mit ihrem Namen (Issue #64). Was sie für andere eingetragen hat (created_by, updated_by), bleibt; ebenso
- * Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“). Ohne App: WordPress-Multisite löscht
+ * Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“). Amtszeiten (Issue #112) bleiben als Chronik
+ * mit dem gespeicherten Namen stehen; nur die Verknüpfung mit dem Konto wird gelöst. Ohne App: WordPress-Multisite löscht
  * damit auch in den Tabellen anderer Seiten des Netzwerks.
  */
 final class UserData
@@ -50,6 +51,11 @@ final class UserData
             $db->execute('DELETE FROM {push_subscriptions} WHERE user_id = ?', [$userId]);
         } catch (\RuntimeException) {
             $ok = false; // Tabelle fehlt (ältere Version oder Seite ohne die App)
+        }
+        try {
+            $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
+        } catch (\RuntimeException) {
+            $ok = false;
         }
         foreach (self::TABLES as $table => $column) {
             try {

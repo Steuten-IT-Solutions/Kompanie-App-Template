@@ -10,6 +10,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
 const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
+const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen oder Rollen vergeben. */
@@ -31,6 +32,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles() },
+      { id: 'aemter', label: sec.offices, on: canOffices() },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
