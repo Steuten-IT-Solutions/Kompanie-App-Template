@@ -12,7 +12,7 @@ import {
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { caps, formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
+import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
@@ -238,16 +238,7 @@ function Members() {
           <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
             <div className="row-main">
               <div className="row-title">
-                {listName(m, order.sort)}{' '}
-                {m.level !== 'member' && (
-                  <span className={`badge ${m.member ? 'badge-role' : 'badge-level-guest'}`}>{caps(levelLabel(m.level))}</span>
-                )}
-                {(m.extra_roles ?? []).map((r) => (
-                  <span key={r} className="badge badge-role badge-extra-role">
-                    {caps(levelLabel(r))}
-                  </span>
-                ))}
-                <TitleBadges titles={m.titles} />
+                {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
                 {m.rank_title !== undefined && (
