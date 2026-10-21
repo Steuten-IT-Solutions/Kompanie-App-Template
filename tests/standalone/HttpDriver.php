@@ -172,6 +172,7 @@ final class HttpDriver implements ApiDriver
         $db->execute('DELETE FROM {events} WHERE created_by = ?', [$id]);
         $db->execute("DELETE FROM {point_catalog} WHERE title LIKE 'Teilnahme Sommerfest'");
         $db->execute('DELETE FROM {sessions} WHERE user_id = ?', [$id]);
+        $db->execute('DELETE FROM {member_roles} WHERE user_id = ?', [$id]);
         $db->execute('DELETE FROM {users} WHERE id = ?', [$id]);
         unset($this->tokens[$id], $this->csrf[$id]);
     }

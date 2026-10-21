@@ -701,6 +701,29 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {inventory_log}_item_id ON {inventory_log} (item_id)',
                 ],
             ],
+            // Zusatzrollen (Issue #66): Die Grundrolle bleibt, wo sie war (Standalone users.level, WordPress Benutzer-Option);
+            // hier stehen nur die zusätzlichen Rollen, beliebig viele je Person, in beiden Varianten im Kern. role: Schlüssel
+            // aus Domain\RoleService (höchstens Auth\Roles::KEY_MAX Zeichen).
+            14 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {member_roles} (
+  user_id bigint(20) unsigned NOT NULL,
+  role varchar(10) NOT NULL,
+  assigned_at datetime NOT NULL,
+  PRIMARY KEY (user_id, role),
+  KEY role (role)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {member_roles} (
+  user_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  assigned_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, role)
+)',
+                    'CREATE INDEX IF NOT EXISTS {member_roles}_role ON {member_roles} (role)',
+                ],
+            ],
         ];
     }
 

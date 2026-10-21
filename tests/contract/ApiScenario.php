@@ -27,6 +27,7 @@ final class ApiScenario
             $this->password();
             $this->roles();
             $this->customRoles();
+            $this->extraRoles();
             $this->candidates();
             $this->ranks();
             $this->titles();
@@ -417,6 +418,57 @@ final class ApiScenario
         $c->ok($this->req('POST', "/members/$admin/password")[0] === 403, 'Kontenpflege: Passwort eines Admins → 403');
         $this->d->actAs($admin);
         $this->req('DELETE', '/admin/roles/' . $pflege, [], ['replacement' => 'member']);
+    }
+
+    /**
+     * Zusatzrollen (Issue #66): eine Grundrolle (level) und beliebig viele eigene Rollen dazu; Rechte zusammen, kleinster
+     * Punktefaktor, dieselben Regeln wie bei der Grundrolle. Gespeichert im Kern, in beiden Varianten gleich.
+     */
+    private function extraRoles(): void
+    {
+        $c = $this->c;
+        $c->section('Zusatzrollen');
+        $admin = $this->user('kptest_zusatz_admin', 'admin');
+        $m = $this->user('kptest_zusatz_m', 'member');
+        $cand = $this->user('kptest_zusatz_anw', 'candidate');
+        $this->d->actAs($admin);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Zusatz Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
+        $young = (string) (array_column((array) $d, 'key', 'label')['Kptest Zusatz Jugend'] ?? '');
+
+        [$s, $d] = $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties', $young]]);
+        $c->ok($s === 200 && ($d['level'] ?? '') === 'member' && ($d['extra_roles'] ?? null) === ['penalties', $young], 'Zusatzrollen vergeben, level bleibt die Grundrolle');
+        $list = array_column((array) $this->req('GET', '/members')[1], 'extra_roles', 'id');
+        $c->ok(($list[$m] ?? null) === ['penalties', $young], 'Mitgliederliste zeigt die Zusatzrollen');
+        $c->ok(($this->req('GET', "/members/$m")[1]['extra_roles'] ?? null) === ['penalties', $young], 'Mitglied zeigt die Zusatzrollen');
+        [, $d] = $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 4, 'reason' => 'Kptest Zusatz']);
+        $c->ok(($d[0]['factor'] ?? null) == 0.5, 'Kleinster Punktefaktor aller Rollen gilt (0,5)');
+        $roles = array_column((array) ($this->req('GET', '/config')[1]['roles'] ?? []), 'extra', 'key');
+        $c->ok(($roles['member'] ?? null) === false && ($roles[$young] ?? null) === true, '/config: welche Rollen Zusatzrollen sein können');
+
+        $this->d->actAs($m);
+        [, $me] = $this->req('GET', '/me');
+        $c->ok(($me['level'] ?? '') === 'member' && ($me['extra_roles'] ?? null) === ['penalties', $young], '/me mit Grundrolle und Zusatzrollen');
+        $c->ok(in_array('manage_penalties', (array) ($this->req('GET', '/config')[1]['user']['capabilities'] ?? []), true), 'Rechte der Zusatzrolle in /config');
+        [$s] = $this->req('POST', '/penalties', ['user_ids' => [$m], 'amount_cents' => 100, 'reason' => 'Kptest Zusatz']);
+        $c->ok($s === 201, 'Recht aus der Zusatzrolle wirkt (Strafen buchen)');
+        $c->ok($this->req('PATCH', "/members/$cand/role", ['extra_roles' => ['events']])[0] === 403, 'Ohne „Rollen vergeben“ → 403');
+
+        $this->d->actAs($admin);
+        $c->ok($this->req('PATCH', "/members/$m/role", ['extra_roles' => ['admin']])[0] === 400, 'Admin als Zusatzrolle → 400');
+        $c->ok($this->req('PATCH', "/members/$m/role", ['extra_roles' => ['member']])[0] === 400, 'Feste Rolle als Zusatzrolle → 400');
+        $c->ok($this->req('PATCH', "/members/$m/role", ['extra_roles' => 'events'])[0] === 400, 'Keine Liste → 400');
+        $c->ok($this->req('PATCH', "/members/$cand/role", ['extra_roles' => ['events']])[0] === 400, 'Anwärter ohne Mitgliederbereich: keine Zusatzrollen → 400');
+        $c->ok($this->req('PATCH', "/members/$admin/role", ['extra_roles' => []])[0] === 400, 'Eigene Rollen nicht änderbar → 400');
+        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'member', 'extra_roles' => ['events']]);
+        $c->ok($s === 200 && ($d['extra_roles'] ?? null) === ['events'], 'Grundrolle und Zusatzrollen in einem Schritt');
+        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'candidate']);
+        $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Grundrolle ohne Mitgliederbereich: Zusatzrollen fallen weg');
+
+        $c->ok($this->req('DELETE', '/admin/roles/' . $young)[0] === 400, 'Rolle nur als Zusatzrolle zugeordnet: Löschen ohne Ersatz → 400');
+        [$s] = $this->req('DELETE', '/admin/roles/' . $young, [], ['replacement' => 'member']);
+        $c->ok($s === 200 && ($this->req('GET', "/members/$m")[1]['extra_roles'] ?? null) === ['penalties'], 'Gelöscht: als Zusatzrolle entfernt');
+        [$s, $d] = $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
+        $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Zusatzrollen entfernen');
     }
 
     /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */
