@@ -10,7 +10,7 @@ import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
-import { navigate, useRoute } from './router';
+import { navigate, useRoute, viewKey } from './router';
 import { AdminNav, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
@@ -401,7 +401,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
       <main className="content">
-        <ErrorBoundary key={rawPath.join('/')}>
+        <ErrorBoundary key={viewKey(path)}>
           <Suspense fallback={<Loading />}>
             {config.setupPending && tab !== 'einrichtung' && (
               <div className="card setup-hint">
