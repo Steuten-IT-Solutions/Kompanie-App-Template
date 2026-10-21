@@ -50,6 +50,8 @@ export interface AppUser {
   extra_roles?: Level[];
   /** Alle Rechte zusammen (Grundrolle und Zusatzrollen) */
   capabilities: Capability[];
+  /** Eigenes Foto (128 Pixel), null ohne; fehlt bei älteren Servern */
+  photo_url?: string | null;
 }
 
 export interface AppConfig {
@@ -327,6 +329,8 @@ export interface MemberSummary {
   rank_badge_url?: string | null;
   /** Titel (nur mit Bereich und Recht „Titel verwalten“) */
   titles?: TitleRef[];
+  /** Foto (128 Pixel; s=480 für die große Fassung), null ohne */
+  photo_url?: string | null;
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
@@ -342,6 +346,8 @@ export interface MemberDetail extends MemberSummary {
   birthday?: Birthday | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
   rights?: MemberRights | null;
+  /** Ob man das Foto hochladen, ersetzen und entfernen darf (create_users und dieses Konto verwalten) */
+  photo_editable?: boolean;
 }
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
@@ -571,8 +577,11 @@ export interface DocumentsResponse {
   max_bytes?: number;
 }
 
+/** Datei für die API: Name und Inhalt als Base64. */
+export type EncodedFile = { name: string; data: string };
+
 /** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
-export async function encodeFile(file: File): Promise<{ name: string; data: string }> {
+export async function encodeFile(file: File): Promise<EncodedFile> {
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
@@ -708,8 +717,10 @@ export interface CreatedUser {
   username: string;
   email: string;
   level: Level;
-  /** Konto angelegt, aber Anfangspunkte bzw. Dienstgrad nicht übernommen */
+  /** Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen */
   warning?: string;
+  /** Foto, wenn eines mitgeschickt wurde */
+  photo_url?: string | null;
   /** Startpasswort – steht nur in dieser einen Antwort. */
   password: string;
 }
@@ -731,6 +742,8 @@ export interface NewPerson extends PersonName {
   rank_id?: number;
   /** JJJJ-MM-TT oder ohne Jahr MM-TT */
   birthday?: string;
+  /** Foto (JPG, PNG oder WebP als Base64) */
+  photo?: EncodedFile;
 }
 
 export interface AccountProfile extends PersonName {
@@ -944,8 +957,12 @@ export const api = {
       initial_points_date?: string;
       rank_id?: number;
       birthday?: string;
+      photo?: EncodedFile;
     },
   ) => request<CreatedUser>('POST', '/users', data),
+  /** Foto eines Mitglieds hochladen bzw. ersetzen (vorher mit preparePhoto verkleinert). */
+  uploadMemberPhoto: (id: number, file: EncodedFile) => request<{ photo_url: string | null }>('PUT', `/members/${id}/photo`, { file }),
+  removeMemberPhoto: (id: number) => request<{ photo_url: null }>('DELETE', `/members/${id}/photo`),
 
   // Dienstgrade (Issue #9)
   ranks: (all = false) => request<Rank[]>('GET', '/ranks', undefined, all ? { all: '1' } : undefined),

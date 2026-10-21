@@ -38,6 +38,7 @@ import {
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
+import { MemberAvatar, MemberPhotoPanel, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
 
@@ -143,6 +144,8 @@ function Members() {
   // Nur Rollen, die in der Liste vorkommen
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+  // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
+  const withPhotos = (data ?? []).some((m) => m.photo_url);
 
   // Scrollen, sobald die Liste steht (aus dem Speicher sofort, sonst nach dem Laden).
   const pendingScroll = useRef(restore?.scrollY ?? null);
@@ -236,6 +239,7 @@ function Members() {
       <ul className="card-list">
         {list.map((m) => (
           <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
+            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} />}
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)}{' '}
@@ -329,6 +333,14 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'uebersicht' && (
         <>
+          <MemberPhotoPanel
+            id={m.id}
+            name={m.name}
+            url={m.photo_url ?? null}
+            editable={!!m.photo_editable}
+            onChanged={reload}
+            onToast={onToast}
+          />
           <p className="muted small member-level">
             {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
             {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
@@ -670,6 +682,7 @@ function NewMember() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState(emptyBirthday());
+  const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
@@ -691,6 +704,7 @@ function NewMember() {
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
           ...(bday ? { birthday: birthdayString(bday) } : {}),
+          ...(photo ? { photo: photo.file } : {}),
         }),
       );
     } catch (err) {
@@ -715,6 +729,7 @@ function NewMember() {
             setInitialPoints('');
             setRankId('');
             setBirthday(emptyBirthday());
+            setPhoto(null);
           }}
         >
           Weiteres Mitglied
@@ -792,6 +807,10 @@ function NewMember() {
           <BirthdayFields value={birthday} onChange={setBirthday} />
         </fieldset>
       )}
+      <fieldset className="fieldset new-member-photo">
+        <legend>Foto (optional)</legend>
+        <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
+      </fieldset>
       <p className="muted small">
         Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
       </p>

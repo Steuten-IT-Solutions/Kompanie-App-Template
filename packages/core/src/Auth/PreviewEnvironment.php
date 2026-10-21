@@ -66,4 +66,9 @@ final class PreviewEnvironment implements Environment
     {
         return $this->preview->url($this->inner->badgeUrl($rankId, $version, $size));
     }
+
+    public function memberPhotoUrl(int $userId, string $version, int $size): string
+    {
+        return $this->preview->url($this->inner->memberPhotoUrl($userId, $version, $size));
+    }
 }

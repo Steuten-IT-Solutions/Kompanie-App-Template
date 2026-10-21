@@ -397,8 +397,9 @@ final class MemberService
      * Mitgliederbereich bzw. nur Kalender und ohne mehr Rechte als man selbst. Sonst könnte, wer Konten anlegen darf,
      * das Konto einer Person mit mehr Rechten übernehmen, oder (bei WordPress) das Konto einer Person, die gar nicht zur
      * Kompanie gehört (Gast). Anwärter legt an, wer Konten anlegen darf; ihr Konto darf er deshalb auch verwalten.
+     * Gilt auch für das Foto (MemberPhotoService).
      */
-    private function guardAccount(User $actor, User $target, string $message): void
+    public function guardAccount(User $actor, User $target, string $message): void
     {
         if ($target->isAdmin() && !$actor->isAdmin()) {
             throw ApiError::forbidden('Konten von Admins verwalten nur Admins.');
