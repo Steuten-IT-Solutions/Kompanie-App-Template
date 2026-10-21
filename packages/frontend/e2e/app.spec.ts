@@ -404,6 +404,13 @@ test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async 
 test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Meins' }).click();
+  // Übersicht zuerst: Name, Rolle und beide Summen
+  const overview = page.locator('.my-overview');
+  await expect(overview.locator('.account-name')).toBeVisible();
+  await expect(overview.locator('.stat-value')).toHaveText(['5', /2,50/]);
+  await shot(page, 'meins-uebersicht');
+
+  await meinsMenu(page, 'Punkte');
   await expect(page.locator('.stat-value')).toHaveText('5');
   await expect(page.getByText('Teilnahme Sommerfest')).toBeVisible();
   await shot(page, '2-punkte');
@@ -477,7 +484,7 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
 
   // Sitzung bleibt gültig: Daten laden weiterhin (neues Token wurde geholt).
   await page.getByRole('button', { name: 'Meins' }).click();
-  await expect(page.locator('.stat-label')).toHaveText('Meine Punkte');
+  await expect(page.locator('.stat-label').first()).toHaveText('Meine Punkte');
 
   await login(page, 'mitglied2', NEW);
   await page.getByRole('button', { name: 'Konto' }).click();

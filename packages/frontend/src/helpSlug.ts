@@ -1,7 +1,6 @@
 /** Was die Hilfe über die Person und die App wissen muss, um die passende Seite zu wählen. */
 export interface HelpContext {
   boardWriter: boolean;
-  meinsFirst?: string;
   /** Recht der Person (wie can() in api.ts). */
   can: (cap: string) => boolean;
   /** Eingeschaltete Bereiche. */
@@ -38,9 +37,13 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'mitglieder';
     case 'meins':
       return (
-        { punkte: 'meine-punkte', strafen: 'meine-strafen', dienstgrad: 'mein-dienstgrad', anwesenheit: 'meine-anwesenheit' }[
-          sub ?? ctx.meinsFirst ?? ''
-        ] ?? (on('titles') ? 'meine-titel' : null)
+        {
+          uebersicht: 'meins-uebersicht',
+          punkte: 'meine-punkte',
+          strafen: 'meine-strafen',
+          dienstgrad: 'mein-dienstgrad',
+          anwesenheit: 'meine-anwesenheit',
+        }[sub ?? 'uebersicht'] ?? 'meins-uebersicht'
       );
     case 'verwaltung':
       return adminSlug(path.slice(1), ctx);
