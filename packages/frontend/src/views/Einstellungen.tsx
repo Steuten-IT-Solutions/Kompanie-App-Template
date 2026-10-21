@@ -10,14 +10,14 @@ import { navigate } from '../router';
 const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
-  { id: 'google', title: 'Google-Zugang', text: 'Verbindung zu Google für Galerie und Kalender.' },
-  { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
-  { id: 'galerie', title: 'Galerie', text: 'Fotoalben aus einem Ordner in Google Drive.' },
-  { id: 'news', title: 'Neuigkeiten', text: 'Woher die Neuigkeiten kommen.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
+  { id: 'google', title: 'Google-Zugang', text: 'Verbindung zu Google für Galerie und Kalender.' },
+  { id: 'galerie', title: 'Galerie', text: 'Fotoalben aus einem Ordner in Google Drive.' },
+  { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
+  { id: 'news', title: 'Neuigkeiten', text: 'Woher die Neuigkeiten kommen.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
-  { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
+  { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
 ] as const;
 
 /**
