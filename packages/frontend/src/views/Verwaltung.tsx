@@ -349,7 +349,12 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
         ‹ Alle Mitglieder
       </button>
-      <h2 className="member-name">{m.name}</h2>
+      <h2 className={`member-name${m.rank_title ? ' with-rank' : ''}`}>{m.name}</h2>
+      {m.rank_title && (
+        <p className="member-rank-line">
+          <RankLabel url={m.rank_badge_url} title={m.rank_title} size="medium" />
+        </p>
+      )}
       <MenuNav
         label="Mitglied"
         className="member-menu"

@@ -3973,7 +3973,7 @@ components:
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
-        rank_title: { type: [string, 'null'], description: 'Dienstgrad (nur mit Bereich Dienstgrade und Recht manage_ranks)' }
+        rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
@@ -3992,7 +3992,7 @@ components:
             penalties:
               type: array
               items: { $ref: '#/components/schemas/Penalty' }
-            rank: { $ref: '#/components/schemas/RankStatus' }
+            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht manage_ranks)' }
             rank_history:
               type: array
               items: { $ref: '#/components/schemas/RankHistoryEntry' }
@@ -4114,7 +4114,8 @@ components:
       description: |
         Abzeichen des Dienstgrads (Issue #17) oder null: `<App>/abzeichen/<id>?v=<Fassung>&s=128`. Die App ersetzt
         `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert nur an angemeldete
-        Personen mit Mitgliederbereich oder internem Kalender (sonst 401/403, im Wartungsmodus 503, Bereich aus 404);
+        Personen mit Mitgliederbereich oder internem Kalender und an alle mit Zugang zur Mitgliederliste (sonst
+        401/403, im Wartungsmodus 503, Bereich aus 404);
         SVG als image/svg+xml mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
         und `X-Content-Type-Options: nosniff`, sonst image/png. Die Adresse wechselt mit jeder Fassung.
 

@@ -323,7 +323,7 @@ export interface MemberSummary {
   extra_roles?: Level[];
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
-  /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
+  /** Dienstgrad (nur mit Bereich Dienstgrade) */
   rank_title?: string | null;
   /** Abzeichen des Dienstgrads (wie rank_title) */
   rank_badge_url?: string | null;

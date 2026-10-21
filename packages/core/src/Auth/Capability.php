@@ -40,4 +40,15 @@ enum Capability: string
     case PromoteUsers = 'promote_users';
     /** Einstellungen und Updates (WordPress: Recht manage_options; zusätzlich gibt es dort das Formular im WP-Admin). */
     case ManageSettings = 'manage_settings';
+
+    /**
+     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade oder Titel pflegt,
+     * Mitglieder anlegt oder Rollen vergibt.
+     *
+     * @return list<self>
+     */
+    public static function memberList(): array
+    {
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::CreateUsers, self::PromoteUsers];
+    }
 }
