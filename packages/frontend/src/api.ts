@@ -2,6 +2,7 @@
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
 import { dataCache } from './dataCache';
+import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 
 /** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
@@ -70,6 +71,8 @@ export interface AppConfig {
   setupPending?: boolean;
   /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
   maintenance?: MaintenanceInfo;
+  /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
+  preview?: { role: string; label: string } | null;
 }
 
 export interface MaintenanceInfo {
@@ -782,6 +785,8 @@ async function requestFull<T>(
         Accept: 'application/json',
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
+        ...(previewRole() ? { [PREVIEW_HEADER]: previewRole()! } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
@@ -809,6 +814,30 @@ async function requestFull<T>(
     throw new ApiError(data?.message ?? `Fehler ${res.status}`, res.status, data?.code ?? '');
   }
   return { data: data as T, headers: res.headers };
+}
+
+/**
+ * Vorschau „App als Rolle ansehen“ (Issue #63) vor dem Start der App: Ist in diesem Tab eine gewählt, die Konfiguration
+ * mit den Rechten der Rolle holen und übernehmen (die mit der Seite gelieferte ist die des Admins). Bestätigt der Server
+ * sie nicht (kein Admin mehr, Rolle gelöscht, offline), endet die Vorschau; zurück kommt dann ein Hinweis.
+ */
+export async function preparePreview(): Promise<string | null> {
+  if (!previewRole() || !config) return null;
+  try {
+    const next = await request<AppConfig>('GET', '/config');
+    if (!next.preview) {
+      stopPreview();
+      return 'Die Vorschau wurde beendet.';
+    }
+    // Bereiche im selben Objekt ändern: Teile der App halten es fest (z. B. App.tsx).
+    const { features, ...rest } = next;
+    Object.assign(config.features, features);
+    Object.assign(config, rest);
+    return null;
+  } catch {
+    stopPreview();
+    return 'Die Vorschau braucht eine Internetverbindung und wurde beendet.';
+  }
 }
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, string>): Promise<T> {

@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api, can, type DocumentInfo, type DocVisibility } from '../api';
 import brand from '../generated/brand';
+import { previewRole } from '../preview';
 import {
   DOC_SORT_LABELS,
   docGroupKey,
@@ -230,8 +231,9 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
   }, [data, docId, show]);
 
   // Nur Dokumente aus der aktuellen Liste offline behalten (gelöscht, nicht mehr sichtbar, ältere Fassung).
+  // Nicht in der Vorschau (Issue #63): Dort sähe die Liste weniger, die gespeicherten Dokumente des Admins blieben aber.
   useEffect(() => {
-    if (data) void pruneDocumentCache(data.documents.map((d) => d.url));
+    if (data && !previewRole()) void pruneDocumentCache(data.documents.map((d) => d.url));
   }, [data]);
 
   useEffect(() => {

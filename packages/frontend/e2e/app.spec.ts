@@ -661,6 +661,72 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await expect(page.locator('.toast')).toHaveText('Zusatzrolle entfernt: Termine verwalten');
 });
 
+test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ansehen, danach wieder als Admin', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const openRoles = async () => {
+    await page.getByRole('button', { name: 'Konto' }).click();
+    await page.getByRole('button', { name: 'Einstellungen öffnen' }).click();
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Rollen', { exact: true }) })
+      .click();
+  };
+  await openRoles();
+  const rollen = page.locator('#einstellungen-rollen');
+  await expect(rollen.getByRole('button', { name: 'App als Admin ansehen' })).toHaveCount(0);
+  await rollen.getByRole('button', { name: 'App als Mitglied ansehen' }).click();
+
+  // Wie ein Mitglied: Navigation ohne Verwaltung und Einstellungen, eigene Daten des Admins, Banner auf jeder Seite.
+  const banner = page.locator('.preview-banner');
+  await expect(banner).toHaveText(/Vorschau als Mitglied – nur ansehen/);
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await expect(page.getByText('Vereinsabend')).toBeVisible();
+  await shot(page, '22-vorschau-mitglied');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page.locator('.stat-label').first()).toBeVisible();
+  await expect(banner).toBeVisible();
+  await page.goto('/app/#/einstellungen');
+  await expect(page.locator('.topbar-title')).not.toHaveText('Einstellungen');
+  await expect(banner).toBeVisible();
+  // Neu laden: Die Vorschau bleibt in diesem Tab; ein anderer Tab zeigt die Admin-Ansicht.
+  await page.reload();
+  await expect(banner).toBeVisible();
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+  const other = await page.context().newPage();
+  await other.goto('/app/');
+  await expect(other.locator('.tabbar').getByRole('button', { name: MANAGER })).toBeVisible();
+  await expect(other.locator('.preview-banner')).toHaveCount(0);
+  await other.close();
+
+  // Nur ansehen: Der Server lehnt Änderungen ab, die App zeigt die Meldung.
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await expect(page.getByRole('button', { name: 'Einstellungen öffnen' })).toHaveCount(0);
+  await page.getByLabel('Aktuelles Passwort').fill(ADMIN_PASSWORD);
+  await page.getByLabel(/^Neues Passwort \(/).fill('Vorschau-Passwort-1');
+  await page.getByLabel('Neues Passwort wiederholen').fill('Vorschau-Passwort-1');
+  await page.getByRole('button', { name: 'Passwort ändern' }).click();
+  await expect(page.locator('.form-error')).toHaveText('In der Vorschau kannst du nichts ändern.');
+  await expect(banner).toBeVisible();
+
+  // Beenden: zurück in die Einstellungen, wieder mit allen Rechten.
+  await banner.getByRole('button', { name: 'Beenden' }).click();
+  await expect(rollen).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toBeVisible();
+
+  // Ohne Anmeldung: nur Öffentliches, mit „Anmelden“ statt Konto.
+  await rollen.getByRole('button', { name: 'App ohne Anmeldung ansehen' }).click();
+  await expect(banner).toHaveText(/Vorschau ohne Anmeldung – nur ansehen/);
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await expect(page.getByText('Vereinsabend')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
+  await banner.getByRole('button', { name: 'Beenden' }).click();
+  await expect(rollen).toBeVisible();
+  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+});
+
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/galerie');
