@@ -137,7 +137,7 @@ Subdomain auf unserem Webspace). Das frühere `tools/status-empfang` ist dadurch
 - **Warnungen per E-Mail und Push** an uns bei neuen Ereignissen, roter Ampel, ausbleibendem Lebenszeichen
   und gehäuften Fehlern nach einem Release. Dann prüfen wir, ob die Version zurückgezogen werden muss
   (Punkt 1).
-- Die Zustimmung wird im Einrichtungsassistenten erfragt; abschaltbar unter *Einstellungen → Updates*. Beim
+- Die Zustimmung wird im Einrichtungsassistenten erfragt (Haken vorausgewählt, lässt sich entfernen); abschaltbar unter *Einstellungen → Updates*. Beim
   Abschalten werden auch die Fehlerzähler gelöscht.
 
 **Datenschutz:** Die Erweiterung (stündlich, Fehlercodes) gehört in die Prüfung aus Abschnitt 3 und in die

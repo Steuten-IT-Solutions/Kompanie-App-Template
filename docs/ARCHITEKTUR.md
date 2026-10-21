@@ -506,7 +506,7 @@ Beim ersten Öffnen durch einen Admin bietet die App den Assistenten an:
 2. Kalender (nur wenn gewählt): geheime iCal-Adresse einfügen (mit Anleitung, wo man sie in Google findet), Testabruf
 3. Galerie (nur wenn gewählt): Google-Zugang („Mit Google verbinden“ oder Dienstkonto), Link zum Ordner, Abgleich mit Fortschritt
 4. News (nur wenn gewählt, nur eigenständige Version): Adresse einer vorhandenen Webseite oder eines Feeds, Testabruf
-5. optional: Statusmeldungen an uns erlauben (siehe Abschnitt 13)
+5. optional: Statusmeldungen an uns erlauben, Haken vorausgewählt (siehe Abschnitt 13)
 
 Der erste Admin entsteht bei der eigenständigen Version im Installer, bei WordPress ist es ein WordPress-Administrator.
 

@@ -19,7 +19,8 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
   const features = useAsync(() => api.features(), []);
   const [chosen, setChosen] = useState<Record<Feature, boolean> | null>(null);
   const [index, setIndex] = useState(0);
-  const [reports, setReports] = useState(false);
+  // Statusmeldungen sind vorausgewählt; der Admin kann den Haken vor dem Abschluss entfernen.
+  const [reports, setReports] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stepRef = useRef<HTMLParagraphElement>(null);
