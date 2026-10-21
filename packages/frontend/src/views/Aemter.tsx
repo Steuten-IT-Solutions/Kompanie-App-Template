@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { api, type Office, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
@@ -61,35 +61,112 @@ function Holders({ holders, link }: { holders: OfficeHolder[]; link: boolean }) 
 
 export type TimelineEntry = { key: string | number; term: OfficeTerm; office?: string };
 
+/** Jahreszahl groß, Zusatz klein: „seit / 2020“, „2007 / bis 2020“, „2025“. */
+function When({ term }: { term: OfficeTerm }) {
+  const single = term.kind === 'point' || term.end_year === term.start_year;
+  return (
+    <div className="tl-when" aria-hidden="true">
+      {term.current && <span className="tl-when-small">seit</span>}
+      <span className="tl-when-year">{term.start_year}</span>
+      {!single && !term.current && <span className="tl-when-small">bis {term.end_year}</span>}
+    </div>
+  );
+}
+
 /**
- * Senkrechter Zeitstrahl: je Amtszeit eine Karte an der Linie, neueste oben. Laufende hervorgehoben, einzelne Jahre
- * (z. B. Ehrungen) mit Stern. Auf breiten Bildschirmen abwechselnd links und rechts, auf dem Handy einseitig.
+ * Chronik als Zeitleiste: links (auf breiten Bildschirmen abwechselnd gegenüber) die Jahre, in der Mitte die Linie, daneben
+ * je Amtszeit eine Karte. Jahrzehnt-Marken gliedern lange Listen; laufende Amtszeiten leuchten, Ehrungen tragen einen Stern.
  */
 export function Timeline({ entries, link = true, label }: { entries: TimelineEntry[]; link?: boolean; label: string }) {
-  return (
-    <ol className="timeline" aria-label={label}>
-      {entries.map(({ key, term, office }) => {
-        const duration = termDuration(term);
-        return (
-          <li key={key} className={`timeline-item${term.current ? ' current' : ''}${term.kind === 'point' ? ' point' : ''}`}>
-            <span className="timeline-marker" aria-hidden="true">
-              {term.kind === 'point' ? '★' : ''}
-            </span>
-            <div className="timeline-card">
-              <div className="timeline-head">
-                <span className="timeline-years">{termYears(term)}</span>
-                {term.current && <span className="badge timeline-now">aktuell</span>}
-                {term.kind === 'point' && <span className="badge timeline-honor">Ehrung</span>}
-              </div>
-              {duration && <div className="timeline-duration">{duration}</div>}
-              {office && <div className="timeline-office">{office}</div>}
-              <Holders holders={term.holders} link={link} />
-              {term.note && <div className="timeline-note">{term.note}</div>}
+  let decade: number | null = null;
+  const rows: ReactElement[] = [];
+  entries.forEach(({ key, term, office }, i) => {
+    const d = Math.floor(term.start_year / 10) * 10;
+    if (entries.length > 4 && d !== decade && !term.current) {
+      rows.push(
+        <li key={`d${d}-${i}`} className="tl-decade" aria-hidden="true">
+          <span className="tl-decade-label">{d}er</span>
+        </li>,
+      );
+    }
+    if (!term.current) decade = d;
+    const duration = termDuration(term);
+    rows.push(
+      <li
+        key={key}
+        className={`tl-item ${i % 2 === 0 ? 'tl-left' : 'tl-right'}${term.current ? ' current' : ''}${term.kind === 'point' ? ' point' : ''}`}
+      >
+        <When term={term} />
+        <span className="tl-dot" aria-hidden="true">
+          {term.kind === 'point' ? '★' : ''}
+        </span>
+        <div className="tl-card">
+          <span className="visually-hidden">{termYears(term)}: </span>
+          {(office || term.current || term.kind === 'point' || duration) && (
+            <div className="tl-meta">
+              {office && <span className="tl-office">{office}</span>}
+              {term.current && <span className="badge timeline-now">im Amt</span>}
+              {term.kind === 'point' && <span className="badge timeline-honor">Ehrung</span>}
+              {duration && <span className="tl-duration">{duration}</span>}
             </div>
-          </li>
-        );
-      })}
+          )}
+          <Holders holders={term.holders} link={link} />
+          {term.note && <div className="timeline-note">{term.note}</div>}
+        </div>
+      </li>,
+    );
+  });
+  return (
+    <ol className="tl" aria-label={label}>
+      {rows}
     </ol>
+  );
+}
+
+/** Siegel aus der Bezeichnung: „1. Vorsitzende“ → „1V“, „Beauftragte für Öffentlichkeitsarbeit“ → „BÖ“. */
+export function monogram(title: string): string {
+  const words = title.split(/\s+/).filter((w) => w !== '' && !/^[a-zäöüß]/.test(w));
+  const out = words.map((w) => (/^\d/.test(w) ? w.replace(/\D/g, '') : w[0])).join('');
+  return (out || title[0] || '?').slice(0, 2).toUpperCase();
+}
+
+/** „Im Amt“: die aktuellen Inhaber groß, mit Foto und wie lange schon. */
+function Spotlight({ terms, link }: { terms: OfficeTerm[]; link: boolean }) {
+  const people = terms.flatMap((t) => t.holders.map((h) => ({ h, t })));
+  return (
+    <section className="spotlight" aria-label="Im Amt">
+      <div className="spotlight-label">Im Amt</div>
+      <ul className="spotlight-list">
+        {people.map(({ h, t }, i) => {
+          const body = (
+            <>
+              <span className="spotlight-avatar" aria-hidden="true">
+                <MemberAvatar url={h.photo_url} name={h.name} size="medium" />
+              </span>
+              <span className="spotlight-text">
+                <span className="spotlight-name">{h.name}</span>
+                <span className="spotlight-since">
+                  seit {t.start_year}
+                  {termDuration(t) ? ` · ${termDuration(t)}` : ''}
+                </span>
+                {t.note && <span className="spotlight-note">{t.note}</span>}
+              </span>
+            </>
+          );
+          return (
+            <li key={i}>
+              {link && h.user_id ? (
+                <button type="button" className="spotlight-person" onClick={() => navigate(`mitglieder/aemter/${h.user_id}`)}>
+                  {body}
+                </button>
+              ) : (
+                <span className="spotlight-person">{body}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -122,15 +199,23 @@ function Summary({ office }: { office: Office }) {
 function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean; onToggle: () => void }) {
   const id = `office-${office.id}`;
   const n = office.terms.length;
+  const since = n > 0 ? Math.min(...office.terms.map((t) => t.start_year)) : null;
+  const current = office.terms.filter((t) => t.current);
+  const history = office.terms.filter((t) => !t.current);
   return (
     <section className={`card office-card${open ? ' open' : ''}`}>
       <button type="button" className="office-head" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+        <span className="office-mono" aria-hidden="true">
+          {monogram(office.title)}
+        </span>
         <span className="office-head-main">
           <span className="office-title">{office.title}</span>
           <Summary office={office} />
-        </span>
-        <span className="office-count" aria-label={n === 1 ? '1 Eintrag' : `${n} Einträge`}>
-          {n}
+          {since !== null && (
+            <span className="office-meta">
+              Chronik seit {since} · {n === 1 ? '1 Eintrag' : `${n} Einträge`}
+            </span>
+          )}
         </span>
         <span className="office-arrow" aria-hidden="true">
           ›
@@ -138,10 +223,13 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
       </button>
       {open && (
         <div id={id} className="office-body">
-          {n === 0 ? (
-            <p className="muted small">Noch keine Einträge.</p>
-          ) : (
-            <Timeline label={office.title} entries={office.terms.map((t) => ({ key: t.id, term: t }))} />
+          {n === 0 && <p className="muted small">Noch keine Einträge.</p>}
+          {current.length > 0 && <Spotlight terms={current} link />}
+          {history.length > 0 && (
+            <>
+              {current.length > 0 && <h3 className="tl-heading">Frühere</h3>}
+              <Timeline label={office.title} entries={history.map((t) => ({ key: t.id, term: t }))} />
+            </>
           )}
         </div>
       )}

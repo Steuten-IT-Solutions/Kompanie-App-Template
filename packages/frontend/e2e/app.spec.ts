@@ -444,13 +444,16 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await expect(page).toHaveURL(/#\/mitglieder\/aemter$/);
   const card = page.locator('.office-card', { hasText: office });
   await expect(card.locator('.office-summary-text')).toHaveText(`Mitglied1, Paul Partner ${id} · seit 2020`);
+  await expect(card.locator('.office-meta')).toHaveText('Chronik seit 1990 · 2 Einträge');
   await card.locator('.office-head').click();
-  const items = card.locator('.timeline-item');
-  await expect(items).toHaveCount(2);
-  await expect(items.nth(0)).toHaveClass(/current/);
-  await expect(items.nth(0)).toContainText('seit 2020');
-  await expect(items.nth(1)).toContainText('1990–2005');
-  await expect(items.nth(1)).toContainText('Gründungsmitglied');
+  // Laufende Amtszeit oben unter „Im Amt“, die frühere in der Chronik
+  const spotlight = card.locator('.spotlight');
+  await expect(spotlight.locator('.spotlight-person')).toHaveCount(2);
+  await expect(spotlight).toContainText('seit 2020');
+  const items = card.locator('.tl-item');
+  await expect(items).toHaveCount(1);
+  await expect(items.nth(0)).toContainText('1990–2005');
+  await expect(items.nth(0)).toContainText('Gründungsmitglied');
   await shot(page, '1b-aemter-zeitstrahl');
   if (SHOTS) {
     // Breiter Bildschirm: abwechselnd links und rechts
@@ -463,9 +466,9 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   // Personen der Mitgliederliste: Tipp auf den Namen zeigt alle ihre Ämter
-  await items.nth(0).getByRole('button', { name: 'Mitglied1' }).click();
+  await spotlight.getByRole('button', { name: /^Mitglied1/ }).click();
   await expect(page.getByRole('heading', { name: 'Ämter von Mitglied1' })).toBeVisible();
-  await expect(page.locator('.timeline-item', { hasText: office })).toContainText('seit 2020');
+  await expect(page.locator('.tl-item', { hasText: office })).toContainText('seit 2020');
 
   // Aufräumen (WordPress behält die Daten zwischen den Läufen)
   await login(page, 'admin', ADMIN_PASSWORD);
