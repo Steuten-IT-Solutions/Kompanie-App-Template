@@ -47,6 +47,12 @@ final class DriveMock
     public int $downloads = 0;
     /** Downloads scheitern (HTTP 500), z. B. bei einer Störung. */
     public bool $downloadFails = false;
+    /** Drive-Datei-ID => Inhalt der Datei (statt des erzeugten JPEGs), z. B. eine RAW-Datei. */
+    public array $contents = [];
+    /** Drive-Datei-IDs, für die Google ein Vorschaubild (thumbnailLink) hat. */
+    public array $thumbnails = [];
+    /** @var string[] abgerufene Vorschaubild-Adressen */
+    public array $thumbnailRequests = [];
     public string $privateKey = '';
     private string $publicKey;
 
@@ -158,15 +164,27 @@ final class DriveMock
                     ? ['status' => 200, 'body' => (string) json_encode(['items' => $this->calendarItems])]
                     : ['status' => $this->calendarStatus, 'body' => '{"error":{"message":"Not Found"}}'];
             }
+            if (str_starts_with($url, 'https://lh3.googleusercontent.com/drive-storage/')) {
+                $this->thumbnailRequests[] = $url;
+                return ($headers['Authorization'] ?? '') === 'Bearer TOKEN123'
+                    ? ['status' => 200, 'body' => self::jpeg(1600, 1200)]
+                    : ['status' => 403, 'body' => ''];
+            }
             if (!str_starts_with($url, DriveClient::FILES_URL)) {
                 return ['status' => 404, 'body' => ''];
             }
             if (($headers['Authorization'] ?? '') !== 'Bearer TOKEN123') {
                 return ['status' => 401, 'body' => '{"error":{"message":"Kein Token"}}'];
             }
+            $id = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\\?.*$#', '$1', $url));
             if (str_contains($url, 'alt=media')) {
                 $this->downloads++;
-                return $this->downloadFails ? ['status' => 500, 'body' => ''] : ['status' => 200, 'body' => self::jpeg()];
+                return $this->downloadFails ? ['status' => 500, 'body' => ''] : ['status' => 200, 'body' => $this->contents[$id] ?? self::jpeg()];
+            }
+            if (str_contains($url, 'fields=thumbnailLink')) {
+                return ['status' => 200, 'body' => (string) json_encode(in_array($id, $this->thumbnails, true)
+                    ? ['thumbnailLink' => 'https://lh3.googleusercontent.com/drive-storage/' . $id . '=s220']
+                    : [])];
             }
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
             preg_match("/'([^']+)' in parents/", (string) $q['q'], $m);
