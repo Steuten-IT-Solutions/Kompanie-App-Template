@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Telemetry;
 
 /**
- * Feste Fehlercodes für die Statusmeldungen (Issue #20). Gesendet werden nur diese Codes, nie
- * Fehlertexte: Die können Pfade, Namen oder E-Mail-Adressen enthalten.
+ * Feste Fehlercodes für die Statusmeldungen (Issue #20). Gesendet werden nur diese Codes mit ihrer Ursache
+ * (Detail), nie Fehlertexte: Die können Pfade, Namen oder E-Mail-Adressen enthalten und stehen nur im
+ * Fehlerprotokoll der Installation.
  */
 enum Code: string
 {

@@ -6,8 +6,12 @@ namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\GalleryService;
+use KompanieApp\Core\Http\Api;
+use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Http\Route;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Tests\Support\DriveMock;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
@@ -71,7 +75,7 @@ final class StatusReportTest extends TestCase
         $sent = $this->sent();
         $this->assertCount(1, $sent);
         $hb = $sent[0];
-        $allowed = ['format', 'installation', 'kompanie', 'version', 'variant', 'php', 'database', 'kind', 'checks', 'errors', 'cron',
+        $allowed = ['format', 'installation', 'kompanie', 'version', 'variant', 'php', 'database', 'kind', 'checks', 'errors', 'details', 'cron',
             'features', 'update', 'updateCheckOk', 'gallery', 'maintenance', 'sent', 'nonce', 'key', '_signature'];
         $this->assertSame([], array_diff(array_keys($hb), $allowed), 'nur Felder der Positivliste');
         $this->assertSame(2, $hb['format']);
@@ -87,6 +91,122 @@ final class StatusReportTest extends TestCase
         $this->assertSame(['kind' => 'real', 'last' => $this->clock->now()->getTimestamp()], $hb['cron']);
         $this->assertContains('points', $hb['features']);
         $this->assertSame([], $hb['errors']);
+        $this->assertSame([], $hb['details']);
+        $this->assertStringContainsString('"details":{}', (string) $this->http->calls[0]['body'], 'leer als Objekt, nicht als Liste');
+    }
+
+    public function testCausesAreSentButNeverTexts(): void
+    {
+        $app = $this->app();
+        $t = $app->telemetry();
+        $t->record(Code::CalendarFetch, 'ics_http_404', 'Der Kalender-Link von max@example.org lieferte HTTP 404.');
+        $t->record(Code::CalendarFetch, 'ics_http_404');
+        $t->record(Code::CalendarFetch, 'ICS Timeout');
+        $t->record(Code::GallerySync);
+        $t->record(Code::UpdateFailed, 'download_http_503', 'Update auf 1.0.0.2 für max@example.org gescheitert');
+        $this->assertSame(['CALENDAR_FETCH' => ['ics_http_404' => 2, 'ics_timeout' => 1], 'UPDATE_FAILED' => ['download_http_503' => 1]], $t->details());
+        $this->assertSame(['UPDATE_FAILED' => 'download_http_503'], $t->pendingDetails());
+
+        $app->runTask(StatusReporter::TASK);
+        [$event, $hb] = $this->sent();
+        $this->assertSame(['UPDATE_FAILED', 'download_http_503'], [$event['event'], $event['detail']]);
+        $this->assertArrayNotHasKey('detail', $hb);
+        $this->assertSame(['CALENDAR_FETCH' => 3, 'GALLERY_SYNC' => 1, 'UPDATE_FAILED' => 1], $hb['errors']);
+        $this->assertSame(['CALENDAR_FETCH' => ['ics_http_404' => 2, 'ics_timeout' => 1], 'UPDATE_FAILED' => ['download_http_503' => 1]], $hb['details']);
+        foreach ($this->http->calls as $c) {
+            $this->assertStringNotContainsString('example.org', (string) $c['body'], 'keine Fehlertexte');
+        }
+        $this->later(3600 * 25);
+        $this->assertSame([], $t->details(), 'älter als 24 Stunden: verworfen');
+    }
+
+    public function testCausesAreLimitedPerCodeAndHour(): void
+    {
+        $t = $this->app()->telemetry();
+        for ($i = 1; $i <= 12; $i++) {
+            $t->record(Code::ServerError, 'route_' . $i);
+        }
+        $details = $t->details()['SERVER_ERROR'];
+        $this->assertCount(11, $details);
+        $this->assertSame(2, $details['other']);
+        $t->record(Code::ServerError, 'route_1');
+        $this->assertSame(2, $t->details()['SERVER_ERROR']['route_1'], 'bekannte Ursachen zählen weiter');
+        // Von Hand verfälschte Einstellung: nur gültige Ursachen
+        $hour = (string) ($this->clock->now()->getTimestamp() - 60);
+        $this->settings->set(Telemetry::DETAILS_SETTING, [$hour => ['SERVER_ERROR' => ['max@example.org' => 1, 'ok' => 1], 'UNBEKANNT' => ['x' => 1]]]);
+        $this->assertSame(['SERVER_ERROR' => ['ok' => 1]], $t->details());
+        $this->settings->set(Telemetry::PENDING_SETTING, ['DB_ERROR:max@example.org', 'PHP_FATAL', 'UNBEKANNT:x']);
+        $this->assertSame(['DB_ERROR' => '', 'PHP_FATAL' => ''], $t->pendingDetails());
+    }
+
+    public function testDetailIsBuiltOnlyFromFixedParts(): void
+    {
+        $this->assertSame('typeerror_get_events_id', Detail::of('TypeError', 'GET', '/events/{id}'));
+        $this->assertSame('sqlstate_42s02_get_points', Detail::of('sqlstate_42S02', 'GET', '/points'));
+        $this->assertSame('n_404', Detail::of('404'));
+        $this->assertSame('ics', Detail::of('ics', ''));
+        $this->assertSame('', Detail::of('', '—'));
+        $this->assertSame(64, strlen(Detail::of(str_repeat('a', 100))));
+        $this->assertSame('http_404', Detail::fromMessage('Der Kalender-Link lieferte HTTP 404.'));
+        $this->assertSame('http_403', Detail::fromMessage('Google Kalender: Forbidden (HTTP 403) – Ist der Kalender freigegeben?'));
+        $this->assertSame('timeout', Detail::fromMessage('cURL error 28: Operation timed out after 15001 milliseconds'));
+        $this->assertSame('dns', Detail::fromMessage('cURL error 6: Could not resolve host: calendar.example.org'));
+        $this->assertSame('tls', Detail::fromMessage('cURL error 60: SSL certificate problem'));
+        $this->assertSame('connect', Detail::fromMessage('cURL error 7: Failed to connect to host port 443'));
+        $this->assertSame('', Detail::fromMessage('Der Ordner von max@example.org fehlt'));
+        foreach (['typeerror_get_events_id', 'n_404', 'http_404'] as $d) {
+            $this->assertMatchesRegularExpression(Detail::PATTERN, $d);
+        }
+    }
+
+    public function testServerErrorsCarryClassAndRoute(): void
+    {
+        $app = $this->app();
+        $api = new Api($app);
+        $fail = static fn () => throw new \TypeError('Argument für max@example.org');
+        $res = $api->dispatch(new Route('GET', '/events/{id}', Route::PUBLIC, $fail), new Request('GET', '/events/5'));
+        $this->assertSame(500, $res->status);
+        $res = $api->dispatch(new Route('POST', '/points', Route::PUBLIC, static fn () => throw new \PDOException('kaputt')), new Request('POST', '/points'));
+        $this->assertSame(500, $res->status);
+        $this->assertSame(['DB_ERROR' => ['sqlstate_0_post_points' => 1], 'SERVER_ERROR' => ['typeerror_get_events_id' => 1]], $app->telemetry()->details());
+        $log = $app->telemetry()->log();
+        $this->assertSame('DB_ERROR', $log[0]['code']);
+        $this->assertSame('SERVER_ERROR', $log[1]['code']);
+        $this->assertStringStartsWith('TypeError: Argument für max@example.org (StatusReportTest.php:', $log[1]['message'], 'Text nur im Protokoll, Datei ohne Verzeichnis');
+    }
+
+    public function testErrorLogKeepsTextsOnTheServerEvenWithoutConsent(): void
+    {
+        $app = $this->app(false);
+        $t = $app->telemetry();
+        $t->record(Code::CalendarFetch, 'ics_timeout', "Zeitüberschreitung bei https://user:pw@calendar.google.com/calendar/ical/x%40group/private-geheim/basic.ics?key=abc\nin /var/www/html/app/core/src/Http/Api.php:85");
+        $t->record(Code::CalendarFetch, 'ics_timeout', "Zeitüberschreitung bei https://user:pw@calendar.google.com/calendar/ical/x%40group/private-geheim/basic.ics?key=abc\nin /var/www/html/app/core/src/Http/Api.php:85");
+        $this->assertSame([], $t->errors(), 'ohne Zustimmung nichts gezählt');
+        $log = $t->log();
+        $this->assertCount(1, $log, 'derselbe Fehler direkt hintereinander: zusammengefasst');
+        $this->assertSame(2, $log[0]['count']);
+        $this->assertSame('ics_timeout', $log[0]['detail']);
+        $this->assertSame('Zeitüberschreitung bei https://calendar.google.com/… in Api.php:85', $log[0]['message'], 'Adresse nur bis zum Server, Datei ohne Verzeichnis');
+
+        $this->later(60);
+        $t->record(Code::GallerySync, '', str_repeat('x', 2000));
+        $this->assertSame(['GALLERY_SYNC', 'CALENDAR_FETCH'], array_column($t->log(), 'code'), 'neueste zuerst');
+        $this->assertSame(1000, mb_strlen($t->log()[0]['message']));
+        for ($i = 0; $i < 60; $i++) {
+            $t->record(Code::ServerError, '', 'Fehler ' . $i);
+        }
+        $this->assertCount(50, $t->log());
+        $this->assertSame('Fehler 59', $t->log()[0]['message']);
+
+        // Widerruf der Zustimmung lässt das Protokoll stehen; nach 14 Tagen ist es weg.
+        $t->forget();
+        $this->assertCount(50, $t->log());
+        $this->later(14 * 86400);
+        $this->assertSame([], $t->log());
+        $t->record(Code::DiskLow);
+        $t->clearLog();
+        $this->assertNull($this->settings->get(Telemetry::LOG_SETTING));
+        $this->assertSame([], $this->sent());
     }
 
     public function testNothingWithoutConsent(): void
@@ -256,6 +376,9 @@ final class StatusReportTest extends TestCase
         $app->runTask(StatusReporter::TASK);
         $events = array_column($this->sent(), 'event');
         $this->assertSame(['CHECK_ERROR'], $events);
+        $this->assertSame('gallery', $this->sent()[1]['detail'], 'Ursache: welche Ampel');
+        $this->assertSame(['CHECK_ERROR', 'gallery'], [$app->telemetry()->log()[0]['code'], $app->telemetry()->log()[0]['detail']]);
+        $this->assertStringContainsString('example.org fehlt', $app->telemetry()->log()[0]['message'], 'der Text steht nur im Protokoll');
         $this->assertSame('error', $this->sent()[2]['checks']['gallery']);
         foreach ($this->http->calls as $c) {
             $this->assertStringNotContainsString('example.org fehlt', (string) $c['body'], 'keine Fehlertexte');
@@ -278,8 +401,8 @@ final class StatusReportTest extends TestCase
     public function testInstallationSettingsStayOutOfBackups(): void
     {
         foreach ([StatusReporter::ID_SETTING, StatusReporter::SECRET_SETTING, StatusReporter::REGISTERED_SETTING, StatusReporter::LAST_SETTING,
-            StatusReporter::HEARTBEAT_SETTING, StatusReporter::CHECKS_SETTING, Telemetry::ERRORS_SETTING, Telemetry::PENDING_SETTING,
-            Telemetry::EVENTS_SETTING, App::TASK_RUN_SETTING] as $key) {
+            StatusReporter::HEARTBEAT_SETTING, StatusReporter::CHECKS_SETTING, Telemetry::ERRORS_SETTING, Telemetry::DETAILS_SETTING,
+            Telemetry::PENDING_SETTING, Telemetry::EVENTS_SETTING, Telemetry::LOG_SETTING, App::TASK_RUN_SETTING] as $key) {
             $this->assertContains($key, Backup::LOCAL_SETTINGS, $key);
         }
     }

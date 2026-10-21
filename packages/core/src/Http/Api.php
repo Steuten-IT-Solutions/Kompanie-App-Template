@@ -17,6 +17,7 @@ use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Update\StatusReporter;
 
 /**
@@ -104,8 +105,10 @@ final class Api
             return Response::error($e);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-            // Nur der Code, nie der Text (Statusmeldungen, nur mit Zustimmung).
-            $this->app->telemetry()->record($e instanceof \PDOException || $e instanceof DatabaseException ? Code::DbError : Code::ServerError);
+            // In der Statusmeldung nur Code und Ursache (Art des Fehlers und Route), der Text nur im Fehlerprotokoll.
+            $db = $e instanceof \PDOException || $e instanceof DatabaseException;
+            $kind = $e instanceof \PDOException ? 'sqlstate_' . (string) ($e->errorInfo[0] ?? $e->getCode()) : ($db ? 'wpdb' : Detail::className($e));
+            $this->app->telemetry()->record($db ? Code::DbError : Code::ServerError, Detail::of($kind, $route->method, $route->path), Detail::describe($e));
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
     }
@@ -709,7 +712,13 @@ final class Api
                 'updates' => $a->updates()->status(),
                 'statusReports' => ['enabled' => (bool) $a->settings->get(StatusReporter::SETTING, false), 'available' => (string) ($a->packageConfig['statusUrl'] ?? '') !== '', 'payload' => $a->statusReporter()->payload(), 'last' => $a->statusReporter()->last()],
                 'setupDone' => (bool) $a->settings->get(self::SETUP_SETTING, false),
+                // Fehlerprotokoll: bleibt auf dem Server, auch ohne Zustimmung zu den Statusmeldungen
+                'errorLog' => $a->telemetry()->log(),
             ], null, $denySettings),
+            new Route('DELETE', '/admin/error-log', Cap::ManageSettings, function () use ($a) {
+                $a->telemetry()->clearLog();
+                return ['errorLog' => []];
+            }, null, $denySettings),
             new Route('POST', '/admin/update/check', Cap::ManageSettings, function () use ($a) {
                 $a->updates()->check();
                 return $a->updates()->status();

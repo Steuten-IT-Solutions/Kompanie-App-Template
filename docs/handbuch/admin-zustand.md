@@ -26,6 +26,11 @@ Ohne WordPress kommen zwei Zeilen dazu:
 Was du bei typischen Meldungen tun kannst, steht unter [Häufige Probleme](seite:haeufige-probleme). Ist bei euch eine Kontaktadresse der Betreuer hinterlegt, steht sie unter der Ampel bei **Hilfe**.
 
 ## Statusmeldungen an die Betreuer
-Wenn du zustimmst, schickt die App den Betreuern der App stündlich ein kurzes Lebenszeichen (u. a. Version, Farbe der Ampel je Zeile, Fehlercodes der letzten 24 Stunden) und meldet schwere Fehler sofort, z. B. ein gescheitertes Update. Namen, Inhalte und Fehlertexte werden nie gesendet. So sehen die Betreuer Probleme früh.
+Wenn du zustimmst, schickt die App den Betreuern der App stündlich ein kurzes Lebenszeichen (u. a. Version, Farbe der Ampel je Zeile, Fehlercodes der letzten 24 Stunden mit Ursache, z. B. „Kalender-Link: HTTP 404“ oder „Zeitüberschreitung“) und meldet schwere Fehler sofort, z. B. ein gescheitertes Update. Namen, Inhalte und Fehlertexte werden nie gesendet. So sehen die Betreuer Probleme früh.
 
-Du stimmst bei der Einrichtung zu oder später unter **Zustand und Updates** mit dem Schalter **Statusmeldungen an die Betreuer der App senden**. Dort siehst du unter **Was genau gesendet wird**, welche Angaben das Lebenszeichen enthält, und wann die letzte Meldung ging. Die Zustimmung lässt sich jederzeit zurücknehmen; dann werden auch die gezählten Fehler gelöscht. Fehlt der Schalter, sind Statusmeldungen in eurer App nicht vorgesehen.
+Bei der Einrichtung ist der Haken dafür schon gesetzt; du kannst ihn dort entfernen oder später unter **Zustand und Updates** den Schalter **Statusmeldungen an die Betreuer der App senden** umstellen. Dort siehst du unter **Was genau gesendet wird**, welche Angaben das Lebenszeichen enthält, und wann die letzte Meldung ging. Die Zustimmung lässt sich jederzeit zurücknehmen; dann werden auch die gezählten Fehler gelöscht. Fehlt der Schalter, sind Statusmeldungen in eurer App nicht vorgesehen.
+
+## Fehlerprotokoll
+Unter **Zustand und Updates** steht außerdem das **Fehlerprotokoll**: die Fehler der letzten 14 Tage (höchstens 50) mit dem vollständigen Fehlertext, auch ohne Zustimmung zu den Statusmeldungen. Es bleibt auf eurem Server und wird nicht gesendet. Gleiche Fehler direkt hintereinander stehen nur einmal da, mit Anzahl und Zeitraum. Adressen sind auf den Server gekürzt (so bleibt z. B. ein geheimer Kalender-Link geheim).
+
+Sollen die Betreuer bei einem Problem helfen, tippe auf **Kopieren** und schick ihnen den Text. Sieh ihn vorher kurz durch: Fehlertexte können Namen oder Inhalte enthalten, z. B. wenn ein Datenbankfehler den Wert eines Eintrags nennt. **Leeren** löscht das Protokoll, z. B. nachdem ein Problem behoben ist.

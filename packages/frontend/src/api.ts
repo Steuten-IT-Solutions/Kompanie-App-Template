@@ -1089,6 +1089,7 @@ export const api = {
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
   // Benachrichtigungen (Web Push): Konten über /me/push, Gäste über /push mit dem auth-Geheimnis des Geräts.
@@ -1223,6 +1224,21 @@ export interface AdminStatus {
     last: { at: number; ok: boolean; kind: 'heartbeat' | 'event' } | null;
   };
   setupDone: boolean;
+  /** Fehlerprotokoll dieser Installation, neueste zuerst (bleibt auf dem Server) */
+  errorLog: ErrorLogEntry[];
+}
+
+export interface ErrorLogEntry {
+  /** zuletzt aufgetreten */
+  at: number;
+  /** zuerst aufgetreten (bei mehreren gleichen direkt hintereinander) */
+  first: number;
+  count: number;
+  /** Fehlercode wie in den Statusmeldungen, z. B. CALENDAR_FETCH */
+  code: string;
+  /** Ursache wie in den Statusmeldungen, z. B. ics_http_404; leer, wenn unbekannt */
+  detail: string;
+  message: string;
 }
 
 export type NewsSourceType = 'none' | 'wordpress' | 'rss';

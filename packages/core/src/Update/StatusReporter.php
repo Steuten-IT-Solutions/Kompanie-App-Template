@@ -13,9 +13,10 @@ use KompanieApp\Core\Telemetry\Code;
  *
  * Inhalt abschließend (docs/OFFENE-PUNKTE.md, Abschnitt 4): Installations-ID, Kompanie, Version,
  * Variante, PHP-Version, Datenbank, Ampel je Bereich (nur Schlüssel und Stufe), Fehlercodes der
- * letzten 24 Stunden mit Anzahl, Art und letzter Lauf der Hintergrundaufgaben, eingeschaltete
- * Bereiche, Ergebnis des letzten Updates und Galerie-Abgleichs. Keine Mitgliederdaten, keine
- * Adressen, keine Fehlertexte.
+ * letzten 24 Stunden mit Anzahl und Ursache (Telemetry\Detail, z. B. „ics_http_404“), Art und letzter
+ * Lauf der Hintergrundaufgaben, eingeschaltete Bereiche, Ergebnis des letzten Updates und
+ * Galerie-Abgleichs. Keine Mitgliederdaten, keine Adressen, keine Fehlertexte (die stehen nur im
+ * Fehlerprotokoll der Installation).
  *
  * Signiert mit HMAC-SHA256 und einem Geheimnis je Installation (Header X-Kompanie-Signature). Das
  * Cockpit lernt das Geheimnis bei der ersten Meldung einer neuen Installation (Feld key, nur bis
@@ -65,7 +66,7 @@ final class StatusReporter
      *
      * @return array<string, mixed>
      */
-    public function payload(string $kind = 'heartbeat', ?Code $event = null): array
+    public function payload(string $kind = 'heartbeat', ?Code $event = null, string $detail = ''): array
     {
         $a = $this->app;
         $last = $a->settings->get('update_last');
@@ -81,6 +82,7 @@ final class StatusReporter
             'kind' => $kind,
             'checks' => $this->checks(),
             'errors' => (object) $a->telemetry()->errors(),
+            'details' => (object) array_map(static fn (array $d): object => (object) $d, $a->telemetry()->details()),
             'cron' => ['kind' => $a->scheduler->kind(), 'last' => $this->lastTaskRun()],
             'features' => array_keys(array_filter($a->features()->all())),
             'update' => is_array($last) ? ['ok' => (bool) ($last['ok'] ?? false), 'at' => (int) ($last['at'] ?? 0), 'to' => (string) ($last['to'] ?? '')] : null,
@@ -93,6 +95,9 @@ final class StatusReporter
         ];
         if ($event !== null) {
             $data['event'] = $event->value;
+            if ($detail !== '') {
+                $data['detail'] = $detail;
+            }
         }
         return $data;
     }
@@ -123,9 +128,11 @@ final class StatusReporter
         }
         $failure = null;
         $keep = [];
-        $pending = $t->pending(true);
-        foreach ($pending as $code) {
-            [$ok, $retry, $error] = $this->send($this->payload('event', $code));
+        $pending = [];
+        foreach ($t->pendingDetails(true) as $value => $detail) {
+            $code = Code::from($value);
+            $pending[] = $code;
+            [$ok, $retry, $error] = $this->send($this->payload('event', $code, $detail));
             if (!$ok) {
                 $failure ??= $error;
                 if ($retry) {
@@ -220,7 +227,7 @@ final class StatusReporter
         $now = $this->checks();
         foreach ($now as $key => $level) {
             if ($level === 'error' && ($before[$key] ?? '') !== 'error') {
-                $this->app->telemetry()->record(Code::CheckError);
+                $this->app->telemetry()->record(Code::CheckError, $key, $this->checkText($key));
                 break;
             }
         }
@@ -229,8 +236,19 @@ final class StatusReporter
         }
         $free = @disk_free_space($this->app->files->path('.', false));
         if (is_float($free) && $free < self::DISK_LOW) {
-            $this->app->telemetry()->record(Code::DiskLow);
+            $this->app->telemetry()->record(Code::DiskLow, '', 'Freier Speicherplatz: ' . (int) round($free / 1024 / 1024) . ' MB');
         }
+    }
+
+    /** Text einer Ampel (nur fürs Fehlerprotokoll der Installation, nicht für die Meldung). */
+    private function checkText(string $key): string
+    {
+        foreach ($this->app->status()->report()['items'] as $item) {
+            if (($item['key'] ?? '') === $key) {
+                return (string) ($item['label'] ?? $key) . ': ' . (string) ($item['text'] ?? '');
+            }
+        }
+        return '';
     }
 
     private function lastTaskRun(): int

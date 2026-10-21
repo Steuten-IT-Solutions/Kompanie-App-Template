@@ -126,9 +126,10 @@ Subdomain auf unserem Webspace). Das frühere `tools/status-empfang` ist dadurch
   sofort (je Code höchstens einmal pro Stunde). „Holen“ durch uns ginge nicht ohne zusätzliche Zugangsdaten.
 - **Inhalt (abschließend)** und Protokoll: [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md) (Format 2). Kurz:
   Installations-ID, Kompanie, Version, Variante, PHP, Datenbank, Ampel je Bereich (nur Stufe), Fehlercodes
-  der letzten 24 Stunden mit Anzahl, Art und letzter Lauf der Hintergrundaufgaben, eingeschaltete Bereiche,
-  Ergebnis des letzten Updates und Galerie-Abgleichs.
-- **Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. IP-Adressen speichert der
+  der letzten 24 Stunden mit Anzahl und Ursache (z. B. `ics_http_404`), Art und letzter Lauf der
+  Hintergrundaufgaben, eingeschaltete Bereiche, Ergebnis des letzten Updates und Galerie-Abgleichs.
+- **Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. Die Texte stehen nur im
+  Fehlerprotokoll der Installation; Admins können es kopieren und uns bei Bedarf schicken. IP-Adressen speichert der
   Empfänger nicht; der Hoster protokolliert sie trotzdem in seinen Server-Logs, das gehört in die
   Datenschutzerklärung.
 - **Signiert** (HMAC-SHA256) mit einem Geheimnis je Installation; das Cockpit lernt es bei der ersten
@@ -139,7 +140,7 @@ Subdomain auf unserem Webspace). Das frühere `tools/status-empfang` ist dadurch
 - **Warnungen per E-Mail und Push** an uns bei neuen Ereignissen, roter Ampel, ausbleibendem Lebenszeichen
   und gehäuften Fehlern nach einem Release. Dann prüfen wir, ob die Version zurückgezogen werden muss
   (Punkt 1).
-- Die Zustimmung wird im Einrichtungsassistenten erfragt; abschaltbar unter *Einstellungen → Zustand und Updates*. Beim
+- Die Zustimmung wird im Einrichtungsassistenten erfragt (Haken vorausgewählt, lässt sich entfernen); abschaltbar unter *Einstellungen → Zustand und Updates*. Beim
   Abschalten werden auch die Fehlerzähler gelöscht.
 
 **Datenschutz:** Die Erweiterung (stündlich, Fehlercodes) gehört in die Prüfung aus Abschnitt 3 und in die
