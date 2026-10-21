@@ -801,6 +801,14 @@ select {
   font-size: 1.6rem;
   letter-spacing: 0.02em;
 }
+.member-name.with-rank {
+  margin-bottom: 4px;
+}
+/* Dienstgrad mit Abzeichen unter dem Namen in den Mitgliedsdetails */
+.member-rank-line {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
 .back {
   margin-bottom: 4px;
 }

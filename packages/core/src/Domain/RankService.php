@@ -243,7 +243,8 @@ final class RankService
 
     /**
      * Für die Auslieferung über badgeUrl(): sehen darf jede angemeldete Person mit Mitgliederbereich oder internem
-     * Kalender (auch Anwärter). Die Header setzt der Kern, damit beide Adapter gleich antworten.
+     * Kalender (auch Anwärter) und jede, die die Mitgliederliste sieht (dort stehen die Abzeichen auch). Die Header
+     * setzt der Kern, damit beide Adapter gleich antworten.
      *
      * @return array{status: int, headers: array<string, string>, path?: string}
      */
@@ -259,7 +260,8 @@ final class RankService
         if ($user === null) {
             return $deny(401);
         }
-        if (!$user->can(Capability::Member) && !$user->can(Capability::Calendar)) {
+        $viewers = [Capability::Member, Capability::Calendar, ...Capability::memberList()];
+        if (array_filter($viewers, static fn (Capability $c): bool => $user->can($c)) === []) {
             return $deny(403);
         }
         $rank = $this->repository()->find($rankId);

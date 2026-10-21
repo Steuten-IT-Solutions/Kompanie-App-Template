@@ -276,7 +276,24 @@ final class Api
         }
     }
 
-    /** Dienstgrade in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    /**
+     * Dienstgrad in den Mitgliedsdetails: Bezeichnung und Abzeichen wie in der Mitgliederliste für alle mit Zugang;
+     * Stand und Verlauf nur, wer Dienstgrade verwaltet.
+     *
+     * @return array<string, mixed>
+     */
+    private function memberRank(int $userId): array
+    {
+        if (!$this->app->features()->enabled('ranks')) {
+            return [];
+        }
+        $status = $this->showRanks() ? $this->app->ranks()->status($userId) : null;
+        $rank = $status !== null ? $status['rank'] : $this->app->ranks()->current($userId);
+        return ['rank_title' => $rank['title'] ?? null, 'rank_badge_url' => $rank['badge_url'] ?? null]
+            + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
+    }
+
+    /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showRanks(): bool
     {
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
@@ -391,7 +408,7 @@ final class Api
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
-        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
+        $manage = Cap::memberList();
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [
@@ -639,7 +656,8 @@ final class Api
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
                 $photos = $a->memberPhotos()->urls();
                 $list = array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $list);
-                if ($this->showRanks()) {
+                // Dienstgrad mit Abzeichen sieht jede Person mit Zugang zur Liste, nicht nur wer Dienstgrade verwaltet.
+                if ($a->features()->enabled('ranks')) {
                     $ranks = $a->ranks()->assigned();
                     $list = array_map(static fn (array $m): array => $m + [
                         'rank_title' => $ranks[$m['id']]['title'] ?? null,
@@ -655,7 +673,7 @@ final class Api
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
                 // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
                 + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
-                + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
+                + $this->memberRank($r->id())
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes

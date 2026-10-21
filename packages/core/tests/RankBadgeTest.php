@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\RankService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
@@ -240,6 +242,17 @@ final class RankBadgeTest extends TestCase
         $members = array_column($this->call('GET', '/members')->data, null, 'id');
         $this->assertSame(['Gefreiter', $gUrl], [$members[$this->m]['rank_title'], $members[$this->m]['rank_badge_url']]);
         $this->assertNull($members[$this->admin]['rank_badge_url']);
+        $detail = $this->call('GET', "/members/{$this->m}")->data;
+        $this->assertSame(['Gefreiter', $gUrl], [$detail['rank_title'], $detail['rank_badge_url']], 'Profil wie Mitgliederliste');
+
+        // Wer die Mitgliederliste nur wegen eines anderen Rechts sieht (hier Punkte vergeben), sieht Dienstgrad und Abzeichen auch.
+        $this->users->current = $this->users->add('leitung', 'points');
+        $members = array_column($this->call('GET', '/members')->data, null, 'id');
+        $this->assertSame(['Gefreiter', $gUrl], [$members[$this->m]['rank_title'], $members[$this->m]['rank_badge_url']]);
+        $detail = $this->call('GET', "/members/{$this->m}")->data;
+        $this->assertSame(['Gefreiter', $gUrl], [$detail['rank_title'], $detail['rank_badge_url']]);
+        $this->assertArrayNotHasKey('rank', $detail, 'Stand und Verlauf nur mit dem Recht, Dienstgrade zu verwalten');
+        $this->users->current = $this->admin;
 
         $promo = array_column($this->call('GET', '/promotions')->data, null, 'user_id')[$this->m];
         $this->assertSame([$gUrl, $uUrl, $uUrl], [$promo['rank']['badge_url'], $promo['next_rank']['badge_url'], $promo['reachable_rank']['badge_url']]);
@@ -292,7 +305,11 @@ final class RankBadgeTest extends TestCase
         $this->assertSame(200, $ranks->badgeForDelivery($candidate, $svgRank, $v, '128')['status'], 'Anwärter sehen Abzeichen');
         $this->assertSame(401, $ranks->badgeForDelivery(null, $svgRank, $v, '128')['status'], 'nicht angemeldet');
         $denied = $ranks->badgeForDelivery($guest, $svgRank, $v, '128');
-        $this->assertSame([403, 'no-store'], [$denied['status'], $denied['headers']['Cache-Control']], 'ohne Mitgliederbereich und Kalender');
+        $this->assertSame([403, 'no-store'], [$denied['status'], $denied['headers']['Cache-Control']], 'ohne Mitgliederbereich, Kalender und Mitgliederliste');
+        foreach (Capability::memberList() as $cap) {
+            $viewer = new User(9999, 'Verwaltung', 'verwaltung', Roles::GUEST, [$cap]);
+            $this->assertSame(200, $ranks->badgeForDelivery($viewer, $svgRank, $v, '128')['status'], 'Mitgliederliste mit ' . $cap->value);
+        }
         $this->assertSame(404, $ranks->badgeForDelivery($member, $none, '', '128')['status'], 'ohne Abzeichen');
         $this->assertSame(404, $ranks->badgeForDelivery($member, 999, '', '128')['status'], 'unbekannter Dienstgrad');
 
