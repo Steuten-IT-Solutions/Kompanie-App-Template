@@ -211,6 +211,13 @@ grep -q '"statusUrl": "https://status.example.org/"' <<< "$(unzip -p "$T/release
   && ok "Geänderte Adresse für Statusmeldungen ergibt eine neue Version" || fail "Statusadresse: $(ls "$T/releases")"
 if STATUS_URL=http://unsicher.example.org/ pub "$SHA4" > /dev/null 2>&1; then fail "http-Adresse für Statusmeldungen angenommen"; else ok "Adresse für Statusmeldungen nur mit https"; fi
 
+# Empfänger der Fehlermeldungen (Issue #64): nur https; ohne Angabe bleibt die Prüfsumme der Paket-Konfiguration gleich
+H0="$(php scripts/package.php --config-hash --kompanie=org/kompanie-test --status-url=https://status.example.org/)"
+H1="$(php scripts/package.php --config-hash --kompanie=org/kompanie-test --status-url=https://status.example.org/ --report-url=)"
+H2="$(php scripts/package.php --config-hash --kompanie=org/kompanie-test --status-url=https://status.example.org/ --report-url=https://status.example.org/reports)"
+[ "$H0" = "$H1" ] && [ "$H0" != "$H2" ] && ok "Ohne Adresse für Fehlermeldungen gleiche Prüfsumme, mit Adresse eine neue" || fail "Prüfsumme mit reportUrl: $H0 $H1 $H2"
+if php scripts/package.php --config-hash --kompanie=org/kompanie-test --report-url=http://unsicher.example.org/ > /dev/null 2>&1; then fail "http-Adresse für Fehlermeldungen angenommen"; else ok "Adresse für Fehlermeldungen nur mit https"; fi
+
 # Zurückgezogener Stand kommt auch mit geänderter Paket-Konfiguration nicht wieder
 env REPO=org/kompanie-test ACTION=withdraw VERSION="$CORE.6" GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/control-release.sh > /dev/null
 OUT4="$(STATUS_URL=https://status.example.org/ SUPPORT=hilfe@example.org pub "$SHA4")"

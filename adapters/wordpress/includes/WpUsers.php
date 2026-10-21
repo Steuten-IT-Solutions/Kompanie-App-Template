@@ -7,6 +7,7 @@ namespace KompanieApp\WordPress;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles as AppRoles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\PersonName;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\UserDirectory;
 
@@ -49,7 +50,8 @@ final class WpUsers implements UserDirectory, AuthContext
     private const LEGACY_WP_ROLES = [AppRoles::MEMBER => Roles::ROLE_MEMBER, AppRoles::ORGANIZER => Roles::ROLE_ORGANIZER, AppRoles::MANAGER => Roles::ROLE_MANAGER];
 
     /**
-     * @param (\Closure(string): array<int, Capability>)|null $capabilities Rechte je Rolle (Domain\RoleService)
+     * @param (\Closure(string, int): array<int, Capability>)|null $capabilities Rechte je Grundrolle und Benutzer-ID, mit den
+     *        Zusatzrollen aus der Tabelle des Kerns (Domain\RoleService::capabilitiesFor; keine eigenen WP-Rollen dafür)
      * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? (für frühere WP-Rollen)
      */
     public function __construct(private readonly ?\Closure $capabilities = null, private readonly ?\Closure $known = null)
@@ -114,17 +116,17 @@ final class WpUsers implements UserDirectory, AuthContext
         return array_values(array_map(fn (\WP_User $u): User => $this->toUser($u), get_users($args)));
     }
 
-    public function create(string $name, string $login, string $email, string $password, string $role = AppRoles::MEMBER): int
+    public function create(string $firstName, string $lastName, string $login, string $email, string $password, string $role = AppRoles::MEMBER): int
     {
-        $parts = preg_split('/\s+/', $name, 2) ?: [$name];
+        $name = PersonName::join($firstName, $lastName);
         $id = wp_insert_user([
             'user_login' => $login,
             'user_pass' => $password,
             'user_email' => $email,
             'display_name' => $name,
             'nickname' => $name,
-            'first_name' => $parts[0],
-            'last_name' => $parts[1] ?? '',
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             // Die frühere WP-Rolle nur für Mitglieder (Rückfall bei einem Zurückrollen); Anwärter sind Abonnenten.
             'role' => $role === AppRoles::MEMBER ? Roles::ROLE_MEMBER : 'subscriber',
         ]);
@@ -213,7 +215,11 @@ final class WpUsers implements UserDirectory, AuthContext
     public function profile(int $id): ?array
     {
         $u = $this->find($id) !== null ? get_userdata($id) : false;
-        return $u ? ['name' => (string) $u->display_name, 'login' => (string) $u->user_login, 'email' => (string) $u->user_email] : null;
+        if (!$u) {
+            return null;
+        }
+        [$first, $last] = self::names($u);
+        return ['name' => (string) $u->display_name, 'first_name' => $first, 'last_name' => $last, 'login' => (string) $u->user_login, 'email' => (string) $u->user_email];
     }
 
     public function canChangeLogin(): bool
@@ -221,7 +227,7 @@ final class WpUsers implements UserDirectory, AuthContext
         return false;
     }
 
-    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    public function updateProfile(int $id, string $firstName, string $lastName, string $email, ?string $login): void
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
@@ -231,8 +237,8 @@ final class WpUsers implements UserDirectory, AuthContext
             throw new \DomainException('Benutzernamen lassen sich in WordPress nicht ändern.');
         }
         $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
-        $parts = preg_split('/\s+/', $name, 2) ?: [$name];
-        $res = wp_update_user(['ID' => $id, 'display_name' => $name, 'nickname' => $name, 'first_name' => $parts[0], 'last_name' => $parts[1] ?? '', 'user_email' => $email]);
+        $name = PersonName::join($firstName, $lastName);
+        $res = wp_update_user(['ID' => $id, 'display_name' => $name, 'nickname' => $name, 'first_name' => $firstName, 'last_name' => $lastName, 'user_email' => $email]);
         if (is_wp_error($res)) {
             throw new \DomainException($res->get_error_message());
         }
@@ -362,7 +368,7 @@ final class WpUsers implements UserDirectory, AuthContext
         if ($this->known !== null && !($this->known)($role) && self::hasNoMeta($u) && $role !== AppRoles::GUEST) {
             $role = AppRoles::MEMBER;
         }
-        $caps = $this->capabilities !== null ? ($this->capabilities)($role) : AppRoles::templateCapabilities($role);
+        $caps = $this->capabilities !== null ? ($this->capabilities)($role, (int) $u->ID) : AppRoles::templateCapabilities($role);
         // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter.
         $wp = ['create_users' => Capability::CreateUsers, 'promote_users' => Capability::PromoteUsers, 'manage_options' => Capability::ManageSettings];
         foreach ($wp as $wpCap => $cap) {
@@ -370,6 +376,46 @@ final class WpUsers implements UserDirectory, AuthContext
                 $caps[] = $cap;
             }
         }
-        return new User((int) $u->ID, (string) $u->display_name, (string) $u->user_login, $role, $caps);
+        [$first, $last] = self::names($u);
+        return new User((int) $u->ID, (string) $u->display_name, (string) $u->user_login, $role, $caps, $first, $last);
+    }
+
+    /**
+     * Vor- und Nachname aus dem WordPress-Profil; fehlen beide (z. B. im Backend ohne angelegt), aus dem Anzeigenamen
+     * geteilt: das letzte Wort ist der Nachname.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function names(\WP_User $u): array
+    {
+        $first = trim((string) $u->first_name);
+        $last = trim((string) $u->last_name);
+        return $first === '' && $last === '' ? PersonName::split((string) $u->display_name) : [$first, $last];
+    }
+
+    /**
+     * Konten der Kompanie hat die App früher am ersten Leerzeichen geteilt („Hans | Peter Schulz“). Einmal auf das
+     * letzte Wort als Nachname umstellen („Hans Peter | Schulz“), aber nur, wo Vor- und Nachname noch genau so stehen;
+     * von Hand im Profil gepflegte Namen bleiben.
+     *
+     * @return int umgestellte Konten
+     */
+    public static function splitLegacyNames(): int
+    {
+        global $wpdb;
+        $count = 0;
+        foreach (get_users(['meta_key' => $wpdb->get_blog_prefix() . self::ACCOUNT_META, 'meta_value' => '1', 'fields' => 'all_with_meta']) as $u) {
+            $name = trim((string) preg_replace('/\s+/u', ' ', (string) $u->display_name));
+            $old = explode(' ', $name, 2);
+            if (count(explode(' ', $name)) < 3 || (string) $u->first_name !== $old[0] || (string) $u->last_name !== ($old[1] ?? '')) {
+                continue;
+            }
+            [$first, $last] = PersonName::split($name);
+            update_user_meta((int) $u->ID, 'first_name', $first);
+            update_user_meta((int) $u->ID, 'last_name', $last);
+            clean_user_cache((int) $u->ID);
+            $count++;
+        }
+        return $count;
     }
 }

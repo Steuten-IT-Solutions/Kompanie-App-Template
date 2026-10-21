@@ -1,6 +1,7 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
-import type { MemberSummary } from './api';
+import type { MemberSummary, PersonName } from './api';
 import { dataCache } from './dataCache';
+import { noteError } from './lastError';
 
 /**
  * Lädt Daten asynchron; reload() lädt neu.
@@ -150,6 +151,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
 
   componentDidCatch(error: unknown) {
     console.error(error);
+    noteError(error instanceof Error ? error.message : 'Diese Ansicht konnte nicht angezeigt werden.');
   }
 
   render() {
@@ -197,3 +199,41 @@ export function lazyView<T extends ComponentType<any>>(load: () => Promise<{ def
     }),
   );
 }
+
+/**
+ * Vor- und Nachname nebeneinander; nur der Vorname ist Pflicht (z. B. Funktionskonten ohne Nachnamen). required=false,
+ * wo leere Zeilen übersprungen werden (mehrere anlegen).
+ */
+export function NameFields({
+  value,
+  onChange,
+  required = true,
+}: {
+  value: PersonName;
+  onChange: (v: PersonName) => void;
+  required?: boolean;
+}) {
+  return (
+    <div className="field-row">
+      <label className="field">
+        <span>Vorname</span>
+        <input
+          type="text"
+          autoComplete="off"
+          value={value.first_name}
+          onChange={(e) => onChange({ ...value, first_name: e.target.value })}
+          required={required}
+        />
+      </label>
+      <label className="field">
+        <span>Nachname</span>
+        <input type="text" autoComplete="off" value={value.last_name} onChange={(e) => onChange({ ...value, last_name: e.target.value })} />
+      </label>
+    </div>
+  );
+}
+
+export const emptyName = (): PersonName => ({ first_name: '', last_name: '' });
+
+/** Für die API: ohne Leerzeichen am Rand. */
+export const trimName = (n: PersonName): PersonName => ({ first_name: n.first_name.trim(), last_name: n.last_name.trim() });

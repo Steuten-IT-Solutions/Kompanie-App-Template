@@ -181,6 +181,14 @@ jobs:
           path: screenshots
           if-no-files-found: ignore
 
+      # Traces und Fehlerkontext fehlgeschlagener E2E-Tests (Issue #68): ansehen mit `npx playwright show-trace`.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: failure()
+        with:
+          name: e2e-test-results-wordpress
+          path: packages/frontend/test-results
+          if-no-files-found: ignore
+
   standalone:
     runs-on: ubuntu-latest
     services:
@@ -238,4 +246,11 @@ jobs:
         with:
           name: screenshots-standalone
           path: screenshots-standalone
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: failure()
+        with:
+          name: e2e-test-results-standalone
+          path: packages/frontend/test-results
           if-no-files-found: ignore

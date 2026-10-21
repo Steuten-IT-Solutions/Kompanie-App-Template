@@ -19,5 +19,7 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
     locale: 'de-DE',
     timezoneId: 'Europe/Berlin',
+    // Bei einem Fehlschlag Ablauf mit Netzwerk und DOM behalten (CI lädt test-results/ hoch), Issue #68.
+    trace: 'retain-on-failure',
   },
 });
