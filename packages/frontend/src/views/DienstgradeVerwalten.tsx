@@ -516,7 +516,7 @@ export function MemberRank({
         <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
           {rank} ändern
         </button>
-        {points && options.length === 0 && !(status.rank && canDemote) && (
+        {points && ranks.data && options.length === 0 && !(status.rank && canDemote) && (
           <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle, degradieren nur darunter.</p>
         )}
       </form>
