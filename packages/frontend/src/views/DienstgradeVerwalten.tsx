@@ -377,15 +377,11 @@ export function Promotions() {
         <ul className="card-list promotions">
           {list.map((p, i) => {
             const due = isDue(p);
-            // Der Server sortiert erreichte Schwellen nach oben: Trenner vor dem ersten, dem noch Punkte fehlen.
-            const divider = i > 0 && !due && isDue(list[i - 1]);
+            // Der Server sortiert erreichte Schwellen nach oben: Überschrift darüber, Trenner vor dem ersten, dem noch Punkte fehlen.
+            const heading = i === 0 && due ? 'Schwelle erreicht' : i > 0 && !due && isDue(list[i - 1]) ? 'Noch nicht erreicht' : null;
             return (
               <Fragment key={p.user_id}>
-                {divider && (
-                  <li className="section-title list-divider" role="separator">
-                    Noch nicht erreicht
-                  </li>
-                )}
+                {heading && <li className="section-title list-divider">{heading}</li>}
                 <li
                   className={`card row clickable ${due ? 'due' : ''}`}
                   onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
