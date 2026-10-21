@@ -17,7 +17,7 @@ import { navigate } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
-import { RankBadge, RankLabel } from '../RankBadge';
+import { RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
@@ -162,11 +162,16 @@ function Members() {
   present.add('candidate');
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
-  // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter
+  // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter.
+  // Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner) in ihrer Reihenfolge, Anwärter zuletzt.
   const groupCounts = useMemo(() => {
     const n = new Map<Level, number>();
     for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
-    return (config?.roles ?? []).filter((r) => n.has(r.key)).map((r) => `${r.label} ${n.get(r.key)}`);
+    const rank = (key: Level) => (key === 'member' ? 0 : key === 'candidate' ? 2 : 1);
+    return (config?.roles ?? [])
+      .filter((r) => n.has(r.key))
+      .sort((a, b) => rank(a.key) - rank(b.key))
+      .map((r) => `${r.label} ${n.get(r.key)}`);
   }, [data]);
   // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
   const withPhotos = (data ?? []).some((m) => m.photo_url);
@@ -292,24 +297,23 @@ function Members() {
       </div>
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
+          <li key={m.id} className="card row clickable member-row" onClick={() => open(m.id)}>
             {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} />}
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
-                {m.rank_title !== undefined && (
-                  <>
-                    {m.rank_title ? <RankLabel url={m.rank_badge_url} title={m.rank_title} /> : `Kein ${brand.labels.rank}`}
-                    {canPoints() ? ' · ' : ''}
-                  </>
-                )}
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
                 {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
+            {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. Ohne Dienstgrad bleibt die
+                Spalte leer, damit der Text in allen Zeilen gleich mittig steht. */}
+            {m.rank_title !== undefined && (
+              <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
+            )}
             <span className="chevron" aria-hidden="true">
               ›
             </span>

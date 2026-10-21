@@ -166,7 +166,7 @@ final class AttendanceServiceTest extends TestCase
         $chief = $this->users->add('leitung', 'points');
         $this->call('PUT', '/attendance', ['id' => $list['id'], 'entries' => [$this->m => 'present', $this->admin => 'present', $chief => 'present', $this->cand => 'present']]);
         $groups = fn (): array => array_column($this->call('GET', '/attendance/' . $list['id'])->data['counts_by_group']['present'], 'count', 'group');
-        $this->assertSame([Roles::CANDIDATE => 1, Roles::MEMBER => 3], $groups(), 'ohne Einstellung: mit Mitgliederbereich als Mitglied');
+        $this->assertSame([Roles::MEMBER => 3, Roles::CANDIDATE => 1], $groups(), 'ohne Einstellung: mit Mitgliederbereich als Mitglied; Mitglieder vor Anwärtern');
 
         $this->assertSame(200, $this->call('PUT', '/attendance/groups', ['groups' => ['points' => null, Roles::CANDIDATE => Roles::MEMBER]])->status);
         $this->assertSame([Roles::MEMBER => 3, 'points' => 1], $groups());

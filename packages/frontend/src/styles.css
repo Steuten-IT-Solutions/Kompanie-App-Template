@@ -1993,6 +1993,32 @@ fieldset.feature-list legend {
   gap: 6px;
   vertical-align: middle;
 }
+/* Mitgliederliste: Dienstgrad rechts (wie das Foto links), Name und Punkte mittig dazwischen */
+.member-row .row-main {
+  text-align: center;
+}
+.member-row .title-badges {
+  justify-content: center;
+}
+.member-row-rank {
+  flex: none;
+  width: 76px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.rank-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.rank-stack .rank-badge-medium {
+  height: 40px;
+  max-width: 76px;
+}
 .rank-badge-hero {
   display: flex;
   justify-content: center;

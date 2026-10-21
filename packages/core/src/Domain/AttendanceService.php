@@ -131,12 +131,13 @@ final class AttendanceService
                 $counts[$status][$group] = ($counts[$status][$group] ?? 0) + 1;
             }
         }
-        // Gruppen in der Reihenfolge der Rollen
+        // Mitglieder zuerst, dann die eigenen Rollen in ihrer Reihenfolge, Anwärter zuletzt (wie die Mitgliederliste)
         $order = array_flip(array_keys($roles->all()));
+        $tier = static fn (string $g): int => $g === Roles::MEMBER ? 0 : ($g === Roles::CANDIDATE ? 2 : 1);
         $byGroup = [];
         foreach (self::STATUSES as $s) {
             $row = $counts[$s] ?? [];
-            uksort($row, static fn (string $a, string $b): int => ($order[$a] ?? PHP_INT_MAX) <=> ($order[$b] ?? PHP_INT_MAX));
+            uksort($row, static fn (string $a, string $b): int => [$tier($a), $order[$a] ?? PHP_INT_MAX] <=> [$tier($b), $order[$b] ?? PHP_INT_MAX]);
             $byGroup[$s] = array_map(static fn (string $g, int $n): array => ['group' => $g, 'label' => $roles->label($g), 'count' => $n], array_keys($row), array_values($row));
         }
         $names = new UserNames($this->app->users);
