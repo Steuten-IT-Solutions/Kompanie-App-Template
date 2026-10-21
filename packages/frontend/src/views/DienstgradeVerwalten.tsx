@@ -364,7 +364,11 @@ export function Promotions() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
-  const list = (data ?? []).filter((p) => (below ? p.below_current_threshold : p.next_rank !== null));
+  // Nach Abschnitten gruppiert; innerhalb eines Abschnitts bleibt die Reihenfolge des Servers (sort ist stabil).
+  const list = (data ?? [])
+    .filter((p) => (below ? p.below_current_threshold : p.next_rank !== null))
+    .sort((a, b) => section(a) - section(b));
+  const headings = ['Schwelle erreicht', 'Noch nicht erreicht', `Höchster ${rank}`];
   return (
     <div>
       <label className="toggle">
@@ -377,8 +381,8 @@ export function Promotions() {
         <ul className="card-list promotions">
           {list.map((p, i) => {
             const due = isDue(p);
-            // Der Server sortiert erreichte Schwellen nach oben: Überschrift darüber, Trenner vor dem ersten, dem noch Punkte fehlen.
-            const heading = i === 0 && due ? 'Schwelle erreicht' : i > 0 && !due && isDue(list[i - 1]) ? 'Noch nicht erreicht' : null;
+            // Überschrift vor dem ersten Eintrag jedes Abschnitts.
+            const heading = i === 0 || section(list[i - 1]) !== section(p) ? headings[section(p)] : null;
             return (
               <Fragment key={p.user_id}>
                 {heading && <li className="section-title list-divider">{heading}</li>}
@@ -414,6 +418,11 @@ export function Promotions() {
 
 function isDue(p: { points_to_next: number | null }): boolean {
   return p.points_to_next !== null && p.points_to_next <= 0;
+}
+
+/** Abschnitt der Beförderungsliste: 0 Schwelle erreicht, 1 noch nicht erreicht, 2 kein höherer Dienstgrad. */
+function section(p: { points_to_next: number | null; next_rank: unknown }): number {
+  return isDue(p) ? 0 : p.next_rank === null ? 2 : 1;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
