@@ -1489,6 +1489,17 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.error-log {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.error-log-message {
+  display: block;
+  word-break: break-word;
+}
 /* Menü der Verwaltung (Burger-Menü) */
 .admin-menu {
   position: relative;

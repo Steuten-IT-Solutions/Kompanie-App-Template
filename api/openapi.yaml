@@ -2653,7 +2653,7 @@ paths:
   /admin/status:
     get:
       tags: [Wartung]
-      summary: Zustand der Installation (Ampel), Updates, Statusmeldungen
+      summary: Zustand der Installation (Ampel), Updates, Statusmeldungen, Fehlerprotokoll
       x-capability: manage_settings
       responses:
         '200':
@@ -2662,7 +2662,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items, support, updates, statusReports, setupDone]
+                required: [items, support, updates, statusReports, setupDone, errorLog]
                 properties:
                   items:
                     type: array
@@ -2683,6 +2683,25 @@ paths:
                       available: { type: boolean, description: Das Paket nennt einen Empfänger }
                       payload: { type: object, description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte)' }
                   setupDone: { type: boolean }
+                  errorLog: { $ref: '#/components/schemas/ErrorLog' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/error-log:
+    delete:
+      tags: [Wartung]
+      summary: Fehlerprotokoll der Installation leeren
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [errorLog]
+                properties:
+                  errorLog: { $ref: '#/components/schemas/ErrorLog' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -3375,6 +3394,23 @@ components:
             type: string
             enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte; member bringt calendar mit.'
+
+    ErrorLog:
+      type: array
+      description: |
+        Die letzten Fehler dieser Installation, neueste zuerst (höchstens 50, höchstens 14 Tage). Bleibt auf dem
+        Server und wird nicht gesendet; Adressen sind auf den Server gekürzt, Dateien ohne Verzeichnis.
+        Gleiche Fehler direkt hintereinander werden zusammengefasst (count, first bis at).
+      items:
+        type: object
+        required: [at, first, count, code, detail, message]
+        properties:
+          at: { type: integer, description: Zuletzt aufgetreten (Unix-Zeit) }
+          first: { type: integer, description: Zuerst aufgetreten (Unix-Zeit) }
+          count: { type: integer }
+          code: { type: string, description: 'Fehlercode wie in den Statusmeldungen, z. B. CALENDAR_FETCH' }
+          detail: { type: string, description: 'Ursache wie in den Statusmeldungen, z. B. ics_http_404; leer, wenn unbekannt' }
+          message: { type: string, description: Fehlertext }
 
     UpdateStatus:
       type: object

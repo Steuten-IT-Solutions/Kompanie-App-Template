@@ -120,25 +120,25 @@ final class CalendarService
      * Für die geplante Aufgabe: den Kalender im Hintergrund erneuern, damit Anfragen ihn selten
      * selbst abrufen müssen. Fehler werden protokolliert; die alte Fassung bleibt.
      */
-    /** @return bool false, wenn der Abruf gescheitert ist (für die Fehlercodes der Statusmeldungen) */
-    public function refreshIfStale(): bool
+    /** @return string|null Fehlermeldung, wenn der Abruf gescheitert ist (für das Fehlerprotokoll und die Statusmeldungen) */
+    public function refreshIfStale(): ?string
     {
         if (!$this->isConfigured()) {
-            return true;
+            return null;
         }
         $copy = $this->copy();
         // Gerade erst abgerufen (z. B. von einer Anfrage): nichts zu tun. Ohne Sperre: Die Aufgabe
         // läuft ohnehin nur einmal, und die Sperre einer Anfrage soll sie nicht eine Stunde aufschieben.
         if ($copy !== null && $copy['fetched_at'] > $this->time->timestamp() - 300) {
-            return true;
+            return null;
         }
         try {
             $this->refresh();
         } catch (ApiError $e) {
             error_log('Kompanie-App: Kalender nicht erneuert: ' . $e->getMessage());
-            return false;
+            return $e->getMessage();
         }
-        return true;
+        return null;
     }
 
     public function clearCache(): void
@@ -273,7 +273,8 @@ final class CalendarService
             for ($page = 0; $page < 4; $page++) {
                 $body = json_decode($res['body'], true);
                 if ($res['status'] !== 200 || !is_array($body)) {
-                    $msg = $body['error']['message'] ?? ('HTTP ' . $res['status']);
+                    // Mit HTTP-Status: Den braucht auch die Ursache in den Statusmeldungen (Telemetry\Detail).
+                    $msg = isset($body['error']['message']) ? $body['error']['message'] . ' (HTTP ' . $res['status'] . ')' : 'HTTP ' . $res['status'];
                     $withHint = $hint !== '' && in_array($res['status'], [401, 403, 404], true);
                     throw ApiError::upstream('Google Kalender: ' . $msg . ($withHint ? ' – ' . $hint : ''));
                 }

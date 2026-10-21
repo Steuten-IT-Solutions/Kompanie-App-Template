@@ -28,12 +28,12 @@ final class Backup
      * Einstellungen, die zur Installation gehören, nicht zu den Daten: Sie werden weder gesichert noch
      * wiederhergestellt (Schema-Stand, Update-Zustand mit der laufenden Nummer der Liste, übersprungene
      * Version, Einrichtung abgeschlossen, Zeitpunkt der letzten Sicherung, Version der Aufgabenplanung,
-     * Installations-ID und Geheimnis der Statusmeldungen samt ihrem Zustand, Fehlerzähler).
+     * Installations-ID und Geheimnis der Statusmeldungen samt ihrem Zustand, Fehlerzähler, Fehlerprotokoll).
      */
     public const LOCAL_SETTINGS = [
         'schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq',
         'tasks_last_run', 'installation_id', 'installation_secret', 'telemetry_registered', 'telemetry_last', 'telemetry_heartbeat', 'telemetry_checks',
-        'telemetry_errors', 'telemetry_pending', 'telemetry_events',
+        'telemetry_errors', 'telemetry_details', 'telemetry_pending', 'telemetry_events', 'error_log',
         // Web Push: Schlüssel und Stand der Abgleiche gehören zu dieser Installation (Abos sind nicht in Sicherungen).
         'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];

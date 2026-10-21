@@ -853,6 +853,8 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await expect(status.locator('.status-item').first()).toBeVisible();
   // Die Test-Instanz ist kein Paket aus einem Release: keine Updates über die App.
   await expect(page.getByText(/bekommt keine Updates über die App/)).toBeVisible();
+  // Fehlerprotokoll mit den Fehlertexten bleibt auf dem Server (ohne Statusmeldungen sichtbar).
+  await expect(page.getByRole('heading', { name: 'Fehlerprotokoll' })).toBeVisible();
 
   await expect(status.locator('.status-item.status-warn', { hasText: 'Datensicherung' })).toBeVisible();
   await page.getByRole('button', { name: '‹ Einstellungen' }).click();

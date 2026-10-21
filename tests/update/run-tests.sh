@@ -130,7 +130,7 @@ foreach ($lines as $l) {
     $ok = $ok && hash_equals("sha256=" . hash_hmac("sha256", $l["body"], $key), $l["sig"]);
 }
 $ev = json_decode($lines[1]["body"], true);
-$ok = $ok && $ev["kind"] === "event" && $ev["event"] === "UPDATE_FAILED" && !isset($ev["key"]) && ($ev["errors"]["UPDATE_FAILED"] ?? 0) === 1
+$ok = $ok && $ev["kind"] === "event" && $ev["event"] === "UPDATE_FAILED" && ($ev["detail"] ?? "") === "download" && !isset($ev["key"]) && ($ev["errors"]["UPDATE_FAILED"] ?? 0) === 1
   && !str_contains($lines[1]["body"], "stimmt nicht");
 $red = json_decode($lines[2]["body"], true);
 $ok = $ok && $red["event"] === "CHECK_ERROR" && $red["checks"]["updates"] === "error";

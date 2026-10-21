@@ -55,6 +55,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
 use KompanieApp\Core\Storage\UserData;
 use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateService;
@@ -213,14 +214,16 @@ final class App
             }
             if ($task === GalleryService::TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runTask(25);
-                if ((string) ($this->gallery()->status()['error'] ?? '') !== '') {
-                    $this->telemetry()->record(Code::GallerySync);
+                $error = (string) ($this->gallery()->status()['error'] ?? '');
+                if ($error !== '') {
+                    $this->telemetry()->record(Code::GallerySync, Detail::fromMessage($error), $error);
                 }
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
-                if (!$this->calendar()->refreshIfStale()) {
-                    $this->telemetry()->record(Code::CalendarFetch);
+                $error = $this->calendar()->refreshIfStale();
+                if ($error !== null) {
+                    $this->telemetry()->record(Code::CalendarFetch, Detail::of($this->calendar()->source(), Detail::fromMessage($error)), $error);
                 }
             } elseif ($task === UpdateService::TASK) {
                 $this->updates()->runTask();
@@ -242,7 +245,7 @@ final class App
             // Die Statusmeldung selbst nicht zählen (sonst meldete sie beim nächsten Mal ihr eigenes Scheitern),
             // Fehler der Update-Liste zählt UpdateService schon.
             if ($task !== StatusReporter::TASK && !($task === UpdateService::TASK && $e instanceof ApiError)) {
-                $this->telemetry()->record(Code::TaskFailed);
+                $this->telemetry()->record(Code::TaskFailed, Detail::of($task, Detail::className($e)), Detail::describe($e));
             }
         }
     }
@@ -262,7 +265,8 @@ final class App
     }
 
     /**
-     * Schwere PHP-Fehler in der App als Fehlercode zählen (nur der Code, kein Text). Ruft der Adapter
+     * Schwere PHP-Fehler in der App als Fehlercode zählen (in der Statusmeldung nur Code und Ursache, der Text
+     * nur im Fehlerprotokoll). Ruft der Adapter
      * einmal je Anfrage auf; Fehler anderer Plugins oder Programme zählen nicht. Bei WordPress läuft vorher
      * dessen eigener Fehler-Handler (Fehlerseite ohne exit), danach diese Funktion.
      */
@@ -284,7 +288,7 @@ final class App
     /**
      * Zählt einen schweren PHP-Fehler, wenn er in der App passiert ist (höchstens einmal je Anfrage).
      *
-     * @param array{type?: int, file?: string} $error wie error_get_last()
+     * @param array{type?: int, file?: string, line?: int, message?: string} $error wie error_get_last()
      */
     public function recordFatal(array $error): void
     {
@@ -299,7 +303,18 @@ final class App
         $recorded = true;
         // Bei zu wenig Speicher scheitert auch das Zählen; dann eben nicht.
         try {
-            $this->telemetry()->record(Code::PhpFatal);
+            $message = (string) ($error['message'] ?? '');
+            $kind = match (true) {
+                str_contains($message, 'Allowed memory size') => 'memory',
+                str_contains($message, 'Maximum execution time') => 'time_limit',
+                default => pathinfo((string) $error['file'], PATHINFO_FILENAME),
+            };
+            $type = match ($error['type']) {
+                E_PARSE => 'parse',
+                E_COMPILE_ERROR => 'compile',
+                default => 'error',
+            };
+            $this->telemetry()->record(Code::PhpFatal, Detail::of($type, $kind), $message . ' (' . basename((string) $error['file']) . ':' . (int) ($error['line'] ?? 0) . ')');
         } catch (\Throwable) {
         }
     }

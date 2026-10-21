@@ -524,7 +524,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 
 - **Statusseite für Admins** mit Ampel in Alltagssprache: Updates, Galerie-Abgleich, Kalender, letzte Sicherung, Server. Bei Gelb/Rot steht dabei, was zu tun ist, oder „Bitte melde dich bei …“ mit unseren Kontaktdaten.
 - **Hinweise direkt in der App** für Admins, statt E-Mails (E-Mail-Versand ist auf Webspace oft unzuverlässig).
-- **Statusmeldungen an uns, nur mit Zustimmung:** stündlich ein Lebenszeichen (Version, Variante, PHP-Version, Datenbank-Art, Ampel je Bereich, Fehlercodes der letzten 24 Stunden), schwere Fehler sofort; signiert je Installation ([STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)). Keine Mitgliederdaten und keine Fehlertexte; was genau gesendet wird, zeigt die App vor der Zustimmung an. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
+- **Statusmeldungen an uns, nur mit Zustimmung:** stündlich ein Lebenszeichen (Version, Variante, PHP-Version, Datenbank-Art, Ampel je Bereich, Fehlercodes der letzten 24 Stunden mit Ursache), schwere Fehler sofort; signiert je Installation ([STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)). Keine Mitgliederdaten und keine Fehlertexte (die stehen nur im Fehlerprotokoll der Installation, das Admins kopieren und uns schicken können); was genau gesendet wird, zeigt die App vor der Zustimmung an. Damit können wir Kompanien helfen, bevor sie ein Problem bemerken. Gehört in die Datenschutzerklärung; abschaltbar. Einzelheiten: [Offene Punkte, Abschnitt 4](OFFENE-PUNKTE.md#4-statusmeldungen).
 - **Hilfe-Texte** an jeder Einstellung; Fachbegriffe nur mit Erklärung.
 
 ## 14. Die beiden Adapter
