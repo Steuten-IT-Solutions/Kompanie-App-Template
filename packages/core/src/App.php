@@ -49,6 +49,7 @@ use KompanieApp\Core\Push\PushTriggers;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
+use KompanieApp\Core\Storage\MemberRoleRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
@@ -311,7 +312,7 @@ final class App
 
     /**
      * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
-     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Push-Abos. Was die Person für
+     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos. Was die Person für
      * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
      * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
      * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag wird gelöscht. Inventar
@@ -418,7 +419,7 @@ final class App
 
     public function roles(): RoleService
     {
-        return $this->service(RoleService::class, fn () => new RoleService($this->settings, $this->config, $this->users));
+        return $this->service(RoleService::class, fn () => new RoleService($this->settings, $this->config, $this->users, new MemberRoleRepository($this->db), $this->time()));
     }
 
     public function calendar(): CalendarService

@@ -540,8 +540,8 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
   if (!STANDALONE) await expect(page.locator('.role-control option', { hasText: 'Admin' })).toHaveCount(0); // WordPress: Admins im Backend
-  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Gast' });
-  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Gast');
+  await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Gast' });
+  await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Gast');
   await shot(page, '13-rolle');
 
   await login(page, 'mitglied2');
@@ -553,8 +553,8 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
-  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Mitglied' });
-  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
+  await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Mitglied' });
+  await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
 
 test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Strafen nein', async ({ page }) => {
@@ -562,8 +562,8 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
-  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Termine verwalten' });
-  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Termine verwalten');
+  await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Termine verwalten' });
+  await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Termine verwalten');
 
   await login(page, 'mitglied2');
   await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
@@ -576,8 +576,8 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
-  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Mitglied' });
-  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Mitglied');
+  await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Mitglied' });
+  await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
 
 test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', async ({ page }) => {
@@ -602,8 +602,8 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
-  await page.locator('.role-control').getByLabel('Rolle in der App').selectOption({ label: 'Kassenwart' });
-  await expect(page.locator('.toast')).toHaveText('Rolle geändert: Kassenwart');
+  await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Kassenwart' });
+  await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Kassenwart');
 
   await login(page, 'mitglied2');
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toBeVisible();
@@ -621,6 +621,44 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await rollen.getByRole('button', { name: 'Löschen' }).click();
   await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
+});
+
+test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Liste und Filter zeigen sie', async ({
+  page,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
+  const extra = page.locator('.extra-roles');
+  // Feste Rollen sind nur Grundrolle.
+  await expect(extra.getByLabel('Mitglied', { exact: true })).toHaveCount(0);
+  await extra.getByLabel('Termine verwalten').check();
+  await expect(page.locator('.toast')).toHaveText('Zusatzrolle vergeben: Termine verwalten');
+  await expect(page.locator('.role-control').getByLabel('Grundrolle')).toHaveValue('member');
+  await shot(page, '21-zusatzrollen');
+
+  // Liste zeigt alle Rollen, Filter findet die Person über die Zusatzrolle.
+  await page.getByRole('button', { name: '‹ Alle Mitglieder' }).click();
+  await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-extra-role')).toHaveText('Termine verwalten');
+  await page.getByLabel('Nach Rolle filtern').selectOption({ label: 'Termine verwalten' });
+  await expect(page.locator('.card-list .row', { hasText: 'Mitglied2' })).toBeVisible();
+  await expect(page.locator('.card-list .row', { hasText: 'Mitglied1' })).toHaveCount(0);
+
+  // Rechte beider Rollen: Mitgliederbereich und Termine pflegen.
+  await login(page, 'mitglied2');
+  await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
+  await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
+  await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
+  await page.getByRole('button', { name: 'Konto' }).click();
+  await expect(page.locator('.account-card').first()).toContainText('Rollen: Mitglied, Termine verwalten');
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Konto und Rolle');
+  await page.locator('.extra-roles').getByLabel('Termine verwalten').uncheck();
+  await expect(page.locator('.toast')).toHaveText('Zusatzrolle entfernt: Termine verwalten');
 });
 
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {

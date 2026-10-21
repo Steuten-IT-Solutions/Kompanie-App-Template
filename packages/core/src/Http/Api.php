@@ -263,6 +263,7 @@ final class Api
         foreach ($a->features()->all() as $key => $on) {
             $features[$key] = $on && $a->features()->configured($key);
         }
+        $user = $a->authContext->currentUser();
         return [
             'apiBase' => $a->env->apiBase(),
             'appUrl' => $a->env->appUrl(),
@@ -285,7 +286,8 @@ final class Api
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
-            'user' => $a->authContext->currentUser()?->toArray(),
+            // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
+            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user)] : null,
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
@@ -587,7 +589,8 @@ final class Api
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
                 + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
-            new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level')), null, $denyRoles),
+            // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
+            new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),

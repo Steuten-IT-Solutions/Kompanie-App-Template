@@ -42,7 +42,11 @@ export interface AppUser {
   id: number;
   name: string;
   login: string;
+  /** Grundrolle */
   level: Level;
+  /** Zusatzrollen (Issue #66); fehlt bei älteren Servern */
+  extra_roles?: Level[];
+  /** Alle Rechte zusammen (Grundrolle und Zusatzrollen) */
   capabilities: Capability[];
 }
 
@@ -122,12 +126,17 @@ export interface RoleInfo {
   key: Level;
   label: string;
   points_factor: number;
+  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Anwärter, Mitglied, Admin; Issue #66) */
+  extra?: boolean;
 }
 
 /** Für Einstellungen → Rollen (nur Admins). */
 export interface RoleAdmin extends RoleInfo {
   capabilities: Capability[];
+  /** Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle */
   users: number;
+  /** Davon als Zusatzrolle */
+  extra_users?: number;
   system: boolean;
   deletable: boolean;
 }
@@ -141,6 +150,14 @@ export const levelLabel = (level: Level): string =>
 
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
+
+/** Punktefaktor einer Person: der kleinste ihrer Rollen, Grundrolle und Zusatzrollen (wie der Server, Issue #66). */
+export const personFactor = (p: { level: Level; extra_roles?: Level[] }): number =>
+  Math.min(roleFactor(p.level), ...(p.extra_roles ?? []).map(roleFactor));
+
+/** Alle Rollen einer Person zum Anzeigen: Grundrolle, dahinter die Zusatzrollen. */
+export const roleLabels = (p: { level: Level; extra_roles?: Level[] }): string =>
+  [p.level, ...(p.extra_roles ?? [])].map(levelLabel).join(', ');
 
 /** Nach dem Schalten von Bereichen: Standardrollen können dazugekommen oder weggefallen sein. */
 export async function refreshRoles(): Promise<RoleAdmin[] | null> {
@@ -156,7 +173,7 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor }) => ({ key, label, points_factor }));
+  config.roles = list.map(({ key, label, points_factor, system }) => ({ key, label, points_factor, extra: !system }));
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -169,6 +186,7 @@ export interface Me {
   id: number;
   name: string;
   level: Level;
+  extra_roles?: Level[];
   points: number;
   open_cents: number;
   /** Eigener Dienstgrad (mit Bereich Dienstgrade) */
@@ -284,7 +302,10 @@ export interface GalleryAlbum {
 export interface MemberSummary {
   id: number;
   name: string;
+  /** Grundrolle */
   level: Level;
+  /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
+  extra_roles?: Level[];
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
   /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
@@ -831,7 +852,10 @@ export const api = {
     }),
   /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
-  setRole: (id: number, level: Level) => request<{ id: number; level: Level }>('PATCH', `/members/${id}/role`, { level }),
+  setRole: (id: number, level: Level) =>
+    request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
+  setExtraRoles: (id: number, extra_roles: Level[]) =>
+    request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { extra_roles }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
   resetPassword: (id: number) => request<{ password: string }>('POST', `/members/${id}/password`),
   /** Ändert das eigene Passwort; danach gilt eine neue Sitzung, daher Token erneuern. */

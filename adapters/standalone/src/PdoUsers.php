@@ -13,8 +13,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
 final class PdoUsers implements UserDirectory
 {
     /**
-     * @param (\Closure(string): array<int, \KompanieApp\Core\Auth\Capability>)|null $capabilities Rechte je Rolle
-     *        (Domain\RoleService der App); ohne: die Vorlagen
+     * @param (\Closure(string, int): array<int, \KompanieApp\Core\Auth\Capability>)|null $capabilities Rechte je Grundrolle
+     *        und Benutzer-ID, mit den Zusatzrollen (Domain\RoleService::capabilitiesFor der App); ohne: die Vorlagen
      */
     public function __construct(
         private readonly Connection $db,
@@ -159,7 +159,7 @@ final class PdoUsers implements UserDirectory
     public function toUser(array $row): User
     {
         $role = (string) $row['level'];
-        $caps = $this->capabilities !== null ? ($this->capabilities)($role) : Roles::templateCapabilities($role);
+        $caps = $this->capabilities !== null ? ($this->capabilities)($role, (int) $row['id']) : Roles::templateCapabilities($role);
         return new User((int) $row['id'], (string) $row['name'], (string) $row['login'], $role, $caps);
     }
 }
