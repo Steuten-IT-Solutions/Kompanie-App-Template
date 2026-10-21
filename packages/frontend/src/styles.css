@@ -284,6 +284,10 @@ select {
 .month:first-child .month-title {
   margin-top: 4px;
 }
+/* Trenner innerhalb einer Kartenliste (z. B. Beförderungen: erreicht | noch nicht erreicht) */
+.card-list > .list-divider {
+  margin: 8px 2px 0;
+}
 
 .card-list {
   list-style: none;

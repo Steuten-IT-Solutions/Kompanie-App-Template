@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, config, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
 import brand from '../generated/brand';
 import { formatDate } from '../format';
@@ -370,37 +370,49 @@ export function Promotions() {
         <Empty>Niemand gefunden.</Empty>
       ) : (
         <ul className="card-list promotions">
-          {list.map((p) => {
-            const due = p.points_to_next !== null && p.points_to_next <= 0;
+          {list.map((p, i) => {
+            const due = isDue(p);
+            // Der Server sortiert erreichte Schwellen nach oben: Trenner vor dem ersten, dem noch Punkte fehlen.
+            const divider = i > 0 && !due && isDue(list[i - 1]);
             return (
-              <li
-                key={p.user_id}
-                className={`card row clickable ${due ? 'due' : ''}`}
-                onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
-              >
-                <div className="row-main">
-                  <div className="row-title">{p.name}</div>
-                  <div className="row-sub">
-                    {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
-                    {p.points.toLocaleString('de-DE')} {sec.points}
-                    {p.next_rank &&
-                      p.points_to_next !== null &&
-                      (due
-                        ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
-                        : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
-                    {p.below_current_threshold && ' · unter der Schwelle'}
+              <Fragment key={p.user_id}>
+                {divider && (
+                  <li className="section-title list-divider" role="separator">
+                    Noch nicht erreicht
+                  </li>
+                )}
+                <li
+                  className={`card row clickable ${due ? 'due' : ''}`}
+                  onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
+                >
+                  <div className="row-main">
+                    <div className="row-title">{p.name}</div>
+                    <div className="row-sub">
+                      {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
+                      {p.points.toLocaleString('de-DE')} {sec.points}
+                      {p.next_rank &&
+                        p.points_to_next !== null &&
+                        (due
+                          ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
+                          : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
+                      {p.below_current_threshold && ' · unter der Schwelle'}
+                    </div>
                   </div>
-                </div>
-                <span className="chevron" aria-hidden="true">
-                  ›
-                </span>
-              </li>
+                  <span className="chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </li>
+              </Fragment>
             );
           })}
         </ul>
       )}
     </div>
   );
+}
+
+function isDue(p: { points_to_next: number | null }): boolean {
+  return p.points_to_next !== null && p.points_to_next <= 0;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
