@@ -411,6 +411,8 @@ test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
   await shot(page, 'meins-uebersicht');
 
   await meinsMenu(page, 'Punkte');
+  // Erst wenn die Übersicht weg ist, gibt es nur noch eine Kachel.
+  await expect(overview).toHaveCount(0);
   await expect(page.locator('.stat-value')).toHaveText('5');
   await expect(page.getByText('Teilnahme Sommerfest')).toBeVisible();
   await shot(page, '2-punkte');
@@ -426,6 +428,7 @@ test('Mitglied 2 sieht keine fremden Einträge und keine Verwaltungsdaten', asyn
   await login(page, 'mitglied2');
   await page.getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Kasse');
+  await expect(page.locator('.my-overview')).toHaveCount(0);
   await expect(page.locator('.stat-value')).toContainText('0,00');
   await expect(page.getByText('Zu spät gekommen')).toHaveCount(0);
 
