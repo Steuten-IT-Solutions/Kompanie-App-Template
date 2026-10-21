@@ -117,9 +117,23 @@ jobs:
       contents: write
       actions: write
     steps:
+      # Gepusht wird als GitHub App: Sie lässt sich im Ruleset von main als Ausnahme eintragen, das GITHUB_TOKEN der
+      # Actions nicht (Pflicht-Checks wie „Quelle ist develop“ lehnen den direkten Push sonst ab). Ohne App wie bisher.
+      - name: Zugang zum Kern-Repo (GitHub App)
+        id: app
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.KOMPANIE_APP_ID }}
+          private-key: ${{ secrets.KOMPANIE_APP_KEY }}
+          owner: Steuten-IT-Solutions
+          repositories: Kompanie-App-Template
+          permission-contents: write
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: main
+          token: ${{ steps.app.outputs.token || github.token }}
 
       - name: STABLE_CORE auf main eintragen
         id: eintragen
@@ -132,9 +146,10 @@ jobs:
           fi
           echo "$STABLE" > STABLE_CORE
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit --quiet -m "chore(release): mark core ${STABLE%% *} as checked" STABLE_CORE
+            commit --quiet -m "chore(release): mark core ${STABLE%% *} as checked [skip ci]" STABLE_CORE
+          # [skip ci]: Ein Push der App startet sonst Workflows (CI, diesen hier erneut); mit dem GITHUB_TOKEN nie.
           if ! git push --quiet origin HEAD:main; then
-            echo "::warning::STABLE_CORE ließ sich nicht auf main schreiben (Branch-Schutz?). Vorhandene Versionen sind freigegeben; damit neue Versionen mit diesem Code direkt stable werden, STABLE_CORE per Pull Request eintragen: $STABLE"
+            echo "::warning::STABLE_CORE ließ sich nicht auf main schreiben (Branch-Schutz? Die GitHub App muss im Ruleset von main als Ausnahme stehen). Vorhandene Versionen sind freigegeben; damit neue Versionen mit diesem Code direkt stable werden, STABLE_CORE per Pull Request über develop eintragen: $STABLE"
           fi
 
       - name: „Kompanien abgleichen“ starten (Kompanien ohne Version mit diesem Code)
