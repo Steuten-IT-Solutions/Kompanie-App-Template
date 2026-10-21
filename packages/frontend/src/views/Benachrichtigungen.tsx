@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import brand from '../generated/brand';
 import { api, config, type PushDevice, type PushStatus, type PushType } from '../api';
 import { currentDevice, disablePush, enablePush, matchesServerKey, pushSupport } from '../push';
+import { previewRole } from '../preview';
 import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
 
@@ -21,7 +22,7 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (support !== 'ok') return;
+    if (support !== 'ok' || previewRole()) return;
     let alive = true;
     (async () => {
       let d = await currentDevice().catch(() => null);
@@ -47,6 +48,17 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
     };
   }, [support, tick]);
 
+  // Vorschau (Issue #63): Schon das Abfragen kann Abos dieses Geräts ändern; der Server lehnt es ab.
+  if (previewRole()) {
+    return (
+      <div className="card push-card">
+        <h3>Benachrichtigungen</h3>
+        <p className="small muted">
+          In der Vorschau lassen sich Benachrichtigungen nicht ansehen oder einrichten: Sie gehören zu diesem Gerät und deinem Konto.
+        </p>
+      </div>
+    );
+  }
   if (support === 'ios-install') {
     return (
       <div className="card push-card">

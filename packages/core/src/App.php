@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core;
 
+use KompanieApp\Core\Auth\Preview;
+use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BirthdayService;
@@ -95,6 +97,14 @@ final class App
     /** @var array<string, object> */
     private array $services = [];
 
+    /** Adressen und Eckdaten; Adressen geschützter Dateien tragen in der Vorschau deren Parameter (PreviewEnvironment). */
+    public readonly Environment $env;
+
+    /** Wer die Anfrage stellt – in der Vorschau die gewählte Rolle (Auth\Preview); ohne Vorschau der Adapter selbst. */
+    public readonly AuthContext $authContext;
+
+    private readonly Preview $preview;
+
     public function __construct(
         public readonly Connection $db,
         public readonly Settings $settings,
@@ -105,8 +115,8 @@ final class App
         public readonly Scheduler $scheduler,
         public readonly NewsSource $news,
         public readonly Clock $clock,
-        public readonly Environment $env,
-        public readonly AuthContext $authContext,
+        Environment $env,
+        AuthContext $authContext,
         public readonly Authenticator $authenticator,
         public readonly UserDirectory $users,
         public readonly KompanieConfig $config,
@@ -116,6 +126,17 @@ final class App
         /** @var array<string, mixed> update.json des Pakets: updatesUrl, trustedKeys, statusUrl, kompanie, support */
         public readonly array $packageConfig = [],
     ) {
+        // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
+        // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
+        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
+        $this->authContext = $this->preview;
+        $this->env = new PreviewEnvironment($env, $this->preview);
+    }
+
+    /** Vorschau „App als Rolle ansehen“ der laufenden Anfrage (Issue #63). */
+    public function preview(): Preview
+    {
+        return $this->preview;
     }
 
     public function migrator(): Migrator

@@ -2310,6 +2310,43 @@ fieldset.feature-list legend {
   color: var(--danger-surface);
 }
 
+/* Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit der Kopfzeile stehen bleibend */
+.preview-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+}
+.preview-sticky .topbar {
+  position: static;
+  padding-top: 12px;
+}
+.preview-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  background: #2e2a6b;
+  color: #ffffff;
+  border-bottom: 3px solid #f2c94c;
+  font-size: 0.92rem;
+}
+.preview-banner .btn {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #2e2a6b;
+}
+.role-preview {
+  margin-top: 16px;
+}
+.role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 /* ------------------------------------------------------------------ */
 /* Schwarzes Brett (Issue #5)                                          */
 /* ------------------------------------------------------------------ */

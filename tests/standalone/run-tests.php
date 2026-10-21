@@ -301,6 +301,11 @@ try {
     $c->ok($again[0] === 304 && ($again[2]['etag'] ?? '') === $etag && ($again[2]['cache-control'] ?? '') === 'private, max-age=86400' && !isset($again[2]['content-length']) , 'Gleicher ETag (If-None-Match) → 304 ohne Inhalt');
     $c->ok($d->send('GET', $photoUrl, ['If-None-Match' => $etag], null)[0] === 401, 'Ohne Anmeldung trotz passendem ETag → 401 (Rechte vor 304)');
     $c->ok($d->send('GET', $photoUrl, $annaCookie + ['If-None-Match' => '"anders"'], null)[0] === 200, 'Anderer ETag → 200');
+    // Vorschau „App als Rolle ansehen“ (Issue #63): Bilder kommen mit den Rechten der Rolle (Parameter oder Header), nie gespeichert.
+    $asMember = $d->send('GET', $photoUrl . '&vorschau=member', $annaCookie, null);
+    $c->ok($asMember[0] === 200 && ($asMember[2]['cache-control'] ?? '') === 'no-store', 'Vorschau als Mitglied: internes Foto, nicht speichern');
+    $c->ok($d->send('GET', $photoUrl . '&vorschau=guest', $annaCookie, null)[0] === 403, 'Vorschau als Gast: internes Foto → 403');
+    $c->ok($d->send('GET', $photoUrl, $annaCookie + ['X-Kompanie-Preview' => '@public'], null)[0] === 401, 'Vorschau ohne Anmeldung (Header): internes Foto → 401');
     $kdb->execute('DELETE FROM {photos} WHERE id = ?', [$photoId]);
     $kdb->execute('DELETE FROM {albums} WHERE id = ?', [$albumId]);
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
@@ -325,6 +330,9 @@ try {
     $c->ok(str_contains($svgBody, '<circle') && !str_contains($svgBody, 'script') && !str_contains($svgBody, 'onload'), 'Ausgeliefert wird das bereinigte SVG');
     $guestId = $users->add('Gina Gast', 'gina', 'gina@example.org', 'gina-passwort', Roles::GUEST);
     $c->ok($d->send('GET', $badgeUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($guestId)], null)[0] === 403, 'Abzeichen ohne Mitgliederbereich und Kalender → 403');
+    $c->ok($d->send('GET', $badgeUrl . '&vorschau=member', ['Cookie' => Sessions::COOKIE . '=' . $d->token($guestId)], null)[0] === 403, 'Vorschau nur für Admins: Gast bekommt keine Rechte dazu');
+    $c->ok($d->send('GET', $badgeUrl . '&vorschau=guest', $cookie, null)[0] === 403, 'Vorschau als Gast: Abzeichen → 403');
+    $c->ok($d->send('GET', $badgeUrl . '&vorschau=%40public', $cookie, null)[0] === 401, 'Vorschau ohne Anmeldung: Abzeichen → 401');
     $im = imagecreatetruecolor(300, 150);
     ob_start();
     imagepng($im);
@@ -344,6 +352,13 @@ try {
     $docAgain = $d->send('GET', $docUrl, $cookie + ['If-None-Match' => (string) ($docRes[2]['etag'] ?? '-')], null);
     $c->ok($docAgain[0] === 304 && ($docAgain[2]['cache-control'] ?? '') === 'private, no-cache', 'Dokument: passender ETag → 304 (wie bisher)');
     $c->ok(($d->send('GET', preg_replace('/&v=[^&]*/', '&v=alt', $docUrl), $cookie, null)[2]['cache-control'] ?? '') === 'private, no-cache', 'Veraltete Fassung in der Adresse: jedes Mal prüfen');
+    $d->preview('member');
+    [, $previewDocs] = $d->request('GET', '/documents');
+    $d->preview(null);
+    $previewDocUrl = (string) (array_column((array) ($previewDocs['documents'] ?? []), 'url', 'id')[$upDoc['id'] ?? 0] ?? '');
+    $previewDoc = $d->send('GET', $previewDocUrl, $cookie, null);
+    $c->ok(str_ends_with($previewDocUrl, '&vorschau=member') && $previewDoc[0] === 200 && ($previewDoc[2]['cache-control'] ?? '') === 'no-store', 'Vorschau: Adresse mit Parameter, Dokument mit den Rechten der Rolle, nicht speichern');
+    $c->ok($d->send('GET', $docUrl . '&vorschau=guest', $cookie, null)[0] === 403, 'Vorschau als Gast: Dokument → 403');
     $d->request('DELETE', '/documents/' . ($upDoc['id'] ?? 0));
 
     $bad = $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $json, '{kaputt');

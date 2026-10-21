@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import brand from '../generated/brand';
+import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 const sec = brand.labels.sections;
@@ -80,9 +81,22 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                           .join(', ')}
                 </div>
               </div>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(r.key)} aria-label={`${r.label} bearbeiten`}>
-                Bearbeiten
-              </button>
+              <div className="role-actions">
+                {r.key !== 'admin' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => startPreview(r.key)}
+                    aria-label={`App als ${r.label} ansehen`}
+                    title="App als diese Rolle ansehen"
+                  >
+                    Ansehen
+                  </button>
+                )}
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(r.key)} aria-label={`${r.label} bearbeiten`}>
+                  Bearbeiten
+                </button>
+              </div>
             </li>
           ),
         )}
@@ -94,6 +108,15 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
           + Neue Rolle
         </button>
       )}
+      <div className="role-preview">
+        <p className="small muted">
+          „Ansehen“ zeigt die App, wie eine Person mit genau dieser Rolle sie sieht (ohne Zusatzrollen) – mit deinen eigenen Daten, nur zum
+          Ansehen. Beenden über das Banner oben.
+        </p>
+        <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
+          App ohne Anmeldung ansehen
+        </button>
+      </div>
       {config?.features.attendance && <AttendanceGroups roles={roles} onToast={onToast} />}
     </section>
   );

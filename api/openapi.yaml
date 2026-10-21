@@ -21,6 +21,15 @@ info:
     **Rechte:** Die `/me`-Routen lesen die Benutzer-ID immer aus der Sitzung.
     Mitglieder sehen nur ihre eigenen Punkte und Strafen.
 
+    **Vorschau „App als Rolle ansehen“ (Issue #63):** Ein Admin kann bei jeder Anfrage den Header
+    `X-Kompanie-Preview` (Parameter `Preview`) mit dem Schlüssel einer Rolle oder `@public` (ohne Anmeldung)
+    schicken; Dateien (Galeriebilder, Dokumente, Abzeichen) tragen ihn als Parameter `?vorschau=…` in der Adresse,
+    die der Server in der Vorschau selbst so erzeugt. Der Server antwortet dann mit den Rechten genau dieser Rolle
+    (dieselbe Person, ohne Zusatzrollen) bzw. wie ohne Anmeldung. Für Nicht-Admins, `admin` und unbekannte Rollen
+    wird die Vorschau ignoriert (`/config.preview` ist `null`). Jede Anfrage mit Header oder Parameter, die nicht
+    `GET`/`HEAD` ist, lehnt der Server mit 403 `preview_readonly` ab (Antwort `PreviewReadonly`), außer
+    `POST /auth/logout`.
+
     **Beträge** sind immer ganze Cent. **Datumsangaben** `YYYY-MM-DD`, Uhrzeiten `HH:MM`
     in der Zeitzone der Kompanie.
 servers:
@@ -52,6 +61,8 @@ paths:
       tags: [App]
       summary: Laufzeit-Konfiguration und angemeldeter Benutzer
       security: []
+      parameters:
+        - $ref: '#/components/parameters/Preview'
       responses:
         '200':
           description: OK
@@ -99,6 +110,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AppConfig' }
         '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/PreviewReadonly' }
         '429': { $ref: '#/components/responses/Error' }
 
   /auth/logout:
@@ -2956,6 +2968,14 @@ components:
       description: Name und Inhalt des Cookies hängen vom Adapter ab (WordPress-Anmelde-Cookie bzw. eigene Sitzung).
 
   parameters:
+    Preview:
+      name: X-Kompanie-Preview
+      in: header
+      required: false
+      description: |
+        Vorschau „App als Rolle ansehen“ (Issue #63): Schlüssel einer Rolle (nicht `admin`) oder `@public`. Gilt nur für
+        Admins und für jede Route; statt des Headers geht auch der Parameter `?vorschau=…` (so bei Dateien).
+      schema: { type: string, maxLength: 32 }
     Id:
       name: id
       in: path
@@ -2975,6 +2995,11 @@ components:
       schema: { type: integer, minimum: 1 }
 
   responses:
+    PreviewReadonly:
+      description: 'In der Vorschau (Header `X-Kompanie-Preview` oder Parameter `vorschau`) ist nur Ansehen möglich: `code: preview_readonly`, „In der Vorschau kannst du nichts ändern.“'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     PushStatus:
       description: OK
       content:
@@ -3528,6 +3553,13 @@ components:
         reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
+        preview:
+          type: [object, 'null']
+          description: 'Vorschau „App als Rolle ansehen“ (Issue #63), vom Server bestätigt; null ohne (gültige) Vorschau. user, capabilities und features sind dann die der Rolle.'
+          required: [role, label]
+          properties:
+            role: { type: string, description: 'Schlüssel der Rolle oder @public (ohne Anmeldung)' }
+            label: { type: string }
         csrf:
           type: object
           required: [header, token, refreshUrl]
