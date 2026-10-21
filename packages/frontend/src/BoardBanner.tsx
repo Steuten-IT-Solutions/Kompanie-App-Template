@@ -31,8 +31,8 @@ export function pollEndText(poll: { ends_at: string | null }): string {
 /**
  * Banner oben auf jeder Seite (Issue #5): die neueste gültige Nachricht, weitere aufklappbar („+N weitere“). Dazu für
  * Mitglieder laufende Umfragen, die sie noch nicht beantwortet haben (Issue #4; beantwortete stehen nur auf der Seite
- * des Bretts). „×“ blendet einen Eintrag auf diesem Gerät aus, bis er geändert wird. Unbekannte Arten überspringt das
- * Banner.
+ * des Bretts). „×“ blendet einen Eintrag auf diesem Gerät aus, bis er geändert wird. Sind alle ausgeblendet, bleibt eine
+ * schmale Zeile mit dem Weg zum Brett, solange es gültige Einträge gibt. Unbekannte Arten überspringt das Banner.
  */
 export default function BoardBanner() {
   const { items, dismissed } = useBoard();
@@ -40,7 +40,21 @@ export default function BoardBanner() {
   const messages = items.filter((i): i is BoardMessage => i.kind === 'message');
   const polls = items.filter((i): i is BoardPoll => i.kind === 'poll' && !i.has_voted);
   const shown = [...messages, ...polls].filter((i) => !dismissed(i));
-  if (shown.length === 0) return null;
+  const hidden = messages.length + polls.length - shown.length;
+  const openLabel = canPostBoard() ? 'Brett öffnen und bearbeiten' : 'Brett öffnen';
+  if (shown.length === 0) {
+    if (hidden === 0) return null;
+    return (
+      <section className="board-banner board-banner-collapsed" aria-label={sec.board}>
+        <span>
+          <strong>{sec.board}</strong> · {hidden} ausgeblendet
+        </span>
+        <button className="btn btn-link board-open" onClick={() => navigate('brett')}>
+          {openLabel}
+        </button>
+      </section>
+    );
+  }
   const list = expanded ? shown : shown.slice(0, 1);
   return (
     <section className="board-banner" aria-label={sec.board} aria-live="polite">
@@ -81,7 +95,7 @@ export default function BoardBanner() {
           </button>
         )}
         <button className="btn btn-link board-open" onClick={() => navigate('brett')}>
-          {canPostBoard() ? 'Brett öffnen und bearbeiten' : 'Brett öffnen'}
+          {openLabel}
         </button>
       </div>
     </section>

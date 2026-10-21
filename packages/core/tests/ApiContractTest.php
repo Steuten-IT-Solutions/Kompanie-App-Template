@@ -33,7 +33,8 @@ final class ApiContractTest extends TestCase
         $db = TestApp::connection($driver);
         try {
             $users = new FakeUsers($adminsAssignable);
-            $app = TestApp::create($db, $users);
+            // Mit Empfänger der Fehlermeldungen (Issue #64); die eigenständige Version prüft den Fall ohne.
+            $app = TestApp::create($db, $users, packageConfig: ['reportUrl' => 'https://status.example.org/reports', 'kompanie' => 'org/kompanie-test']);
             $checks = new Checks();
             (new ApiScenario(new CoreDriver($app, $users), $checks))->run();
             $this->assertSame([], $checks->failed, 'Fehlgeschlagen: ' . implode('; ', $checks->failed));

@@ -12,6 +12,8 @@ use KompanieApp\Core\Http\Request;
 /** Führt das API-Szenario direkt gegen den Kern aus. */
 final class CoreDriver implements ApiDriver
 {
+    private ?string $preview = null;
+
     public function __construct(private readonly App $app, private readonly FakeUsers $users)
     {
     }
@@ -20,7 +22,7 @@ final class CoreDriver implements ApiDriver
     {
         // Über JSON, damit Typen wie bei einer echten Anfrage ankommen.
         $body = json_decode((string) json_encode($body), true) ?? [];
-        $res = $this->app->api()->handle(new Request($method, $path, $query, $body));
+        $res = $this->app->api()->handle(new Request($method, $path, $query, $body, [], '', $this->preview));
         $data = json_decode((string) json_encode($res->data), true);
         return [$res->status, $data, array_change_key_case($res->headers)];
     }
@@ -28,6 +30,11 @@ final class CoreDriver implements ApiDriver
     public function actAs(?int $userId): void
     {
         $this->users->current = $userId;
+    }
+
+    public function preview(?string $value): void
+    {
+        $this->preview = $value;
     }
 
     public function createUser(string $login, string $level): int

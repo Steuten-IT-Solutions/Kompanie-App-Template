@@ -174,6 +174,33 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertSame([], $this->users->find($this->m)?->capabilities);
     }
 
+    public function testExtraRolesAreTheBase(): void
+    {
+        // Zusatzrolle „Strafen verwalten“: Ihr Recht lässt sich entziehen, und ein zusätzliches, das sie hat, fällt weg.
+        $this->assertSame(200, $this->rights($this->m, ['manage_penalties', 'manage_events'])->status);
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => ['penalties']])->status);
+        $rights = $this->call('GET', "/members/{$this->m}")->data['rights'];
+        $this->assertSame(['member', 'manage_penalties', 'calendar'], $rights['role'], 'Rechte aller Rollen');
+        $this->assertSame(['manage_events'], $rights['grant']);
+
+        $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['manage_penalties'])->status);
+        $this->assertFalse($this->can($this->m, Capability::ManagePenalties));
+        $this->assertTrue($this->can($this->m, Capability::ManageEvents));
+
+        // Zusatzrolle weg: Das Entzogene hat keine Rolle mehr und fällt weg (käme sonst mit einer späteren zurück).
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => []])->status);
+        $this->assertSame([], $this->call('GET', "/members/{$this->m}")->data['rights']['revoke']);
+
+        // Rolle gelöscht, die nur Zusatzrolle war: Ersatz gilt als Grundlage.
+        $kasse = $this->role('Kasse', ['member', 'manage_points', 'manage_penalties']);
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => [$kasse]])->status);
+        $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['manage_points'])->status);
+        $this->assertSame(200, $this->call('DELETE', "/admin/roles/$kasse", [], ['replacement' => 'penalties'])->status);
+        $rights = $this->call('GET', "/members/{$this->m}")->data['rights'];
+        $this->assertSame(['grant' => ['manage_events'], 'revoke' => []], ['grant' => $rights['grant'], 'revoke' => $rights['revoke']]);
+        $this->assertTrue($this->can($this->m, Capability::ManagePenalties));
+    }
+
     public function testDeletedRoleAndDeletedAccount(): void
     {
         $kasse = $this->role('Kasse', ['member', 'manage_points', 'manage_penalties']);
@@ -195,7 +222,7 @@ final class CapabilityOverridesTest extends TestCase
             RoleService::SETTING => $this->app->settings->get(RoleService::SETTING),
             RoleService::OVERRIDES_SETTING => $this->app->settings->get(RoleService::OVERRIDES_SETTING),
         ]));
-        $this->assertSame([Capability::Member, Capability::ManageDocuments, Capability::Calendar], $next->roles()->capabilitiesFor(Roles::MEMBER, $this->m));
-        $this->assertSame([Capability::Member, Capability::Calendar], $next->roles()->capabilitiesFor(Roles::MEMBER, $this->admin), 'andere Person');
+        $this->assertSame([Capability::Member, Capability::ManageDocuments, Capability::Calendar], $next->roles()->capabilitiesFor($this->m, Roles::MEMBER));
+        $this->assertSame([Capability::Member, Capability::Calendar], $next->roles()->capabilitiesFor($this->admin, Roles::MEMBER), 'andere Person');
     }
 }

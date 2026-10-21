@@ -6,6 +6,7 @@ namespace KompanieApp\Standalone;
 
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\PersonName;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\Sql\Connection;
 
@@ -13,8 +14,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
 final class PdoUsers implements UserDirectory
 {
     /**
-     * @param (\Closure(string, int): array<int, \KompanieApp\Core\Auth\Capability>)|null $capabilities Rechte je Rolle und Person
-     *        (Domain\RoleService der App); ohne: die Vorlagen
+     * @param (\Closure(string, int): array<int, \KompanieApp\Core\Auth\Capability>)|null $capabilities Rechte je Grundrolle
+     *        und Benutzer-ID, mit den Zusatzrollen (Domain\RoleService::capabilitiesFor der App); ohne: die Vorlagen
      */
     public function __construct(
         private readonly Connection $db,
@@ -58,18 +59,27 @@ final class PdoUsers implements UserDirectory
         return array_map([$this, 'toUser'], $this->db->select("SELECT * FROM {users} $where ORDER BY name ASC, id ASC"));
     }
 
-    public function create(string $name, string $login, string $email, string $password, string $role = Roles::MEMBER): int
+    public function create(string $firstName, string $lastName, string $login, string $email, string $password, string $role = Roles::MEMBER): int
     {
-        return $this->add($name, $login, $email, $password, $role);
+        return $this->insertUser($firstName, $lastName, $login, $email, $password, $role);
     }
 
+    /** Mit dem ganzen Namen (Einrichtung, Kommandozeile): das letzte Wort ist der Nachname. */
     public function add(string $name, string $login, string $email, string $password, string $role): int
+    {
+        [$first, $last] = PersonName::split($name);
+        return $this->insertUser($first, $last, $login, $email, $password, $role);
+    }
+
+    private function insertUser(string $firstName, string $lastName, string $login, string $email, string $password, string $role): int
     {
         $now = gmdate('Y-m-d H:i:s');
         return $this->db->insert('users', [
             'login' => $login,
             'email' => $email,
-            'name' => $name,
+            'name' => PersonName::join($firstName, $lastName),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'level' => $role,
             'created_at' => $now,
@@ -134,8 +144,12 @@ final class PdoUsers implements UserDirectory
 
     public function profile(int $id): ?array
     {
-        $row = $id > 0 ? $this->db->selectOne('SELECT name, login, email FROM {users} WHERE id = ?', [$id]) : null;
-        return $row ? ['name' => (string) $row['name'], 'login' => (string) $row['login'], 'email' => (string) $row['email']] : null;
+        $row = $id > 0 ? $this->db->selectOne('SELECT * FROM {users} WHERE id = ?', [$id]) : null;
+        if (!$row) {
+            return null;
+        }
+        [$first, $last] = self::names($row);
+        return ['name' => (string) $row['name'], 'first_name' => $first, 'last_name' => $last, 'login' => (string) $row['login'], 'email' => (string) $row['email']];
     }
 
     public function canChangeLogin(): bool
@@ -143,9 +157,10 @@ final class PdoUsers implements UserDirectory
         return true;
     }
 
-    public function updateProfile(int $id, string $name, string $email, ?string $login): void
+    public function updateProfile(int $id, string $firstName, string $lastName, string $email, ?string $login): void
     {
-        $this->db->update('users', ['name' => $name, 'email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')] + ($login !== null ? ['login' => $login] : []), ['id' => $id]);
+        $names = ['name' => PersonName::join($firstName, $lastName), 'first_name' => $firstName, 'last_name' => $lastName];
+        $this->db->update('users', $names + ['email' => $email, 'updated_at' => gmdate('Y-m-d H:i:s')] + ($login !== null ? ['login' => $login] : []), ['id' => $id]);
     }
 
     /** Konto löschen und alle Sitzungen beenden. */
@@ -160,6 +175,20 @@ final class PdoUsers implements UserDirectory
     {
         $role = (string) $row['level'];
         $caps = $this->capabilities !== null ? ($this->capabilities)($role, (int) $row['id']) : Roles::templateCapabilities($role);
-        return new User((int) $row['id'], (string) $row['name'], (string) $row['login'], $role, $caps);
+        [$first, $last] = self::names($row);
+        return new User((int) $row['id'], (string) $row['name'], (string) $row['login'], $role, $caps, $first, $last);
+    }
+
+    /**
+     * Vor- und Nachname; Konten aus der Zeit mit einem Namensfeld (beide leer) werden aus name geteilt.
+     *
+     * @param array<string, mixed> $row
+     * @return array{0: string, 1: string}
+     */
+    private static function names(array $row): array
+    {
+        $first = (string) ($row['first_name'] ?? '');
+        $last = (string) ($row['last_name'] ?? '');
+        return $first === '' && $last === '' ? PersonName::split((string) $row['name']) : [$first, $last];
     }
 }

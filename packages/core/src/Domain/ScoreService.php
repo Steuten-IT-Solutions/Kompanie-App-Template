@@ -65,7 +65,8 @@ final class ScoreService
     }
 
     /**
-     * Der Punktefaktor kommt aus der Rolle der Person (Issue #28) und wird mit dem Eintrag gespeichert.
+     * Der Punktefaktor kommt aus den Rollen der Person (Issue #28; bei Zusatzrollen der kleinste, Issue #66) und wird mit
+     * dem Eintrag gespeichert.
      * apply_factor = false bucht für alle mit Faktor 1 (die Leitung kann den Faktor so übergehen).
      *
      * attendance_id: die Anwesenheitsliste, aus deren Vorschlag gebucht wird (geprüft von AttendanceService::forBooking).
@@ -79,7 +80,7 @@ final class ScoreService
         $applyFactor = !array_key_exists('apply_factor', $in) || Input::bool($in['apply_factor']);
         $factors = [];
         foreach ($users as $id => $user) {
-            $factors[$id] = $applyFactor && $this->roles !== null ? $this->roles->pointsFactor($user->role) : 1.0;
+            $factors[$id] = $applyFactor && $this->roles !== null ? $this->roles->pointsFactorFor($user->id, $user->role) : 1.0;
         }
         $date = Input::date($in['date'] ?? null, $this->time->today());
 

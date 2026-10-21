@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Http\FileCache;
 
 /**
@@ -63,6 +64,14 @@ final class AppPage
         $path = (string) get_query_var(self::QUERY_VAR);
         if ($path === '') {
             return;
+        }
+        if (preg_match('#^(foto|dokument|abzeichen)/#', $path)) {
+            // Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
+            // der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
+            $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, schränkt Rechte nur ein
+            $query = isset($_GET[Preview::QUERY]) && is_string($_GET[Preview::QUERY]) ? sanitize_text_field(wp_unslash($_GET[Preview::QUERY])) : null;
+            $app->preview()->begin(Preview::valueFrom($header, $query));
         }
         if ($path === 'manifest.webmanifest') {
             self::sendManifest($app);
@@ -166,7 +175,8 @@ final class AppPage
         header('X-Content-Type-Options: nosniff');
         // Über diese Adresse kommen auch noch nicht aufbereitete öffentliche Bilder; ein Bild kann
         // später nach „intern“ verschoben werden. Deshalb hier nie dauerhaft öffentlich speichern lassen.
-        header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
+        // In der Vorschau (Issue #63) nie speichern.
+        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
         if (self::notModified($res['etag'] ?? null)) {
             return;
         }

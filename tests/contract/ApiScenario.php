@@ -27,6 +27,8 @@ final class ApiScenario
             $this->password();
             $this->roles();
             $this->customRoles();
+            $this->extraRoles();
+            $this->preview();
             $this->rightOverrides();
             $this->candidates();
             $this->ranks();
@@ -40,8 +42,10 @@ final class ApiScenario
             $this->accounts();
             $this->events();
             $this->push();
+            $this->reports();
             $this->config();
         } finally {
+            $this->d->preview(null);
             $this->d->actAs(null);
             foreach (array_reverse($this->users) as $id) {
                 $this->d->deleteUser($id);
@@ -420,6 +424,139 @@ final class ApiScenario
         $this->req('DELETE', '/admin/roles/' . $pflege, [], ['replacement' => 'member']);
     }
 
+    /**
+     * Zusatzrollen (Issue #66): eine Grundrolle (level) und beliebig viele eigene Rollen dazu; Rechte zusammen, kleinster
+     * Punktefaktor, dieselben Regeln wie bei der Grundrolle. Gespeichert im Kern, in beiden Varianten gleich.
+     */
+    private function extraRoles(): void
+    {
+        $c = $this->c;
+        $c->section('Zusatzrollen');
+        $admin = $this->user('kptest_zusatz_admin', 'admin');
+        $m = $this->user('kptest_zusatz_m', 'member');
+        $cand = $this->user('kptest_zusatz_anw', 'candidate');
+        $this->d->actAs($admin);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Zusatz Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
+        $young = (string) (array_column((array) $d, 'key', 'label')['Kptest Zusatz Jugend'] ?? '');
+
+        [$s, $d] = $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties', $young]]);
+        $c->ok($s === 200 && ($d['level'] ?? '') === 'member' && ($d['extra_roles'] ?? null) === ['penalties', $young], 'Zusatzrollen vergeben, level bleibt die Grundrolle');
+        $list = array_column((array) $this->req('GET', '/members')[1], 'extra_roles', 'id');
+        $c->ok(($list[$m] ?? null) === ['penalties', $young], 'Mitgliederliste zeigt die Zusatzrollen');
+        $c->ok(($this->req('GET', "/members/$m")[1]['extra_roles'] ?? null) === ['penalties', $young], 'Mitglied zeigt die Zusatzrollen');
+        [, $d] = $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 4, 'reason' => 'Kptest Zusatz']);
+        $c->ok(($d[0]['factor'] ?? null) == 0.5, 'Kleinster Punktefaktor aller Rollen gilt (0,5)');
+        $roles = array_column((array) ($this->req('GET', '/config')[1]['roles'] ?? []), 'extra', 'key');
+        $c->ok(($roles['member'] ?? null) === false && ($roles[$young] ?? null) === true, '/config: welche Rollen Zusatzrollen sein können');
+
+        $this->d->actAs($m);
+        [, $me] = $this->req('GET', '/me');
+        $c->ok(($me['level'] ?? '') === 'member' && ($me['extra_roles'] ?? null) === ['penalties', $young], '/me mit Grundrolle und Zusatzrollen');
+        $c->ok(in_array('manage_penalties', (array) ($this->req('GET', '/config')[1]['user']['capabilities'] ?? []), true), 'Rechte der Zusatzrolle in /config');
+        [$s] = $this->req('POST', '/penalties', ['user_ids' => [$m], 'amount_cents' => 100, 'reason' => 'Kptest Zusatz']);
+        $c->ok($s === 201, 'Recht aus der Zusatzrolle wirkt (Strafen buchen)');
+        $c->ok($this->req('PATCH', "/members/$cand/role", ['extra_roles' => ['events']])[0] === 403, 'Ohne „Rollen vergeben“ → 403');
+
+        $this->d->actAs($admin);
+        $c->ok($this->req('PATCH', "/members/$m/role", ['extra_roles' => ['admin']])[0] === 400, 'Admin als Zusatzrolle → 400');
+        $c->ok($this->req('PATCH', "/members/$m/role", ['extra_roles' => ['member']])[0] === 400, 'Feste Rolle als Zusatzrolle → 400');
+        $c->ok($this->req('PATCH', "/members/$m/role", ['extra_roles' => 'events'])[0] === 400, 'Keine Liste → 400');
+        $c->ok($this->req('PATCH', "/members/$cand/role", ['extra_roles' => ['events']])[0] === 400, 'Anwärter ohne Mitgliederbereich: keine Zusatzrollen → 400');
+        $c->ok($this->req('PATCH', "/members/$admin/role", ['extra_roles' => []])[0] === 400, 'Eigene Rollen nicht änderbar → 400');
+        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'member', 'extra_roles' => ['events']]);
+        $c->ok($s === 200 && ($d['extra_roles'] ?? null) === ['events'], 'Grundrolle und Zusatzrollen in einem Schritt');
+        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'candidate']);
+        $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Grundrolle ohne Mitgliederbereich: Zusatzrollen fallen weg');
+
+        $c->ok($this->req('DELETE', '/admin/roles/' . $young)[0] === 400, 'Rolle nur als Zusatzrolle zugeordnet: Löschen ohne Ersatz → 400');
+        [$s] = $this->req('DELETE', '/admin/roles/' . $young, [], ['replacement' => 'member']);
+        $c->ok($s === 200 && ($this->req('GET', "/members/$m")[1]['extra_roles'] ?? null) === ['penalties'], 'Gelöscht: als Zusatzrolle entfernt');
+        [$s, $d] = $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
+        $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Zusatzrollen entfernen');
+    }
+
+    /**
+     * Vorschau „App als Rolle ansehen“ (Issue #63): nur für Admins, mit genau den Rechten der Rolle (ohne Zusatzrollen),
+     * dieselbe Person; @public wie ohne Anmeldung; ändernde Anfragen immer 403 preview_readonly.
+     */
+    private function preview(): void
+    {
+        $c = $this->c;
+        $c->section('Vorschau als Rolle');
+        $admin = $this->user('kptest_vorschau_admin', 'admin');
+        $m = $this->user('kptest_vorschau_m', 'member');
+        $this->d->actAs($admin);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Vorschau Kasse', 'capabilities' => ['member', 'manage_points']]);
+        $cash = (string) (array_column((array) $d, 'key', 'label')['Kptest Vorschau Kasse'] ?? '');
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties']]);
+        $pdf = base64_encode("%PDF-1.4\n%%EOF\n");
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        [, $all] = $this->req('POST', '/documents', ['title' => "Kptest Vorschau Alle $sfx", 'date' => '2026-10-01', 'file' => ['name' => 'a.pdf', 'data' => $pdf]]);
+        [, $mgr] = $this->req('POST', '/documents', ['title' => "Kptest Vorschau Vorstand $sfx", 'date' => '2026-10-01', 'visibility' => 'managers', 'file' => ['name' => 'b.pdf', 'data' => $pdf]]);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(array_key_exists('preview', (array) $d) && $d['preview'] === null, 'Ohne Header: preview null');
+
+        $this->d->preview('member');
+        [$s, $d] = $this->req('GET', '/config');
+        $caps = (array) ($d['user']['capabilities'] ?? []);
+        sort($caps);
+        $c->ok($s === 200 && ($d['preview']['role'] ?? '') === 'member' && is_string($d['preview']['label'] ?? null), '/config meldet die Vorschau mit Bezeichnung');
+        $c->ok(($d['user']['id'] ?? 0) === $admin && ($d['user']['level'] ?? '') === 'member' && ($d['user']['extra_roles'] ?? null) === [], 'Vorschau: dieselbe Person mit der Rolle, ohne Zusatzrollen');
+        $c->ok($caps === ['calendar', 'member'], 'Vorschau: genau die Rechte der Rolle');
+        $c->ok(($d['setupPending'] ?? null) === false, 'Vorschau: kein Einrichtungsassistent');
+        [$s, $me] = $this->req('GET', '/me');
+        $c->ok($s === 200 && ($me['id'] ?? 0) === $admin && ($me['level'] ?? '') === 'member', '/me: eigene Daten des Admins mit der Rolle');
+        $c->ok($this->req('GET', '/admin/roles')[0] === 403, 'Vorschau: Einstellungen → 403');
+        $c->ok($this->req('GET', '/members')[0] === 403, 'Vorschau: Mitgliederliste ohne Recht → 403');
+        $docs = array_column((array) ($this->req('GET', '/documents')[1]['documents'] ?? []), 'url', 'title');
+        $c->ok(isset($docs["Kptest Vorschau Alle $sfx"]) && !isset($docs["Kptest Vorschau Vorstand $sfx"]), 'Vorschau: Dokumente wie die Rolle');
+        $c->ok(str_contains((string) ($docs["Kptest Vorschau Alle $sfx"] ?? ''), 'vorschau=member'), 'Vorschau: Adressen der Dateien tragen die Vorschau');
+        [$s, $err] = $this->req('POST', '/board', ['text' => 'Kptest Vorschau', 'push' => false]);
+        $c->ok($s === 403 && ($err['code'] ?? '') === 'preview_readonly', 'Vorschau: Ändern → 403 preview_readonly');
+        $c->ok(($this->req('PUT', '/me/birthday', ['month' => 5, 'day' => 4])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: eigener Geburtstag nicht änderbar');
+        $c->ok(($this->req('POST', '/me/push/status', [])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Benachrichtigungen nicht änderbar');
+        $c->ok(($this->req('POST', '/me/password', ['current_password' => 'x', 'new_password' => 'y'])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Passwort nicht änderbar');
+        $c->ok(($this->req('PATCH', "/members/$m/role", ['extra_roles' => []])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Admin-Rechte wirken auch beim Ändern nicht');
+
+        $this->d->preview($cash);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(in_array('manage_points', (array) ($d['user']['capabilities'] ?? []), true) && !in_array('manage_settings', (array) ($d['user']['capabilities'] ?? []), true), 'Vorschau als eigene Rolle: deren Rechte');
+        $c->ok($this->req('GET', '/members')[0] === 200, 'Vorschau als eigene Rolle: Mitgliederliste mit deren Recht');
+
+        $this->d->preview('@public');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok(($d['preview']['role'] ?? '') === '@public' && $d['user'] === null, 'Vorschau ohne Anmeldung: kein Benutzer');
+        $c->ok($this->req('GET', '/me')[0] === 401 && $this->req('GET', '/calendar')[0] === 401, 'Vorschau ohne Anmeldung: interne Inhalte → 401');
+        $c->ok($this->req('GET', '/events')[0] === 200, 'Vorschau ohne Anmeldung: öffentliche Inhalte');
+        $c->ok(($this->req('POST', '/push/status', [])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau ohne Anmeldung: nur ansehen');
+
+        $this->d->preview('admin');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Vorschau als Admin gibt es nicht (ignoriert)');
+        $this->d->preview('gibtesnicht');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Unbekannte Rolle: ignoriert');
+        $c->ok(($this->req('POST', '/board', ['text' => 'Kptest Vorschau', 'push' => false])[1]['code'] ?? '') === 'preview_readonly', 'Ungültige Vorschau bleibt trotzdem nur lesend');
+
+        $this->d->actAs($m);
+        $this->d->preview('member');
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && in_array('manage_penalties', (array) ($d['user']['capabilities'] ?? []), true), 'Nicht-Admins: Vorschau ignoriert, eigene Rechte');
+        $this->d->preview('admin');
+        $c->ok($this->req('GET', '/admin/roles')[0] === 403, 'Nicht-Admins bekommen über die Vorschau keine Rechte');
+        $c->ok(($this->req('POST', '/penalties', ['user_ids' => [$m], 'amount_cents' => 100, 'reason' => 'Kptest'])[1]['code'] ?? '') === 'preview_readonly', 'Nicht-Admins mit Header: nur lesend');
+
+        $this->d->preview(null);
+        $this->d->actAs($admin);
+        [, $d] = $this->req('GET', '/config');
+        $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Nach der Vorschau wieder Admin');
+        foreach ([$all, $mgr] as $doc) {
+            $this->req('DELETE', '/documents/' . ($doc['id'] ?? 0));
+        }
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
+        $c->ok($this->req('DELETE', '/admin/roles/' . $cash)[0] === 200, 'Aufräumen');
+    }
+
     /** Rechte einzelner Personen zusätzlich zur Rolle geben oder entziehen (über das Benutzerverzeichnis des Adapters). */
     private function rightOverrides(): void
     {
@@ -453,6 +590,14 @@ final class ApiScenario
         $c->ok($s === 200 && ($d['level'] ?? '') === 'member' && in_array('member', $caps(), true), 'Als Gast verfallen die Ausnahmen');
         $this->d->actAs($admin);
         $c->ok($this->req('PUT', "/members/$admin/rights", ['grant' => ['manage_points']])[0] === 400, 'Nicht für Admins → 400');
+
+        // Zusatzrollen (Issue #66): Grundlage sind alle Rollen der Person.
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties']]);
+        [$s, $d] = $this->req('PUT', "/members/$m/rights", ['revoke' => ['manage_penalties']]);
+        $c->ok($s === 200 && ($d['revoke'] ?? null) === ['manage_penalties'] && !in_array('manage_penalties', $caps(), true), 'Recht aus einer Zusatzrolle entzogen');
+        $this->d->actAs($admin);
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
+        $c->ok(($this->req('GET', "/members/$m")[1]['rights']['revoke'] ?? null) === [], 'Zusatzrolle weg: Ausnahme fällt weg');
     }
 
     /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */
@@ -1085,6 +1230,57 @@ final class ApiScenario
         [$s, $d] = $this->req('PATCH', '/admin/push', ['reminder_hour' => 7]);
         $c->ok($s === 200 && $d['reminderHour'] === 7, 'Uhrzeit der Erinnerung ändern');
         $this->req('PATCH', '/admin/push', ['reminder_hour' => $hour]);
+        // Benachrichtigung am Geburtstag: nur mit dem Bereich Geburtstage
+        $c->ok(array_key_exists('birthdays', $d) && ($d['birthdays'] === null || (is_bool($d['birthdays']['enabled'] ?? null) && is_int($d['birthdays']['hour'] ?? null))), 'GET /admin/push nennt die Benachrichtigung am Geburtstag');
+        if (is_array($d['birthdays'] ?? null)) {
+            $before = $d['birthdays'];
+            $c->ok($this->req('PATCH', '/admin/push', ['birthday_hour' => 24])[0] === 400, 'Ungültige Stunde am Geburtstag → 400');
+            [$s, $d] = $this->req('PATCH', '/admin/push', ['birthday_notify' => false, 'birthday_hour' => 9]);
+            $c->ok($s === 200 && $d['birthdays'] === ['enabled' => false, 'hour' => 9], 'Benachrichtigung am Geburtstag ausschalten und Stunde ändern');
+            $this->req('PATCH', '/admin/push', ['birthday_notify' => $before['enabled'], 'birthday_hour' => $before['hour']]);
+        }
+    }
+
+    /**
+     * Fehlermeldungen (Issue #64): nur mit Empfänger (reportUrl in update.json); auch für Gäste, mit Zeitfalle,
+     * Honeypot und Einwilligung. Ohne Empfänger antworten die Routen 404, und /config blendet den Knopf aus.
+     */
+    private function reports(): void
+    {
+        $c = $this->c;
+        $c->section('Fehlermeldungen');
+        $this->d->actAs(null);
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(is_bool($config['reports'] ?? null), '/config sagt, ob Fehlermeldungen möglich sind');
+        if (!$config['reports']) {
+            [$s, $d] = $this->req('GET', '/reports/form');
+            $c->ok($s === 404 && ($d['code'] ?? '') === 'reports_unavailable', 'Ohne Empfänger kein Formular (404)');
+            $c->ok($this->req('POST', '/reports', ['description' => 'x', 'consent' => true])[0] === 404, 'Ohne Empfänger keine Meldung (404)');
+            return;
+        }
+        [$s, $form] = $this->req('GET', '/reports/form');
+        $c->ok($s === 200 && is_string($form['token'] ?? null) && ($form['details']['role'] ?? '') === 'ohne Anmeldung' && is_string($form['details']['version'] ?? null),
+            'Formular für Gäste mit Zeitmarke und den beigefügten Angaben');
+        $body = ['token' => $form['token'], 'consent' => true, 'description' => 'Test aus dem Vertragstest', 'page' => '#/termine', 'userAgent' => 'Vertragstest'];
+        [$s, $d] = $this->req('POST', '/reports', $body);
+        $c->ok($s === 429 && ($d['code'] ?? '') === 'too_fast', 'Sofort abgeschickt → 429 too_fast (Zeitfalle)');
+        // Die Zeitmarke gehört zu keinem Konto; das Formular eines Mitglieds nennt dessen Rolle.
+        $this->d->actAs($this->m1);
+        [, $memberForm] = $this->req('GET', '/reports/form');
+        $c->ok(($memberForm['details']['role'] ?? '') !== 'ohne Anmeldung' && ($memberForm['details']['role'] ?? '') !== '', 'Formular nennt die Rolle des Kontos');
+        $this->d->actAs(null);
+        sleep((int) ($form['minSeconds'] ?? 3));
+        $c->ok(($this->req('POST', '/reports', ['consent' => false] + $body)[0]) === 400, 'Ohne Einwilligung → 400');
+        $c->ok(($this->req('POST', '/reports', ['description' => ' '] + $body)[0]) === 400, 'Ohne Beschreibung → 400');
+        $c->ok(($this->req('POST', '/reports', ['includeName' => true] + $body)[0]) === 400, 'Gast mit Namen → 400');
+        $c->ok(($this->req('POST', '/reports', ['screenshot' => ['type' => 'image/png', 'data' => base64_encode('kein Bild')]] + $body)[0]) === 400, 'Kein echtes Bild → 400');
+        $c->ok(($this->req('POST', '/reports', ['token' => 'x'] + $body)[1]['code'] ?? '') === 'form_expired', 'Ungültige Zeitmarke → form_expired');
+        [$s, $d] = $this->req('POST', '/reports', $body + ['screenshot' => ['type' => 'image/png', 'data' => self::pngBase64()]]);
+        $c->ok($s === 201 && ($d['queued'] ?? false) === true, 'Gast meldet einen Fehler mit Bildschirmfoto → 201');
+        $this->d->actAs($this->m1);
+        [$s] = $this->req('POST', '/reports', ['token' => $memberForm['token'], 'includeName' => true] + $body);
+        $c->ok($s === 201, 'Mitglied meldet mit Namen → 201');
+        $this->d->actAs(null);
     }
 
     private function config(): void

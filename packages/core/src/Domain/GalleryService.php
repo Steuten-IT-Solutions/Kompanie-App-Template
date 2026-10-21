@@ -54,6 +54,8 @@ final class GalleryService
     public const SIZES = ['thumb' => 400, 'large' => 1600];
     /** So oft wird ein Bild aufbereitet, bevor es als dauerhaft fehlerhaft gilt. */
     public const MAX_ATTEMPTS = 5;
+    /** Höchstens so viele fehlgeschlagene Bilder zeigt Einstellungen → Galerie. */
+    public const FAILED_LIST_MAX = 200;
 
     /** Wartezeit auf die Sperre eines Bildes in Sekunden (Tests setzen 0). */
     public int $waitSeconds = self::WAIT_SECONDS;
@@ -350,6 +352,40 @@ final class GalleryService
     public function countFailed(): int
     {
         return $this->repo->countFailed();
+    }
+
+    /**
+     * Bilder, die sich nicht laden ließen, für Admins: Dateiname, Album, Fehlermeldung und Versuche, dazu die Adresse
+     * der Datei in Google Drive (dort lässt sie sich prüfen oder ersetzen).
+     *
+     * @return list<array{id: int, name: string, album: string, intern: bool, error: string, attempts: int, drive_url: string}>
+     */
+    public function failedPhotos(int $limit = self::FAILED_LIST_MAX): array
+    {
+        return array_values(array_map(static fn (array $p): array => [
+            'id' => (int) $p['id'],
+            'name' => (string) $p['name'],
+            'album' => trim((string) ($p['album_year'] ?? '') . ' · ' . (string) ($p['album_title'] ?? ''), ' ·'),
+            'intern' => (bool) (int) $p['is_intern'],
+            'error' => (string) $p['error'],
+            'attempts' => (int) $p['attempts'],
+            'drive_url' => 'https://drive.google.com/file/d/' . rawurlencode((string) $p['drive_file_id']) . '/view',
+        ], $this->repo->failedPhotos($limit)));
+    }
+
+    /**
+     * Alle fehlgeschlagenen Bilder erneut aufbereiten (auch nach MAX_ATTEMPTS Versuchen), z. B. nachdem der Hoster mehr
+     * Speicher gibt. Die Aufbereitung selbst läuft wie sonst (Aufgabe bzw. „Jetzt abgleichen“).
+     */
+    public function retryFailedNow(): int
+    {
+        $n = $this->repo->resetFailed();
+        if ($n > 0) {
+            $status = $this->status();
+            $status['pending'] = $this->repo->countPending();
+            $this->settings->set(self::STATUS_SETTING, $status);
+        }
+        return $n;
     }
 
     public function countPending(): int
