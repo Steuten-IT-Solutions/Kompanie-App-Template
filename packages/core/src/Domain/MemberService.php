@@ -37,6 +37,7 @@ final class MemberService
             'id' => $user->id,
             'name' => $user->name,
             'level' => $user->role,
+            'extra_roles' => $this->roles?->extraRolesOf($user) ?? [],
             'points' => $this->scores->pointsTotal($user->id),
             'open_cents' => $this->scores->openCents($user->id),
         ];
@@ -70,7 +71,11 @@ final class MemberService
             $out[] = [
                 'id' => $u->id,
                 'name' => $u->name,
+                'first_name' => $u->firstName,
+                'last_name' => $u->lastName,
                 'level' => $u->role,
+                // Zusatzrollen (Issue #66); level bleibt die Grundrolle
+                'extra_roles' => $this->roles?->extraRolesOf($u) ?? [],
                 // Mit Mitgliederbereich (Punkte und Strafen möglich); sonst nur Kalender oder Gast.
                 'member' => $u->isMember(),
                 'points' => $points ? ($totals[$u->id]['points'] ?? 0) : null,
@@ -91,7 +96,10 @@ final class MemberService
         return [
             'id' => $u->id,
             'name' => $u->name,
+            'first_name' => $u->firstName,
+            'last_name' => $u->lastName,
             'level' => $u->role,
+            'extra_roles' => $this->roles?->extraRolesOf($u) ?? [],
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
@@ -117,8 +125,16 @@ final class MemberService
         return $viewer === null ? [true, true] : [$viewer->can(Capability::ManagePoints), $viewer->can(Capability::ManagePenalties)];
     }
 
-    /** @return array{id: int, level: string} */
-    public function setLevel(User $actor, int $id, mixed $level): array
+    /**
+     * Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66) ändern. Beides wird erst vollständig geprüft,
+     * dann geschrieben. Zusatzrollen gelten dieselben Regeln wie der Grundrolle: Wer kein Admin ist, vergibt und
+     * entfernt nur Rollen, deren Rechte er selbst hat und die weder Konten anlegen noch Rollen vergeben dürfen, und nur
+     * bei Personen, die nicht mehr Rechte haben als er (RoleService::canHandle/canHandleUser).
+     *
+     * @param mixed $extraRoles Liste von Schlüsseln; null = unverändert
+     * @return array{id: int, level: string, extra_roles: list<string>}
+     */
+    public function setLevel(User $actor, int $id, mixed $level, mixed $extraRoles = null): array
     {
         if ($actor->id === $id) {
             throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
@@ -127,28 +143,92 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Benutzer nicht gefunden.');
         }
-        $new = is_string($level) ? $level : '';
-        $known = $this->roles !== null ? $this->roles->exists($new) : isset(Roles::TEMPLATES[$new]);
-        if (!$known) {
-            throw ApiError::invalid('Ungültige Rolle.');
+        if ($level === null && $extraRoles === null) {
+            throw ApiError::invalid('Bitte eine Rolle angeben.');
         }
-        if (($new === Roles::ADMIN || $target->isAdmin()) && !$this->users->canAssignAdmin()) {
-            throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
+        $new = $level === null ? $target->role : (is_string($level) ? $level : '');
+        if ($level !== null) {
+            $known = $this->roles !== null ? $this->roles->exists($new) : isset(Roles::TEMPLATES[$new]);
+            if (!$known) {
+                throw ApiError::invalid('Ungültige Rolle.');
+            }
+            if (($new === Roles::ADMIN || $target->isAdmin()) && !$this->users->canAssignAdmin()) {
+                throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
+            }
+            // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
+            if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandleUser($actor, $target))) {
+                throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
+            }
+            if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
+                throw ApiError::invalid('Der letzte Admin kann nicht herabgestuft werden.');
+            }
         }
-        // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
-        if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandleUser($actor, $target))) {
-            throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
+        $extra = $this->roles !== null ? $this->roles->extraRolesOf($target) : [];
+        $nextExtra = $extra;
+        if ($extraRoles !== null) {
+            $nextExtra = $this->checkExtraRoles($actor, $target, $new, $extraRoles, $extra);
+        } elseif ($this->roles !== null && !$this->roles->allowsExtraRoles($new)) {
+            // Neue Grundrolle ohne Mitgliederbereich (z. B. Anwärter, Gast) oder Admin: Zusatzrollen fallen weg.
+            $nextExtra = [];
         }
-        if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
-            throw ApiError::invalid('Der letzte Admin kann nicht herabgestuft werden.');
+        if ($level !== null) {
+            try {
+                $this->users->setRole($id, $new);
+            } catch (\DomainException $e) {
+                throw ApiError::invalid($e->getMessage());
+            }
         }
-        try {
-            $this->users->setRole($id, $new);
-        } catch (\DomainException $e) {
-            throw ApiError::invalid($e->getMessage());
+        if ($this->roles !== null && $nextExtra !== $extra) {
+            $this->roles->setExtraRoles($id, $nextExtra);
         }
         $after = $this->users->find($id);
-        return ['id' => $id, 'level' => $after?->role ?? $new];
+        return ['id' => $id, 'level' => $after?->role ?? $new, 'extra_roles' => $after !== null && $this->roles !== null ? $this->roles->extraRolesOf($after) : []];
+    }
+
+    /**
+     * Gewünschte Zusatzrollen prüfen (Issue #66): nur eigene Rollen, nur zu einer Grundrolle mit Mitgliederbereich, nicht
+     * für Admins; wer kein Admin ist, nur mit Rollen, die er auch als Grundrolle vergeben dürfte (hinzufügen wie
+     * entfernen). Die Grundrolle selbst als Zusatzrolle fällt still weg.
+     *
+     * @param list<string> $current wirksame Zusatzrollen bisher
+     * @return list<string> künftige Zusatzrollen, in der Reihenfolge der Rollen
+     */
+    private function checkExtraRoles(User $actor, User $target, string $base, mixed $raw, array $current): array
+    {
+        if ($this->roles === null) {
+            throw ApiError::invalid('Zusatzrollen gibt es hier nicht.');
+        }
+        if (!is_array($raw) || !array_is_list($raw)) {
+            throw ApiError::invalid('Zusatzrollen als Liste angeben.');
+        }
+        $wanted = [];
+        foreach ($raw as $key) {
+            if (!is_string($key) || !$this->roles->exists($key)) {
+                throw ApiError::invalid('Ungültige Zusatzrolle.');
+            }
+            if (!RoleService::canBeExtra($key)) {
+                throw ApiError::invalid(sprintf('„%s“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', $this->roles->label($key)));
+            }
+            if ($key !== $base) {
+                $wanted[$key] = true;
+            }
+        }
+        if ($wanted !== [] && ($target->isAdmin() || $base === Roles::ADMIN)) {
+            throw ApiError::invalid('Admins haben schon alle Rechte und bekommen keine Zusatzrollen.');
+        }
+        if ($wanted !== [] && !$this->roles->allowsExtraRoles($base)) {
+            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich, nicht zu „%s“.', $this->roles->label($base)));
+        }
+        $changed = array_merge(array_diff(array_keys($wanted), $current), array_diff($current, array_keys($wanted)));
+        if ($changed !== [] && !$this->roles->canHandleUser($actor, $target)) {
+            throw ApiError::forbidden('Die Rollen dieser Person darfst du nicht ändern.');
+        }
+        foreach ($changed as $key) {
+            if (!$this->roles->canHandle($actor, $key)) {
+                throw ApiError::forbidden(sprintf('Die Rolle „%s“ darfst du nicht vergeben bzw. entfernen.', $this->roles->label($key)));
+            }
+        }
+        return array_values(array_filter(array_keys($this->roles->all()), static fn (string $k): bool => isset($wanted[$k])));
     }
 
     /**
@@ -181,7 +261,7 @@ final class MemberService
      * Legt ein Konto mit zufälligem Startpasswort an, als Mitglied oder als Anwärter. Das Passwort steht nur
      * in dieser Antwort; es wird keine E-Mail verschickt.
      *
-     * @param array<string, mixed> $in name, username, email, level (member oder candidate)
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (member oder candidate)
      * @return array<string, mixed>
      */
     public function create(array $in): array
@@ -194,16 +274,14 @@ final class MemberService
      * Angaben eines neuen Kontos prüfen; $taken sammelt Benutzernamen und E-Mail-Adressen, die schon für andere
      * Einträge derselben Anfrage vorgesehen sind (mehrere anlegen).
      *
-     * @param array<string, mixed> $in name, username, email, level
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level
      * @param array<string, true> $taken
-     * @return array{name: string, login: string, email: string, level: string}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string}
      */
     public function prepare(array $in, array &$taken): array
     {
-        $name = Text::line($in['name'] ?? '', 100);
-        if ($name === '') {
-            throw ApiError::invalid('Bitte einen Namen angeben.');
-        }
+        [$first, $last] = self::names($in, ['', '']);
+        $name = self::checkNames($first, $last);
         $level = $in['level'] ?? Roles::MEMBER;
         if ($level !== Roles::MEMBER && $level !== Roles::CANDIDATE) {
             throw ApiError::invalid('Neue Konten sind Mitglieder oder Anwärter; andere Rollen danach vergeben.');
@@ -237,25 +315,57 @@ final class MemberService
             $taken['email:' . mb_strtolower($email)] = true;
         }
         $taken['login:' . mb_strtolower($login)] = true;
-        return ['name' => $name, 'login' => $login, 'email' => $email, 'level' => (string) $level];
+        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level];
+    }
+
+    /**
+     * Vor- und Nachname aus der Anfrage: first_name/last_name, sonst name (ein Feld wie früher, z. B. eine noch nicht
+     * aktualisierte App; das letzte Wort ist der Nachname). Was fehlt, kommt aus $current.
+     *
+     * @param array<string, mixed> $in
+     * @param array{0: string, 1: string} $current Vor- und Nachname bisher
+     * @return array{0: string, 1: string}
+     */
+    private static function names(array $in, array $current): array
+    {
+        if (array_key_exists('first_name', $in) || array_key_exists('last_name', $in)) {
+            return [
+                array_key_exists('first_name', $in) ? Text::line($in['first_name'], PersonName::MAX) : $current[0],
+                array_key_exists('last_name', $in) ? Text::line($in['last_name'], PersonName::MAX) : $current[1],
+            ];
+        }
+        return array_key_exists('name', $in) ? PersonName::split(Text::line($in['name'], PersonName::MAX)) : $current;
+    }
+
+    /** Vorname ist Pflicht, der Nachname nicht. Gibt den Anzeigenamen zurück. */
+    private static function checkNames(string $first, string $last): string
+    {
+        if ($first === '') {
+            throw ApiError::invalid('Bitte einen Vornamen angeben.');
+        }
+        $name = PersonName::join($first, $last);
+        if (mb_strlen($name) > PersonName::MAX) {
+            throw ApiError::invalid(sprintf('Vor- und Nachname sind zusammen zu lang (höchstens %d Zeichen).', PersonName::MAX));
+        }
+        return $name;
     }
 
     /**
      * Konto mit zufälligem Startpasswort anlegen (geprüft mit prepare()).
      *
-     * @param array{name: string, login: string, email: string, level: string} $p
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string} $p
      * @return array<string, mixed>
      */
     public function insert(array $p): array
     {
-        ['name' => $name, 'login' => $login, 'email' => $email, 'level' => $level] = $p;
+        ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => $level] = $p;
         $password = Passwords::readable(12);
         try {
-            $id = $this->users->create($name, $login, $email, $password, $level);
+            $id = $this->users->create($first, $last, $login, $email, $password, $level);
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
-        return ['id' => $id, 'name' => $name, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
+        return ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
     }
 
     /** Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. */
@@ -300,7 +410,7 @@ final class MemberService
     /**
      * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt).
      *
-     * @return array{name: string, login: string, email: string, can_change_login: bool}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
      */
     public function profile(int $id, ?User $actor = null): array
     {
@@ -313,11 +423,11 @@ final class MemberService
     }
 
     /**
-     * Name, E-Mail und Benutzername ändern (Issue #24). Ein neuer Benutzername beendet alle Sitzungen des Kontos; ändert
-     * jemand den eigenen, bleibt dieses Gerät angemeldet.
+     * Vor- und Nachname, E-Mail und Benutzername ändern (Issue #24). Ein neuer Benutzername beendet alle Sitzungen des
+     * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet.
      *
-     * @param array<string, mixed> $in name, email, username
-     * @return array{name: string, login: string, email: string, can_change_login: bool}
+     * @param array<string, mixed> $in first_name, last_name (oder name), email, username
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
      */
     public function updateProfile(User $actor, int $id, array $in): array
     {
@@ -326,10 +436,8 @@ final class MemberService
             $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht ändern.');
         }
         $current = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        $name = array_key_exists('name', $in) ? Text::line($in['name'] ?? '', 100) : $current['name'];
-        if ($name === '') {
-            throw ApiError::invalid('Bitte einen Namen angeben.');
-        }
+        [$first, $last] = self::names($in, [$current['first_name'], $current['last_name']]);
+        self::checkNames($first, $last);
         $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
         // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
         if (mb_strtolower($email) !== mb_strtolower($current['email']) && $email !== '') {
@@ -357,7 +465,7 @@ final class MemberService
             }
         }
         try {
-            $this->users->updateProfile($id, $name, $email, $login);
+            $this->users->updateProfile($id, $first, $last, $email, $login);
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }

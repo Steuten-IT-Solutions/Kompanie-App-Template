@@ -4,9 +4,9 @@
  *
  *   php scripts/package.php --config=pfad/kompanie.json --version=0.1.0.3 --out=dist/release [--kompanie=org/repo]
  *       [--kompanie-commit=sha] [--dist=ordner --brand=brand.json] [--updates-url=…] [--status-url=https://…]
- *       [--support="Text"] [--trust-signing-key]
+ *       [--report-url=https://…] [--support="Text"] [--trust-signing-key]
  *       php scripts/package.php --code-hash     nur die Prüfsumme des Programmcodes ausgeben (für STABLE_CORE)
- *       php scripts/package.php --config-hash --kompanie=org/repo [--status-url=… --support=…]
+ *       php scripts/package.php --config-hash --kompanie=org/repo [--status-url=… --report-url=… --support=…]
  *                                               nur die Prüfsumme der Paket-Konfiguration (update.json)
  *
  * Vorher: scripts/build-frontend.sh mit KOMPANIE_CONFIG/KOMPANIE_ASSETS derselben Kompanie
@@ -22,7 +22,7 @@
  *
  * In beide Pakete kommt update.json: Adresse der Update-Liste (Standard bei --kompanie=org/repo:
  * https://org.github.io/repo/updates.json), vertrauenswürdige Schlüssel (TrustedKeys; mit
- * --trust-signing-key zusätzlich der Signaturschlüssel – nur für Tests), Statusmeldungen, Hilfe.
+ * --trust-signing-key zusätzlich der Signaturschlüssel – nur für Tests), Statusmeldungen, Fehlermeldungen, Hilfe.
  * Mit --require-signature muss der Signaturschlüssel in TrustedKeys stehen, sonst könnten die
  * Installationen keine Updates prüfen, und --kompanie ist Pflicht.
  *
@@ -42,7 +42,7 @@ use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\Version;
 use KompanieApp\Standalone\Migrations as StandaloneMigrations;
 
-$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'kompanie-commit::', 'dist::', 'brand::', 'require-signature', 'updates-url::', 'status-url::', 'support::', 'trust-signing-key', 'code-hash', 'config-hash']);
+$opt = getopt('', ['config:', 'version:', 'out:', 'kompanie::', 'kompanie-commit::', 'dist::', 'brand::', 'require-signature', 'updates-url::', 'status-url::', 'report-url::', 'support::', 'trust-signing-key', 'code-hash', 'config-hash']);
 $config = (string) ($opt['config'] ?? '');
 $version = (string) ($opt['version'] ?? '');
 $out = rtrim((string) ($opt['out'] ?? ''), '/');
@@ -214,8 +214,14 @@ $updateJson = [
     'support' => (string) ($opt['support'] ?? ''),
     'trustedKeys' => $trusted,
 ];
+// Empfänger der Fehlermeldungen (Issue #64) nur, wenn gesetzt: So bleibt die Prüfsumme der Paket-Konfiguration ohne ihn
+// unverändert, und keine Kompanie bekommt allein durch dieses Feld eine neue Version.
+$reportUrl = kompanie_https((string) ($opt['report-url'] ?? ''), '--report-url', $fail);
+if ($reportUrl !== '') {
+    $updateJson['reportUrl'] = $reportUrl;
+}
 $updateEntry = ['content' => json_encode($updateJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"];
-// Prüfsumme der Paket-Konfiguration (Update-Adresse, Schlüssel, Statusmeldungen, Hilfe): Ändert sich etwas
+// Prüfsumme der Paket-Konfiguration (Update-Adresse, Schlüssel, Status- und Fehlermeldungen, Hilfe): Ändert sich etwas
 // davon, braucht jede Kompanie eine neue Version (scripts/updates.php --find, scripts/find-pending.sh).
 $configHash = hash('sha256', (string) json_encode($updateJson, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 if (isset($opt['config-hash'])) {

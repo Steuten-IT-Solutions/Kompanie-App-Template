@@ -36,7 +36,10 @@ final class AccountsTest extends TestCase
 
     public function testEditNameEmailAndLogin(): void
     {
-        $this->assertSame(['name' => 'Mitglied', 'login' => 'mitglied', 'email' => '', 'can_change_login' => true], $this->call('GET', "/members/{$this->m}/account")->data);
+        $this->assertSame(
+            ['name' => 'Mitglied', 'first_name' => 'Mitglied', 'last_name' => '', 'login' => 'mitglied', 'email' => '', 'can_change_login' => true],
+            $this->call('GET', "/members/{$this->m}/account")->data,
+        );
         $res = $this->call('PATCH', "/members/{$this->m}/account", ['name' => 'Max Muster', 'email' => 'max@example.org', 'username' => 'max']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $this->assertSame(['Max Muster', 'max', 'max@example.org'], [$res->data['name'], $res->data['login'], $res->data['email']]);
@@ -59,6 +62,47 @@ final class AccountsTest extends TestCase
         $this->users->adminsAssignable = false;
         $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['username' => 'moritz'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['name' => 'Moritz'])->status);
+    }
+
+    public function testFirstAndLastName(): void
+    {
+        // Konten von früher (ein Namensfeld): das letzte Wort ist der Nachname.
+        $this->users->users[$this->m]['name'] = 'Hans Peter Schulz';
+        $p = $this->call('GET', "/members/{$this->m}/account")->data;
+        $this->assertSame(['Hans Peter', 'Schulz'], [$p['first_name'], $p['last_name']]);
+        $row = array_column($this->call('GET', '/members')->data, null, 'id')[$this->m];
+        $this->assertSame(['Hans Peter Schulz', 'Hans Peter', 'Schulz'], [$row['name'], $row['first_name'], $row['last_name']]);
+
+        // Getrennt geändert; der Anzeigename folgt.
+        $res = $this->call('PATCH', "/members/{$this->m}/account", ['first_name' => ' Maria ', 'last_name' => 'von  Berg']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['Maria von Berg', 'Maria', 'von Berg'], [$res->data['name'], $res->data['first_name'], $res->data['last_name']]);
+        $detail = $this->call('GET', "/members/{$this->m}")->data;
+        $this->assertSame(['Maria', 'von Berg'], [$detail['first_name'], $detail['last_name']]);
+
+        // Nur ein Feld geschickt: das andere bleibt.
+        $res = $this->call('PATCH', "/members/{$this->m}/account", ['first_name' => 'Marie']);
+        $this->assertSame(['Marie von Berg', 'Marie', 'von Berg'], [$res->data['name'], $res->data['first_name'], $res->data['last_name']]);
+        $res = $this->call('PATCH', "/members/{$this->m}/account", ['last_name' => 'Berg']);
+        $this->assertSame(['Marie', 'Berg'], [$res->data['first_name'], $res->data['last_name']]);
+        $this->call('PATCH', "/members/{$this->m}/account", ['first_name' => 'Maria', 'last_name' => 'von Berg']);
+
+        // Nur der Vorname ist Pflicht; ohne Namensfelder bleibt der Name.
+        $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['first_name' => ' ', 'last_name' => 'Berg'])->status);
+        $res = $this->call('PATCH', "/members/{$this->m}/account", ['email' => 'maria@example.org']);
+        $this->assertSame(['Maria', 'von Berg'], [$res->data['first_name'], $res->data['last_name']]);
+        $res = $this->call('PATCH', "/members/{$this->m}/account", ['first_name' => 'Kassenwart', 'last_name' => '']);
+        $this->assertSame(['Kassenwart', 'Kassenwart', ''], [$res->data['name'], $res->data['first_name'], $res->data['last_name']]);
+        $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['first_name' => str_repeat('a', 60), 'last_name' => str_repeat('b', 60)])->status, 'zusammen zu lang');
+
+        // Anlegen mit getrennten Feldern, einzeln und mehrere.
+        $res = $this->call('POST', '/users', ['first_name' => 'Anna', 'last_name' => 'Alt']);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['Anna Alt', 'Anna', 'Alt', 'anna.alt'], [$res->data['name'], $res->data['first_name'], $res->data['last_name'], $res->data['username']]);
+        $this->assertSame(400, $this->call('POST', '/users', ['first_name' => '', 'last_name' => 'Alt'])->status);
+        $res = $this->call('POST', '/users/bulk', ['people' => [['first_name' => 'Ben', 'last_name' => 'Bär'], ['first_name' => '', 'last_name' => 'Ohne']]]);
+        $this->assertSame(400, $res->status);
+        $this->assertStringContainsString('Zeile 2 (Ohne): Bitte einen Vornamen angeben.', (string) $res->data['message']);
     }
 
     public function testGuards(): void

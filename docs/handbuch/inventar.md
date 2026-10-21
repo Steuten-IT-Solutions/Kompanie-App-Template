@@ -14,13 +14,13 @@ Tippe auf ein Material, um zu sehen, wo wie viel davon liegt. Über das Suchfeld
 ## Anlegen
 Mit **+ Eintrag anlegen**:
 - **Bezeichnung** und **Ort** sind Pflicht. Ein Eintrag hat genau einen Ort. Liegt dasselbe Material an zwei Orten, sind das zwei Einträge.
-- **Menge**: 0 oder mehr, auch mit Komma (z. B. 2,5).
-- Optional: **Einheit** (z. B. Stück, kg, m), **Kategorie** und **Notiz**.
+- **Menge**: 0 oder mehr, auch mit Komma (z. B. 2,5; höchstens drei Nachkommastellen). Leer gelassen gilt 0.
+- Optional: **Einheit** (z. B. Stück, kg, m), **Kategorie**, **Notiz** und ein **Grund**, der im Verlauf steht.
 
-Beim Ort schlägt die App die Orte vor, die es schon gibt. Schreibst du einen bekannten Ort nur anders groß oder klein, übernimmt die App die bekannte Schreibweise.
+Beim Ort, bei Einheit und Kategorie schlägt die App vor, was es schon gibt. Schreibst du einen bekannten Ort (oder eine bekannte Einheit oder Kategorie) nur anders groß oder klein, übernimmt die App die bekannte Schreibweise.
 
 ## Ändern
-- **−** und **+** ändern die Menge um 1.
+- **−** und **+** ändern die Menge um 1. Unter 0 geht es nicht.
 - **Bearbeiten** ändert alle Angaben. Ein **Grund** (optional) steht danach im Verlauf, z. B. „Inventur“ oder „Sturmschaden“.
 - **Löschen** nimmt den Eintrag aus der Liste. Die App fragt nach einem Grund (optional). Der Verlauf bleibt erhalten.
 
@@ -28,7 +28,7 @@ Beim Ort schlägt die App die Orte vor, die es schon gibt. Schreibst du einen be
 Mit **Umlagern** bringst du einen Teil oder alles an einen anderen Ort:
 - Gibt es am Zielort schon dasselbe Material mit derselben Einheit, kommt die Menge dort dazu. Sonst entsteht am Zielort ein neuer Eintrag.
 - Lagerst du alles um, verschwindet der Eintrag am alten Ort (oder es ändert sich nur sein Ort, wenn es am Ziel noch nichts davon gibt).
-- Mehr als vorhanden geht nicht; dann ändert sich nichts.
+- Mehr als vorhanden geht nicht, und der Zielort muss ein anderer sein; dann ändert sich nichts. Ein **Grund** (optional) steht im Verlauf.
 
 ## Verlauf
-Jede Änderung steht im Verlauf: wann, wer, was sich geändert hat und der Grund. **Verlauf** bei einem Eintrag zeigt seine Änderungen, **Gesamter Verlauf** oben alle. Beim Umlagern bekommen der alte und der neue Eintrag je einen Verlaufseintrag. Auch gelöschte Einträge behalten ihren Verlauf.
+Jede Änderung steht im Verlauf: wann, wer, was sich geändert hat und der Grund. **Verlauf** bei einem Eintrag zeigt seine Änderungen, **Gesamter Verlauf** oben alle (mit **Ältere Einträge laden** unten kommen weitere). Beim Umlagern bekommen der alte und der neue Eintrag je einen Verlaufseintrag. Auch gelöschte Einträge behalten ihren Verlauf.

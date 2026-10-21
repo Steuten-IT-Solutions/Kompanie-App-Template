@@ -4,7 +4,7 @@ import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
-import { Loading, useAsync } from '../ui';
+import { Loading, NameFields, trimName, useAsync } from '../ui';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
@@ -102,10 +102,10 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
 
 type Row = NewPerson & { points: string; bday: BirthdayValue };
 
-const emptyRow = (): Row => ({ name: '', username: '', email: '', points: '', bday: emptyBirthday() });
+const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', email: '', points: '', bday: emptyBirthday() });
 
 /**
- * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Name, optional Benutzername, E-Mail und Anfangspunkte;
+ * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, optional Benutzername, E-Mail und Anfangspunkte;
  * Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt.
  */
 export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
@@ -123,13 +123,14 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    const filled = rows.filter((r) => r.name.trim() !== '');
+    const filled = rows.filter((r) => `${r.first_name}${r.last_name}`.trim() !== '');
     const people: NewPerson[] = [];
     for (const [i, r] of filled.entries()) {
+      const name = trimName(r);
       const bday = birthdays ? readBirthday(r.bday) : null;
-      if (typeof bday === 'string') return setFormError(`Zeile ${i + 1} (${r.name.trim()}): ${bday}`);
+      if (typeof bday === 'string') return setFormError(`Zeile ${i + 1} (${`${name.first_name} ${name.last_name}`.trim()}): ${bday}`);
       people.push({
-        name: r.name.trim(),
+        ...name,
         ...(r.username?.trim() ? { username: r.username.trim() } : {}),
         ...(r.email?.trim() ? { email: r.email.trim() } : {}),
         ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
@@ -185,16 +186,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       {rows.map((r, i) => (
         <fieldset key={i} className="fieldset bulk-row">
           <legend>Person {i + 1}</legend>
-          <label className="field">
-            <span>Name</span>
-            <input
-              type="text"
-              autoComplete="off"
-              placeholder="Vorname Nachname"
-              value={r.name}
-              onChange={(e) => update(i, { name: e.target.value })}
-            />
-          </label>
+          <NameFields value={r} onChange={(n) => update(i, n)} required={false} />
           <div className="field-row">
             <label className="field">
               <span>Benutzername (optional)</span>
@@ -259,7 +251,7 @@ function plainName(s: string): string {
   return t.value;
 }
 
-/** Mitgliedsdetails: Name, Benutzername (nicht bei WordPress) und E-Mail ändern, Konto löschen (Issue #24). */
+/** Mitgliedsdetails: Vor- und Nachname, Benutzername und E-Mail ändern, Konto löschen (Issue #24). */
 export function AccountPanel({
   id,
   level,
@@ -292,7 +284,7 @@ export function AccountPanel({
     try {
       setData(
         await api.updateAccount(id, {
-          name: editing.name.trim(),
+          ...trimName(editing),
           email: editing.email.trim(),
           ...(p.can_change_login ? { username: editing.login.trim() } : {}),
         }),
@@ -329,10 +321,7 @@ export function AccountPanel({
       <h3 className="section-title">Konto</h3>
       {editing ? (
         <form className="form card account-edit" onSubmit={save}>
-          <label className="field">
-            <span>Name</span>
-            <input type="text" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} required />
-          </label>
+          <NameFields value={editing} onChange={(n) => setEditing({ ...editing, ...n })} />
           <label className="field">
             <span>Benutzername</span>
             <input

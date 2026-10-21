@@ -94,6 +94,8 @@ final class QueryCountTest extends TestCase
             $call('POST', '/penalties', ['user_ids' => [$id], 'amount_cents' => 200, 'reason' => 'Zu spät']);
             $call('PUT', "/members/$id/rank", ['rank_id' => $ranks[$i % 2], 'reason' => 'x']);
             $call('PUT', "/members/$id/titles", ['title_ids' => [$titles[$i % 2]]]);
+            // Zusatzrollen (Issue #66): für alle Benutzer einer Anfrage eine Abfrage
+            $call('PATCH', "/members/$id/role", ['extra_roles' => $i % 2 === 0 ? ['events'] : ['events', 'documents']]);
             $call('PUT', "/members/$id/birthday", ['month' => 1 + $i % 12, 'day' => 1 + $i % 28]);
             $call('POST', '/inventory', ['title' => "Gegenstand $i", 'quantity' => 2, 'location' => 'Lager']);
             $call('POST', '/board', ['text' => "Hallo $i"]);

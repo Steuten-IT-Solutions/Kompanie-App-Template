@@ -146,9 +146,44 @@ $c->ok($refused($webUser), 'Passwort eines Benutzers mit WP-Benutzerrechten nur 
 $c->ok(!$refused($plain), 'Passwort eines Mitglieds mit dem App-Recht „Mitglieder anlegen“');
 $marked = static fn (int $id): bool => get_user_meta($id, $GLOBALS['wpdb']->get_blog_prefix() . WpUsers::ACCOUNT_META, true) === '1';
 $c->ok($marked($plain), 'Konto, dem eine Rolle mit WP-Recht gegeben wurde, ist als Konto der Kompanie markiert');
-$neu = $app->users->create('Kpwp Neu', 'kpwp_neu', 'kpwp_neu@example.com', wp_generate_password());
+$neu = $app->users->create('Kpwp', 'Neu', 'kpwp_neu', 'kpwp_neu@example.com', wp_generate_password());
 $c->ok($marked($neu), 'Von der App angelegtes Konto ist markiert');
 wp_delete_user($neu);
+
+// Vor- und Nachname: im WordPress-Profil (first_name, last_name), Anzeigename „Vorname Nachname“.
+wp_set_current_user(0);
+$named = $app->users->create('Hans Peter', 'von Kpwp', 'kpwp_named', '', wp_generate_password());
+clean_user_cache($named);
+$wpUser = get_userdata($named);
+$u = $app->users->find($named);
+$c->ok(
+    [$wpUser->first_name, $wpUser->last_name, $wpUser->display_name] === ['Hans Peter', 'von Kpwp', 'Hans Peter von Kpwp']
+        && [$u?->firstName, $u?->lastName] === ['Hans Peter', 'von Kpwp'],
+    'Vor- und Nachname stehen im WordPress-Profil',
+);
+$app->users->updateProfile($named, 'Maria', '', '', null);
+clean_user_cache($named);
+$p = $app->users->profile($named);
+$c->ok([$p['name'] ?? null, $p['first_name'] ?? null, $p['last_name'] ?? null] === ['Maria', 'Maria', ''], 'Nur Vorname: Anzeigename ist der Vorname');
+// Konto ohne Vor- und Nachname (z. B. im Backend angelegt): aus dem Anzeigenamen geteilt.
+wp_update_user(['ID' => $named, 'display_name' => 'Kpwp Ohne Namen', 'first_name' => '', 'last_name' => '']);
+clean_user_cache($named);
+$u = $app->users->find($named);
+$c->ok([$u?->firstName, $u?->lastName] === ['Kpwp Ohne', 'Namen'], 'Ohne Vor- und Nachname im Profil: letztes Wort des Anzeigenamens ist der Nachname');
+// Früher teilte die App am ersten Leerzeichen; einmalig umstellen, von Hand gepflegte Namen bleiben.
+wp_update_user(['ID' => $named, 'display_name' => 'Kpwp Peter Schulz', 'first_name' => 'Kpwp', 'last_name' => 'Peter Schulz']);
+$manual = $app->users->create('Kpwp Maria', 'von Berg', 'kpwp_manual', '', wp_generate_password());
+WpUsers::splitLegacyNames();
+clean_user_cache($named);
+clean_user_cache($manual);
+$c->ok(
+    [get_userdata($named)->first_name, get_userdata($named)->last_name] === ['Kpwp Peter', 'Schulz']
+        && [get_userdata($manual)->first_name, get_userdata($manual)->last_name] === ['Kpwp Maria', 'von Berg'],
+    'Update: frühere Teilung am ersten Leerzeichen wird umgestellt, gepflegte Namen bleiben',
+);
+wp_delete_user($named);
+wp_delete_user($manual);
+wp_set_current_user($pfleger);
 // Konto der Webseite (z. B. Kunde, Forum), das erst über die App zum Mitglied gemacht wird: nicht übernehmbar.
 wp_set_current_user(0);
 $app->roles()->update($pflegeKey, ['capabilities' => ['member', 'create_users', 'promote_users']]);
