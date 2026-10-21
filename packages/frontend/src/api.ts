@@ -1046,6 +1046,8 @@ export const api = {
       '/admin/gallery/sync',
       { only_process: onlyProcess },
     ),
+  galleryFailed: () => request<{ photos: FailedPhoto[]; total: number }>('GET', '/admin/gallery/failed'),
+  retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
@@ -1224,9 +1226,21 @@ export interface AdminSettings {
     oauth_email: string;
     /** Darf der Google-Zugang auch den Kalender lesen (OAuth mit calendar.readonly bzw. Dienstkonto)? */
     calendar_access: boolean;
-    status: { albums?: number; photos?: number; pending?: number; last_sync?: number; error?: string };
+    status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;
+}
+
+/** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
+export interface FailedPhoto {
+  id: number;
+  name: string;
+  /** „Jahr · Album“ */
+  album: string;
+  intern: boolean;
+  error: string;
+  attempts: number;
+  drive_url: string;
 }
 
 export interface AdminSettingsInput {

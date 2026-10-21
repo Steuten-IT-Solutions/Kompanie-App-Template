@@ -2714,8 +2714,60 @@ paths:
                   photos: { type: integer }
                   processed: { type: integer }
                   pending: { type: integer }
-                  failed: { type: integer, description: Bilder, die sich nicht laden ließen (werden beim nächsten Abgleich erneut versucht) }
+                  failed: { type: integer, description: 'Bilder, die sich nicht laden ließen (der nächste Abgleich versucht sie erneut, höchstens fünfmal; Liste unter /admin/gallery/failed)' }
                   error: { type: string, description: Fehler des Abgleichs, sonst leer }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/failed:
+    get:
+      tags: [Einstellungen]
+      summary: Bilder, die sich nicht laden ließen, mit Album und Fehlermeldung
+      description: Höchstens 200, neueste Alben zuerst; `total` ist die Gesamtzahl.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [photos, total]
+                properties:
+                  total: { type: integer }
+                  photos:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, album, intern, error, attempts, drive_url]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string, description: Dateiname in Google Drive }
+                        album: { type: string, description: '„Jahr · Album“' }
+                        intern: { type: boolean }
+                        error: { type: string, description: Fehlermeldung der letzten Aufbereitung }
+                        attempts: { type: integer }
+                        drive_url: { type: string, description: Adresse der Datei in Google Drive }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/retry:
+    post:
+      tags: [Einstellungen]
+      summary: Alle Bilder, die sich nicht laden ließen, erneut aufbereiten
+      description: Reiht sie wieder ein, auch nach fünf gescheiterten Versuchen; aufbereitet wird wie sonst (Aufgabe bzw. /admin/gallery/sync).
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [retried, pending]
+                properties:
+                  retried: { type: integer }
+                  pending: { type: integer }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }

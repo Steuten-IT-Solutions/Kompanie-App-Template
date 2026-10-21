@@ -57,7 +57,7 @@ final class SettingsService
                 'oauth_connected' => $drive->oauth() !== null,
                 'oauth_email' => $drive->oauthEmail(),
                 'calendar_access' => $drive->calendarAccess(),
-                'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending()]),
+                'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending(), 'failed' => $a->gallery()->countFailed()]),
             ],
             'news' => null,
         ];

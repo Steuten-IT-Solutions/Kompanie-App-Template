@@ -2825,3 +2825,18 @@ fieldset.feature-list legend {
 .extra-roles .toggle {
   margin-bottom: 8px;
 }
+
+/* Einstellungen → Galerie: Bilder, die sich nicht laden ließen */
+.gallery-failed {
+  margin-top: 0.75rem;
+}
+.gallery-failed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+.gallery-failed-list li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}

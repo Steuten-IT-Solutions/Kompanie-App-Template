@@ -54,6 +54,7 @@ Meldet die App einen Fehler, steht die Ursache dabei. Häufig: Die Weiterleitung
 
 ## Prüfen
 - **Jetzt abgleichen** zeigt, wie viele Alben und Bilder gefunden wurden.
+- Ließen sich Bilder nicht laden, steht darunter **„… Bilder ließen sich nicht laden – anzeigen“**. Aufgeklappt zeigt die Liste je Bild Dateiname, Album, Fehlermeldung und einen Link **In Google Drive öffnen**. Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein für den Speicher des Servers zu großes oder ein beschädigtes Bild. Abhilfe: das Bild als JPG in denselben Ordner legen und das alte entfernen. **Alle erneut versuchen** bereitet alle noch einmal auf, z. B. nachdem der Hoster mehr Speicher gibt.
 - **Kalender testen** zeigt die ersten Termine. Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache, z. B. Google Calendar API nicht aktiviert oder Kalender für das Konto nicht sichtbar.
 - Unter **Zustand der App** sind {bereich.gallery} und {bereich.calendar} grün.
 

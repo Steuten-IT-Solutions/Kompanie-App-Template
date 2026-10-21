@@ -693,6 +693,9 @@ final class Api
                 $a->googleConnect()->disconnect();
                 return $a->settingsService()->get();
             }, null, $denySettings),
+            // Bilder, die sich nicht laden ließen: Liste mit Fehlermeldung, alle erneut versuchen
+            new Route('GET', '/admin/gallery/failed', Cap::ManageSettings, fn () => ['photos' => $a->gallery()->failedPhotos(), 'total' => $a->gallery()->countFailed()], null, $denySettings),
+            new Route('POST', '/admin/gallery/retry', Cap::ManageSettings, fn () => ['retried' => $a->gallery()->retryFailedNow(), 'pending' => $a->gallery()->countPending()], null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)
