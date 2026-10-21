@@ -89,7 +89,8 @@ const tabLabels = (): Record<Tab, string> => ({
   news: sec.news,
   galerie: sec.gallery,
   dokumente: sec.documents,
-  mitglieder: sec.directory,
+  // Nur Ämter ohne Mitgliederliste (Issue #112): Der Tab heißt dann wie die Ämter.
+  mitglieder: features?.directory || !features?.offices ? sec.directory : sec.offices,
   meins: 'Meins',
   verwaltung: 'Verwaltung',
 });
@@ -251,9 +252,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
     news: !!features?.news,
     galerie: !!features?.gallery,
     dokumente: isMember() && !!features?.documents,
-    // Mitgliederliste für alle Mitglieder und Anwärter (der Mitgliederbereich enthält den Kalender).
-    mitglieder: !!features?.directory && (can('calendar') || isMember()),
-    meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
+    // Mitgliederliste und Ämter (Issue #112): für alle, auch ohne Anmeldung.
+    mitglieder: !!(features?.directory || features?.offices),
+    meins:
+      isMember() &&
+      !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance || features?.offices),
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
     verwaltung: adminTabs().length > 0,
     // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
@@ -431,7 +434,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Dokumente docId={docId} onToast={showToast} />
               ))}
-            {tab === 'mitglieder' && <Mitglieder />}
+            {tab === 'mitglieder' && <Mitglieder path={path.slice(1)} />}
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {adminView && <AdminNav active={adminView} />}

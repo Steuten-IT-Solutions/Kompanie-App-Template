@@ -390,6 +390,97 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   await page.getByLabel('Mitglied suchen').fill('mitglied2');
   await expect(list.locator('.member-row')).toHaveCount(1);
   await shot(page, '1-mitgliederliste');
+
+  // Öffentlich (Issue #112): auch ohne Anmeldung, ebenfalls ohne Punkte
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+  await expect(list).not.toContainText(/Punkte|offen/);
+});
+
+test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitglieder', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const group = `Verein ${id}`;
+  const office = `Kassenprüfer ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Ämter');
+  await page.getByLabel('Neue Gruppe').fill(group);
+  await page.getByRole('button', { name: 'Gruppe anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  await newOffice.getByLabel('Bezeichnung').fill(office);
+  await newOffice.getByLabel('Gruppe').selectOption({ label: group });
+  await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.getByRole('button', { name: office, exact: true }).click();
+
+  // Frühere Amtszeit mit einem Namen ohne Konto
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  let form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)').fill('1990');
+  await form.getByLabel('Bis (leer: bis heute)').fill('2005');
+  await form.getByLabel('Name', { exact: true }).fill(`Frieda Früher ${id}`);
+  await form.getByLabel(/Zusatz/).fill('Gründungsmitglied');
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+  // Laufende Amtszeit mit einem Konto und einem zweiten Namen
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)').fill('2020');
+  await form.getByLabel('Konto', { exact: false }).first().selectOption({ label: 'Mitglied1' });
+  await form.getByRole('button', { name: 'Weitere Person' }).click();
+  await form.locator('.office-holder-row').nth(1).getByLabel('Name', { exact: true }).fill(`Paul Partner ${id}`);
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+  await expect(page.locator('.office-term-row').first()).toContainText('seit 2020');
+
+  // Ohne Anmeldung: Zeitstrahl im Tab Mitglieder, laufende Amtszeit oben
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByRole('button', { name: 'Ämter', exact: true }).click();
+  await expect(page).toHaveURL(/#\/mitglieder\/aemter$/);
+  const card = page.locator('.office-card', { hasText: office });
+  await expect(card.locator('.office-summary-text')).toHaveText(`Mitglied1, Paul Partner ${id} · seit 2020`);
+  await expect(card.locator('.office-meta')).toHaveText('Chronik seit 1990 · 2 Einträge');
+  await card.locator('.office-head').click();
+  // Laufende Amtszeit oben unter „Im Amt“, die frühere in der Chronik
+  const spotlight = card.locator('.spotlight');
+  await expect(spotlight.locator('.spotlight-person')).toHaveCount(2);
+  await expect(spotlight).toContainText('seit 2020');
+  const items = card.locator('.tl-item');
+  await expect(items).toHaveCount(1);
+  await expect(items.nth(0)).toContainText('1990–2005');
+  await expect(items.nth(0)).toContainText('Gründungsmitglied');
+  await shot(page, '1b-aemter-zeitstrahl');
+  if (SHOTS) {
+    // Breiter Bildschirm: abwechselnd links und rechts
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await shot(page, '1c-aemter-zeitstrahl-breit');
+  }
+
+  // Schmaler Bildschirm: nichts ragt seitlich heraus
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Personen der Mitgliederliste: Tipp auf den Namen zeigt alle ihre Ämter
+  await spotlight.getByRole('button', { name: /^Mitglied1/ }).click();
+  await expect(page.getByRole('heading', { name: 'Ämter von Mitglied1' })).toBeVisible();
+  await expect(page.locator('.tl-item', { hasText: office })).toContainText('seit 2020');
+
+  // Aufräumen (WordPress behält die Daten zwischen den Läufen)
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.row', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
 });
 
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {

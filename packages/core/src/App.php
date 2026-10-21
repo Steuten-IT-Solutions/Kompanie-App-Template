@@ -30,6 +30,7 @@ use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
+use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
@@ -461,6 +462,11 @@ final class App
     public function titles(): TitleService
     {
         return $this->service(TitleService::class, fn () => new TitleService($this));
+    }
+
+    public function offices(): OfficeService
+    {
+        return $this->service(OfficeService::class, fn () => new OfficeService($this));
     }
 
     public function members(): MemberService

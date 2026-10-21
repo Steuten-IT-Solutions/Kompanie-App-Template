@@ -52,6 +52,7 @@ tags:
   - name: Geburtstage
   - name: Inventar
   - name: Mitgliederliste
+  - name: Ämter
   - name: Einstellungen
   - name: Wartung
   - name: Fehlermeldungen
@@ -1964,13 +1965,13 @@ paths:
   /directory:
     get:
       tags: [Mitgliederliste]
-      summary: Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory)
+      summary: Mitgliederliste (Bereich directory), öffentlich
       description: |
-        Für alle mit Mitgliederbereich oder internem Kalender (Recht `member` oder `calendar`, also auch Anwärter; Gäste
-        → 403). Enthält alle Mitglieder und Anwärter (auch Personen mit eigenen Rollen nur mit dem internen Kalender),
-        keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch den Dienstgrad, mit Bereich Titel die Titel;
-        nie Rollen, Punkte, Strafen oder Kontodaten. Sortiert nach Anzeigename.
-      x-capability: 'member oder calendar'
+        Für alle, auch Gäste und ohne Anmeldung (Issue #112). Enthält alle Mitglieder und Anwärter (auch Personen mit
+        eigenen Rollen nur mit dem internen Kalender), keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch
+        den Dienstgrad, mit Bereich Titel die Titel; nie Rollen, Punkte, Strafen oder Kontodaten. Sortiert nach
+        Anzeigename. Bereich aus → 403 `feature_disabled`.
+      security: []
       responses:
         '200':
           description: OK
@@ -1979,7 +1980,6 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/DirectoryEntry' }
-        '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
   /directory/counts:
@@ -1987,10 +1987,10 @@ paths:
       tags: [Mitgliederliste]
       summary: Zähler über der Mitgliederliste (Anzahl je Gruppe)
       description: |
-        Gleiche Rechte wie `GET /directory`. Anzahl der Personen dieser Liste je Gruppe wie im Zähler der Anwesenheit
-        (Einstellungen → Rollen, `GET /attendance/groups`), ohne Gäste. Nur die Summen, keine Rolle je Person; Gruppen
-        ohne Personen fehlen.
-      x-capability: 'member oder calendar'
+        Gleiche Rechte wie `GET /directory` (öffentlich, Issue #112). Anzahl der Personen dieser Liste je Gruppe wie im
+        Zähler der Anwesenheit (Einstellungen → Rollen, `GET /attendance/groups`), ohne Gäste. Nur die Summen, keine Rolle
+        je Person; Gruppen ohne Personen fehlen.
+      security: []
       responses:
         '200':
           description: OK
@@ -2006,6 +2006,320 @@ paths:
                     count: { type: integer, minimum: 1 }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+
+  /offices:
+    get:
+      tags: [Ämter]
+      summary: Alle Gruppen, Ämter und Amtszeiten für den Zeitstrahl (Issue #112), öffentlich
+      description: |
+        Für alle, auch ohne Anmeldung. Ämter in der Reihenfolge ihrer Gruppen (ohne Gruppe zuletzt); Amtszeiten laufende
+        zuerst, dann nach Beginn absteigend. Inhaber mit `user_id` und `photo_url` nur, wenn sie in der Mitgliederliste
+        stehen (Bereich directory); wer `manage_offices` hat, sieht alle Konten, jede Person ihr eigenes. `title_id` und
+        `linked_title` nur mit `manage_offices`. Bereich aus → 403 `feature_disabled`.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficesOverview' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Ämter]
+      summary: Amt anlegen (kommt ans Ende)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60, description: In der Gruppe eindeutig ohne Groß-/Kleinschreibung }
+                group_id: { type: [integer, 'null'] }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/order:
+    put:
+      tags: [Ämter]
+      summary: Reihenfolge der Ämter (alle IDs; angezeigt innerhalb ihrer Gruppe)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Ämter in der neuen Reihenfolge
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OfficeRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/import:
+    post:
+      tags: [Ämter]
+      summary: Tabelle importieren (Ersterfassung); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon oder Tabulator, höchstens 200 KB und 2000 Zeilen: `gruppe;amt;beginn;ende;art;personen;zusatz`
+        (Kopfzeile erlaubt). ende: Jahr, „heute“ (laufend) oder leer (ein Jahr); art leer, „zeitraum“ oder „zeitpunkt“;
+        personen mit „&“ getrennt. Gruppen und Ämter werden nach Namen gefunden oder angelegt, gleiche Amtszeiten
+        übersprungen. Mit `link` werden Namen, die genau einem Konto entsprechen, damit verknüpft. Mit `apply` alles in
+        einer Transaktion; enthält eine Zeile einen Fehler → 400 (nichts übernommen).
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                link: { type: boolean, default: true }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Umbenennen, Gruppe wechseln, mit einem Titel verknüpfen
+      description: |
+        `title_id` verknüpft das Amt mit einem Titel (je Titel höchstens ein Amt): Wer eine laufende Amtszeit hat (Konto,
+        Mitglied), bekommt ihn, wer keine hat, verliert ihn; von Hand ist er dann nicht mehr zu vergeben. `null` löst die
+        Verknüpfung, die vergebenen Titel bleiben.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 60 }
+                group_id: { type: [integer, 'null'] }
+                title_id: { type: [integer, 'null'] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Amt mit allen Amtszeiten löschen (ein verknüpfter Titel geht den Inhabern verloren)
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /offices/{id}/title-preview:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Ämter]
+      summary: Was eine Verknüpfung mit einem Titel ändern würde (ändert nichts)
+      x-capability: manage_offices
+      parameters:
+        - { name: title_id, in: query, required: false, schema: { type: integer } }
+      responses:
+        '200':
+          description: Wer den Titel bekommt, wer ihn verliert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  add: { type: array, items: { $ref: '#/components/schemas/OfficeTitleChange' } }
+                  remove: { type: array, items: { $ref: '#/components/schemas/OfficeTitleChange' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /offices/{id}/terms:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Ämter]
+      summary: Amtszeit eintragen
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeTermInput' }
+      responses:
+        '201':
+          description: Eingetragen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /office-terms/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Amtszeit ändern (fehlende Felder bleiben; holders ersetzt alle Inhaber)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeTermInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Amtszeit löschen
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /office-groups:
+    post:
+      tags: [Ämter]
+      summary: Gruppe anlegen (kommt ans Ende)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60, description: Eindeutig ohne Groß-/Kleinschreibung }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroup' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /office-groups/order:
+    put:
+      tags: [Ämter]
+      summary: Reihenfolge der Gruppen (alle IDs)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Gruppen in der neuen Reihenfolge
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OfficeGroup' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /office-groups/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Gruppe umbenennen
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroup' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Leere Gruppe löschen (mit Ämtern → 400)
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /members:
     get:
@@ -3545,7 +3859,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -3697,7 +4011,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -3710,7 +4024,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
 
@@ -3728,7 +4042,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -3848,6 +4162,7 @@ components:
             birthdays: { type: boolean }
             inventory: { type: boolean }
             directory: { type: boolean }
+            offices: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -4082,7 +4397,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users]
+      enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users]
 
     MemberRights:
       type: object
@@ -4169,21 +4484,137 @@ components:
       type: [string, 'null']
       description: |
         Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
-        durch 480. Ausgeliefert als image/jpeg nur an angemeldete Personen: die Person selbst und wer die Mitglieder in
-        der Verwaltung sieht (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder
-        promote_users) sowie mit dem Bereich directory alle Mitglieder und Anwärter, wenn das Foto zu einem Mitglied oder
-        Anwärter gehört; sonst 401/403, im Wartungsmodus 503. `Cache-Control: private`, bei passender Fassung einen Tag.
-        Die Adresse wechselt mit jedem Foto.
+        durch 480. Ausgeliefert als image/jpeg an die Person selbst und an alle, die die Mitglieder in der Verwaltung
+        sehen (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users); mit dem
+        Bereich directory an alle, auch ohne Anmeldung, wenn das Foto zu einem Mitglied oder Anwärter gehört (Issue #112,
+        dann `Cache-Control: public`); sonst 401/403, im Wartungsmodus 503. Sonst `Cache-Control: private`, bei passender
+        Fassung einen Tag; immer `X-Robots-Tag: noindex`. Die Adresse wechselt mit jedem Foto.
 
     BadgeUrl:
       type: [string, 'null']
       description: |
         Abzeichen des Dienstgrads (Issue #17) oder null: `<App>/abzeichen/<id>?v=<Fassung>&s=128`. Die App ersetzt
-        `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert nur an angemeldete
-        Personen mit Mitgliederbereich oder internem Kalender und an alle mit Zugang zur Mitgliederliste (sonst
+        `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert an angemeldete
+        Personen mit Mitgliederbereich oder internem Kalender und an alle mit Zugang zur Mitgliederliste der Verwaltung;
+        mit dem Bereich directory (öffentliche Mitgliederliste, Issue #112) an alle, dann `Cache-Control: public` (sonst
         401/403, im Wartungsmodus 503, Bereich aus 404);
         SVG als image/svg+xml mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
         und `X-Content-Type-Options: nosniff`, sonst image/png. Die Adresse wechselt mit jeder Fassung.
+
+    OfficeGroup:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 60 }
+
+    OfficeRef:
+      type: object
+      required: [id, group_id, title, title_id]
+      properties:
+        id: { type: integer }
+        group_id: { type: [integer, 'null'] }
+        title: { type: string, maxLength: 60 }
+        title_id: { type: [integer, 'null'], description: Verknüpfter Titel }
+
+    OfficeHolder:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: 'Anzeigename des Kontos, sonst der gespeicherte Name (auch nach dem Löschen des Kontos)' }
+        user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
+        photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+
+    OfficeTerm:
+      type: object
+      required: [id, kind, start_year, end_year, note, current, holders]
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [period, point], description: 'period: Zeitraum (ohne Ende bis heute), point: ein Jahr' }
+        start_year: { type: integer }
+        end_year: { type: [integer, 'null'] }
+        note: { type: string, maxLength: 100 }
+        current: { type: boolean, description: Zeitraum ohne Ende }
+        office_id: { type: integer, description: Nur in Antworten der Pflege }
+        holders:
+          type: array
+          items: { $ref: '#/components/schemas/OfficeHolder' }
+
+    OfficeTermInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [period, point], default: period }
+        start_year: { type: integer, minimum: 1800, description: Höchstens zehn Jahre in der Zukunft }
+        end_year: { type: [integer, 'null'], description: 'Nicht vor dem Beginn; null: bis heute (bei point immer null)' }
+        note: { type: string, maxLength: 100 }
+        holders:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            description: Ein Konto (user_id) oder ein freier Name; jede Person nur einmal
+            properties:
+              user_id: { type: integer }
+              name: { type: string, maxLength: 100 }
+
+    Office:
+      allOf:
+        - $ref: '#/components/schemas/OfficeRef'
+        - type: object
+          required: [terms]
+          properties:
+            terms:
+              type: array
+              items: { $ref: '#/components/schemas/OfficeTerm' }
+            linked_title: { type: [string, 'null'], description: Nur mit manage_offices }
+
+    OfficesOverview:
+      type: object
+      required: [groups, offices]
+      properties:
+        groups:
+          type: array
+          items: { $ref: '#/components/schemas/OfficeGroup' }
+        offices:
+          type: array
+          items: { $ref: '#/components/schemas/Office' }
+
+    OfficeTitleChange:
+      type: object
+      properties:
+        name: { type: string }
+        title: { type: string }
+
+    OfficeImportResult:
+      type: object
+      required: [rows, groups_new, offices_new, terms_new, applied]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              line: { type: integer }
+              group: { type: string }
+              office: { type: string }
+              kind: { type: string, enum: [period, point] }
+              start_year: { type: integer }
+              end_year: { type: [integer, 'null'] }
+              note: { type: string }
+              holders:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    user_id: { type: [integer, 'null'] }
+              duplicate: { type: boolean, description: Gibt es schon; wird übersprungen }
+              error: { type: string }
+        groups_new: { type: integer }
+        offices_new: { type: integer }
+        terms_new: { type: integer }
+        applied: { type: boolean }
 
     Title:
       type: object
@@ -4194,6 +4625,14 @@ components:
         sort: { type: integer, description: Reihenfolge der Anzeige }
         active: { type: boolean, description: 'Deaktivierte werden nicht mehr neu vergeben; wer sie hat, behält sie' }
         assigned: { type: integer, description: Wie vielen Mitgliedern zugewiesen }
+        office:
+          description: 'Amt, das den Titel über die laufenden Amtszeiten vergibt (Issue #112); von Hand nicht vergebbar'
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                id: { type: integer }
+                title: { type: string }
 
     DocCategory:
       type: object
