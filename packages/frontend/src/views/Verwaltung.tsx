@@ -86,13 +86,8 @@ function Members() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
-  const totalOpen = (data ?? []).filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
-
   return (
     <div>
-      {canPenalties() && (
-        <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />
-      )}
       {can('create_users') && (
         <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
           + Mitglied anlegen
@@ -816,6 +811,7 @@ function GivePenalty({
   const [date, setDate] = useState(attendance?.date ?? todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(0);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -835,6 +831,7 @@ function GivePenalty({
       setSelected([]);
       setAmount('');
       setReason('');
+      setSaved((n) => n + 1);
       onDone?.();
     } catch (err) {
       setFormError((err as Error).message);
@@ -845,6 +842,7 @@ function GivePenalty({
 
   return (
     <form className="form" onSubmit={submit}>
+      {!attendance && <OpenPenaltyTotal key={saved} />}
       <div className="field-row">
         <label className="field">
           <span>Betrag in €</span>
@@ -880,6 +878,14 @@ function GivePenalty({
       </button>
     </form>
   );
+}
+
+/** Summe aller offenen Strafen (Mitglieder und Anwärter, ohne Gast-Konten). */
+function OpenPenaltyTotal() {
+  const { data } = useAsync(() => api.members(false, true));
+  if (!data) return null;
+  const totalOpen = data.filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
+  return <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />;
 }
 
 /* ------------------------------------------------------------------ */
