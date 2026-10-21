@@ -9,9 +9,12 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/kompanie-e2e.XXXXXX")"
 mkdir -p "$WORK/www"
 ln -s "$ROOT/adapters/standalone" "$WORK/www/app"
 export KOMPANIE_DATA_DIR="$WORK/data"
-php -S "localhost:$PORT" -t "$WORK/www" "$ROOT/tests/standalone/e2e-router.php" > "$WORK/server.log" 2>&1 &
+# Mehrere Anfragen gleichzeitig wie bei einem echten Webserver (und wie bei den E2E-Tests mit WordPress): Sonst wartet
+# jede Anfrage der App hinter den Aufgaben, die die eigenständige Version nach einem Seitenaufruf erledigt (Issue #68).
+PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}" php -S "localhost:$PORT" -t "$WORK/www" "$ROOT/tests/standalone/e2e-router.php" > "$WORK/server.log" 2>&1 &
 SERVER=$!
-trap 'kill $SERVER 2>/dev/null || true; rm -rf "$WORK"' EXIT
+# Mit PHP_CLI_SERVER_WORKERS hat der Server Kindprozesse; die müssen mit beendet werden.
+trap 'pkill -P $SERVER 2>/dev/null || true; kill $SERVER 2>/dev/null || true; rm -rf "$WORK"' EXIT
 for _ in $(seq 1 30); do curl -s -o /dev/null "http://localhost:$PORT/" && break; sleep 0.5; done
 # Läuft wirklich unser Server (und nicht etwas anderes auf dem Port)?
 if ! kill -0 "$SERVER" 2>/dev/null || ! curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/app/" | grep -qE '^(200|503)$'; then

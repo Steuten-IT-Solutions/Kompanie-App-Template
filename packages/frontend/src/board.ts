@@ -15,6 +15,8 @@ export const BOARD_CHANGED = 'kompanie-board-changed';
 const DISMISSED_KEY = 'kompanie-board-dismissed';
 
 let items: BoardItem[] | null = null;
+/** Zuletzt gestartete Ladeanfrage: Eine ältere, die später ankommt, überschreibt keinen neueren Stand. */
+let latestRequest = 0;
 
 /** Wer das Brett sieht: Bereich an, Mitglieder und Anwärter (wie BoardService::isRecipient im Kern). */
 export function boardVisible(): boolean {
@@ -42,11 +44,15 @@ export function canManagePolls(): boolean {
  */
 export async function refreshBoard(): Promise<string | null> {
   if (!boardVisible() && !canPostBoard()) return null;
+  const request = ++latestRequest;
+  let loaded: BoardItem[];
   try {
-    items = (await api.board()).items;
+    loaded = (await api.board()).items;
   } catch (err) {
     return (err as Error).message;
   }
+  if (request !== latestRequest) return null;
+  items = loaded;
   window.dispatchEvent(new Event(BOARD_CHANGED));
   return null;
 }
