@@ -815,6 +815,37 @@ select {
 .add-member {
   margin-top: 14px;
 }
+.member-counts {
+  margin: 14px 2px 0;
+}
+.member-filters-toggle {
+  min-height: 44px;
+  padding: 6px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+.member-filters-arrow {
+  display: inline-block;
+  font-size: 1.3rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.member-filters-toggle[aria-expanded='true'] .member-filters-arrow {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-filters-arrow {
+    transition: none;
+  }
+}
 
 .form {
   display: flex;

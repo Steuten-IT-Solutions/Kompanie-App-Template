@@ -339,7 +339,11 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await expect(page.getByLabel('Auch Anwärter anzeigen')).toBeChecked();
+  // Zähler über „Mitglied anlegen“: Gruppen wie in der Anwesenheit
+  await expect(page.locator('.member-counts')).toContainText(/Anwärter \d+/);
+  // Filter und Sortierung sind zunächst eingeklappt.
+  await expect(page.getByRole('button', { name: 'Filter und Sortierung' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Sortierung')).toBeHidden();
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberMenu(page, 'Konto und Rolle');
   page.once('dialog', (d) => d.accept());
@@ -667,6 +671,7 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: 'Filter und Sortierung' }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
@@ -787,6 +792,7 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   // Liste zeigt keine Rollen, Filter findet die Person über die Zusatzrolle.
   await page.getByRole('button', { name: '‹ Alle Mitglieder' }).click();
   await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-role')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filter und Sortierung' }).click();
   await page.getByLabel('Nach Rolle filtern').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied1' })).toHaveCount(0);

@@ -12,7 +12,7 @@ Unter **Verwaltung → {bereich.titles}** legst du die {bereich.titles} an: Beze
 Ein Titel, den niemand hat, lässt sich **löschen**. Ein Titel, den jemand hat, lässt sich nur umbenennen oder **deaktivieren**: Ein deaktivierter Titel wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
 
 ## {bereich.titles} vergeben
-Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{bereich.titles}**) die passenden {bereich.titles} ankreuzen und **Titel speichern** tippen; ein Häkchen wegnehmen entfernt den Titel. Ein Mitglied kann mehrere {bereich.titles} haben. In der Mitgliederliste stehen die {bereich.titles} neben dem Namen; über **Alle {bereich.titles}** filterst du die Liste nach einem Titel.
+Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{bereich.titles}**) die passenden {bereich.titles} ankreuzen und **Titel speichern** tippen; ein Häkchen wegnehmen entfernt den Titel. Ein Mitglied kann mehrere {bereich.titles} haben. In der Mitgliederliste stehen die {bereich.titles} neben dem Namen; unter **Filter und Sortierung** filterst du über **Alle {bereich.titles}** die Liste nach einem Titel.
 
 Neue {bereich.titles} bekommt nur, wer Mitglied ist. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seine {bereich.titles}, bis du sie dort entfernst.
 

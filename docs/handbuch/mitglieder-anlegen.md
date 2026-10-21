@@ -6,8 +6,10 @@ rechte: [create_users]
 Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort öffnet sich zuerst die **Mitgliederliste**. Hast du in der Verwaltung noch weitere Aufgaben, wechselst du über das Menü oben (es zeigt gerade **Mitglieder**).
 
 ## Die Mitgliederliste
-- Oben steht **+ Mitglied anlegen**, darunter das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
-- **Auch {rolle.candidate} anzeigen** nimmt {rolle.candidate} und Personen mit Rollen nur für den internen Kalender dazu. Wer Mitglieder anlegen darf, hat dieses Häkchen von Anfang an gesetzt.
+- Ganz oben steht, wie viele Personen es je Gruppe gibt (z. B. {rolle.member} und {rolle.candidate}; ohne Gäste). Die Gruppen sind dieselben wie im Zähler der {bereich.attendance} (Einstellungen → Rollen → {bereich.attendance}); Suche und Rollenfilter ändern den Zähler nicht.
+- Darunter steht **+ Mitglied anlegen**, dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
+- In der Liste stehen auch {rolle.candidate} und Personen mit Rollen nur für den internen Kalender.
+- **Filter und Sortierung** ist zunächst eingeklappt; ein Tipp klappt es auf. Darin stehen die Filter nach Rolle und {bereich.titles}, die Sortierung und das Häkchen für Gast-Konten. Ist ein Filter gesetzt, steht am eingeklappten Bereich **aktiv**.
 - **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** gibt es nur für alle, die auch Rollen vergeben dürfen.
 - **Sortierung**: nach Nachname, nach Vorname oder (wer {bereich.points} vergeben darf) nach {bereich.points}. Der Knopf **Reihenfolge** daneben dreht sie um: bei Namen A → Z oder Z → A, bei {bereich.points} die meisten oder die wenigsten zuerst. Eine neu gewählte Sortierung beginnt mit A → Z bzw. mit den meisten {bereich.points}. Dein Gerät merkt sich die Wahl.
 - Jede Zeile zeigt den Namen, nach Nachname sortiert als „Nachname, Vorname“; wer nicht {rolle.member} ist, hat ein Schild mit der Rolle. Dazu steht der {begriff.rank} mit Abzeichen (wenn der Bereich eingeschaltet ist), je nach deinen Rechten auch {bereich.titles}, {bereich.points} und offene {bereich.penalties}. Sobald es Fotos gibt, steht vorn ein kleines rundes Foto; wer keines hat, bekommt dort seine Anfangsbuchstaben.

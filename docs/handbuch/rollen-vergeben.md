@@ -14,7 +14,7 @@ Unter **Verwaltung → Mitglieder** die Person öffnen, im Menü unter dem Namen
 ## Zusatzrollen
 Darunter kreuzt du unter **Zusatzrollen** weitere Rollen an, z. B. „{bereich.points} verwalten“ für ein {rolle.member}. Die Person hat dann die Rechte aller ihrer Rollen zusammen; bei {bereich.points} zählt der kleinste Punktefaktor ihrer Rollen. Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich, und die festen Rollen ({rolle.guest}, {rolle.candidate}, {rolle.member}, {rolle.admin}) sind nur Grundrolle.
 
-Die Mitgliederliste zeigt die Rollen nicht an; über **Alle Rollen** filterst du die Liste nach einer Rolle, egal ob Grund- oder Zusatzrolle. {rolle.guest} und {rolle.candidate} kannst du dort auch wählen, ohne vorher das Häkchen darunter zu setzen.
+Die Mitgliederliste zeigt die Rollen nicht an; unter **Filter und Sortierung** filterst du über **Alle Rollen** die Liste nach einer Rolle, egal ob Grund- oder Zusatzrolle. {rolle.guest} kannst du dort auch wählen, ohne vorher das Häkchen darunter zu setzen.
 
 - Die eigene Rolle ändert niemand selbst.
 - Der letzte {rolle.admin} kann nicht herabgestuft werden.
@@ -32,6 +32,6 @@ Soll eine Person ein Recht bekommen, das keine ihrer Rollen hat, oder ein Recht 
 - Wer kein {rolle.admin} ist, ändert nur Rechte, die er selbst hat, nie „Mitglieder anlegen“ oder „Rollen vergeben“, und nur bei Personen, die er auch sonst verwalten darf. Die eigenen Rechte ändert niemand selbst.
 
 ## Gäste und {rolle.candidate}
-Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit dem Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** erscheinen sie (zusammen mit den {rolle.candidate}), und du kannst ihnen eine Rolle geben. {rolle.candidate} und Personen mit Rollen nur für den internen Kalender erscheinen mit **Auch {rolle.candidate} anzeigen**.
+Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit dem Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** erscheinen sie, und du kannst ihnen eine Rolle geben. {rolle.candidate} und Personen mit Rollen nur für den internen Kalender stehen immer in der Liste.
 
 Neue Konten anlegen, Passwörter zurücksetzen und {rolle.candidate} mit **Als {rolle.member} aufnehmen** aufnehmen darf nur, wer Mitglieder anlegen darf.

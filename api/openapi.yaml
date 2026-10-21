@@ -3971,6 +3971,7 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
+        group: { type: [string, 'null'], description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
         rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)' }

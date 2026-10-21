@@ -105,7 +105,7 @@ type MembersState = {
   role: Level;
   title: number | null;
   showGuests: boolean;
-  showCandidates: boolean;
+  filtersOpen: boolean;
   scrollY: number;
 };
 let savedMembers: MembersState | null = null;
@@ -119,13 +119,13 @@ function Members() {
     return s;
   });
   const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
-  // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
-  const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
-  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste und Anwärter lassen sich auch ohne Häkchen wählen.
+  // Filter und Sortierung zunächst eingeklappt; beim Zurückkommen wie verlassen.
+  const [filtersOpen, setFiltersOpen] = useState(restore?.filtersOpen ?? false);
+  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
   const [role, setRole] = useState<Level>(restore?.role ?? '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
-  const loadCandidates = showCandidates || role === 'candidate';
-  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, loadCandidates), [loadGuests, loadCandidates], 'members');
+  // Anwärter (und Rollen nur mit Kalender) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
+  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
   // Filter nach Titel (nur, wer Titel sieht)
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
@@ -141,6 +141,8 @@ function Members() {
   };
   // Gemerkter Titel, den niemand mehr trägt: nicht still weiterfiltern.
   const activeTitle = title !== null && (data ?? []).some((m) => (m.titles ?? []).some((t) => t.id === title)) ? title : null;
+  // Hinweis am eingeklappten Bereich, damit ein gesetzter Filter nicht übersehen wird (die Sortierung zählt nicht).
+  const filtersActive = role !== '' || activeTitle !== null || showGuests;
   const list = useMemo(
     () =>
       sortMembers(
@@ -160,6 +162,12 @@ function Members() {
   present.add('candidate');
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+  // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter
+  const groupCounts = useMemo(() => {
+    const n = new Map<Level, number>();
+    for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
+    return (config?.roles ?? []).filter((r) => n.has(r.key)).map((r) => `${r.label} ${n.get(r.key)}`);
+  }, [data]);
   // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
   const withPhotos = (data ?? []).some((m) => m.photo_url);
   // Titel, die in der Liste vorkommen, alphabetisch
@@ -176,7 +184,7 @@ function Members() {
   }, [data]);
 
   function open(id: number) {
-    savedMembers = { query, role, title, showGuests, showCandidates, scrollY: window.scrollY };
+    savedMembers = { query, role, title, showGuests, filtersOpen, scrollY: window.scrollY };
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -185,6 +193,11 @@ function Members() {
 
   return (
     <div>
+      {groupCounts.length > 0 && (
+        <p className="member-counts small muted" role="status">
+          {groupCounts.join(' · ')}
+        </p>
+      )}
       {can('create_users') && (
         <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
           + Mitglied anlegen
@@ -198,79 +211,85 @@ function Members() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Mitglied suchen"
       />
-      {roleOptions.length > 1 && (
-        <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
-          <option value="">Alle Rollen</option>
-          {roleOptions.map((r) => (
-            <option key={r.key} value={r.key}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      )}
-      {titleOptions.length > 0 && (
-        <select
-          className="role-filter"
-          value={activeTitle ?? ''}
-          onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
-          aria-label={`Nach ${sec.titles} filtern`}
-        >
-          <option value="">Alle {sec.titles}</option>
-          {titleOptions.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="field-row member-sort">
-        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
-        <div className="field">
-          <span id="member-sort-label">Sortierung</span>
-          <select
-            aria-labelledby="member-sort-label"
-            value={order.sort}
-            // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
-            onChange={(e) => {
-              const sort = e.target.value as MemberSort;
-              changeOrder({ sort, dir: defaultDir(sort) });
-            }}
-          >
-            {sortOptions.map((s) => (
-              <option key={s} value={s}>
-                {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+      <button
+        type="button"
+        className="member-filters-toggle"
+        aria-expanded={filtersOpen}
+        aria-controls="member-filters"
+        onClick={() => setFiltersOpen(!filtersOpen)}
+      >
+        Filter und Sortierung
+        {filtersActive && <span className="badge badge-role">aktiv</span>}
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      <div id="member-filters" className="member-filters" hidden={!filtersOpen}>
+        {roleOptions.length > 1 && (
+          <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
+            <option value="">Alle Rollen</option>
+            {roleOptions.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
               </option>
             ))}
           </select>
-        </div>
-        <div className="field member-sort-dir">
-          <span id="member-sort-dir-label">Reihenfolge</span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-labelledby="member-sort-dir-label member-sort-dir-value"
-            title="Reihenfolge umkehren"
-            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+        )}
+        {titleOptions.length > 0 && (
+          <select
+            className="role-filter"
+            value={activeTitle ?? ''}
+            onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
+            aria-label={`Nach ${sec.titles} filtern`}
           >
-            <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
-          </button>
+            <option value="">Alle {sec.titles}</option>
+            {titleOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="field-row member-sort">
+          {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+          <div className="field">
+            <span id="member-sort-label">Sortierung</span>
+            <select
+              aria-labelledby="member-sort-label"
+              value={order.sort}
+              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
+              onChange={(e) => {
+                const sort = e.target.value as MemberSort;
+                changeOrder({ sort, dir: defaultDir(sort) });
+              }}
+            >
+              {sortOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field member-sort-dir">
+            <span id="member-sort-dir-label">Reihenfolge</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-labelledby="member-sort-dir-label member-sort-dir-value"
+              title="Reihenfolge umkehren"
+              onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+            >
+              <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+            </button>
+          </div>
         </div>
+        {canPromote && (
+          <label className="toggle">
+            <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
+            Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
+          </label>
+        )}
       </div>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showCandidates || showGuests}
-          disabled={showGuests}
-          onChange={(e) => setShowCandidates(e.target.checked)}
-        />
-        Auch {levelLabel('candidate')} anzeigen
-      </label>
-      {canPromote && (
-        <label className="toggle">
-          <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
-          Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
-        </label>
-      )}
       <ul className="card-list">
         {list.map((m) => (
           <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>

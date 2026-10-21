@@ -323,6 +323,8 @@ export interface MemberSummary {
   extra_roles?: Level[];
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
+  /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
+  group?: Level | null;
   /** Dienstgrad (nur mit Bereich Dienstgrade) */
   rank_title?: string | null;
   /** Abzeichen des Dienstgrads (wie rank_title) */
