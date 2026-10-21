@@ -12,7 +12,7 @@ Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), fi
 - **Sortierung**: nach Nachname, nach Vorname oder (wer {bereich.points} vergeben darf) nach {bereich.points}. Der Knopf **Reihenfolge** daneben dreht sie um: bei Namen A → Z oder Z → A, bei {bereich.points} die meisten oder die wenigsten zuerst. Eine neu gewählte Sortierung beginnt mit A → Z bzw. mit den meisten {bereich.points}. Dein Gerät merkt sich die Wahl.
 - Jede Zeile zeigt den Namen, nach Nachname sortiert als „Nachname, Vorname“; wer nicht {rolle.member} ist, hat ein Schild mit der Rolle. Je nach deinen Rechten stehen dabei auch {begriff.rank}, {bereich.titles}, {bereich.points} und offene {bereich.penalties}.
 
-Ein Tipp auf eine Person öffnet ihre Seite. Unter dem Namen wählst du im Menü die Unterseite: **Übersicht**, **Konto und Rolle**, {bereich.points}, {bereich.penalties}, {begriff.rank}, {bereich.titles} und **Geburtstag**. Du siehst nur die Unterseiten, für die du die Rechte hast und deren Bereich eingeschaltet ist. **‹ Alle Mitglieder** führt zurück zur Liste.
+Ein Tipp auf eine Person öffnet ihre Seite. Unter dem Namen wählst du im Menü die Unterseite: **Übersicht**, **Konto und Rolle**, {bereich.points}, {bereich.penalties}, {begriff.rank}, {bereich.titles} und **Geburtstag**. Du siehst nur die Unterseiten, für die du die Rechte hast und deren Bereich eingeschaltet ist. **‹ Alle Mitglieder** (oder die Zurück-Taste) führt zurück zur Liste, und zwar an dieselbe Stelle, mit demselben Suchbegriff und denselben Filtern. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
 
 ## Neues Mitglied
 1. In der Mitgliederliste **+ Mitglied anlegen** tippen.
