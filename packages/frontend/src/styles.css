@@ -2350,11 +2350,20 @@ fieldset.feature-list legend {
 .role-preview {
   margin-top: 16px;
 }
+/* Text und Knöpfe teilen sich die Zeile nur, wenn genug Platz ist;
+   auf dem Handy rutschen die Knöpfe unter den Text. */
+.role-list .role-item.row {
+  flex-wrap: wrap;
+}
+.role-list .role-item .row-main {
+  flex: 1 1 14rem;
+}
 .role-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 /* ------------------------------------------------------------------ */
