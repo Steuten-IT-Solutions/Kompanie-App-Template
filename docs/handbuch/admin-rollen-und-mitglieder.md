@@ -31,5 +31,8 @@ Die Grundrolle sagt, wer jemand in der Kompanie ist: {rolle.guest}, {rolle.candi
 - **Punktefaktor:** Bei mehreren Rollen gilt der kleinste, z. B. ×0,5, wenn eine der Rollen ×0,5 hat.
 - Neben jeder Rolle steht, wie viele Personen sie haben, als Grund- oder als Zusatzrolle. Löschst du eine Rolle, die jemand als Zusatzrolle hat, bekommt er stattdessen die gewählte Ersatzrolle als Zusatzrolle, wenn das eine eigene Rolle ist; sonst fällt sie einfach weg.
 
+## Rollen ausprobieren
+Was eine Rolle in der App sieht, zeigt dir **Ansehen** neben der Rolle, ohne anderes Konto; siehe [App als Rolle ansehen](seite:admin-vorschau).
+
 ## Mitglieder und ihre Rollen
 Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben).
