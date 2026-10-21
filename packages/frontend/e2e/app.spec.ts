@@ -298,18 +298,18 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.getByRole('heading', { name: '2 Konten angelegt' })).toBeVisible();
   await expect(page.locator('.print-sheet .form-error')).toHaveCount(0);
 
-  // Liste: Foto bzw. Anfangsbuchstaben; Details: großes Foto, entfernen
+  // Liste: Foto bzw. Anfangsbuchstaben; Details: Foto neben dem Dienstgrad, entfernen
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   await page.getByLabel('Mitglied suchen').fill(id);
   await expect(page.locator('.row', { hasText: `${id}, Hanna` }).locator('.member-avatar img')).toBeVisible();
   await expect(page.locator('.row', { hasText: `${id}, Gerd` }).locator('.member-avatar-initials')).toHaveText(`G${id[0].toUpperCase()}`);
   await page.locator('.row', { hasText: `${id}, Hanna` }).click();
-  await expect(page.locator('.member-photo .member-avatar-large img')).toBeVisible();
+  await expect(page.locator('.member-rank-line .member-avatar img')).toBeVisible();
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Foto entfernen' }).click();
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
   await expect(page.getByRole('button', { name: 'Foto hochladen' })).toBeVisible();
-  await expect(page.locator('.member-photo .member-avatar-initials')).toBeVisible();
+  await expect(page.locator('.member-rank-line .member-avatar-initials')).toBeVisible();
 
   // Das Mitglied sieht sein Foto unter „Konto“, kann es dort aber nicht ändern.
   await login(page, username, password);

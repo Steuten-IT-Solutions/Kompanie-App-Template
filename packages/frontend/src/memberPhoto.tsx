@@ -12,8 +12,8 @@ const UPLOAD_EDGE = 1024;
 const UPLOAD_QUALITY = 0.9;
 
 /** Darstellungsgrößen; geladen wird die passende Fassung (128 oder 480 Pixel, für hochauflösende Displays reichlich). */
-export type AvatarSize = 'small' | 'large';
-const PIXELS: Record<AvatarSize, number> = { small: 128, large: 480 };
+export type AvatarSize = 'small' | 'medium' | 'large';
+const PIXELS: Record<AvatarSize, number> = { small: 128, medium: 128, large: 480 };
 
 /** Ein gewähltes, schon verkleinertes Foto: für die API und als Vorschau. */
 export type PreparedPhoto = { file: EncodedFile; preview: string };
@@ -136,12 +136,16 @@ export function PhotoPicker({
   );
 }
 
-/** Foto in den Mitgliedsdetails: groß anzeigen; mit Recht hochladen, ersetzen und entfernen (sofort gespeichert). */
+/**
+ * Foto in den Mitgliedsdetails: groß anzeigen; mit Recht hochladen, ersetzen und entfernen (sofort gespeichert).
+ * Mit showAvatar={false} nur die Knöpfe, wenn das Foto schon an anderer Stelle steht.
+ */
 export function MemberPhotoPanel({
   id,
   name,
   url,
   editable,
+  showAvatar = true,
   onChanged,
   onToast,
 }: {
@@ -149,6 +153,7 @@ export function MemberPhotoPanel({
   name: string;
   url: string | null;
   editable: boolean;
+  showAvatar?: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -185,10 +190,10 @@ export function MemberPhotoPanel({
     }
   }
 
-  if (!url && !editable) return null;
+  if (!editable && (!url || !showAvatar)) return null;
   return (
     <div className="member-photo">
-      <MemberAvatar url={url} name={name} size="large" />
+      {showAvatar && <MemberAvatar url={url} name={name} size="large" />}
       {editable && (
         <>
           <div className="button-row">
