@@ -2,7 +2,9 @@
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
 import { dataCache } from './dataCache';
+import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
+import { noteError } from './lastError';
 
 /** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -42,7 +44,11 @@ export interface AppUser {
   id: number;
   name: string;
   login: string;
+  /** Grundrolle */
   level: Level;
+  /** Zusatzrollen (Issue #66); fehlt bei älteren Servern */
+  extra_roles?: Level[];
+  /** Alle Rechte zusammen (Grundrolle und Zusatzrollen) */
   capabilities: Capability[];
 }
 
@@ -58,6 +64,8 @@ export interface AppConfig {
   features: Record<Feature, boolean>;
   /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
   handbookUrl?: string | null;
+  /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
+  reports?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -66,6 +74,8 @@ export interface AppConfig {
   setupPending?: boolean;
   /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
   maintenance?: MaintenanceInfo;
+  /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
+  preview?: { role: string; label: string } | null;
 }
 
 export interface MaintenanceInfo {
@@ -122,12 +132,17 @@ export interface RoleInfo {
   key: Level;
   label: string;
   points_factor: number;
+  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Anwärter, Mitglied, Admin; Issue #66) */
+  extra?: boolean;
 }
 
 /** Für Einstellungen → Rollen (nur Admins). */
 export interface RoleAdmin extends RoleInfo {
   capabilities: Capability[];
+  /** Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle */
   users: number;
+  /** Davon als Zusatzrolle */
+  extra_users?: number;
   system: boolean;
   deletable: boolean;
 }
@@ -139,8 +154,19 @@ export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.f
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
 
+/** Überschrift für die Neuigkeiten: Standardbezeichnung „News“ ausgeschrieben, eigene Bezeichnungen unverändert. */
+export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? 'Neuigkeiten' : brand.labels.sections.news);
+
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
+
+/** Punktefaktor einer Person: der kleinste ihrer Rollen, Grundrolle und Zusatzrollen (wie der Server, Issue #66). */
+export const personFactor = (p: { level: Level; extra_roles?: Level[] }): number =>
+  Math.min(roleFactor(p.level), ...(p.extra_roles ?? []).map(roleFactor));
+
+/** Alle Rollen einer Person zum Anzeigen: Grundrolle, dahinter die Zusatzrollen. */
+export const roleLabels = (p: { level: Level; extra_roles?: Level[] }): string =>
+  [p.level, ...(p.extra_roles ?? [])].map(levelLabel).join(', ');
 
 /** Nach dem Schalten von Bereichen: Standardrollen können dazugekommen oder weggefallen sein. */
 export async function refreshRoles(): Promise<RoleAdmin[] | null> {
@@ -156,7 +182,7 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor }) => ({ key, label, points_factor }));
+  config.roles = list.map(({ key, label, points_factor, system }) => ({ key, label, points_factor, extra: !system }));
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -169,6 +195,7 @@ export interface Me {
   id: number;
   name: string;
   level: Level;
+  extra_roles?: Level[];
   points: number;
   open_cents: number;
   /** Eigener Dienstgrad (mit Bereich Dienstgrade) */
@@ -283,8 +310,15 @@ export interface GalleryAlbum {
 
 export interface MemberSummary {
   id: number;
+  /** Anzeigename „Vorname Nachname“ */
   name: string;
+  /** Vor- und Nachname (Nachname kann leer sein); fehlen bei einem Server vor der Trennung */
+  first_name?: string;
+  last_name?: string;
+  /** Grundrolle */
   level: Level;
+  /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
+  extra_roles?: Level[];
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
   /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
@@ -524,7 +558,7 @@ export interface DocumentsResponse {
 }
 
 /** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
-async function encodeFile(file: File): Promise<{ name: string; data: string }> {
+export async function encodeFile(file: File): Promise<{ name: string; data: string }> {
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
@@ -655,6 +689,8 @@ export interface Promotion extends Required<Omit<RankStatus, 'rank'>> {
 export interface CreatedUser {
   id: number;
   name: string;
+  first_name?: string;
+  last_name?: string;
   username: string;
   email: string;
   level: Level;
@@ -667,8 +703,13 @@ export interface CreatedUser {
 /** Ergebnis je Person beim Anlegen mehrerer (Issue #24): angelegt oder mit Grund nicht. */
 export type BulkResult = CreatedUser | { name: string; username: string; error: string };
 
-export interface NewPerson {
-  name: string;
+/** Vor- und Nachname; nur der Vorname ist Pflicht. */
+export interface PersonName {
+  first_name: string;
+  last_name: string;
+}
+
+export interface NewPerson extends PersonName {
   username?: string;
   email?: string;
   initial_points?: number;
@@ -678,7 +719,7 @@ export interface NewPerson {
   birthday?: string;
 }
 
-export interface AccountProfile {
+export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
@@ -761,10 +802,13 @@ async function requestFull<T>(
         Accept: 'application/json',
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
+        ...(previewRole() ? { [PREVIEW_HEADER]: previewRole()! } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    if (!path.startsWith('/reports')) noteError('Keine Verbindung zum Server');
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
@@ -785,9 +829,36 @@ async function requestFull<T>(
     applyMaintenance({ on: true, reason: String(data.reason ?? ''), since: config.maintenance?.since ?? 0 });
   }
   if (!res.ok) {
-    throw new ApiError(data?.message ?? `Fehler ${res.status}`, res.status, data?.code ?? '');
+    const message: string = data?.message ?? `Fehler ${res.status}`;
+    // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
+    if (!path.startsWith('/reports')) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
+    throw new ApiError(message, res.status, data?.code ?? '');
   }
   return { data: data as T, headers: res.headers };
+}
+
+/**
+ * Vorschau „App als Rolle ansehen“ (Issue #63) vor dem Start der App: Ist in diesem Tab eine gewählt, die Konfiguration
+ * mit den Rechten der Rolle holen und übernehmen (die mit der Seite gelieferte ist die des Admins). Bestätigt der Server
+ * sie nicht (kein Admin mehr, Rolle gelöscht, offline), endet die Vorschau; zurück kommt dann ein Hinweis.
+ */
+export async function preparePreview(): Promise<string | null> {
+  if (!previewRole() || !config) return null;
+  try {
+    const next = await request<AppConfig>('GET', '/config');
+    if (!next.preview) {
+      stopPreview();
+      return 'Die Vorschau wurde beendet.';
+    }
+    // Bereiche im selben Objekt ändern: Teile der App halten es fest (z. B. App.tsx).
+    const { features, ...rest } = next;
+    Object.assign(config.features, features);
+    Object.assign(config, rest);
+    return null;
+  } catch {
+    stopPreview();
+    return 'Die Vorschau braucht eine Internetverbindung und wurde beendet.';
+  }
 }
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, string>): Promise<T> {
@@ -831,7 +902,10 @@ export const api = {
     }),
   /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
-  setRole: (id: number, level: Level) => request<{ id: number; level: Level }>('PATCH', `/members/${id}/role`, { level }),
+  setRole: (id: number, level: Level) =>
+    request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
+  setExtraRoles: (id: number, extra_roles: Level[]) =>
+    request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { extra_roles }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
   resetPassword: (id: number) => request<{ password: string }>('POST', `/members/${id}/password`),
   /** Ändert das eigene Passwort; danach gilt eine neue Sitzung, daher Token erneuern. */
@@ -841,19 +915,20 @@ export const api = {
   },
   createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  updateAccount: (id: number, data: { name?: string; email?: string; username?: string }) =>
+  updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
-  createUser: (data: {
-    name: string;
-    username?: string;
-    email?: string;
-    level?: 'member' | 'candidate';
-    initial_points?: number;
-    initial_points_date?: string;
-    rank_id?: number;
-    birthday?: string;
-  }) => request<CreatedUser>('POST', '/users', data),
+  createUser: (
+    data: PersonName & {
+      username?: string;
+      email?: string;
+      level?: 'member' | 'candidate';
+      initial_points?: number;
+      initial_points_date?: string;
+      rank_id?: number;
+      birthday?: string;
+    },
+  ) => request<CreatedUser>('POST', '/users', data),
 
   // Dienstgrade (Issue #9)
   ranks: (all = false) => request<Rank[]>('GET', '/ranks', undefined, all ? { all: '1' } : undefined),
@@ -986,6 +1061,8 @@ export const api = {
       '/admin/gallery/sync',
       { only_process: onlyProcess },
     ),
+  galleryFailed: () => request<{ photos: FailedPhoto[]; total: number }>('GET', '/admin/gallery/failed'),
+  retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
@@ -1025,7 +1102,36 @@ export const api = {
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
+  setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
+
+  // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
+  reportForm: () => request<ReportForm>('GET', '/reports/form'),
+  sendReport: (data: ReportInput) => request<{ queued: boolean }>('POST', '/reports', data),
 };
+
+/** Formular „Fehler melden“: Zeitmarke (Zeitfalle) und die Angaben, die der Server beifügt. */
+export interface ReportForm {
+  token: string;
+  /** Frühestens so viele Sekunden nach dem Öffnen absendbar */
+  minSeconds: number;
+  /** Höchstgröße des Bildschirmfotos in Bytes */
+  maxBytes: number;
+  details: { version: string; role: string };
+}
+
+export interface ReportInput {
+  token: string;
+  consent: boolean;
+  description: string;
+  expected?: string;
+  page: string;
+  userAgent: string;
+  lastError?: string | null;
+  includeName?: boolean;
+  screenshot?: { type: string; data: string } | null;
+  /** Verstecktes Feld gegen Programme (bleibt leer) */
+  website?: string;
+}
 
 export type PushType = 'board' | 'polls' | 'birthdays' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
 
@@ -1055,6 +1161,8 @@ export interface PushAdmin {
   guests: number;
   queued: number;
   reminderHour: number;
+  /** Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage */
+  birthdays: { enabled: boolean; hour: number } | null;
 }
 
 const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;
@@ -1134,9 +1242,21 @@ export interface AdminSettings {
     oauth_email: string;
     /** Darf der Google-Zugang auch den Kalender lesen (OAuth mit calendar.readonly bzw. Dienstkonto)? */
     calendar_access: boolean;
-    status: { albums?: number; photos?: number; pending?: number; last_sync?: number; error?: string };
+    status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;
+}
+
+/** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
+export interface FailedPhoto {
+  id: number;
+  name: string;
+  /** „Jahr · Album“ */
+  album: string;
+  intern: boolean;
+  error: string;
+  attempts: number;
+  drive_url: string;
 }
 
 export interface AdminSettingsInput {

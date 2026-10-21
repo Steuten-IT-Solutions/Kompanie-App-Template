@@ -9,7 +9,8 @@
 # Umgebung: REPO (Organisation/Name), KOMPANIE_SHA (Commit des Kompanie-Repos), CONFIG (dessen kompanie.json),
 #   DIST (gebaute Oberfläche), BRAND (Ordner mit brand.json, theme.css, logo.png, favicon.png),
 #   SCREENSHOTS (Ordner mit PNGs, optional), GH_TOKEN (Schreibrecht auf das Kompanie-Repo), KOMPANIE_SIGNING_KEY,
-#   optional STATUS_URL (Empfang der Statusmeldungen, https://…) und SUPPORT (Kontakt für Hilfe).
+#   optional STATUS_URL (Empfang der Statusmeldungen, https://…), REPORT_URL (Empfang der Fehlermeldungen, https://…)
+#   und SUPPORT (Kontakt für Hilfe).
 #   Für Tests: GIT_REMOTE (statt GitHub), GH (Befehl statt gh), STABLE_CORE (statt der Datei), TRUST_SIGNING_KEY=1.
 #
 # Ablauf und Wiederholbarkeit: Das Release entsteht als Entwurf (unsichtbar) und wird erst veröffentlicht,
@@ -96,7 +97,7 @@ if [ -n "$PUBLISHED" ]; then
   exit 1
 fi
 CODE="$(php "$ROOT/scripts/package.php" --code-hash)"
-CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$REPO" --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}" "${TRUST[@]}")"
+CONFIG_HASH="$(php "$ROOT/scripts/package.php" --config-hash --kompanie="$REPO" --status-url="${STATUS_URL:-}" --report-url="${REPORT_URL:-}" --support="${SUPPORT:-}" "${TRUST[@]}")"
 KNOWN="$(updates --find="$KOMPANIE_SHA" --core-code="$CODE" --config-hash="$CONFIG_HASH")"
 if [ -n "$KNOWN" ]; then
   read -r KNOWN_VERSION KNOWN_CHANNEL <<< "$KNOWN"
@@ -113,7 +114,7 @@ BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}/"
 
 php "$ROOT/scripts/package.php" --config="$CONFIG" --dist="$DIST" --brand="$BRAND/brand.json" --version="$VERSION" \
   --out="$WORK/release" --kompanie="$REPO" --kompanie-commit="$KOMPANIE_SHA" --require-signature "${TRUST[@]}" \
-  --status-url="${STATUS_URL:-}" --support="${SUPPORT:-}"
+  --status-url="${STATUS_URL:-}" --report-url="${REPORT_URL:-}" --support="${SUPPORT:-}"
 # Branding vor dem Anlegen des Releases prüfen (download-page.php lehnt fremdes theme.css ab).
 php "$ROOT/scripts/download-page.php" --out="$WORK/brand-check" --brand="$BRAND" > /dev/null
 FILES=("$WORK/release/kompanie-app-wordpress.zip" "$WORK/release/kompanie-app-standalone.zip" "$WORK/release/release.json" "$WORK/release/install.php")

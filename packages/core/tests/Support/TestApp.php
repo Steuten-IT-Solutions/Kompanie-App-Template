@@ -35,7 +35,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log', 'bug_reports'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -75,7 +75,7 @@ final class TestApp
             config: new KompanieConfig($config),
             packageConfig: $packageConfig,
         );
-        $users->capabilities = static fn (string $role): array => $app->roles()->capabilities($role);
+        $users->capabilities = static fn (string $role, int $id): array => $app->roles()->capabilitiesFor($id, $role);
         $app->upgrade();
         if ($features !== false) {
             $app->features()->update($features ?? array_fill_keys(Features::keys(), true));

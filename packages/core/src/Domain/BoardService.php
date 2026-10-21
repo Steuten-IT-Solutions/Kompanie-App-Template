@@ -76,7 +76,9 @@ final class BoardService
 
     /**
      * Text ändern, solange die Nachricht gilt; die Ablaufzeit bleibt. Unveränderter Text ändert nichts (auch nicht
-     * updated_at: Wer sie auf dem Gerät ausgeblendet hat, bekommt sie dann nicht erneut angezeigt).
+     * updated_at: Wer sie auf dem Gerät ausgeblendet hat, bekommt sie dann nicht erneut angezeigt). Geänderter Text
+     * bekommt immer ein späteres updated_at als vorher, auch innerhalb derselben Sekunde (Issue #68): Ausgeblendet
+     * merkt sich die App die Fassung über updated_at.
      *
      * @return BoardItem
      */
@@ -85,7 +87,11 @@ final class BoardService
         $message = $this->active($id);
         $body = self::validText($text);
         if ($body !== $message['body']) {
-            $this->repository()->update($id, $body, $this->app->time()->nowUtc());
+            $now = $this->app->time()->nowUtc();
+            if ($now <= $message['updated_at']) {
+                $now = gmdate('Y-m-d H:i:s', (int) strtotime($message['updated_at'] . ' UTC') + 1);
+            }
+            $this->repository()->update($id, $body, $now);
         }
         return $this->one($id);
     }

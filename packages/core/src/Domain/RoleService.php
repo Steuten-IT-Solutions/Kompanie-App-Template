@@ -11,6 +11,7 @@ use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Port\UserDirectory;
+use KompanieApp\Core\Storage\MemberRoleRepository;
 
 /**
  * Rollen der App: Bezeichnung, Rechte und Punktefaktor – die einzige Stelle, die das sagt (Issue #28).
@@ -20,10 +21,15 @@ use KompanieApp\Core\Port\UserDirectory;
  * Bereich ein, der Rechte braucht, kommt dessen Standardrolle dazu (Domain\Features, z. B. „Punkte
  * verwalten“); schaltet er ihn aus, verschwindet sie wieder, wenn ihr niemand zugeordnet ist.
  * Gespeichert als eine Einstellung: Die Einstellungen lädt jede Anfrage ohnehin auf einmal, die Rechte
- * eines Benutzers kosten so keine eigene Abfrage.
+ * einer Rolle kosten so keine eigene Abfrage (die Zusatzrollen aller Personen zusammen eine, siehe capabilitiesFor).
  *
- * Eine Person hat genau eine Rolle. Der Punktefaktor (z. B. 0,5 für junge Mitglieder) gilt beim
- * Buchen und wird mit dem Eintrag gespeichert; eine spätere Änderung ändert alte Einträge nicht.
+ * Eine Person hat genau eine Grundrolle (Standalone users.level, WordPress Benutzer-Option) und beliebig viele
+ * Zusatzrollen (Issue #66, Tabelle member_roles, Storage\MemberRoleRepository). Ihre Rechte sind die Vereinigung
+ * aller ihrer Rollen (capabilitiesFor, die einzige Stelle, die das ausrechnet). Zusatzrollen sind nur eigene Rollen
+ * (nicht Gast, Anwärter, Mitglied, Admin) und wirken nur, solange die Grundrolle den Mitgliederbereich hat: Ob jemand
+ * Mitglied, Anwärter oder Gast ist, entscheidet allein die Grundrolle. Der Punktefaktor (z. B. 0,5 für junge
+ * Mitglieder) ist der kleinste aller Rollen der Person; er gilt beim Buchen und wird mit dem Eintrag gespeichert, eine
+ * spätere Änderung ändert alte Einträge nicht.
  */
 final class RoleService
 {
@@ -37,10 +43,15 @@ final class RoleService
     /** @var array<string, array{key: string, label: string, capabilities: string[], points_factor: float}>|null */
     private ?array $roles = null;
 
+    /** @var array<int, list<string>>|null Zusatzrollen je Person, einmal je Anfrage geladen */
+    private ?array $extra = null;
+
     public function __construct(
         private readonly Settings $settings,
         private readonly KompanieConfig $config,
         private readonly UserDirectory $users,
+        private readonly ?MemberRoleRepository $memberRoles = null,
+        private readonly ?Time $time = null,
     ) {
     }
 
@@ -111,14 +122,128 @@ final class RoleService
     }
 
     /**
-     * Für /config: Schlüssel, Bezeichnung und Punktefaktor (die Bezeichnungen braucht die App überall).
+     * Rechte einer Person: die ihrer Grundrolle und aller Zusatzrollen zusammen (Issue #66). Die einzige Stelle, die die
+     * Rechte einer Person ausrechnet (die Adapter rufen sie über ihre Closure auf). Die Vorschau „App als Rolle ansehen“
+     * (Issue #63, Auth\Preview) ersetzt dagegen die angemeldete Person durch eine mit genau einer Rolle (capabilities()). Die Zusatzrollen kosten für alle Benutzer einer Anfrage zusammen eine
+     * Abfrage, und nur, wenn die Grundrolle den Mitgliederbereich hat.
      *
-     * @return array<int, array{key: string, label: string, points_factor: float}>
+     * @return Capability[]
+     */
+    public function capabilitiesFor(int $userId, string $baseRole): array
+    {
+        $caps = $this->capabilities($baseRole);
+        foreach ($this->extraRoles($userId, $baseRole) as $key) {
+            foreach ($this->capabilities($key) as $cap) {
+                if (!in_array($cap, $caps, true)) {
+                    $caps[] = $cap;
+                }
+            }
+        }
+        return $caps;
+    }
+
+    /** Punktefaktor einer Person: der kleinste ihrer Rollen (Grundrolle und Zusatzrollen, Entscheidung zu Issue #66). */
+    public function pointsFactorFor(int $userId, string $baseRole): float
+    {
+        $factor = $this->pointsFactor($baseRole);
+        foreach ($this->extraRoles($userId, $baseRole) as $key) {
+            $factor = min($factor, $this->pointsFactor($key));
+        }
+        return $factor;
+    }
+
+    /**
+     * Wirksame Zusatzrollen einer Person, in der Reihenfolge der Rollen: nur bestehende eigene Rollen und nur, wenn die
+     * Grundrolle den Mitgliederbereich hat (Admins haben ohnehin alle Rechte). Gespeicherte, die nicht wirken (z. B. nach
+     * einem Wechsel der Grundrolle im WP-Backend), bleiben unberücksichtigt.
+     *
+     * @return list<string>
+     */
+    public function extraRoles(int $userId, string $baseRole): array
+    {
+        if (!$this->allowsExtraRoles($baseRole)) {
+            return [];
+        }
+        $saved = $this->assignments()[$userId] ?? [];
+        if ($saved === []) {
+            return [];
+        }
+        $out = [];
+        foreach (array_keys($this->all()) as $key) {
+            if ($key !== $baseRole && self::canBeExtra($key) && in_array($key, $saved, true)) {
+                $out[] = $key;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Wirksame Zusatzrollen einer Person (wie extraRoles).
+     *
+     * @return list<string>
+     */
+    public function extraRolesOf(User $user): array
+    {
+        // Vorschau (Issue #63): genau die gewählte Rolle, nicht die gespeicherten Zusatzrollen des Admin-Kontos.
+        return $user->preview ? [] : $this->extraRoles($user->id, $user->role);
+    }
+
+    /** Kann eine Person mit dieser Grundrolle Zusatzrollen haben? Nur mit Mitgliederbereich und nicht als Admin. */
+    public function allowsExtraRoles(string $baseRole): bool
+    {
+        return $baseRole !== Roles::ADMIN && in_array(Capability::Member, $this->capabilities($baseRole), true);
+    }
+
+    /**
+     * Taugt die Rolle als Zusatzrolle? Nur eigene Rollen (auch die Standardrollen der Bereiche und frühere feste wie
+     * Verwalter): Gast, Anwärter, Mitglied und Admin bestimmen, wer überhaupt zur Kompanie gehört, und sind deshalb nur
+     * Grundrolle. Admin ginge auch sonst nicht: Er hat manage_settings, das keine andere Rolle vergeben kann.
+     */
+    public static function canBeExtra(string $key): bool
+    {
+        return !Roles::isSystem($key);
+    }
+
+    /**
+     * Zusatzrollen einer Person ersetzen (geprüft hat Domain\MemberService). Leere Liste: keine mehr.
+     *
+     * @param list<string> $keys
+     */
+    public function setExtraRoles(int $userId, array $keys): void
+    {
+        if ($this->memberRoles === null) {
+            throw ApiError::invalid('Zusatzrollen gibt es hier nicht.');
+        }
+        $current = $this->assignments()[$userId] ?? [];
+        $keys = array_values(array_unique($keys));
+        $this->memberRoles->replace($userId, $current, $keys, $this->time?->nowUtc() ?? gmdate('Y-m-d H:i:s'));
+        if ($keys === []) {
+            unset($this->extra[$userId]);
+        } else {
+            $this->extra[$userId] = $keys;
+        }
+    }
+
+    /**
+     * Gespeicherte Zusatzrollen aller Personen (eine Abfrage, danach aus dem Zwischenspeicher dieser Anfrage).
+     *
+     * @return array<int, list<string>>
+     */
+    private function assignments(): array
+    {
+        return $this->extra ??= $this->memberRoles?->all() ?? [];
+    }
+
+    /**
+     * Für /config: Schlüssel, Bezeichnung, Punktefaktor (die Bezeichnungen braucht die App überall) und ob die Rolle als
+     * Zusatzrolle taugt (Issue #66).
+     *
+     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool}>
      */
     public function publicList(): array
     {
         return array_values(array_map(
-            static fn (array $r): array => ['key' => $r['key'], 'label' => $r['label'], 'points_factor' => $r['points_factor']],
+            static fn (array $r): array => ['key' => $r['key'], 'label' => $r['label'], 'points_factor' => $r['points_factor'], 'extra' => self::canBeExtra($r['key'])],
             $this->all(),
         ));
     }
@@ -130,9 +255,14 @@ final class RoleService
      */
     public function describe(): array
     {
+        // Personen je Rolle: als Grundrolle und als Zusatzrolle (wer beides nicht haben kann, zählt einmal).
         $counts = [];
+        $extra = [];
         foreach ($this->users->list(true) as $u) {
             $counts[$u->role] = ($counts[$u->role] ?? 0) + 1;
+            foreach ($this->extraRolesOf($u) as $key) {
+                $extra[$key] = ($extra[$key] ?? 0) + 1;
+            }
         }
         $out = [];
         foreach ($this->all() as $key => $r) {
@@ -141,7 +271,9 @@ final class RoleService
                 'label' => $r['label'],
                 'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->granted($key)),
                 'points_factor' => $r['points_factor'],
-                'users' => $counts[$key] ?? 0,
+                'users' => ($counts[$key] ?? 0) + ($extra[$key] ?? 0),
+                // Davon als Zusatzrolle (Issue #66)
+                'extra_users' => $extra[$key] ?? 0,
                 'system' => Roles::isSystem($key),
                 'deletable' => !Roles::isSystem($key),
             ];
@@ -202,10 +334,13 @@ final class RoleService
             return;
         }
         foreach ($this->users->list(true) as $u) {
-            if ($u->role === $key) {
+            if ($u->role === $key || in_array($key, $this->extraRolesOf($u), true)) {
                 return;
             }
         }
+        // Zuordnungen, die nicht wirken, mit entfernen: Der Schlüssel des Bereichs kommt beim Einschalten wieder.
+        $this->memberRoles?->removeRole($key);
+        $this->extra = null;
         unset($roles[$key]);
         $this->save($roles);
     }
@@ -260,8 +395,9 @@ final class RoleService
             $role['capabilities'] = self::validCapabilities($in['capabilities']);
         }
         if (array_key_exists('points_factor', $in)) {
-            if ($key === Roles::GUEST || $key === Roles::ADMIN) {
-                throw ApiError::invalid('Gast und Admin haben keinen eigenen Punktefaktor.');
+            // Punkte bekommen nur Personen mit Mitgliederbereich; Admins zählen immer voll.
+            if ($key === Roles::GUEST || $key === Roles::CANDIDATE || $key === Roles::ADMIN) {
+                throw ApiError::invalid('Gast, Anwärter und Admin haben keinen eigenen Punktefaktor.');
             }
             $role['points_factor'] = self::validFactor($in['points_factor']);
         }
@@ -271,7 +407,9 @@ final class RoleService
     }
 
     /**
-     * Löscht eine Rolle. Sind ihr noch Personen zugeordnet, bekommen sie $replacement; ohne Ersatz → 400.
+     * Löscht eine Rolle. Sind ihr noch Personen zugeordnet (als Grundrolle oder als Zusatzrolle), bekommen sie
+     * $replacement; ohne Ersatz → 400. Als Zusatzrolle wird sie durch den Ersatz ersetzt, wenn der als Zusatzrolle taugt
+     * (eine eigene Rolle, die nicht schon die Grundrolle der Person ist); sonst fällt sie dort einfach weg.
      */
     public function delete(string $key, ?string $replacement): void
     {
@@ -282,10 +420,12 @@ final class RoleService
         if (Roles::isSystem($key)) {
             throw ApiError::invalid('Diese Rolle lässt sich nicht löschen.');
         }
-        $assigned = array_filter($this->users->list(true), static fn (User $u): bool => $u->role === $key);
-        if ($assigned !== []) {
+        $users = $this->users->list(true);
+        $assigned = array_filter($users, static fn (User $u): bool => $u->role === $key);
+        $extra = array_filter($users, fn (User $u): bool => in_array($key, $this->extraRolesOf($u), true));
+        if ($assigned !== [] || $extra !== []) {
             if ($replacement === null || $replacement === '') {
-                throw ApiError::invalid(sprintf('Dieser Rolle sind noch %d Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', count($assigned)));
+                throw ApiError::invalid(sprintf('Dieser Rolle sind noch %d Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', count($assigned) + count($extra)));
             }
             if ($replacement === $key || !isset($roles[$replacement]) || $replacement === Roles::ADMIN) {
                 throw ApiError::invalid('Ungültige Ersatzrolle.');
@@ -298,7 +438,17 @@ final class RoleService
                     error_log('Kompanie-App: Rolle von ' . $u->name . ' nicht geändert: ' . $e->getMessage());
                 }
             }
+            foreach ($extra as $u) {
+                $next = array_values(array_diff($this->assignments()[$u->id] ?? [], [$key]));
+                if (self::canBeExtra($replacement) && $replacement !== $u->role) {
+                    $next[] = $replacement;
+                }
+                $this->setExtraRoles($u->id, $next);
+            }
         }
+        // Auch Zuordnungen, die nicht wirken (z. B. bei Gästen), nicht stehen lassen.
+        $this->memberRoles?->removeRole($key);
+        $this->extra = null;
         unset($roles[$key]);
         $this->save($roles);
     }

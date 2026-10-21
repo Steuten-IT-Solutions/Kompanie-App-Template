@@ -1691,6 +1691,72 @@ fieldset.feature-list legend {
   margin-top: 18px;
 }
 
+/* Fehler melden (Issue #64) */
+.hilfe-melden {
+  margin-top: 18px;
+}
+.report-form .back {
+  align-self: flex-start;
+}
+.report-form .news-headline {
+  margin: 0;
+}
+/* Honeypot: für Menschen unsichtbar, auch für Screenreader (aria-hidden), nicht per Tab erreichbar */
+.report-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.report-shot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.report-shot img {
+  max-width: 120px;
+  max-height: 90px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  object-fit: contain;
+}
+.report-details {
+  border-left: 4px solid var(--accent);
+  padding: 4px 12px;
+}
+.report-details h3 {
+  font-size: 0.95rem;
+  margin: 6px 0;
+}
+.report-details dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  font-size: 0.85rem;
+}
+.report-details dt {
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.report-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.report-consent {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+.report-consent input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.report-done {
+  padding: 16px;
+}
+
 /* Dienstgrade: eigener Dienstgrad als Karte mit Akzentlinie und Fortschrittsbalken */
 .rank-card {
   padding: 16px 18px;
@@ -2077,6 +2143,16 @@ fieldset.feature-list legend {
 .doc-sort {
   margin: 0 0 6px;
 }
+.member-sort {
+  margin: -4px 0 14px;
+}
+.member-sort-dir {
+  flex: 0 0 auto;
+}
+.member-sort-dir .btn {
+  min-height: 46px;
+  white-space: nowrap;
+}
 .doc-group + .doc-group {
   margin-top: 6px;
 }
@@ -2271,6 +2347,52 @@ fieldset.feature-list legend {
   color: var(--danger-surface);
 }
 
+/* Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit der Kopfzeile stehen bleibend */
+.preview-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+}
+.preview-sticky .topbar {
+  position: static;
+  padding-top: 12px;
+}
+.preview-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  background: #2e2a6b;
+  color: #ffffff;
+  border-bottom: 3px solid #f2c94c;
+  font-size: 0.92rem;
+}
+.preview-banner .btn {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #2e2a6b;
+}
+.role-preview {
+  margin-top: 16px;
+}
+/* Text und Knöpfe teilen sich die Zeile nur, wenn genug Platz ist;
+   auf dem Handy rutschen die Knöpfe unter den Text. */
+.role-list .role-item.row {
+  flex-wrap: wrap;
+}
+.role-list .role-item .row-main {
+  flex: 1 1 14rem;
+}
+.role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
 /* ------------------------------------------------------------------ */
 /* Schwarzes Brett (Issue #5)                                          */
 /* ------------------------------------------------------------------ */
@@ -2328,10 +2450,20 @@ fieldset.feature-list legend {
   justify-content: space-between;
   gap: 4px 12px;
 }
-.board-banner-foot .btn-link {
+.board-banner-foot .btn-link,
+.board-banner-collapsed .btn-link {
   padding: 6px 0;
   font-size: 0.85rem;
   text-decoration: underline;
+}
+.board-banner-collapsed {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0 12px;
+  padding: 2px 16px;
+  font-size: 0.85rem;
 }
 .board-page-title {
   margin: 18px 0 10px;
@@ -2735,4 +2867,32 @@ fieldset.feature-list legend {
   .inventory-history {
     max-width: 760px;
   }
+}
+
+/* Zusatzrollen (Issue #66): Filter der Mitgliederliste, Ankreuzen im Mitglied */
+.role-filter {
+  width: 100%;
+  margin: 0 0 14px;
+}
+.extra-roles {
+  border: 0;
+  padding: 0;
+}
+.extra-roles .toggle {
+  margin-bottom: 8px;
+}
+
+/* Einstellungen → Galerie: Bilder, die sich nicht laden ließen */
+.gallery-failed {
+  margin-top: 0.75rem;
+}
+.gallery-failed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+.gallery-failed-list li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
 }

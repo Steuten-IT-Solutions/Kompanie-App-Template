@@ -91,7 +91,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const badgeFor = useRef<number | null>(null);
   const points = ranksUsePoints();
   // Schwellen immer pflegbar (gespeichert und geprüft auch ohne Punkte); sie wirken nur zusammen mit Punkten.
-  const thresholdLabel = points ? 'Punkteschwelle' : `Punkteschwelle (wirkt nur mit ${sec.points})`;
+  const thresholdLabel = points ? `${sec.points}schwelle` : `${sec.points}schwelle (wirkt nur mit ${sec.points})`;
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -163,10 +163,14 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
       <p className="muted small">
         Vom niedrigsten zum höchsten {rank}.{' '}
         {points
-          ? `Mit Punkteschwelle: befördern erst ab der Schwelle, degradieren nur darunter. Ohne Schwelle frei.`
-          : `Befördern und degradieren geht frei; mit dem Bereich ${sec.points} kommen Punkteschwellen dazu.`}
+          ? `Mit ${sec.points}schwelle: befördern erst ab der Schwelle, degradieren nur darunter. Ohne Schwelle frei.`
+          : `Befördern und degradieren geht frei; mit dem Bereich ${sec.points} kommen ${sec.points}schwellen dazu.`}
       </p>
-      {missing && <p className="small">Noch nicht alle {sec.ranks} haben eine Punkteschwelle; für diese gelten keine Punkteregeln.</p>}
+      {missing && (
+        <p className="small">
+          Noch nicht alle {sec.ranks} haben eine {sec.points}schwelle; für diese gelten keine Regeln zu {sec.points}.
+        </p>
+      )}
       {formError && (
         <p className="form-error" role="alert">
           {formError}

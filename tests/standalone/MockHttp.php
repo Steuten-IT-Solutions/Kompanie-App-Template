@@ -17,6 +17,11 @@ final class MockHttp implements ExtendedHttpClient
 {
     use SequentialHttp;
 
+    /** Simulierter Empfänger der Fehlermeldungen (Issue #64): nimmt jede an und legt sie im Datenverzeichnis ab. */
+    public const REPORT_URL = 'https://meldungen.test/reports';
+    /** Ergänzung der update.json für die Testinstallation (Kernel, $packageOverride) */
+    public const PACKAGE = ['reportUrl' => self::REPORT_URL, 'kompanie' => 'org/kompanie-test'];
+
     public function request(string $method, string $url, array $headers = [], ?string $body = null, int $timeoutSeconds = 15): array
     {
         $ok = static fn (string|array $b, string $type = 'application/json'): array => ['status' => 200, 'headers' => ['content-type' => $type], 'body' => is_string($b) ? $b : (string) json_encode($b)];
@@ -35,6 +40,13 @@ final class MockHttp implements ExtendedHttpClient
         }
         if (str_starts_with($url, 'https://www.googleapis.com/drive/v3/about')) {
             return $ok(['user' => ['emailAddress' => 'kompanie@example.org']]);
+        }
+        if ($url === self::REPORT_URL) {
+            $dir = (string) getenv('KOMPANIE_DATA_DIR');
+            if ($dir !== '' && is_dir($dir)) {
+                file_put_contents($dir . '/mock-reports.jsonl', (string) $body . "\n", FILE_APPEND | LOCK_EX);
+            }
+            return ['status' => 201, 'headers' => ['content-type' => 'application/json'], 'body' => '{"ok":true}'];
         }
         if (str_starts_with($url, 'https://kalender.test/')) {
             return $ok(self::ics(), 'text/calendar');
