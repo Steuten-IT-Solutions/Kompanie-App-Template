@@ -35,7 +35,8 @@ async function loadOverview(): Promise<[AttendanceEvent[] | string, AttendanceSu
 }
 
 function Overview({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(loadOverview);
+  // Mit Schlüssel: Beim Zurückkehren aus einer Liste steht die Übersicht sofort da (statt „Lädt …“).
+  const { data, error, loading, reload } = useAsync(loadOverview, [], 'attendance-overview');
   const [showAll, setShowAll] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());

@@ -210,7 +210,8 @@ function ImageView({ doc }: { doc: DocumentInfo }) {
 }
 
 export default function Dokumente({ docId, onToast }: { docId?: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(api.documents);
+  // Mit Schlüssel: Beim Öffnen eines Dokuments und beim Zurückkehren steht die Liste sofort da (statt „Lädt …“).
+  const { data, error, loading, reload } = useAsync(api.documents, [], 'documents');
   const [offline, setOffline] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [sort, setSort] = useDocSort();
