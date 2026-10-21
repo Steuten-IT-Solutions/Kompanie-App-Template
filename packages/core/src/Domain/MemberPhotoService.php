@@ -18,7 +18,8 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
  *   gedreht, ohne Metadaten wie GPS) in 128 und 480 Pixeln an der längeren Kante, in der Datenbank
  *   (MemberPhotoRepository).
- * - Sehen: die Person selbst (Konto) und alle, die die Mitglieder in der Verwaltung sehen (VIEWERS). Ausgeliefert
+ * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
+ *   directory alle Mitglieder und Anwärter die Fotos der Personen in der Mitgliederliste (canSeeInDirectory). Ausgeliefert
  *   über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide Adapter gleich
  *   antworten.
  */
@@ -173,6 +174,19 @@ final class MemberPhotoService
         return false;
     }
 
+    /**
+     * Mitgliederliste für Mitglieder und Anwärter (Bereich directory): Wer sie sieht, sieht die Fotos der Personen darin,
+     * nicht die von Gästen.
+     */
+    private function canSeeInDirectory(User $viewer, int $userId): bool
+    {
+        if (!$this->app->features()->enabled('directory') || !($viewer->can(Capability::Member) || $viewer->can(Capability::Calendar))) {
+            return false;
+        }
+        $target = $this->app->users->find($userId);
+        return $target !== null && MemberService::inDirectory($target);
+    }
+
     /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */
     public function canEdit(User $actor, int $userId): bool
     {
@@ -205,7 +219,7 @@ final class MemberPhotoService
         if ($viewer === null) {
             return $deny(401);
         }
-        if ($viewer->id !== $userId && !self::canSeeOthers($viewer)) {
+        if ($viewer->id !== $userId && !self::canSeeOthers($viewer) && !$this->canSeeInDirectory($viewer, $userId)) {
             return $deny(403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;

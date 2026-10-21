@@ -39,7 +39,7 @@ Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mit
 
 Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoauswahl. Die App verkleinert das Foto schon auf dem Gerät, der Server speichert es in zwei kleinen Größen und ohne Angaben wie den Aufnahmeort. Die App zeigt das Foto rund und schneidet es dafür zu: in der Breite aus der Mitte, bei Hochformat vom oberen Rand aus. Am besten wirkt deshalb ein Porträt mit dem Kopf mittig im oberen Teil des Bildes.
 
-Sehen kann das Foto nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Andere {rolle.member} sehen es nicht. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
+Sehen kann das Foto nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Ist der Bereich **{bereich.directory}** eingeschaltet, sehen alle {rolle.member} und {rolle.candidate} die Fotos der {rolle.member} und {rolle.candidate} in der Liste unter **{bereich.directory}**; sonst sehen andere {rolle.member} es nicht. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
 
 ## {rolle.candidate} aufnehmen
 {rolle.candidate} nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen den internen Kalender, aber nicht den Mitgliederbereich. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Das geht nur von {rolle.candidate} zu {rolle.member}.

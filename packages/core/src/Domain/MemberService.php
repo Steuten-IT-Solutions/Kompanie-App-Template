@@ -85,6 +85,29 @@ final class MemberService
         return $out;
     }
 
+    /**
+     * Mitgliederliste für Mitglieder und Anwärter (Bereich directory): alle mit Mitgliederbereich oder internem
+     * Kalender, ohne Gäste und ohne Punkte, Strafen oder Rollen. Foto, Dienstgrad und Titel ergänzt die API.
+     *
+     * @return list<array{id: int, name: string, first_name: string, last_name: string}>
+     */
+    public function directory(): array
+    {
+        $out = [];
+        foreach ($this->users->list(false) as $u) {
+            if (self::inDirectory($u)) {
+                $out[] = ['id' => $u->id, 'name' => $u->name, 'first_name' => $u->firstName, 'last_name' => $u->lastName];
+            }
+        }
+        return $out;
+    }
+
+    /** Steht in der Mitgliederliste für Mitglieder und Anwärter (und darf sie sehen): Mitglied oder nur Kalender. */
+    public static function inDirectory(User $u): bool
+    {
+        return $u->isMember() || self::calendarOnly($u);
+    }
+
     /** @return array<string, mixed> */
     public function detail(int $id, ?User $viewer = null): array
     {

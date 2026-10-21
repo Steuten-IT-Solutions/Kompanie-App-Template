@@ -1,6 +1,9 @@
 import type { MemberSummary } from './api';
 
-/** Sortierung der Mitgliederliste in der Verwaltung. */
+/** Was die Sortierung braucht: Mitgliederliste der Verwaltung und die für alle (DirectoryEntry). */
+type Sortable = Pick<MemberSummary, 'id' | 'name' | 'first_name' | 'last_name'> & { points?: number | null };
+
+/** Sortierung der Mitgliederliste in der Verwaltung und der für alle. */
 export type MemberSort = 'last-name' | 'first-name' | 'points';
 
 /** Richtung: auf- oder absteigend (Namen A → Z bzw. Z → A, Punkte wenigste bzw. meiste zuerst). */
@@ -64,12 +67,12 @@ export function splitName(name: string): { first: string; last: string } {
   return { first: parts.join(' '), last };
 }
 
-function nameParts(m: MemberSummary): { first: string; last: string } {
+function nameParts(m: Sortable): { first: string; last: string } {
   return m.first_name !== undefined ? { first: m.first_name, last: m.last_name ?? '' } : splitName(m.name);
 }
 
 /** In der Liste: bei Sortierung nach Nachname „Nachname, Vorname“, sonst der Anzeigename. */
-export function listName(m: MemberSummary, sort: MemberSort): string {
+export function listName(m: Sortable, sort: MemberSort): string {
   const { first, last } = nameParts(m);
   return sort === 'last-name' && last !== '' ? `${last}, ${first}` : m.name;
 }
@@ -78,27 +81,27 @@ export function listName(m: MemberSummary, sort: MemberSort): string {
 const cmp = (a: string, b: string) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true });
 
 /** Ohne Nachnamen (z. B. Funktionskonto) zählt beim Nachnamen der Vorname. */
-const byLastName = (a: MemberSummary, b: MemberSummary) => {
+const byLastName = (a: Sortable, b: Sortable) => {
   const x = nameParts(a);
   const y = nameParts(b);
   return cmp(x.last || x.first, y.last || y.first) || cmp(x.first, y.first) || a.id - b.id;
 };
 
-const byFirstName = (a: MemberSummary, b: MemberSummary) => {
+const byFirstName = (a: Sortable, b: Sortable) => {
   const x = nameParts(a);
   const y = nameParts(b);
   return cmp(x.first, y.first) || cmp(x.last, y.last) || a.id - b.id;
 };
 
 /** Ohne sichtbare Punkte (null) zählen sie als 0. */
-const byPoints = (a: MemberSummary, b: MemberSummary) => (a.points ?? 0) - (b.points ?? 0);
+const byPoints = (a: Sortable, b: Sortable) => (a.points ?? 0) - (b.points ?? 0);
 
-export function sortMembers(members: MemberSummary[], { sort, dir }: MemberOrder): MemberSummary[] {
+export function sortMembers<T extends Sortable>(members: T[], { sort, dir }: MemberOrder): T[] {
   const sign = dir === 'asc' ? 1 : -1;
   // Namen kehren sich ganz um; bei gleichen Punkten bleibt es beim Nachnamen A → Z.
   const compare =
     sort === 'points'
-      ? (a: MemberSummary, b: MemberSummary) => sign * byPoints(a, b) || byLastName(a, b)
-      : (a: MemberSummary, b: MemberSummary) => sign * (sort === 'last-name' ? byLastName : byFirstName)(a, b);
+      ? (a: T, b: T) => sign * byPoints(a, b) || byLastName(a, b)
+      : (a: T, b: T) => sign * (sort === 'last-name' ? byLastName : byFirstName)(a, b);
   return [...members].sort(compare);
 }

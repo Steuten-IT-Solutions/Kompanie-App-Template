@@ -38,7 +38,8 @@ export type Feature =
   | 'board'
   | 'polls'
   | 'birthdays'
-  | 'inventory';
+  | 'inventory'
+  | 'directory';
 
 export interface AppUser {
   id: number;
@@ -336,6 +337,21 @@ export interface MemberSummary {
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
+}
+
+/** Eintrag der Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Name, Foto, Dienstgrad, Titel. */
+export interface DirectoryEntry {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  /** Foto (128 Pixel), null ohne */
+  photo_url: string | null;
+  /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */
+  rank_title?: string | null;
+  rank_badge_url?: string | null;
+  /** Titel (fehlen ohne Bereich Titel) */
+  titles?: TitleRef[];
 }
 
 export interface MemberDetail extends MemberSummary {
@@ -924,6 +940,7 @@ export const api = {
   updateCatalogItem: (id: number, data: Partial<Pick<CatalogItem, 'title' | 'points' | 'active' | 'sort'>>) =>
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
 
+  directory: () => request<DirectoryEntry[]>('GET', '/directory'),
   members: (all = false, candidates = false) =>
     request<MemberSummary[]>('GET', '/members', undefined, {
       ...(all ? { all: '1' } : {}),

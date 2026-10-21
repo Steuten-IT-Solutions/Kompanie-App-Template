@@ -38,8 +38,9 @@ const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
 const Brett = lazyView(() => import('./views/Brett'));
 const Umfragen = lazyView(() => import('./views/Umfragen'));
 const Inventar = lazyView(() => import('./views/Inventar'));
+const Mitglieder = lazyView(() => import('./views/Mitglieder'));
 
-type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'meins' | 'verwaltung';
+type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'mitglieder' | 'meins' | 'verwaltung';
 type View =
   | Tab
   | 'brett'
@@ -58,6 +59,7 @@ const VIEWS: View[] = [
   'news',
   'galerie',
   'dokumente',
+  'mitglieder',
   'meins',
   'verwaltung',
   'brett',
@@ -87,6 +89,7 @@ const tabLabels = (): Record<Tab, string> => ({
   news: sec.news,
   galerie: sec.gallery,
   dokumente: sec.documents,
+  mitglieder: sec.directory,
   meins: 'Meins',
   verwaltung: 'Verwaltung',
 });
@@ -120,6 +123,8 @@ function Icon({ name }: { name: Tab }) {
       'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
     dokumente:
       'M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 13v1.5h8V13H8zm0 3v1.5h8V16H8zm0-6v1.5h4V10H8z',
+    mitglieder:
+      'M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm8.5 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13c-3 0-7 1.5-7 4.5V20h14v-2.5C15 14.5 11 13 8 13zm8.5 0c-.6 0-1.3.1-2 .2 1.4 1 2.5 2.4 2.5 4.3V20h6v-2.5c0-3-3.9-4.5-6.5-4.5z',
     meins: 'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z',
     verwaltung:
       'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm-4 9.5c.8-1.6 2.3-2.5 4-2.5s3.2.9 4 2.5',
@@ -252,6 +257,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     news: !!features?.news,
     galerie: !!features?.gallery,
     dokumente: isMember() && !!features?.documents,
+    // Mitgliederliste für alle Mitglieder und Anwärter (der Mitgliederbereich enthält den Kalender).
+    mitglieder: !!features?.directory && (can('calendar') || isMember()),
     meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
     verwaltung: adminTabs().length > 0,
@@ -270,7 +277,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     hilfe: true,
   };
   // „Meins“ ganz rechts, die Verwaltung davor.
-  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
+  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'mitglieder', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
@@ -431,6 +438,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Dokumente docId={docId} onToast={showToast} />
               ))}
+            {tab === 'mitglieder' && <Mitglieder />}
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {adminView && <AdminNav active={adminView} />}

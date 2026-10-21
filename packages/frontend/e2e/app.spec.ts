@@ -355,6 +355,20 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 });
 
+test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte oder Rollen', async ({ page }) => {
+  await login(page, 'mitglied1');
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Mitglieder');
+  const list = page.locator('.directory .card-list');
+  await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+  await expect(list.locator('.member-row', { hasText: 'Verwalter' })).toBeVisible();
+  await expect(page.locator('.directory .member-counts')).toHaveText(/\d+ Personen/);
+  await expect(list).not.toContainText(/Punkte|offen/);
+  await page.getByLabel('Mitglied suchen').fill('mitglied2');
+  await expect(list.locator('.member-row')).toHaveCount(1);
+  await shot(page, '1-mitgliederliste');
+});
+
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
   await login(page, 'verwalter');
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();

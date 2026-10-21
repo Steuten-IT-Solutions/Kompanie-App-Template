@@ -192,6 +192,13 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "directory": {
+              "type": "string",
+              "default": "Mitglieder",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },

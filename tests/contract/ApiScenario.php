@@ -39,6 +39,7 @@ final class ApiScenario
             $this->polls();
             $this->birthdays();
             $this->inventory();
+            $this->directory();
             $this->accounts();
             $this->events();
             $this->push();
@@ -90,7 +91,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -958,6 +959,37 @@ final class ApiScenario
      * Geburtstage (Issue #1): eigener mit Schaltern, Pflege durch create_users (ohne die Schalter), nur Mitglieder sehen,
      * nie das Geburtsjahr, Konto löschen entfernt den Geburtstag, Bereich aus → 403.
      */
+    /** Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Namen, Fotos, Dienstgrade und Titel. */
+    private function directory(): void
+    {
+        $c = $this->c;
+        $c->section('Mitgliederliste für Mitglieder und Anwärter');
+        $admin = $this->user('kptest_liste_admin', 'admin');
+        $m = $this->user('kptest_liste_m', 'member');
+        $cand = $this->user('kptest_liste_anw', 'candidate');
+        $guest = $this->user('kptest_liste_gast', 'guest');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/directory')[0] === 401, 'GET /directory ohne Anmeldung → 401');
+        $this->d->actAs($guest);
+        $c->ok($this->req('GET', '/directory')[0] === 403, 'Gast-Konto: GET /directory → 403');
+        foreach ([$m => 'Mitglied', $cand => 'Anwärter'] as $who => $label) {
+            $this->d->actAs($who);
+            [$s, $d] = $this->req('GET', '/directory');
+            $ids = array_column((array) $d, 'id');
+            $c->ok($s === 200 && in_array($m, $ids, true) && in_array($cand, $ids, true) && !in_array($guest, $ids, true), "$label sieht Mitglieder und Anwärter, keine Gäste");
+        }
+        $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
+        $c->ok(is_string($entry['name'] ?? null) && array_key_exists('photo_url', $entry) && array_key_exists('rank_title', $entry) && is_array($entry['titles'] ?? null), 'Name, Foto, Dienstgrad und Titel');
+        $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['directory' => false]);
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', '/directory');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['directory' => true]);
+    }
+
     private function birthdays(): void
     {
         $c = $this->c;

@@ -290,6 +290,13 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - App: kein eigener Tab; Einstieg über *Mein Konto* → *Inventar öffnen* (`#/inventar`, wie Schwarzes Brett und Umfragen). Die Liste ist **nach Material gruppiert** (Entscheidung im Issue): Schlüssel ist die Bezeichnung ohne Unterschied in Groß- und Kleinschreibung, je Gruppe die Summe über alle Orte, je Einheit getrennt („12 Stück · 3 kg“). Aufgeklappt die Einträge je Ort mit −/+, *Umlagern*, *Bearbeiten*, *Verlauf* und *Löschen* (fragt nach einem Grund); Suche über Bezeichnung, Ort, Kategorie und Notiz. Verlauf je Eintrag (`#/inventar/verlauf/<id>`) und gesamt (`#/inventar/verlauf`); je 100 Einträge, „Ältere Einträge laden“ holt die nächste Seite über `before`.
 - Offen: Die Übernahme der Lanker Inventardaten (Lank #44) gehört wie die übrigen Daten ins Übernahme-Plugin (Abschnitt 15).
 
+### Mitgliederliste für alle
+
+- Bereich `directory` (Bezeichnung „Mitglieder“, `labels.sections.directory`; aus, nie automatisch eingeschaltet), **kein eigenes Recht und keine Standardrolle** (`role: null`).
+- `GET /directory` für alle mit `member` oder `calendar` (Mitglieder und Anwärter; Gäste 403, Bereich aus → 403 `feature_disabled`). Darin stehen dieselben Personen (`MemberService::inDirectory`: Mitgliederbereich oder nur Kalender), nie Gast-Konten. Je Person nur `id`, `name`, `first_name`, `last_name`, `photo_url`, mit Bereich Dienstgrade `rank_title`/`rank_badge_url`, mit Bereich Titel `titles`; keine Rollen, Punkte, Strafen oder Kontodaten. Feste Zahl von Abfragen (`QueryCountTest`).
+- Fotos: Mit dem Bereich liefert `MemberPhotoService::forDelivery` die Fotos der Personen in der Liste auch an alle Mitglieder und Anwärter aus, nicht die von Gästen.
+- App: eigener Tab *Mitglieder* (`#/mitglieder`) zwischen *Dokumente* und *Verwaltung*, mit Suche und Sortierung nach Nach- oder Vorname (gemerkt wie in der Verwaltung), ohne Seite je Person.
+
 ### Rechte und Rollen
 
 | Recht | Bedeutung |
@@ -543,7 +550,7 @@ Eine einzelne Datei, auf die Kompanie zugeschnitten (Repo-Name und Signaturschl�
 
 Beim ersten Öffnen durch einen Admin bietet die App den Assistenten an:
 
-1. **Bereiche wählen** (alle 14 aus `Domain\Features`: Termine, Kalender, News, Galerie, Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, Dokumente, Schwarzes Brett, Umfragen, Geburtstage, Inventar), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
+1. **Bereiche wählen** (alle 15 aus `Domain\Features`: Termine, Kalender, News, Galerie, Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, Dokumente, Schwarzes Brett, Umfragen, Geburtstage, Inventar, Mitglieder), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
 2. Google-Zugang („Mit Google verbinden“ oder Dienstkonto) beim ersten Schritt, der ihn braucht: Galerie, sonst Kalender (für Kalender-IDs)
 3. Kalender (nur wenn gewählt): Kalender-IDs über den Google-Zugang oder geheime iCal-Adresse (mit Anleitung, wo man sie in Google findet), Testabruf
 4. Galerie (nur wenn gewählt): Link zum Ordner, Abgleich mit Fortschritt

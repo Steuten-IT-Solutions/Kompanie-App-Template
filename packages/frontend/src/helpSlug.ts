@@ -34,6 +34,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'galerie';
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : 'dokumente';
+    case 'mitglieder':
+      return 'mitglieder';
     case 'meins':
       return (
         { punkte: 'meine-punkte', strafen: 'meine-strafen', dienstgrad: 'mein-dienstgrad', anwesenheit: 'meine-anwesenheit' }[
