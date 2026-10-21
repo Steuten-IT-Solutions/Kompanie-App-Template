@@ -360,8 +360,13 @@ try {
     $c->ok($d->send('GET', $monaUrl, $monaCookie + ['If-None-Match' => (string) ($own[2]['etag'] ?? '-')], null)[0] === 304, 'Foto: passender ETag → 304');
     $large = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=480', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
     $c->ok(($large[0] ?? 0) === 480 && ($large[1] ?? 0) === 320 && ($large['mime'] ?? '') === 'image/jpeg', 'Wer Mitglieder verwaltet, sieht das Foto; s=480 liefert 480 Pixel');
-    $c->ok($d->send('GET', $monaUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)], null)[0] === 403, 'Andere Mitglieder sehen das Foto nicht → 403');
+    // Mitgliederliste für alle (Bereich directory): an sehen andere Mitglieder das Foto, aus nicht.
+    $ottoCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)];
+    $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 200, 'Mit Mitgliederliste sehen andere Mitglieder das Foto');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
+    $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 403, 'Ohne Mitgliederliste sehen andere Mitglieder das Foto nicht → 403');
     $c->ok($d->send('GET', $monaUrl . '&vorschau=member', $cookie, null)[0] === 403, 'Vorschau als Mitglied: fremdes Foto → 403');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
     [$s] = $d->request('DELETE', '/members/' . $mona);
     $c->ok($s === 200 && $d->send('GET', $monaUrl, $cookie, null)[0] === 404, 'Konto gelöscht: Foto weg (404)');
 

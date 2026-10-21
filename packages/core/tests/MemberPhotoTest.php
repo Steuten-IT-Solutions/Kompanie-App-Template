@@ -150,7 +150,8 @@ final class MemberPhotoTest extends TestCase
         $deliver = fn (?int $viewer, mixed $v = null, mixed $s = '480'): array => $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $this->m, $v ?? $info['version'], $s);
 
         $this->assertSame(401, $deliver(null)['status']);
-        $this->assertSame(403, $deliver($other)['status'], 'andere Mitglieder sehen das Foto nicht');
+        $this->app->features()->update(['directory' => false]);
+        $this->assertSame(403, $deliver($other)['status'], 'ohne Mitgliederliste sehen andere Mitglieder das Foto nicht');
         $own = $deliver($this->m);
         $this->assertSame([200, 'image/jpeg', 'private, max-age=86400'], [$own['status'], $own['headers']['Content-Type'], $own['headers']['Cache-Control']]);
         $size = getimagesizefromstring($own['body'] ?? '');
@@ -160,6 +161,26 @@ final class MemberPhotoTest extends TestCase
         $this->assertSame('private, no-cache', $deliver($manager, 'alt')['headers']['Cache-Control'], 'veraltete Fassung jedes Mal prüfen');
         $this->assertSame(404, $deliver($manager, null, '64')['status'], 'unbekannte Größe');
         $this->assertSame(404, $photos->forDelivery($this->users->find($manager), $other, 'x', '128')['status'], 'ohne Foto');
+    }
+
+    public function testDirectoryShowsPhotosOfMembersAndCandidatesOnly(): void
+    {
+        $candidate = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $guest = $this->users->add('gast', Roles::GUEST);
+        foreach ([$this->m, $guest] as $id) {
+            $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);
+        }
+        $photos = $this->app->memberPhotos();
+        $deliver = function (int $viewer, int $owner) use ($photos): int {
+            $version = $photos->repository()->find($owner)['version'] ?? '';
+            return $photos->forDelivery($this->users->find($viewer), $owner, $version, '128')['status'];
+        };
+
+        $this->assertSame(200, $deliver($candidate, $this->m), 'Anwärter sieht das Foto eines Mitglieds');
+        $this->assertSame(403, $deliver($candidate, $guest), 'Gäste stehen nicht in der Liste: Foto bleibt verborgen');
+        $this->assertSame(403, $deliver($guest, $this->m), 'Gäste sehen die Liste nicht');
+        $this->app->features()->update(['directory' => false]);
+        $this->assertSame(403, $deliver($candidate, $this->m), 'Bereich aus');
     }
 
     public function testPhotoWhenCreatingAccounts(): void

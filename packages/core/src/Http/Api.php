@@ -293,6 +293,24 @@ final class Api
             + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
     }
 
+    /**
+     * Mitgliederliste für Mitglieder und Anwärter: Namen und Fotos, mit den Bereichen auch Dienstgrad (mit Abzeichen) und
+     * Titel. Keine Rollen, Punkte, Strafen oder Kontodaten.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function directory(): array
+    {
+        $a = $this->app;
+        $photos = $a->memberPhotos()->urls();
+        $ranks = $a->features()->enabled('ranks') ? $a->ranks()->assigned() : null;
+        $titles = $a->features()->enabled('titles') ? $a->titles()->byUser() : null;
+        return array_map(static fn (array $m): array => $m
+            + ['photo_url' => $photos[$m['id']] ?? null]
+            + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
+            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : []), $a->members()->directory());
+    }
+
     /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showRanks(): bool
     {
@@ -406,6 +424,7 @@ final class Api
         $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
         $denyPolls = 'Umfragen sind nur für Mitglieder.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
+        $denyDirectory = 'Die Mitgliederliste ist nur für Mitglieder und Anwärter.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = Cap::memberList();
@@ -645,6 +664,9 @@ final class Api
                 $a->attendance()->delete($r->id());
                 return ['deleted' => true];
             }, 'attendance', $denyRights),
+
+            // Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): nur Namen, Fotos, Dienstgrade und Titel
+            new Route('GET', '/directory', [Cap::Member, Cap::Calendar], fn () => $this->directory(), 'directory', $denyDirectory),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {

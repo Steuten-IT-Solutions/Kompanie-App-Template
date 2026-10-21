@@ -2421,6 +2421,12 @@ fieldset.feature-list legend {
   font-size: 0.64rem;
   letter-spacing: 0.02em;
 }
+/* Sieben Tabs (mit der Mitgliederliste): noch etwas kleiner und ohne Sperrung. */
+.tabbar button:first-child:nth-last-child(n + 7),
+.tabbar button:first-child:nth-last-child(n + 7) ~ button {
+  font-size: 0.58rem;
+  letter-spacing: 0;
+}
 @media (max-width: 380px) {
   .tabbar button {
     letter-spacing: 0.02em;

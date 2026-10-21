@@ -22,6 +22,7 @@ const ALL_FEATURES = [
   'polls',
   'birthdays',
   'inventory',
+  'directory',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -61,6 +62,7 @@ const PATHS = [
   ['dokumente'],
   ['dokumente', '5'],
   ['dokumente', 'verwalten'],
+  ['mitglieder'],
   ['meins'],
   ['meins', 'punkte'],
   ['meins', 'strafen'],
