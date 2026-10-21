@@ -1,6 +1,6 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import type { MemberSummary, PersonName } from './api';
-import { dataCache } from './dataCache';
+import { DATA_UPDATED, dataCache } from './dataCache';
 import { noteError } from './lastError';
 
 /**
@@ -63,6 +63,12 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   }, [...deps, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
+  // Der Service Worker hat im Hintergrund neue Daten geholt (Issue #108): neu laden, die Antwort kommt dann aus seinem
+  // Speicher.
+  useEffect(() => {
+    window.addEventListener(DATA_UPDATED, reload);
+    return () => window.removeEventListener(DATA_UPDATED, reload);
+  }, [reload]);
   return { data, error, loading, reload, setData, revision };
 }
 

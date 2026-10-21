@@ -10,6 +10,16 @@ export const MAX_ENTRIES = 200;
 const entries = new Map<string, unknown>();
 let generation = 0;
 
+/** Meldung „neue Daten“ (Service Worker, Issue #108): Ansichten laden neu. */
+export const DATA_UPDATED = 'kompanie-data-updated';
+let updateTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Neue Daten im Hintergrund angekommen: offene Ansichten neu laden (mehrere Meldungen kurz hintereinander gebündelt). */
+export function dataUpdated(): void {
+  clearTimeout(updateTimer);
+  updateTimer = setTimeout(() => window.dispatchEvent(new Event(DATA_UPDATED)), 100);
+}
+
 export const dataCache = {
   has: (key: string) => entries.has(key),
   get: <T>(key: string) => entries.get(key) as T,
