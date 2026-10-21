@@ -12,7 +12,7 @@ final class WpSettings implements Settings
     public const PREFIX = 'kompanie_app_';
 
     /** Große, selten gebrauchte Werte: nicht bei jedem Seitenaufruf laden. */
-    public const NO_AUTOLOAD = ['drive_service_account', 'drive_oauth', 'gallery_status'];
+    public const NO_AUTOLOAD = ['drive_service_account', 'drive_oauth', 'gallery_status', 'error_log'];
 
     public function get(string $key, mixed $default = null): mixed
     {

@@ -1,10 +1,11 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { api, config, type AdminStatus, type UpdateStatus } from '../api';
+import { api, config, type AdminStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
+import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
- * Zustimmung) und Datensicherung. Gilt für beide Varianten.
+ * Zustimmung), Fehlerprotokoll und Datensicherung. Gilt für beide Varianten.
  */
 /** Seiten „Zustand und Updates“ und „Datensicherung“ der Einstellungen. */
 export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
@@ -18,6 +19,7 @@ export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensic
       <StatusCard status={s} />
       {/* key: nach dem Neuladen mit dem neuen Stand neu aufbauen */}
       <Updates key={JSON.stringify([s.updates, s.statusReports.enabled])} status={s} onChanged={reload} onToast={onToast} />
+      <Fehlerprotokoll key={JSON.stringify(s.errorLog)} status={s} onToast={onToast} />
     </>
   );
 }
@@ -269,8 +271,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               }}
             />
             <span>
-              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen, schwere Fehler sofort (ohne Namen, Inhalte oder
-              Fehlertexte)
+              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen, schwere Fehler sofort, jeweils mit Fehlercode und
+              Ursache (z. B. „Kalender: HTTP 404“), ohne Namen, Inhalte oder Fehlertexte
             </span>
           </label>
           {reports && (
@@ -285,6 +287,113 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             {showPayload ? 'Inhalt ausblenden' : 'Was genau gesendet wird (Beispiel: Lebenszeichen)'}
           </button>
           {showPayload && <pre className="small payload">{JSON.stringify(status.statusReports.payload, null, 2)}</pre>}
+        </>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+const CODE_TEXT: Record<string, string> = {
+  UPDATE_FAILED: 'Update gescheitert',
+  ROLLBACK: 'Zurückgerollt',
+  UPDATE_CHECK: 'Update-Liste nicht abrufbar',
+  CALENDAR_FETCH: 'Kalender nicht abrufbar',
+  GALLERY_SYNC: 'Galerie-Abgleich gescheitert',
+  TASK_FAILED: 'Hintergrundaufgabe abgebrochen',
+  SERVER_ERROR: 'Fehler bei einer Anfrage',
+  DB_ERROR: 'Datenbankfehler',
+  PHP_FATAL: 'Schwerer PHP-Fehler',
+  DISK_LOW: 'Wenig Speicherplatz',
+  CHECK_ERROR: 'Ampel auf Rot',
+};
+
+/** Ein Eintrag als Text zum Weitergeben (Zeit, Code, Ursache, Anzahl, Meldung). */
+function logLine(e: ErrorLogEntry): string {
+  const when = e.count > 1 ? `${date(e.first)} bis ${date(e.at)}, ${e.count}×` : date(e.at);
+  return `${when} ${e.code}${e.detail ? ` (${e.detail})` : ''}${e.message ? `: ${e.message}` : ''}`;
+}
+
+/**
+ * Fehlerprotokoll der Installation mit den Fehlertexten. Es bleibt auf dem Server; zum Weitergeben an die
+ * Betreuer lässt es sich kopieren.
+ */
+function Fehlerprotokoll({ status, onToast }: { status: AdminStatus; onToast: (msg: string) => void }) {
+  const [log, setLog] = useState<ErrorLogEntry[]>(status.errorLog);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Ohne Zugriff auf die Zwischenablage (z. B. ohne HTTPS): Text zum Markieren zeigen.
+  const [showText, setShowText] = useState(false);
+  const text = [
+    `${brand.name} ${status.updates.current} (${config?.variant ?? ''}), Fehlerprotokoll vom ${date(Date.now() / 1000)}`,
+    ...log.map(logLine),
+  ].join('\n');
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      onToast('Fehlerprotokoll kopiert');
+    } catch {
+      setShowText(true);
+    }
+  }
+
+  async function clear() {
+    if (!window.confirm('Fehlerprotokoll leeren?')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setLog((await api.clearErrorLog()).errorLog);
+      setShowText(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" aria-labelledby="errorlog-title">
+      <h3 id="errorlog-title">Fehlerprotokoll</h3>
+      <p className="small muted">
+        Die letzten Fehler dieser Installation mit Fehlertext (höchstens 14 Tage). Das Protokoll bleibt auf eurem Server. Wenn die Betreuer
+        der App bei einem Problem helfen sollen, kopiere es und schicke es ihnen
+        {status.support ? (
+          <>
+            {' '}
+            (<a href={supportHref(status.support)}>{status.support}</a>)
+          </>
+        ) : null}
+        . Vorher kurz durchsehen: Fehlertexte können Namen enthalten.
+      </p>
+      {log.length === 0 ? (
+        <p className="small">Keine Fehler in den letzten 14 Tagen.</p>
+      ) : (
+        <>
+          <ul className="error-log">
+            {log.map((e, i) => (
+              <li key={i}>
+                <span className="small muted">{e.count > 1 ? `${date(e.first)} bis ${date(e.at)} · ${e.count}×` : date(e.at)}</span>
+                <br />
+                <strong>{CODE_TEXT[e.code] ?? e.code}</strong>
+                {e.detail && <span className="small muted"> ({e.detail})</span>}
+                {e.message && <span className="small error-log-message">{e.message}</span>}
+              </li>
+            ))}
+          </ul>
+          <div className="button-row">
+            <button type="button" className="btn" onClick={copy}>
+              Kopieren
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={clear}>
+              {busy ? 'Wird geleert …' : 'Leeren'}
+            </button>
+          </div>
+          {showText && <textarea className="payload small" readOnly rows={8} value={text} aria-label="Fehlerprotokoll als Text" />}
         </>
       )}
       {error && (

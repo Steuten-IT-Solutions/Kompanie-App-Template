@@ -1,50 +1,154 @@
 // Knopf „?“ (src/helpSlug.ts): jede Seite führt zu einer Hilfeseite, die es im Handbuch gibt.
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { helpSlug } from '../src/helpSlug.ts';
+import { helpSlug, type HelpContext } from '../src/helpSlug.ts';
 
-const pages = new Set(readdirSync(new URL('../../../docs/handbuch/', import.meta.url)).map((f) => f.replace(/\.md$/, '')));
+const dir = new URL('../../../docs/handbuch/', import.meta.url);
+const pages = new Set(readdirSync(dir).map((f) => f.replace(/\.md$/, '')));
 
-test('Seiten führen zu vorhandenen Hilfeseiten', () => {
-  const paths = [
-    ['termine'],
-    ['termine', 'verwalten'],
-    ['termine', 'geburtstage'],
-    ['dokumente'],
-    ['dokumente', 'verwalten'],
-    ['meins', 'punkte'],
-    ['meins', 'strafen'],
-    ['meins', 'dienstgrad'],
-    ['meins', 'anwesenheit'],
-    ['verwaltung'],
-    ['verwaltung', 'katalog'],
-    ['verwaltung', 'strafe'],
-    ['verwaltung', 'befoerderungen'],
-    ['verwaltung', 'titel'],
-    ['verwaltung', 'anwesenheit'],
-    ['brett'],
-    ['umfragen'],
-    ['umfragen', 'verwalten'],
-    ['inventar'],
-    ['konto'],
-    ['benachrichtigungen'],
-    ['installieren'],
-    ['einrichtung'],
-    ...['bereiche', 'rollen', 'google', 'kalender', 'galerie', 'news', 'benachrichtigungen', 'zustand', 'wartung', 'datensicherung'].map(
-      (s) => ['einstellungen', s],
-    ),
-  ];
-  for (const p of paths) {
-    const slug = helpSlug(p, { boardWriter: false });
+const ALL_FEATURES = [
+  'events',
+  'calendar',
+  'news',
+  'gallery',
+  'points',
+  'penalties',
+  'ranks',
+  'titles',
+  'attendance',
+  'documents',
+  'board',
+  'polls',
+  'birthdays',
+  'inventory',
+];
+/** Admin mit allen Rechten und allen Bereichen. */
+const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
+const withRights = (rights: string[], features: string[] = ALL_FEATURES, extra: Partial<HelpContext> = {}): HelpContext => ({
+  boardWriter: false,
+  can: (c) => rights.includes(c),
+  features: Object.fromEntries(features.map((f) => [f, true])),
+  ...extra,
+});
+
+/** Rechte und Bereiche einer Handbuchseite aus dem Kopfbereich. */
+function meta(slug: string): { rechte: string[]; bereiche: string[] } {
+  const head = readFileSync(new URL(`${slug}.md`, dir), 'utf8').split('---')[1] ?? '';
+  const list = (key: string) =>
+    (head.match(new RegExp(`^${key}:\\s*\\[(.*)\\]`, 'm'))?.[1] ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return { rechte: list('rechte'), bereiche: list('bereiche') };
+}
+
+/** Sieht die Person die Seite (wie visible() in Hilfe.tsx; Mitglieder sehen den internen Kalender)? */
+function sees(slug: string, ctx: HelpContext): boolean {
+  const { rechte, bereiche } = meta(slug);
+  const can = (c: string) => ctx.can(c) || (c === 'calendar' && ctx.can('member'));
+  return rechte.every(can) && bereiche.every((b) => !!ctx.features[b]);
+}
+
+const PATHS = [
+  ['termine'],
+  ['termine', 'verwalten'],
+  ['termine', 'geburtstage'],
+  ['news'],
+  ['news', 'abc'],
+  ['galerie'],
+  ['galerie', '3'],
+  ['dokumente'],
+  ['dokumente', '5'],
+  ['dokumente', 'verwalten'],
+  ['meins'],
+  ['meins', 'punkte'],
+  ['meins', 'strafen'],
+  ['meins', 'dienstgrad'],
+  ['meins', 'anwesenheit'],
+  ['verwaltung'],
+  ['verwaltung', 'mitglieder'],
+  ['verwaltung', 'punkte'],
+  ['verwaltung', 'katalog'],
+  ['verwaltung', 'strafe'],
+  ['verwaltung', 'dienstgrade'],
+  ['verwaltung', 'befoerderungen'],
+  ['verwaltung', 'titel'],
+  ['verwaltung', 'anwesenheit'],
+  ['verwaltung', 'neu'],
+  ['verwaltung', 'neu-mehrere'],
+  ...['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'geburtstag'].map((s) => ['verwaltung', 'mitglied', '7', s]),
+  ['brett'],
+  ['umfragen'],
+  ['umfragen', '4'],
+  ['umfragen', 'verwalten'],
+  ['inventar'],
+  ['inventar', 'verlauf'],
+  ['konto'],
+  ['anmelden'],
+  ['benachrichtigungen'],
+  ['installieren'],
+  ['einrichtung'],
+  ['einstellungen'],
+  ...['bereiche', 'rollen', 'google', 'kalender', 'galerie', 'news', 'benachrichtigungen', 'zustand', 'wartung', 'datensicherung'].map(
+    (s) => ['einstellungen', s],
+  ),
+];
+
+test('Jede Seite führt Admins zu einer vorhandenen Hilfeseite, die sie sehen', () => {
+  for (const p of PATHS) {
+    const slug = helpSlug(p, admin);
     assert.ok(slug && pages.has(slug), `${p.join('/')} → ${slug}`);
+    assert.ok(sees(slug, admin), `${p.join('/')} → ${slug} (nicht sichtbar)`);
   }
-  assert.equal(helpSlug(['brett'], { boardWriter: true }), 'schwarzes-brett-schreiben');
-  assert.equal(helpSlug(['meins'], { boardWriter: false, meinsFirst: 'strafen' }), 'meine-strafen');
+});
+
+test('Termine: passend zu Kalender, öffentlichen Terminen und Geburtstagen', () => {
+  assert.equal(helpSlug(['termine'], withRights([], ['events'])), 'termine-und-kalender');
+  assert.equal(helpSlug(['termine'], withRights(['member'], ['events', 'calendar'])), 'termine-und-kalender');
+  assert.equal(helpSlug(['termine'], withRights(['calendar'], ['events', 'calendar'])), 'kalender');
+  assert.equal(helpSlug(['termine'], withRights(['member', 'calendar'], ['calendar'])), 'kalender');
+  assert.equal(helpSlug(['termine'], withRights(['member'], ['birthdays'])), 'geburtstage');
+});
+
+test('Meins: erste Unterseite, sonst die Titel', () => {
+  assert.equal(helpSlug(['meins'], withRights(['member'], ALL_FEATURES, { meinsFirst: 'strafen' })), 'meine-strafen');
+  assert.equal(helpSlug(['meins'], withRights(['member'], ['titles'])), 'meine-titel');
+  assert.equal(helpSlug(['meins'], withRights(['member'], [])), null);
+});
+
+test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', () => {
+  const cases: [string[], string[], string][] = [
+    [['create_users'], [], 'mitglieder-anlegen'],
+    [['promote_users'], [], 'rollen-vergeben'],
+    [['manage_points'], ['points'], 'punkte-vergeben'],
+    [['manage_penalties'], ['penalties'], 'strafen-verwalten'],
+    [['manage_ranks'], ['ranks'], 'dienstgrade-verwalten'],
+    [['manage_titles'], ['titles'], 'titel-verwalten'],
+    [['manage_attendance'], ['attendance'], 'anwesenheit-erfassen'],
+  ];
+  for (const [rights, features, expected] of cases) {
+    const ctx = withRights(['member', ...rights], features);
+    for (const p of [['verwaltung'], ['verwaltung', 'mitglieder'], ['verwaltung', 'mitglied', '7', 'uebersicht']]) {
+      const slug = helpSlug(p, ctx);
+      assert.equal(slug, expected, `${rights.join()} ${p.join('/')}`);
+      assert.ok(sees(slug!, ctx), `${slug} für ${rights.join()} nicht sichtbar`);
+    }
+  }
+  // Geburtstag eines Mitglieds: Pflegeseite nur mit dem Recht dazu
+  assert.equal(helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['create_users'])), 'geburtstage-pflegen');
+  assert.equal(
+    helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_points'], ['points', 'birthdays'])),
+    'punkte-vergeben',
+  );
+});
+
+test('Schwarzes Brett: lesen oder schreiben', () => {
+  assert.equal(helpSlug(['brett'], withRights(['member'])), 'schwarzes-brett');
+  assert.equal(helpSlug(['brett'], { ...withRights(['post_board']), boardWriter: true }), 'schwarzes-brett-schreiben');
 });
 
 test('Ohne passende Seite das Verzeichnis', () => {
-  assert.equal(helpSlug(['galerie'], { boardWriter: false }), null);
-  assert.equal(helpSlug(['einstellungen'], { boardWriter: false }), null);
-  assert.equal(helpSlug(['hilfe'], { boardWriter: false }), null);
+  assert.equal(helpSlug(['hilfe'], admin), null);
+  assert.equal(helpSlug(['unbekannt'], admin), null);
 });

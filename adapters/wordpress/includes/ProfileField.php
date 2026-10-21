@@ -70,6 +70,7 @@ final class ProfileField
             && $app->roles()->canHandle($actor, $level) && $app->roles()->canHandleUser($actor, $target)) {
             try {
                 $app->users->setRole($userId, $level);
+                $app->roles()->roleChanged($userId, $level);
             } catch (\DomainException) {
                 // Administratoren bleiben unverändert.
             }

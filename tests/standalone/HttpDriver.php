@@ -22,6 +22,7 @@ final class HttpDriver implements ApiDriver
     private array $csrf = [];
     /** @var array<string, string> zusätzliche Header für die nächsten Anfragen */
     public array $extraHeaders = [];
+    private ?string $preview = null;
 
     public function __construct(private readonly Kernel $kernel, private readonly string $apiBase)
     {
@@ -63,6 +64,9 @@ final class HttpDriver implements ApiDriver
         }
         if ($headers !== null) {
             $h = $headers + (isset($h['Cookie']) ? ['Cookie' => $h['Cookie']] : []);
+        }
+        if ($this->preview !== null) {
+            $h['X-Kompanie-Preview'] = $this->preview;
         }
         $h = $this->extraHeaders + $h;
         return $this->send($method, $url, $h, $payload);
@@ -120,6 +124,11 @@ final class HttpDriver implements ApiDriver
         $this->as = $userId;
     }
 
+    public function preview(?string $value): void
+    {
+        $this->preview = $value;
+    }
+
     /** Nach dem Wiederherstellen einer Sicherung gibt es keine Sitzungen mehr. */
     public function forgetSessions(): void
     {
@@ -172,6 +181,7 @@ final class HttpDriver implements ApiDriver
         $db->execute('DELETE FROM {events} WHERE created_by = ?', [$id]);
         $db->execute("DELETE FROM {point_catalog} WHERE title LIKE 'Teilnahme Sommerfest'");
         $db->execute('DELETE FROM {sessions} WHERE user_id = ?', [$id]);
+        $db->execute('DELETE FROM {member_roles} WHERE user_id = ?', [$id]);
         $db->execute('DELETE FROM {users} WHERE id = ?', [$id]);
         unset($this->tokens[$id], $this->csrf[$id]);
     }

@@ -555,19 +555,22 @@ final class DriveClient
         return $tmp;
     }
 
-    /** Fehlermeldung aus einer Google-Antwort ({error: {message}} oder {error, error_description}). */
+    /**
+     * Fehlermeldung aus einer Google-Antwort ({error: {message}} oder {error, error_description}), immer mit
+     * HTTP-Status (den braucht auch die Ursache in den Statusmeldungen, Telemetry\Detail).
+     */
     private static function errorMessage(mixed $body, int $status): string
     {
         if (is_array($body)) {
             $error = $body['error'] ?? null;
             if (is_array($error) && is_string($error['message'] ?? null)) {
-                return $error['message'];
+                return $error['message'] . ' (HTTP ' . $status . ')';
             }
             if (is_string($body['error_description'] ?? null)) {
-                return $body['error_description'];
+                return $body['error_description'] . ' (HTTP ' . $status . ')';
             }
             if (is_string($error)) {
-                return $error;
+                return $error . ' (HTTP ' . $status . ')';
             }
         }
         return 'HTTP ' . $status;

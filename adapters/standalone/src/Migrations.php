@@ -98,6 +98,18 @@ final class Migrations
                     'CREATE TABLE IF NOT EXISTS {tasks} (name TEXT PRIMARY KEY, interval_seconds INTEGER NOT NULL, next_run INTEGER NOT NULL)',
                 ],
             ],
+            // Vor- und Nachname getrennt; name bleibt der Anzeigename „Vorname Nachname“. Bestehende Konten haben beide
+            // leer und werden beim Lesen geteilt (PdoUsers::toUser), bis jemand die Angaben ändert.
+            2 => [
+                'mysql' => [
+                    "ALTER TABLE {users} ADD COLUMN first_name varchar(100) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {users} ADD COLUMN last_name varchar(100) NOT NULL DEFAULT ''",
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {users} ADD COLUMN first_name TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {users} ADD COLUMN last_name TEXT NOT NULL DEFAULT ''",
+                ],
+            ],
         ];
     }
 }

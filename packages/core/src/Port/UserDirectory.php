@@ -34,8 +34,11 @@ interface UserDirectory
      */
     public function list(bool $includeGuests): array;
 
-    /** Legt ein Konto als Mitglied oder als Anwärter (Auth\Roles) an und gibt seine ID zurück. */
-    public function create(string $name, string $login, string $email, string $password, string $role = Roles::MEMBER): int;
+    /**
+     * Legt ein Konto als Mitglied oder als Anwärter (Auth\Roles) an und gibt seine ID zurück. Anzeigename ist
+     * „Vorname Nachname“ (Domain\PersonName::join).
+     */
+    public function create(string $firstName, string $lastName, string $login, string $email, string $password, string $role = Roles::MEMBER): int;
 
     /** Ob in dieser Umgebung Admins in der App ernannt werden können (nur Standalone). */
     public function canAssignAdmin(): bool;
@@ -61,19 +64,20 @@ interface UserDirectory
     /**
      * Angaben zum Bearbeiten (Issue #24).
      *
-     * @return array{name: string, login: string, email: string}|null
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string}|null
      */
     public function profile(int $id): ?array;
 
-    /** Ob sich der Benutzername ändern lässt (WordPress: nein). */
+    /** Ob sich der Benutzername ändern lässt. */
     public function canChangeLogin(): bool;
 
     /**
-     * Name, E-Mail und (wo möglich) Benutzername ändern; geprüft hat der Kern.
+     * Vor- und Nachname, E-Mail und (wo möglich) Benutzername ändern; geprüft hat der Kern. Ein neuer Benutzername
+     * beendet alle Sitzungen des Kontos (wie setPassword()).
      *
      * @throws \DomainException wenn es so nicht geht
      */
-    public function updateProfile(int $id, string $name, string $email, ?string $login): void;
+    public function updateProfile(int $id, string $firstName, string $lastName, string $email, ?string $login): void;
 
     /**
      * Konto aus der App entfernen und alle Sitzungen beenden (Issue #24). Standalone: Das Konto wird gelöscht.

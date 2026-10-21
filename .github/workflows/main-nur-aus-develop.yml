@@ -1,0 +1,29 @@
+# Pull Requests nach main kommen nur aus develop (Release, siehe docs/RELEASE.md). Alles andere geht zuerst
+# nach develop; ein PR von einem anderen Branch nach main wird hier rot.
+# Damit er den Merge auch sperrt: in den Einstellungen von main den Check „Quelle ist develop“ als Pflicht eintragen.
+name: main nur aus develop
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  quelle:
+    name: Quelle ist develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quell-Branch prüfen
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REPO" = "$REPO" ] && [ "$HEAD_REF" = "develop" ]; then
+            echo "OK: Release aus develop."
+            exit 0
+          fi
+          echo "::error::Pull Requests nach main nur aus develop (hier: $HEAD_REPO:$HEAD_REF). Bitte den Ziel-Branch auf develop ändern."
+          exit 1

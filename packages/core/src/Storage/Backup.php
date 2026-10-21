@@ -19,6 +19,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Dateien der Dokumente und Abzeichen der Dienstgrade sind ebenfalls nicht enthalten, nur ihre Zeilen (mit dem Namen
  * der Datei); die Dateien bleiben in der geschützten Dateiablage. Fehlt ein Abzeichen nach dem Einspielen auf einem
  * anderen Server, liefert die API badge_url = null.
+ * Nicht enthalten sind außerdem Push-Abos samt Warteschlange und wartende Fehlermeldungen (bug_reports, Issue #64): Sie
+ * gehören zur Installation, und Meldungen mit Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  */
 final class Backup
 {
@@ -28,17 +30,19 @@ final class Backup
      * Einstellungen, die zur Installation gehören, nicht zu den Daten: Sie werden weder gesichert noch
      * wiederhergestellt (Schema-Stand, Update-Zustand mit der laufenden Nummer der Liste, übersprungene
      * Version, Einrichtung abgeschlossen, Zeitpunkt der letzten Sicherung, Version der Aufgabenplanung,
-     * Installations-ID und Geheimnis der Statusmeldungen samt ihrem Zustand, Fehlerzähler).
+     * Installations-ID und Geheimnis der Statusmeldungen samt ihrem Zustand, Fehlerzähler, Fehlerprotokoll).
      */
     public const LOCAL_SETTINGS = [
         'schema_version', 'update_state', 'update_last', 'update_skip', 'setup_done', 'backup_last', 'running_version', 'tasks_planned', 'roles_seq',
         'tasks_last_run', 'installation_id', 'installation_secret', 'telemetry_registered', 'telemetry_last', 'telemetry_heartbeat', 'telemetry_checks',
-        'telemetry_errors', 'telemetry_pending', 'telemetry_events',
+        'telemetry_errors', 'telemetry_details', 'telemetry_pending', 'telemetry_events', 'error_log',
+        // Fehlermeldungen (Issue #64): Bestätigung durch den Empfänger. Die Warteschlange (bug_reports) ist keine Kerntabelle der Sicherung.
+        'bug_reports_registered',
         // Web Push: Schlüssel und Stand der Abgleiche gehören zu dieser Installation (Abos sind nicht in Sicherungen).
         'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log'];
 
     public function __construct(private readonly Connection $db)
     {

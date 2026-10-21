@@ -17,6 +17,9 @@
  *   ebenso versioniert; je Dienstgrad und Größe nur die aktuelle Fassung. Einmal geladen, sind sie offline da.
  * - Rückkehr von Google („Mit Google verbinden“, <App>/google/callback bzw. ?r=/google/callback) → durchreichen: Der
  *   Server tauscht dort den Code ein und leitet weiter; eine gespeicherte App-Seite nach dem Zeitlimit wäre falsch.
+ * - Vorschau „App als Rolle ansehen“ (Issue #63): Anfragen mit dem Header X-Kompanie-Preview (API) oder dem Parameter
+ *   vorschau (Bilder, Dokumente, Abzeichen) → durchreichen, nie speichern und nie aus dem Speicher beantworten: Sie
+ *   gelten nur für diese Ansicht und dürfen sich nicht mit den Daten des Admins mischen.
  * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
@@ -116,6 +119,11 @@ function isGoogleCallback(url) {
   const scope = new URL(self.registration.scope);
   if (url.pathname.startsWith(scope.pathname) && /^google\/callback\/?$/.test(url.pathname.slice(scope.pathname.length))) return true;
   return /^\/?google\/callback$/.test(url.searchParams.get('r') || '');
+}
+
+/** Vorschau „App als Rolle ansehen“: Header der App oder Parameter in der Adresse (auch in ?r=… bzw. kodiert). */
+function isPreview(request, url) {
+  return request.headers.has('X-Kompanie-Preview') || url.searchParams.has('vorschau');
 }
 
 /** Kennung eines Dokuments aus seiner Adresse: <App>/dokument/<id>, ?kompanie_app=dokument/<id> oder ?r=/dokument/<id> */
@@ -247,6 +255,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (isGoogleCallback(url)) return;
+  if (isPreview(request, url)) return;
 
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;

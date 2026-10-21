@@ -47,6 +47,6 @@ interface Authenticator
 
     public function logout(): void;
 
-    /** Nach einer Passwortänderung: andere Sitzungen beenden, diese Sitzung erneuern. */
+    /** Nach einer Änderung von Passwort oder eigenem Benutzernamen: andere Sitzungen beenden, diese Sitzung erneuern. */
     public function afterPasswordChange(int $userId): void;
 }

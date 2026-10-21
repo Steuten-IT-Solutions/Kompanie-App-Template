@@ -53,7 +53,7 @@ final class StatusService
         }
         if ($s['withdrawn']) {
             return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen. "
-                . ($s['autoAllowed'] ? "Die Installation wechselt beim nächsten Abgleich automatisch auf Version {$s['fallback']}; das geht auch sofort unter Einstellungen → Updates." : "Bitte unter Einstellungen → Updates auf Version {$s['fallback']} wechseln (automatische Updates sind hier gesperrt)."));
+                . ($s['autoAllowed'] ? "Die Installation wechselt beim nächsten Abgleich automatisch auf Version {$s['fallback']}; das geht auch sofort unter Einstellungen → Zustand und Updates." : "Bitte unter Einstellungen → Zustand und Updates auf Version {$s['fallback']} wechseln (automatische Updates sind hier gesperrt)."));
         }
         if ($last && !$last['ok'] && ($last['at'] ?? 0) >= ($s['checked_at'] ?? 0) - 86400 * 2) {
             return $this->item('updates', 'Updates', 'error', 'Das letzte Update hat nicht geklappt: ' . $last['error'] . ' Die bisherige Version läuft weiter.');
@@ -65,18 +65,18 @@ final class StatusService
             return $this->item('updates', 'Updates', 'warn', 'Die Update-Liste war zuletzt nicht erreichbar: ' . $s['error']);
         }
         if ($s['major']) {
-            return $this->item('updates', 'Updates', 'warn', "Eine neue Hauptversion ({$s['latest']}) ist da. Sie wird nicht automatisch eingespielt; bitte unter Einstellungen → Updates bestätigen.");
+            return $this->item('updates', 'Updates', 'warn', "Eine neue Hauptversion ({$s['latest']}) ist da. Sie wird nicht automatisch eingespielt; bitte unter Einstellungen → Zustand und Updates bestätigen.");
         }
         if ($s['available'] && $s['skipped']) {
-            return $this->item('updates', 'Updates', 'ok', "Version {$s['current']} läuft (zurückgerollt). Version {$s['latest']} wird nicht automatisch eingespielt; von Hand geht es unter Einstellungen → Updates.");
+            return $this->item('updates', 'Updates', 'ok', "Version {$s['current']} läuft (zurückgerollt). Version {$s['latest']} wird nicht automatisch eingespielt; von Hand geht es unter Einstellungen → Zustand und Updates.");
         }
         if ($s['available'] && !$s['autoAllowed']) {
-            return $this->item('updates', 'Updates', 'warn', "Version {$s['latest']} ist da. Automatische Updates sind hier gesperrt (z. B. in WordPress); bitte unter Einstellungen → Updates aktualisieren.");
+            return $this->item('updates', 'Updates', 'warn', "Version {$s['latest']} ist da. Automatische Updates sind hier gesperrt (z. B. in WordPress); bitte unter Einstellungen → Zustand und Updates aktualisieren.");
         }
         if ($s['available']) {
             return $this->item('updates', 'Updates', 'warn', $s['auto']
                 ? "Version {$s['latest']} wird beim nächsten Abgleich automatisch eingespielt."
-                : "Version {$s['latest']} ist da. Automatische Updates sind aus; bitte unter Einstellungen → Updates aktualisieren.");
+                : "Version {$s['latest']} ist da. Automatische Updates sind aus; bitte unter Einstellungen → Zustand und Updates aktualisieren.");
         }
         return $this->item('updates', 'Updates', 'ok', "Version {$s['current']} ist aktuell. Zuletzt geprüft: " . $this->date($s['checked_at']) . '.');
     }
@@ -84,26 +84,27 @@ final class StatusService
     private function gallery(): array
     {
         $g = $this->app->gallery();
+        $label = $this->app->config->sectionLabel('gallery', 'Galerie');
         if (!$this->app->features()->enabled('gallery')) {
-            return $this->item('gallery', 'Galerie', 'off', 'Die Galerie ist ausgeschaltet.');
+            return $this->item('gallery', $label, 'off', "Der Bereich „{$label}“ ist ausgeschaltet.");
         }
         if (!$g->isConfigured()) {
-            return $this->item('gallery', 'Galerie', 'off', 'Noch nicht eingerichtet (Einstellungen → Galerie).');
+            return $this->item('gallery', $label, 'off', "Noch nicht eingerichtet (Einstellungen → {$label}).");
         }
         $st = $g->status();
         $last = isset($st['last_sync']) ? (int) $st['last_sync'] : null;
         if (($st['error'] ?? '') !== '') {
-            return $this->item('gallery', 'Galerie', 'error', 'Der letzte Abgleich ist fehlgeschlagen: ' . $st['error'] . ' Ist der Ordner für das verbundene Google-Konto bzw. das Dienstkonto noch sichtbar (Einstellungen → Google-Zugang)?');
+            return $this->item('gallery', $label, 'error', 'Der letzte Abgleich ist fehlgeschlagen: ' . $st['error'] . ' Ist der Ordner für das verbundene Google-Konto bzw. das Dienstkonto noch sichtbar (Einstellungen → Google-Zugang)?');
         }
         if ($last === null || $last < $this->app->time()->timestamp() - 3 * 86400) {
-            return $this->item('gallery', 'Galerie', 'warn', 'Der letzte Abgleich ist länger her (' . $this->date($last) . '). Werden die Seiten der App selten aufgerufen, hilft ein Cronjob beim Hoster.');
+            return $this->item('gallery', $label, 'warn', 'Der letzte Abgleich ist länger her (' . $this->date($last) . '). Werden die Seiten der App selten aufgerufen, hilft ein Cronjob beim Hoster.');
         }
         $failed = $g->countFailed();
         $pending = $g->countPending();
         if ($failed > 0) {
-            return $this->item('gallery', 'Galerie', 'warn', "$failed Bilder ließen sich nicht laden (z. B. beschädigte Dateien). Abgleich zuletzt: " . $this->date($last) . '.');
+            return $this->item('gallery', $label, 'warn', "$failed Bilder ließen sich nicht laden (z. B. beschädigte Dateien). Abgleich zuletzt: " . $this->date($last) . '.');
         }
-        return $this->item('gallery', 'Galerie', 'ok', ($pending > 0 ? "$pending Bilder werden noch aufbereitet. " : '') . 'Abgleich zuletzt: ' . $this->date($last) . '.');
+        return $this->item('gallery', $label, 'ok', ($pending > 0 ? "$pending Bilder werden noch aufbereitet. " : '') . 'Abgleich zuletzt: ' . $this->date($last) . '.');
     }
 
     private function calendar(): array

@@ -13,6 +13,7 @@ use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Port\UpdateTarget;
 use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Telemetry\Telemetry;
 
 /**
@@ -95,20 +96,28 @@ final class UpdateService
     {
         $this->requireConfigured();
         $state = ['checked_at' => $this->time->timestamp(), 'error' => '', 'list' => null];
+        // Schritt, an dem es scheitert: Ursache für die Statusmeldungen
+        $step = 'network';
         try {
             $res = $this->http->request('GET', $this->updatesUrl(), ['Accept' => 'application/json', 'Cache-Control' => 'no-cache'], null, 20);
             if ($res['status'] !== 200) {
+                $step = 'http_' . $res['status'];
                 throw new \RuntimeException('Die Update-Liste ist nicht erreichbar (HTTP ' . $res['status'] . ').');
             }
-            $list = UpdateList::fromPayload(SignedEnvelope::open($res['body'], $this->trustedKeys()));
+            $step = 'signature';
+            $payload = SignedEnvelope::open($res['body'], $this->trustedKeys());
+            $step = 'invalid_list';
+            $list = UpdateList::fromPayload($payload);
             $kompanie = (string) ($this->config['kompanie'] ?? '');
             if ($kompanie !== '' && $list->kompanie() !== $kompanie) {
+                $step = 'other_kompanie';
                 throw new \RuntimeException('Die Update-Liste gehört zu einer anderen Kompanie und wird nicht verwendet.');
             }
             // Nie eine ältere Liste als die zuletzt gesehene annehmen (Schutz vor dem Unterschieben
             // einer alten, ebenfalls signierten Liste, z. B. mit einer zurückgezogenen Version).
             $previous = (array) ($this->settings->get(self::STATE, [])['list'] ?? []);
             if ($list->serial() < (int) ($previous['serial'] ?? 0)) {
+                $step = 'older_list';
                 throw new \RuntimeException('Die Update-Liste ist älter als die zuletzt geladene und wird nicht verwendet.');
             }
             $state['list'] = $list->toArray();
@@ -116,7 +125,10 @@ final class UpdateService
             $state['error'] = $e->getMessage();
             $state['list'] = $this->settings->get(self::STATE, [])['list'] ?? null;
             $this->settings->set(self::STATE, $state);
-            $this->telemetry?->record(Code::UpdateCheck);
+            if ($step === 'network') {
+                $step = Detail::of($step, Detail::fromMessage($e->getMessage()));
+            }
+            $this->telemetry?->record(Code::UpdateCheck, $step, $e->getMessage());
             throw ApiError::upstream($e->getMessage());
         }
         $this->settings->set(self::STATE, $state);
@@ -260,12 +272,16 @@ final class UpdateService
         class_exists(ApiError::class);
         class_exists(Version::class);
         class_exists(Code::class);
+        class_exists(Detail::class);
         class_exists(StatusReporter::class); // für Telemetry::record (Zustimmung) nach dem Austausch
         $record = ['from' => $this->currentVersion, 'to' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'ok' => false, 'error' => ''];
+        $step = 'download';
         try {
             $zip = $this->download($file);
             try {
+                $step = 'backup';
                 $this->backupBefore($entry, Version::major($version) > Version::major($this->currentVersion));
+                $step = 'install';
                 // Danach neu einplanen (App::upgrade). Auch beim Zurückrollen auf eine ältere Version, die
                 // diese Einstellung nicht kennt: Kommt später wieder diese Version, plant sie neu ein.
                 $this->settings->delete(App::PLAN_SETTING);
@@ -277,14 +293,14 @@ final class UpdateService
             $lock && flock($lock, LOCK_UN);
             $record['error'] = $e->getMessage();
             $this->settings->set(self::LAST, $record);
-            $this->telemetry?->record(Code::UpdateFailed);
+            $this->telemetry?->record(Code::UpdateFailed, Detail::of($step, Detail::fromMessage($e->getMessage())), $this->currentVersion . ' → ' . $version . ': ' . $e->getMessage());
             throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
         }
         $lock && flock($lock, LOCK_UN);
         $record['ok'] = true;
         $this->settings->set(self::LAST, $record);
         if ($kind === 'rollback' || $kind === 'withdrawn') {
-            $this->telemetry?->record(Code::Rollback);
+            $this->telemetry?->record(Code::Rollback, $kind, $this->currentVersion . ' → ' . $version);
         }
         if ($kind === 'rollback') {
             $this->settings->set(self::SKIP, $this->currentVersion);

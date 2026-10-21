@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Standalone;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\FileCache;
@@ -62,9 +63,16 @@ final class Kernel
     private ?StandaloneEnvironment $env = null;
     private HttpContext $http;
 
-    /** @param HttpClient|null $httpClient für Tests (z. B. simuliertes Google Drive) */
-    public function __construct(public readonly string $root, ?HttpContext $http = null, private readonly ?HttpClient $httpClient = null)
-    {
+    /**
+     * @param HttpClient|null $httpClient für Tests (z. B. simuliertes Google Drive)
+     * @param array<string, mixed> $packageOverride für Tests: Werte, die update.json ergänzen (z. B. reportUrl)
+     */
+    public function __construct(
+        public readonly string $root,
+        ?HttpContext $http = null,
+        private readonly ?HttpClient $httpClient = null,
+        private readonly array $packageOverride = [],
+    ) {
         $this->http = $http ?? HttpContext::fromGlobals(self::basePath($_SERVER));
     }
 
@@ -103,7 +111,7 @@ final class Kernel
     public function packageConfig(): array
     {
         $data = json_decode((string) @file_get_contents($this->root . '/update.json'), true);
-        return is_array($data) ? $data : [];
+        return $this->packageOverride + (is_array($data) ? $data : []);
     }
 
     public function version(): string
@@ -156,8 +164,9 @@ final class Kernel
 
     public function users(): PdoUsers
     {
-        // Rechte je Rolle aus der App (Einstellungen → Rollen); erst beim ersten Benutzer abgefragt.
-        return new PdoUsers($this->db(), $this->sessions(), fn (string $role): array => $this->app()->roles()->capabilities($role));
+        // Rechte je Rolle aus der App (Einstellungen → Rollen), mit den Zusatzrollen und Ausnahmen der Person; erst beim ersten
+        // Benutzer abgefragt.
+        return new PdoUsers($this->db(), $this->sessions(), fn (string $role, int $id): array => $this->app()->roles()->capabilitiesFor($id, $role));
     }
 
     /**
@@ -317,10 +326,13 @@ final class Kernel
         } elseif ($path === '/sw.js') {
             $this->sendServiceWorker();
         } elseif (preg_match('#^/foto/(\d+)/(thumb|large)$#', $path, $m)) {
+            $this->beginPreview();
             $this->sendPhoto((int) $m[1], $m[2]);
         } elseif (preg_match('#^/dokument/(\d+)$#', $path, $m)) {
+            $this->beginPreview();
             $this->sendDocument((int) $m[1]);
         } elseif (preg_match('#^/abzeichen/(\d+)$#', $path, $m)) {
+            $this->beginPreview();
             $this->sendBadge((int) $m[1]);
         } elseif ($path === '/google/callback') {
             $this->sendGoogleCallback();
@@ -331,6 +343,15 @@ final class Kernel
             $this->sendApp();
         }
         $this->afterResponse();
+    }
+
+    /**
+     * Vorschau „App als Rolle ansehen“ (Issue #63) für Bilder, Dokumente und Abzeichen: Der Browser lädt sie ohne den
+     * Header der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
+     */
+    private function beginPreview(): void
+    {
+        $this->app()->preview()->begin(Preview::valueFrom($this->http->header(Preview::HEADER), $_GET[Preview::QUERY] ?? null));
     }
 
     /** Pfad der Anfrage, z. B. /api/v1/me – aus ?r= oder aus der umgeschriebenen Adresse. */
@@ -371,7 +392,7 @@ final class Kernel
             }
             $query = $_GET;
             unset($query['r']);
-            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp()));
+            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER)));
         } catch (ApiError $e) {
             $res = Response::error($e);
         }
@@ -458,7 +479,8 @@ final class Kernel
             return;
         }
         // Siehe WordPress-Adapter: Bilder können später nach „intern“ verschoben werden.
-        header($res['intern'] ? 'Cache-Control: private, max-age=86400' : 'Cache-Control: public, max-age=3600');
+        // In der Vorschau (Issue #63) nie speichern.
+        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
         if ($this->notModified($res['etag'] ?? null)) {
             return;
         }
