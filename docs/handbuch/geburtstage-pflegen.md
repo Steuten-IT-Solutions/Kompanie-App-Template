@@ -7,7 +7,7 @@ bereiche: [birthdays]
 Jedes Mitglied trägt seinen Geburtstag selbst unter **Konto** (oben rechts) ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
 
 ## In den Mitgliedsdetails
-**Verwaltung → Mitglieder →** Mitglied antippen und unten auf seiner Seite **Geburtstag** antippen (wie die Mitgliederliste aufgebaut ist, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen)). Dort steht das eingetragene Datum oder „Nicht eingetragen.“. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn nach einer Rückfrage.
+**Verwaltung → Mitglieder →** Mitglied antippen und auf seiner Seite unter den Kacheln **Geburtstag** antippen (wie die Mitgliederliste aufgebaut ist, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen)). Dort steht das eingetragene Datum oder „Nicht eingetragen.“. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn nach einer Rückfrage.
 
 Ob **Anderen Mitgliedern zeigen** und **Alter anzeigen** an oder aus sind und (mit der Liste **{bereich.directory}**) ob der Geburtstag auf der Seite der Person steht, siehst du dort nur zur Information. Das gehört der Person selbst: Du kannst es nicht ändern, und ein neu eingetragener Geburtstag ist zunächst sichtbar, ohne Alter und nicht auf ihrer Seite.
 

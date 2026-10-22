@@ -20,8 +20,8 @@ Ein Tipp auf eine Person öffnet ihre Seite. Alles steht auf dieser einen Seite;
 - **Foto** rechts daneben: vergrößert es, darunter **Foto ersetzen** und **Foto entfernen**. Ohne Foto stehen dort die Anfangsbuchstaben; ein Tipp darauf öffnet **Foto hochladen**.
 - Kacheln **{bereich.points}** und **Offen**: Eintrag nur für diese Person, darunter ihre bisherigen Einträge (stornieren, bezahlt).
 - Kachel **{bereich.titles}**: {bereich.titles} ankreuzen.
-- Darunter ihre **{bereich.offices}** (nur zum Ansehen).
-- Ganz unten **Geburtstag**, **Eintritt** und **Austritt**.
+- Darunter **Geburtstag**, **Eintritt** und **Austritt**.
+- Darunter ihre **{bereich.offices}** als Zeitstrahl (nur zum Ansehen).
 - **Konto und Rolle** ganz unten klappt beim Antippen auf: Rolle, Rechte, Startpasswort, Ehemalig und Konto.
 
 Schließen mit **✕**, durch Tippen neben das Fenster oder mit der Zurück-Taste. Du siehst nur, wofür du die Rechte hast und dessen Bereich eingeschaltet ist. **‹ Alle Mitglieder** (oder die Zurück-Taste) führt zurück zur Liste, und zwar an dieselbe Stelle, mit demselben Suchbegriff und denselben Filtern. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
