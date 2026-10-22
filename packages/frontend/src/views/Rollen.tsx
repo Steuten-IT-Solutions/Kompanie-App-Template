@@ -12,13 +12,13 @@ const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
 
 /**
  * Einstellungen → Rollen (Issue #28): Rollen anlegen, umbenennen, Rechte und Punktefaktor festlegen, ordnen (per
- * Ziehen), löschen. Gast, Mitglied und Admin sind fest (nur umbenennen, Mitglied und Admin mit Punktefaktor) und stehen
- * vorn bzw. hinten; Mitglied ist die Rolle neuer Konten. Anwärter sind eine eigene Rolle (z. B. nur mit dem Kalender).
+ * Ziehen, alle Rollen), löschen. Gast, Mitglied und Admin sind fest (nur umbenennen, Mitglied und Admin mit
+ * Punktefaktor); Mitglied ist die Rolle neuer Konten. Anwärter sind eine eigene Rolle (z. B. nur mit dem Kalender).
  */
 export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string) => void; refresh?: number }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.roles(), [refresh], 'admin/roles');
   const [editing, setEditing] = useState<Level | 'neu' | null>(null);
-  const own = (data ?? []).filter((r) => !r.system);
+  const list = data ?? [];
 
   const show = (list: RoleAdmin[]) => {
     setData(list);
@@ -27,8 +27,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
   const saveOrder = useSaveQueue();
   function reorder(next: RoleAdmin[]) {
     // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
-    const all = data ?? [];
-    show([...all.filter((r) => r.system && r.key !== 'admin'), ...next, ...all.filter((r) => r.key === 'admin')]);
+    show(next);
     saveOrder(
       () => api.reorderRoles(next.map((r) => r.key)),
       show,
@@ -38,7 +37,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
       },
     );
   }
-  const sort = useDragSort(own, reorder, editing !== null);
+  const sort = useDragSort(list, reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -55,23 +54,20 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
       <h3>Rollen</h3>
       <p className="small muted">
         Jede Person hat eine Grundrolle und auf Wunsch weitere eigene Rollen als Zusatzrollen; sie hat dann die Rechte aller ihrer Rollen
-        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen. Die Reihenfolge der eigenen Rollen gilt überall, wo Rollen
-        stehen; zum Ändern eine Rolle am Griff links ziehen.{' '}
+        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen. Die Reihenfolge gilt überall, wo Rollen stehen, auch in den
+        Zählern; zum Ändern eine Rolle am Griff links ziehen.{' '}
         {config?.features.points &&
           `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder; bei mehreren Rollen der kleinste.`}
       </p>
       <ul className="card-list role-list">
-        {roles.map((r) => {
-          // Nur eigene Rollen lassen sich verschieben; Gast und Mitglied stehen vorn, Admin hinten.
-          const i = own.indexOf(r);
-          const drag = (className: string) => (i >= 0 ? sort.itemProps(i, className) : { className });
-          return editing === r.key ? (
-            <li key={r.key} {...drag('role-item')}>
+        {roles.map((r, i) =>
+          editing === r.key ? (
+            <li key={r.key} {...sort.itemProps(i, 'role-item')}>
               <RoleForm role={r} roles={roles} onSaved={saved} onCancel={() => setEditing(null)} />
             </li>
           ) : (
-            <li key={r.key} {...drag('row role-item')}>
-              {i >= 0 && own.length > 1 && sort.handle(i, r.label)}
+            <li key={r.key} {...sort.itemProps(i, 'row role-item')}>
+              {sort.handle(i, r.label)}
               <div className="row-main">
                 <div className="row-title">
                   {r.label}
@@ -111,8 +107,8 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                 </button>
               </div>
             </li>
-          );
-        })}
+          ),
+        )}
       </ul>
       {editing === 'neu' ? (
         <RoleForm roles={roles} onSaved={saved} onCancel={() => setEditing(null)} />

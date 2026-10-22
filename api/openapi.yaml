@@ -2968,8 +2968,8 @@ paths:
       summary: Rollen mit Rechten, Punktefaktor und Anzahl der Personen
       description: |
         Jede Person hat genau eine Grundrolle. Fest sind Gast, Mitglied (Rolle neuer Konten) und Admin (nur umbenennen;
-        Mitglied und Admin auch mit Punktefaktor; Bezeichnungen bei der Ersteinrichtung aus `kompanie.json`), in dieser
-        Reihenfolge: Gast, Mitglied, die eigenen Rollen (wie der Admin sie ordnet, `PUT /admin/roles/order`), Admin.
+        Mitglied und Admin auch mit Punktefaktor; Bezeichnungen bei der Ersteinrichtung aus `kompanie.json`), in der
+        Reihenfolge, die der Admin festlegt (`PUT /admin/roles/order`; anfangs Gast, Mitglied, eigene Rollen, Admin).
         Anwärter (Issue #23) sind eine eigene Rolle; die frühere feste Rolle `candidate` bleibt in Installationen, die
         sie hatten, als eigene Rolle mit `new_accounts` und `promotable` erhalten. Schaltet der Admin einen Bereich mit eigenen Rechten ein
         (Termine, Punkte, Strafen), kommt dessen Standardrolle dazu; schaltet er ihn aus, verschwindet sie, wenn niemand sie hat.
@@ -3004,11 +3004,11 @@ paths:
   /admin/roles/order:
     put:
       tags: [Einstellungen]
-      summary: Reihenfolge der eigenen Rollen
+      summary: Reihenfolge der Rollen
       description: |
-        `keys`: alle eigenen Rollen (ohne `guest`, `member`, `admin`) in der neuen Reihenfolge, jede genau einmal (sonst
-        400). Gast und Mitglied bleiben vorn, Admin hinten. Die Reihenfolge gilt überall, wo Rollen stehen (`/config`,
-        Zusatzrollen, Zähler).
+        `keys`: alle Rollen, auch `guest`, `member` und `admin`, in der neuen Reihenfolge, jede genau einmal (sonst 400).
+        Die Reihenfolge gilt überall, wo Rollen stehen (`/config`, Zusatzrollen; `counts_by_group` der Anwesenheit umgekehrt, von unten nach oben). Neue Rollen kommen ans Ende,
+        vor `admin`, wenn der dort steht.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -4170,7 +4170,7 @@ components:
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
-            system: { type: boolean, description: 'guest, member und admin: Rechte fest, nicht löschbar, nicht verschiebbar' }
+            system: { type: boolean, description: 'guest, member und admin: Rechte fest, nicht löschbar' }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
 
     RoleInput:

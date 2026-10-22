@@ -31,8 +31,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Meins → Übersicht**: Foto, Name, Rollen, Dienstgrad, Punkte und offene Strafen auf einen Blick, dazu die eigenen
   Titel als Kachel.
 - **Fotos vergrößern**: Ein Tipp auf ein Mitgliedsfoto zeigt es groß und scharf (auch bei hoher Pixeldichte).
-- **Rollen ordnen**: Eigene Rollen lassen sich unter *Einstellungen → Rollen* per Ziehen sortieren. Admins haben einen
-  eigenen Punktefaktor.
+- **Rollen ordnen**: Alle Rollen, auch Gast, Mitglied und Admin, lassen sich unter *Einstellungen → Rollen* per Ziehen
+  sortieren, z. B. Anwärter zwischen Gast und Mitglied. Admins haben einen eigenen Punktefaktor.
 
 ### Geändert
 
@@ -42,7 +42,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (bisher nur für die, die Dienstgrade verwalten).
 - Mitgliederliste und Mitgliedsdetails neu angeordnet: Foto links, Dienstgrad rechts, Name und Titel mittig, größere
   Fotos und Abzeichen. Runde Fotos werden von oben zugeschnitten, damit der Kopf sichtbar bleibt.
-- Zähler je Gruppe über der Mitgliederliste und in der Anwesenheit: Mitglieder zuerst, mit Mehrzahl („Mitglieder 45“).
+- Zähler je Gruppe über der Mitgliederliste und in der Anwesenheit: in umgekehrter Reihenfolge der Rollen (von unten nach oben), mit Mehrzahl
+  („Mitglieder 45“).
   Anwärter werden immer angezeigt und mitgezählt.
 - Die App zeigt gespeicherte Daten sofort und aktualisiert sie im Hintergrund, statt bei schwachem Netz bei
   „Lädt …“ stehen zu bleiben. Wechsel zwischen Unterseiten (Mitglied, Meins, Dokumente, Anwesenheit) ohne Neuladen.

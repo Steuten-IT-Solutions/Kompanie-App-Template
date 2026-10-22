@@ -379,6 +379,19 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
     await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
   }
   await expect(rollen.locator('.row', { hasText: /^Anwärter/ })).toContainText('für neue Konten');
+  // Auch feste Rollen lassen sich verschieben: Anwärter am Griff (Pfeil hoch) zwischen Gast und Mitglied.
+  const all = async () => (await rollen.locator('.role-item .row-title').allTextContents()).map((t) => t.trim());
+  const titles = async () => (await all()).slice(0, 3);
+  const handle = rollen.getByRole('button', { name: 'Anwärter verschieben (ziehen oder Pfeiltasten)' });
+  await handle.focus();
+  for (let i = (await all()).indexOf('Anwärter'); i > 1; i--) {
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => (await all()).indexOf('Anwärter')).toBe(i - 1);
+  }
+  if ((await all()).indexOf('Anwärter') === 0) await page.keyboard.press('ArrowDown');
+  await expect.poll(titles).toEqual(['Gast', 'Anwärter', 'Mitglied']);
+  await page.reload();
+  await expect.poll(titles).toEqual(['Gast', 'Anwärter', 'Mitglied']);
 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();

@@ -675,14 +675,15 @@ final class ApiScenario
         $this->d->actAs($holder);
         $c->ok($this->req('POST', "/members/$friend/promote")[0] === 400, 'Rolle nicht zum Aufnehmen freigegeben → 400');
 
-        // Reihenfolge der eigenen Rollen per Ziehen; Gast und Mitglied vorn, Admin hinten.
+        // Reihenfolge aller Rollen per Ziehen, auch der festen (z. B. Anwärter zwischen Gast und Mitglied).
         $this->d->actAs($admin);
-        $own = array_values(array_column(array_filter((array) $this->req('GET', '/admin/roles')[1], static fn (mixed $r): bool => is_array($r) && !($r['system'] ?? true)), 'key'));
-        [$s, $d] = $this->req('PUT', '/admin/roles/order', ['keys' => array_reverse($own)]);
-        $keys = array_column((array) $d, 'key');
-        $c->ok($s === 200 && array_slice($keys, 0, 2) === ['guest', 'member'] && end($keys) === 'admin' && array_slice($keys, 2, -1) === array_reverse($own), 'Eigene Rollen umsortiert');
-        $c->ok($this->req('PUT', '/admin/roles/order', ['keys' => array_slice($own, 1)])[0] === 400, 'Nicht alle eigenen Rollen → 400');
-        $this->req('PUT', '/admin/roles/order', ['keys' => $own]);
+        $before = array_column((array) $this->req('GET', '/admin/roles')[1], 'key');
+        $wanted = array_values(array_merge(['guest', $this->anw, 'member'], array_diff($before, ['guest', $this->anw, 'member'])));
+        [$s, $d] = $this->req('PUT', '/admin/roles/order', ['keys' => $wanted]);
+        $c->ok($s === 200 && array_column((array) $d, 'key') === $wanted, 'Rollen umsortiert, auch feste');
+        $c->ok(array_column((array) ($this->req('GET', '/config')[1]['roles'] ?? []), 'key') === $wanted, '/config in der neuen Reihenfolge');
+        $c->ok($this->req('PUT', '/admin/roles/order', ['keys' => array_slice($wanted, 1)])[0] === 400, 'Nicht alle Rollen → 400');
+        $this->req('PUT', '/admin/roles/order', ['keys' => $before]);
 
         // Punktefaktor auch für Admins
         [$s, $d] = $this->req('PATCH', '/admin/roles/admin', ['points_factor' => 0.5]);

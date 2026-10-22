@@ -124,7 +124,7 @@ final class RolesTest extends TestCase
         ]]);
         $app = TestApp::create(TestApp::connection(), $users, settings: $settings, features: false);
         $roles = $app->roles()->all();
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'r1', Roles::CANDIDATE, Roles::ADMIN], array_keys($roles), 'eigene Rolle, am Ende wie bisher in den Zählern');
+        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($roles), 'eigene Rolle vor Mitglied: in den Zählern (von unten nach oben) wie bisher nach den Mitgliedern');
         $this->assertSame(['key' => 'candidate', 'label' => 'Rekrut', 'capabilities' => ['calendar'], 'points_factor' => 1.0, 'new_accounts' => true, 'promotable' => true], $roles[Roles::CANDIDATE]);
         $this->assertTrue($settings->get(RoleService::CANDIDATE_SETTING));
         $cand = $users->add('anwaerter', Roles::CANDIDATE);
@@ -172,25 +172,31 @@ final class RolesTest extends TestCase
         $this->assertSame([], $app->roles()->capabilities(Roles::CANDIDATE), 'unbekannte Rolle: keine Rechte');
     }
 
-    public function testOwnRolesCanBeReordered(): void
+    public function testAllRolesCanBeReordered(): void
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users, features: false);
         $users->current = $users->add('admin', Roles::ADMIN);
         $a = $app->roles()->create(['label' => 'A', 'capabilities' => ['member']])['key'];
         $b = $app->roles()->create(['label' => 'B', 'capabilities' => ['calendar']])['key'];
-        $c = $app->roles()->create(['label' => 'C', 'capabilities' => []])['key'];
+        $this->assertSame([Roles::GUEST, Roles::MEMBER, $a, $b, Roles::ADMIN], array_keys($app->roles()->all()), 'neue Rollen vor Admin');
         $order = static fn (array $body) => $app->api()->handle(new Request('PUT', '/admin/roles/order', [], $body));
-        $res = $order(['keys' => [$c, $a, $b]]);
+        // Auch feste Rollen: Anwärter (B) zwischen Gast und Mitglied, Admin nicht mehr am Ende.
+        $res = $order(['keys' => [Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a]]);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, $c, $a, $b, Roles::ADMIN], array_column($res->data, 'key'), 'feste Rollen vorn bzw. hinten');
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, $c, $a, $b, Roles::ADMIN], array_column($app->api()->config()['roles'], 'key'));
-        foreach ([[$c, $a], [$c, $a, $b, $b], [$c, $a, Roles::MEMBER], [$c, $a, 'r99'], 'r1', [$c, $a, 3]] as $bad) {
+        $this->assertSame([Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a], array_column($res->data, 'key'));
+        $this->assertSame([Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a], array_column($app->api()->config()['roles'], 'key'));
+        $c = $app->roles()->create(['label' => 'C', 'capabilities' => []])['key'];
+        $this->assertSame($c, array_key_last($app->roles()->all()), 'Admin steht nicht am Ende: neue Rolle ganz hinten');
+        $again = TestApp::create(TestApp::connection(), settings: new MemorySettings([RoleService::SETTING => $app->settings->get(RoleService::SETTING), RoleService::CANDIDATE_SETTING => true]), features: false);
+        $this->assertSame([Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a, $c], array_keys($again->roles()->all()), 'gespeicherte Reihenfolge bleibt');
+        $all = [Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a, $c];
+        foreach ([[$a, $b, $c], [...$all, $a], [...array_slice($all, 1), 'r99'], 'r1', [...array_slice($all, 1), 3]] as $bad) {
             $this->assertSame(400, $order(['keys' => $bad])->status, (string) json_encode($bad));
         }
         $this->assertSame(400, $order([])->status);
         $users->current = $users->add('m', Roles::MEMBER);
-        $this->assertSame(403, $order(['keys' => [$a, $b, $c]])->status, 'nur Admins');
+        $this->assertSame(403, $order(['keys' => $all])->status, 'nur Admins');
     }
 
     public function testAdminsGetAPointsFactor(): void

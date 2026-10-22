@@ -6,7 +6,7 @@ rechte: [create_users]
 Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort öffnet sich zuerst die **Mitgliederliste**. Hast du in der Verwaltung noch weitere Aufgaben, wechselst du über das Menü oben (es zeigt gerade **Mitglieder**).
 
 ## Die Mitgliederliste
-- Ganz oben steht, wie viele Personen es je Gruppe gibt (ohne Gäste): zuerst {rolle.member}, dann eigene Rollen, die gesondert zählen, in ihrer Reihenfolge (z. B. Anwärter). Die Gruppen sind dieselben wie im Zähler der {bereich.attendance} (Einstellungen → Rollen → {bereich.attendance}); Suche und Rollenfilter ändern den Zähler nicht.
+- Ganz oben steht, wie viele Personen es je Gruppe gibt (ohne Gäste): {rolle.member} und die Rollen, die gesondert zählen (z. B. Anwärter), in umgekehrter Reihenfolge der Liste unter **Einstellungen → Rollen** (von unten nach oben). Die Gruppen sind dieselben wie im Zähler der {bereich.attendance} (Einstellungen → Rollen → {bereich.attendance}); Suche und Rollenfilter ändern den Zähler nicht.
 - Darunter stehen **+ Mitglied anlegen** und **Ehemalige** (ausgetretene und verstorbene Mitglieder, siehe [Ehemalige Mitglieder](seite:ehemalige-mitglieder)), dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
 - In der Liste stehen auch Personen mit Rollen nur für den internen Kalender (z. B. Anwärter).
 - **Filter und Sortierung** ist zunächst eingeklappt; ein Tipp klappt es auf. Darin stehen die Filter nach Rolle und {bereich.titles}, die Sortierung und das Häkchen für Gast-Konten. Ist ein Filter gesetzt, steht am eingeklappten Bereich **aktiv**.

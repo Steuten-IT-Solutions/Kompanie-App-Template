@@ -12,7 +12,7 @@ Jede Zeile zeigt den Namen und vorn ein kleines rundes Foto; wer keines hat, bek
 Ein Tipp auf eine Person öffnet ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, und nutzt die Kompanie **{bereich.offices}**, darunter alle ihre Ämter als Zeitstrahl. **‹ Zurück** führt wieder zur Liste. Mehr zeigt die Liste nicht: keine Rollen, keine {bereich.points} oder {bereich.penalties}, keine E-Mail-Adressen oder Benutzernamen.
 
 ## Suchen und sortieren
-Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: zuerst {rolle.member}, dann eigene Rollen, die gesondert zählen, in ihrer Reihenfolge (z. B. Anwärter). Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**. Die Sortierung merkt sich die App auf diesem Gerät.
+Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: {rolle.member} und die Rollen, die gesondert zählen (z. B. Anwärter), in umgekehrter Reihenfolge der Rollen, die ein {rolle.admin} festlegt (von unten nach oben). Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**. Die Sortierung merkt sich die App auf diesem Gerät.
 
 ## Fotos
 Die Fotos laden die zuständigen Personen in der Verwaltung hoch (siehe **Mitglieder anlegen**). Dein eigenes Foto siehst du unter **Konto**. Möchtest du ein anderes Foto oder keines, sprich die Verwaltung an.
