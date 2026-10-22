@@ -15,6 +15,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.2.0] – 2026-10-22
+
 ### Neu
 
 - **Listen** (neuer Bereich, anfangs aus): Listen zum Ausdrucken, als PDF oder als CSV für Excel, z. B.
