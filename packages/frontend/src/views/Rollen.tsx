@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import { CAPABILITIES } from '../capabilities';
 import { useDragSort, useSaveQueue } from '../dragSort';
@@ -15,10 +15,19 @@ const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
  * Ziehen, alle Rollen), löschen. Gast, Mitglied und Admin sind fest (nur umbenennen, Mitglied und Admin mit
  * Punktefaktor); Mitglied ist die Rolle neuer Konten. Anwärter sind eine eigene Rolle (z. B. nur mit dem Kalender).
  */
+/** Rollen in der Reihenfolge der Schlüssel; unbekannte (inzwischen dazugekommene) hinten. */
+function sortedBy(roles: RoleAdmin[], keys: Level[]): RoleAdmin[] {
+  const pos = (k: Level) => (keys.indexOf(k) < 0 ? keys.length : keys.indexOf(k));
+  return [...roles].sort((a, b) => pos(a.key) - pos(b.key));
+}
+
 export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string) => void; refresh?: number }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.roles(), [refresh], 'admin/roles');
   const [editing, setEditing] = useState<Level | 'neu' | null>(null);
-  const list = data ?? [];
+  // Reihenfolge, solange sie noch gespeichert wird: Lädt die Liste inzwischen neu (z. B. Daten aus dem Hintergrund,
+  // Issue #108), sprängen Rollen sonst auf einen Zwischenstand zurück.
+  const [order, setOrder] = useState<Level[] | null>(null);
+  const list = useMemo(() => (order ? sortedBy(data ?? [], order) : (data ?? [])), [data, order]);
 
   const show = (list: RoleAdmin[]) => {
     setData(list);
@@ -27,11 +36,15 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
   const saveOrder = useSaveQueue();
   function reorder(next: RoleAdmin[]) {
     // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
-    show(next);
+    setOrder(next.map((r) => r.key));
     saveOrder(
       () => api.reorderRoles(next.map((r) => r.key)),
-      show,
+      (saved) => {
+        setOrder(null);
+        show(saved);
+      },
       (e) => {
+        setOrder(null);
         onToast(e.message);
         reload();
       },
@@ -41,7 +54,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const roles = data!;
+  const roles = list;
 
   const saved = (list: RoleAdmin[], msg: string) => {
     show(list);

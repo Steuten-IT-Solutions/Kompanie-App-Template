@@ -382,7 +382,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   // Auch feste Rollen lassen sich verschieben: Anwärter am Griff (Pfeil hoch) zwischen Gast und Mitglied.
   const all = async () => (await rollen.locator('.role-item .row-title').allTextContents()).map((t) => t.trim());
   const titles = async () => (await all()).slice(0, 3);
-  const handle = rollen.getByRole('button', { name: 'Anwärter verschieben (ziehen oder Pfeiltasten)' });
+  // exact: Im WordPress-Test gibt es aus dem API-Szenario auch „Kptest Anwärter“.
+  const handle = rollen.getByRole('button', { name: 'Anwärter verschieben (ziehen oder Pfeiltasten)', exact: true });
   await handle.focus();
   for (let i = (await all()).indexOf('Anwärter'); i > 1; i--) {
     await page.keyboard.press('ArrowUp');
