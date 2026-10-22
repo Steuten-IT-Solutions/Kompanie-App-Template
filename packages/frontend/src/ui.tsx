@@ -6,9 +6,10 @@ import { noteError } from './lastError';
 /**
  * Lädt Daten asynchron; reload() lädt neu.
  * Mit `key` zeigt die Ansicht beim nächsten Öffnen sofort die zuletzt geladenen Daten und
- * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs; siehe dataCache.ts).
+ * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs, auch nach einem Neustart der App; siehe
+ * dataCache.ts). `onDevice: false` behält sie nur im Speicher, nicht auf dem Gerät (Daten von /admin/).
  */
-export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
+export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string, { onDevice = true } = {}) {
   const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
   const cached = () => (cacheKey !== null && dataCache.has(cacheKey) ? dataCache.get<T>(cacheKey) : null);
   const [data, setDataState] = useState<T | null>(cached);
@@ -18,10 +19,10 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
 
   const setData = useCallback(
     (d: T | null) => {
-      if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d);
+      if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, undefined, onDevice);
       setDataState(d);
     },
-    [cacheKey],
+    [cacheKey, onDevice],
   );
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
           setError(null);
         }
         // Auch wenn die Ansicht schon geschlossen ist: Beim nächsten Öffnen sind die Daten dann aktuell.
-        if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since);
+        if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since, onDevice);
       })
       .catch((e: Error) => alive && setError(e.message))
       .finally(() => alive && setLoading(false));
@@ -51,13 +52,8 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   return { data, error, loading, reload, setData };
 }
 
-export function Loading() {
-  return (
-    <div className="loading" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" /> Lädt …
-    </div>
-  );
-}
+// Lädt …, mit dem Gerüst der Seite, sobald die App es kennt (skeleton.tsx)
+export { Loading } from './skeleton';
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (

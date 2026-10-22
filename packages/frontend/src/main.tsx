@@ -6,7 +6,10 @@ import { createRoot } from 'react-dom/client';
 import { isStandalone } from './install';
 import App from './App';
 import { config, preparePreview } from './api';
+import { dataCache } from './dataCache';
+import { deviceStore } from './deviceStore';
 import { previewRole } from './preview';
+import { skeletons } from './skeleton';
 import { checkPushOnStart } from './push';
 import { watchRuntimeErrors } from './lastError';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
@@ -33,8 +36,23 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 // Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
 watchRuntimeErrors();
 
+/**
+ * Zuletzt gezeigte Daten und Gerüste der Seiten vom Gerät (dataCache.ts, skeleton.tsx), getrennt nach Version und
+ * Benutzer. Höchstens kurz darauf warten: Ein langsamer Speicher soll den Start nicht aufhalten. In der Vorschau nicht:
+ * Ihre Daten dürfen sich nicht mit denen des Admins mischen.
+ */
+function restoreViews(): Promise<unknown> {
+  if (!config || previewRole() || !('caches' in window)) return Promise.resolve();
+  const scope = `${config.version}|${config.user?.id ?? 'gast'}`;
+  const restoring = Promise.all([
+    dataCache.restore(scope, deviceStore('kompanie-ansicht-daten-v1', 60)),
+    skeletons.restore(scope, deviceStore('kompanie-ansicht-geruest-v1', 80)),
+  ]).catch(() => undefined);
+  return Promise.race([restoring, new Promise((resolve) => setTimeout(resolve, 300))]);
+}
+
 // Vorschau „App als Rolle ansehen“ (Issue #63): erst die Konfiguration der Rolle holen, dann starten.
-void preparePreview().then((notice) =>
+void Promise.all([preparePreview(), restoreViews()]).then(([notice]) =>
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App notice={notice} />

@@ -651,6 +651,47 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Nach dem Neustart: zuletzt geladene Daten sofort, ohne sie das Gerüst der Seite statt „Lädt …“', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/#/news');
+  await expect(page.locator('.news-card').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Termine' }).click();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  /** Schlüssel im Speicher der Ansichten auf dem Gerät (Daten bzw. Gerüste) */
+  const stored = (name: string) =>
+    page.evaluate(async (name) => (await (await caches.open(name)).keys()).map((r) => decodeURIComponent(r.url)), name);
+  await expect.poll(async () => (await stored('kompanie-ansicht-daten-v1')).some((u) => u.includes('termine|'))).toBe(true);
+  await expect.poll(async () => (await stored('kompanie-ansicht-geruest-v1')).some((u) => u.includes('/news|'))).toBe(true);
+  // Kein Text im Gerüst, nur der Aufbau
+  const layouts = await page.evaluate(async () => {
+    const cache = await caches.open('kompanie-ansicht-geruest-v1');
+    return Promise.all((await cache.keys()).map(async (k) => (await cache.match(k))!.text()));
+  });
+  expect(layouts.join('')).not.toContain('Tag der offenen Tür');
+
+  // Ab jetzt antworten Termine und News sehr langsam.
+  await page.context().route(/events|news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    // Termine: Die Daten vom letzten Mal sind nach dem Neustart sofort da.
+    await page.reload();
+    await expect(page.getByText('Tag der offenen Tür')).toBeVisible({ timeout: 1500 });
+    // News ohne gespeicherte Daten: sofort das Gerüst (Karten wie beim letzten Mal), kein „Lädt …“.
+    await page.evaluate(() => caches.delete('kompanie-ansicht-daten-v1'));
+    await page.goto('/app/#/news');
+    await page.reload();
+    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.loading')).toHaveCount(0);
+    await shot(page, 'geruest-news');
+    await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.skeleton')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();

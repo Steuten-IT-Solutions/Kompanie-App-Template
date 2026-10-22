@@ -68,8 +68,8 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
 /** Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat. */
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
-  // ein und schiebt die Zeilen darunter weg.
-  const { data, loading } = useAsync(() => api.settings(), [], 'settings');
+  // ein und schiebt die Zeilen darunter weg. Nicht auf dem Gerät: Verwaltung (/admin/) speichert die App dort nie.
+  const { data, loading } = useAsync(() => api.settings(), [], 'settings', { onDevice: false });
   if (loading && !data) return <Loading />;
   const pages = PAGES.filter((p) => p.id !== 'news' || !!data?.news);
   return (

@@ -20,3 +20,24 @@ test('Antwort einer Anfrage, die vor einer Änderung begann, wird nicht gespeich
   dataCache.set('me/points|[]', ['neu'], dataCache.generation());
   assert.deepEqual(dataCache.get('me/points|[]'), ['neu']);
 });
+
+test('Daten vom Gerät erscheinen nach dem Neustart; eigene Änderungen leeren auch den Speicher auf dem Gerät', async () => {
+  dataCache.clear();
+  const calls: string[] = [];
+  const stored = new Map<string, unknown>([
+    ['termine|[]', ['vom Gerät']],
+    ['me|[]', { alt: true }],
+  ]);
+  dataCache.set('me|[]', { frisch: true }); // schon frisch geladen, bevor der Speicher da war
+  await dataCache.restore('v|1', {
+    open: async () => stored,
+    put: (key) => calls.push(`put ${key}`),
+    clear: () => calls.push('clear'),
+  });
+  assert.deepEqual(dataCache.get('termine|[]'), ['vom Gerät']);
+  assert.deepEqual(dataCache.get('me|[]'), { frisch: true });
+  dataCache.set('news|[1]', ['n']);
+  dataCache.set('settings|[]', { geheim: 1 }, dataCache.generation(), false); // Verwaltung: nicht auf das Gerät
+  dataCache.clear();
+  assert.deepEqual(calls, ['put news|[1]', 'clear']);
+});
