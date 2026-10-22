@@ -632,6 +632,12 @@ const LINE_MM = 0.265;
  * Verschiebungen der Grafik selbst auf ganze Pixel rundet).
  */
 const TOP_MM = -LINE_MM / 2;
+/**
+ * Die Linie unter dem Kopf (Rahmen der ersten Zeile) zeichnet Chromium etwas unterhalb der Zellkante; ihre Mitte liegt
+ * so weit unter der Grafik (im PDF nachgemessen). Die Fläche reicht bis dorthin, und unter den gekippten Feldern zeichnet
+ * die Grafik die Linie selbst, sonst bliebe ein heller Streifen.
+ */
+const BOTTOM_MM = 0.21;
 /** Schriftgröße der Überschriften (10,5 pt) in Millimetern */
 const HEAD_FONT_MM = 3.7;
 
@@ -647,11 +653,13 @@ function RotatedHead({ labels, widths, height, color }: { labels: string[]; widt
   return (
     <svg className="list-th-svg" width={`${r + h}mm`} height={`${h}mm`} viewBox={`0 0 ${r + h} ${h}`} overflow="visible" aria-hidden="true">
       {/* 0,3 mm nach links unter die gerade Zelle davor (gleiche Farbe), gegen eine helle Naht */}
-      <polygon points={`-0.3,${TOP_MM} ${r + h - TOP_MM},${TOP_MM} ${r},${h} -0.3,${h}`} fill={color} />
+      <polygon points={`-0.3,${TOP_MM} ${r + h - TOP_MM},${TOP_MM} ${r},${h} ${r},${h + BOTTOM_MM} -0.3,${h + BOTTOM_MM}`} fill={color} />
       <g stroke="#555" strokeWidth={LINE_MM} fill="none">
         <line x1={-0.3} y1={TOP_MM} x2={r + h - TOP_MM} y2={TOP_MM} />
+        <line x1={-0.3} y1={h + BOTTOM_MM} x2={r + LINE_MM / 2} y2={h + BOTTOM_MM} />
+        {/* Schräge Trennlinien, unten ein kurzes Stück senkrecht bis zur Linie unter dem Kopf (wie die Rahmen darunter) */}
         {xs.map((x, i) => (
-          <line key={i} x1={x} y1={h} x2={x + h - TOP_MM} y2={TOP_MM} />
+          <polyline key={i} points={`${x},${h + BOTTOM_MM} ${x},${h} ${x + h - TOP_MM},${TOP_MM}`} strokeLinejoin="miter" />
         ))}
       </g>
       {labels.map((label, i) => {
