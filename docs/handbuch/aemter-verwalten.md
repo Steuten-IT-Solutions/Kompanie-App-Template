@@ -14,7 +14,7 @@ Unter **Neues Amt** trägst du Bezeichnung und Gruppe ein (oder „Ohne Gruppe�
 ## Amtszeiten
 Im Amt tippst du auf **Amtszeit eintragen**:
 - **Art:** *Zeitraum* (von–bis, oder ohne „Bis“: läuft noch) oder *Einzelnes Jahr*, z. B. für eine Ehrung.
-- **Personen:** Wähle ein Konto oder trage einen Namen ein, wenn die Person kein Konto hat (z. B. frühere oder verstorbene Mitglieder). Mit **Weitere Person** trägst du mehrere ein, z. B. zwei Minister.
+- **Personen:** Wähle zuerst unter **Profil**, wer die Person ist: *Ohne Profil* (sie hat kein Konto, z. B. frühere oder verstorbene Mitglieder; dann trägst du den Namen ein), *Mitglied* oder *Ehemaliger* (dann wählst du sie im Feld daneben aus). Ehemalige stehen dort, wenn sie unter **Verwaltung → Ehemalige** eingetragen sind. Mit **Weitere Person** trägst du mehrere ein, z. B. zwei Minister.
 - **Zusatz:** ein kurzer Hinweis, z. B. „Unter …“ oder „Ehrenvorsitz“.
 
 Die Reihenfolge im Zeitstrahl ergibt sich von selbst: laufende zuerst, dann nach Jahren. **Bearbeiten** und **Löschen** stehen bei jeder Amtszeit. Endet ein Amt, trage bei der Amtszeit das Jahr unter **Bis** ein.

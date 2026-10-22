@@ -306,15 +306,32 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   );
 }
 
-/** Konten zur Auswahl als Inhaber: wer die Mitgliederliste der Verwaltung sieht, alle; sonst die öffentliche Liste. */
+type Person = { id: number; name: string };
+type People = { members: Person[]; former: Person[] };
+
+/**
+ * Konten zur Auswahl als Inhaber, getrennt nach Mitgliedern und Ehemaligen: wer die jeweilige Liste der Verwaltung sieht,
+ * bekommt sie von dort; sonst die öffentliche Mitgliederliste bzw. den Tab „Ehemalige“.
+ */
 function usePeople() {
   const source = memberListAllowed() ? 'members' : config?.features.directory ? 'directory' : null;
+  const formerSource = can('create_users') ? 'members' : config?.features.directory ? 'directory' : null;
   return useAsync(
-    async () => {
-      const list = source === 'members' ? await api.members(false, true) : source === 'directory' ? await api.directory() : [];
-      return list.map((p) => ({ id: p.id, name: p.name }));
+    async (): Promise<People> => {
+      const [members, former] = await Promise.all([
+        source === 'members' ? api.members(false, true) : source === 'directory' ? api.directory() : Promise.resolve([]),
+        // Ohne die Ehemaligen (z. B. ältere Server) bleiben Mitglieder und freie Namen wählbar.
+        (formerSource === 'members'
+          ? api.formerMembers()
+          : formerSource === 'directory'
+            ? api.directoryFormer()
+            : Promise.resolve([])
+        ).catch(() => []),
+      ]);
+      const pick = (list: Person[]) => list.map((p) => ({ id: p.id, name: p.name }));
+      return { members: pick(members), former: pick(former) };
     },
-    [source],
+    [source, formerSource],
     'office-people',
   );
 }
@@ -342,7 +359,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             <TermForm
               key={t.id}
               initial={t}
-              people={people.data ?? []}
+              people={people.data ?? NO_PEOPLE}
               onCancel={() => setEditing(null)}
               onSave={async (input) => {
                 if (await run(() => api.updateOfficeTerm(t.id, input), 'Amtszeit gespeichert')) setEditing(null);
@@ -373,7 +390,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
       </div>
       {editing === 'new' ? (
         <TermForm
-          people={people.data ?? []}
+          people={people.data ?? NO_PEOPLE}
           onCancel={() => setEditing(null)}
           onSave={async (input) => {
             if (await run(() => api.createOfficeTerm(office.id, input), 'Amtszeit eingetragen')) setEditing(null);
@@ -517,7 +534,12 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
   );
 }
 
-type HolderRow = { user: string; name: string };
+const NO_PEOPLE: People = { members: [], former: [] };
+
+/** Person in der Amtszeit: ohne Profil (freier Name), Mitglied oder Ehemaliger (Konto). */
+type HolderKind = 'name' | 'member' | 'former';
+/** kind fehlt bei vorhandenen Einträgen, bis man sie ändert: ergibt sich dann aus den Listen (siehe kindOf). */
+type HolderRow = { kind?: HolderKind; user: string; name: string };
 
 /** Amtszeit eintragen oder bearbeiten: Art, Jahre, Zusatz und eine oder mehrere Personen (Konto oder freier Name). */
 function TermForm({
@@ -528,7 +550,7 @@ function TermForm({
   busy,
 }: {
   initial?: OfficeTerm;
-  people: { id: number; name: string }[];
+  people: People;
   onSave: (input: OfficeTermInput) => void;
   onCancel: () => void;
   busy: boolean;
@@ -540,10 +562,18 @@ function TermForm({
   const [holders, setHolders] = useState<HolderRow[]>(
     initial?.holders.map((h) => ({ user: h.user_id ? String(h.user_id) : '', name: h.name })) ?? [{ user: '', name: '' }],
   );
-  const options = [...people];
+  const formerIds = new Set(people.former.map((p) => p.id));
+  const kindOf = (h: HolderRow): HolderKind => h.kind ?? (!h.user ? 'name' : formerIds.has(Number(h.user)) ? 'former' : 'member');
+  // Konten, die schon in der Amtszeit stehen, aber in keiner Liste (z. B. ohne Recht darauf), bleiben bei den Mitgliedern wählbar.
+  const members = [...people.members];
   for (const h of initial?.holders ?? []) {
-    if (h.user_id && !options.some((p) => p.id === h.user_id)) options.push({ id: h.user_id, name: h.name });
+    if (h.user_id && !formerIds.has(h.user_id) && !members.some((p) => p.id === h.user_id)) members.push({ id: h.user_id, name: h.name });
   }
+  const kinds: { value: HolderKind; label: string }[] = [
+    { value: 'name', label: 'Ohne Profil' },
+    ...(members.length > 0 ? [{ value: 'member' as const, label: 'Mitglied' }] : []),
+    ...(people.former.length > 0 ? [{ value: 'former' as const, label: 'Ehemaliger' }] : []),
+  ];
   const set = (i: number, row: Partial<HolderRow>) => setHolders(holders.map((h, j) => (j === i ? { ...h, ...row } : h)));
 
   return (
@@ -556,7 +586,7 @@ function TermForm({
           start_year: Number(start),
           end_year: kind === 'period' && end.trim() !== '' ? Number(end) : null,
           note: note.trim(),
-          holders: holders.map((h) => (h.user ? { user_id: Number(h.user) } : { name: h.name.trim() })),
+          holders: holders.map((h) => (kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim() })),
         });
       }}
     >
@@ -590,39 +620,54 @@ function TermForm({
       </div>
       <fieldset className="extra-roles">
         <legend>Personen</legend>
-        {holders.map((h, i) => (
-          <div key={i} className="office-holder-row">
-            {options.length > 0 && (
-              <label className="field">
-                <span>Konto</span>
-                <select value={h.user} onChange={(e) => set(i, { user: e.target.value })}>
-                  <option value="">Ohne Konto (Name eingeben)</option>
-                  {options.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {!h.user && (
-              <label className="field">
-                <span>Name</span>
-                <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
-              </label>
-            )}
-            {holders.length > 1 && (
-              <button
-                type="button"
-                className="btn btn-small btn-secondary"
-                aria-label="Person entfernen"
-                onClick={() => setHolders(holders.filter((_, j) => j !== i))}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
+        {holders.map((h, i) => {
+          const kind = kindOf(h);
+          const list = kind === 'former' ? people.former : members;
+          return (
+            <div key={i} className="office-holder-row">
+              {kinds.length > 1 && (
+                <label className="field">
+                  <span>Profil</span>
+                  <select value={kind} onChange={(e) => set(i, { kind: e.target.value as HolderKind, user: '' })}>
+                    {kinds.map((k) => (
+                      <option key={k.value} value={k.value}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {kind === 'name' ? (
+                <label className="field">
+                  <span>Name</span>
+                  <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
+                </label>
+              ) : (
+                <label className="field">
+                  <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
+                  <select value={h.user} onChange={(e) => set(i, { user: e.target.value })} required>
+                    <option value="">Bitte wählen</option>
+                    {list.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {holders.length > 1 && (
+                <button
+                  type="button"
+                  className="btn btn-small btn-secondary"
+                  aria-label="Person entfernen"
+                  onClick={() => setHolders(holders.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          );
+        })}
         {holders.length < 20 && (
           <button type="button" className="btn btn-small btn-secondary" onClick={() => setHolders([...holders, { user: '', name: '' }])}>
             Weitere Person
