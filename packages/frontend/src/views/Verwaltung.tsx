@@ -44,7 +44,17 @@ import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'aemter' | 'anwesenheit';
+type Sub =
+  | 'mitglieder'
+  | 'ehemalige'
+  | 'punkte'
+  | 'strafe'
+  | 'katalog'
+  | 'dienstgrade'
+  | 'befoerderungen'
+  | 'titel'
+  | 'aemter'
+  | 'anwesenheit';
 
 const sec = brand.labels.sections;
 
@@ -54,7 +64,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'ehemalige' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -78,9 +88,9 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
-      ) : sub === 'ehemalige' && arg === 'import' && can('create_users') ? (
+      ) : active === 'ehemalige' && arg === 'import' ? (
         <FormerImport onToast={onToast} />
-      ) : sub === 'ehemalige' && can('create_users') ? (
+      ) : active === 'ehemalige' ? (
         <FormerList />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
@@ -212,9 +222,6 @@ function Members() {
         <div className="button-row add-member">
           <button className="btn" onClick={() => navigate('verwaltung/neu')}>
             + Mitglied anlegen
-          </button>
-          <button className="btn btn-secondary" onClick={() => navigate('verwaltung/ehemalige')}>
-            Ehemalige
           </button>
         </div>
       )}

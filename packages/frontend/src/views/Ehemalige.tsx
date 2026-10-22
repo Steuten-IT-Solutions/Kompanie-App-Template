@@ -58,10 +58,6 @@ export function FormerList() {
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-        ‹ Alle Mitglieder
-      </button>
-      <h2 className="member-name">Ehemalige</h2>
       <p className="member-counts small muted" role="status">
         {(Object.keys(REASON_TEXT) as FormerReason[])
           .filter((r) => count(r) > 0)
