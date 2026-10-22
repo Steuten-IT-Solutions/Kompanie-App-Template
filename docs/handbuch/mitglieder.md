@@ -4,28 +4,42 @@ reihenfolge: 39
 rechte: []
 bereiche: [directory]
 ---
-Unter **{bereich.directory}** (unten in der Leiste) siehst du, wer zur Kompanie gehört: alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter). Sehen kann die Liste jeder, auch Gäste und ohne Anmeldung; Gäste stehen nicht darin. Oben wechselst du zwischen der Liste, dem Zeitstrahl der Ämter (nutzt die Kompanie **{bereich.offices}**, siehe dort im Handbuch) und den **Ehemaligen**. Mit WordPress zeigt der Shortcode `[kompanie_mitglieder]` nur die {rolle.member} (ohne Personen nur mit dem internen Kalender, z. B. Anwärter) als Bildergalerie (Foto mit Namen, groß beim Antippen) auch auf der Webseite; wer kein Foto hat, bekommt dort seine Anfangsbuchstaben oder ein Platzhalterbild, wenn die Kompanie eines hinterlegt hat.
+Unter **{bereich.directory}** siehst du, wer zur Kompanie gehört: alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter), mit Foto, {bereich.titles} und {begriff.rank}. Die Liste sieht jeder, auch ohne Anmeldung.
 
-## Was in der Liste steht
-Jede Zeile zeigt den Namen und vorn ein kleines rundes Foto; wer keines hat, bekommt dort seine Anfangsbuchstaben. Tippst du auf ein Foto, erscheint es groß und ganz – so kannst du dir die Gesichter besser einprägen. Schließen mit **✕** oder durch Tippen neben das Foto. Nutzt die Kompanie **{bereich.titles}**, stehen sie beim Namen. Ist der Bereich **{bereich.ranks}** eingeschaltet, steht rechts das Abzeichen mit dem {begriff.rank} darunter; wer keinen {begriff.rank} hat, hat dort nichts.
+![Liste unter {bereich.directory}](bild:mitglieder)
 
-Ein Tipp auf eine Person öffnet ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, und nutzt die Kompanie **{bereich.offices}**, darunter alle ihre Ämter als Zeitstrahl. **‹ Zurück** führt wieder zur Liste. Mehr zeigt die Liste nicht: keine Rollen, keine {bereich.points} oder {bereich.penalties}, keine E-Mail-Adressen oder Benutzernamen.
+## So öffnest du die Seite
+Tippe unten in der Leiste auf **{bereich.directory}**.
 
-## Geburtstag und Eintritt
-Auf seiner Seite kann jedes {rolle.member} auch seinen Geburtstag und seinen Eintritt zeigen, z. B. „Geburtstag 12. März 1988 (38 Jahre) · Eintritt 01.04.2005“. Das entscheidet nur die Person selbst unter **Meins → Konto**, je Angabe: **Nicht anzeigen**, **Mitgliedern anzeigen** (von Anfang an; nur angemeldete {rolle.member} sehen es) oder **Öffentlich anzeigen** (jeder, auch ohne Anmeldung). Beim Geburtstag stehen Jahr und Alter nur, wenn die Person **Alter anzeigen** eingeschaltet und ein Jahr eingetragen hat, sonst nur Tag und Monat.
+## Was du hier siehst
+- **Umschalter** oben: **{bereich.directory}**, **{bereich.offices}** (wenn die Kompanie sie nutzt; dazu gibt es eine eigene Handbuchseite) und **Ehemalige**. Die App merkt sich auf diesem Gerät, was du zuletzt gewählt hast.
+- **Zähler**: wie viele Personen es je Gruppe gibt, z. B. {rolle.member} und Anwärter.
+- **Mitglied suchen …**: filtert die Liste nach dem Namen; ein Teil des Namens genügt.
+- **Sortierung** und **Reihenfolge**: **Nachname** oder **Vorname** (**A → Z** bzw. **Z → A**) oder **Eintritt** (**Früheste zuerst** bzw. **Neueste zuerst**).
+- **Die Liste**: vorn ein rundes Foto oder die Anfangsbuchstaben, dann der Name mit {bereich.titles}. Nutzt die Kompanie {bereich.ranks}, steht rechts das Abzeichen mit dem {begriff.rank}.
 
-So stellst du es für dich ein:
-- **Geburtstag:** unter **Meins → Konto** in der Karte **Geburtstag** bei **Auf meiner Seite unter „{bereich.directory}“** (nur wenn die Kompanie {bereich.birthdays} nutzt).
-- **Eintritt:** unter **Meins → Konto** in der Karte **Eintritt** das Datum (TT.MM.JJJJ) oder nur das Jahr eintragen, die Anzeige wählen und **Eintritt speichern** tippen. **Entfernen** löscht ihn. Auf deiner Seite steht der Eintritt so, wie er eingetragen ist: das ganze Datum oder nur das Jahr. Den Eintritt kann auch die Verwaltung für dich eintragen; die Anzeige wählst aber nur du.
+## So gehst du vor
+### Die Seite einer Person öffnen
+1. Tippe auf den Namen. Es öffnet sich ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, Geburtstag und Eintritt (soweit die Person sie zeigt) und darunter ihre {bereich.offices} als Zeitstrahl.
+2. **‹ Zurück** führt wieder zur Liste.
 
-## Ehemalige
-Unter **Ehemalige** stehen alle, die die Verwaltung als ehemalig eingetragen hat (ausgetreten, verstorben oder sonst ausgeschieden). Die Liste sieht aus wie die der {rolle.member}, mit Suche und Sortierung; unter dem Namen stehen, soweit eingetragen, „Gründungsmitglied“ sowie Eintritt und Ausscheiden, so wie sie eingetragen sind, z. B. „01.04.1985 – 03.05.2010“ oder nur mit den Jahren „1985–2010“. Der Grund des Ausscheidens steht dort nicht. Ein Tipp öffnet die Seite der Person mit ihren Ämtern.
+![Seite einer Person](bild:mitglieder-person)
 
-## Suchen und sortieren
-Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: {rolle.member} und die Rollen, die gesondert zählen (z. B. Anwärter), in umgekehrter Reihenfolge der Rollen, die ein {rolle.admin} festlegt (von unten nach oben). Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**, oder **Eintritt** mit **Früheste zuerst** bzw. **Neueste zuerst**. Nach Eintritt zählt der Eintritt, den eine Person auf ihrer Seite zeigt (unter dem Namen steht dann z. B. „Eintritt 01.04.2005“); wer keinen sichtbaren Eintritt hat, steht am Ende. Unter **Ehemalige** stehen Gründungsmitglieder ganz vorn; dort gibt es zusätzlich **Austritt** (nach dem Ausscheiden, wer keines hat, am Ende). Die Sortierung merkt sich die App auf diesem Gerät.
+### Ein Foto groß ansehen
+1. Tippe in der Liste auf das Foto. Es erscheint groß und ganz.
+2. Schließe es mit **✕** oder durch Tippen neben das Foto.
 
-## Fotos
-Die Fotos laden die zuständigen Personen in der Verwaltung hoch (siehe **Mitglieder anlegen**). Dein eigenes Foto siehst du unter **Meins**. Möchtest du ein anderes Foto oder keines, sprich die Verwaltung an.
+### Die Ehemaligen ansehen
+1. Tippe oben auf **Ehemalige**.
+2. Unter dem Namen stehen, soweit eingetragen, „Gründungsmitglied“ sowie Eintritt und Ausscheiden, z. B. „01.04.1985 – 03.05.2010“ oder „1985–2010“. Dort kannst du zusätzlich nach **Austritt** sortieren.
 
-## Für Admins
-Die Liste ist ein eigener Bereich: **Einstellungen → Bereiche → {bereich.directory}**. Solange er an ist, sind Namen, Fotos, {bereich.titles} und {begriff.rank} aller {rolle.member}, Personen mit dem internen Kalender (z. B. Anwärter) und Ehemaligen (bei diesen auch Eintritt und Ausscheiden, mit dem ganzen Datum, soweit eingetragen) öffentlich, ebenso Geburtstag und Eintritt der {rolle.member}, die das selbst so gewählt haben, also für jeden mit der Adresse der App sichtbar (Suchmaschinen sollen die App nicht aufnehmen). Bitte nur mit dem Einverständnis der Personen einschalten. Ist er aus, verschwindet die Liste, und {rolle.member} sehen die Fotos der anderen nicht mehr.
+![Ehemalige unter {bereich.directory}](bild:mitglieder-ehemalige)
+
+## Gut zu wissen
+- Gäste stehen nicht in der Liste. Rollen, {bereich.points}, {bereich.penalties}, E-Mail-Adressen und Benutzernamen zeigt die Liste nicht. Bei Ehemaligen steht kein Grund des Ausscheidens.
+- Geburtstag und Eintritt stehen nur da, wenn die Person das selbst unter **Meins → Konto** gewählt hat: **Nicht anzeigen**, **Mitgliedern anzeigen** (nur angemeldete {rolle.member} sehen es) oder **Öffentlich anzeigen** (jeder). Jahr und Alter beim Geburtstag nur, wenn sie **Alter anzeigen** eingeschaltet und ein Jahr eingetragen hat.
+- Nach **Eintritt** sortiert zählt der Eintritt, den die Person auf ihrer Seite zeigt; wer keinen zeigt, steht am Ende. Die Sortierung merkt sich die App auf diesem Gerät.
+- Die Fotos laden die zuständigen Personen in der Verwaltung hoch. Möchtest du ein anderes Foto oder keines, sprich sie an.
+- Solange die Kompanie die Liste nutzt, sind Namen, Fotos, {bereich.titles} und {begriff.rank} der {rolle.member}, Anwärter und Ehemaligen für jeden sichtbar, der die Adresse der App kennt.
+
+> **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_mitglieder]` die {rolle.member} (ohne Anwärter) als Bildergalerie auch auf der Webseite.
