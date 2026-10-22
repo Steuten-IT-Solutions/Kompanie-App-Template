@@ -5,7 +5,7 @@ import { useDragSort } from '../dragSort';
 import { formatDate, formatEuro, todayYmd } from '../format';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo-small.webp';
-import { csvFileName, listFileBase, toCsv } from '../lists';
+import { columnWidths, csvFileName, listFileBase, toCsv } from '../lists';
 import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -628,8 +628,12 @@ function RowEditor({
  * gekippt (Parallelogramm mit schrägen Linien), damit keine Linie den Text kreuzt.
  */
 const rotated = (c: ListColumn): boolean => c.width === 'narrow' && c.field !== 'nr' && columnLabel(c).trim() !== '';
-/** Ungefähr: Millimeter je Zeichen in fetter Schrift, um 45° gedreht (Höhe) */
-const ROTATED_MM_PER_CHAR = 1.8;
+/**
+ * Abstände der gedrehten Überschrift im Kopf (Millimeter): Sie beginnt 3 mm über der Unterkante (.list-th-label), oben
+ * bleibt etwas Luft bis zur Linie.
+ */
+const ROTATED_BOTTOM_MM = 3;
+const ROTATED_TOP_MM = 1.5;
 /** Druckbreite auf A4 mit 12 mm Rand (@page in PrintPortal) */
 const PAGE_WIDTH_MM = { portrait: 186, landscape: 273 };
 /** CSS-Pixel je Millimeter (96 dpi, in allen Browsern fest) */
@@ -653,6 +657,11 @@ function SlantedHead({ cols, widths, spare, height }: { cols: ListColumn[]; widt
   const pct = (v: number) => `${(v / total) * 100}%`;
   // Linien und gekippte Felder beginnen auf der Mitte des senkrechten Rahmens darunter
   const e = (i: number) => x[i] - 0.5;
+  // Wie weit der gekippte Kopf der gedrehten Spalten davor oben in eine gerade Spalte ragt (an ihrer linken Kante)
+  const cover = (i: number) => {
+    const r = cols.slice(0, i).map(rotated).lastIndexOf(true);
+    return r < 0 ? 0 : Math.max(0, h - (x[i] - x[r + 1]));
+  };
   const line = { stroke: '#555', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' as const };
   const color = brand.themeColor;
   return (
@@ -660,6 +669,8 @@ function SlantedHead({ cols, widths, spare, height }: { cols: ListColumn[]; widt
       <svg viewBox={`0 0 ${total} ${h}`} preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true">
         {cols.map((c, i) => !rotated(c) && <rect key={i} x={x[i]} y={0} width={widths[i]} height={h} fill={color} />)}
         {cols.map((c, i) => !rotated(c) && i > 0 && !rotated(cols[i - 1]) && <line key={i} x1={e(i)} y1={0} x2={e(i)} y2={h} {...line} />)}
+        {/* Rechter Rand, wenn hinter der letzten (geraden) Spalte noch Platz für den gekippten Kopf ist */}
+        {spare > 0 && !rotated(cols[cols.length - 1]) && <line x1={e(cols.length)} y1={0} x2={e(cols.length)} y2={h} {...line} />}
         {cols.map(
           (c, i) =>
             rotated(c) &&
@@ -686,13 +697,90 @@ function SlantedHead({ cols, widths, spare, height }: { cols: ListColumn[]; widt
             {columnLabel(c)}
           </span>
         ) : (
-          <span key={i} className="list-th-straight" style={{ left: pct(x[i]), width: pct(widths[i]) }}>
+          <StraightLabel key={i} left={pct(x[i])} width={pct(widths[i])} cover={cover(i)} height={h}>
             {columnLabel(c)}
-          </span>
+          </StraightLabel>
         ),
       )}
     </div>
   );
+}
+
+/** Zeilenhöhe der Überschriften in der Kopfzeile (fett, 10,5 pt, Zeilenabstand 1,2) */
+const HEAD_LINE_PX = 17;
+/** Innenabstand links und rechts der Überschriften (wie die Kopfzellen, styles.css) */
+const STRAIGHT_PAD_PX = 6;
+
+/**
+ * Überschrift einer geraden Spalte im gekippten Kopf. Ragt ein gekippter Kopf davor oben hinein (cover > 0), weicht der
+ * Text der schrägen Kante aus: ein unsichtbares Dreieck links (shape-outside), um das der Text fließt. Er beginnt auf
+ * halber Höhe wie in den anderen Kopfzellen, tiefer nur, wo die Zeile neben der Kante erst Platz hat.
+ */
+function StraightLabel({
+  left,
+  width,
+  cover,
+  height,
+  children,
+}: {
+  left: string;
+  width: string;
+  cover: number;
+  height: number;
+  children: string;
+}) {
+  if (cover <= 0)
+    return (
+      <span className="list-th-straight" style={{ left, width }}>
+        {children}
+      </span>
+    );
+  const top = Math.max(0, Math.round(height / 2 - HEAD_LINE_PX / 2));
+  // Bis zur Höhe des Textanfangs ist die Kante schon um so viel nach links gewandert; dazu der Innenabstand links
+  const shape = Math.max(0, cover - top - STRAIGHT_PAD_PX);
+  return (
+    <span className="list-th-straight list-th-straight-under" style={{ left, width, paddingTop: `${top}px` }}>
+      {shape > 0 && <span className="list-th-shape" style={{ width: `${shape}px`, height: `${shape}px` }} />}
+      {children}
+    </span>
+  );
+}
+
+/** Felder mit Namen: Diese Spalten brechen nicht um (columnWidths). */
+const NAME_FIELDS = new Set<ListField>(['name', 'first_name', 'last_name']);
+/** Zur Textbreite: Innenabstand der Zelle (2 × 6 px), Rahmen und etwas Luft für Rundungen beim Messen */
+const CELL_EXTRA_PX = 16;
+
+let measureCanvas: HTMLCanvasElement | null = null;
+
+/** Breite des längsten Texts in CSS-Pixeln */
+function textWidth(texts: string[], font: string): number {
+  measureCanvas ??= document.createElement('canvas');
+  const ctx = measureCanvas.getContext('2d');
+  if (!ctx) return 0;
+  ctx.font = font;
+  return Math.max(0, ...texts.map((t) => ctx.measureText(t).width));
+}
+
+/**
+ * Schrift der Liste zum Messen (Schrift der App): normal für die Zellen, fett für die Überschriften, beide 10,5 pt =
+ * 14 px. Ist sie noch nicht geladen, misst die Zeichenfläche mit einer Ersatzschrift: dann nach dem Laden noch einmal.
+ */
+function useListFonts(): { cell: string; head: string } {
+  const family = getComputedStyle(document.body).fontFamily;
+  const cell = `400 14px ${family}`;
+  const head = `700 14px ${family}`;
+  const [, setLoaded] = useState(false);
+  useEffect(() => {
+    let active = true;
+    Promise.all([document.fonts?.load(cell), document.fonts?.load(head)])
+      .then(() => active && setLoaded(true))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [cell, head]);
+  return { cell, head };
 }
 
 /**
@@ -702,24 +790,48 @@ function SlantedHead({ cols, widths, spare, height }: { cols: ListColumn[]; widt
  */
 function PrintSheet({ draft }: { draft: Draft }) {
   const cols = draft.columns;
-  const total = cols.reduce((s, c) => s + WIDTH_WEIGHT[c.width], 0) || 1;
-  const longest = Math.max(0, ...cols.filter(rotated).map((c) => columnLabel(c).length));
-  // Höhe des Kopfs in ganzen Pixeln: Sonst rundet der Browser die Zeile und unter den gekippten Feldern bleibt ein Spalt.
-  const headPx = longest > 0 ? Math.round(Math.min(50, Math.max(12, longest * ROTATED_MM_PER_CHAR + 8)) * PX_PER_MM) : 0;
-  // Der gekippte Kopf der letzten Spalte ragt oben um die Höhe des Kopfs nach rechts hinaus: dafür eine leere Spalte
-  // ohne Rahmen ans Ende, damit die Tabelle den Platz mitrechnet.
-  const last = cols[cols.length - 1];
-  const sparePx = last && rotated(last) ? headPx : 0;
+  const fonts = useListFonts();
+  // Höhe des Kopfs aus der längsten gedrehten Überschrift: Sie läuft um 45° nach oben (Länge / √2), dazu die halbe
+  // Zeilenhöhe (Zeilenabstand 1) an ihrem oberen Ende und die Abstände unten und oben. In ganzen Pixeln: Sonst rundet
+  // der Browser die Zeile und unter den gekippten Feldern bleibt ein Spalt.
+  const labels = cols.filter(rotated).map(columnLabel);
+  const rise = (textWidth(labels, fonts.head) + 7) / Math.SQRT2;
+  const headMm = rise / PX_PER_MM + ROTATED_BOTTOM_MM + ROTATED_TOP_MM;
+  const headPx = labels.length > 0 ? Math.round(Math.min(50, Math.max(12, headMm)) * PX_PER_MM) : 0;
   // Der gekippte Kopf beginnt eine Spalte vor der ersten gedrehten: Deren Fläche und die gerade davor überlappen sich so
   // in einer Grafik (zwei Flächen nebeneinander zeigen in manchen PDF-Anzeigen eine helle Naht).
   const firstRotated = cols.findIndex(rotated);
   const slantFrom = firstRotated < 0 ? -1 : Math.max(0, firstRotated - 1);
+  const lastRotated = cols.map(rotated).lastIndexOf(true);
   const pageWidth = PAGE_WIDTH_MM[draft.orientation];
+  // Namen brechen nicht um: Ihre Spalten sind mindestens so breit wie der längste Name (Schrift der Zellen, 10,5 pt).
+  const minimums = cols.map((c) =>
+    c.kind === 'field' && c.field !== null && NAME_FIELDS.has(c.field)
+      ? Math.ceil(
+          textWidth(
+            draft.rows.map((r, i) => cellText(c, r, i)),
+            fonts.cell,
+          ),
+        ) + CELL_EXTRA_PX
+      : 0,
+  );
   // Spaltenbreiten in ganzen Pixeln: Der Browser rastet die senkrechten Rahmen auf ganze Pixel ein, die gekippten Felder
-  // nicht; nur so beginnen die schrägen Linien genau über den senkrechten. Die letzte Spalte nimmt den Rundungsrest.
-  const available = Math.floor(pageWidth * PX_PER_MM) - sparePx;
-  const widths = cols.map((c) => Math.floor((available * WIDTH_WEIGHT[c.width]) / total));
-  if (widths.length > 0) widths[widths.length - 1] += available - widths.reduce((a, b) => a + b, 0);
+  // nicht; nur so beginnen die schrägen Linien genau über den senkrechten. Der gekippte Kopf der letzten gedrehten
+  // Spalte ragt oben um die Höhe des Kopfs nach rechts hinaus: Reichen die Spalten dahinter dafür nicht, kommt eine leere
+  // Spalte ohne Rahmen ans Ende, damit die Tabelle den Platz mitrechnet (hängt von den Breiten ab, daher in Runden).
+  let sparePx = 0;
+  let widths: number[] = [];
+  for (let round = 0; round < 4; round++) {
+    widths = columnWidths(
+      cols.map((c) => WIDTH_WEIGHT[c.width]),
+      minimums,
+      Math.floor(pageWidth * PX_PER_MM) - sparePx,
+    );
+    const tail = widths.slice(lastRotated + 1).reduce((a, b) => a + b, 0);
+    const spare = lastRotated < 0 ? 0 : Math.max(0, headPx - tail);
+    if (spare === sparePx) break;
+    sparePx = spare;
+  }
   return (
     <div className="list-sheet" style={{ ['--list-color' as string]: brand.themeColor, width: `${pageWidth}mm` }}>
       <header className="list-sheet-head">
