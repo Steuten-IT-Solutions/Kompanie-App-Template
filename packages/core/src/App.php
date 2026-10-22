@@ -6,6 +6,7 @@ namespace KompanieApp\Core;
 
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\PreviewEnvironment;
+use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BirthdayService;
@@ -16,6 +17,7 @@ use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\MemberService;
@@ -471,7 +473,19 @@ final class App
 
     public function members(): MemberService
     {
-        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache, $this->roles()));
+        return $this->service(MemberService::class, fn () => new MemberService(
+            $this->users,
+            $this->scores(),
+            $this->authenticator,
+            $this->cache,
+            $this->roles(),
+            fn (User $user): ?string => $this->formerMembers()->previousRole($user),
+        ));
+    }
+
+    public function formerMembers(): FormerMemberService
+    {
+        return $this->service(FormerMemberService::class, fn () => new FormerMemberService($this));
     }
 
     public function roles(): RoleService

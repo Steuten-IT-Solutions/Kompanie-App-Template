@@ -872,6 +872,39 @@ final class Migrations
                 'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge mediumtext DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge TEXT DEFAULT NULL'],
             ],
+            // Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden. Das Konto bleibt mit allen Daten, hat
+            // aber die Rolle Gast (Port\UserDirectory::deactivate). reason: left | deceased | other; joined_on und left_on:
+            // JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer; founder: Gründungsmitglied. restore: Rollen und Ausnahmen bei den
+            // Rechten von vorher als JSON, damit „Wieder aufnehmen“ den alten Stand herstellt.
+            19 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {former_members} (
+  user_id bigint(20) unsigned NOT NULL,
+  reason varchar(10) NOT NULL,
+  joined_on varchar(10) NOT NULL DEFAULT \'\',
+  founder tinyint(1) NOT NULL DEFAULT 0,
+  left_on varchar(10) NOT NULL DEFAULT \'\',
+  restore text NOT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {former_members} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  reason TEXT NOT NULL,
+  joined_on TEXT NOT NULL DEFAULT \'\',
+  founder INTEGER NOT NULL DEFAULT 0,
+  left_on TEXT NOT NULL DEFAULT \'\',
+  restore TEXT NOT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

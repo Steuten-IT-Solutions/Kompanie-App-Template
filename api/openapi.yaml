@@ -2480,6 +2480,120 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/former:
+    get:
+      tags: [Verwaltung]
+      summary: Ehemalige Mitglieder (ausgetreten, verstorben, sonst ausgeschieden)
+      description: Nach Namen. `points` bzw. `open_cents` nur mit manage_points bzw. manage_penalties (sonst null).
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FormerMember' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/former/import:
+    post:
+      tags: [Verwaltung]
+      summary: Ehemalige aus einer Tabelle anlegen (Ersterfassung, z. B. Chronik); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon oder Tabulator, UTF-8 oder Windows-1252, höchstens 200 KB und 500 Zeilen:
+        `vorname;nachname;eintritt;ausgeschieden;grund` (Kopfzeile erlaubt). Daten als TT.MM.JJJJ, JJJJ-MM-TT, nur das Jahr
+        oder leer; eintritt „Gründer“ setzt `founder`. grund: ausgetreten (auch leer), verstorben, sonstiges. Wer genau so
+        heißt wie ein vorhandenes Konto, wird übersprungen (`existing`); gleiche Namen in der Tabelle sind ein Fehler. Mit
+        `apply` entsteht je Person ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen
+        wird; enthält eine Zeile einen Fehler → 400 (nichts angelegt).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormerImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/former:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: Als ehemalig eintragen (Konto stilllegen, alle Daten bleiben)
+      description: |
+        Grundrolle Gast, Zusatzrollen und Ausnahmen fallen weg (werden für „Wieder aufnehmen“ gemerkt), alle Sitzungen und
+        Push-Abos enden; die eigenständige Version sperrt die Anmeldung. Grenzen wie beim Löschen; nicht das eigene Konto,
+        nicht den letzten Admin, keine Gäste.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormerInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormerInfo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Angaben einer ehemaligen Person ändern (fehlende bleiben)
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormerInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormerInfo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Wieder aufnehmen
+      description: |
+        Grundrolle von vorher (Mitglied, wenn es sie nicht mehr gibt), Zusatzrollen, soweit es sie gibt und der Handelnde
+        sie vergeben darf; Ausnahmen bei den Rechten nur durch Admins. Ein Startpasswort danach über
+        `POST /members/{id}/password`.
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+                  extra_roles:
+                    type: array
+                    items: { $ref: '#/components/schemas/Level' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/account:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -4393,6 +4507,84 @@ components:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
             photo_editable: { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
+            former:
+              description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
+              oneOf:
+                - $ref: '#/components/schemas/FormerInfo'
+                - type: 'null'
+
+    FormerReason:
+      type: string
+      description: ausgetreten, verstorben, sonst ausgeschieden
+      enum: [left, deceased, other]
+
+    FormerDate:
+      type: string
+      description: JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer
+      pattern: '^(\d{4}(-\d{2}-\d{2})?)?$'
+
+    FormerInput:
+      type: object
+      description: Daten auch als TT.MM.JJJJ; nicht in der Zukunft, nicht vor 1800, Eintritt nicht nach dem Ausscheiden.
+      properties:
+        reason: { $ref: '#/components/schemas/FormerReason' }
+        joined_on: { type: string }
+        left_on: { type: string, description: 'bei Verstorbenen der Todestag' }
+        founder: { type: boolean, description: Gründungsmitglied }
+
+    FormerInfo:
+      type: object
+      required: [reason, joined_on, founder, left_on, previous_level]
+      properties:
+        reason: { $ref: '#/components/schemas/FormerReason' }
+        joined_on: { $ref: '#/components/schemas/FormerDate' }
+        founder: { type: boolean }
+        left_on: { $ref: '#/components/schemas/FormerDate' }
+        previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
+
+    FormerMember:
+      allOf:
+        - $ref: '#/components/schemas/FormerInfo'
+        - type: object
+          required: [id, name, first_name, last_name, photo_url, points, open_cents]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            first_name: { type: string }
+            last_name: { type: string }
+            photo_url: { type: [string, 'null'] }
+            points: { type: [number, 'null'] }
+            open_cents: { type: [integer, 'null'] }
+
+    FormerImportResult:
+      type: object
+      required: [rows, new, existing, applied]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              reason: { $ref: '#/components/schemas/FormerReason' }
+              joined_on: { $ref: '#/components/schemas/FormerDate' }
+              founder: { type: boolean }
+              left_on: { $ref: '#/components/schemas/FormerDate' }
+              existing:
+                description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  former: { type: boolean }
+              error: { type: string }
+        new: { type: integer }
+        existing: { type: integer }
+        applied: { type: boolean }
 
     GrantableCapability:
       type: string

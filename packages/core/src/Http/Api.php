@@ -705,6 +705,8 @@ final class Api
                     $this->showRanks() ? array_keys($a->ranks()->repository()->assignments()) : [],
                     $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
                 );
+                // Ehemalige stehen in ihrer eigenen Liste (GET /members/former), auch wenn sie noch Dienstgrad oder Titel haben.
+                $holders = array_values(array_diff($holders, $a->formerMembers()->ids()));
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
                 // Gruppe für den Zähler über der Liste, wie in der Anwesenheit (Einstellungen → Rollen); Gäste ohne.
                 $groups = $a->attendance()->groupMap();
@@ -732,7 +734,19 @@ final class Api
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
+                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
+                // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
+                + ['former' => $a->formerMembers()->of($r->id())], null, $denyManage),
+            // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
+            new Route('GET', '/members/former', Cap::CreateUsers, function () use ($a) {
+                $photos = $a->memberPhotos()->urls();
+                return array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $a->formerMembers()->list($this->user()));
+            }, null, $denyUsers),
+            // Import (Ersterfassung, z. B. aus einer Chronik): ohne apply nur die Vorschau
+            new Route('POST', '/members/former/import', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            new Route('PUT', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('PATCH', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('DELETE', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyUsers),
             // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
             // Rechte einzelner Personen zusätzlich zu ihren Rollen geben oder entziehen

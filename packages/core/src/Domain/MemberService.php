@@ -24,7 +24,22 @@ final class MemberService
         private readonly Authenticator $auth,
         private readonly ?Cache $cache = null,
         private readonly ?RoleService $roles = null,
+        /** @var (\Closure(User): ?string)|null Grundrolle vor dem Ausscheiden, wenn die Person ehemalig ist (FormerMemberService) */
+        private readonly ?\Closure $formerRole = null,
     ) {
+    }
+
+    /** Grundrolle vor dem Ausscheiden, wenn die Person ehemalig ist; sonst null. */
+    private function formerRole(User $user): ?string
+    {
+        return $this->formerRole !== null ? ($this->formerRole)($user) : null;
+    }
+
+    private function denyFormer(User $user): void
+    {
+        if ($this->formerRole($user) !== null) {
+            throw ApiError::invalid('Diese Person ist ehemalig. Bitte zuerst wieder aufnehmen.');
+        }
     }
 
     /** Versuche beim Passwortwechsel (Prüfung des aktuellen Passworts): höchstens so viele in 15 Minuten. */
@@ -191,6 +206,7 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Benutzer nicht gefunden.');
         }
+        $this->denyFormer($target);
         if ($level === null && $extraRoles === null) {
             throw ApiError::invalid('Bitte eine Rolle angeben.');
         }
@@ -295,6 +311,7 @@ final class MemberService
         if ($actor->id === $id) {
             throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
         }
+        $this->denyFormer($target);
         if ($target->role !== Roles::CANDIDATE) {
             throw ApiError::invalid('Nur Anwärter können so zum Mitglied gemacht werden.');
         }
@@ -429,6 +446,9 @@ final class MemberService
             throw ApiError::notFound('Mitglied nicht gefunden.');
         }
         $this->guardAccount($actor, $target, 'Das Passwort dieser Person darfst du nicht zurücksetzen.');
+        if ($this->formerRole($target) !== null) {
+            throw ApiError::invalid('Ehemalige können sich nicht anmelden. Wer wieder aufgenommen wird, bekommt hier ein neues Startpasswort.');
+        }
         $password = Passwords::readable(12);
         try {
             $this->users->setPassword($id, $password);
@@ -443,10 +463,18 @@ final class MemberService
      * Mitgliederbereich bzw. nur Kalender und ohne mehr Rechte als man selbst. Sonst könnte, wer Konten anlegen darf,
      * das Konto einer Person mit mehr Rechten übernehmen, oder (bei WordPress) das Konto einer Person, die gar nicht zur
      * Kompanie gehört (Gast). Anwärter legt an, wer Konten anlegen darf; ihr Konto darf er deshalb auch verwalten.
-     * Gilt auch für das Foto (MemberPhotoService).
+     * Gilt auch für das Foto (MemberPhotoService). Ehemalige (Rolle Gast) gelten mit ihrer Grundrolle von vorher: Wer sie
+     * als ehemalig markieren durfte, darf ihr Konto weiter verwalten.
      */
     public function guardAccount(User $actor, User $target, string $message): void
     {
+        $previous = $this->formerRole($target);
+        if ($previous !== null) {
+            if (!$actor->isAdmin() && ($previous === Roles::ADMIN || $this->roles === null || !$this->roles->canHandle($actor, $previous))) {
+                throw ApiError::forbidden($previous === Roles::ADMIN ? 'Konten von Admins verwalten nur Admins.' : $message);
+            }
+            return;
+        }
         if ($target->isAdmin() && !$actor->isAdmin()) {
             throw ApiError::forbidden('Konten von Admins verwalten nur Admins.');
         }

@@ -202,6 +202,34 @@ final class RoleService
         }
     }
 
+    /**
+     * Ausnahmen einer Person, wie gespeichert (ehemalige Mitglieder merken sie sich für „Wieder aufnehmen“).
+     *
+     * @return array{grant: string[], revoke: string[]}
+     */
+    public function overridesOf(int $id): array
+    {
+        return $this->loadOverrides()[$id] ?? self::NO_OVERRIDES;
+    }
+
+    /**
+     * Früher gemerkte Ausnahmen wieder einsetzen (ehemaliges Mitglied wieder aufgenommen). Unbekannte Rechte und was die
+     * Rollen jetzt schon regeln, fallen weg.
+     */
+    public function restoreOverrides(int $id, mixed $saved, string $baseRole): void
+    {
+        if (!is_array($saved) || !self::overridable($baseRole)) {
+            return;
+        }
+        $o = [
+            'grant' => self::ordered(array_filter((array) ($saved['grant'] ?? []), 'is_string')),
+            'revoke' => self::ordered(array_filter((array) ($saved['revoke'] ?? []), 'is_string')),
+        ];
+        if ($o['grant'] !== [] || $o['revoke'] !== []) {
+            $this->storeOverrides($id, self::normalized($this->grantedFor($id, $baseRole), $o));
+        }
+    }
+
     /** Konto entfernt: Ausnahmen löschen (sonst bekäme sie eine spätere Person mit derselben ID). */
     public function forget(int $id): void
     {
