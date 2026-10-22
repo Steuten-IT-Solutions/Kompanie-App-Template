@@ -3871,44 +3871,56 @@ button.spotlight-person:focus-visible {
   padding: 5px 6px;
 }
 /*
- * Gedrehte Überschrift wie in Tabellenkalkulationen (RotatedHead in ListenVerwalten.tsx): Jede gedrehte Zelle zeichnet
- * ihr gekipptes Feld als Grafik in ihrer eigenen Breite. Die Zellen selbst haben weder Farbe noch Rahmen, die gerade
- * Zelle davor keine Linie rechts. Positioniert ist nur das innere div, nicht die Zelle: So liegt die Grafik über den
- * Nachbarzellen.
+ * Gedrehte Überschrift wie in Tabellenkalkulationen (SlantedHead in ListenVerwalten.tsx): Ab der ersten gedrehten
+ * Spalte (ab der Spalte davor) ist der Kopf eine Zelle, die alles selbst als Grafik zeichnet, ohne über sich
+ * hinauszuragen (Chrome schneidet das beim Drucken ab). Rahmen hat sie oben, links nur vor einer geraden Spalte, rechts
+ * nur, wenn keine gedrehte Spalte am Ende überragt; unten liegen die Rahmen der Zeilen.
  */
-.list-table th.list-th-rotated {
-  padding: 0;
-  border-width: 0;
-  background: none;
-  vertical-align: top;
-}
-.list-table th.list-th-before-rotated {
-  border-right-width: 0;
-}
-.list-th-rotated > div {
+.list-table th.list-th-slanted {
   position: relative;
+  padding: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-bottom-width: 0;
+  background: none;
 }
-.list-th-svg {
+.list-table th.list-th-slanted-left {
+  border-left-width: 1px;
+}
+.list-table th.list-th-slanted-right {
+  border-right-width: 1px;
+}
+.list-th-slanted-inner {
   position: absolute;
-  left: 0;
-  top: 0;
-  overflow: visible;
+  inset: 0;
+  overflow: hidden;
+}
+.list-th-slanted-inner > svg {
+  position: absolute;
+  inset: 0;
+  display: block;
 }
 /* Mitte des Textes auf der Mittellinie des Felds: unten in der Spaltenmitte, 3 mm höher also 3 mm weiter rechts */
 .list-th-label {
   position: absolute;
-  left: calc(50% + 3mm);
   bottom: 3mm;
   transform-origin: 0 50%;
   transform: translateY(50%) rotate(-45deg);
   white-space: nowrap;
   line-height: 1;
 }
-/* Platz für den gekippten Kopf der letzten Spalte: ohne Farbe und Rahmen */
-.list-table th.list-spare-head {
-  border-width: 0;
-  padding: 0;
-  background: none;
+/* Gerade Spalte hinter einer gedrehten: Überschrift wie in den anderen Kopfzellen */
+.list-th-straight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 6px;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 .list-table thead {
   display: table-header-group;

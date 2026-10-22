@@ -682,15 +682,13 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   // Vorschau wie gedruckt: Kopf mit Titel, Spalten, Kästchen, eigene Zeilen
   const preview = page.locator('.list-preview');
   await expect(preview.locator('.list-sheet-title')).toHaveText(title);
-  await expect(preview.locator('thead th:not(.list-spare-head)')).toHaveText([
-    'Name',
-    'Vorname',
-    'Unterschrift',
-    'Bezahlt',
-    'Anzahl Kinder',
-  ]);
+  // Ab der Spalte vor der ersten gedrehten ist der Kopf eine Zelle (sonst schneidet Chrome ihn im Druck ab)
+  await expect(preview.locator('thead th:not(.list-th-slanted)')).toHaveText(['Name', 'Vorname']);
+  await expect(preview.locator('thead th.list-th-slanted .list-th-straight')).toHaveText(['Unterschrift']);
   // Schmale Spalten mit gedrehter Überschrift (wie in den Tabellen der Kompanie), Nr. nicht
-  await expect(preview.locator('thead th.list-th-rotated')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
+  await expect(preview.locator('thead th.list-th-slanted .list-th-label')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
+  // Titel der Seite = Titel der Liste: Den schlägt der Browser als Namen der PDF-Datei vor
+  await expect(page).toHaveTitle(title);
   await expect(preview.locator('tbody tr')).toHaveCount(members + 2);
   await expect(preview.locator('tbody tr').nth(members)).toHaveText('NachbarvereinGast vom☐');
 
@@ -721,6 +719,7 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen)
   await page.getByRole('button', { name: /Alle Listen/ }).click();
   await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
+  await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
   await expect(page.locator('.toast')).toHaveText('Liste kopiert');
   for (const t of [`${title} (Kopie)`, title]) {

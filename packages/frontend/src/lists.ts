@@ -18,12 +18,15 @@ export function toCsv(header: string[], rows: (string | number)[][]): string {
   return BOM + [header, ...rows].map((r) => r.map(csvField).join(';')).join('\r\n') + '\r\n';
 }
 
-/** Dateiname aus dem Titel: ohne Zeichen, die Dateisysteme nicht mögen. */
-export function csvFileName(title: string): string {
-  const base = title
+/** Dateiname (ohne Endung) aus dem Titel: ohne Zeichen, die Dateisysteme nicht mögen; leer bei leerem Titel. */
+export function listFileBase(title: string): string {
+  return title
     .replace(/[\\/:*?"<>|\u0000-\u001F]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80);
-  return `${base || 'liste'}.csv`;
+}
+
+export function csvFileName(title: string): string {
+  return `${listFileBase(title) || 'liste'}.csv`;
 }
