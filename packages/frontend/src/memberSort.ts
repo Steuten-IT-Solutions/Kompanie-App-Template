@@ -61,6 +61,26 @@ export function loadMemberOrder(): MemberOrder {
   }
 }
 
+/** Gemerkte Sortierung, wenn die Liste sie anbietet; sonst nach Nachname (die gemerkte Wahl bleibt). */
+export function orderFor(stored: MemberOrder, options: readonly MemberSort[]): MemberOrder {
+  return options.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+}
+
+/** Liste, aus der eine Person geöffnet wird: aktive Mitglieder oder Ehemalige (wie in der Adresse). */
+export type BrowseList = 'mitglied' | 'ehemalige';
+
+/** Reihenfolge der Liste beim Öffnen einer Person (gefiltert und sortiert): Auf ihrer Seite blättert man darin weiter. */
+let browse: { list: BrowseList; ids: number[] } | null = null;
+
+export function setBrowseOrder(list: BrowseList, ids: number[]): void {
+  browse = { list, ids };
+}
+
+/** Gemerkte Reihenfolge, wenn die Person darin steht; sonst null. */
+export function browseOrder(list: BrowseList, id: number): number[] | null {
+  return browse && browse.list === list && browse.ids.includes(id) ? browse.ids : null;
+}
+
 export function saveMemberOrder(order: MemberOrder): void {
   try {
     localStorage.setItem(SORT_KEY, order.sort);
