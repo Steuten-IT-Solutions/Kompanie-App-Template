@@ -155,12 +155,13 @@ final class MemberPhotoService
         return $photo === null ? null : $this->app->env->memberPhotoUrl($userId, $photo['version'], self::DEFAULT_SIZE);
     }
 
-    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel), für Listen mit einer Abfrage */
-    public function urls(): array
+    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel oder eine andere aus SIZES), für Listen mit einer Abfrage */
+    public function urls(int $size = self::DEFAULT_SIZE): array
     {
+        $size = in_array($size, self::SIZES, true) ? $size : self::DEFAULT_SIZE;
         $out = [];
         foreach ($this->repository()->versions() as $userId => $version) {
-            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, self::DEFAULT_SIZE);
+            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, $size);
         }
         return $out;
     }
