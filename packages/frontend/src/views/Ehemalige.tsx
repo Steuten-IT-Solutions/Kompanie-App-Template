@@ -22,8 +22,8 @@ import {
 
 const sec = brand.labels.sections;
 
-/** Nach Namen oder Eintritt; Punkte gibt es in dieser Liste nicht. */
-export const FORMER_SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
+/** Nach Namen, Eintritt oder Austritt; Punkte gibt es in dieser Liste nicht. */
+export const FORMER_SORTS: MemberSort[] = ['last-name', 'first-name', 'joined', 'left'];
 
 /** Auswahl beim Eintragen */
 export const REASON_OPTIONS: Record<FormerReason, string> = { left: 'Ausgetreten', deceased: 'Verstorben', other: 'Sonstiges' };

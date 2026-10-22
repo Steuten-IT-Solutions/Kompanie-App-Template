@@ -158,10 +158,13 @@ type MembersState = {
 };
 let savedMembers: MembersState | null = null;
 
-/** Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users). */
+/**
+ * Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt
+ * (create_users); nach Austritt nur bei den Ehemaligen.
+ */
 const memberSorts = (): MemberSort[] =>
   (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
-    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+    (s) => s !== 'left' && (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
   );
 
 function Members() {

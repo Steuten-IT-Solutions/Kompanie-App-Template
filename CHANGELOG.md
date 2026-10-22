@@ -27,6 +27,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung, und die gewählte
   Unterseite (z. B. Punkte) bleibt.
+- **Ehemalige nach Austritt sortieren**: Die Liste der Ehemaligen (in der Verwaltung und in der Mitgliederliste) lässt
+  sich jetzt auch nach dem Datum des Ausscheidens sortieren, früheste oder neueste zuerst; wer keines hat, steht am Ende.
 
 ### Geändert
 
