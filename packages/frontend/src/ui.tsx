@@ -93,6 +93,32 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
+/** Zeile mit einem Datum der Person; mit onOpen antippbar (öffnet, wo es sich ändern lässt). */
+export function DateRow({ label, onOpen, children }: { label: string; onOpen?: () => void; children: ReactNode }) {
+  const content = (
+    <>
+      <span className="member-date-label">{label}</span>
+      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? 'Nicht eingetragen'}</span>
+      {onOpen && (
+        <span className="chevron" aria-hidden="true">
+          ›
+        </span>
+      )}
+    </>
+  );
+  return (
+    <li>
+      {onOpen ? (
+        <button type="button" className="member-date" onClick={onOpen}>
+          {content}
+        </button>
+      ) : (
+        <div className="member-date">{content}</div>
+      )}
+    </li>
+  );
+}
+
 /** Kennzahl als Kachel; mit onClick ein Knopf (z. B. öffnet er ein Fenster zum Bearbeiten). */
 export function StatCard({
   label,

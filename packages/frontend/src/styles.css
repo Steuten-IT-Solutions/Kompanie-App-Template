@@ -2351,9 +2351,6 @@ fieldset.feature-list legend {
 .account-card .member-avatar-large {
   margin-bottom: 8px;
 }
-.my-overview-rank {
-  margin: 8px 0 0;
-}
 
 /* Abzeichen der Dienstgrade (Issue #17): ohne eigenen Hintergrund, Rahmen oder Farbfilter, damit transparente
  * Abzeichen direkt auf der Fläche dahinter stehen (hell wie dunkel). Höhe fest, Breite nach Seitenverhältnis. */
@@ -2489,16 +2486,6 @@ fieldset.feature-list legend {
 .badge-title,
 .badge-name {
   text-transform: none;
-}
-.my-overview .stats {
-  margin-bottom: 16px;
-}
-.my-titles .title-badges {
-  margin: 6px 0 0;
-}
-.my-titles .badge-title {
-  font-size: 0.85rem;
-  padding: 2px 11px;
 }
 .member-titles .toggle {
   display: flex;

@@ -2,15 +2,17 @@ import { api, config, isMember, roleLabels, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
-import { ErrorBox, lazyView, Loading, StatCard, useAsync } from '../ui';
+import { DateRow, ErrorBox, lazyView, Loading, StatCard, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
 import MeineAnwesenheit from './MeineAnwesenheit';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 import { TitleBadges } from '../TitleBadges';
 import { MenuNav } from '../adminNav';
-import { MemberAvatar } from '../memberPhoto';
-import { RankLabel } from '../RankBadge';
+import { ZoomableAvatar } from '../memberPhoto';
+import { RankBadge } from '../RankBadge';
+import { birthdaysVisible, formatBirthday } from '../birthdays';
+import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
 
 const sec = brand.labels.sections;
@@ -18,8 +20,9 @@ const sec = brand.labels.sections;
 const Konto = lazyView(() => import('./Konto'));
 
 /**
- * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad, Anwesenheit, Ämter und das Konto,
+ * „Meins“: Übersicht (mit Titeln, Daten und Ämtern), Punkte, Strafen, Dienstgrad, Anwesenheit und das Konto,
  * umschaltbar. Die Summen (/me) lädt Meins einmal für alle, nur für Mitglieder; das Konto haben alle Angemeldeten.
+ * Ältere Links auf meins/aemter landen in der Übersicht.
  */
 export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToast: (msg: string) => void; onLogout: () => void }) {
   const member = isMember();
@@ -31,7 +34,6 @@ export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToas
       ['strafen', sec.penalties, config?.features.penalties],
       ['dienstgrad', brand.labels.rank, config?.features.ranks],
       ['anwesenheit', sec.attendance, config?.features.attendance],
-      ['aemter', sec.offices, config?.features.offices],
     ] as const
   )
     .filter(([, , on]) => member && on)
@@ -64,51 +66,87 @@ export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToas
         <Dienstgrad />
       ) : active === 'anwesenheit' ? (
         <MeineAnwesenheit />
-      ) : active === 'aemter' && config?.user ? (
-        <PersonOffices userId={config.user.id} empty={`Du hast keine ${brand.labels.sections.offices} eingetragen.`} />
       ) : null}
     </div>
   );
 }
 
-/** „Meins“ → Übersicht: die eigenen Angaben wie in den Mitgliedsdetails der Verwaltung, nur zum Ansehen. */
+/**
+ * „Meins“ → Übersicht: aufgebaut wie die Mitgliedsdetails der Verwaltung (Name, Abzeichen und Foto, Rolle, Kacheln,
+ * Titel, Geburtstag und Eintritt, Ämter), nur zum Ansehen. Antippen führt dorthin, wo die Einzelheiten stehen: Kacheln
+ * und Abzeichen zur passenden Seite von „Meins“, Geburtstag und Eintritt zu „Konto“.
+ */
 function Uebersicht({ me }: { me: Me }) {
   const f = config?.features;
-  // Foto: hochladen und ändern nur, wer Mitglieder anlegt (in der Verwaltung), wie unter „Mein Konto“.
+  // Foto: hochladen und ändern nur, wer Mitglieder anlegt (in der Verwaltung), wie unter „Konto“.
   const photo = config?.user?.id === me.id ? config.user.photo_url : null;
+  const member = isMember();
+  const birthdayOn = birthdaysVisible();
+  const birthday = useAsync(() => (birthdayOn ? api.myBirthday() : Promise.resolve(null)), [], 'me/birthday');
+  const joinYear = useAsync(() => (member ? api.myJoinYear() : Promise.resolve(null)), [], 'me/join-year');
+  // Ändern lassen sich beide unter „Konto“; den Eintritt gibt es dort nur mit der Mitgliederliste.
+  const toAccount = () => navigate('meins/konto');
+  const rank = f?.ranks ? me.rank : null;
+  const offices = !!f?.offices && !!config?.user;
   return (
     <div className="my-overview">
-      <div className="card account-card">
-        {photo && <MemberAvatar url={photo} name={me.name} size="large" />}
-        <h2 className="account-name">{me.name}</h2>
-        <p className="muted small">
-          {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
-        </p>
-        {f?.ranks && me.rank !== undefined && (
-          <p className="my-overview-rank">
-            {me.rank ? (
-              <>
-                {brand.labels.rank}: <RankLabel url={me.rank.badge_url} title={me.rank.title} />
-              </>
-            ) : (
-              `Noch kein ${brand.labels.rank}`
-            )}
-          </p>
-        )}
-      </div>
+      <h2 className={`member-name member-name-centered account-name${rank || photo ? ' with-rank' : ''}`}>{me.name}</h2>
+      {(rank || photo) && (
+        <div className="member-rank-line">
+          {rank && (
+            <button type="button" className="member-rank-badge member-rank-open" onClick={() => navigate('meins/dienstgrad')}>
+              <RankBadge url={rank.badge_url} title={rank.title} size="large" />
+              <span>{rank.title}</span>
+            </button>
+          )}
+          {photo && <ZoomableAvatar url={photo} name={me.name} />}
+        </div>
+      )}
+      <p className="muted small member-level">
+        {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
+      </p>
       {(f?.points || f?.penalties) && (
-        <div className="stats">
-          {f.points && <StatCard label={`Meine ${sec.points}`} value={me.points.toLocaleString('de-DE')} tone="good" />}
+        <div className="stats member-stats">
+          {f.points && (
+            <StatCard label={sec.points} value={me.points.toLocaleString('de-DE')} tone="good" onClick={() => navigate('meins/punkte')} />
+          )}
           {f.penalties && (
-            <StatCard label={`Offen: ${sec.penalties}`} value={formatEuro(me.open_cents)} tone={me.open_cents > 0 ? 'warn' : 'good'} />
+            <StatCard
+              label="Offen"
+              value={formatEuro(me.open_cents)}
+              tone={me.open_cents > 0 ? 'warn' : 'good'}
+              onClick={() => navigate('meins/strafen')}
+            />
           )}
         </div>
       )}
       {f?.titles && me.titles !== undefined && (
-        <div className="card account-card my-titles">
-          <h3>{sec.titles}</h3>
-          {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <p className="muted small">Du hast zurzeit keine {sec.titles}.</p>}
+        <div className="card member-tile member-titles-tile my-titles">
+          <span className="member-tile-label">{sec.titles}</span>
+          <span className="member-tile-value">
+            {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">Keine</span>}
+          </span>
         </div>
+      )}
+      {(birthday.data || joinYear.data) && (
+        <ul className="card member-dates">
+          {birthday.data && (
+            <DateRow label="Geburtstag" onOpen={toAccount}>
+              {birthday.data.birthday ? formatBirthday(birthday.data.birthday) : null}
+            </DateRow>
+          )}
+          {joinYear.data && (
+            <DateRow label="Eintritt" onOpen={profileChoice() ? toAccount : undefined}>
+              {joinYear.data.join_year ? joinText(joinYear.data.join_year) : null}
+            </DateRow>
+          )}
+        </ul>
+      )}
+      {offices && (
+        <section className="member-offices">
+          <h3 className="section-title">{sec.offices}</h3>
+          <PersonOffices userId={config!.user!.id} empty={`Du hast keine ${sec.offices} eingetragen.`} />
+        </section>
       )}
     </div>
   );
