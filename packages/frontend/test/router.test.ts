@@ -8,6 +8,12 @@ test('Seiten eines Mitglieds teilen sich den Schlüssel', () => {
   assert.equal(viewKey(['verwaltung', 'mitglied', '12', 'konto']), viewKey(['verwaltung', 'mitglied', '12', 'titel']));
 });
 
+test('Seiten einer ehemaligen Person teilen sich den Schlüssel, nicht aber der Import', () => {
+  assert.equal(viewKey(['verwaltung', 'ehemalige', '12']), viewKey(['verwaltung', 'ehemalige', '12', 'punkte']));
+  assert.notEqual(viewKey(['verwaltung', 'ehemalige', '12']), viewKey(['verwaltung', 'mitglied', '12']));
+  assert.notEqual(viewKey(['verwaltung', 'ehemalige']), viewKey(['verwaltung', 'ehemalige', 'import']));
+});
+
 test('anderes Mitglied, andere Ansicht', () => {
   assert.notEqual(viewKey(['verwaltung', 'mitglied', '12']), viewKey(['verwaltung', 'mitglied', '13']));
   assert.notEqual(viewKey(['verwaltung', 'mitglied', '12']), viewKey(['verwaltung', 'mitglieder']));

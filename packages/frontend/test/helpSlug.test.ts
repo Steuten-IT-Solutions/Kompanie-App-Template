@@ -90,12 +90,11 @@ const PATHS = [
   ['verwaltung', 'listen', '3'],
   ['verwaltung', 'neu'],
   ['verwaltung', 'neu-mehrere'],
-  ...['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag'].map((s) => [
-    'verwaltung',
-    'mitglied',
-    '7',
-    s,
-  ]),
+  ['verwaltung', 'ehemalige'],
+  ['verwaltung', 'ehemalige', 'import'],
+  ...['mitglied', 'ehemalige'].flatMap((base) =>
+    ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag'].map((s) => ['verwaltung', base, '7', s]),
+  ),
   ['brett'],
   ['umfragen'],
   ['umfragen', '4'],
@@ -158,6 +157,12 @@ test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', ()
   }
   // Geburtstag eines Mitglieds: Pflegeseite nur mit dem Recht dazu
   assert.equal(helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['create_users'])), 'geburtstage-pflegen');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(
+    helpSlug(['verwaltung', 'ehemalige', '7', 'punkte'], withRights(['create_users', 'manage_points'], ['points'])),
+    'punkte-vergeben',
+  );
   assert.equal(
     helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_points'], ['points', 'birthdays'])),
     'punkte-vergeben',
