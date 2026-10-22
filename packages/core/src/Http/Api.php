@@ -951,6 +951,19 @@ final class Api
                 }
                 return ['restored' => true];
             }, null, $denySettings),
+            new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
+                $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));
+                $a->scheduleTasks();
+                return $status;
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/drive/upload', Cap::ManageSettings, function () use ($a) {
+                try {
+                    return $a->backupUpload()->upload();
+                } catch (\RuntimeException $e) {
+                    throw $e instanceof ApiError ? $e : new ApiError(502, 'upload_failed', $e->getMessage());
+                }
+            }, null, $denySettings),
             new Route('POST', '/admin/setup/done', Cap::ManageSettings, function () use ($a) {
                 $a->settings->set(self::SETUP_SETTING, true);
                 return ['done' => true];

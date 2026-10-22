@@ -625,11 +625,20 @@ try {
     $d->actAs($anna);
     [, $ev] = $d->request('POST', '/events', ['title' => 'Sicherungstest', 'start_date' => '2031-05-01']);
     $backup = new StandaloneBackup($kernel);
+    // Abzeichen eines Dienstgrads: Datei in der Sicherung, nach dem Umzug wieder da.
+    $rankId = $kernel->db()->insert('ranks', ['title' => 'Sicherungsrang', 'sort' => 99, 'badge_file' => 'abz-sicherung', 'badge_ext' => 'svg', 'badge_version' => 'v1']);
+    $badge = $kernel->app()->files->path('abzeichen/abz-sicherung.svg', false);
+    file_put_contents($badge, '<svg xmlns="http://www.w3.org/2000/svg"/>');
     $export = $backup->export();
+    $c->ok(isset($export['files']['abzeichen/abz-sicherung.svg']), 'Export enthält die Abzeichen der Dienstgrade');
+    unlink($badge);
     $c->ok($export['format'] === 'kompanie-app-backup' && count($export['tables']['users']) >= 2 && !isset($export['tables']['sessions']), 'Export enthält Daten und Benutzer, keine Sitzungen');
     $d->request('DELETE', '/events/' . $ev['id']);
     $backup->import((string) json_encode($export));
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Import stellt gelöschte Daten wieder her');
+    $c->ok(is_file($badge), 'Import legt die Abzeichen wieder ab');
+    $kernel->db()->execute('DELETE FROM {ranks} WHERE id = ?', [$rankId]);
+    @unlink($badge);
     $c->ok((int) $kernel->db()->scalar('SELECT COUNT(*) FROM {sessions}') === 0, 'Nach dem Import müssen sich alle neu anmelden');
     $c->ok($kernel->users()->verifyPassword($anna, 'anna-passwort'), 'Passwörter bleiben erhalten');
     $noAdmin = $export;
