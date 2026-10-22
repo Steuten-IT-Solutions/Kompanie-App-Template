@@ -58,7 +58,7 @@ export function profileHint(v: ProfileVisibility): string {
 const editValue = (j: JoinYear | null): string => (j ? editYearOrDate(j.date ?? String(j.year)) : '');
 
 /** Eintritt zum Anzeigen: „am 12.03.2005“ bzw. „2005“. */
-const joinText = (j: JoinYear): string => {
+export const joinText = (j: JoinYear): string => {
   const d = j.date ?? String(j.year);
   return d.length === 4 ? d : `am ${formatYearOrDate(d)}`;
 };
