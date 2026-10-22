@@ -272,10 +272,11 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
     put:
       tags: [Mitgliederliste]
-      summary: Eigenes Eintrittsjahr eintragen oder ändern
+      summary: Eigenen Eintritt eintragen oder ändern
       description: |
-        Jahr ab 1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein
-        neuer Eintrag steht nicht auf der Seite (`profile: none`).
+        `date` als TT.MM.JJJJ, JJJJ-MM-TT oder nur das Jahr JJJJ; ohne `date` gilt `year` (ältere Apps, nur das Jahr). Ab
+        1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein neuer
+        Eintrag steht nicht auf der Seite (`profile: none`). Auf der Seite steht immer nur das Jahr.
       x-capability: member
       requestBody:
         required: true
@@ -283,9 +284,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [year]
               properties:
-                year: { type: integer, minimum: 1800 }
+                date: { type: string, examples: ['12.03.2005', '2005'] }
+                year: { type: integer, minimum: 1800, description: 'Nur ohne date' }
                 profile: { $ref: '#/components/schemas/ProfileVisibility' }
       responses:
         '200':
@@ -2954,10 +2955,11 @@ paths:
       - $ref: '#/components/parameters/Id'
     put:
       tags: [Mitgliederliste]
-      summary: Eintrittsjahr eines Mitglieds eintragen oder ändern
+      summary: Eintritt eines Mitglieds eintragen oder ändern
       description: |
-        Nur das Jahr (Prüfung wie bei `PUT /me/join-year`). Die Anzeige (`profile`) entscheidet allein die Person: Sie
-        bleibt, wie sie ist (ein mitgeschickter Wert wird nicht übernommen); ein neuer Eintrag steht nicht auf der Seite.
+        Nur der Eintritt (`date` bzw. `year`, Prüfung wie bei `PUT /me/join-year`). Die Anzeige (`profile`) entscheidet
+        allein die Person: Sie bleibt, wie sie ist (ein mitgeschickter Wert wird nicht übernommen); ein neuer Eintrag
+        steht nicht auf der Seite.
       x-capability: create_users
       requestBody:
         required: true
@@ -2965,9 +2967,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [year]
               properties:
-                year: { type: integer, minimum: 1800 }
+                date: { type: string, examples: ['12.03.2005', '2005'] }
+                year: { type: integer, minimum: 1800, description: 'Nur ohne date' }
       responses:
         '200':
           description: Gespeichert
@@ -4783,6 +4785,9 @@ components:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
+        joined_on:
+          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
+          type: string
 
     DirectoryEntry:
       type: object
@@ -4827,9 +4832,10 @@ components:
 
     JoinYear:
       type: object
-      required: [year, profile]
+      required: [year, date, profile]
       properties:
         year: { type: integer }
+        date: { type: string, description: 'Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ' }
         profile: { $ref: '#/components/schemas/ProfileVisibility' }
 
     JoinYearResponse:

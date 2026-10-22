@@ -1,11 +1,12 @@
-// Sortierung der Mitgliederliste (src/memberSort.ts): nach Nachname, Vorname oder Punkten, auf- oder absteigend; die Wahl
-// merkt sich das Gerät.
+// Sortierung der Mitgliederliste (src/memberSort.ts): nach Nachname, Vorname, Eintritt oder Punkten, auf- oder absteigend;
+// die Wahl merkt sich das Gerät.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MemberSummary } from '../src/api.ts';
 import {
   defaultDir,
   dirLabel,
+  joinKey,
   listName,
   loadMemberOrder,
   saveMemberOrder,
@@ -83,6 +84,45 @@ test('nach Punkten: Richtung umkehrbar, bei Gleichstand immer Nachname A → Z',
 test('ohne Nachnamen (Funktionskonto) zählt beim Nachnamen der Vorname', () => {
   const withRole = [...list, m(5, 'Kassenwart', '')];
   assert.deepEqual(names(sortMembers(withRole, { sort: 'last-name', dir: 'asc' })).slice(2, 4), ['Kassenwart', 'Maria von Berg']);
+});
+
+test('nach Eintritt: früheste bzw. neueste zuerst, nur das Jahr vor den Tagen des Jahres, ohne Angabe immer am Ende', () => {
+  const f = (id: number, first: string, last: string, joined_on: string, founder = false) => ({
+    ...m(id, first, last),
+    joined_on,
+    founder,
+  });
+  const former = [
+    f(1, 'Anna', 'Zimmer', '1990-05-01'),
+    f(2, 'Bernd', 'Becker', ''),
+    f(3, 'Carl', 'Adam', '1990'),
+    f(4, 'Dora', 'Gründer', '', true),
+    f(5, 'Emil', 'Berg', '2001-02-03'),
+    f(6, 'Fritz', 'Alt', '1990-05-01'),
+  ];
+  assert.deepEqual(names(sortMembers(former, { sort: 'joined', dir: 'asc' })), [
+    'Dora Gründer',
+    'Carl Adam',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Emil Berg',
+    'Bernd Becker',
+  ]);
+  assert.deepEqual(names(sortMembers(former, { sort: 'joined', dir: 'desc' })), [
+    'Emil Berg',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Carl Adam',
+    'Dora Gründer',
+    'Bernd Becker',
+  ]);
+  // Mitglieder (Jahr bzw. Datum) und Ehemalige in der Liste für alle (nur Jahre)
+  assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: 2004 }), '2004');
+  assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: null }), null);
+  assert.equal(joinKey({ ...m(8, 'I', 'J'), joined_year: '1975', founder: true }), '1975');
+  assert.equal(defaultDir('joined'), 'asc');
+  assert.equal(dirLabel('joined', 'asc'), 'Früheste zuerst');
+  assert.equal(dirLabel('joined', 'desc'), 'Neueste zuerst');
 });
 
 test('Anzeige: bei Nachname „Nachname, Vorname“, sonst der Anzeigename', () => {
