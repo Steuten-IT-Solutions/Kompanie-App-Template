@@ -134,9 +134,14 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     document.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Waagerecht wischen im Fenster ist keine Zurück-Geste des Browsers (die schlösse es und blätterte im Verlauf).
+    const root = document.documentElement.style;
+    const overscroll = root.overscrollBehaviorX;
+    root.overscrollBehaviorX = 'none';
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
+      root.overscrollBehaviorX = overscroll;
     };
   }, [onClose]);
   return createPortal(
