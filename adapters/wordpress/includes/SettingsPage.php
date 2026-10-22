@@ -257,7 +257,7 @@ final class SettingsPage
         ?>
         <h2 id="webseite">Webseite: Mitglieder ohne Foto</h2>
         <p>Die Mitgliederliste auf der Webseite (<code>[kompanie_mitglieder]</code>) zeigt bei Personen ohne Foto dieses Bild
-           statt der Anfangsbuchstaben, z. B. eine Silhouette oder das Wappen. Am besten im Hochformat 2 : 3; andere Formate
+           statt der Anfangsbuchstaben, z. B. eine Silhouette oder das Logo. Am besten im Hochformat 2 : 3; andere Formate
            werden mittig zugeschnitten. Ohne Platzhalterbild stehen dort die Anfangsbuchstaben. Die App selbst zeigt weiter die Anfangsbuchstaben.</p>
         <?php if ($id > 0 && $preview === false) : ?>
             <div class="notice notice-warning inline"><p>Das gewählte Bild ist nicht mehr in der Mediathek. Bis du ein neues wählst, stehen dort die Anfangsbuchstaben.</p></div>
