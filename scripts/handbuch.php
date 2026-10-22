@@ -25,6 +25,8 @@
 
 declare(strict_types=1);
 
+require __DIR__ . '/markdown.php';
+
 const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'create_users', 'promote_users', 'manage_settings'];
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
@@ -177,82 +179,6 @@ function group(array $page): string
     };
 }
 
-/**
- * Markdown (kleine Auswahl) → HTML. Alles wird maskiert; Platzhalter bleiben als Text stehen.
- * $link bildet seite:name auf eine Adresse ab.
- */
-function render(string $md, callable $link): string
-{
-    $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $inline = static function (string $s) use ($h, $link): string {
-        $s = $h($s);
-        $s = (string) preg_replace_callback('/`([^`]+)`/', static fn (array $m): string => '<code>' . $m[1] . '</code>', $s);
-        $s = (string) preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $s);
-        $s = (string) preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/', '<em>$1</em>', $s);
-        return (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', static function (array $m) use ($link): string {
-            $url = html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            if (str_starts_with($url, 'seite:')) {
-                return '<a href="' . htmlspecialchars($link(substr($url, 6)), ENT_QUOTES) . '" data-seite="' . htmlspecialchars(substr($url, 6), ENT_QUOTES) . '">' . $m[1] . '</a>';
-            }
-            if (!preg_match('#^https://#', $url)) {
-                return $m[1]; // nur https-Verweise
-            }
-            return '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" target="_blank" rel="noopener noreferrer">' . $m[1] . '</a>';
-        }, $s);
-    };
-    $out = [];
-    $para = [];
-    $list = null;
-    $items = [];
-    $flushPara = static function () use (&$para, &$out, $inline): void {
-        if ($para) {
-            $out[] = '<p>' . $inline(implode(' ', $para)) . '</p>';
-            $para = [];
-        }
-    };
-    $flushList = static function () use (&$list, &$items, &$out, $inline): void {
-        if ($list) {
-            $out[] = "<$list>" . implode('', array_map(static fn (string $i): string => '<li>' . $inline($i) . '</li>', $items)) . "</$list>";
-            $list = null;
-            $items = [];
-        }
-    };
-    foreach (explode("\n", $md) as $line) {
-        $t = rtrim($line);
-        if (trim($t) === '') {
-            $flushPara();
-            $flushList();
-            continue;
-        }
-        if (preg_match('/^(#{2,3})\s+(.+)$/', $t, $m)) {
-            $flushPara();
-            $flushList();
-            $level = strlen($m[1]);
-            $out[] = "<h$level>" . $inline($m[2]) . "</h$level>";
-        } elseif (preg_match('/^\s*[-*]\s+(.+)$/', $t, $m) || preg_match('/^\s*\d+\.\s+(.+)$/', $t, $m)) {
-            $flushPara();
-            $type = preg_match('/^\s*\d+\./', $t) ? 'ol' : 'ul';
-            if ($list !== $type) {
-                $flushList();
-                $list = $type;
-            }
-            $items[] = $m[1];
-        } elseif (preg_match('/^>\s?(.*)$/', $t, $m)) {
-            $flushPara();
-            $flushList();
-            $out[] = '<p class="hinweis">' . $inline($m[1]) . '</p>';
-        } elseif ($list && preg_match('/^\s{2,}(.+)$/', $t, $m)) {
-            $items[count($items) - 1] .= ' ' . $m[1]; // Fortsetzung eines Listenpunkts
-        } else {
-            $flushList();
-            $para[] = trim($t);
-        }
-    }
-    $flushPara();
-    $flushList();
-    return implode("\n", $out);
-}
-
 [$pages, $errors] = load($src);
 
 if (isset($opt['check'])) {
@@ -278,7 +204,7 @@ if (isset($opt['app'])) {
             'rechte' => $p['rechte'],
             'bereiche' => $p['bereiche'],
             'variante' => $p['variante'] === '' ? null : $p['variante'],
-            'html' => render($p['markdown'], static fn (string $s): string => '#/hilfe/' . $s),
+            'html' => kompanie_markdown($p['markdown'], static fn (string $s): string => '#/hilfe/' . $s),
         ];
     }
     $file = (string) $opt['app'];
@@ -383,7 +309,7 @@ HTML;
             $note[] = $p['variante'] === 'wordpress' ? 'nur mit WordPress' : 'nur ohne WordPress';
         }
         $wenn = $note ? '<p class="wenn">' . $h(ucfirst(implode('; ', $note))) . '.</p>' : '';
-        $body = '<h1>' . $fill($h($p['titel'])) . '</h1>' . $wenn . $fill(render($p['markdown'], static fn (string $s): string => $s . '.html'));
+        $body = '<h1>' . $fill($h($p['titel'])) . '</h1>' . $wenn . $fill(kompanie_markdown($p['markdown'], static fn (string $s): string => $s . '.html'));
         $title = strtr($p['titel'], array_combine(array_map(static fn (string $k): string => '{' . $k . '}', array_keys($labels)), $labels));
         file_put_contents("$dir/{$p['slug']}.html", $layout($title, $body));
         $groups[group($p)][] = '<li><a href="' . $h($p['slug']) . '.html">' . $fill($h($p['titel'])) . '</a>' . ($note ? ' <span class="wenn">(' . $h(implode('; ', $note)) . ')</span>' : '') . '</li>';

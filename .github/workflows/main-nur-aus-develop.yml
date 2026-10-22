@@ -1,6 +1,8 @@
 # Pull Requests nach main kommen nur aus develop (Release, siehe docs/RELEASE.md). Alles andere geht zuerst
-# nach develop; ein PR von einem anderen Branch nach main wird hier rot.
-# Damit er den Merge auch sperrt: in den Einstellungen von main den Check „Quelle ist develop“ als Pflicht eintragen.
+# nach develop; ein PR von einem anderen Branch nach main wird hier rot. Außerdem muss CHANGELOG.md einen Abschnitt
+# für die Kern-Version aus VERSION haben, und „Unveröffentlicht“ muss leer sein.
+# Damit sie den Merge auch sperren: in den Einstellungen von main die Checks „Quelle ist develop“ und
+# „Changelog zur Version“ als Pflicht eintragen.
 name: main nur aus develop
 
 on:
@@ -27,3 +29,21 @@ jobs:
           fi
           echo "::error::Pull Requests nach main nur aus develop (hier: $HEAD_REPO:$HEAD_REF). Bitte den Ziel-Branch auf develop ändern."
           exit 1
+
+  changelog:
+    name: Changelog zur Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.1'
+          tools: none
+
+      - name: Abschnitt für die Kern-Version, Unveröffentlicht leer
+        run: php scripts/changelog.php --check --require-version

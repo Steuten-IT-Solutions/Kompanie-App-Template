@@ -12,6 +12,7 @@ import {
   type NewsSourceType,
 } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Neuerungen from './Neuerungen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import { MaintenanceCard } from '../maintenance';
@@ -31,6 +32,7 @@ const PAGES = [
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
   { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
+  { id: 'neuerungen', title: 'Was ist neu', text: 'Änderungen von Version zu Version.' },
 ] as const;
 
 /**
@@ -58,6 +60,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
+      {page.id === 'neuerungen' && <Neuerungen />}
       {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
