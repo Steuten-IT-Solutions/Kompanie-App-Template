@@ -450,9 +450,13 @@ Der Kern enthält **eine Routentabelle**. WordPress registriert sie unter `/wp-j
 
 ### Handbuch
 
-Die Seiten stehen in `docs/handbuch/*.md`, mit Kopfbereich (Titel, Reihenfolge, Rechte, Bereiche, Variante) und Platzhaltern für die Bezeichnungen der Kompanie (`{bereich.points}`, `{rolle.member}` …). `scripts/handbuch.php` prüft sie (`--check`), erzeugt die Daten für die Hilfe in der App (`--app`) und die statischen Seiten für GitHub Pages (`--site`). Die App zeigt nur Seiten, die zu Rechten, eingeschalteten Bereichen und Variante passen.
+Die Seiten stehen in `docs/handbuch/*.md`, mit Kopfbereich (Titel, Reihenfolge, Rechte, `einrecht` für Bildschirme, die man mit einem von mehreren Rechten sieht, Bereiche, Variante) und Platzhaltern für die Bezeichnungen der Kompanie (`{bereich.points}`, `{rolle.member}` …). `scripts/handbuch.php` prüft sie (`--check`), erzeugt die Daten für die Hilfe in der App (`--app`) und die statischen Seiten für GitHub Pages (`--site`). Die App zeigt nur Seiten, die zu Rechten, eingeschalteten Bereichen und Variante passen.
 
-**Regel:** Wer eine Funktion ändert oder hinzufügt, passt die Handbuchseiten im selben Pull Request an. `--check` verlangt für jeden Bereich mit eigenen Rechten eine Seite.
+**Eine Seite je Bildschirm:** Der Knopf „?“ öffnet die Anleitung zum aktuellen Bildschirm (Zuordnung in `packages/frontend/src/helpSlug.ts`). Jede Seite folgt derselben Gliederung: wozu die Seite da ist, Foto, „So öffnest du die Seite“, „Was du hier siehst“, „So gehst du vor“ (Schritte), „Gut zu wissen“, „Siehe auch“. Du-Form, Knöpfe **fett** wie in der App, keine internen Begriffe.
+
+**Bildschirmfotos:** `![Beschreibung](bild:name)` als eigene Zeile. `scripts/handbuch-bilder.sh` fotografiert sie mit Beispieldaten (`packages/frontend/e2e/handbuch-bilder/`, Daten in `tests/standalone/handbuch-daten/`), beim Veröffentlichen einer Kompanie in deren Farben, Logo und Bezeichnungen. Die Fotos liegen in der gebauten Oberfläche unter `handbuch/bilder/` (nicht im Programmteil, damit die App klein bleibt; der Service Worker speichert angesehene Fotos) und auf der Download-Seite unter `handbuch/bilder/`. Fehlt ein Foto, schlägt der Lauf fehl; eine selbst gebaute App ohne Fotos blendet die Bilder aus.
+
+**Regel:** Wer eine Funktion ändert oder hinzufügt, passt die Handbuchseiten und ihre Fotos im selben Pull Request an. `--check` verlangt für jeden Bereich mit eigenen Rechten eine Seite.
 
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 

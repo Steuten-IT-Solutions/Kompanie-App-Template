@@ -167,7 +167,8 @@ auf einen früheren Stand ist also ein neuer Stand), und ruft für jedes
 [`publish-kompanie.yml`](../.github/workflows/publish-kompanie.yml) auf (auch einzeln von Hand startbar):
 
 1. **build** (ohne Geheimnisse): Branding aus `kompanie.json` und Logo, App, Bildschirmfotos mit
-   Beispieldaten (`scripts/screenshots.sh`).
+   Beispieldaten (`scripts/screenshots.sh`) und die Fotos für das Handbuch (`scripts/handbuch-bilder.sh`, in die
+   gebaute Oberfläche unter `handbuch/bilder/`).
 2. **publish** (Environment `veroeffentlichen`, ohne npm): Build-Ergebnis prüfen und übernehmen
    (`scripts/import-build.php`), dann `scripts/publish-release.sh`: nächste Versionsnummer, Pakete,
    `install.php` und signierte `release.json` (`scripts/package.php`), GitHub-Release `v<Version>` im
