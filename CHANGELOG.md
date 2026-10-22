@@ -48,8 +48,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.
   Das Abzeichen öffnet Befördern und Degradieren, das Foto die große Ansicht mit „Foto ersetzen“ und „Foto
   entfernen“, die Kacheln Punkte und Offen ein Fenster mit dem Formular nur für diese Person und ihren Einträgen,
-  die neue Kachel Titel die Auswahl der Titel. Darunter stehen die Ämter, ganz unten Geburtstag, Eintritt und
-  Austritt (Austritt trägt als ehemalig ein bzw. ändert die Angaben) und zum Aufklappen „Konto und Rolle“. Die
+  die neue Kachel Titel die Auswahl der Titel. Darunter stehen Geburtstag, Eintritt und Austritt (Austritt trägt als
+  ehemalig ein bzw. ändert die Angaben), dann die Ämter als Zeitstrahl und zum Aufklappen „Konto und Rolle“. Die
   Knöpfe unter dem Foto und unter den Kacheln entfallen. Gilt auch für Ehemalige.
 - **Seiten beim Laden**: Statt „Lädt …“ steht eine Seite, deren Daten noch nicht da sind, sofort in ihrem gewohnten
   Aufbau da (Karten, Zeilen, Knöpfe als graue Platzhalter), bis die Daten kommen. Die App merkt sich dafür nur den
