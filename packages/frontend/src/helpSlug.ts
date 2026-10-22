@@ -83,8 +83,9 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
   }
 }
 
-/** Verwaltung: Reiter, Mitgliederliste und die Seiten eines Mitglieds (verwaltung/mitglied/<id>/<seite>). */
-function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
+/** Verwaltung: Reiter, Mitgliederliste und die Seiten eines Mitglieds (verwaltung/mitglied/<id>/<seite>, bei Ehemaligen
+ * verwaltung/ehemalige/<id>/<seite>). */
+function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null {
   const tabs: Record<string, string> = {
     punkte: 'punkte-vergeben',
     katalog: 'punkte-vergeben',
@@ -97,7 +98,9 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
   };
   if (sub && tabs[sub]) return tabs[sub];
   if (sub === 'neu' || sub === 'neu-mehrere') return 'mitglieder-anlegen';
-  if (sub === 'mitglied') {
+  // Liste der Ehemaligen und Import (die Seiten einer ehemaligen Person wie bei Mitgliedern, unten)
+  if (sub === 'ehemalige' && (!arg || arg === 'import')) return 'ehemalige-mitglieder';
+  if (sub === 'mitglied' || (sub === 'ehemalige' && /^\d+$/.test(arg ?? ''))) {
     const memberPages: Record<string, string> = {
       punkte: 'punkte-vergeben',
       strafen: 'strafen-verwalten',

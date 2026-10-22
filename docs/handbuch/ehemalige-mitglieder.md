@@ -18,7 +18,7 @@ Danach hat die Person keine Rolle mehr: Sie steht nicht mehr in der Mitgliederli
 Ist ein Amt mit einem Titel verknüpft, verliert eine ehemalige Person diesen Titel beim nächsten Abgleich; ihre Amtszeiten bleiben im Zeitstrahl stehen.
 
 ## Die Liste der Ehemaligen
-In der Mitgliederliste neben **+ Mitglied anlegen** auf **Ehemalige** tippen. Oben steht, wie viele ausgetreten, verstorben und sonst ausgeschieden sind. Die Liste lässt sich durchsuchen und nach dem Grund filtern; sie ist sortiert wie die Mitgliederliste (nach Nach- oder Vorname). Jede Zeile zeigt Eintritt und Ausscheiden und, wer {bereich.penalties} sieht, offene Beträge. Ein Tipp öffnet die Seite der Person wie gewohnt; **‹ Ehemalige** führt zurück.
+In der Verwaltung im Menü oben **Ehemalige** wählen. Oben steht, wie viele ausgetreten, verstorben und sonst ausgeschieden sind. Die Liste lässt sich durchsuchen und nach dem Grund filtern; sie ist sortiert wie die Mitgliederliste (nach Nach- oder Vorname). Jede Zeile zeigt Eintritt und Ausscheiden und, wer {bereich.penalties} sieht, offene Beträge. Ein Tipp öffnet die Seite der Person wie gewohnt; **‹ Ehemalige** führt zurück.
 
 ## Angaben ändern und wieder aufnehmen
 Auf der Seite einer ehemaligen Person unter **Konto und Rolle**, Abschnitt **Ehemalig**:

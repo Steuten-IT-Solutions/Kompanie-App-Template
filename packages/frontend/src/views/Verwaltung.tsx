@@ -14,7 +14,7 @@ import {
 } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
-import { navigate } from '../router';
+import { navigate, redirect as redirectTo } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
@@ -44,7 +44,17 @@ import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'aemter' | 'anwesenheit';
+type Sub =
+  | 'mitglieder'
+  | 'ehemalige'
+  | 'punkte'
+  | 'strafe'
+  | 'katalog'
+  | 'dienstgrade'
+  | 'befoerderungen'
+  | 'titel'
+  | 'aemter'
+  | 'anwesenheit';
 
 const sec = brand.labels.sections;
 
@@ -54,7 +64,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'ehemalige' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -73,14 +83,16 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
     <div>
       <AdminNav active={active} />
       {sub === 'mitglied' && arg ? (
-        <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} />
+        <MemberDetailView base="mitglied" id={Number(arg)} page={path[2]} onToast={onToast} />
+      ) : active === 'ehemalige' && arg && /^\d+$/.test(arg) ? (
+        <MemberDetailView base="ehemalige" id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
-      ) : sub === 'ehemalige' && arg === 'import' && can('create_users') ? (
+      ) : active === 'ehemalige' && arg === 'import' ? (
         <FormerImport onToast={onToast} />
-      ) : sub === 'ehemalige' && can('create_users') ? (
+      ) : active === 'ehemalige' ? (
         <FormerList />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
@@ -213,9 +225,6 @@ function Members() {
           <button className="btn" onClick={() => navigate('verwaltung/neu')}>
             + Mitglied anlegen
           </button>
-          <button className="btn btn-secondary" onClick={() => navigate('verwaltung/ehemalige')}>
-            Ehemalige
-          </button>
         </div>
       )}
       <input
@@ -339,11 +348,28 @@ function Members() {
 
 /**
  * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
- * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht.
+ * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht. Ehemalige haben dieselbe Seite unter
+ * verwaltung/ehemalige/<id>/<seite>; steht eine Person unter der falschen Adresse (alter Link, gerade als ehemalig
+ * eingetragen oder wieder aufgenommen), leitet die Seite um.
  */
-function MemberDetailView({ id, page, onToast }: { id: number; page?: string; onToast: (msg: string) => void }) {
+function MemberDetailView({
+  base,
+  id,
+  page,
+  onToast,
+}: {
+  base: 'mitglied' | 'ehemalige';
+  id: number;
+  page?: string;
+  onToast: (msg: string) => void;
+}) {
   const { data, error, loading, reload } = useAsync(() => api.member(id), [id], 'member');
   const [busy, setBusy] = useState(false);
+  // Erst nach dem Laden entscheiden: Daten aus dem Speicher könnten veraltet sein.
+  const target = !loading && data?.id === id ? (data.former ? 'ehemalige' : 'mitglied') : base;
+  useEffect(() => {
+    if (target !== base) redirectTo(`verwaltung/${target}/${id}${page ? `/${page}` : ''}`);
+  }, [target, base, id, page]);
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -360,6 +386,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (target !== base) return null;
   const m = data!;
 
   const pages = [
@@ -409,7 +436,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
         label="Mitglied"
         className="member-menu"
         active={active}
-        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/mitglied/${m.id}/${p.id}`) }))}
+        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/${base}/${m.id}/${p.id}`) }))}
       />
 
       {active === 'uebersicht' && (

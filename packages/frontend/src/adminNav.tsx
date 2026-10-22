@@ -26,6 +26,7 @@ export function adminTabs(): AdminTab[] {
   return (
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
+      { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: `${sec.points}katalog`, on: points },
