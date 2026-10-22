@@ -97,6 +97,7 @@ const PATHS = [
   ['verwaltung', 'import'],
   ['verwaltung', 'ehemalige'],
   ['verwaltung', 'ehemalige', 'import'],
+  ['verwaltung', 'ehemalige', 'neu'],
   ...['mitglied', 'ehemalige'].flatMap((base) =>
     ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag', 'eintritt', 'austritt'].map((s) => [
       'verwaltung',
@@ -184,6 +185,7 @@ test('Eine eigene Seite je Bildschirm', () => {
     [['verwaltung', 'mitglied', '7', 'punkte'], 'mitglied-punkte'],
     [['verwaltung', 'ehemalige', '7', 'titel'], 'mitglied-titel'],
     [['verwaltung', 'ehemalige', '7'], 'ehemalige-mitglieder'],
+    [['verwaltung', 'ehemalige', 'neu'], 'ehemalige-anlegen'],
     [['einstellungen', 'kalender'], 'admin-kalender'],
     [['einstellungen', 'neuerungen'], 'admin-neuerungen'],
   ];

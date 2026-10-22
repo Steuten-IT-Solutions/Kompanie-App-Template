@@ -1,11 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, levelLabel, type FormerImportResult, type FormerInfo, type FormerInput, type FormerReason } from '../api';
+import { api, levelLabel, type CreatedFormer, type FormerImportResult, type FormerInfo, type FormerInput, type FormerReason } from '../api';
+import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
 import { readSheet } from '../sheet';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-import { MemberAvatar } from '../memberPhoto';
+import { Empty, emptyName, ErrorBox, Loading, NameFields, trimName, useAsync } from '../ui';
+import { MemberAvatar, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import {
   MEMBER_SORT_LABELS,
   defaultDir,
@@ -88,9 +89,11 @@ export function FormerList() {
           .map((r) => `${count(r)} ${REASON_TEXT[r]}`)
           .join(' · ') || 'Noch niemand eingetragen.'}
       </p>
-      <button className="btn btn-block btn-secondary" onClick={() => navigate('verwaltung/ehemalige/import')}>
-        Tabelle importieren (z. B. Chronik)
-      </button>
+      <div className="button-row add-member">
+        <button className="btn" onClick={() => navigate('verwaltung/ehemalige/neu')}>
+          + Ehemalige Person anlegen
+        </button>
+      </div>
       <input
         className="search"
         type="search"
@@ -228,6 +231,120 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
         <span>Gründungsmitglied</span>
       </label>
     </>
+  );
+}
+
+/** Leeres Formular: ausgetreten, ohne Daten */
+const emptyFormer = (): FormerInput => ({ reason: 'left', joined_on: '', founder: false, left_on: '' });
+
+/**
+ * Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“ (create_users), aufgebaut wie „+ Mitglied anlegen“: Name, Angaben zum
+ * Ausscheiden, Geburtstag und Foto. Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Darüber
+ * führt „Tabelle importieren“ zum Import vieler auf einmal.
+ */
+export function NewFormer() {
+  const [name, setName] = useState(emptyName());
+  const [former, setFormer] = useState<FormerInput>(emptyFormer);
+  const [birthday, setBirthday] = useState(emptyBirthday());
+  const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedFormer | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
+    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    if (typeof bday === 'string') return setFormError(bday);
+    setBusy(true);
+    try {
+      setCreated(
+        await api.createFormer({
+          ...trimName(name),
+          ...former,
+          joined_on: former.joined_on.trim(),
+          left_on: former.left_on.trim(),
+          ...(bday ? { birthday: birthdayString(bday) } : {}),
+          ...(photo ? { photo: photo.file } : {}),
+        }),
+      );
+    } catch (err) {
+      setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (created) {
+    return (
+      <div>
+        <h2 className="member-name">{created.name} ist als ehemalig angelegt</h2>
+        <p className="small">{formerSummary(created)}</p>
+        {created.offices_linked > 0 && (
+          <p className="small">
+            {created.offices_linked === 1 ? '1 Eintrag' : `${created.offices_linked} Einträge`} in den {sec.offices} mit dem Konto
+            verknüpft.
+          </p>
+        )}
+        {created.warning && (
+          <p className="form-error" role="alert">
+            {created.warning}
+          </p>
+        )}
+        <button className="btn btn-block" onClick={() => navigate('verwaltung/ehemalige')}>
+          Fertig
+        </button>
+        <button
+          className="btn btn-secondary btn-block"
+          onClick={() => {
+            setCreated(null);
+            setName(emptyName());
+            setFormer(emptyFormer());
+            setBirthday(emptyBirthday());
+            setPhoto(null);
+          }}
+        >
+          Weitere Person
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form className="form" onSubmit={submit}>
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+        ‹ Ehemalige
+      </button>
+      <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/ehemalige/import')}>
+        Tabelle importieren (z. B. Chronik)
+      </button>
+      <NameFields value={name} onChange={setName} />
+      <FormerFields value={former} onChange={setFormer} />
+      {canSetBirthdays() && (
+        <fieldset className="fieldset new-member-birthday">
+          <legend>Geburtstag (optional)</legend>
+          <BirthdayFields value={birthday} onChange={setBirthday} />
+        </fieldset>
+      )}
+      <fieldset className="fieldset new-member-photo">
+        <legend>Foto (optional)</legend>
+        <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
+      </fieldset>
+      <p className="muted small">
+        Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Wer schon ein Konto mit genau diesem Namen hat, wird
+        nicht noch einmal angelegt. Steht die Person in den {sec.offices} bisher nur mit ihrem Namen, wird der Eintrag mit ihrem Konto
+        verknüpft.
+      </p>
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
+      <button className="btn btn-block" type="submit" disabled={busy}>
+        {busy ? 'Legt an …' : 'Ehemalige Person anlegen'}
+      </button>
+    </form>
   );
 }
 
@@ -412,8 +529,8 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
   return (
     <div className="office-import">
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
-        ‹ Ehemalige
+      <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige/neu')}>
+        ‹ Einzeln anlegen
       </button>
       <h2 className="member-name">Ehemalige importieren</h2>
       <p className="muted small">

@@ -12,7 +12,7 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 
 ## Was du hier siehst
 - **Zähler** oben: wie viele ausgetreten, verstorben und sonst ausgeschieden sind.
-- **Tabelle importieren (z. B. Chronik)**: viele frühere Mitglieder auf einmal übernehmen.
+- **+ Ehemalige Person anlegen**: jemanden eintragen, der schon vor der App ausgeschieden ist (siehe [Ehemalige Person anlegen](seite:ehemalige-anlegen)). Dort geht es auch zum Import vieler auf einmal.
 - **Suchen …**: filtert die Liste nach dem Namen.
 - **Filter und Sortierung**: zunächst eingeklappt. Darin filterst du bei **Alle Gründe** nach dem Grund und sortierst nach **Nachname**, **Vorname**, **Eintritt** oder **Austritt**, mit **Reihenfolge** daneben. Ist ein Filter gesetzt, steht **aktiv** daneben.
 - **Die Liste**: je Person der Name, darunter „Gründungsmitglied“, Eintritt und Ausscheiden, soweit eingetragen, und offene {bereich.penalties}, wenn du sie siehst.
@@ -38,7 +38,7 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 3. Erzeuge danach unter **Konto und Rolle** ein neues Startpasswort, damit sie sich wieder anmelden kann.
 
 ### Ehemalige aus einer Tabelle übernehmen
-1. Tippe auf **Tabelle importieren (z. B. Chronik)**.
+1. Tippe auf **+ Ehemalige Person anlegen** und dann oben auf **Tabelle importieren (z. B. Chronik)**. **‹ Einzeln anlegen** führt zurück zum Formular.
 2. Füge die Tabelle ins Feld **Tabelle** ein oder wähle bei **Oder Datei wählen (Excel .xlsx oder CSV)** eine Datei. Eine Zeile je Person, Spalten getrennt durch Semikolon oder Tabulator: `vorname;nachname;eintritt;ausgeschieden;grund`.
 3. Tippe auf **Vorschau**. Sie zeigt jede Zeile mit dem, was die App verstanden hat, und Fehler je Zeile.
 4. Hat keine Zeile einen Fehler, tippe auf **Übernehmen**.

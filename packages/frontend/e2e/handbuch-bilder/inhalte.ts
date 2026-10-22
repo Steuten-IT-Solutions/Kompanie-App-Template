@@ -20,7 +20,7 @@ const gruppe: Gruppe = async (f) => {
   await f.anmelden('mitglied1');
   await f.oeffnen('dokumente');
   await f.foto('dokumente');
-  await page.locator('.doc-group-toggle').filter({ hasText: 'Protokolle' }).click();
+  await page.locator('.doc-group .fold-toggle').filter({ hasText: 'Protokolle' }).click();
   await f.foto('dokumente-kategorie');
   await page.locator('.doc-card').filter({ hasText: 'Protokoll Jahreshauptversammlung' }).getByRole('button', { name: 'Öffnen' }).click();
   await expect(page.locator('img.pdf-page')).toBeVisible({ timeout: 15_000 });
@@ -36,7 +36,7 @@ const gruppe: Gruppe = async (f) => {
     .setInputFiles({ name: 'Protokoll Vorstandssitzung Juni.pdf', mimeType: 'application/pdf', buffer: PDF });
   await upload.getByLabel('Kategorie').selectOption({ label: 'Protokolle' });
   await ausschnitt('dokumente-pflegen-hochladen', upload);
-  await page.locator('.doc-group-toggle').filter({ hasText: 'Protokolle' }).click();
+  await page.locator('.doc-group .fold-toggle').filter({ hasText: 'Protokolle' }).click();
   const kasse = page.locator('.card').filter({ hasText: 'Kassenbericht' });
   await kasse.getByRole('button', { name: 'Bearbeiten' }).click();
   const bearbeiten = page.locator('form.doc-edit');

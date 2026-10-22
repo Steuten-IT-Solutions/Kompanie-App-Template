@@ -60,8 +60,8 @@ const gruppe: Gruppe = async (f) => {
 
   // Konto und Rolle (aufgeklappt)
   await f.oeffnen(`verwaltung/mitglied/${id}/konto`);
-  await expect(page.locator('.member-account[open]')).toBeVisible();
-  await oben('.member-account summary');
+  await expect(page.locator('.member-account .fold-toggle[aria-expanded="true"]')).toBeVisible();
+  await oben('.member-account .fold-toggle');
   await f.foto('rollen-vergeben');
   await oben('.member-rights');
   await f.foto('rollen-vergeben-rechte');
@@ -73,9 +73,13 @@ const gruppe: Gruppe = async (f) => {
   await expect(page.locator('.sheet form')).toBeVisible();
   await f.foto('ehemalige-mitglieder-eintragen');
 
-  // Ehemalige: Liste und Import (Vorschau, nicht übernehmen)
+  // Ehemalige: Liste, einzeln anlegen (nur ausfüllen) und Import (Vorschau, nicht übernehmen)
   await f.oeffnen('verwaltung/ehemalige');
   await f.foto('ehemalige-mitglieder');
+  await f.oeffnen('verwaltung/ehemalige/neu');
+  await page.getByLabel('Vorname').fill('Heinrich');
+  await page.getByLabel('Nachname').fill('Lohmann');
+  await f.foto('ehemalige-anlegen');
   await f.oeffnen('verwaltung/ehemalige/import');
   await page
     .locator('textarea')
