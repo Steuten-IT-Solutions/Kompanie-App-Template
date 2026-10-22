@@ -327,7 +327,10 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
     try {
       const res = await api.importFormer(csv, apply);
       if (apply) {
-        onToast(`${res.new === 1 ? '1 Person' : `${res.new} Personen`} als ehemalig angelegt`);
+        onToast(
+          `${res.new === 1 ? '1 Person' : `${res.new} Personen`} als ehemalig angelegt` +
+            ((res.offices_linked ?? 0) > 0 ? `, ${res.offices_linked} Einträge in den ${sec.offices} verknüpft` : ''),
+        );
         navigate('verwaltung/ehemalige');
       } else {
         setResult(res);
@@ -353,7 +356,8 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
       </p>
       <p className="muted small">
         Für jede Person entsteht ein Konto, das gleich als ehemalig eingetragen ist (ohne Anmeldung). Wer schon ein Konto mit genau diesem
-        Namen hat, wird übersprungen; ein zweiter Import legt also nichts doppelt an.
+        Namen hat, wird übersprungen; ein zweiter Import legt also nichts doppelt an. Steht eine Person in den {sec.offices} bisher nur mit
+        ihrem Namen, wird der Eintrag mit ihrem Konto verknüpft.
       </p>
       <label className="field">
         <span>Tabelle</span>
@@ -400,6 +404,11 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
           <p role="status">
             Neu: {result.new === 1 ? '1 Person' : `${result.new} Personen`} · schon vorhanden: {result.existing}
           </p>
+          {(result.offices_linked ?? 0) > 0 && (
+            <p className="small">
+              {result.offices_linked} Einträge in den {sec.offices}, die bisher nur den Namen hatten, werden mit dem Konto verknüpft.
+            </p>
+          )}
           {errors > 0 && (
             <p className="form-error">{errors === 1 ? '1 Zeile hat' : `${errors} Zeilen haben`} einen Fehler; bitte erst korrigieren.</p>
           )}

@@ -2506,7 +2506,8 @@ paths:
         oder leer; eintritt „Gründer“ setzt `founder`. grund: ausgetreten (auch leer), verstorben, sonstiges. Wer genau so
         heißt wie ein vorhandenes Konto, wird übersprungen (`existing`); gleiche Namen in der Tabelle sind ein Fehler. Mit
         `apply` entsteht je Person ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen
-        wird; enthält eine Zeile einen Fehler → 400 (nichts angelegt).
+        wird; enthält eine Zeile einen Fehler → 400 (nichts angelegt). Freie Namen in Amtszeiten, die genau zu einer neu
+        angelegten (oder schon früher als ehemalig importierten) Person passen, werden mit ihrem Konto verknüpft.
       x-capability: create_users
       requestBody:
         required: true
@@ -4558,7 +4559,7 @@ components:
 
     FormerImportResult:
       type: object
-      required: [rows, new, existing, applied]
+      required: [rows, new, existing, offices_linked, applied]
       properties:
         rows:
           type: array
@@ -4584,6 +4585,7 @@ components:
               error: { type: string }
         new: { type: integer }
         existing: { type: integer }
+        offices_linked: { type: integer, description: 'Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden' }
         applied: { type: boolean }
 
     GrantableCapability:

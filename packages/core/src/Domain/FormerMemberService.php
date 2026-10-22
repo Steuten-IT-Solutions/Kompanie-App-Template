@@ -205,8 +205,10 @@ final class FormerMemberService
      * - grund: ausgetreten (auch leer), verstorben oder sonstiges.
      * - Wer genau so heißt wie ein vorhandenes Konto, wird übersprungen (existing); doppelte Namen in der Tabelle sind ein
      *   Fehler. Ohne apply nur die Vorschau; mit apply erst, wenn keine Zeile einen Fehler hat.
+     * - Steht eine neu angelegte (oder schon früher als ehemalig importierte) Person in Amtszeiten nur als freier Name,
+     *   wird der Eintrag mit ihrem Konto verknüpft (OfficeService::linkNames, offices_linked).
      *
-     * @return array{rows: list<array<string, mixed>>, new: int, existing: int, applied: bool}
+     * @return array{rows: list<array<string, mixed>>, new: int, existing: int, offices_linked: int, applied: bool}
      */
     public function import(User $actor, mixed $csv, bool $apply): array
     {
@@ -230,6 +232,7 @@ final class FormerMemberService
         $members = $this->app->members();
         $taken = [];
         $seen = [];
+        $formerIds = [];
         $rows = [];
         $planned = [];
         $count = 0;
@@ -259,6 +262,9 @@ final class FormerMemberService
                 if ($match !== []) {
                     $row['existing'] = ['id' => $match[0]->id, 'name' => $match[0]->name, 'former' => $this->previousRole($match[0]) !== null];
                     $existing++;
+                    if ($row['existing']['former'] && count($match) === 1) {
+                        $formerIds[$key] = $match[0]->id; // aus einem früheren Import: Amtszeiten auch jetzt verknüpfen
+                    }
                 } else {
                     $planned[] = [$members->prepare(['first_name' => $row['first_name'], 'last_name' => $row['last_name']], $taken), $data];
                 }
@@ -274,7 +280,11 @@ final class FormerMemberService
         if ($apply && $errors !== []) {
             throw ApiError::invalid(sprintf('Zeile %d: %s', $errors[0]['line'], $errors[0]['error']) . (count($errors) > 1 ? sprintf(' (und %d weitere Fehler)', count($errors) - 1) : ''));
         }
-        $result = ['rows' => $rows, 'new' => count($planned), 'existing' => $existing, 'applied' => false];
+        $names = $formerIds;
+        foreach ($planned as [$prepared]) {
+            $names[mb_strtolower($prepared['name'])] = null;
+        }
+        $result = ['rows' => $rows, 'new' => count($planned), 'existing' => $existing, 'offices_linked' => $this->app->offices()->linkNames($names, false), 'applied' => false];
         if (!$apply) {
             return $result;
         }
@@ -286,11 +296,14 @@ final class FormerMemberService
                 $created = $members->insert($prepared);
                 $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.');
                 $this->deactivate($actor, $target, $data);
+                $names[mb_strtolower($prepared['name'])] = $target->id;
             } catch (ApiError $e) {
+                $this->app->offices()->linkNames(array_filter($names), true);
                 throw ApiError::invalid(sprintf('Nach %d von %d Personen abgebrochen bei „%s“: %s Ein neuer Import legt nur die übrigen an.', $done, count($planned), $prepared['name'], $e->getMessage()));
             }
             $done++;
         }
+        $result['offices_linked'] = $this->app->offices()->linkNames($names, true);
         $result['applied'] = true;
         return $result;
     }

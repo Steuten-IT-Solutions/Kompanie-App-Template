@@ -424,6 +424,8 @@ export interface FormerImportResult {
   rows: FormerImportRow[];
   new: number;
   existing: number;
+  /** Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden */
+  offices_linked?: number;
   applied: boolean;
 }
 

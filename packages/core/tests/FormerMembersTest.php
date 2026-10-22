@@ -201,6 +201,33 @@ final class FormerMembersTest extends TestCase
         $this->assertTrue($res->data['rows'][1]['existing']['former']);
     }
 
+    public function testImportLinksFreeNamesInOffices(): void
+    {
+        $office = $this->call('POST', '/offices', ['title' => 'Vorsitz'])->data['id'];
+        $king = $this->call('POST', '/offices', ['title' => 'König'])->data['id'];
+        $this->call('POST', "/offices/$office/terms", ['kind' => 'period', 'start_year' => 1975, 'end_year' => 1980, 'holders' => [['name' => 'max  beispiel'], ['name' => 'Anna Andere']]]);
+        $this->call('POST', "/offices/$king/terms", ['kind' => 'point', 'start_year' => 1978, 'holders' => [['name' => 'Max Beispiel']]]);
+        $this->call('POST', "/offices/$king/terms", ['kind' => 'point', 'start_year' => 1979, 'holders' => [['name' => 'M. Beispiel']]]);
+        $this->call('POST', "/offices/$king/terms", ['kind' => 'point', 'start_year' => 2020, 'holders' => [['user_id' => $this->m]]]);
+        $holders = fn (): array => array_column($this->app->db->select('SELECT name, user_id FROM {office_holders} ORDER BY id'), 'user_id', 'name');
+
+        $csv = "Max;Beispiel;1974;1990;verstorben\nOtto;Normal;;1985;";
+        $res = $this->call('POST', '/members/former/import', ['csv' => $csv]);
+        $this->assertSame(2, $res->data['offices_linked'], 'Vorschau: Groß-/Kleinschreibung und Leerzeichen egal, Abkürzungen nicht');
+        $this->assertSame([null, null, null, null], array_values(array_slice($holders(), 0, 4)), 'Vorschau ändert nichts');
+
+        $res = $this->call('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
+        $this->assertSame(2, $res->data['offices_linked']);
+        $max = array_column($this->call('GET', '/members/former')->data, 'id', 'name')['Max Beispiel'];
+        $this->assertSame(['max beispiel' => $max, 'Anna Andere' => null, 'Max Beispiel' => $max, 'M. Beispiel' => null, 'Mitglied' => $this->m], $holders(), 'gespeicherter Name bleibt');
+
+        // Aus einem früheren Import (ohne Verknüpfung): ein neuer Lauf verknüpft nachträglich.
+        $this->app->db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$max]);
+        $res = $this->call('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
+        $this->assertSame([0, 2, 2], [$res->data['new'], $res->data['existing'], $res->data['offices_linked']]);
+        $this->assertSame($max, $holders()['Max Beispiel']);
+    }
+
     public function testImportFormats(): void
     {
         // Excel unter Windows: Windows-1252, Tabulator statt Semikolon, Kopfzeile fehlt.
