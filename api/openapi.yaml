@@ -53,6 +53,7 @@ tags:
   - name: Inventar
   - name: Mitgliederliste
   - name: Ämter
+  - name: Listen
   - name: Einstellungen
   - name: Wartung
   - name: Fehlermeldungen
@@ -952,6 +953,169 @@ paths:
                         user_id: { type: integer }
                         name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
+
+  /lists:
+    get:
+      tags: [Listen]
+      summary: Alle gespeicherten Listen (Issue #121), zuletzt geänderte zuerst
+      description: Nur mit `manage_lists` (Standardrolle „Listen verwalten“, Admins). Bereich aus → 403 `feature_disabled`.
+      x-capability: manage_lists
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PrintListSummary' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Listen]
+      summary: Liste anlegen
+      description: |
+        Ohne `columns`: Name (Nachname), Vorname und eine breite leere Spalte „Unterschrift“. Ohne `rows` beginnt die Liste leer;
+        Mitglieder kommen über `POST /lists/{id}/sync-members` dazu.
+      x-capability: manage_lists
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrintListInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /lists/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Listen]
+      summary: Liste mit Spalten, Zeilen und den Werten der Datenspalten
+      description: |
+        Die Werte der Datenspalten werden beim Lesen ermittelt und nur geliefert, soweit die anfragende Person sie in der
+        App ohnehin sehen darf (`available`): Rolle nur mit Zugang zur Mitgliederliste der Verwaltung, Dienstgrad und
+        Titel mit öffentlicher Mitgliederliste (Bereich directory) oder dem Recht, sie zu pflegen, Geburtstag (Tag und
+        Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `manage_points`, offene
+        Strafen nur mit `manage_penalties`; jeweils nur bei eingeschaltetem Bereich.
+      x-capability: manage_lists
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Listen]
+      summary: Liste ganz ersetzen (Titel, Untertitel, Datum, Ausrichtung, Spalten, Zeilen)
+      description: |
+        Mitgliedszeilen nur für Konten, die schon in der Liste stehen (z. B. beim Umsortieren), oder für Mitglieder (Recht
+        `member`); jedes Konto höchstens einmal. `user_id: null` steht für ein gelöschtes Konto. Mit `updated_at` (der
+        geladene Stand) nur, wenn niemand die Liste inzwischen geändert hat, sonst 409 `conflict`.
+      x-capability: manage_lists
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrintListInput' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Listen]
+      summary: Liste löschen
+      x-capability: manage_lists
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /lists/{id}/copy:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Listen]
+      summary: Liste kopieren (mit allen Spalten und Zeilen, Titel mit „(Kopie)“)
+      x-capability: manage_lists
+      responses:
+        '201':
+          description: Kopie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /lists/{id}/sync-members:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Listen]
+      summary: „Mitglieder aktualisieren“
+      description: |
+        Legt Zeilen für alle Mitglieder (Recht `member`, ohne Gäste und Anwärter) an, die noch keine haben, und löscht die
+        Zeilen von Konten, die es nicht mehr gibt oder die kein Mitglied mehr sind. Freie Zeilen bleiben. Neue Zeilen
+        werden nach Nachname vor die erste Mitgliedszeile eingeordnet, die nach Namen später kommt (sonst hinter die
+        letzte; ohne Mitgliedszeilen an den Anfang). Ohne `apply` nur die Übersicht, was sich ändern würde.
+      x-capability: manage_lists
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Übersicht bzw. Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [added, removed, applied, list]
+                properties:
+                  added:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id: { type: integer }
+                        name: { type: string }
+                  removed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id: { type: [integer, 'null'], description: null bei gelöschtem Konto }
+                        name: { type: [string, 'null'] }
+                  applied: { type: boolean, description: false ohne apply oder wenn es nichts zu ändern gab }
+                  list:
+                    oneOf:
+                      - $ref: '#/components/schemas/PrintList'
+                      - type: 'null'
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /documents:
     get:
@@ -4031,7 +4195,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -4186,7 +4350,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -4199,7 +4363,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -4219,7 +4383,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -4340,6 +4504,7 @@ components:
             inventory: { type: boolean }
             directory: { type: boolean }
             offices: { type: boolean }
+            lists: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -4663,7 +4828,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users]
+      enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users]
 
     MemberRights:
       type: object
@@ -4766,6 +4931,108 @@ components:
         401/403, im Wartungsmodus 503, Bereich aus 404);
         SVG als image/svg+xml mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
         und `X-Content-Type-Options: nosniff`, sonst image/png. Die Adresse wechselt mit jeder Fassung.
+
+    PrintListSummary:
+      type: object
+      required: [id, title, subtitle, date, rows, updated_by_name, updated_at]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 120 }
+        subtitle: { type: [string, 'null'], maxLength: 200 }
+        date: { type: [string, 'null'], format: date }
+        rows: { type: integer, description: Zahl der Zeilen }
+        updated_by_name: { type: [string, 'null'] }
+        updated_at: { type: string, format: date-time }
+
+    PrintListColumn:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [field, blank], description: 'field: Wert aus der App, blank: leer zum Ausfüllen auf Papier' }
+        field:
+          type: [string, 'null']
+          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, points, penalties, null]
+          description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
+        label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
+        width: { type: string, enum: [narrow, normal, wide], default: normal }
+        checkbox: { type: boolean, description: Kästchen zum Abhaken (nur bei blank) }
+        available: { type: boolean, description: 'Nur in Antworten: ob die anfragende Person die Werte sieht (blank immer)' }
+
+    PrintListRow:
+      oneOf:
+        - type: object
+          description: Mitgliedszeile
+          required: [kind, user_id, name, deleted, values]
+          properties:
+            kind: { type: string, enum: [member] }
+            user_id: { type: [integer, 'null'], description: null bei gelöschtem Konto }
+            name: { type: string, description: Anzeigename; leer bei gelöschtem Konto }
+            first_name: { type: string }
+            last_name: { type: string }
+            deleted: { type: boolean }
+            values:
+              type: object
+              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), points (Zahl), penalties (offene Cent)'
+              additionalProperties: true
+        - type: object
+          description: Freie Zeile
+          required: [kind, name]
+          properties:
+            kind: { type: string, enum: [free] }
+            name: { type: string, maxLength: 100, description: Freier Name oder leer }
+
+    PrintList:
+      type: object
+      required: [id, title, subtitle, date, orientation, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 120 }
+        subtitle: { type: [string, 'null'], maxLength: 200 }
+        date: { type: [string, 'null'], format: date }
+        orientation: { type: string, enum: [portrait, landscape] }
+        created_by_name: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        updated_by_name: { type: [string, 'null'] }
+        updated_at: { type: string, format: date-time }
+        columns:
+          type: array
+          items: { $ref: '#/components/schemas/PrintListColumn' }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/PrintListRow' }
+        fields:
+          type: array
+          description: Alle Datenspalten mit der Angabe, ob die anfragende Person sie sieht (für die Auswahl)
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              available: { type: boolean }
+
+    PrintListInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 120 }
+        subtitle: { type: string, maxLength: 200 }
+        date: { type: [string, 'null'], format: date }
+        orientation: { type: string, enum: [portrait, landscape], default: portrait }
+        columns:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/PrintListColumn' }
+        rows:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [kind]
+            properties:
+              kind: { type: string, enum: [member, free] }
+              user_id: { type: [integer, 'null'], description: Nur bei member }
+              name: { type: string, maxLength: 100, description: Nur bei free }
+        updated_at: { type: string, format: date-time, description: 'Nur beim Ersetzen (PUT): der geladene Stand' }
 
     OfficeGroup:
       type: object

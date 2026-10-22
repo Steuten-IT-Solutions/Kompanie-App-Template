@@ -3,7 +3,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MemberSummary } from '../src/api.ts';
-import { defaultDir, dirLabel, listName, loadMemberOrder, saveMemberOrder, sortMembers, splitName } from '../src/memberSort.ts';
+import {
+  defaultDir,
+  dirLabel,
+  listName,
+  loadMemberOrder,
+  saveMemberOrder,
+  sortMembers,
+  sortRowsByName,
+  splitName,
+} from '../src/memberSort.ts';
 
 const m = (id: number, first: string, last: string, points: number | null = null): MemberSummary => ({
   id,
@@ -118,4 +127,29 @@ test('ohne localStorage gilt der Standard', () => {
   Object.assign(globalThis, { localStorage: { getItem: fail, setItem: fail } });
   saveMemberOrder({ sort: 'first-name', dir: 'desc' });
   assert.deepEqual(loadMemberOrder(), { sort: 'last-name', dir: 'asc' });
+});
+
+type Row = { kind: 'member' | 'free'; name: string; first_name?: string; last_name?: string; deleted?: boolean };
+
+test('Listen (Issue #121), nach Namen sortieren: Nachname, Vorname, Umlaute wie Grundbuchstaben; leere und gelöschte Zeilen ans Ende', () => {
+  const member = (first: string, last: string): Row => ({
+    kind: 'member',
+    name: `${first} ${last}`.trim(),
+    first_name: first,
+    last_name: last,
+  });
+  const rows: Row[] = [
+    { kind: 'free', name: '' },
+    member('Ada', 'Zander'),
+    { kind: 'member', name: '', deleted: true },
+    { kind: 'free', name: 'Gast Nachbarverein' },
+    member('Bernd', 'Özdemir'),
+    member('Kasse', ''),
+    member('Anna', 'Müller'),
+    member('Zoe', 'Müller'),
+  ];
+  assert.deepEqual(
+    sortRowsByName(rows).map((r) => (r.deleted ? '(gelöscht)' : r.name)),
+    ['Kasse', 'Anna Müller', 'Zoe Müller', 'Gast Nachbarverein', 'Bernd Özdemir', 'Ada Zander', '', '(gelöscht)'],
+  );
 });

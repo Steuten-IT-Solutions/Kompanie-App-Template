@@ -3699,3 +3699,254 @@ button.spotlight-person:focus-visible {
 .office-import-rows .form-error {
   margin: 2px 0 0;
 }
+
+/* Listen (Issue #121): Bearbeiten, Vorschau und Druck */
+.list-editor .card + .card,
+.list-editor .card + .list-save {
+  margin-top: 0;
+}
+.list-output {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.list-output h3 {
+  margin-top: 0;
+}
+.list-columns .row,
+.list-rows .row {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.list-columns .row-actions {
+  align-items: center;
+  margin-top: 8px;
+}
+.list-columns .field.narrow {
+  flex-basis: 124px;
+}
+.list-columns .toggle {
+  margin: 0 8px 0 2px;
+}
+.list-add-column {
+  align-items: flex-end;
+}
+.list-add-column .btn {
+  flex: none;
+  min-height: 46px;
+}
+.list-rows {
+  gap: 6px;
+}
+.list-row-nr {
+  flex: none;
+  min-width: 2ch;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.list-row input[type='text'] {
+  min-height: 40px;
+  padding: 6px 10px;
+}
+.list-sync {
+  padding: 12px 14px;
+  border-color: var(--accent);
+}
+.list-sync p {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.list-sync .button-row {
+  margin-bottom: 0;
+}
+/* Unten am Bildschirm, damit Speichern auch bei langen Listen erreichbar ist */
+.list-save {
+  position: sticky;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 8px);
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 16px;
+  pointer-events: none;
+}
+.list-save .btn {
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 18%);
+}
+/* Vorschau: ein Blatt Papier, scrollt in sich (breite Tabellen), die Seite selbst nicht */
+.list-preview {
+  max-height: 70vh;
+  overflow: auto;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.list-preview .list-sheet {
+  /* Breite wie gedruckt (PrintSheet), der Rand der Vorschau kommt dazu */
+  box-sizing: content-box;
+  padding: 16px;
+}
+.list-sheet {
+  --list-color: #333;
+  color: #000;
+  background: #fff;
+  font-size: 10.5pt;
+  /* Farbige Flächen auch drucken (sonst lassen Browser Hintergründe weg) */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* Titelbalken wie in den Tabellen der Kompanie: Farbe der Kompanie, weiße fette Schrift, zentriert */
+.list-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 12mm;
+  padding: 6px 10px;
+  background: var(--list-color);
+  color: #fff;
+}
+.list-sheet-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex: none;
+  /* Weißer Grund: Logos in der Farbe der Kompanie bleiben auf dem Balken sichtbar */
+  background: #fff;
+  border-radius: 6px;
+  padding: 2px;
+}
+.list-sheet-heading {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  /* Gegengewicht zum Logo, damit der Titel in der Mitte steht */
+  margin-right: 46px;
+}
+.list-sheet-title {
+  font-size: 17pt;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.list-sheet-subtitle {
+  margin: 2px 0 0;
+  font-size: 10pt;
+  color: #fff;
+}
+.list-sheet-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+  font-size: 8.5pt;
+  color: #444;
+}
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.list-table th,
+.list-table td {
+  border: 1px solid #555;
+  padding: 3px 6px;
+  height: 8.5mm;
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  color: #000;
+}
+/* Kopfzeile: weiß und fett auf der Farbe der Kompanie, zentriert */
+.list-table th {
+  background: var(--list-color);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  height: auto;
+  padding: 5px 6px;
+}
+/*
+ * Gedrehte Überschrift wie in Tabellenkalkulationen (RotatedHead in ListenVerwalten.tsx): Jede gedrehte Zelle zeichnet
+ * ihr gekipptes Feld als Grafik in ihrer eigenen Breite. Die Zellen selbst haben weder Farbe noch Rahmen, die gerade
+ * Zelle davor keine Linie rechts. Positioniert ist nur das innere div, nicht die Zelle: So liegt die Grafik über den
+ * Nachbarzellen.
+ */
+.list-table th.list-th-rotated {
+  padding: 0;
+  border-width: 0;
+  background: none;
+  vertical-align: top;
+}
+.list-table th.list-th-before-rotated {
+  border-right-width: 0;
+}
+.list-th-rotated > div {
+  position: relative;
+}
+.list-th-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+/* Mitte des Textes auf der Mittellinie des Felds: unten in der Spaltenmitte, 3 mm höher also 3 mm weiter rechts */
+.list-th-label {
+  position: absolute;
+  left: calc(50% + 3mm);
+  bottom: 3mm;
+  transform-origin: 0 50%;
+  transform: translateY(50%) rotate(-45deg);
+  white-space: nowrap;
+  line-height: 1;
+}
+/* Platz für den gekippten Kopf der letzten Spalte: ohne Farbe und Rahmen */
+.list-table th.list-spare-head {
+  border-width: 0;
+  padding: 0;
+  background: none;
+}
+.list-table thead {
+  display: table-header-group;
+}
+.list-table tr {
+  break-inside: avoid;
+}
+.list-table .list-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.list-table .list-spare {
+  border: 0;
+  background: none;
+}
+/*
+ * Zeilen abwechselnd leicht in der Farbe der Kompanie über alle Spalten (wie die Tabellenformatvorlage der
+ * Kompanie-Tabellen: erste Zeile gefärbt, Farbe um 80 % aufgehellt)
+ */
+.list-table tbody tr:nth-child(odd) td:not(.list-spare) {
+  background: color-mix(in srgb, var(--list-color) 20%, #fff);
+}
+.list-table .list-blank {
+  text-align: center;
+  font-size: 13pt;
+}
+/* Nur beim Drucken: die Tabelle unter <body> (ListenVerwalten.tsx, PrintPortal) */
+.list-print-root {
+  display: none;
+}
+@media print {
+  body.list-printing > *:not(.list-print-root) {
+    display: none !important;
+  }
+  body.list-printing .list-print-root {
+    display: block;
+  }
+  html:has(> body.list-printing),
+  body.list-printing {
+    background: #fff !important;
+  }
+}

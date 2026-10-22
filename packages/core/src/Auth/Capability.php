@@ -36,6 +36,8 @@ enum Capability: string
     case ManageInventory = 'manage_inventory';
     /** Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere (Bereich Ämter, Issue #112). */
     case ManageOffices = 'manage_offices';
+    /** Listen zum Drucken und als CSV anlegen, bearbeiten und löschen (Bereich Listen, Issue #121). */
+    case ManageLists = 'manage_lists';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */

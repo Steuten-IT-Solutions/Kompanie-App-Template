@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Tests;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Push\WebPushCrypto;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
@@ -27,7 +28,7 @@ final class QueryCountTest extends TestCase
     private const LISTS = [
         'GET /members', 'GET /members?all=1', 'GET /members/{m}', 'GET /promotions', 'GET /ranks?all=1', 'GET /titles',
         'GET /attendance', 'GET /attendance/{list}', 'GET /birthdays', 'GET /inventory', 'GET /inventory/log',
-        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
+        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /lists', 'GET /lists/{printlist}', 'POST /lists/{printlist}/sync-members', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
     ];
 
     public function testListsDoNotGrowWithMembers(): void
@@ -122,6 +123,10 @@ final class QueryCountTest extends TestCase
             $entries[$id] = $i % 3 === 0 ? 'absent' : 'present';
         }
         $list = $call('PUT', '/attendance', ['source' => 'free', 'title' => 'Übung', 'date' => '2026-10-19', 'entries' => $entries]);
+        // Listen (Issue #121): alle Mitglieder als Zeilen, alle Datenspalten
+        $columns = array_map(static fn (string $f): array => ['kind' => 'field', 'field' => $f], ListService::FIELDS);
+        $printList = $call('POST', '/lists', ['title' => 'Alle', 'columns' => $columns, 'rows' => [['kind' => 'free', 'name' => 'Gast']]]);
+        $call('POST', "/lists/{$printList['id']}/sync-members", ['apply' => true]);
 
         $requests = [];
         foreach (self::LISTS as $label) {
@@ -134,7 +139,7 @@ final class QueryCountTest extends TestCase
 
         $out = [];
         foreach ($requests as $label => [$method, $path, $body]) {
-            $path = strtr($path, ['{m}' => (string) $members[0], '{list}' => (string) $list['id'], '{poll}' => (string) $poll['id']]);
+            $path = strtr($path, ['{m}' => (string) $members[0], '{list}' => (string) $list['id'], '{poll}' => (string) $poll['id'], '{printlist}' => (string) $printList['id']]);
             [$path, $q] = explode('?', $path, 2) + [1 => ''];
             parse_str($q, $query);
             $users->current = $path === '/me' || str_starts_with($path, '/me/') ? $members[0] : $admin;

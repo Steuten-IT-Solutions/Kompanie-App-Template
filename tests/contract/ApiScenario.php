@@ -41,6 +41,7 @@ final class ApiScenario
             $this->inventory();
             $this->directory();
             $this->offices();
+            $this->lists();
             $this->accounts();
             $this->formerMembers();
             $this->events();
@@ -93,7 +94,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -1089,6 +1090,66 @@ final class ApiScenario
         $this->d->actAs($admin);
         $this->req('PUT', '/admin/features', ['offices' => true]);
         $c->ok($this->req('DELETE', "/offices/$oid")[0] === 200 && $this->req('DELETE', '/office-groups/' . (int) ($group['id'] ?? 0))[0] === 200 && $this->req('DELETE', "/titles/$tid")[0] === 200, 'Aufräumen: Amt, Gruppe und Titel löschen');
+    }
+
+    /**
+     * Listen (Issue #121): nur mit manage_lists, „Mitglieder aktualisieren“ mit Übersicht, freie Zeilen bleiben, gelöschtes
+     * Konto bleibt bis zum Aktualisieren ohne Namen stehen, Punkte nur mit dem Recht dazu, Bereich aus → 403.
+     */
+    private function lists(): void
+    {
+        $c = $this->c;
+        $c->section('Listen');
+        $admin = $this->user('kptest_liste_admin', 'admin');
+        $m = $this->user('kptest_liste_m', 'member');
+        $gone = $this->user('kptest_liste_weg', 'member');
+        $guest = $this->user('kptest_liste_gast', 'guest');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/lists')[0] === 403, 'Ohne manage_lists → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('POST', '/lists', ['title' => 'Kptest'])[0] === 401, 'Ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $list] = $this->req('POST', '/lists', ['title' => 'Kptest Unterschriften', 'rows' => [['kind' => 'free', 'name' => 'Kptest Gast']]]);
+        $id = (int) ($list['id'] ?? 0);
+        $c->ok($s === 201 && array_column($list['columns'] ?? [], 'field') === ['last_name', 'first_name', null] && count($list['rows'] ?? []) === 1, 'Liste anlegen → 201, mit Vorgabespalten');
+        $c->ok($this->req('PUT', "/lists/$id", ['title' => '', 'columns' => $list['columns'] ?? [], 'rows' => []])[0] === 400, 'Ohne Titel → 400');
+        $c->ok($this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $list['columns'] ?? [], 'rows' => [['kind' => 'member', 'user_id' => $guest]]])[0] === 400, 'Gast als Mitgliedszeile → 400');
+        [$s, $d] = $this->req('POST', "/lists/$id/sync-members");
+        $added = array_column($d['added'] ?? [], 'user_id');
+        $c->ok($s === 200 && ($d['applied'] ?? null) === false && in_array($m, $added, true) && in_array($gone, $added, true) && !in_array($guest, $added, true), 'Mitglieder aktualisieren: Übersicht ohne Gäste');
+        [$s, $d] = $this->req('POST', "/lists/$id/sync-members", ['apply' => true]);
+        $rows = $d['list']['rows'] ?? [];
+        $c->ok($s === 200 && ($d['applied'] ?? null) === true && in_array($m, array_column($rows, 'user_id'), true) && end($rows) === ['kind' => 'free', 'name' => 'Kptest Gast'], 'Mitglieder aktualisieren: Zeilen angelegt, freie Zeile bleibt');
+
+        [$s] = $this->req('DELETE', "/members/$gone");
+        [, $d] = $this->req('GET', "/lists/$id");
+        $c->ok($s === 200 && count(array_filter($d['rows'] ?? [], static fn (mixed $r): bool => is_array($r) && ($r['deleted'] ?? false) === true)) === 1, 'Gelöschtes Konto: Zeile bleibt ohne Namen');
+        [, $d] = $this->req('POST', "/lists/$id/sync-members", ['apply' => true]);
+        $c->ok(($d['removed'] ?? null) === [['user_id' => null, 'name' => null]] && ($d['added'] ?? null) === [], 'Aktualisieren löscht die Zeile des gelöschten Kontos');
+
+        // Ohne manage_points keine Punkte, auch nicht in der Liste.
+        $this->req('PUT', '/admin/features', ['points' => true]);
+        $columns = [['kind' => 'field', 'field' => 'name'], ['kind' => 'field', 'field' => 'points']];
+        [, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [['kind' => 'member', 'user_id' => $m]]]);
+        $c->ok(($d['columns'][1]['available'] ?? null) === true && is_numeric($d['rows'][0]['values']['points'] ?? null), 'Admin sieht die Punkte');
+        [$s, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [], 'updated_at' => '2000-01-01T00:00:00+00:00']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict, nichts überschrieben');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === ['member', 'manage_lists'], 'Standardrolle „Listen verwalten“');
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['lists']]);
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', "/lists/$id");
+        $c->ok($s === 200 && ($d['columns'][1]['available'] ?? null) === false && !array_key_exists('points', (array) ($d['rows'][0]['values'] ?? [])), 'Nur manage_lists: Punkte nicht sichtbar');
+
+        $this->d->actAs($admin);
+        [$s, $copy] = $this->req('POST', "/lists/$id/copy");
+        $c->ok($s === 201 && ($copy['title'] ?? '') === 'Kptest (Kopie)', 'Liste kopieren → 201');
+        $this->req('PUT', '/admin/features', ['lists' => false]);
+        [$s, $d] = $this->req('GET', '/lists');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['lists' => true]);
+        $c->ok($this->req('DELETE', "/lists/$id")[0] === 200 && $this->req('DELETE', '/lists/' . (int) ($copy['id'] ?? 0))[0] === 200 && $this->req('GET', "/lists/$id")[0] === 404, 'Aufräumen: Listen löschen');
     }
 
     private function birthdays(): void

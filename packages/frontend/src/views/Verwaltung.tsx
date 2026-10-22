@@ -26,6 +26,7 @@ import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Kon
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
+import { ListAdmin } from './ListenVerwalten';
 import { PersonOffices } from './Aemter';
 import {
   DEFAULT_MEMBER_SORT,
@@ -54,7 +55,8 @@ type Sub =
   | 'befoerderungen'
   | 'titel'
   | 'aemter'
-  | 'anwesenheit';
+  | 'anwesenheit'
+  | 'listen';
 
 const sec = brand.labels.sections;
 
@@ -112,6 +114,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <OfficeAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
+      ) : active === 'listen' ? (
+        <ListAdmin path={path.slice(1)} onToast={onToast} />
       ) : (
         <Members />
       )}

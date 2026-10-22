@@ -68,6 +68,7 @@ final class Roles
         Capability::ManagePolls,
         Capability::ManageInventory,
         Capability::ManageOffices,
+        Capability::ManageLists,
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];

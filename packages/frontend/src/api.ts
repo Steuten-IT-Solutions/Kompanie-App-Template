@@ -22,6 +22,7 @@ export type Capability =
   | 'manage_polls'
   | 'manage_inventory'
   | 'manage_offices'
+  | 'manage_lists'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
@@ -41,7 +42,8 @@ export type Feature =
   | 'birthdays'
   | 'inventory'
   | 'directory'
-  | 'offices';
+  | 'offices'
+  | 'lists';
 
 export interface AppUser {
   id: number;
@@ -853,6 +855,85 @@ export interface OfficeImportResult {
   applied: boolean;
 }
 
+/** Listen (Issue #121): Datenspalten; nr zählt die Zeilen. */
+export type ListField = 'nr' | 'name' | 'first_name' | 'last_name' | 'role' | 'rank' | 'titles' | 'birthday' | 'points' | 'penalties';
+export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
+
+export interface ListColumn {
+  /** field: Wert aus der App, blank: leer zum Ausfüllen auf Papier */
+  kind: 'field' | 'blank';
+  field: ListField | null;
+  /** Überschrift; leer: Standardbezeichnung der Datenspalte */
+  label: string;
+  width: ListColumnWidth;
+  /** Kästchen zum Abhaken (nur leere Spalten) */
+  checkbox: boolean;
+  /** Nur in Antworten: Die Person sieht die Werte (leere Spalten immer). */
+  available?: boolean;
+}
+
+/** Werte der sichtbaren Datenspalten eines Mitglieds. */
+export interface ListValues {
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  rank?: string | null;
+  titles?: string[];
+  /** „TT.MM.“ oder null (nicht freigegeben) */
+  birthday?: string | null;
+  points?: number;
+  /** Offene Strafen in Cent */
+  penalties?: number;
+}
+
+export type ListRow =
+  | { kind: 'member'; user_id: number | null; name: string; first_name?: string; last_name?: string; deleted: boolean; values: ListValues }
+  | { kind: 'free'; name: string };
+
+export interface PrintListSummary {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  date: string | null;
+  rows: number;
+  updated_by_name: string | null;
+  updated_at: string;
+}
+
+export interface PrintList {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  date: string | null;
+  orientation: 'portrait' | 'landscape';
+  created_by_name: string | null;
+  created_at: string;
+  updated_by_name: string | null;
+  updated_at: string;
+  columns: ListColumn[];
+  rows: ListRow[];
+  fields: { key: ListField; available: boolean }[];
+}
+
+export interface PrintListInput {
+  title: string;
+  subtitle?: string;
+  date?: string | null;
+  orientation?: 'portrait' | 'landscape';
+  columns?: Omit<ListColumn, 'available'>[];
+  rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
+  /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */
+  updated_at?: string;
+}
+
+export interface ListSyncResult {
+  added: { user_id: number; name: string }[];
+  removed: { user_id: number | null; name: string | null }[];
+  applied: boolean;
+  list: PrintList | null;
+}
+
 export interface RankRef {
   id: number;
   title: string;
@@ -1274,6 +1355,15 @@ export const api = {
   updateOfficeTerm: (id: number, data: OfficeTermInput) => request<OfficeTerm>('PATCH', `/office-terms/${id}`, data),
   deleteOfficeTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-terms/${id}`),
   importOffices: (csv: string, apply: boolean, link = true) => request<OfficeImportResult>('POST', '/offices/import', { csv, apply, link }),
+
+  // Listen (Issue #121): nur mit manage_lists
+  lists: () => request<PrintListSummary[]>('GET', '/lists'),
+  list: (id: number) => request<PrintList>('GET', `/lists/${id}`),
+  createList: (data: PrintListInput) => request<PrintList>('POST', '/lists', data),
+  saveList: (id: number, data: PrintListInput) => request<PrintList>('PUT', `/lists/${id}`, data),
+  copyList: (id: number) => request<PrintList>('POST', `/lists/${id}/copy`),
+  deleteList: (id: number) => request<{ deleted: boolean }>('DELETE', `/lists/${id}`),
+  syncListMembers: (id: number, apply: boolean) => request<ListSyncResult>('POST', `/lists/${id}/sync-members`, { apply }),
 
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),

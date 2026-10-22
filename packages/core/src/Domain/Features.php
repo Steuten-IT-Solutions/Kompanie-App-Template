@@ -54,6 +54,8 @@ final class Features
         'directory' => ['label' => 'Mitglieder', 'description' => 'Liste der Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter) mit Foto, Dienstgrad und Titeln, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => null],
         // Ämter (Issue #112): Zeitstrahl aller Ämter mit früheren Inhabern, öffentlich; im Tab der Mitgliederliste.
         'offices' => ['label' => 'Ämter', 'description' => 'Wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl für alle sichtbar; laufende Ämter können Titel vergeben.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_offices']],
+        // Listen (Issue #121): nur für alle mit manage_lists, Werte der Mitglieder nur, soweit sie sie ohnehin sehen.
+        'lists' => ['label' => 'Listen', 'description' => 'Listen zum Ausdrucken oder als CSV, z. B. Unterschriften- oder Teilnehmerlisten, mit eigenen Spalten und den Mitgliedern als Zeilen; nur für alle, die sie verwalten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_lists']],
     ];
 
     /** @var array<string, bool>|null */
@@ -214,8 +216,8 @@ final class Features
         $state = [];
         foreach (self::keys() as $key) {
             // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
-            // Mitgliederliste und Ämter gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices'], true) && $this->app->config->legacyFeature($key);
+            // Mitgliederliste, Ämter und Listen gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

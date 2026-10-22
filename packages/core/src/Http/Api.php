@@ -591,6 +591,19 @@ final class Api
                 return ['deleted' => true];
             }, 'offices', $denyRights),
 
+            // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
+            new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
+            new Route('POST', '/lists', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->create($this->user(), $r->body)), 'lists', $denyRights),
+            new Route('GET', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->detail($this->user(), $r->id()), 'lists', $denyRights),
+            new Route('PUT', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->save($this->user(), $r->id(), $r->body), 'lists', $denyRights),
+            new Route('DELETE', '/lists/{id}', Cap::ManageLists, function (Request $r) use ($a) {
+                $a->lists()->delete($r->id());
+                return ['deleted' => true];
+            }, 'lists', $denyRights),
+            new Route('POST', '/lists/{id}/copy', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->copy($this->user(), $r->id())), 'lists', $denyRights),
+            // „Mitglieder aktualisieren“: ohne apply nur die Übersicht, was sich ändert
+            new Route('POST', '/lists/{id}/sync-members', Cap::ManageLists, fn (Request $r) => $a->lists()->syncMembers($this->user(), $r->id(), Input::bool($r->input('apply'))), 'lists', $denyRights),
+
             // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
             new Route('GET', '/documents', Cap::Member, fn () => $a->documents()->list($this->user()), 'documents', $denyMember),
             new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),

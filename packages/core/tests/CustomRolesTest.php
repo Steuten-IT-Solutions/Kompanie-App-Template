@@ -43,10 +43,10 @@ final class CustomRolesTest extends TestCase
     {
         // Feste Rollen und die Standardrollen der eingeschalteten Bereiche (TestApp schaltet alle ein).
         $roles = $this->call('GET', '/admin/roles')->data;
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'events', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'inventory', 'offices', Roles::ADMIN], array_column($roles, 'key'));
-        $this->assertSame(['Gast', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Dokumente verwalten', 'Schwarzes Brett verwalten', 'Umfragen verwalten', 'Inventar verwalten', 'Ämter verwalten', 'Admin'], array_column($roles, 'label'));
-        $this->assertSame(1, $roles[13]['users'], 'ein Admin');
-        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[13]['system']);
+        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'events', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'inventory', 'offices', 'lists', Roles::ADMIN], array_column($roles, 'key'));
+        $this->assertSame(['Gast', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Dokumente verwalten', 'Schwarzes Brett verwalten', 'Umfragen verwalten', 'Inventar verwalten', 'Ämter verwalten', 'Listen verwalten', 'Admin'], array_column($roles, 'label'));
+        $this->assertSame(1, $roles[14]['users'], 'ein Admin');
+        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[14]['system']);
         $this->assertFalse($roles[1]['deletable'], 'Mitglied ist die Rolle neuer Konten');
         $this->assertSame(['member'], $roles[1]['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt angezeigt');
         $this->assertTrue($roles[3]['deletable']);
