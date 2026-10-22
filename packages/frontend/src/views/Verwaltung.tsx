@@ -69,8 +69,15 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
 
+  // Seite einer ehemaligen Person: Im Menü steht „Ehemalige“ (erst bekannt, wenn die Person geladen ist).
+  const [formerId, setFormerId] = useState<number | null>(null);
   const subs = adminTabs().filter((t) => !t.route);
-  const active: Sub = subs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
+  const active: Sub =
+    sub === 'mitglied' && arg && Number(arg) === formerId && subs.some((t) => t.id === 'ehemalige')
+      ? 'ehemalige'
+      : subs.some((t) => t.id === sub)
+        ? (sub as Sub)
+        : 'mitglieder';
   // Ohne Mitgliederliste (z. B. nur Schwarzes Brett): gleich den ersten Bereich öffnen.
   const first = adminTabs()[0];
   const redirect = !memberListAllowed() && !sub && first?.route ? first.route : null;
@@ -83,7 +90,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
     <div>
       <AdminNav active={active} />
       {sub === 'mitglied' && arg ? (
-        <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} />
+        <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} onFormer={setFormerId} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
@@ -348,9 +355,22 @@ function Members() {
  * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
  * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht.
  */
-function MemberDetailView({ id, page, onToast }: { id: number; page?: string; onToast: (msg: string) => void }) {
+function MemberDetailView({
+  id,
+  page,
+  onToast,
+  onFormer,
+}: {
+  id: number;
+  page?: string;
+  onToast: (msg: string) => void;
+  /** Ehemalige Person: ihre ID, sonst null (auch nach „Als ehemalig eintragen“ bzw. „Wieder aufnehmen“) */
+  onFormer: (id: number | null) => void;
+}) {
   const { data, error, loading, reload } = useAsync(() => api.member(id), [id], 'member');
   const [busy, setBusy] = useState(false);
+  const former = data?.id === id && !!data.former;
+  useEffect(() => onFormer(former ? id : null), [former, id, onFormer]);
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
