@@ -132,7 +132,8 @@ select {
   color: var(--on-accent);
   border-color: var(--accent);
 }
-.topbar .topbar-help {
+.topbar .topbar-help,
+.topbar .topbar-share {
   color: var(--on-primary);
   font-weight: 700;
   font-size: 1rem;
@@ -145,6 +146,10 @@ select {
   flex: none;
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
+}
+/* Teilen steht direkt neben „?“: Abstand kommt aus gap. */
+.topbar .topbar-share {
+  margin-right: 0;
 }
 .topbar .topbar-help.active {
   background: var(--accent);
@@ -840,14 +845,16 @@ select {
   width: 100%;
   margin: 14px 0;
 }
-.member-name {
+.member-name,
+.member-peek-name {
   margin: 4px 0 14px;
   font-family: var(--font-head);
   font-weight: 700;
   font-size: 1.6rem;
   letter-spacing: 0.02em;
 }
-.member-name.with-rank {
+.member-name.with-rank,
+.member-peek-name.with-rank {
   margin-bottom: 4px;
 }
 /* Mitgliedsdetails: Name mittig */
@@ -1080,6 +1087,37 @@ button.member-date {
 .member-detail {
   /* Waagerecht wischt die App selbst; sonst blättert der Browser zusätzlich im Verlauf zurück oder vor. */
   touch-action: pan-y pinch-zoom;
+  /* Karussell: Die Nachbarn stehen neben der Karte im Seitenrand und darüber hinaus; abgeschnitten wird erst am Rand
+     von .content, ohne dass die Seite seitlich scrollt. */
+  margin: 0 -16px;
+  padding: 0 16px;
+  overflow-x: clip;
+}
+/* Spur mit der Karte; beim Ziehen setzt swipe.ts den Versatz, beim Loslassen gleitet sie. */
+.member-track {
+  position: relative;
+  transition: transform 0.22s ease-out;
+}
+.member-track.peeking {
+  will-change: transform;
+}
+/* Nachbarn links und rechts, Abstand wie PEEK_GAP in swipe.ts */
+.member-peek {
+  position: absolute;
+  top: var(--peek-top, 0);
+  width: 100%;
+  pointer-events: none;
+}
+.member-peek-prev {
+  right: calc(100% + 32px);
+}
+.member-peek-next {
+  left: calc(100% + 32px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-track {
+    transition: none;
+  }
 }
 .member-nav {
   display: flex;
@@ -1886,7 +1924,8 @@ code {
   flex: none;
   color: var(--accent-text);
 }
-.admin-menu-current {
+.admin-menu-current,
+.member-peek-menu-current {
   flex: 1;
   min-width: 0;
   overflow: hidden;

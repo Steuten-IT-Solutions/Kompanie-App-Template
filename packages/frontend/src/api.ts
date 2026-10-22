@@ -5,6 +5,7 @@ import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
+import { rememberRoute } from './share';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -1102,6 +1103,8 @@ let csrfToken = config?.csrf.token ?? '';
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
+  // Nach der Anmeldung zurück auf diese Seite (z. B. aus einem geteilten Link), siehe main.tsx.
+  rememberRoute(window.location.hash);
   if (config?.auth.mode === 'redirect' && config.auth.loginUrl) {
     window.location.href = config.auth.loginUrl;
   } else {
@@ -1501,6 +1504,9 @@ export const api = {
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
+  setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
+  uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
   clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
@@ -1600,6 +1606,22 @@ const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push
 const guestAuth = (device: PushDevice): string | undefined => (config?.user ? undefined : device.keys.auth);
 
 export type StatusLevel = 'ok' | 'warn' | 'error' | 'off';
+
+/** Sicherungen in Google Drive (Einstellungen → Datensicherung). */
+export interface BackupDriveStatus {
+  /** Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden */
+  available: boolean;
+  /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
+  access: boolean;
+  enabled: boolean;
+  email: string;
+  folder_url: string | null;
+  last_ok: number | null;
+  last_try: number | null;
+  error: string | null;
+  every_days: number;
+  keep: number;
+}
 
 export interface UpdateStatus {
   configured: boolean;

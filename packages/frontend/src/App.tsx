@@ -14,6 +14,7 @@ import { navigate, useRoute, viewKey } from './router';
 import { AdminNav, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
+import { shareLink, shareUrl } from './share';
 import News from './views/News';
 import Termine from './views/Termine';
 
@@ -282,6 +283,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Menü oben, Tab unten).
   const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
   const activeTab: View = adminView ? 'verwaltung' : tab;
+  // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
+  const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
+  const loginFirst = !user && canLogin && VIEWS.includes(requested) && requested !== 'anmelden' && !allowed[requested];
 
   const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
@@ -338,6 +342,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
+  const pageUrl = shareUrl(config.appUrl, tab, requested, path);
   const head = (
     <header className="topbar">
       <img src={logoUrl} alt="" className="logo" />
@@ -345,6 +350,21 @@ export default function App({ notice = null }: { notice?: string | null }) {
         <div className="topbar-title">{caps(titles()[tab])}</div>
         <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
       </div>
+      {!['anmelden', 'einrichtung'].includes(tab) && (
+        <button
+          className="btn btn-link topbar-share"
+          onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${caps(titles()[tab])}`, showToast)}
+          aria-label="Link zu dieser Seite teilen"
+          title="Link zu dieser Seite teilen"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7l7-4.1c.5.5 1.3.8 2.1.8 1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 .2 0 .5.1.7l-7 4.1C7.5 9.3 6.8 9 6 9c-1.7 0-3 1.3-3 3s1.3 3 3 3c.8 0 1.5-.3 2-.8l7.1 4.2c-.1.2-.1.4-.1.6 0 1.6 1.3 2.9 2.9 2.9s2.9-1.3 2.9-2.9-1.2-2.9-2.8-2.9z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      )}
       <button
         className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
         onClick={() => {
@@ -414,6 +434,14 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 </p>
                 <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
                   Einrichtung starten
+                </button>
+              </div>
+            )}
+            {loginFirst && (
+              <div className="card login-first" role="note">
+                <p>Diese Seite ist erst nach der Anmeldung zu sehen. Danach geht sie direkt auf.</p>
+                <button className="btn btn-block" onClick={toLogin}>
+                  Anmelden
                 </button>
               </div>
             )}

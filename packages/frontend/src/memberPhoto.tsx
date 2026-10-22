@@ -71,6 +71,11 @@ export function initials(name: string): string {
 }
 
 /** Rundes Foto; ohne Foto (oder wenn es nicht lädt) die Anfangsbuchstaben. */
+/** Foto schon laden (z. B. des nächsten Mitglieds beim Wischen), damit es ohne Verzögerung erscheint. */
+export function preloadAvatar(url: string | null | undefined, size: AvatarSize = 'large'): void {
+  if (url && !url.startsWith('data:')) new Image().src = badgeSrc(url, PIXELS[size]);
+}
+
 export function MemberAvatar({ url, name, size = 'small' }: { url?: string | null; name: string; size?: AvatarSize }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);

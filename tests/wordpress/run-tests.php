@@ -838,7 +838,7 @@ $res = rest_do_request(new WP_REST_Request('POST', '/kpwp-alt/v1/push/status'));
 $c->ok($res->get_status() !== 404, 'Push-Routen im Alias erreichbar (Status ' . $res->get_status() . ')');
 
 $c->section('Datensicherung und Update');
-$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name());
+$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name(), $app->files);
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'vorher');
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state', ['serial' => 5]);
 $app->cache->increment('backup_test', 900);
@@ -860,6 +860,71 @@ try {
 } catch (RuntimeException $e) {
     $c->ok(str_contains($e->getMessage(), 'anderen Website'), 'Sicherung einer anderen Website wird abgelehnt');
 }
+
+// Dateien der Dokumente: in der Sicherung, nach dem Verlust wieder da.
+$docId = $app->db->insert('documents', ['title' => 'Satzung (Sicherung)', 'category_id' => null, 'doc_date' => '2026-01-01', 'visibility' => 'members', 'file' => 'dok-sicherungstest.pdf', 'ext' => 'pdf', 'size' => 9, 'version' => 'v1', 'uploaded_by' => $admin, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00']);
+$docPath = $app->files->path('dokumente/dok-sicherungstest.pdf', false);
+file_put_contents($docPath, '%PDF-test');
+$withFile = $backup->export();
+$c->ok(base64_decode((string) ($withFile['files']['dokumente/dok-sicherungstest.pdf'] ?? '')) === '%PDF-test', 'Sicherung enthält die Dateien der Dokumente');
+unlink($docPath);
+$backup->import((string) json_encode($withFile));
+$c->ok(is_file($docPath) && file_get_contents($docPath) === '%PDF-test', 'Wiederherstellen legt die Dateien der Dokumente wieder ab');
+$app->db->execute('DELETE FROM {documents} WHERE id = ?', [$docId]);
+unlink($docPath);
+
+// Konten (WordPress-Benutzer) in der Sicherung: nach dem Verlust der Website mit derselben ID wieder angelegt.
+$verloren = wp_insert_user(['user_login' => 'kpwp_verloren', 'user_pass' => 'Geheim-123', 'user_email' => 'verloren@example.com', 'display_name' => 'Vera Loren', 'first_name' => 'Vera', 'last_name' => 'Loren', 'role' => 'subscriber']);
+wp_set_current_user(0);
+$app->users->setRole($verloren, KompanieApp\Core\Auth\Roles::MEMBER);
+update_user_option($verloren, WpUsers::ACCOUNT_META, '1', false);
+$acc = $backup->export()['accounts'];
+$row = array_values(array_filter($acc, static fn (array $a): bool => $a['id'] === $verloren))[0] ?? [];
+$c->ok(($row['login'] ?? '') === 'kpwp_verloren' && ($row['app_role'] ?? '') === 'member' && ($row['app_account'] ?? false) === true
+    && ($row['first_name'] ?? '') === 'Vera' && wp_check_password('Geheim-123', (string) ($row['pass'] ?? '')), 'Sicherung enthält die Konten mit Passwort-Hash, Namen und Rolle in der App');
+$c->ok(in_array($admin, array_column($acc, 'id'), true), 'Sicherung enthält alle Benutzer der Website, auch Administratoren');
+$member2 = $d->createUser('kpwp_rolle', 'member');
+$withAccounts = $backup->export();
+wp_delete_user($verloren);
+$app->users->setRole($member2, 'points');
+$backup->import((string) json_encode($withAccounts));
+$back = get_userdata($verloren);
+$c->ok($back !== false && $back->user_login === 'kpwp_verloren' && $back->user_email === 'verloren@example.com' && $back->first_name === 'Vera'
+    && $back->display_name === 'Vera Loren', 'Fehlendes Konto mit derselben ID, Benutzername, E-Mail und Namen wieder angelegt');
+$c->ok($back !== false && wp_check_password('Geheim-123', $back->user_pass, $verloren) && $app->users->find($verloren)?->role === 'member'
+    && in_array(Roles::ROLE_MEMBER, $back->roles, true), 'Wiederhergestelltes Konto: altes Passwort und Rolle in der App gelten');
+$c->ok($app->users->find($member2)?->role === 'member', 'Vorhandenes Konto bekommt die Rolle in der App aus der Sicherung zurück');
+// Widerspruch: Die ID gehört hier einem anderen Benutzernamen → nichts ändern.
+$falsch = $withAccounts;
+foreach ($falsch['accounts'] as &$a) {
+    if ($a['id'] === $member2) {
+        $a['login'] = 'kpwp_jemand_anders';
+    }
+}
+unset($a);
+$app->users->setRole($member2, 'points');
+try {
+    $backup->import((string) json_encode($falsch));
+    $c->ok(false, 'Konto-ID mit anderem Benutzernamen wird abgelehnt');
+} catch (RuntimeException $e) {
+    $c->ok(str_contains($e->getMessage(), 'kpwp_jemand_anders') && $app->users->find($member2)?->role === 'points', 'Konto-ID mit anderem Benutzernamen wird abgelehnt, ohne etwas zu ändern');
+}
+// Konten anlegen nur mit dem WP-Recht dazu.
+wp_delete_user($verloren);
+wp_set_current_user($member2);
+try {
+    $backup->import((string) json_encode($withAccounts));
+    $c->ok(false, 'Konten anlegen ohne WP-Recht wird abgelehnt');
+} catch (RuntimeException $e) {
+    $c->ok(str_contains($e->getMessage(), 'Benutzer anlegen') && get_userdata($verloren) === false, 'Konten anlegen ohne WP-Recht wird abgelehnt');
+}
+wp_set_current_user(0);
+// Ältere Sicherung ohne Konten: wie bisher.
+$alt = $withAccounts;
+unset($alt['accounts']);
+$backup->import((string) json_encode($alt));
+$c->ok(get_userdata($verloren) === false && (int) $app->db->scalar('SELECT COUNT(*) FROM {events} WHERE title = ?', ['Aus der Sicherung']) === 1, 'Ältere Sicherung ohne Konten lässt sich weiter einspielen');
+wp_delete_user($member2);
 $app->db->execute('DELETE FROM {events} WHERE title = ?', ['Aus der Sicherung']);
 foreach ($photoStatus as $p) {
     $app->db->update('photos', ['status' => $p['status']], ['id' => $p['id']]);

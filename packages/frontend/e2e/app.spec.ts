@@ -280,6 +280,46 @@ test('Mitglied: Wischen blättert in der Liste, nicht aber in einem offenen Fens
   await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
 });
 
+test('Mitglied: Beim Wischen steht der Nachbar schon daneben, gewechselt wird ohne Laden', async ({ page }) => {
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  // Merken, ob irgendwann „Lädt …“ bzw. das Gerüst erscheint.
+  await page.evaluate(() => {
+    const w = window as unknown as { sawLoading: boolean };
+    w.sawLoading = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-loading]')) w.sawLoading = true;
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+
+  // Finger noch auf dem Bildschirm: Die Karte ist verschoben, rechts daneben steht schon das nächste Mitglied.
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 + 60;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [-20, -60, -120]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  }
+  await expect(page.locator('.member-peek-next .member-peek-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-peek-next .member-step')).toContainText('2 / 2');
+  expect(await page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('translateX(-120px)');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-peek')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false);
+
+  // Nur kurz gezogen: Die Karte schnappt zurück, es bleibt beim selben Mitglied.
+  await swipe(page, 30);
+  await expect(page.locator('.member-peek')).toHaveCount(0);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  expect(await page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('');
+});
+
 test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neustart)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const last = `Altwisch${id}`;
@@ -1090,6 +1130,31 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
     async () => (await fetch(window.KOMPANIE_CONFIG!.apiBase + 'me/points', { credentials: 'same-origin' })).status,
   );
   expect(status).toBe(401);
+});
+
+test('Geteilter Link: Gast meldet sich an und landet auf der Seite; Teilen-Knopf liefert die Adresse', async ({ page }) => {
+  await page.context().clearCookies();
+  // Teilen-Menü des Geräts nachbilden: Die App gibt ihm die Adresse der Seite.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', {
+      value: async (data: ShareData) => {
+        (window as unknown as { shared: ShareData }).shared = data;
+      },
+    });
+  });
+  await page.goto('/app/#/meins/punkte');
+  const hint = page.locator('.login-first');
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Anmelden' }).click();
+  await fillLogin(page, 'mitglied1', PASSWORD);
+  await expect(page).toHaveURL(/\/app\/#\/meins\/punkte$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  await expect(page.locator('.login-first')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Link zu dieser Seite teilen' }).click();
+  const shared = await page.evaluate(() => (window as unknown as { shared?: ShareData }).shared);
+  expect(shared?.url).toMatch(/\/app\/#\/meins\/punkte$/);
+  expect(shared?.title).toContain('Meins');
 });
 
 /**
