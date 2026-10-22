@@ -456,6 +456,46 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   await expect(list).not.toContainText(/Punkte|offen/);
 });
 
+test.describe('ohne Service Worker', () => {
+  // page.route sieht Anfragen des Service Workers nicht
+  test.use({ serviceWorkers: 'block' });
+
+  test('Ehemalige: auf der Seite einer ehemaligen Person bleibt „Ehemalige“ markiert', async ({ page }) => {
+    // Die Liste kommt aus dem Test, damit keine Daten zurückbleiben.
+    await page.route(/directory\/former(?![\w/])/, (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 987654,
+            name: 'Erwin Ehemalig',
+            first_name: 'Erwin',
+            last_name: 'Ehemalig',
+            photo_url: null,
+            founder: true,
+            joined_year: '1985',
+            left_year: '2010',
+          },
+        ],
+      }),
+    );
+    await page.goto('/app/#/mitglieder/ehemalige');
+    const switcher = page.locator('.members-switch');
+    const list = page.locator('.directory .card-list');
+    await list.locator('.member-row', { hasText: 'Ehemalig, Erwin' }).locator('.member-row-open').click();
+    await expect(page).toHaveURL(/#\/mitglieder\/987654$/);
+    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 1985–2010');
+    await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'false');
+
+    // Bei Mitgliedern bleibt es „Mitglieder“
+    await switcher.getByRole('button', { name: 'Mitglieder' }).click();
+    await list.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
+    await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied2' })).toBeVisible();
+    await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
 test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitglieder', async ({ page }) => {
   const id = Date.now() % 1000000;
   const group = `Verein ${id}`;
