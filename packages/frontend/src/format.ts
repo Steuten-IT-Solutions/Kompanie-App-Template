@@ -37,14 +37,13 @@ const ROLE_PLURALS: Record<string, string> = { Mitglied: 'Mitglieder', Gast: 'G�
 export const roleCount = (label: string, count: number): string => `${count === 1 ? label : (ROLE_PLURALS[label] ?? label)} ${count}`;
 
 /**
- * Zähler je Gruppe über Mitgliederlisten in der Reihenfolge der Rollen (Einstellungen → Rollen): Mitglieder zuerst,
- * dann die eigenen Rollen (z. B. Jungmariner, Anwärter) so, wie der Admin sie ordnet; Gruppen ohne Personen fehlen.
+ * Zähler je Gruppe über Mitgliederlisten in umgekehrter Reihenfolge der Rollen (Einstellungen → Rollen, von unten nach
+ * oben): Bei Gast, Anwärter, Mitglied stehen die Mitglieder vor den Anwärtern. Gruppen ohne Personen fehlen.
  */
 export function groupCounts(roles: { key: string; label: string }[], counts: Map<string, number>): string[] {
-  const rank = (key: string) => (key === 'member' ? 0 : 1);
   return roles
     .filter((r) => (counts.get(r.key) ?? 0) > 0)
-    .sort((a, b) => rank(a.key) - rank(b.key))
+    .reverse()
     .map((r) => roleCount(r.label, counts.get(r.key) ?? 0));
 }
 

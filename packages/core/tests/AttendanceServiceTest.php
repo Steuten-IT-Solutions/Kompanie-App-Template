@@ -166,10 +166,14 @@ final class AttendanceServiceTest extends TestCase
         $chief = $this->users->add('leitung', 'points');
         $this->call('PUT', '/attendance', ['id' => $list['id'], 'entries' => [$this->m => 'present', $this->admin => 'present', $chief => 'present', $this->cand => 'present']]);
         $groups = fn (): array => array_column($this->call('GET', '/attendance/' . $list['id'])->data['counts_by_group']['present'], 'count', 'group');
-        $this->assertSame([Roles::MEMBER => 3, TestApp::candidateRole($this->app) => 1], $groups(), 'ohne Einstellung: mit Mitgliederbereich als Mitglied; Mitglieder vor Anwärtern');
+        $this->assertSame([TestApp::candidateRole($this->app) => 1, Roles::MEMBER => 3], $groups(), 'ohne Einstellung: mit Mitgliederbereich als Mitglied; Rollen von unten nach oben');
+        $keys = array_keys($this->app->roles()->all());
+        $cand = TestApp::candidateRole($this->app);
+        $this->app->roles()->reorder(array_values(array_merge([Roles::GUEST, $cand], array_diff($keys, [Roles::GUEST, $cand]))));
+        $this->assertSame([Roles::MEMBER => 3, $cand => 1], $groups(), 'Anwärter zwischen Gast und Mitglied: Mitglieder zuerst');
 
         $this->assertSame(200, $this->call('PUT', '/attendance/groups', ['groups' => ['points' => null, TestApp::candidateRole($this->app) => Roles::MEMBER]])->status);
-        $this->assertSame([Roles::MEMBER => 3, 'points' => 1], $groups());
+        $this->assertSame(['points' => 1, Roles::MEMBER => 3], $groups(), 'Punkte verwalten steht unter Mitglied');
         $res = $this->call('PUT', '/attendance/groups', ['groups' => [Roles::ADMIN => 'points', 'points' => Roles::MEMBER]]);
         $this->assertSame(400, $res->status, 'keine Ketten');
         $this->assertSame(400, $this->call('PUT', '/attendance/groups', ['groups' => [Roles::GUEST => Roles::MEMBER]])->status);

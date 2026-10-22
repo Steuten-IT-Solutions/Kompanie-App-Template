@@ -188,7 +188,7 @@ function Members() {
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
   // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter.
-  // Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner, Anwärter) in ihrer Reihenfolge.
+  // In umgekehrter Reihenfolge der Rollen (Einstellungen → Rollen, von unten nach oben).
   const groupCounts = useMemo(() => {
     const n = new Map<Level, number>();
     for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
