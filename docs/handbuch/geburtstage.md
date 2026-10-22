@@ -6,7 +6,7 @@ bereiche: [birthdays]
 ---
 Unter **Alle {bereich.birthdays}** siehst du, wann die {rolle.member} der {kompanie.name} Geburtstag haben, der nächste zuerst. Deinen eigenen Geburtstag trägst du in deinem Konto ein und legst dort fest, wer ihn sieht.
 
-![Liste aller Geburtstage, nach Monaten geordnet](bild:geburtstage)
+![Liste aller {bereich.birthdays}, nach Monaten geordnet](bild:geburtstage)
 
 ## So öffnest du die Seite
 Tippe unten auf **{bereich.events}**. Oben steht die Karte **Anstehende {bereich.birthdays}**; tippe darin auf **Alle {bereich.birthdays}**.

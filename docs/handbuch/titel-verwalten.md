@@ -6,7 +6,7 @@ bereiche: [titles]
 ---
 Hier legst du die {bereich.titles} an, die Mitglieder tragen können, z. B. Ehrenmitglied oder Schützenkönig, und bestimmst ihre Reihenfolge. Wer welchen Titel hat, änderst du auf der Seite des Mitglieds.
 
-![Die Liste der Titel mit Griff zum Verschieben und den Knöpfen](bild:titel-verwalten)
+![Die Liste der {bereich.titles} mit Griff zum Verschieben und den Knöpfen](bild:titel-verwalten)
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.titles}**. Mit **‹ Verwaltung** kommst du zurück.

@@ -2125,12 +2125,12 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await expect(item(STANDALONE ? 'Installation ohne WordPress' : 'Installation mit WordPress')).toBeVisible();
   await expect(item(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('Startpasswort');
-  await expect(item('Mitglieder anlegen')).toBeVisible();
+  await expect(item('Mitglied anlegen')).toBeVisible();
   await expect(item('Wartungsmodus')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('');
-  await item('Rollen und Mitglieder').click();
-  await page.locator('.hilfe-text a', { hasText: 'Rollen vergeben' }).click(); // Verweis auf eine andere Seite
-  await expect(page.locator('.news-headline')).toHaveText('Rollen vergeben');
+  await page.locator('.row-title', { hasText: /^Rollen$/ }).click();
+  await page.locator('.hilfe-text a', { hasText: 'Konto und Rolle' }).first().click(); // Verweis auf eine andere Seite
+  await expect(page.locator('.news-headline')).toHaveText('Konto und Rolle');
   await shot(page, '21-hilfe');
 
   // Offline: Hilfe kommt aus dem Speicher des Service Workers

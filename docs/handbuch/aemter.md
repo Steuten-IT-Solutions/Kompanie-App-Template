@@ -6,7 +6,7 @@ bereiche: [offices]
 ---
 Unter **{bereich.offices}** siehst du, wer welches Amt gerade hat und wer es früher hatte – als Zeitstrahl, der weit zurückreichen kann. Sehen kann ihn jeder, auch ohne Anmeldung.
 
-![Ämter nach Gruppen](bild:aemter)
+![{bereich.offices} nach Gruppen](bild:aemter)
 
 ## So öffnest du die Seite
 Tippe unten in der Leiste auf **{bereich.directory}** und oben auf **{bereich.offices}**. Nutzt die Kompanie keine Mitgliederliste, heißt der Knopf unten gleich **{bereich.offices}**.

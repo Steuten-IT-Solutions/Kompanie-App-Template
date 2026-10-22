@@ -46,7 +46,7 @@ Habt ihr eine Mitgliederliste in Excel oder als CSV, legst du hier alle Mitglied
 
 ## Gut zu wissen
 - Die Einrichtung gilt als abgeschlossen, sobald ein {rolle.admin} auf **Einrichtung abschließen** getippt hat. Danach verschwindet der Hinweis **Willkommen!** für alle.
-- Weitere Mitglieder legst du danach in der Verwaltung an; sie bekommen von dir Benutzername und Startpasswort (siehe [Mitglieder anlegen](seite:mitglieder-anlegen)).
+- Weitere Mitglieder legst du danach in der Verwaltung an; sie bekommen von dir Benutzername und Startpasswort (siehe [Mitglied anlegen](seite:mitglieder-anlegen)).
 
 ## Siehe auch
 - [Einstellungen](seite:admin-einstellungen)

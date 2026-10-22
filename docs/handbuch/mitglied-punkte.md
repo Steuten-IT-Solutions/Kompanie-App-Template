@@ -6,7 +6,7 @@ bereiche: [points]
 ---
 Auf der Seite eines Mitglieds öffnest du ein Fenster mit seinen {bereich.points}. Dort vergibst du {bereich.points} nur an diese Person und stornierst falsche Einträge.
 
-![Das Fenster Punkte auf der Seite eines Mitglieds](bild:mitglied-punkte)
+![Das Fenster {bereich.points} auf der Seite eines Mitglieds](bild:mitglied-punkte)
 
 ## So öffnest du die Seite
 1. Tippe unten auf **Verwaltung** und dann auf **Mitglieder**.

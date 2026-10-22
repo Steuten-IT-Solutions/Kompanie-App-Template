@@ -46,7 +46,7 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 ![Vorschau beim Import der Ehemaligen](bild:ehemalige-mitglieder-import)
 
 ## Gut zu wissen
-- Danach hat die Person keine Rolle mehr: Sie steht nicht mehr in der Mitgliederliste, nicht in der öffentlichen Liste der {rolle.member}, bekommt keine Benachrichtigungen, nimmt nicht an Umfragen teil und taucht bei den Geburtstagen nicht mehr auf. Sie wird auf allen Geräten abgemeldet und kann sich nicht mehr anmelden.
+- Danach hat die Person keine Rolle mehr: Sie steht nicht mehr in der Mitgliederliste, nicht in der öffentlichen Liste der {rolle.member}, bekommt keine Benachrichtigungen, nimmt nicht an {bereich.polls} teil und taucht bei den {bereich.birthdays} nicht mehr auf. Sie wird auf allen Geräten abgemeldet und kann sich nicht mehr anmelden.
 - Sind noch {bereich.penalties} offen, weist die App vorher darauf hin. Sie bleiben offen und stehen auch in der Liste der Ehemaligen.
 - Ist ein Amt mit einem Titel verknüpft, verliert eine ehemalige Person diesen Titel beim nächsten Abgleich; ihre Amtszeiten bleiben im Zeitstrahl stehen.
 - Beim Wiederaufnehmen bekommt die Person ihre Rolle von vorher zurück, dazu ihre Zusatzrollen, soweit es sie noch gibt und du sie vergeben darfst. Ausnahmen bei den Rechten stellt nur ein {rolle.admin} wieder her. Gibt es die Rolle nicht mehr, wird sie {rolle.member}.

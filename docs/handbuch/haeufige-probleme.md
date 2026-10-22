@@ -10,7 +10,7 @@ Hier findest du als {rolle.admin} Lösungen für Probleme, die häufig vorkommen
 2. Wähle **Zustand und Updates**.
 3. Sieh nach, welche Zeile gelb oder rot ist. Der Text daneben sagt meist schon, was zu tun ist.
 
-Mehr dazu unter [Zustand und Statusmeldungen](seite:admin-zustand). Wo welche Einstellung liegt, zeigt [Einstellungen im Überblick](seite:admin-einstellungen).
+Mehr dazu unter [Zustand und Updates](seite:admin-zustand). Wo welche Einstellung liegt, zeigt [Einstellungen](seite:admin-einstellungen).
 
 ## Ein Bereich fehlt in der App
 1. Öffne **Verwaltung** → **Einstellungen** → **Bereiche**.
@@ -24,14 +24,14 @@ Mehr dazu unter [Zustand und Statusmeldungen](seite:admin-zustand). Wo welche Ei
 2. Klappe ganz unten **Konto und Rolle** auf und prüfe ihre Rolle.
 3. Prüfe unter **Einstellungen** → **Rollen**, welche Rechte diese Rolle hat.
 
-Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
+Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen](seite:admin-rollen-und-mitglieder).
 
 ## Jemand hat sein Passwort vergessen
 1. Öffne unter **Verwaltung** → **Mitglieder** die Person.
 2. Klappe **Konto und Rolle** auf und erzeuge ein neues Startpasswort.
 3. Gib es der Person weiter; sie ändert es danach unter **Meins** → **Konto**.
 
-Siehe auch [Mitglieder anlegen](seite:mitglieder-anlegen).
+Siehe auch [Mitglied anlegen](seite:mitglieder-anlegen).
 
 ## Bilder der {bereich.gallery} erscheinen grau
 Neue Bilder bereitet die App beim ersten Abruf und im Hintergrund auf. Bei vielen neuen Bildern zeigt sie für einige kurz einen grauen Platzhalter und lädt sie dann von selbst nach. Meist genügt es zu warten.
@@ -46,7 +46,7 @@ Klappt es weiter nicht, liegt es meist an einem dieser Gründe:
 - Der Ordner in Google Drive ist für das verbundene Google-Konto bzw. das Dienstkonto nicht mehr sichtbar, z. B. weil die Freigabe entfernt wurde. Gib ihn dort wieder frei.
 - Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Tippe unter **Einstellungen** → **Google-Zugang** auf **Verbindung trennen** und verbinde neu mit Google.
 
-Läuft die Verbindung immer wieder nach 7 Tagen ab, ist das Google-Projekt noch im Status „Testen“, siehe [Google einrichten](seite:admin-google).
+Läuft die Verbindung immer wieder nach 7 Tagen ab, ist das Google-Projekt noch im Status „Testen“, siehe [Google-Zugang](seite:admin-google).
 
 ## Der Kalender zeigt nichts an
 1. Öffne **Verwaltung** → **Einstellungen** → **Kalender**.
@@ -65,7 +65,7 @@ Unter **Verwaltung** → **Einstellungen** → **Zustand und Updates** steht unt
 
 > **Für Fortgeschrittene:** Fragt WordPress nach FTP-Zugangsdaten, darf es die Plugin-Dateien nicht selbst schreiben; der Hoster muss die Dateirechte anpassen, oder du lädst das Update von Hand hoch. Ohne WordPress: Darf PHP die Programmdateien nicht ändern, prüfe beim Hoster die Dateirechte oder lade `install.php` erneut hoch und wähle **Aktualisieren / Reparieren**.
 
-Mehr dazu unter [Updates und Datensicherung](seite:admin-updates-und-sicherung).
+Mehr dazu unter [Datensicherung](seite:admin-updates-und-sicherung).
 
 ## Die Zeile „Hintergrundaufgaben“ ist gelb oder rot (ohne WordPress)
 Abgleiche und Updates laufen dann nur, wenn jemand die App aufruft.

@@ -6,7 +6,7 @@ bereiche: [penalties]
 ---
 Hier siehst du, wie viel du bei den {bereich.penalties} noch zahlen musst und welche Einträge schon bezahlt sind. Die Seite ist nur zum Ansehen; andere Mitglieder sehen deine Einträge nicht.
 
-![Meine Strafen mit offenem Betrag und den Listen Offen und Bezahlt](bild:meine-strafen)
+![Meine {bereich.penalties} mit offenem Betrag und den Listen Offen und Bezahlt](bild:meine-strafen)
 
 ## So öffnest du die Seite
 Tippe unten auf **Meins**, dann oben auf das Menü und wähle **{bereich.penalties}**. Oder tippe in der Übersicht auf die Kachel **Offen**.

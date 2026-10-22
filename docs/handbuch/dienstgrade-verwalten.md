@@ -6,7 +6,7 @@ bereiche: [ranks]
 ---
 Hier legst du fest, welche {bereich.ranks} es bei euch gibt, in welcher Reihenfolge, ab wie vielen {bereich.points} sie erreichbar sind und welches Abzeichen sie haben. Wer welchen {begriff.rank} hat, änderst du auf der Seite des Mitglieds.
 
-![Die Liste der Dienstgrade mit Schwellen und Abzeichen](bild:dienstgrade-verwalten)
+![Die Liste der {bereich.ranks} mit Schwellen und Abzeichen](bild:dienstgrade-verwalten)
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.ranks}**. Mit **‹ Verwaltung** kommst du zurück.
@@ -17,7 +17,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.ranks}**. Mit *
 - Darunter das Abzeichen: eine Vorschau auf heller und dunkler Fläche („hell“, „dunkel“) mit **Ersetzen** und **Entfernen**, ohne Abzeichen der Knopf **Abzeichen hochladen**.
 - Unten das Formular **Neuer {begriff.rank}** mit **Bezeichnung**, **{bereich.points}schwelle (optional)** und **Anlegen**.
 
-![Ein Dienstgrad mit seinen Knöpfen und der Vorschau des Abzeichens](bild:dienstgrade-verwalten-abzeichen)
+![Ein {begriff.rank} mit seinen Knöpfen und der Vorschau des Abzeichens](bild:dienstgrade-verwalten-abzeichen)
 
 ## So gehst du vor
 ### Einen {begriff.rank} anlegen
@@ -25,7 +25,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.ranks}**. Mit *
 2. Trage bei Bedarf die **{bereich.points}schwelle** ein: ab wie vielen {bereich.points} man ihn bekommen kann.
 3. Tippe auf **Anlegen**. Der neue {begriff.rank} steht ganz unten, also als höchster.
 
-![Ausgefülltes Formular für einen neuen Dienstgrad](bild:dienstgrade-verwalten-neu)
+![Ausgefülltes Formular für einen neuen {begriff.rank}](bild:dienstgrade-verwalten-neu)
 
 ### Die Reihenfolge ändern
 1. Tippe beim {begriff.rank} auf **niedriger** oder **höher**. Er rückt eine Stufe weiter.

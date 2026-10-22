@@ -6,7 +6,7 @@ bereiche: [points]
 ---
 Hier trägst du {bereich.points} für ein oder mehrere Mitglieder auf einmal ein, z. B. für alle, die beim Arbeitsdienst geholfen haben. Auch Abzüge gehen hier.
 
-![Das Formular zum Vergeben von Punkten](bild:punkte-vergeben)
+![Das Formular zum Vergeben von {bereich.points}](bild:punkte-vergeben)
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.points} +**. Mit **‹ Verwaltung** kommst du zurück zur Startseite der Verwaltung.

@@ -3,7 +3,7 @@ titel: Rollen
 reihenfolge: 114
 rechte: [manage_settings]
 ---
-Hier legst du fest, welche Rollen es gibt und was jede Rolle in der App darf. Wer welche Rolle bekommt, wählst du bei der Person in der Verwaltung (siehe [Rollen vergeben](seite:rollen-vergeben)).
+Hier legst du fest, welche Rollen es gibt und was jede Rolle in der App darf. Wer welche Rolle bekommt, wählst du bei der Person in der Verwaltung (siehe [Konto und Rolle](seite:rollen-vergeben)).
 
 ![Die Seite Rollen mit der Liste aller Rollen](bild:admin-rollen-und-mitglieder)
 
@@ -66,5 +66,5 @@ Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbe
 
 ## Siehe auch
 - [App als Rolle ansehen](seite:admin-vorschau)
-- [Rollen vergeben](seite:rollen-vergeben)
-- [Mitglieder anlegen](seite:mitglieder-anlegen)
+- [Konto und Rolle](seite:rollen-vergeben)
+- [Mitglied anlegen](seite:mitglieder-anlegen)

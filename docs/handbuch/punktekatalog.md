@@ -6,7 +6,7 @@ bereiche: [points]
 ---
 Im {bereich.points}katalog legst du häufige Anlässe mit ihrer Punktzahl als Vorlage an, z. B. „Arbeitsdienst – 4“. Beim Vergeben wählst du dann nur noch die Vorlage, statt Punktzahl und Grund jedes Mal einzutippen.
 
-![Der Punktekatalog mit aktiven und deaktivierten Vorlagen](bild:punktekatalog)
+![Der {bereich.points}katalog mit aktiven und deaktivierten Vorlagen](bild:punktekatalog)
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.points}katalog**. Mit **‹ Verwaltung** kommst du zurück.

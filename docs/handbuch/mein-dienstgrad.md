@@ -6,7 +6,7 @@ bereiche: [ranks]
 ---
 Hier siehst du deinen {begriff.rank}, alle {bereich.ranks} der Reihe nach und wann sich dein {begriff.rank} geändert hat. Gibt es bei euch auch {bereich.points}, zeigt die Seite, wie viele dir bis zum nächsten {begriff.rank} fehlen.
 
-![Mein Dienstgrad mit Abzeichen, Fortschritt und der Liste aller Dienstgrade](bild:mein-dienstgrad)
+![Mein {begriff.rank} mit Abzeichen, Fortschritt und der Liste aller {bereich.ranks}](bild:mein-dienstgrad)
 
 ## So öffnest du die Seite
 Tippe unten auf **Meins**, dann oben auf das Menü und wähle **{begriff.rank}**. Oder tippe in der Übersicht auf dein Abzeichen.

@@ -6,7 +6,7 @@ bereiche: [penalties]
 ---
 Auf der Seite eines Mitglieds öffnest du ein Fenster mit seinen {bereich.penalties}. Dort markierst du Einträge als bezahlt, stornierst falsche und trägst neue nur für diese Person ein.
 
-![Das Fenster Strafen auf der Seite eines Mitglieds](bild:mitglied-strafen)
+![Das Fenster {bereich.penalties} auf der Seite eines Mitglieds](bild:mitglied-strafen)
 
 ## So öffnest du die Seite
 1. Tippe unten auf **Verwaltung** und dann auf **Mitglieder**.

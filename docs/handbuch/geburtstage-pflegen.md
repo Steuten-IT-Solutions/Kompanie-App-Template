@@ -36,4 +36,4 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe auf die Perso
 
 ## Siehe auch
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)
-- [Mitglieder anlegen](seite:mitglieder-anlegen)
+- [Mitglied anlegen](seite:mitglieder-anlegen)

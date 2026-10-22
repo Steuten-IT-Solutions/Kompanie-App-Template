@@ -6,7 +6,7 @@ bereiche: [titles]
 ---
 In diesem Fenster verleihst du einem Mitglied {bereich.titles} oder nimmst sie ihm wieder weg.
 
-![Das Fenster Titel mit angekreuzten Titeln](bild:mitglied-titel)
+![Das Fenster {bereich.titles} mit angekreuzten Einträgen](bild:mitglied-titel)
 
 ## So öffnest du die Seite
 1. Tippe unten auf **Verwaltung** und dann auf **Mitglieder**.

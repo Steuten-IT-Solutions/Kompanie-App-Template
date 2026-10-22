@@ -6,7 +6,7 @@ bereiche: [ranks]
 ---
 In diesem Fenster beförderst oder degradierst du ein Mitglied und siehst, wie sich sein {begriff.rank} bisher geändert hat.
 
-![Das Fenster Dienstgrad mit vorgeschlagenem nächsten Dienstgrad](bild:mitglied-dienstgrad)
+![Das Fenster {begriff.rank} mit dem vorgeschlagenen nächsten {begriff.rank}](bild:mitglied-dienstgrad)
 
 ## So öffnest du die Seite
 1. Tippe unten auf **Verwaltung** und dann auf **Mitglieder**.

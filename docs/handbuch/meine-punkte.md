@@ -6,7 +6,7 @@ bereiche: [points]
 ---
 Hier siehst du, wie viele {bereich.points} du hast und wofür du sie bekommen hast. Die Seite ist nur zum Ansehen; andere Mitglieder sehen deine {bereich.points} nicht.
 
-![Meine Punkte mit Summe und Verlauf](bild:meine-punkte)
+![Meine {bereich.points} mit Summe und Verlauf](bild:meine-punkte)
 
 ## So öffnest du die Seite
 Tippe unten auf **Meins**, dann oben auf das Menü und wähle **{bereich.points}**. Oder tippe in der Übersicht auf die Kachel **{bereich.points}**.
