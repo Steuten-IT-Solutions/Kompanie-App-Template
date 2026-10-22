@@ -214,8 +214,9 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
 }
 
 /**
- * Im Mitglied unter „Konto und Rolle“ (create_users): als ehemalig eintragen bzw. die Angaben ändern und wieder
- * aufnehmen. Offene Beträge werden vor dem Eintragen genannt, damit sie nicht in Vergessenheit geraten.
+ * Im Mitglied unter „Konto und Rolle“ und hinter „Austritt“ (create_users): als ehemalig eintragen bzw. die Angaben
+ * ändern und wieder aufnehmen. Offene Beträge werden vor dem Eintragen genannt, damit sie nicht in Vergessenheit geraten.
+ * Mit `editing` steht gleich das Formular da; „Abbrechen“ ruft dann `onCancel` (z. B. schließt das Fenster).
  */
 export function FormerPanel({
   id,
@@ -223,7 +224,9 @@ export function FormerPanel({
   former,
   joinedOn,
   openCents,
+  editing = false,
   onChanged,
+  onCancel,
   onToast,
 }: {
   id: number;
@@ -233,10 +236,21 @@ export function FormerPanel({
   joinedOn?: string | null;
   /** offene Beträge; null, wenn man sie nicht sieht */
   openCents: number | null;
+  editing?: boolean;
   onChanged: () => void;
+  onCancel?: () => void;
   onToast: (msg: string) => void;
 }) {
-  const [form, setForm] = useState<FormerInput | null>(null);
+  const startForm = (): FormerInput =>
+    former
+      ? {
+          reason: former.reason,
+          joined_on: editYearOrDate(former.joined_on),
+          founder: former.founder,
+          left_on: editYearOrDate(former.left_on),
+        }
+      : { reason: 'left', joined_on: joinedOn ? editYearOrDate(joinedOn) : '', founder: false, left_on: '' };
+  const [form, setForm] = useState<FormerInput | null>(() => (editing ? startForm() : null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -304,7 +318,14 @@ export function FormerPanel({
             <button className="btn" type="submit" disabled={busy}>
               {former ? 'Speichern' : 'Als ehemalig eintragen'}
             </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setForm(null)}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setForm(null);
+                onCancel?.();
+              }}
+            >
               Abbrechen
             </button>
           </div>
@@ -313,18 +334,7 @@ export function FormerPanel({
         <>
           <p className="small">{formerSummary(former)}</p>
           <div className="button-row">
-            <button
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={() =>
-                setForm({
-                  reason: former.reason,
-                  joined_on: editYearOrDate(former.joined_on),
-                  founder: former.founder,
-                  left_on: editYearOrDate(former.left_on),
-                })
-              }
-            >
+            <button className="btn btn-secondary" disabled={busy} onClick={() => setForm(startForm())}>
               Angaben ändern
             </button>
             <button className="btn" disabled={busy} onClick={reactivate}>
@@ -337,11 +347,7 @@ export function FormerPanel({
           <p className="muted small">
             Ausgetreten oder verstorben? Dann hier eintragen statt das Konto zu löschen: Die Daten bleiben erhalten.
           </p>
-          <button
-            className="btn btn-secondary"
-            disabled={busy}
-            onClick={() => setForm({ reason: 'left', joined_on: joinedOn ? editYearOrDate(joinedOn) : '', founder: false, left_on: '' })}
-          >
+          <button className="btn btn-secondary" disabled={busy} onClick={() => setForm(startForm())}>
             Als ehemalig eintragen …
           </button>
         </>
