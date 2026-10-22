@@ -1082,6 +1082,31 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
   expect(status).toBe(401);
 });
 
+test('Geteilter Link: Gast meldet sich an und landet auf der Seite; Teilen-Knopf liefert die Adresse', async ({ page }) => {
+  await page.context().clearCookies();
+  // Teilen-Menü des Geräts nachbilden: Die App gibt ihm die Adresse der Seite.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', {
+      value: async (data: ShareData) => {
+        (window as unknown as { shared: ShareData }).shared = data;
+      },
+    });
+  });
+  await page.goto('/app/#/meins/punkte');
+  const hint = page.locator('.login-first');
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Anmelden' }).click();
+  await fillLogin(page, 'mitglied1', PASSWORD);
+  await expect(page).toHaveURL(/\/app\/#\/meins\/punkte$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  await expect(page.locator('.login-first')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Link zu dieser Seite teilen' }).click();
+  const shared = await page.evaluate(() => (window as unknown as { shared?: ShareData }).shared);
+  expect(shared?.url).toMatch(/\/app\/#\/meins\/punkte$/);
+  expect(shared?.title).toContain('Meins');
+});
+
 /**
  * Headless-Chromium hat keinen Push-Dienst: Erlaubnis und PushManager nachbilden. Das Abo hat einen echten
  * P-256-Schlüssel (der Server prüft ihn) und liegt im localStorage, damit es ein Neuladen übersteht.

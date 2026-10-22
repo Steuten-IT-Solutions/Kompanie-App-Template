@@ -13,6 +13,7 @@ import {
   useCanPrompt,
   type Platform,
 } from '../install';
+import { shareLink } from '../share';
 
 /*
  * Schritt-für-Schritt-Anleitung „App aufs Handy holen“ – mit großen Bildern,
@@ -242,26 +243,7 @@ function CopyLink() {
 
 function ShareGuide({ onToast }: { onToast: (msg: string) => void }) {
   const url = installUrl();
-  async function share() {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${brand.shortName}: App installieren`,
-          text: `So kommt die App der ${brand.name} aufs Handy:`,
-          url,
-        });
-      } catch {
-        /* abgebrochen */
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      onToast('Link kopiert');
-    } catch {
-      window.prompt('Link kopieren:', url);
-    }
-  }
+  const share = () => shareLink(url, `${brand.shortName}: App installieren`, onToast, `So kommt die App der ${brand.name} aufs Handy:`);
   return (
     <div className="card install-share">
       <h3>Anleitung weitergeben</h3>
