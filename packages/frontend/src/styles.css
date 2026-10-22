@@ -1181,6 +1181,7 @@ button.member-date {
 input[type='text'],
 input[type='number'],
 input[type='date'],
+input[type='datetime-local'],
 input[type='search'],
 input[type='email'],
 input[type='password'],

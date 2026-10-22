@@ -776,6 +776,9 @@ $c->section('Shortcodes: Ämter und Mitglieder');
 wp_set_current_user($admin);
 $app->features()->update(['offices' => true, 'directory' => true]);
 $guestHolder = $d->createUser('kpwp_gast_amt', 'guest');
+$galleryCandKey = (string) (array_search('Kpwp Anwärter Galerie', array_column($app->roles()->all(), 'label', 'key'), true)
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter Galerie', 'capabilities' => ['calendar']])['key']);
+$galleryCand = $d->createUser('kpwp_anwaerter_galerie', $galleryCandKey);
 $memberName = (string) $app->users->find($member)?->name;
 $offices = $app->offices();
 $groupA = $offices->createGroup('Kpwp Kompanie');
@@ -800,6 +803,9 @@ $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<
 $body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
 $c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
 $c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');
+$c->ok(in_array($galleryCand, array_column($app->api()->directory(), 'id'), true) && !str_contains($body, 'Kpwp_anwaerter_galerie'), 'Ohne Anwärter (in der App-Liste stehen sie)');
+wp_delete_user($galleryCand);
+$app->roles()->delete($galleryCandKey, null);
 
 // Platzhalterbild aus der Mediathek statt der Anfangsbuchstaben (Einstellungen der Webseite).
 require_once ABSPATH . 'wp-admin/includes/image.php';

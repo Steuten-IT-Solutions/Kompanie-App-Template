@@ -2738,6 +2738,53 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/FormerMember' }
         '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Eine ehemalige Person neu anlegen (Konto ohne Anmeldung, gleich als ehemalig eingetragen)
+      description: |
+        Wie eine Zeile von `/members/former/import`, mit den Feldern von `PUT /members/{id}/former` (Daten als TT.MM.JJJJ,
+        JJJJ-MM-TT, nur das Jahr oder leer). Erst wird alles geprüft, dann angelegt. Wer genau so heißt wie ein vorhandenes
+        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage) und
+        Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
+        Namen in Amtszeiten, die genau passen, werden mit dem Konto verknüpft (`offices_linked`).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, reason]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                reason: { $ref: '#/components/schemas/FormerReason' }
+                joined_on: { type: string }
+                founder: { type: boolean, default: false }
+                left_on: { type: string }
+                birthday: { $ref: '#/components/schemas/BirthdayString' }
+                photo:
+                  description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
+                  allOf:
+                    - $ref: '#/components/schemas/PhotoFile'
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/FormerInfo' }
+                  - type: object
+                    required: [id, name, offices_linked]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      offices_linked: { type: integer }
+                      warning: { type: string }
+                      photo_url: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
 
   /members/former/import:
     post:
