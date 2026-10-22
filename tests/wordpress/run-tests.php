@@ -800,6 +800,31 @@ $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<
 $body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
 $c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
 $c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');
+
+// Platzhalterbild aus der Mediathek statt der Anfangsbuchstaben (Einstellungen der Webseite).
+require_once ABSPATH . 'wp-admin/includes/image.php';
+$upload = wp_upload_dir();
+$file = $upload['path'] . '/kpwp-platzhalter.png';
+$im = imagecreatetruecolor(400, 600);
+imagepng($im, $file);
+imagedestroy($im);
+$attachment = wp_insert_attachment(['post_mime_type' => 'image/png', 'post_title' => 'Kpwp Platzhalter', 'post_status' => 'inherit'], $file);
+wp_update_attachment_metadata($attachment, wp_generate_attachment_metadata($attachment, $file));
+$c->ok(KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['placeholder_id' => 'x']) === ['Bitte ein Bild aus der Mediathek wählen.', true]
+    && KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['placeholder_id' => (string) $guestHolder])[1], 'Platzhalterbild: nur Bilder aus der Mediathek');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['placeholder_id' => (string) $attachment]) === ['Platzhalterbild gespeichert.', false]
+    && (int) $app->settings->get(KompanieApp\WordPress\Shortcodes::MEMBERS_PLACEHOLDER) === $attachment, 'Platzhalterbild gespeichert');
+$c->ok(str_contains($renderSettings(), 'id="kompanie-placeholder-id" value="' . $attachment . '"'), 'Einstellungsseite zeigt das Platzhalterbild');
+$html = do_shortcode('[kompanie_mitglieder]');
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html);
+$c->ok(!str_contains($body, 'class="ka-mitglied-leer"') && str_contains($body, 'class="ka-mitglied-platzhalter"') && str_contains($body, 'kpwp-platzhalter')
+    && str_contains($body, esc_url((string) $app->memberPhotos()->urls(480)[$member])), 'Ohne Foto das Platzhalterbild statt der Anfangsbuchstaben, Fotos bleiben');
+$c->ok(substr_count($body, 'data-ka-lightbox="mitglieder"') === count($app->memberPhotos()->urls(480)), 'Platzhalterbild ohne Großansicht');
+wp_delete_attachment($attachment, true);
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', do_shortcode('[kompanie_mitglieder]'));
+$c->ok(str_contains($body, 'class="ka-mitglied-leer"') && !str_contains($body, 'ka-mitglied-platzhalter'), 'Bild aus der Mediathek gelöscht: wieder die Anfangsbuchstaben');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['remove' => '1'])[1] === false
+    && $app->settings->get(KompanieApp\WordPress\Shortcodes::MEMBERS_PLACEHOLDER) === null, 'Platzhalterbild entfernt');
 $app->features()->update(['offices' => false, 'directory' => false]);
 $c->ok(do_shortcode('[kompanie_aemter]') === '' && do_shortcode('[kompanie_mitglieder]') === '', 'Bereich aus: keine Ausgabe');
 $app->features()->update(['offices' => true, 'directory' => true]);

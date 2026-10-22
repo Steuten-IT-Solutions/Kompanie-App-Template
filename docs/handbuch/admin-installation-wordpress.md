@@ -14,6 +14,11 @@ Ohne „schöne“ Permalinks läuft die App unter einer längeren Adresse; Word
 
 Die Einstellungen der App gibt es in der App unter **Verwaltung → Einstellungen** und zusätzlich im WP-Admin unter *Einstellungen* auf der Seite der App (Wartungsmodus, Bereiche, Google-Zugang, {bereich.calendar} und {bereich.gallery}).
 
+## Shortcodes auf der Webseite
+Auf Seiten und in Beiträgen zeigen die Shortcodes Inhalte der App: `[kompanie_termine]` die öffentlichen Termine, `[kompanie_galerie]` die {bereich.gallery}, `[kompanie_aemter]` die {bereich.offices} und `[kompanie_mitglieder]` die {bereich.directory} als Bildergalerie.
+
+In `[kompanie_mitglieder]` stehen bei Personen ohne Foto ihre Anfangsbuchstaben. Stattdessen kann dort ein eigenes **Platzhalterbild** stehen, z. B. eine Silhouette oder das Wappen: im WP-Admin unter *Einstellungen* auf der Seite der App, Abschnitt **Webseite: Mitglieder ohne Foto**, auf **Bild aus der Mediathek wählen** klicken, ein Bild hochladen oder auswählen und **Übernehmen**. Es gilt sofort. Am besten passt ein Bild im Hochformat 2 : 3; andere Formate werden mittig zugeschnitten. Das Platzhalterbild öffnet sich beim Antippen nicht groß. **Platzhalterbild entfernen** bringt die Anfangsbuchstaben zurück, ebenso das Löschen des Bilds aus der Mediathek. In der App bleiben die Anfangsbuchstaben.
+
 > Admin in der App ist, wer in WordPress Administrator ist; diese Rolle wird nur in WordPress vergeben. Die Rolle anderer Personen lässt sich in der App wählen oder im WordPress-Benutzerprofil unter **Rolle in der App** (siehe [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder)).
 
 ## Server mit nginx

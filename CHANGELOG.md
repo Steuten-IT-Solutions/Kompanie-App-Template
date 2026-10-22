@@ -27,6 +27,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung, und die gewählte
   Unterseite (z. B. Punkte) bleibt.
+- **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
+  Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Wappen. `[kompanie_mitglieder]`
+  zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
 
 ### Geändert
 
