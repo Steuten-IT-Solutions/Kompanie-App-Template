@@ -40,6 +40,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
   dabei dem Finger, daneben ist die nächste Person schon zu sehen, und weil die App die Nachbarn vorlädt, steht deren
   Seite nach dem Wechsel sofort da, ohne Laden.
+- **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
+  Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Logo. `[kompanie_mitglieder]`
+  zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
 
 ### Geändert
 
@@ -51,6 +54,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   eingetragen ist, z. B. „Eintritt 01.04.2005“ (bisher nur das Jahr). Bei den Ehemaligen stehen Eintritt und
   Ausscheiden ebenso mit ganzem Datum, z. B. „01.04.1985 – 03.05.2010“; wer dort nur Jahre eingetragen hat, sieht
   weiter nur die Jahre. Das gilt für alle, die die Angaben sehen dürfen, bei den Ehemaligen also auch ohne Anmeldung.
+- **Liste der Ehemaligen**: *Filter und Sortierung* ist wie in der Mitgliederliste zunächst eingeklappt und klappt mit
+  einem Tipp auf. Ist der Filter nach dem Grund gesetzt, steht am eingeklappten Bereich „aktiv“.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
   (heruntergeladen oder in Google Drive).
 - **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.
