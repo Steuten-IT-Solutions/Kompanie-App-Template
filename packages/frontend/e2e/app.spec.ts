@@ -305,24 +305,37 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.locator('.row', { hasText: `${id}, Gerd` }).locator('.member-avatar-initials')).toHaveText(`G${id[0].toUpperCase()}`);
   await page.locator('.row', { hasText: `${id}, Hanna` }).click();
   await expect(page.locator('.member-rank-line .member-avatar img')).toBeVisible();
-  // Antippen vergrößert das Foto; bis es geladen ist, dreht sich eine Ladeschnecke. Escape und ✕ schließen die Ansicht.
-  let release = () => {};
-  const held = new Promise<void>((resolve) => (release = resolve));
+  // Antippen vergrößert das Foto; bis es geladen ist, dreht sich eine Ladeschnecke. Erst die 1024-Pixel-Fassung, dann
+  // ersetzt sie die nachgeladene Originalauflösung (s=4096). Escape und ✕ schließen die Ansicht.
+  const hold = () => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    return { held, release };
+  };
+  const heldBig = hold();
+  const heldOriginal = hold();
   const bigPhoto = /[?&]s=1024(&|$)/;
+  const originalPhoto = /[?&]s=4096(&|$)/;
   await page.route(bigPhoto, async (route) => {
-    await held;
+    await heldBig.held;
+    await route.continue();
+  });
+  await page.route(originalPhoto, async (route) => {
+    await heldOriginal.held;
     await route.continue();
   });
   await page.getByRole('button', { name: /vergrößern/ }).click();
   const zoom = page.getByRole('dialog', { name: /^Foto von / });
   await expect(zoom.getByRole('status', { name: 'Foto lädt' })).toBeVisible();
   await expect(zoom.locator('img')).toBeHidden();
-  release();
+  heldBig.release();
   await expect(zoom.locator('img')).toBeVisible();
   await expect(zoom.getByRole('status', { name: 'Foto lädt' })).toHaveCount(0);
+  await expect(zoom.locator('img')).toHaveAttribute('src', bigPhoto);
+  heldOriginal.release();
+  await expect(zoom.locator('img')).toHaveAttribute('src', originalPhoto);
   await page.unroute(bigPhoto);
-  // Vergrößert die 1024-Pixel-Fassung (scharf auch bei hoher Pixeldichte)
-  await expect(zoom.locator('img')).toHaveAttribute('src', /[?&]s=1024(&|$)/);
+  await page.unroute(originalPhoto);
   await page.keyboard.press('Escape');
   await expect(zoom).toHaveCount(0);
   await page.getByRole('button', { name: /vergrößern/ }).click();
