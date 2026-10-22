@@ -16,7 +16,7 @@ Auf seiner Seite kann jedes {rolle.member} auch seinen Geburtstag und das Jahr s
 
 So stellst du es für dich ein:
 - **Geburtstag:** unter **Konto** in der Karte **Geburtstag** bei **Auf meiner Seite unter „{bereich.directory}“** (nur wenn die Kompanie {bereich.birthdays} nutzt).
-- **Eintritt:** unter **Konto** in der Karte **Eintritt** das Jahr eintragen, die Anzeige wählen und **Eintrittsjahr speichern** tippen. **Entfernen** löscht es. Das Jahr kann auch die Verwaltung für dich eintragen; die Anzeige wählst aber nur du.
+- **Eintritt:** unter **Konto** in der Karte **Eintritt** das Datum (TT.MM.JJJJ) oder nur das Jahr eintragen, die Anzeige wählen und **Eintritt speichern** tippen. **Entfernen** löscht ihn. Auf deiner Seite steht immer nur das Jahr, auch wenn du das ganze Datum eingetragen hast. Den Eintritt kann auch die Verwaltung für dich eintragen; die Anzeige wählst aber nur du.
 
 ## Ehemalige
 Unter **Ehemalige** stehen alle, die die Verwaltung als ehemalig eingetragen hat (ausgetreten, verstorben oder sonst ausgeschieden). Die Liste sieht aus wie die der {rolle.member}, mit Suche und Sortierung; unter dem Namen stehen, soweit eingetragen, „Gründungsmitglied“ und die Jahre von Eintritt und Ausscheiden, z. B. „1985–2010“. Der Grund des Ausscheidens und genaue Daten stehen dort nicht. Ein Tipp öffnet die Seite der Person mit ihren Ämtern.

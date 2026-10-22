@@ -41,8 +41,8 @@ Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoa
 
 Ist der Bereich **{bereich.directory}** eingeschaltet, ist das Foto von {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärtern) öffentlich: Es steht in der Liste unter **{bereich.directory}**, die jeder sehen kann, auch ohne Anmeldung. Sonst sieht es nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Fotos von Gästen sind nie öffentlich. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
 
-## Eintrittsjahr
-Im Mitglied unter **Eintritt** trägst du das Jahr ein, in dem die Person eingetreten ist (ab 1800, nicht in der Zukunft), und tippst **Eintrittsjahr speichern**; **Entfernen** löscht es nach einer Rückfrage. Die Person kann es auch selbst unter **Konto** eintragen. Ob es auf ihrer Seite unter **{bereich.directory}** steht, wählt nur sie selbst; du siehst die Auswahl hier nur zur Information. Trägst du die Person später als ehemalig ein, schlägt die App dieses Jahr als Eintritt vor.
+## Eintritt
+Im Mitglied unter **Eintritt** trägst du ein, wann die Person eingetreten ist: das Datum als TT.MM.JJJJ oder nur das Jahr (ab 1800, nicht in der Zukunft). Dann **Eintritt speichern** tippen; **Entfernen** löscht ihn nach einer Rückfrage. Die Person kann ihn auch selbst unter **Konto** eintragen. Ob das Jahr auf ihrer Seite unter **{bereich.directory}** steht, wählt nur sie selbst; du siehst die Auswahl hier nur zur Information. Dort steht nie das ganze Datum. Trägst du die Person später als ehemalig ein, schlägt die App diesen Eintritt vor.
 
 ## Als {rolle.member} aufnehmen
 Anwärter nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Den Knopf gibt es nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat (Einstellungen → Rollen).

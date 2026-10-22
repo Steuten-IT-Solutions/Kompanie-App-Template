@@ -13,7 +13,7 @@ import {
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro, formatPoints, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
+import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
@@ -44,7 +44,7 @@ import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberB
 import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
-import { FormerImport, FormerList, FormerPanel, formerDate, formerSummary } from './Ehemalige';
+import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 
 type Sub =
   | 'mitglieder'
@@ -332,7 +332,7 @@ function Members() {
               </div>
               <div className="row-sub">
                 {/* Nach Eintritt sortiert: das Jahr vorn, damit die Reihenfolge nachvollziehbar ist. */}
-                {order.sort === 'joined' && m.joined_on && `Eintritt ${formerDate(m.joined_on)}`}
+                {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
                 {order.sort === 'joined' && m.joined_on && (canPoints() || (m.open_cents ?? 0) > 0) && ' · '}
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
                 {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
@@ -414,7 +414,7 @@ function MemberDetailView({
       label: 'Geburtstag',
       on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
     },
-    // Eintrittsjahr aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
+    // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
     { id: 'eintritt', label: 'Eintritt', on: m.join_year !== undefined && !m.former && m.level !== 'guest' },
   ].filter((p) => p.on);
   const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
@@ -531,7 +531,7 @@ function MemberDetailView({
               id={m.id}
               name={m.name}
               former={m.former}
-              joinYear={m.join_year?.year ?? null}
+              joinedOn={m.join_year ? (m.join_year.date ?? String(m.join_year.year)) : null}
               openCents={m.open_cents}
               onChanged={reload}
               onToast={onToast}

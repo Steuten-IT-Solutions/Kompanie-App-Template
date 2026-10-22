@@ -55,6 +55,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Ehemaligen in der Verwaltung und die Mitgliederliste für alle (Tabs „Mitglieder“ und „Ehemalige“) lassen sich nach
   Eintritt sortieren, früheste oder neueste zuerst. Wer keinen Eintritt hat, steht am Ende, Gründungsmitglieder ohne
   Datum vorn. In der Mitgliederliste für alle zählt nur das Jahr, das eine Person auf ihrer Seite zeigt.
+- **Eintritt mit Tag und Monat**: Den Eintritt aktiver Mitglieder kann man unter *Konto → Eintritt* und im Mitglied
+  unter *Eintritt* jetzt als ganzes Datum (TT.MM.JJJJ) oder weiter nur als Jahr eintragen, wie bisher schon bei den
+  Ehemaligen. Auf der Seite in der Mitgliederliste steht weiterhin nur das Jahr. Beim Eintragen als ehemalig übernimmt
+  die App das ganze Datum.
 - **Anwärter** ist keine feste Rolle mehr, sondern eine eigene Rolle mit zwei Einstellungen: „Beim Anlegen neuer Konten
   wählbar“ und „Als Mitglied aufnehmen“. Bestehende Installationen behalten ihre Anwärter mit denselben Rechten.
 - Dienstgrad und Abzeichen stehen in der Mitgliederliste und den Mitgliedsdetails für alle, die die Liste sehen dürfen

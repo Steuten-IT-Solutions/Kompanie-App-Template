@@ -1008,6 +1008,12 @@ final class Migrations
 )',
                 ],
             ],
+            // Eintritt aktiver Mitglieder auch mit Tag und Monat: join_years.joined_on JJJJ-MM-TT, leer mit nur dem Jahr
+            // (year bleibt in jedem Fall das Jahr).
+            22 => [
+                'mysql' => ["ALTER TABLE {join_years} ADD COLUMN joined_on varchar(10) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {join_years} ADD COLUMN joined_on TEXT NOT NULL DEFAULT ''"],
+            ],
         ];
     }
 

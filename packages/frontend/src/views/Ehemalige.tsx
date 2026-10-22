@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { api, levelLabel, type FormerImportResult, type FormerInfo, type FormerInput, type FormerReason } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro } from '../format';
+import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { MemberAvatar } from '../memberPhoto';
@@ -29,18 +29,12 @@ export const REASON_OPTIONS: Record<FormerReason, string> = { left: 'Ausgetreten
 /** In Sätzen: „ausgetreten 2015“, „verstorben 14.03.2024“ */
 const REASON_TEXT: Record<FormerReason, string> = { left: 'ausgetreten', deceased: 'verstorben', other: 'ausgeschieden' };
 
-/** Datum vom Server (JJJJ-MM-TT oder nur JJJJ) zum Anzeigen. */
-export const formerDate = (value: string): string => (value.length === 4 ? value : formatDate(value));
-
-/** Datum vom Server zum Bearbeiten: TT.MM.JJJJ oder das Jahr. */
-const editDate = (value: string): string => (value.length === 10 ? value.split('-').reverse().join('.') : value);
-
 /** Eine Zeile wie „Gründungsmitglied · verstorben 14.03.2024“ bzw. „Eintritt 1990 · ausgetreten 31.12.2015“. */
 export function formerSummary(f: Pick<FormerInfo, 'reason' | 'joined_on' | 'founder' | 'left_on'>): string {
   const parts: string[] = [];
   if (f.founder) parts.push('Gründungsmitglied');
-  if (f.joined_on) parts.push(`Eintritt ${formerDate(f.joined_on)}`);
-  parts.push(REASON_TEXT[f.reason] + (f.left_on ? ` ${formerDate(f.left_on)}` : ''));
+  if (f.joined_on) parts.push(`Eintritt ${formatYearOrDate(f.joined_on)}`);
+  parts.push(REASON_TEXT[f.reason] + (f.left_on ? ` ${formatYearOrDate(f.left_on)}` : ''));
   return parts.join(' · ');
 }
 
@@ -217,7 +211,7 @@ export function FormerPanel({
   id,
   name,
   former,
-  joinYear,
+  joinedOn,
   openCents,
   onChanged,
   onToast,
@@ -225,8 +219,8 @@ export function FormerPanel({
   id: number;
   name: string;
   former: FormerInfo | null;
-  /** Eintrittsjahr als aktives Mitglied: Vorschlag für den Eintritt beim Eintragen als ehemalig */
-  joinYear?: number | null;
+  /** Eintritt als aktives Mitglied (JJJJ-MM-TT oder JJJJ): Vorschlag für den Eintritt beim Eintragen als ehemalig */
+  joinedOn?: string | null;
   /** offene Beträge; null, wenn man sie nicht sieht */
   openCents: number | null;
   onChanged: () => void;
@@ -315,9 +309,9 @@ export function FormerPanel({
               onClick={() =>
                 setForm({
                   reason: former.reason,
-                  joined_on: editDate(former.joined_on),
+                  joined_on: editYearOrDate(former.joined_on),
                   founder: former.founder,
-                  left_on: editDate(former.left_on),
+                  left_on: editYearOrDate(former.left_on),
                 })
               }
             >
@@ -336,7 +330,7 @@ export function FormerPanel({
           <button
             className="btn btn-secondary"
             disabled={busy}
-            onClick={() => setForm({ reason: 'left', joined_on: joinYear ? String(joinYear) : '', founder: false, left_on: '' })}
+            onClick={() => setForm({ reason: 'left', joined_on: joinedOn ? editYearOrDate(joinedOn) : '', founder: false, left_on: '' })}
           >
             Als ehemalig eintragen …
           </button>

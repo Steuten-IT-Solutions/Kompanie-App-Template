@@ -361,7 +361,7 @@ export interface MemberSummary {
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
-  /** Eintritt als JJJJ (nur für create_users; leer ohne Eintrag, fehlt bei älteren Servern) */
+  /** Eintritt als JJJJ-MM-TT oder JJJJ (nur für create_users; leer ohne Eintrag, fehlt bei älteren Servern) */
   joined_on?: string;
 }
 
@@ -396,9 +396,11 @@ export interface DirectoryBirthday {
 /** Wem eine Angabe auf der eigenen Seite in der Mitgliederliste erscheint: nicht, nur Mitgliedern, allen. */
 export type ProfileVisibility = 'none' | 'members' | 'public';
 
-/** Eintrittsjahr eines aktiven Mitglieds mit der Anzeige auf seiner Seite. */
+/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht nur das Jahr). */
 export interface JoinYear {
   year: number;
+  /** JJJJ-MM-TT oder nur das Jahr JJJJ; fehlt bei älteren Servern (nur year) */
+  date?: string;
   profile: ProfileVisibility;
 }
 
@@ -417,7 +419,7 @@ export interface MemberDetail extends MemberSummary {
   rank_history?: RankHistoryEntry[];
   /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
   birthday?: Birthday | null;
-  /** Eintrittsjahr mit Anzeige (nur für create_users; null ohne Eintrag) */
+  /** Eintritt mit Anzeige (nur für create_users; null ohne Eintrag) */
   join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
   rights?: MemberRights | null;
@@ -1327,10 +1329,10 @@ export const api = {
     request<{ birthday: Birthday | null }>('PUT', `/members/${id}/birthday`, data),
   deleteMemberBirthday: (id: number) => request<{ birthday: null }>('DELETE', `/members/${id}/birthday`),
   myJoinYear: () => request<{ join_year: JoinYear | null }>('GET', '/me/join-year'),
-  saveMyJoinYear: (data: { year: number; profile?: ProfileVisibility }) =>
+  saveMyJoinYear: (data: { date: string; profile?: ProfileVisibility }) =>
     request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
   deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
-  setMemberJoinYear: (id: number, year: number) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { year }),
+  setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
   deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 
   // Inventar (Issue #6)
