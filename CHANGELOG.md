@@ -26,6 +26,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Ehemaligen. Auf der Seite in der Mitgliederliste steht weiterhin nur das Jahr. Beim Eintragen als ehemalig übernimmt
   die App das ganze Datum.
 
+### Behoben
+
+- **Shortcode `[kompanie_aemter gruppe="…"]`**: erkennt die Gruppe auch mit typografischen Anführungszeichen
+  (z. B. `gruppe=„Kompanie“` aus Word oder dem Editor), auch bei Namen mit Leerzeichen.
+
 ## [0.2.0] – 2026-10-22
 
 ### Neu
