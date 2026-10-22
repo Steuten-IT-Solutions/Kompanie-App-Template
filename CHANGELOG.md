@@ -15,12 +15,24 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Großansicht in voller Auflösung**: Galerie und Mitgliedsfotos erscheinen beim Antippen erst wie bisher und werden
+  nach einem Moment durch die Originalauflösung ersetzt (App und Webseite). In der Galerie entsteht sie aus dem
+  Original in Google Drive, wenn jemand das Bild zum ersten Mal öffnet. Mitgliedsfotos lädt die App jetzt bis
+  4096 Pixel hoch; vorhandene Fotos haben die volle Auflösung erst, wenn sie neu hochgeladen werden.
+
 ### Geändert
 
 - **Shortcodes auf der Webseite**: `[kompanie_mitglieder]` sieht aus wie eine Bildergalerie: Fotos im Hochformat
   (scharf, auch auf Handys), Name als Balken im Bild, ohne Dienstgrad, nach Namen sortiert, groß beim Antippen. In
   `[kompanie_aemter]` sind die Fotos schärfer und oben ausgerichtet, damit der runde Ausschnitt keine Gesichter
   abschneidet. Schrift steht in der Textfarbe der Webseite, damit sie auch mit dunklem Hintergrund lesbar ist.
+
+### Sicherheit
+
+- **Keine Metadaten in Bildern**: Gespeicherte Bilder enthalten keine EXIF-Daten mehr, auch keinen GPS-Ort, auch
+  wenn der Server sie nicht verkleinern musste.
 
 ## [0.2.0] – 2026-10-22
 

@@ -175,6 +175,36 @@ final class MemberPhotoTest extends TestCase
         $this->assertSame(200, $deliver($manager, null, '480')['status']);
     }
 
+    public function testOriginalResolutionForTheLargeView(): void
+    {
+        $exif = JpegMetadataTest::jpegWithMetadata(3000, 2000);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('gross.jpg', $exif)])->status);
+        $repo = $this->app->memberPhotos()->repository();
+        $original = (string) $repo->original($this->m);
+        $info = getimagesizefromstring($original);
+        $this->assertNotFalse($info);
+        $this->assertSame([3000, 2000, 'image/jpeg'], [$info[0], $info[1], $info['mime']], 'volle Auflösung');
+        $this->assertStringNotContainsString('GPSLatitude', $original, 'ohne Metadaten');
+        foreach ([128, 480, 1024] as $size) {
+            $this->assertStringNotContainsString('GPSLatitude', (string) $repo->image($this->m, $size));
+        }
+        $version = (string) $repo->find($this->m)['version'];
+        $photos = $this->app->memberPhotos();
+        $res = $photos->forDelivery(null, $this->m, $version, '4096');
+        $this->assertSame([200, $original], [$res['status'], $res['body'] ?? null]);
+        $this->assertStringEndsWith('&s=4096', $photos->urls(4096)[$this->m]);
+
+        // Kleine Fotos: so groß wie hochgeladen, nie vergrößert.
+        $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('klein.png', self::image(300, 200, 'png'))]);
+        $this->assertSame([300, 200], array_slice((array) getimagesizefromstring((string) $repo->original($this->m)), 0, 2));
+
+        // Ohne Original (vor Datenbankversion 23 hochgeladen): 404, die Großansicht bleibt bei der 1024er.
+        $this->app->db->execute('UPDATE {member_photos} SET original = NULL WHERE user_id = ?', [$this->m]);
+        $version = (string) $repo->find($this->m)['version'];
+        $this->assertSame(404, $photos->forDelivery(null, $this->m, $version, '4096')['status']);
+        $this->assertSame(200, $photos->forDelivery(null, $this->m, $version, '1024')['status']);
+    }
+
     public function testDirectoryShowsPhotosOfMembersAndCandidatesToEveryone(): void
     {
         $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));

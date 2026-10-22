@@ -8,7 +8,7 @@ Die **{bereich.gallery}** zeigt die Fotoalben der {kompanie.name}, nach Jahren g
 
 ## Bilder ansehen
 1. Ein Album antippen; die Bilder erscheinen als kleine Vorschau.
-2. Ein Bild antippen: Es öffnet sich groß. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf die Pfeile, am Computer gehen auch die Pfeiltasten.
+2. Ein Bild antippen: Es öffnet sich groß, nach einem Moment in voller Auflösung. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf die Pfeile, am Computer gehen auch die Pfeiltasten.
 3. Vergrößern: zwei Finger auseinanderziehen (bis zu vierfach) oder doppelt tippen. Vergrößert verschiebst du das Bild mit einem Finger; doppelt tippen stellt es wieder zurück.
 4. **✕** (oder die Escape-Taste) schließt das Bild, **‹ Alle Alben** führt zurück zur Übersicht.
 

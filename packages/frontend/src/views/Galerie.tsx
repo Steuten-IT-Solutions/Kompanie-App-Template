@@ -117,7 +117,8 @@ function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
 
 /**
  * Vollbild-Ansicht mit Wischen, Pfeiltasten und Escape. Zoomen mit zwei Fingern (bis 4-fach) oder doppeltem Tippen;
- * vergrößert verschiebt ein Finger das Bild statt zu blättern.
+ * vergrößert verschiebt ein Finger das Bild statt zu blättern. Zuerst erscheint die 1600er-Fassung, die
+ * Originalauflösung wird nachgeladen und ersetzt sie, sobald sie ganz da ist.
  */
 function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: number; onClose: () => void }) {
   const [i, setI] = useState(start);
@@ -125,6 +126,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   const gesture = useRef<{ kind: 'swipe' | 'pan' | 'pinch'; x: number; y: number; start: Zoom; dist?: number } | null>(null);
   const lastTap = useRef(0);
   const closeRef = useRef<HTMLButtonElement>(null);
+  // IDs der Bilder, deren Originalauflösung schon geladen ist (dann aus dem Speicher des Browsers).
+  const [originals, setOriginals] = useState<ReadonlySet<number>>(() => new Set());
   const go = useCallback(
     (d: number) => {
       setZoom(NO_ZOOM);
@@ -195,6 +198,18 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     for (const n of [i + 1, i - 1 + photos.length]) new Image().src = photos[n % photos.length].large;
   }, [i, photos]);
 
+  // Originalauflösung des gezeigten Bildes nachladen; fehlt sie (404) oder dauert es, bleibt die 1600er stehen.
+  useEffect(() => {
+    const cur = photos[i];
+    if (!cur.ready || !cur.original || originals.has(cur.id)) return;
+    const big = new Image();
+    big.onload = () => setOriginals((s) => new Set(s).add(cur.id));
+    big.src = cur.original;
+    return () => {
+      big.onload = null;
+    };
+  }, [i, photos, originals]);
+
   const p = photos[i];
   return (
     <div
@@ -209,7 +224,7 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     >
       <img
         key={p.id}
-        src={p.large}
+        src={p.original && originals.has(p.id) ? p.original : p.large}
         alt=""
         className={zoom.scale > 1 ? 'zoomed' : undefined}
         style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
