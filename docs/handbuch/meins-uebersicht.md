@@ -43,5 +43,5 @@ Den Eintritt kannst du nur ändern, wenn es bei euch die {bereich.directory} gib
 - Bekommst du einen neuen Titel, kann dir die App eine Nachricht schicken. Das schaltest du unter **Konto** → **Benachrichtigungen einstellen** mit **{bereich.titles}: neu verliehen** ein.
 
 ## Siehe auch
-- [Anmelden und Konto](seite:anmelden-und-konto)
+- [Mein Konto](seite:anmelden-und-konto)
 - [Benachrichtigungen](seite:benachrichtigungen)

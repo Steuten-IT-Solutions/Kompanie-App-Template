@@ -16,7 +16,9 @@ cp -R docs/handbuch "$T/src"
 printf -- '---\ntitel: Kaputt\nreihenfolge: 1\nrechte: [darf_alles]\nbereiche: [inventar]\n---\nText {bereich.unbekannt} und [weiter](seite:gibt-es-nicht).\n' > "$T/src/kaputt.md"
 printf -- '---\ntitel: Offen\nreihenfolge: 2\nrechte: manage_settings\nbereiche: events\n---\nText.\n' > "$T/src/offen.md"
 printf -- '---\ntitel: Für alle\nreihenfolge: 3\nrechte: []\n---\nSiehe [Installation](seite:admin-installation-eigenstaendig) und [x](seite:javascript:alert).\n' > "$T/src/verweis.md"
-rm "$T/src/strafen-verwalten.md" "$T/src/rollen-vergeben.md"
+# Alle Seiten mit dem Recht für Strafen und alle für promote_users (auch über einrecht) entfernen
+grep -l '^rechte: .*manage_penalties' "$T/src"/*.md | xargs rm
+grep -lE '^(rechte|einrecht): .*promote_users' "$T/src"/*.md | xargs rm
 OUT="$(php scripts/handbuch.php --check --src="$T/src" 2>&1 || true)"
 for want in 'unbekanntes Recht „darf_alles“' 'unbekannter Bereich „inventar“' 'unbekannter Platzhalter {bereich.unbekannt}' 'Verweis auf fehlende Seite „gibt-es-nicht“' 'Bereich „penalties“ hat eigene Rechte' 'offen.md: „rechte“ muss eine Liste in [ ] sein' 'offen.md: „bereiche“ muss eine Liste in [ ] sein' 'verweis.md: Verweis auf „admin-installation-eigenstaendig“, die nicht jeder sieht' 'Für das Recht „promote_users“ fehlt eine eigene Handbuchseite' 'verweis.md: ungültiger Verweis seite:javascript:alert'; do
   grep -qF "$want" <<< "$OUT" || fail "Fehler nicht erkannt: $want – $OUT"
@@ -54,10 +56,11 @@ grep -qF 'quelle.md: Verweis auf „ziel-eng“, die nicht jeder sieht' <<< "$OU
 ! grep -qF 'ziel-weiter' <<< "$OUT" && ! grep -qF 'admin.md' <<< "$OUT" || fail "Verweis auf passende Seite abgelehnt: $OUT"
 ok "einrecht: Verweise nur auf Seiten, die jeder mit einem dieser Rechte sieht (Admins sehen alles)"
 # Pflichtseite für ein Recht auch über einrecht
-cp -R docs/handbuch "$T/ein3"
-rm -f "$T/ein3/rollen-vergeben.md"
-printf -- '---\ntitel: Rollen\nreihenfolge: 6\nrechte: []\neinrecht: [promote_users, create_users]\n---\nText.\n' > "$T/ein3/rollen-vergeben.md"
-php scripts/handbuch.php --check --src="$T/ein3" > /dev/null || fail "Pflichtseite über einrecht abgelehnt: $(php scripts/handbuch.php --check --src="$T/ein3" 2>&1)"
+mkdir -p "$T/ein3"
+printf -- '---\ntitel: Rollen\nreihenfolge: 6\nrechte: []\neinrecht: [promote_users, create_users]\n---\nText.\n' > "$T/ein3/rollen.md"
+printf -- '---\ntitel: Anlegen\nreihenfolge: 7\nrechte: [create_users]\n---\nText.\n' > "$T/ein3/anlegen.md"
+OUT="$(php scripts/handbuch.php --check --src="$T/ein3" 2>&1 || true)"
+grep -q 'Bereich „' <<< "$OUT" && ! grep -q 'Für das Recht' <<< "$OUT" || fail "Pflichtseite über einrecht abgelehnt: $OUT"
 ok "Pflichtseite für ein Recht auch mit rechte: [] und dem Recht in einrecht"
 
 # Ausgabe für die App und die Webseite: eigene Testseiten neben dem Handbuch (unabhängig von dessen Wortlaut)

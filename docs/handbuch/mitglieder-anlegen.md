@@ -36,7 +36,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf 
 - Ohne Benutzernamen bildet die App ihn aus dem Namen. Ein Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten. Benutzername und E-Mail dürfen nicht schon vergeben sein.
 - Das Startpasswort steht **nur dieses eine Mal** da. Eine E-Mail verschickt die App nicht. **Teilen …** gibt es nur, wenn dein Gerät es kann.
 - Andere Rollen vergibt danach, wer Rollen vergeben darf (unter **Konto und Rolle** auf der Seite des Mitglieds).
-- Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Anmelden und Konto](seite:anmelden-und-konto).
+- Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Mein Konto](seite:anmelden-und-konto).
 - Bitte lade ein Foto nur mit dem Einverständnis der Person hoch. Erlaubt sind JPG, PNG und WebP.
 
 ## Siehe auch
