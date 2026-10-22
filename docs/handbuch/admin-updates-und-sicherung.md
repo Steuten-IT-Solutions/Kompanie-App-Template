@@ -26,13 +26,19 @@ Klappt nach einem Update etwas nicht mehr, öffnest du **Auf eine ältere Versio
 Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist – noch bevor sie für alle freigegeben wird. Beim Einschalten fragt die App nach. Das ist für eine Testseite gedacht: Vorabversionen können noch Fehler enthalten. Schaltest du es wieder aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
 
 ## Datensicherung
-Unter **Verwaltung → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen und Zugangsschlüssel, ohne WordPress auch die Konten. Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf. Die Ampel unter **Zustand und Updates** wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
+Unter **Verwaltung → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen, die Zugangsschlüssel und die Konten (mit WordPress alle Benutzer der Webseite, mit Passwort als Prüfwert). Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf. Die Ampel unter **Zustand und Updates** wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
 
 ### Wiederherstellen
 Mit **Sicherung wiederherstellen …** wählst du eine Sicherungsdatei. Nach einer Rückfrage ersetzt sie **alle** Daten der App; rückgängig machen lässt sich das nur mit einer anderen Sicherung.
-- Mit WordPress geht das nur auf derselben Webseite, z. B. nach einem missglückten Update.
+- Mit WordPress geht das nur auf derselben Webseite (Adresse), z. B. nach einem missglückten Update oder auf einer neu installierten WordPress-Seite, wenn die alte verloren ist. Fehlende Konten legt die App dabei mit ihrer bisherigen ID wieder an; alle melden sich mit ihrem bisherigen Benutzernamen und Passwort an. Vorhandene Konten behalten Anmeldedaten und E-Mail und bekommen nur ihre Rolle in der App aus der Sicherung. Konten anlegen darf nur ein WordPress-Administrator.
 - Ohne WordPress auch auf einer neuen Installation (z. B. beim Umzug), aber nicht aus einer Sicherung des WordPress-Plugins. Danach melden sich alle neu an.
 - Eine Sicherung aus einer neueren Version lässt sich erst einspielen, wenn die App aktualisiert ist.
+
+### Nach dem Verlust der Webseite (WordPress)
+1. WordPress unter derselben Adresse neu installieren. Den Administrator dabei mit dem **Benutzernamen und der E-Mail deines bisherigen Kontos** anlegen (oder mit einem Namen und einer E-Mail, die es bisher nicht gab). Gehört die neue Konto-Nummer in der Sicherung jemand anderem, bricht das Wiederherstellen ab und nennt das Konto; geändert wird dann nichts.
+2. Das Plugin der Kompanie installieren (Download-Seite der Kompanie) und die App öffnen.
+3. Unter **Verwaltung → Einstellungen → Datensicherung** die zuletzt heruntergeladene Sicherung einspielen.
+4. Beiträge der Webseite (Neuigkeiten), Seiten und andere Plugins gehören zu WordPress selbst und sind nicht in der Sicherung der App; dafür braucht es eine Sicherung von WordPress bzw. vom Webhoster.
 
 ### Was nicht in der Sicherung ist
 Die Fotos der {bereich.gallery} sind nicht in der Sicherung; die App holt sie danach neu aus Google Drive. Auch die Dateien der {bereich.documents} und die Abzeichen der {bereich.ranks} sind nicht in der Sicherung, nur ihre Angaben (Titel, Kategorie, Stand bzw. welcher {begriff.rank} welches Abzeichen hat). Sie bleiben auf dem Server. Beim Umzug ohne WordPress nimm die Ordner `data/files/dokumente` und `data/files/abzeichen` mit (bzw. das Datenverzeichnis, falls es woanders liegt). Sonst lassen sich die Dokumente danach nicht öffnen und müssen neu hochgeladen werden; fehlende Abzeichen zeigt die App nicht an, bis du sie neu hochlädst. Die Fotos der Mitglieder liegen dagegen in der Datenbank und sind in der Sicherung enthalten.

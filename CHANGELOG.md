@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Konten in der Datensicherung** (WordPress): Die Sicherung enthält jetzt auch die Benutzer der Webseite mit
+  Benutzername, E-Mail, Namen, Passwort (als Prüfwert) und Rollen. Ist die Webseite verloren, legt das Wiederherstellen
+  auf einer neu installierten WordPress-Seite unter derselben Adresse die Konten mit ihrer bisherigen Nummer wieder an;
+  alle melden sich wie gewohnt an. Vorhandene Konten bleiben, wie sie sind, und bekommen nur ihre Rolle in der App
+  zurück. Passen Konten nicht zusammen, ändert das Wiederherstellen nichts und sagt, welches Konto stört.
+
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung, und die gewählte

@@ -471,11 +471,9 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
     <section className="card settings-section" aria-labelledby="backup-title">
       <h3 id="backup-title">Datensicherung</h3>
       <p className="muted small">
-        Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis und Einstellungen
-        {config?.variant === 'standalone'
-          ? ', die Konten (Passwörter als Prüfwerte, aus denen sich einfache Passwörter erraten lassen)'
-          : ''}{' '}
-        und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen sichert die App automatisch.
+        Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis und Einstellungen, die Konten (Passwörter als Prüfwerte, aus denen sich einfache
+        Passwörter erraten lassen) und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen
+        sichert die App automatisch.
         {config?.features.documents && ' Die Dateien der Dokumente sind nicht enthalten (nur ihre Angaben); sie bleiben auf dem Server.'}
       </p>
       <div className="button-row">

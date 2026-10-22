@@ -3870,8 +3870,9 @@ paths:
       tags: [Wartung]
       summary: Datensicherung herunterladen
       description: |
-        Gemeinsames Format `kompanie-app-backup` (Tabellen und Einstellungen; eigenständige Version
-        auch Konten mit Passwort-Hashes). Enthält Zugangsschlüssel – sicher aufbewahren.
+        Gemeinsames Format `kompanie-app-backup` (Tabellen, Einstellungen und Konten mit Passwort-Hashes:
+        eigenständige Version in `tables.users`, WordPress als `accounts` mit den Benutzern der Website).
+        Enthält Zugangsschlüssel – sicher aufbewahren.
       x-capability: manage_settings
       responses:
         '200':
@@ -3887,7 +3888,9 @@ paths:
       summary: Sicherung wiederherstellen (ersetzt alle Daten)
       description: |
         Eigenständige Version: nur Sicherungen der eigenständigen Version mit mindestens einem Admin;
-        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website.
+        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website; fehlende Konten werden mit
+        ihrer ID angelegt (nur mit den WP-Rechten create_users und promote_users), vorhandene behalten
+        Anmeldedaten. Passt eine ID nicht zum Benutzernamen, wird nichts geändert (400).
       x-capability: manage_settings
       requestBody:
         required: true

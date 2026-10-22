@@ -13,6 +13,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  *   {format: "kompanie-app-backup", formatVersion: 1, created, variant, version,
  *    schema: {name: version}, tables: {tabelle: [zeilen]}, settings: {name: wert}}
  *
+ * Konten: in der eigenständigen Version als Tabelle users, im WordPress-Plugin als accounts (WordPress-Benutzer, s. WpBackup).
+ *
  * Wiederherstellen ersetzt den Inhalt der Tabellen. Spalten, die die Datenbank nicht kennt
  * (Sicherung einer neueren Version), werden ausgelassen; fehlende bekommen ihren Standardwert.
  * Galeriebilder sind nicht enthalten; sie werden nach dem Wiederherstellen neu aus Drive erzeugt.
