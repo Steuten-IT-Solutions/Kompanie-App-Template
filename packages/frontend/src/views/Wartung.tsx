@@ -108,7 +108,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
         <>
           <p className="small">
             Installiert: <strong>{u.current}</strong>
-            {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)}
+            {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)} ·{' '}
+            <a href="#/einstellungen/neuerungen">Was ist neu</a>
           </p>
           {u.withdrawn &&
             (u.fallback ? (
