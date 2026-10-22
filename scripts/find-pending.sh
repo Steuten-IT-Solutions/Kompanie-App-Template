@@ -17,7 +17,18 @@ trap 'rm -rf "$WORK"' EXIT
 if [ -n "${ONLY:-}" ]; then
   REPOS="$ONLY"
 else
-  REPOS="$(gh search repos --owner "$ORG" --topic kompanie-app --visibility public --archived=false --limit 500 --json fullName --jq '.[].fullName')"
+  search() { gh search repos --owner "$ORG" --topic kompanie-app --visibility public --archived=false --limit 500 --json fullName --jq '.[].fullName'; }
+  REPOS="$(search)"
+  # Die Suche von GitHub liefert gelegentlich kurz gar nichts; dann würde still nichts veröffentlicht.
+  # Einmal wiederholen, danach abbrechen (es gibt immer mindestens eine Kompanie).
+  if [ -z "$REPOS" ]; then
+    sleep 15
+    REPOS="$(search)"
+  fi
+  if [ -z "$REPOS" ]; then
+    echo "::error::Keine Kompanie-Repos gefunden (Topic kompanie-app in $ORG). Suche von GitHub gestört? Workflow neu starten." >&2
+    exit 1
+  fi
 fi
 
 PENDING=()

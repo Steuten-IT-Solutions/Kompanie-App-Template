@@ -15,6 +15,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- **Shortcode `[kompanie_aemter gruppe="…"]`**: erkennt die Gruppe auch mit typografischen Anführungszeichen
+  (z. B. `gruppe=„Kompanie“` aus Word oder dem Editor), auch bei Namen mit Leerzeichen.
+
 ## [0.2.0] – 2026-10-22
 
 ### Neu

@@ -204,7 +204,16 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         }
         // Immer die Sicht eines Gastes: Fotos nur von Personen, die auch in der öffentlichen Mitgliederliste stehen.
         $overview = $app->offices()->overview(null);
-        $wanted = trim((string) ($atts['gruppe'] ?? ''));
+        // Typografische Anführungszeichen (gruppe=„…“ bzw. ”…”, z. B. aus Word oder dem Editor) erkennt WordPress
+        // nicht als Anführungszeichen: Sie landen im Wert, und ein Leerzeichen teilt ihn (der Rest kommt als
+        // Attribute ohne Namen). Deshalb wieder zusammensetzen und die Zeichen entfernen.
+        $wanted = (string) ($atts['gruppe'] ?? '');
+        foreach ($atts as $k => $v) {
+            if (is_int($k) && $wanted !== '') {
+                $wanted .= ' ' . $v;
+            }
+        }
+        $wanted = trim((string) preg_replace('/^[\s"\'\p{Pi}\p{Pf}„‚]+|[\s"\'\p{Pi}\p{Pf}„‚]+$/u', '', $wanted));
         $groups = [];
         foreach ($overview['groups'] as $g) {
             if ($wanted === '' || mb_strtolower($g['title']) === mb_strtolower($wanted)) {

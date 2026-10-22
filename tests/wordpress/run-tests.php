@@ -792,6 +792,8 @@ $c->ok(str_contains($html, esc_html($memberName)) && str_contains($html, 'seit 2
 $c->ok(str_contains($html, 'Chronik seit 1980') && str_contains($html, '1980–1990') && str_contains($html, 'Kpwp Früher'), 'Frühere Amtszeiten als Chronik');
 $html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
+$html = do_shortcode('[kompanie_aemter gruppe=”Kpwp Bruderschaft”]');
+$c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän'), 'gruppe mit typografischen Anführungszeichen');
 $html = do_shortcode('[kompanie_mitglieder]');
 $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, esc_html($memberName)) && str_contains($html, esc_url((string) $photo['photo_url'])), '[kompanie_mitglieder]: Mitglied mit Foto');
 $c->ok(!str_contains($html, 'Kpwp_gast_amt') && !str_contains($html, 'punkte') && !str_contains($html, 'role'), 'Ohne Gäste, Punkte oder Rollen');
