@@ -81,6 +81,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   `[kompanie_aemter]` sind die Fotos schärfer und oben ausgerichtet, damit der runde Ausschnitt keine Gesichter
   abschneidet. Schrift steht in der Textfarbe der Webseite, damit sie auch mit dunklem Hintergrund lesbar ist.
 
+### Behoben
+
+- **Eingabefelder in Umfragen**: Die Felder *Frage* und *Antwortmöglichkeiten* sowie *Ende* beim Anlegen oder
+  Bearbeiten einer Umfrage sehen jetzt aus wie alle anderen Eingabefelder der App (bisher graue, eckige Kästen).
+
 ## [0.2.0] – 2026-10-22
 
 ### Neu
