@@ -231,6 +231,35 @@ final class FormerMemberService
     }
 
     /**
+     * Eine ehemalige Person neu anlegen (Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“): Konto ohne Anmeldung, gleich als
+     * ehemalig eingetragen, wie eine Zeile des Imports. Erst alles prüfen, dann anlegen. Wer genau so heißt wie ein
+     * vorhandenes Konto, wird nicht angelegt (wie beim Import, damit niemand doppelt entsteht). Steht die Person in
+     * Amtszeiten nur als freier Name, wird der Eintrag mit ihrem Konto verknüpft.
+     *
+     * @param array<string, mixed> $in first_name, last_name, reason, joined_on, founder, left_on
+     * @return array{id: int, name: string, offices_linked: int, reason: string, joined_on: string, founder: bool, left_on: string, previous_level: string}
+     */
+    public function create(User $actor, array $in): array
+    {
+        $data = self::valid($in, $this->app->time()->today());
+        $taken = [];
+        $prepared = $this->app->members()->prepare(['first_name' => $in['first_name'] ?? '', 'last_name' => $in['last_name'] ?? ''], $taken);
+        $key = mb_strtolower($prepared['name']);
+        foreach ($this->app->users->list(true) as $u) {
+            if (mb_strtolower($u->name) === $key) {
+                throw ApiError::invalid(sprintf(
+                    'Es gibt schon %s „%s“. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).',
+                    $this->previousRole($u) !== null ? 'eine ehemalige Person' : 'ein Konto',
+                    $u->name,
+                ));
+            }
+        }
+        $id = $this->createImported($actor, $prepared, $data);
+        $linked = $this->app->offices()->linkNames([$key => $id], true);
+        return ['id' => $id, 'name' => $prepared['name'], 'offices_linked' => $linked] + ($this->of($id) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.'));
+    }
+
+    /**
      * Ehemalige aus einer Tabelle anlegen (CSV mit Semikolon oder Tabulator): vorname;nachname;eintritt;ausgeschieden;grund.
      * - eintritt und ausgeschieden: TT.MM.JJJJ, JJJJ-MM-TT, nur das Jahr oder leer; eintritt „Gründer“ bzw.
      *   „Gründungsmitglied“ trägt ein Gründungsmitglied ohne Datum ein.
