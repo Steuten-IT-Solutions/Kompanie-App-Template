@@ -149,6 +149,43 @@ export function StatCard({
 }
 
 /**
+ * Einklappbarer Abschnitt: Kopf in der Optik von .section-title mit Pfeil „›“, der beim Aufklappen nach unten zeigt.
+ * Für Dokument-Kategorien und „Konto und Rolle“ in den Mitgliedsdetails, damit alle gleich aussehen.
+ */
+export function FoldSection({
+  id,
+  title,
+  open,
+  onToggle,
+  className,
+  children,
+}: {
+  id: string;
+  title: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const bodyId = `${id}-body`;
+  return (
+    <section id={id} className={className ? `fold ${className}` : 'fold'}>
+      <h3 className="section-title fold-title">
+        <button type="button" className="fold-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+          {title}
+          <span className="fold-arrow" aria-hidden="true">
+            ›
+          </span>
+        </button>
+      </h3>
+      <div id={bodyId} className="fold-body" hidden={!open}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/**
  * Fenster über der Seite (auf dem Handy von unten, am Computer mittig) mit Überschrift und ✕. Schließen mit ✕, Escape
  * oder Tippen daneben. Im body, damit Wischen auf der Seite darunter nicht greift (swipe.ts) und nichts die Optik erbt.
  */

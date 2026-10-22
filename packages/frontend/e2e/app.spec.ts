@@ -40,8 +40,8 @@ async function openKonto(page: Page) {
 
 /** Auf der Seite eines Mitglieds in der Verwaltung „Konto und Rolle“ aufklappen (ganz unten). */
 async function memberAccount(page: Page) {
-  const account = page.locator('.member-account');
-  if ((await account.getAttribute('open')) === null) await account.locator('summary').click();
+  const toggle = page.locator('.member-account .fold-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
 }
 /** Auf der Seite eines Mitglieds die Kachel „Offen“ antippen: Fenster mit Formular und Einträgen der Kasse. */
 async function memberPenalties(page: Page) {
@@ -2626,7 +2626,7 @@ test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({
 
   const doc = page.locator('.doc-card', { hasText: `Langes Dokument ${id}` });
   await expect(doc).toBeAttached();
-  const toggle = page.locator('.doc-group', { has: doc }).locator('.doc-group-toggle');
+  const toggle = page.locator('.doc-group', { has: doc }).locator('.fold-toggle');
   if ((await toggle.count()) > 0 && (await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
   await doc.getByRole('button', { name: 'Öffnen' }).click();
   const first = page.getByAltText(`Langes Dokument ${id}, Seite 1 von 10`);
