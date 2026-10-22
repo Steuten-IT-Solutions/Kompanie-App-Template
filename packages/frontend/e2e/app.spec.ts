@@ -1140,15 +1140,16 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
 
 test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
   await page.context().clearCookies();
-  await page.goto('/app/#/news');
-  await expect(page.locator('.news-card').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Termine' }).click();
-  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   const layouts = () =>
     page.evaluate(async () => {
       const cache = await caches.open('kompanie-ansicht-geruest-v1');
       return Promise.all((await cache.keys()).map(async (k) => decodeURIComponent(k.url) + (await (await cache.match(k))!.text())));
     });
+  await page.goto('/app/#/news');
+  await expect(page.locator('.news-card').first()).toBeVisible();
+  // Sofort weiter (wie in WordPress, wo die Daten schnell da sind): Das Gerüst ist trotzdem gemerkt.
+  await page.getByRole('button', { name: 'Termine' }).click();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await expect.poll(async () => (await layouts()).some((l) => l.includes('/news|'))).toBe(true);
   // Nur der Aufbau, kein Text
   expect((await layouts()).join('')).not.toContain('Tag der offenen Tür');

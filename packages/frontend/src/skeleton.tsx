@@ -78,7 +78,8 @@ function learn(parent: Element, before: Set<Node>, key: string, route: string) {
     const parts = capture(fresh as unknown as DomNode[]);
     if (parts.length > 0) skeletons.set(key, parts);
   };
-  setTimeout(attempt, 50);
+  // Gleich nach dem Rendern (die neuen Elemente stehen schon im DOM): Wer sofort weiterwechselt, hat das Gerüst trotzdem.
+  queueMicrotask(attempt);
 }
 
 const currentRoute = () => window.location.hash.replace(/^#\/?/, '');
