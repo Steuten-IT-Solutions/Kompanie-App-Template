@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api, type EncodedFile } from './api';
 import { badgeSrc } from './RankBadge';
+import { Sheet } from './ui';
 
 /**
  * Fotos der Mitglieder. Hochladen, ersetzen und entfernen nur, wer Mitglieder anlegen darf; sehen die Person selbst
@@ -88,9 +89,10 @@ export function MemberAvatar({ url, name, size = 'small' }: { url?: string | nul
 /**
  * Foto vergrößert über der Seite (1024-Pixel-Fassung, scharf auch bei hoher Pixeldichte; ganzes Bild statt runder
  * Ausschnitt), damit sich neue Mitglieder die Gesichter einprägen können. Schließen mit ✕, Escape oder Tippen neben
- * das Bild. Im body, damit es nicht im Absatz der Dienstgrad-Zeile steht und deren Farbe erbt.
+ * das Bild. Im body, damit es nicht im Absatz der Dienstgrad-Zeile steht und deren Farbe erbt. `actions` steht unter
+ * dem Bild (z. B. Foto ersetzen und entfernen).
  */
-function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string; actions?: ReactNode; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   // Vor Datenbankversion 18 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
   const [fallback, setFallback] = useState(false);
@@ -135,6 +137,7 @@ function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose:
           />
         )}
         <figcaption>{name}</figcaption>
+        {actions}
       </figure>
       <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
         ✕
@@ -144,17 +147,58 @@ function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose:
   );
 }
 
-/** Foto in den Mitgliedsdetails und der Mitgliederliste: Antippen vergrößert es; ohne Foto nur die Anfangsbuchstaben. */
-export function ZoomableAvatar({ url, name, size = 'large' }: { url?: string | null; name: string; size?: AvatarSize }) {
+/** Bearbeiten des Fotos aus der vergrößerten Ansicht: wer Fotos hochladen darf (photo_editable). */
+export type PhotoEdit = { id: number; onChanged: () => void; onToast: (msg: string) => void };
+
+/**
+ * Foto in den Mitgliedsdetails und der Mitgliederliste: Antippen vergrößert es; ohne Foto nur die Anfangsbuchstaben.
+ * Mit `edit` stehen in der vergrößerten Ansicht „Foto ersetzen“ und „Foto entfernen“; ohne Foto öffnen die
+ * Anfangsbuchstaben ein Fenster zum Hochladen. Nach einer Änderung schließt sich die Ansicht.
+ */
+export function ZoomableAvatar({
+  url,
+  name,
+  size = 'large',
+  edit,
+}: {
+  url?: string | null;
+  name: string;
+  size?: AvatarSize;
+  edit?: PhotoEdit;
+}) {
   const [zoomed, setZoomed] = useState(false);
   const close = useCallback(() => setZoomed(false), []);
-  if (!url) return <MemberAvatar url={url} name={name} size={size} />;
+  if (!url && !edit) return <MemberAvatar url={url} name={name} size={size} />;
+  const panel = edit && (
+    <MemberPhotoPanel
+      id={edit.id}
+      name={name}
+      url={url ?? null}
+      editable
+      showAvatar={!url}
+      onChanged={() => {
+        setZoomed(false);
+        edit.onChanged();
+      }}
+      onToast={edit.onToast}
+    />
+  );
   return (
     <>
-      <button type="button" className="member-photo-open" onClick={() => setZoomed(true)} aria-label={`Foto von ${name} vergrößern`}>
+      <button
+        type="button"
+        className="member-photo-open"
+        onClick={() => setZoomed(true)}
+        aria-label={url ? `Foto von ${name} vergrößern` : `Foto von ${name} hochladen`}
+      >
         <MemberAvatar url={url} name={name} size={size} />
       </button>
-      {zoomed && <PhotoZoom url={url} name={name} onClose={close} />}
+      {zoomed && url && <PhotoZoom url={url} name={name} actions={panel} onClose={close} />}
+      {zoomed && !url && edit && (
+        <Sheet title="Foto" onClose={close}>
+          {panel}
+        </Sheet>
+      )}
     </>
   );
 }

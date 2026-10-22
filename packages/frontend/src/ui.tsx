@@ -1,4 +1,5 @@
-import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { Component, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
 import { DATA_UPDATED, dataCache } from './dataCache';
 import { noteError } from './lastError';
@@ -92,12 +93,65 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
-export function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'neutral' }) {
+/** Kennzahl als Kachel; mit onClick ein Knopf (z. B. öffnet er ein Fenster zum Bearbeiten). */
+export function StatCard({
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  tone?: 'good' | 'warn' | 'neutral';
+  onClick?: () => void;
+}) {
+  const className = `stat stat-${tone ?? 'neutral'}`;
+  if (onClick) {
+    return (
+      <button type="button" className={`${className} stat-button`} onClick={onClick}>
+        <span className="stat-value">{value}</span>
+        <span className="stat-label">{label}</span>
+      </button>
+    );
+  }
   return (
-    <div className={`stat stat-${tone ?? 'neutral'}`}>
+    <div className={className}>
       <div className="stat-value">{value}</div>
       <div className="stat-label">{label}</div>
     </div>
+  );
+}
+
+/**
+ * Fenster über der Seite (auf dem Handy von unten, am Computer mittig) mit Überschrift und ✕. Schließen mit ✕, Escape
+ * oder Tippen daneben. Im body, damit Wischen auf der Seite darunter nicht greift (swipe.ts) und nichts die Optik erbt.
+ */
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="sheet-head">
+          <h2 className="sheet-title">{title}</h2>
+          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label="Schließen">
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
