@@ -75,6 +75,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (scharf, auch auf Handys), Name als Balken im Bild, ohne Dienstgrad, nach Namen sortiert, groß beim Antippen. In
   `[kompanie_aemter]` sind die Fotos schärfer und oben ausgerichtet, damit der runde Ausschnitt keine Gesichter
   abschneidet. Schrift steht in der Textfarbe der Webseite, damit sie auch mit dunklem Hintergrund lesbar ist.
+- **„Konto und Rolle“ in den Mitgliedsdetails** sieht beim Auf- und Zuklappen aus wie die Kategorien unter
+  Dokumente: Überschrift mit Linien links und rechts und einem Pfeil, der beim Aufklappen nach unten zeigt.
 
 ## [0.2.0] – 2026-10-22
 

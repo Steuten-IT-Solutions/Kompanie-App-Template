@@ -21,7 +21,7 @@ import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCent
 import { navigate, redirect as redirectTo } from '../router';
 import { neighbors, useSwipeDrag } from '../swipe';
 import { AdminNav, adminTabs, memberListAllowed } from '../adminNav';
-import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
+import { emptyName, Empty, ErrorBox, FoldSection, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
@@ -589,14 +589,18 @@ function MemberDetailView({
       redirectTo(here);
     }
   }, [here]);
-  // Konto und Rolle aufgeklappt, wenn ein älterer Link auf die Unterseite zeigt.
-  const accountRef = useRef<HTMLDetailsElement>(null);
+  // Konto und Rolle aufgeklappt, wenn ein älterer Link auf die Unterseite zeigt; hinscrollen erst, wenn es offen ist.
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountScroll, setAccountScroll] = useState(0);
   useEffect(() => {
-    if (page === 'konto' && accountRef.current) {
-      accountRef.current.open = true;
-      accountRef.current.scrollIntoView({ block: 'start' });
+    if (page === 'konto' && data) {
+      setAccountOpen(true);
+      setAccountScroll((n) => n + 1);
     }
   }, [page, data !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (accountScroll > 0) document.getElementById('member-account')?.scrollIntoView({ block: 'start' });
+  }, [accountScroll]);
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -773,8 +777,13 @@ function MemberDetailView({
           </section>
         )}
 
-        <details className="member-account" ref={accountRef}>
-          <summary>Konto und Rolle</summary>
+        <FoldSection
+          id="member-account"
+          className="member-account"
+          title="Konto und Rolle"
+          open={accountOpen}
+          onToggle={() => setAccountOpen((o) => !o)}
+        >
           {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
           {!m.former && (
             <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
@@ -809,7 +818,7 @@ function MemberDetailView({
           {can('create_users') && !self && (
             <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
           )}
-        </details>
+        </FoldSection>
 
         {sheet === 'punkte' && canPoints() && (
           <Sheet title={sec.points} onClose={closeSheet}>
