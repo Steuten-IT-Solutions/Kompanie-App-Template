@@ -3,6 +3,7 @@ import { api, levelLabel, type FormerImportResult, type FormerInfo, type FormerI
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
+import { readSheet } from '../sheet';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { MemberAvatar } from '../memberPhoto';
 import {
@@ -358,16 +359,6 @@ export function FormerPanel({
 const IMPORT_EXAMPLE =
   'vorname;nachname;eintritt;ausgeschieden;grund\nErika;Muster;Gründer;31.12.1990;ausgetreten\nMax;Beispiel;1975;2003;verstorben';
 
-/** Datei lesen: UTF-8, sonst Windows-1252 (so speichert Excel unter Windows „CSV (Trennzeichen-getrennt)“). */
-async function readText(file: File): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return new TextDecoder('windows-1252').decode(bytes);
-  }
-}
-
 /**
  * Ehemalige aus einer Tabelle anlegen (Ersterfassung, z. B. aus einer Chronik): einfügen oder Datei wählen, Vorschau mit
  * Fehlern je Zeile, dann übernehmen. Für jede Person entsteht ein Konto, das gleich als ehemalig eingetragen ist; wer
@@ -429,15 +420,18 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
         />
       </label>
       <label className="field">
-        <span>Oder Datei wählen (CSV)</span>
+        <span>Oder Datei wählen (Excel .xlsx oder CSV)</span>
         <input
           type="file"
-          accept=".csv,.txt,text/csv,text/plain"
+          accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={async (e) => {
             const file = e.target.files?.[0];
-            if (file) {
-              setCsv(await readText(file));
-              setResult(null);
+            if (!file) return;
+            setResult(null);
+            try {
+              setCsv(await readSheet(file));
+            } catch (err) {
+              setError((err as Error).message);
             }
           }}
         />
