@@ -43,6 +43,8 @@ const STATIC_CACHE = 'kompanie-static-' + BUILD;
 const DATA_CACHE = 'kompanie-data-v2';
 const DOCS_CACHE = 'kompanie-docs-v1';
 const BADGES_CACHE = 'kompanie-badges-v1';
+// Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
+const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
@@ -115,7 +117,11 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE].includes(k)).map((k) => caches.delete(k))),
+        Promise.all(
+          keys
+            .filter((k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE].includes(k) && !k.startsWith(VIEWS_CACHE))
+            .map((k) => caches.delete(k)),
+        ),
       )
       .then(() => trimData())
       .then(() => self.clients.claim()),

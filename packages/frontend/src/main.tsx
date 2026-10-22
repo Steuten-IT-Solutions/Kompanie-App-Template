@@ -7,7 +7,9 @@ import { isStandalone } from './install';
 import App from './App';
 import { config, preparePreview } from './api';
 import { dataUpdated } from './dataCache';
+import { deviceStore } from './deviceStore';
 import { previewRole } from './preview';
+import { skeletons } from './skeleton';
 import { checkPushOnStart } from './push';
 import { watchRuntimeErrors } from './lastError';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
@@ -34,8 +36,19 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 // Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
 watchRuntimeErrors();
 
+/**
+ * Gerüste der Seiten vom Gerät (skeleton.tsx), getrennt nach Version und Benutzer. Höchstens kurz darauf warten: Ein
+ * langsamer Speicher soll den Start nicht aufhalten. In der Vorschau nicht: Sie zeigt die App einer anderen Rolle.
+ */
+function restoreSkeletons(): Promise<unknown> {
+  if (!config || previewRole() || !('caches' in window)) return Promise.resolve();
+  const scope = `${config.version}|${config.user?.id ?? 'gast'}`;
+  const restoring = skeletons.restore(scope, deviceStore('kompanie-ansicht-geruest-v1', 80)).catch(() => undefined);
+  return Promise.race([restoring, new Promise((resolve) => setTimeout(resolve, 300))]);
+}
+
 // Vorschau „App als Rolle ansehen“ (Issue #63): erst die Konfiguration der Rolle holen, dann starten.
-void preparePreview().then((notice) =>
+void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) =>
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App notice={notice} />

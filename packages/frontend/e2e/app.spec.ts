@@ -1138,6 +1138,44 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
+  await page.context().clearCookies();
+  const layouts = () =>
+    page.evaluate(async () => {
+      const cache = await caches.open('kompanie-ansicht-geruest-v1');
+      return Promise.all((await cache.keys()).map(async (k) => decodeURIComponent(k.url) + (await (await cache.match(k))!.text())));
+    });
+  // Erst über die Navigation zu den News, später direkt: Das Gerüst muss trotzdem passen.
+  await page.goto('/app/');
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await page.getByRole('button', { name: 'News' }).click();
+  await expect(page.locator('.news-card').first()).toBeVisible();
+  // Sofort weiter (wie in WordPress, wo die Daten schnell da sind): Das Gerüst ist trotzdem gemerkt.
+  await page.getByRole('button', { name: 'Termine' }).click();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await expect.poll(async () => (await layouts()).some((l) => l.includes('/news|'))).toBe(true);
+  // Nur der Aufbau, kein Text
+  expect((await layouts()).join('')).not.toContain('Tag der offenen Tür');
+
+  // Keine gespeicherten Daten (auch nicht beim Service Worker), News antworten sehr langsam.
+  await page.evaluate(() => caches.delete('kompanie-data-v2'));
+  await page.context().route(/news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.goto('/app/#/news');
+    await page.reload();
+    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.loading')).toHaveCount(0);
+    await shot(page, 'geruest-news');
+    await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.skeleton')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
