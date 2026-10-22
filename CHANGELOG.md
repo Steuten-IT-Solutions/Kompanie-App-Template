@@ -46,6 +46,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Anwärter in der Mitgliederliste erkennbar**: In der Mitgliederliste der Verwaltung steht bei Personen, deren
+  Rolle das Häkchen *Als Mitglied aufnehmen* hat (z. B. Anwärter), der Name der Rolle neben dem Namen wie ein Titel.
 - **Geburtstag und Eintritt auf der eigenen Seite**: Unter *Konto* steht die Auswahl „Auf meiner Seite …“ jetzt
   von Anfang an auf **Mitgliedern anzeigen** (bisher „Nicht anzeigen“); nur angemeldete Mitglieder sehen die Angabe.
   Das gilt auch für alle schon eingetragenen Geburtstage und Eintritte, die auf „Nicht anzeigen“ standen. Wer sie

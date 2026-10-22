@@ -168,6 +168,12 @@ const memberSorts = (): MemberSort[] =>
     (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
   );
 
+/** Rolle als Titel in der Liste, solange die Person noch als Mitglied aufzunehmen ist (Häkchen an der Rolle, z. B. Anwärter). */
+const admitRole = (level: Level) => {
+  const r = roleInfo(level);
+  return r?.promotable ? r.label : undefined;
+};
+
 function Members() {
   const canPromote = can('promote_users');
   // Nur einmal übernehmen: Wer die Liste danach neu öffnet, fängt wieder oben an.
@@ -357,7 +363,7 @@ function Members() {
             {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">
-                {listName(m, order.sort)} <TitleBadges titles={m.titles} />
+                {listName(m, order.sort)} <TitleBadges titles={m.titles} role={admitRole(m.level)} />
               </div>
               <div className="row-sub">
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}

@@ -679,6 +679,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   // Filter und Sortierung sind zunächst eingeklappt.
   await expect(page.getByRole('button', { name: 'Filter und Sortierung' })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByLabel('Sortierung')).toBeHidden();
+  // Die Rolle steht wie ein Titel neben dem Namen, solange die Person noch aufzunehmen ist.
+  await expect(page.locator('.row', { hasText: `${last}, Anna` }).locator('.badge-role')).toHaveText('Anwärter');
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberAccount(page);
   page.once('dialog', (d) => d.accept());
