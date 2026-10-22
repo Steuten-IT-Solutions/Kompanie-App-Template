@@ -4,20 +4,49 @@ reihenfolge: 50
 rechte: [manage_points]
 bereiche: [points]
 ---
-Wer die Rolle „{bereich.points} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht.
+Hier trägst du {bereich.points} für ein oder mehrere Mitglieder auf einmal ein, z. B. für alle, die beim Arbeitsdienst geholfen haben. Auch Abzüge gehen hier.
 
-## Vorlagen im {bereich.points}katalog
-Unter **Verwaltung → {bereich.points}katalog** legst du häufige Anlässe mit ihrer Punktzahl an, z. B. „Teilnahme am Sommerfest – 5“: Bezeichnung und {bereich.points} eintragen und **Hinzufügen** tippen. Mit **Wert ändern** passt du die Punktzahl später an. Nicht mehr benötigte Vorlagen lassen sich **deaktivieren** (und wieder **aktivieren**); deaktivierte stehen beim Vergeben nicht zur Auswahl.
+![Das Formular zum Vergeben von Punkten](bild:punkte-vergeben)
 
-## {bereich.points} vergeben
-1. **Verwaltung → {bereich.points} +** öffnen. Für eine einzelne Person geht es auch auf ihrer Seite: Kachel **{bereich.points}** antippen; das Formular gilt dann nur für sie.
-2. Unter **Vorlage aus dem Katalog** eine Vorlage wählen (sie füllt Punktzahl und Grund aus, beides lässt sich noch ändern) oder Punktzahl und Grund selbst eintragen. Das Datum ist heute vorausgewählt. Die Punktzahl ist eine ganze Zahl außer 0, höchstens 10.000; Abzüge gehen mit einer negativen Zahl.
-3. Ein oder mehrere Mitglieder ankreuzen (die Suche hilft bei vielen Namen, **Alle** kreuzt alle gefundenen an) und **{bereich.points} vergeben** tippen.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.points} +**. Mit **‹ Verwaltung** kommst du zurück zur Startseite der Verwaltung.
 
-{bereich.points} gibt es nur für Mitglieder, nicht für Rollen ohne Mitgliederbereich (z. B. Anwärter) oder Gäste. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn er {bereich.points} erhält oder ihm welche abgezogen werden.
+## Was du hier siehst
+- **Vorlage aus dem Katalog**: häufige Anlässe mit fester Punktzahl. „– freie Eingabe –“ heißt: ohne Vorlage.
+- **{bereich.points}**: die Punktzahl, eine ganze Zahl. Für einen Abzug schreibst du ein Minus davor.
+- **Datum**: heute ist vorausgewählt.
+- **Grund**: steht später beim Mitglied im Verlauf.
+- **Mitglieder**: alle Mitglieder zum Ankreuzen, mit **Mitglied suchen …**, **Alle** (bzw. **Keine**) und darunter, wie viele ausgewählt sind.
+- **{bereich.points}faktor der Rolle anwenden**: erscheint nur, wenn jemand Ausgewähltes eine Rolle mit einem anderen Faktor als 1 hat.
 
-## {bereich.points}faktor
-Manche Rollen haben einen {bereich.points}faktor, z. B. ×0,5 für junge Mitglieder; den legt ein {rolle.admin} unter **Verwaltung → Einstellungen → Rollen** fest. Hat eine Rolle einen anderen Faktor als 1, steht er beim Namen, z. B. „×0,5“. Er gilt beim Vergeben und wird mit dem Eintrag gespeichert. Ist so jemand angekreuzt, erscheint **{bereich.points}faktor der Rolle anwenden**; ohne Häkchen zählt der Eintrag für alle voll.
+## So gehst du vor
+### {bereich.points} vergeben
+1. Wähle unter **Vorlage aus dem Katalog** eine Vorlage. Sie füllt **{bereich.points}** und **Grund** aus; beides kannst du noch ändern. Ohne Vorlage trägst du beides selbst ein.
+2. Ändere das **Datum**, wenn der Anlass nicht heute war.
+3. Kreuze die Mitglieder an. Bei vielen Namen hilft die Suche; **Alle** kreuzt alle gefundenen an.
+4. Tippe auf **{bereich.points} vergeben**. Unten erscheint kurz, wie viele Mitglieder die {bereich.points} bekommen haben.
 
-## Stornieren
-Unter **Verwaltung → Mitglieder** das Mitglied öffnen, die Kachel **{bereich.points}** antippen und beim Eintrag auf **Stornieren** tippen. Der Eintrag zählt dann nicht mehr; gespeichert bleibt, wer ihn angelegt und storniert hat.
+![Formular mit Vorlage und zwei ausgewählten Mitgliedern](bild:punkte-vergeben-ausgefuellt)
+
+### {bereich.points} abziehen
+1. Wähle „– freie Eingabe –“ und trage die Punktzahl mit Minus ein, z. B. -2.
+2. Trage den **Grund** ein, kreuze die Mitglieder an und tippe auf **{bereich.points} vergeben**.
+
+### Vorschlag aus einer {bereich.attendance}sliste übernehmen
+Wer zusätzlich die {bereich.attendance} erfasst, kann aus einer {bereich.attendance}sliste heraus {bereich.points} vergeben. Dann öffnet sich dieses Formular mit einem Vorschlag:
+1. Oben steht der Rückweg „‹ …“ mit dem Namen der Liste, darunter „Vorschlag: alle Anwesenden, die für … noch keine {bereich.points} haben.“ Diese Mitglieder sind schon angekreuzt.
+2. **Grund** und **Datum** kommen aus der Liste. Wählst du eine Vorlage, heißt der Grund „Vorlage: Name der Liste“.
+3. Prüfe die Auswahl und tippe auf **{bereich.points} vergeben**. Danach bist du wieder bei der Liste.
+
+## Gut zu wissen
+- Die Punktzahl darf nicht 0 sein und höchstens 10.000 (bzw. -10.000) betragen. Der Grund ist Pflicht.
+- {bereich.points} bekommen nur Mitglieder, keine Gäste.
+- Aus einer {bereich.attendance}sliste bekommt niemand zweimal {bereich.points}: Wer für diese Liste schon welche hat, wird übersprungen.
+- **{bereich.points}faktor**: Manche Rollen haben einen Faktor, z. B. ×0,5 für junge Mitglieder. Er steht in der Auswahl hinter dem Namen, z. B. „×0,5“. Mit Häkchen bei **{bereich.points}faktor der Rolle anwenden** zählt der Eintrag entsprechend weniger (oder mehr); ohne Häkchen zählt er für alle voll. Hat jemand mehrere Rollen, gilt der kleinste Faktor. Den Faktor legt ein {rolle.admin} bei den Rollen in den Einstellungen fest.
+- Wer Benachrichtigungen eingeschaltet hat, bekommt eine Nachricht mit Wert und Grund.
+- Einen falschen Eintrag stornierst du auf der Seite des Mitglieds.
+
+## Siehe auch
+- [{bereich.points}katalog](seite:punktekatalog)
+- [{bereich.points} eines Mitglieds](seite:mitglied-punkte)
+- [Benachrichtigungen](seite:benachrichtigungen)

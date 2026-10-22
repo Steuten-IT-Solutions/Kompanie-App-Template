@@ -1,21 +1,45 @@
 ---
 titel: "{bereich.titles} verwalten"
-reihenfolge: 58
+reihenfolge: 57
 rechte: [manage_titles]
 bereiche: [titles]
 ---
-Wer die Rolle „{bereich.titles} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht. {bereich.titles} sind Ehrentitel und Ämter wie Ehrenmitglied oder Vorsitz, unabhängig von {bereich.ranks} und {bereich.points}.
+Hier legst du die {bereich.titles} an, die Mitglieder tragen können, z. B. Ehrenmitglied oder Schützenkönig, und bestimmst ihre Reihenfolge. Wer welchen Titel hat, änderst du auf der Seite des Mitglieds.
 
-## Liste pflegen
-Unter **Verwaltung → {bereich.titles}** legst du die {bereich.titles} an: Bezeichnung (höchstens 60 Zeichen) eintragen und **Anlegen** tippen. Die Reihenfolge, in der sie überall angezeigt werden, änderst du, indem du einen Titel am Griff links (sechs Punkte) an die gewünschte Stelle ziehst – mit dem Finger oder der Maus. Am Computer geht es auch mit der Tastatur: Griff mit Tab auswählen, dann Pfeil hoch oder runter. **Umbenennen** ändert die Bezeichnung.
+![Die Liste der Titel mit Griff zum Verschieben und den Knöpfen](bild:titel-verwalten)
 
-Ein Titel, den niemand hat, lässt sich **löschen**. Ein Titel, den jemand hat, lässt sich nur umbenennen oder **deaktivieren**: Ein deaktivierter Titel wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.titles}**. Mit **‹ Verwaltung** kommst du zurück.
 
-## {bereich.titles} vergeben
-Im Mitglied (**Verwaltung → Mitglieder**, dann die Kachel **{bereich.titles}** antippen) die passenden {bereich.titles} ankreuzen und **Titel speichern** tippen; ein Häkchen wegnehmen entfernt den Titel. Ein Mitglied kann mehrere {bereich.titles} haben. In der Mitgliederliste stehen die {bereich.titles} neben dem Namen; unter **Filter und Sortierung** filterst du über **Alle {bereich.titles}** die Liste nach einem Titel.
+## Was du hier siehst
+- Alle {bereich.titles} in der Reihenfolge, in der sie überall angezeigt werden, jeweils mit „… × vergeben“ oder „nicht vergeben“. Deaktivierte tragen das Schild „inaktiv“.
+- Links der **Griff** (sechs Punkte) zum Verschieben.
+- Bei jedem Titel **Umbenennen**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen**.
+- Unten das Formular **Neuer Titel** mit **Bezeichnung** und **Anlegen**.
 
-Neue {bereich.titles} bekommt nur, wer Mitglied ist. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seine {bereich.titles}, bis du sie dort entfernst.
+## So gehst du vor
+### Einen Titel anlegen
+1. Trage unter **Neuer Titel** die **Bezeichnung** ein.
+2. Tippe auf **Anlegen**. Der Titel steht danach ganz unten.
 
-Ist ein Titel mit einem Amt verknüpft (Bereich **{bereich.offices}**), vergibt ihn die App über die laufenden Amtszeiten: Wer das Amt hat, bekommt ihn, wer es nicht mehr hat, verliert ihn. Solche Titel lassen sich im Mitglied nicht von Hand ankreuzen; in der Liste steht, welches Amt sie vergibt (siehe **{bereich.offices} verwalten** im Handbuch). Ein verknüpfter Titel lässt sich trotzdem umbenennen; wird er gelöscht, fällt die Verknüpfung weg.
+### Die Reihenfolge ändern
+1. Halte einen Titel am Griff links fest.
+2. Ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert.
 
-Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn ihm ein neuer Titel verliehen wird; beim Entfernen nicht.
+Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter.
+
+### Einen Titel umbenennen
+1. Tippe beim Titel auf **Umbenennen**.
+2. Ändere die **Bezeichnung** und tippe auf **Speichern** (oder **Abbrechen**).
+
+### Einen Titel löschen oder stilllegen
+- Hat niemand den Titel, tippe auf **Löschen** und bestätige.
+- Hat jemand den Titel, geht nur **Deaktivieren**: Er wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
+
+## Gut zu wissen
+- {bereich.titles} sind unabhängig von {bereich.ranks} und {bereich.points}. Ein Mitglied kann mehrere haben.
+- Die Bezeichnung hat höchstens 60 Zeichen, und jede gibt es nur einmal.
+- Ein Titel kann mit einem Amt verknüpft sein (Bereich {bereich.offices}). Dann bekommt ihn, wer das Amt gerade hat, und verliert ihn, wenn die Amtszeit endet. Die Verknüpfung stellst du beim Amt ein. Umbenennen geht trotzdem; löschst du den Titel, fällt die Verknüpfung weg.
+
+## Siehe auch
+- [{bereich.titles} eines Mitglieds](seite:mitglied-titel)

@@ -1,33 +1,60 @@
 ---
 titel: "{bereich.ranks} verwalten"
-reihenfolge: 57
+reihenfolge: 54
 rechte: [manage_ranks]
 bereiche: [ranks]
 ---
-Wer die Rolle „{bereich.ranks} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht.
+Hier legst du fest, welche {bereich.ranks} es bei euch gibt, in welcher Reihenfolge, ab wie vielen {bereich.points} sie erreichbar sind und welches Abzeichen sie haben. Wer welchen {begriff.rank} hat, änderst du auf der Seite des Mitglieds.
 
-## Liste pflegen
-Unter **Verwaltung → {bereich.ranks}** legst du die {bereich.ranks} an, vom niedrigsten zum höchsten: Bezeichnung (und optional eine {bereich.points}schwelle) eintragen und **Anlegen** tippen. Neue {bereich.ranks} kommen ans obere Ende. Mit **niedriger** und **höher** änderst du die Reihenfolge, mit **Ändern** Bezeichnung und {bereich.points}schwelle.
+![Die Liste der Dienstgrade mit Schwellen und Abzeichen](bild:dienstgrade-verwalten)
 
-Ein {begriff.rank}, den niemand hat, lässt sich **löschen**. Ein {begriff.rank}, den jemand hat, lässt sich nur **deaktivieren**: Er wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.ranks}**. Mit **‹ Verwaltung** kommst du zurück.
 
-## Abzeichen
-Zu jedem {begriff.rank} kannst du direkt in dieser Liste ein Abzeichen (Bild) hochladen: **Abzeichen hochladen**, später **Ersetzen** oder **Entfernen**. Welche Dateien gehen, wie das Abzeichen auf hellem und dunklem Hintergrund gut aussieht und was bei SVG zu beachten ist, steht unter [Abzeichen für {bereich.ranks}](seite:dienstgrade-abzeichen).
+## Was du hier siehst
+- Die {bereich.ranks} vom niedrigsten (oben) zum höchsten (unten), jeweils mit Abzeichen, Bezeichnung, Schwelle („ab … {bereich.points}“ oder „ohne Schwelle“) und wie oft er vergeben ist. Deaktivierte tragen das Schild „inaktiv“.
+- Bei jedem {begriff.rank} die Knöpfe **niedriger**, **höher**, **Ändern**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen**.
+- Darunter das Abzeichen: eine Vorschau auf heller und dunkler Fläche („hell“, „dunkel“) mit **Ersetzen** und **Entfernen**, ohne Abzeichen der Knopf **Abzeichen hochladen**.
+- Unten das Formular **Neuer {begriff.rank}** mit **Bezeichnung**, **{bereich.points}schwelle (optional)** und **Anlegen**.
 
-## Befördern und degradieren
-Im Mitglied (**Verwaltung → Mitglieder**, dann das Abzeichen unter dem Namen antippen; ohne {begriff.rank} der Kreis mit „+“) unter **Neuer {begriff.rank}** den {begriff.rank} wählen, optional eine Begründung eintragen und **{begriff.rank} ändern** tippen. Jede Änderung steht im Verlauf des Mitglieds, mit Datum, Begründung und wer sie vorgenommen hat. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn sich sein {begriff.rank} ändert.
+![Ein Dienstgrad mit seinen Knöpfen und der Vorschau des Abzeichens](bild:dienstgrade-verwalten-abzeichen)
 
-Einen {begriff.rank} bekommen nur Mitglieder. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seinen {begriff.rank}; du kannst ihn dort jederzeit auf „Kein {begriff.rank}“ setzen.
+## So gehst du vor
+### Einen {begriff.rank} anlegen
+1. Trage unter **Neuer {begriff.rank}** die **Bezeichnung** ein.
+2. Trage bei Bedarf die **{bereich.points}schwelle** ein: ab wie vielen {bereich.points} man ihn bekommen kann.
+3. Tippe auf **Anlegen**. Der neue {begriff.rank} steht ganz unten, also als höchster.
 
-## Zusammen mit {bereich.points}
-Jeder {begriff.rank} kann eine **{bereich.points}schwelle** haben (eine ganze Zahl ab 0, leer = ohne). Sie wirkt nur, wenn auch {bereich.points} eingeschaltet ist. Die Schwellen müssen mit der Reihenfolge steigen. Dann gilt für alle, auch für {rolle.admin}s:
-- **Befördern** erst, wenn die {bereich.points} des Mitglieds die Schwelle des neuen {begriff.rank}s erreichen. Mehrere {bereich.ranks} auf einmal zu überspringen ist erlaubt.
-- **Degradieren** geht immer, auch wenn die {bereich.points} die Schwelle des aktuellen {begriff.rank}s noch erreichen, z. B. um eine zu hohe Einstufung zu korrigieren. Wer danach die Schwelle eines höheren {begriff.rank}s erreicht, steht unter **Beförderungen** oben.
-- Für {bereich.ranks} ohne Schwelle gelten diese Regeln nicht; trage die Schwellen nach, wenn ihr sie nutzen wollt.
+![Ausgefülltes Formular für einen neuen Dienstgrad](bild:dienstgrade-verwalten-neu)
 
-Die Auswahl unter **Neuer {begriff.rank}** bietet nur an, was nach diesen Regeln erlaubt ist. Wer {bereich.ranks} verwaltet, sieht dafür die Punktestände der Mitglieder, auch ohne selbst {bereich.points} vergeben zu dürfen.
+### Die Reihenfolge ändern
+1. Tippe beim {begriff.rank} auf **niedriger** oder **höher**. Er rückt eine Stufe weiter.
+2. Wiederhole das, bis er an der richtigen Stelle steht.
 
-Unter **Verwaltung → Beförderungen** (nur mit {bereich.points}) stehen alle Mitglieder, die noch einen höheren {begriff.rank} erreichen können, in zwei Abschnitten: unter **Schwelle erreicht** die, deren Schwelle für den nächsten {begriff.rank} mit Schwelle erreicht ist (mit dem Datum, seit dem; die längsten zuerst), darunter unter **Noch nicht erreicht** die übrigen, nach fehlenden {bereich.points} sortiert. Der Schalter **Nur unter der Schwelle des aktuellen {begriff.rank}s** zeigt, wer degradiert werden könnte, mit denselben Abschnitten; dort erscheinen auch Mitglieder mit dem höchsten {begriff.rank}, unter **Höchster {begriff.rank}**. Ein Tipp auf einen Namen öffnet den {begriff.rank} des Mitglieds, mit dem nächsten {begriff.rank} schon vorgeschlagen.
+### Bezeichnung oder Schwelle ändern
+1. Tippe beim {begriff.rank} auf **Ändern**.
+2. Ändere **Bezeichnung** oder **{bereich.points}schwelle**. Leer heißt: ohne Schwelle.
+3. Tippe auf **Speichern** (oder **Abbrechen**).
 
-## Bestehende Mitglieder übernehmen
-Wer zusätzlich Mitglieder anlegen darf, kann beim Anlegen gleich den {begriff.rank} eintragen (mit dem Recht für {bereich.points} auch den Anfangsbestand an {bereich.points} mit Datum). Mit {bereich.points} geht nur ein {begriff.rank}, dessen Schwelle der Anfangsbestand erreicht. Im Verlauf steht das als „Ersteinstufung“.
+### Ein Abzeichen hochladen
+1. Tippe beim {begriff.rank} auf **Abzeichen hochladen** und wähle die Bilddatei.
+2. Prüfe in der Vorschau, ob das Abzeichen auf heller und auf dunkler Fläche gut zu erkennen ist.
+3. Ein anderes Bild nimmst du mit **Ersetzen**, ganz weg geht es mit **Entfernen**.
+
+### Einen {begriff.rank} löschen oder stilllegen
+- Hat niemand den {begriff.rank}, tippe auf **Löschen** und bestätige. Sein Abzeichen wird mit gelöscht.
+- Hat jemand den {begriff.rank}, geht nur **Deaktivieren**: Er wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
+
+## Gut zu wissen
+- Die Bezeichnung hat höchstens 60 Zeichen, und jede gibt es nur einmal.
+- **Schwellen**: eine ganze Zahl ab 0, leer = ohne. Sie müssen mit der Reihenfolge steigen; sonst meldet die App, welche {bereich.ranks} nicht passen. Schwellen wirken nur, wenn es bei euch auch {bereich.points} gibt; sonst steht beim Feld „(wirkt nur mit {bereich.points})“.
+- **Regeln mit Schwelle** (gelten für alle, auch für {rolle.admin}s): Befördern geht erst, wenn die {bereich.points} des Mitglieds die Schwelle des neuen {begriff.rank}s erreichen. Mehrere Stufen auf einmal sind erlaubt. Degradieren geht immer. Für {bereich.ranks} ohne Schwelle gelten keine Regeln; haben noch nicht alle eine, weist die Seite oben darauf hin.
+- **Abzeichen**: PNG, JPG, WebP oder SVG, höchstens 1 MB (PNG, JPG und WebP höchstens 4096 × 4096 Pixel). Etwa 256 Pixel an der längeren Kante reichen; die App verkleinert selbst.
+- Am besten wirkt ein Abzeichen mit **transparentem Hintergrund** (PNG, WebP oder SVG). Die App legt keine Fläche dahinter, und der Hintergrund ist je nach Einstellung des Handys hell oder dunkel. Ein heller Rand um dunkle Teile hilft. JPG hat immer einen eigenen Hintergrund.
+- Das Abzeichen erscheint überall, wo der {begriff.rank} steht: unter **Meins**, in der Mitgliederliste der Verwaltung, auf der Seite eines Mitglieds und unter **Beförderungen**. Wer es einmal gesehen hat, sieht es auch ohne Netz.
+- Bei einer Beförderung zeigt die Benachrichtigung das neue Abzeichen als Bild. Bei einem SVG zeichnet die App dafür beim Hochladen ein Bild; klappt das nicht, steht „Ohne Bild in Benachrichtigungen“ beim {begriff.rank}. Lade das SVG dann erneut hoch, z. B. auf einem anderen Gerät, oder nimm ein PNG.
+- SVG-Dateien werden beim Hochladen bereinigt: Skripte, Verweise nach außen, eingebettete Bilder und fremde Inhalte fallen weg. Ein normales SVG aus einem Grafikprogramm sieht danach gleich aus. Dateien mit einer DOCTYPE-Angabe lehnt die App ab.
+- Ein deaktivierter {begriff.rank} behält sein Abzeichen.
+
+## Siehe auch
+- [{begriff.rank} eines Mitglieds](seite:mitglied-dienstgrad)
