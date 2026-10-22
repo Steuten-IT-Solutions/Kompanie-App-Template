@@ -9,7 +9,7 @@ Zu jedem {begriff.rank} kannst du ein Abzeichen hinterlegen. Es erscheint übera
 Abzeichen pflegst du in derselben Liste, in der du die {bereich.ranks} anlegst; wie das geht, steht unter [{bereich.ranks} verwalten](seite:dienstgrade-verwalten).
 
 ## Hochladen, ersetzen, entfernen
-Unter **Verwaltung → {bereich.ranks}** (Menü oben) tippst du beim {begriff.rank} auf **Abzeichen hochladen** und wählst eine Datei. Ist schon ein Abzeichen da, ersetzt du es mit **Ersetzen** oder löschst es mit **Entfernen**. Je {begriff.rank} gibt es ein Abzeichen; ein deaktivierter {begriff.rank} behält seins. Löschst du einen {begriff.rank}, wird sein Abzeichen mit gelöscht.
+Unter **Verwaltung → {bereich.ranks}** (Knopf auf der Startseite der Verwaltung) tippst du beim {begriff.rank} auf **Abzeichen hochladen** und wählst eine Datei. Ist schon ein Abzeichen da, ersetzt du es mit **Ersetzen** oder löschst es mit **Entfernen**. Je {begriff.rank} gibt es ein Abzeichen; ein deaktivierter {begriff.rank} behält seins. Löschst du einen {begriff.rank}, wird sein Abzeichen mit gelöscht.
 
 Erlaubt sind **PNG, JPG, WebP und SVG**, höchstens **1 MB** (und bei PNG, JPG und WebP höchstens 4096 × 4096 Pixel). Die App verkleinert das Bild selbst für die verschiedenen Größen; ein Bild mit etwa 256 Pixeln an der längeren Kante reicht.
 

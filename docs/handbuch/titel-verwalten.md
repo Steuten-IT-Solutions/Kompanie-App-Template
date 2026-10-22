@@ -4,7 +4,7 @@ reihenfolge: 58
 rechte: [manage_titles]
 bereiche: [titles]
 ---
-Wer die Rolle „{bereich.titles} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Die einzelnen Seiten wählst du dort im Menü oben. {bereich.titles} sind Ehrentitel und Ämter wie Ehrenmitglied oder Vorsitz, unabhängig von {bereich.ranks} und {bereich.points}.
+Wer die Rolle „{bereich.titles} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht. {bereich.titles} sind Ehrentitel und Ämter wie Ehrenmitglied oder Vorsitz, unabhängig von {bereich.ranks} und {bereich.points}.
 
 ## Liste pflegen
 Unter **Verwaltung → {bereich.titles}** legst du die {bereich.titles} an: Bezeichnung (höchstens 60 Zeichen) eintragen und **Anlegen** tippen. Die Reihenfolge, in der sie überall angezeigt werden, änderst du, indem du einen Titel am Griff links (sechs Punkte) an die gewünschte Stelle ziehst – mit dem Finger oder der Maus. Am Computer geht es auch mit der Tastatur: Griff mit Tab auswählen, dann Pfeil hoch oder runter. **Umbenennen** ändert die Bezeichnung.

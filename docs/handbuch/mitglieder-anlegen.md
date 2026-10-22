@@ -3,7 +3,7 @@ titel: Mitglieder anlegen
 reihenfolge: 70
 rechte: [create_users]
 ---
-Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort öffnet sich zuerst die **Mitgliederliste**. Hast du in der Verwaltung noch weitere Aufgaben, wechselst du über das Menü oben (es zeigt gerade **Mitglieder**).
+Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort tippst du auf **Mitglieder** und kommst zur **Mitgliederliste**. Die Startseite der Verwaltung zeigt jede Seite, die du pflegen darfst, als eigenen Knopf mit Symbol; **‹ Verwaltung** führt zurück dorthin. Gibt es für dich nur die Mitgliederliste, öffnet **Verwaltung** sie gleich.
 
 ## Die Mitgliederliste
 - Oben steht **+ Mitglied anlegen**, darunter das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.

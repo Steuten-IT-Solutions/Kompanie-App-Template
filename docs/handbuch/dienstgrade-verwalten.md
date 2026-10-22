@@ -4,7 +4,7 @@ reihenfolge: 57
 rechte: [manage_ranks]
 bereiche: [ranks]
 ---
-Wer die Rolle „{bereich.ranks} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Die einzelnen Seiten wählst du dort im Menü oben.
+Wer die Rolle „{bereich.ranks} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht.
 
 ## Liste pflegen
 Unter **Verwaltung → {bereich.ranks}** legst du die {bereich.ranks} an, vom niedrigsten zum höchsten: Bezeichnung (und optional eine {bereich.points}schwelle) eintragen und **Anlegen** tippen. Neue {bereich.ranks} kommen ans obere Ende. Mit **niedriger** und **höher** änderst du die Reihenfolge, mit **Ändern** Bezeichnung und {bereich.points}schwelle.

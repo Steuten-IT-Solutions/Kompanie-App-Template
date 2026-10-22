@@ -3,7 +3,7 @@ titel: Ersteinrichtung und Bereiche
 reihenfolge: 110
 rechte: [manage_settings]
 ---
-Nach der Installation führt die App jeden {rolle.admin} durch die Einrichtung, bis einer sie abgeschlossen hat. Bis dahin steht oben auf jeder Seite **Willkommen!** mit dem Knopf **Einrichtung starten**. Alles lässt sich später unter **Verwaltung → Einstellungen** ändern (Menü oben in der Verwaltung; Überblick: [Einstellungen im Überblick](seite:admin-einstellungen)).
+Nach der Installation führt die App jeden {rolle.admin} durch die Einrichtung, bis einer sie abgeschlossen hat. Bis dahin steht oben auf jeder Seite **Willkommen!** mit dem Knopf **Einrichtung starten**. Alles lässt sich später unter **Verwaltung → Einstellungen** ändern (Knopf auf der Startseite der Verwaltung; Überblick: [Einstellungen im Überblick](seite:admin-einstellungen)).
 
 ## Ablauf der Einrichtung
 1. **Bereiche wählen** (siehe unten), dann **Weiter**. Diesen Schritt kannst du nicht überspringen.

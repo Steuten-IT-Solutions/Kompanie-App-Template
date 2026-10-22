@@ -4,7 +4,7 @@ reihenfolge: 50
 rechte: [manage_points]
 bereiche: [points]
 ---
-Wer die Rolle „{bereich.points} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Die einzelnen Seiten wählst du dort im Menü oben.
+Wer die Rolle „{bereich.points} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht.
 
 ## Vorlagen im {bereich.points}katalog
 Unter **Verwaltung → {bereich.points}katalog** legst du häufige Anlässe mit ihrer Punktzahl an, z. B. „Teilnahme am Sommerfest – 5“: Bezeichnung und {bereich.points} eintragen und **Hinzufügen** tippen. Mit **Wert ändern** passt du die Punktzahl später an. Nicht mehr benötigte Vorlagen lassen sich **deaktivieren** (und wieder **aktivieren**); deaktivierte stehen beim Vergeben nicht zur Auswahl.

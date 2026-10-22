@@ -14,7 +14,7 @@ import {
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
 import { navigate } from '../router';
-import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
+import { AdminBack, AdminMenu, adminTabs, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
 import { RankLabel } from '../RankBadge';
@@ -55,11 +55,12 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
 
-  const subs = adminTabs().filter((t) => !t.route);
-  const active: Sub = subs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
-  // Ohne Mitgliederliste (z. B. nur Schwarzes Brett): gleich den ersten Bereich öffnen.
-  const first = adminTabs()[0];
-  const redirect = !memberListAllowed() && !sub && first?.route ? first.route : null;
+  const tabs = adminTabs();
+  const subs = tabs.filter((t) => !t.route);
+  // Ohne Unterseite die Startseite mit allen Bereichen; gibt es nur einen, öffnet er gleich.
+  const only = tabs.length === 1 ? tabs[0] : null;
+  const active: Sub | null = subs.some((t) => t.id === sub) ? (sub as Sub) : !sub && only && !only.route ? (only.id as Sub) : null;
+  const redirect = !sub && only?.route ? only.route : null;
   useEffect(() => {
     if (redirect) navigate(redirect);
   }, [redirect]);
@@ -67,7 +68,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 
   return (
     <div>
-      <AdminNav active={active} />
+      {active && !(active === 'anwesenheit' && arg) && fromList === null && <AdminBack />}
       {sub === 'mitglied' && arg ? (
         <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
@@ -90,8 +91,10 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <TitleList onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
-      ) : (
+      ) : active === 'mitglieder' ? (
         <Members />
+      ) : (
+        <AdminMenu />
       )}
     </div>
   );

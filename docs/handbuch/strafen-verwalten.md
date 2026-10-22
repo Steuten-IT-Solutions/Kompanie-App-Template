@@ -4,7 +4,7 @@ reihenfolge: 55
 rechte: [manage_penalties]
 bereiche: [penalties]
 ---
-Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Die einzelnen Seiten wählst du dort im Menü oben.
+Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Recht hat, findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Er beginnt mit einer Übersicht, in der jede Seite ein eigener Knopf mit Symbol ist; **‹ Verwaltung** führt von einer Seite zurück zur Übersicht.
 
 ## Eintrag anlegen
 1. **Verwaltung → {bereich.penalties} +** öffnen. Alternativ im Mitglied unter **Übersicht** auf **{bereich.penalties}: Eintrag** tippen; dann ist das Mitglied schon angekreuzt.

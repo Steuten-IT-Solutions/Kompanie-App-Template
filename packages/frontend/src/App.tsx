@@ -11,7 +11,7 @@ import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
 import { navigate, useRoute } from './router';
-import { AdminNav, adminTabs } from './adminNav';
+import { AdminBack, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
 import News from './views/News';
@@ -275,8 +275,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
   const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : start;
-  // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Menü oben, Tab unten).
+  // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Knopf dort, Tab unten).
   const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
+  // „‹ Verwaltung“ nur auf der Seite, zu der der Knopf führt; Unterseiten haben ihren eigenen Rückweg.
+  const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === path.join('/');
   const activeTab: View = adminView ? 'verwaltung' : tab;
 
   const [toast, setToast] = useState<string | null>(notice);
@@ -433,7 +435,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ))}
             {tab === 'meins' && <Meins sub={path[1]} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
-            {adminView && <AdminNav active={adminView} />}
+            {adminStart && <AdminBack />}
             {tab === 'brett' && <Brett onToast={showToast} />}
             {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
             {tab === 'inventar' && <Inventar path={path.slice(1)} onToast={showToast} />}

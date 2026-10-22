@@ -4,7 +4,7 @@ reihenfolge: 63
 rechte: [post_board]
 bereiche: [board]
 ---
-Wer ans {bereich.board} schreiben darf (Rolle „{bereich.board} verwalten“ oder eine Rolle mit diesem Recht), findet es unter **Verwaltung** → **{bereich.board}** (Menü oben). Ist das deine einzige Aufgabe in der Verwaltung, öffnet **Verwaltung** gleich das Brett. Steht schon eine Nachricht am Brett, führt auch **Brett öffnen und bearbeiten** im Banner dorthin.
+Wer ans {bereich.board} schreiben darf (Rolle „{bereich.board} verwalten“ oder eine Rolle mit diesem Recht), findet es unter **Verwaltung** → **{bereich.board}** (Knopf auf der Startseite der Verwaltung). Ist das deine einzige Aufgabe in der Verwaltung, öffnet **Verwaltung** gleich das Brett. Steht schon eine Nachricht am Brett, führt auch **Brett öffnen und bearbeiten** im Banner dorthin.
 
 ## Schreiben
 Unter **Neue Nachricht** den Text eingeben (höchstens 500 Zeichen, Zeilenumbrüche bleiben erhalten) und **Veröffentlichen** tippen. Die App fragt noch einmal nach, denn dann geht es sofort los:

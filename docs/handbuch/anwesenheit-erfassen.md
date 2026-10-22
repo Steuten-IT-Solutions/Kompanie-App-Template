@@ -4,7 +4,7 @@ reihenfolge: 59
 rechte: [manage_attendance]
 bereiche: [attendance]
 ---
-Wer die Rolle „{bereich.attendance} verwalten“ oder eine Rolle mit diesem Recht hat, führt unter **Verwaltung → {bereich.attendance}** (Menü oben) je Termin eine Liste, wer **anwesend** war, wer **entschuldigt** war und wer **fehlt**.
+Wer die Rolle „{bereich.attendance} verwalten“ oder eine Rolle mit diesem Recht hat, führt unter **Verwaltung → {bereich.attendance}** (Knopf auf der Startseite der Verwaltung) je Termin eine Liste, wer **anwesend** war, wer **entschuldigt** war und wer **fehlt**.
 
 ## Liste anlegen
 - **Termin aus dem Kalender:** Ist {bereich.calendar} eingeschaltet und eingerichtet, stehen dort die Termine der letzten 90 Tage, die jüngsten zuerst (weitere mit **Ältere Termine anzeigen**). Ein Tipp öffnet die Liste zu diesem Termin; gibt es sie schon („Liste vorhanden“), öffnet sich die vorhandene.
