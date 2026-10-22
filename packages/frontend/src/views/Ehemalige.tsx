@@ -48,6 +48,8 @@ export function FormerList() {
   const { data, error, loading, reload } = useAsync(() => api.formerMembers(), [], 'former-members');
   const [query, setQuery] = useState('');
   const [reason, setReason] = useState<FormerReason | ''>('');
+  // Filter und Sortierung zunächst eingeklappt, wie in der Mitgliederliste.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Wie die Mitgliederliste (gemerkt je Gerät); gemerkt nach Punkten gilt hier der Nachname.
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   const order = orderFor(stored, FORMER_SORTS);
@@ -97,49 +99,65 @@ export function FormerList() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Ehemalige suchen"
       />
-      <select
-        className="role-filter"
-        value={reason}
-        onChange={(e) => setReason(e.target.value as FormerReason | '')}
-        aria-label="Nach Grund filtern"
+      <button
+        type="button"
+        className="member-filters-toggle"
+        aria-expanded={filtersOpen}
+        aria-controls="former-filters"
+        onClick={() => setFiltersOpen(!filtersOpen)}
       >
-        <option value="">Alle Gründe</option>
-        {(Object.keys(REASON_OPTIONS) as FormerReason[]).map((r) => (
-          <option key={r} value={r}>
-            {REASON_OPTIONS[r]}
-          </option>
-        ))}
-      </select>
-      <div className="field-row member-sort">
-        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
-        <div className="field">
-          <span id="former-sort-label">Sortierung</span>
-          <select
-            aria-labelledby="former-sort-label"
-            value={order.sort}
-            onChange={(e) => {
-              const sort = e.target.value as MemberSort;
-              changeOrder({ sort, dir: defaultDir(sort) });
-            }}
-          >
-            {FORMER_SORTS.map((s) => (
-              <option key={s} value={s}>
-                {MEMBER_SORT_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field member-sort-dir">
-          <span id="former-sort-dir-label">Reihenfolge</span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-labelledby="former-sort-dir-label former-sort-dir-value"
-            title="Reihenfolge umkehren"
-            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
-          >
-            <span id="former-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
-          </button>
+        Filter und Sortierung
+        {/* Hinweis am eingeklappten Bereich, damit ein gesetzter Filter nicht übersehen wird (die Sortierung zählt nicht). */}
+        {reason !== '' && <span className="badge badge-role">aktiv</span>}
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      <div id="former-filters" className="member-filters" hidden={!filtersOpen}>
+        <select
+          className="role-filter"
+          value={reason}
+          onChange={(e) => setReason(e.target.value as FormerReason | '')}
+          aria-label="Nach Grund filtern"
+        >
+          <option value="">Alle Gründe</option>
+          {(Object.keys(REASON_OPTIONS) as FormerReason[]).map((r) => (
+            <option key={r} value={r}>
+              {REASON_OPTIONS[r]}
+            </option>
+          ))}
+        </select>
+        <div className="field-row member-sort">
+          {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+          <div className="field">
+            <span id="former-sort-label">Sortierung</span>
+            <select
+              aria-labelledby="former-sort-label"
+              value={order.sort}
+              onChange={(e) => {
+                const sort = e.target.value as MemberSort;
+                changeOrder({ sort, dir: defaultDir(sort) });
+              }}
+            >
+              {FORMER_SORTS.map((s) => (
+                <option key={s} value={s}>
+                  {MEMBER_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field member-sort-dir">
+            <span id="former-sort-dir-label">Reihenfolge</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-labelledby="former-sort-dir-label former-sort-dir-value"
+              title="Reihenfolge umkehren"
+              onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+            >
+              <span id="former-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+            </button>
+          </div>
         </div>
       </div>
       <ul className="card-list">
