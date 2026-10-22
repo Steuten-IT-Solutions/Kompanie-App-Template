@@ -42,6 +42,7 @@ final class ApiScenario
             $this->directory();
             $this->offices();
             $this->accounts();
+            $this->formerMembers();
             $this->events();
             $this->push();
             $this->reports();
@@ -1254,6 +1255,46 @@ final class ApiScenario
         $detail = $this->req('GET', "/members/$b");
         $c->ok($detail[0] === 404 || ($detail[1]['level'] ?? '') === 'guest', 'Entfernt: gelöscht bzw. (WordPress) Gast ohne Rolle');
         $c->ok($this->req('DELETE', "/members/$admin")[0] === 400, 'Eigenes Konto → 400');
+    }
+
+    /** Ehemalige Mitglieder: Konto stilllegen (Daten bleiben), Anmeldung gesperrt (eigenständig), wieder aufnehmen, Import. */
+    private function formerMembers(): void
+    {
+        $c = $this->c;
+        $c->section('Ehemalige Mitglieder');
+        $admin = $this->user('kptest_ehem_admin', 'admin');
+        $m = $this->user('kptest_ehem_m', 'member');
+        $this->d->setPassword($m, 'kptest-passwort-1');
+        $this->d->actAs($admin);
+        $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 3, 'reason' => 'Kptest Ehemalig']);
+        [$s, $d] = $this->req('PUT', "/members/$m/former", ['reason' => 'deceased', 'joined_on' => '1980', 'left_on' => '14.03.2024']);
+        $c->ok($s === 200 && ($d['reason'] ?? '') === 'deceased' && ($d['left_on'] ?? '') === '2024-03-14' && ($d['previous_level'] ?? '') === 'member', 'Als verstorben eintragen');
+        $c->ok(!in_array($m, array_column((array) $this->req('GET', '/members')[1], 'id'), true), 'Nicht mehr in der Mitgliederliste');
+        $former = array_column((array) $this->req('GET', '/members/former')[1], null, 'id');
+        $c->ok((float) ($former[$m]['points'] ?? 0) === 3.0, 'In der Liste der Ehemaligen, Punkte bleiben');
+        $c->ok(($this->req('GET', "/members/$m")[1]['level'] ?? '') === 'guest', 'Rolle Gast');
+        $c->ok($this->req('PATCH', "/members/$m/role", ['level' => 'member'])[0] === 400, 'Rolle ändern erst nach „Wieder aufnehmen“ → 400');
+        if ($this->d->canAssignAdmin()) {
+            $this->d->actAs(null);
+            $c->ok($this->req('POST', '/auth/login', ['username' => 'kptest_ehem_m', 'password' => 'kptest-passwort-1'])[0] >= 400, 'Anmeldung gesperrt');
+            $this->d->actAs($admin);
+        }
+        [$s, $d] = $this->req('DELETE', "/members/$m/former");
+        $c->ok($s === 200 && ($d['level'] ?? '') === 'member', 'Wieder aufnehmen: Rolle von vorher');
+        $c->ok(in_array($m, array_column((array) $this->req('GET', '/members')[1], 'id'), true), 'Wieder in der Mitgliederliste');
+
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        $csv = "Vorname;Nachname;Eintritt;Ausgeschieden;Grund\nKptest$sfx;Altmann;Gründer;01.06.1977;\nKptest$sfx;Seemann;1990;2001;verstorben\n";
+        [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv]);
+        $c->ok($s === 200 && ($d['new'] ?? 0) === 2 && ($d['applied'] ?? true) === false, 'Import: Vorschau');
+        [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
+        $imported = array_values(array_filter((array) $this->req('GET', '/members/former')[1], static fn (array $f): bool => str_starts_with((string) ($f['name'] ?? ''), "Kptest$sfx ")));
+        foreach ($imported as $f) {
+            $this->users[] = (int) $f['id'];
+        }
+        $c->ok($s === 200 && ($d['applied'] ?? false) === true && count($imported) === 2, 'Import: Konten angelegt und als ehemalig eingetragen');
+        [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
+        $c->ok($s === 200 && ($d['new'] ?? -1) === 0 && ($d['existing'] ?? 0) === 2, 'Import: zweiter Lauf legt nichts doppelt an');
     }
 
     private function events(): void

@@ -7,7 +7,7 @@ Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), fi
 
 ## Die Mitgliederliste
 - Ganz oben steht, wie viele Personen es je Gruppe gibt (ohne Gäste): zuerst {rolle.member}, dann eigene Rollen, die gesondert zählen, in ihrer Reihenfolge (z. B. Anwärter). Die Gruppen sind dieselben wie im Zähler der {bereich.attendance} (Einstellungen → Rollen → {bereich.attendance}); Suche und Rollenfilter ändern den Zähler nicht.
-- Darunter steht **+ Mitglied anlegen**, dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
+- Darunter stehen **+ Mitglied anlegen** und **Ehemalige** (ausgetretene und verstorbene Mitglieder, siehe [Ehemalige Mitglieder](seite:ehemalige-mitglieder)), dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
 - In der Liste stehen auch Personen mit Rollen nur für den internen Kalender (z. B. Anwärter).
 - **Filter und Sortierung** ist zunächst eingeklappt; ein Tipp klappt es auf. Darin stehen die Filter nach Rolle und {bereich.titles}, die Sortierung und das Häkchen für Gast-Konten. Ist ein Filter gesetzt, steht am eingeklappten Bereich **aktiv**.
 - **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** gibt es nur für alle, die auch Rollen vergeben dürfen.
@@ -50,6 +50,8 @@ Im Mitglied unter **Konto und Rolle**, Abschnitt **Konto**: **Angaben ändern** 
 Konten aus der Zeit, als es nur ein Namensfeld gab, hat die App beim Update geteilt: Das letzte Wort ist der Nachname, der Rest der Vorname. Bei Namen wie „Maria von Berg“ stimmt das nicht; dann hier korrigieren. Mit WordPress bleiben Vor- und Nachnamen, die schon im Profil gepflegt waren.
 
 **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, Geburtstag, Foto, Antworten bei Umfragen und Benachrichtigungen; ohne WordPress werden auch alle ihre Geräte abgemeldet. Was die Person für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“ statt des Namens. Zur Sicherheit fragt die App nach und lässt den Namen (Vor- und Nachname) eintippen. Mit WordPress heißt der Knopf **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Ein Konto ganz löschen geht dort im WordPress-Backend unter *Benutzer*; auch dann löscht die App alle seine Daten. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen.
+
+Wer nur ausgetreten oder verstorben ist, muss nicht gelöscht werden: Unter **Konto und Rolle → Ehemalig** eingetragen, bleiben alle Daten erhalten (siehe [Ehemalige Mitglieder](seite:ehemalige-mitglieder)).
 
 ## Passwort vergessen
 Im Mitglied unter **Konto und Rolle** auf **Passwort vergessen? Neues Startpasswort erzeugen** tippen. Das bisherige Passwort gilt danach nicht mehr, und das Mitglied wird auf allen Geräten abgemeldet. Das neue Startpasswort steht nur jetzt da; darunter steht der Link zur Installationsanleitung, falls die App noch nicht auf dem Handy ist.

@@ -294,11 +294,14 @@ function plainName(s: string): string {
 export function AccountPanel({
   id,
   level,
+  former = false,
   onChanged,
   onToast,
 }: {
   id: number;
   level: Level;
+  /** ehemalig: Der Hinweis auf „Als ehemalig eintragen“ entfällt */
+  former?: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -422,6 +425,8 @@ export function AccountPanel({
                 Person werden gelöscht
                 {wordpress ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App).' : ', das Konto auch.'} Das lässt sich nicht
                 rückgängig machen.
+                {!former &&
+                  ' Wer nur ausgetreten oder verstorben ist, lässt sich stattdessen als ehemalig eintragen; dann bleiben die Daten.'}
               </p>
               <label className="field">
                 <span>Zur Bestätigung den Namen eintippen</span>

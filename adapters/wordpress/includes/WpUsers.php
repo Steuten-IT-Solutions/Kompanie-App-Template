@@ -320,6 +320,51 @@ final class WpUsers implements UserDirectory, AuthContext
     }
 
     /**
+     * Ehemaliges Mitglied: Rolle Gast in der App, frühere WP-Rollen der App entfernen, alle Sitzungen beenden. Anders als
+     * removeAccount() bleibt die Konto-Markierung: Das Konto gehört weiter zur Kompanie, wieder aufnehmen darf deshalb
+     * auch, wer nur „Mitglieder anlegen“ aus der App hat. Die Anmeldung an der Webseite sperrt WordPress nicht; in der App
+     * sieht die Person nur, was Gäste sehen.
+     */
+    public function deactivate(int $id): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
+            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        update_user_option($id, self::ROLE_META, AppRoles::GUEST, false);
+        $user->remove_role(Roles::ROLE_MANAGER);
+        $user->remove_role(Roles::ROLE_ORGANIZER);
+        $user->remove_role(Roles::ROLE_MEMBER);
+        if (empty($user->roles)) {
+            $user->add_role('subscriber');
+        }
+        \WP_Session_Tokens::get_instance($id)->destroy_all();
+        clean_user_cache($id);
+    }
+
+    /** Wieder aufnehmen: Rolle in der App (und für Mitglieder die frühere WP-Rolle) setzen, geprüft wie deactivate(). */
+    public function reactivate(int $id, string $role): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if ($role === AppRoles::ADMIN) {
+            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        update_user_option($id, self::ROLE_META, $role, false);
+        if (isset(self::LEGACY_WP_ROLES[$role])) {
+            $user->add_role(self::LEGACY_WP_ROLES[$role]);
+        }
+        clean_user_cache($id);
+    }
+
+    /**
      * Braucht das Ändern dieses Kontos das Recht aus WordPress (statt „Mitglieder anlegen“ aus der App)? Ja für Benutzer
      * der Webseite (Redakteure, Administratoren, eigene WP-Rollen), für Konten, die nicht von der Kompanie sind
      * (ACCOUNT_META), und bei Multisite für Konten, die auch zu anderen Seiten des Netzwerks gehören: Dort könnten sie

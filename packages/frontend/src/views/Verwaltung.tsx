@@ -42,6 +42,7 @@ import {
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
+import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 
 type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'aemter' | 'anwesenheit';
 
@@ -53,7 +54,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'ehemalige' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -77,6 +78,10 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
+      ) : sub === 'ehemalige' && arg === 'import' && can('create_users') ? (
+        <FormerImport onToast={onToast} />
+      ) : sub === 'ehemalige' && can('create_users') ? (
+        <FormerList />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -204,9 +209,14 @@ function Members() {
         </p>
       )}
       {can('create_users') && (
-        <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
-          + Mitglied anlegen
-        </button>
+        <div className="button-row add-member">
+          <button className="btn" onClick={() => navigate('verwaltung/neu')}>
+            + Mitglied anlegen
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate('verwaltung/ehemalige')}>
+            Ehemalige
+          </button>
+        </div>
       )}
       <input
         className="search"
@@ -373,9 +383,15 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-        ‹ Alle Mitglieder
-      </button>
+      {m.former ? (
+        <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+          ‹ Ehemalige
+        </button>
+      ) : (
+        <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+          ‹ Alle Mitglieder
+        </button>
+      )}
       <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
       {(m.rank_title || avatar) && (
         <p className="member-rank-line">
@@ -408,7 +424,11 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
             onToast={onToast}
           />
           <p className="muted small member-level">
-            {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
+            {m.former
+              ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)}): ${formerSummary(m.former)}`
+              : (m.extra_roles ?? []).length > 0
+                ? `Rollen: ${roleLabels(m)}`
+                : `Rolle: ${levelLabel(m.level)}`}
             {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
           </p>
           <div className="stats">
@@ -436,7 +456,10 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'konto' && (
         <>
-          <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
+          {!m.former && (
+            <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          )}
           {m.rights && (
             <MemberRightsPanel
               key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
@@ -461,9 +484,13 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               Als {levelLabel('member')} aufnehmen
             </button>
           )}
-          <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
+          {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+          {/* Gäste gehören nicht zur Kompanie; m.former fehlt bei älteren Servern (dann kein Bereich). */}
+          {can('create_users') && m.id !== config?.user?.id && m.former !== undefined && (m.former !== null || m.level !== 'guest') && (
+            <FormerPanel id={m.id} name={m.name} former={m.former} openCents={m.open_cents} onChanged={reload} onToast={onToast} />
+          )}
           {can('create_users') && m.id !== config?.user?.id && (
-            <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+            <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
           )}
         </>
       )}

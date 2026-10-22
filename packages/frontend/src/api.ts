@@ -388,6 +388,65 @@ export interface MemberDetail extends MemberSummary {
   rights?: MemberRights | null;
   /** Ob man das Foto hochladen, ersetzen und entfernen darf (create_users und dieses Konto verwalten) */
   photo_editable?: boolean;
+  /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
+  former?: FormerInfo | null;
+}
+
+/** Grund des Ausscheidens */
+export type FormerReason = 'left' | 'deceased' | 'other';
+
+/** Angaben zu einem ehemaligen Mitglied. Daten als JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer. */
+export interface FormerInfo {
+  reason: FormerReason;
+  joined_on: string;
+  /** Gründungsmitglied */
+  founder: boolean;
+  left_on: string;
+  /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
+  previous_level: Level;
+}
+
+/** Eintrag der Liste „Ehemalige“ (create_users). */
+export interface FormerMember extends FormerInfo {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  /** null: nur wer Punkte bzw. Strafen vergibt */
+  points: number | null;
+  open_cents: number | null;
+}
+
+export interface FormerInput {
+  reason: FormerReason;
+  joined_on: string;
+  founder: boolean;
+  left_on: string;
+}
+
+/** Zeile der Vorschau beim Import der Ehemaligen */
+export interface FormerImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  reason?: FormerReason;
+  joined_on?: string;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface FormerImportResult {
+  rows: FormerImportRow[];
+  new: number;
+  existing: number;
+  /** Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden */
+  offices_linked?: number;
+  applied: boolean;
 }
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
@@ -1075,6 +1134,11 @@ export const api = {
   updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
+  formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
+  markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
+  updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
+  reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
+  importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
   createUser: (
     data: PersonName & {
       username?: string;

@@ -138,6 +138,10 @@ final class SessionAuth implements Authenticator, AuthContext
         if (!password_verify($password, $hash) || !$row) {
             throw new ApiError(400, 'login_failed', 'Benutzername oder Passwort ist falsch.');
         }
+        // Erst nach dem Passwort prüfen: Sonst verriete die Meldung ohne Passwort, dass es das Konto gibt.
+        if (PdoUsers::isDisabled($row)) {
+            throw new ApiError(403, 'account_disabled', 'Dieses Konto ist nicht mehr aktiv. Bitte wende dich an die Kompanie.');
+        }
         $this->throttle->success($account, $ip, $knownDevice);
         $this->users->rehashIfNeeded($id, $password, $hash);
         $this->users->touchLogin($id);
