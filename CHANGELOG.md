@@ -22,6 +22,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   auf einer neu installierten WordPress-Seite unter derselben Adresse die Konten mit ihrer bisherigen Nummer wieder an;
   alle melden sich wie gewohnt an. Vorhandene Konten bleiben, wie sie sind, und bekommen nur ihre Rolle in der App
   zurück. Passen Konten nicht zusammen, ändert das Wiederherstellen nichts und sagt, welches Konto stört.
+- **Dokumente, Abzeichen und Benachrichtigungen in der Datensicherung**: Die Sicherung enthält jetzt auch die Dateien
+  der Dokumente und die Abzeichen der Dienstgrade sowie die Anmeldungen der Geräte für Benachrichtigungen. Nach dem
+  Wiederherstellen auf einem neuen Server lassen sich die Dokumente öffnen, und Benachrichtigungen kommen weiter an.
+- **Sicherungen in Google Drive**: Unter *Einstellungen → Datensicherung* legt die App auf Wunsch einmal pro Woche eine
+  Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und behält die letzten acht. So liegt auch nach dem
+  Verlust des Servers eine aktuelle Sicherung woanders. Dafür einmal unter *Google-Zugang* die Verbindung trennen und
+  neu verbinden und dabei das Häkchen für eigene Dateien in Google Drive setzen.
 
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
@@ -30,6 +37,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
+  (heruntergeladen oder in Google Drive).
 - **Punkte in der Mitgliederliste der Verwaltung** stehen nur noch, wenn die Liste nach Punkten sortiert ist, wie
   schon der Eintritt bei der Sortierung nach Eintritt. Offene Strafen stehen weiter immer da.
 - **Shortcodes auf der Webseite**: `[kompanie_mitglieder]` sieht aus wie eine Bildergalerie: Fotos im Hochformat

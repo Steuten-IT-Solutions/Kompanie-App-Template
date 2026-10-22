@@ -838,7 +838,7 @@ $res = rest_do_request(new WP_REST_Request('POST', '/kpwp-alt/v1/push/status'));
 $c->ok($res->get_status() !== 404, 'Push-Routen im Alias erreichbar (Status ' . $res->get_status() . ')');
 
 $c->section('Datensicherung und Update');
-$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name());
+$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name(), $app->files);
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'vorher');
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state', ['serial' => 5]);
 $app->cache->increment('backup_test', 900);
@@ -860,6 +860,18 @@ try {
 } catch (RuntimeException $e) {
     $c->ok(str_contains($e->getMessage(), 'anderen Website'), 'Sicherung einer anderen Website wird abgelehnt');
 }
+
+// Dateien der Dokumente: in der Sicherung, nach dem Verlust wieder da.
+$docId = $app->db->insert('documents', ['title' => 'Satzung (Sicherung)', 'category_id' => null, 'doc_date' => '2026-01-01', 'visibility' => 'members', 'file' => 'dok-sicherungstest.pdf', 'ext' => 'pdf', 'size' => 9, 'version' => 'v1', 'uploaded_by' => $admin, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00']);
+$docPath = $app->files->path('dokumente/dok-sicherungstest.pdf', false);
+file_put_contents($docPath, '%PDF-test');
+$withFile = $backup->export();
+$c->ok(base64_decode((string) ($withFile['files']['dokumente/dok-sicherungstest.pdf'] ?? '')) === '%PDF-test', 'Sicherung enthält die Dateien der Dokumente');
+unlink($docPath);
+$backup->import((string) json_encode($withFile));
+$c->ok(is_file($docPath) && file_get_contents($docPath) === '%PDF-test', 'Wiederherstellen legt die Dateien der Dokumente wieder ab');
+$app->db->execute('DELETE FROM {documents} WHERE id = ?', [$docId]);
+unlink($docPath);
 
 // Konten (WordPress-Benutzer) in der Sicherung: nach dem Verlust der Website mit derselben ID wieder angelegt.
 $verloren = wp_insert_user(['user_login' => 'kpwp_verloren', 'user_pass' => 'Geheim-123', 'user_email' => 'verloren@example.com', 'display_name' => 'Vera Loren', 'first_name' => 'Vera', 'last_name' => 'Loren', 'role' => 'subscriber']);

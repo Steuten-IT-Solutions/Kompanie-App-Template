@@ -3871,7 +3871,8 @@ paths:
       summary: Datensicherung herunterladen
       description: |
         Gemeinsames Format `kompanie-app-backup` (Tabellen, Einstellungen und Konten mit Passwort-Hashes:
-        eigenständige Version in `tables.users`, WordPress als `accounts` mit den Benutzern der Website).
+        eigenständige Version in `tables.users`, WordPress als `accounts` mit den Benutzern der Website;
+        dazu unter `files` die Dateien der Dokumente und Abzeichen als Base64 sowie die Push-Abos).
         Enthält Zugangsschlüssel – sicher aufbewahren.
       x-capability: manage_settings
       responses:
@@ -3915,6 +3916,50 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/drive:
+    get:
+      tags: [Wartung]
+      summary: Sicherungen in Google Drive – Stand
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Sicherungen in Google Drive ein- oder ausschalten
+      description: |
+        Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
+        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen
+        eigenen Ordner im verbundenen Google-Konto und behält die letzten acht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/drive/upload:
+    post:
+      tags: [Wartung]
+      summary: Sicherung jetzt in Google Drive hochladen
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
 
   /admin/setup/done:
     post:
@@ -3977,6 +4022,24 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    BackupDriveStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, access, enabled, email, folder_url, last_ok, last_try, error, every_days, keep]
+            properties:
+              available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
+              access: { type: boolean, description: Google hat drive.file erlaubt }
+              enabled: { type: boolean }
+              email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
+              folder_url: { type: [string, 'null'] }
+              last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
+              last_try: { type: [integer, 'null'] }
+              error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
+              every_days: { type: integer }
+              keep: { type: integer }
     PushStatus:
       description: OK
       content:

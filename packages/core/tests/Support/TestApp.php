@@ -11,6 +11,7 @@ use KompanieApp\Core\Infra\ArrayCache;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Infra\NullNewsSource;
+use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
@@ -56,6 +57,7 @@ final class TestApp
         array $packageConfig = [],
         ?NullScheduler $scheduler = null,
         ?NewsSource $news = null,
+        ?BackupProvider $backup = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -73,6 +75,7 @@ final class TestApp
             authenticator: $users,
             users: $users,
             config: new KompanieConfig($config),
+            backup: $backup,
             packageConfig: $packageConfig,
         );
         $users->capabilities = static fn (string $role, int $id): array => $app->roles()->capabilitiesFor($id, $role);

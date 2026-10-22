@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
+use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\BugReportService;
@@ -89,6 +90,7 @@ final class App
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
+        BackupUploadService::TASK => BackupUploadService::INTERVAL,
     ];
 
     /**
@@ -214,6 +216,8 @@ final class App
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
             // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Einreihen vorgezogen; nur mit Empfänger.
             BugReportService::TASK => $this->bugReports()->available(),
+            // Sicherung in Google Drive: täglich prüfen, wöchentlich hochladen.
+            BackupUploadService::TASK => $this->backupUpload()->active(),
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -273,6 +277,8 @@ final class App
                 $this->birthdays()->notifyToday();
             } elseif ($task === BugReportService::TASK) {
                 $this->bugReports()->runTask();
+            } elseif ($task === BackupUploadService::TASK) {
+                $this->backupUpload()->runTask();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -544,6 +550,12 @@ final class App
             $this->packageConfig,
             $this->telemetry(),
         ));
+    }
+
+    /** Sicherungen automatisch in Google Drive */
+    public function backupUpload(): BackupUploadService
+    {
+        return $this->service(BackupUploadService::class, fn () => new BackupUploadService($this));
     }
 
     public function status(): StatusService

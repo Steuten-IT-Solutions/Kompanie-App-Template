@@ -6,13 +6,15 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Port\BackupProvider;
+use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Migrator;
 
 /**
- * Datensicherung im WordPress-Plugin: Daten des Kerns, Einstellungen (Options mit Präfix) und die Konten der Website
+ * Datensicherung im WordPress-Plugin: Daten des Kerns mit den Dateien der Dokumente und Abzeichen (Backup::dumpFiles),
+ * Einstellungen (Options mit Präfix) und die Konten der Website
  * (accounts: WordPress-Benutzer mit Passwort-Hash, Namen, WP-Rollen und Rolle in der App). Die Daten verweisen auf die
  * IDs der Benutzer. Deshalb lässt sich eine Sicherung nur auf derselben Website (Adresse) wiederherstellen: nach einem
  * missglückten Update oder nach dem Verlust der Website auf einer neu installierten WordPress-Seite.
@@ -30,13 +32,19 @@ final class WpBackup implements BackupProvider
     /** Frühere WP-Rollen der App: Beim Wiederherstellen vorhandener Konten ändern sich nur diese WP-Rollen. */
     private const APP_WP_ROLES = [Roles::ROLE_MEMBER, Roles::ROLE_ORGANIZER, Roles::ROLE_MANAGER];
 
-    public function __construct(private readonly Connection $db, private readonly string $version, private readonly string $kompanie)
-    {
+    /** @param FileStorage|null $files geschützte Dateiablage (Dokumente, Abzeichen); ohne sie bleiben die Dateien außen vor */
+    public function __construct(
+        private readonly Connection $db,
+        private readonly string $version,
+        private readonly string $kompanie,
+        private readonly ?FileStorage $files = null,
+    ) {
     }
 
     /** @return array<string, mixed> */
     public function export(): array
     {
+        $tables = (new Backup($this->db))->dump(Backup::CORE_TABLES);
         $settings = [];
         foreach (self::settingNames() as $key) {
             $settings[$key] = get_option(WpSettings::PREFIX . $key);
@@ -50,7 +58,8 @@ final class WpBackup implements BackupProvider
             'kompanie' => $this->kompanie,
             'site' => self::site(),
             'schema' => ['core' => (int) get_option(WpSettings::PREFIX . Migrator::SETTING, 0)],
-            'tables' => (new Backup($this->db))->dump(Backup::CORE_TABLES),
+            'tables' => $tables,
+            'files' => $this->files !== null ? Backup::dumpFiles($this->files, $tables) : [],
             'accounts' => self::accounts(),
             'settings' => $settings,
         ];
@@ -74,6 +83,7 @@ final class WpBackup implements BackupProvider
         // Ältere Sicherungen ohne Konten: wie bisher nur die Daten (die Konten müssen dann schon da sein).
         $accounts = array_key_exists('accounts', $data) ? self::parseAccounts($data['accounts']) : [];
         $plan = self::planAccounts($accounts);
+        $files = Backup::parseFiles($data['files'] ?? null);
         try {
             $this->db->transaction(function () use ($data, $plan): void {
                 self::restoreAccounts($plan);
@@ -86,6 +96,9 @@ final class WpBackup implements BackupProvider
             foreach ($accounts as $a) {
                 clean_user_cache($a['id']);
             }
+        }
+        if ($this->files !== null) {
+            Backup::restoreFiles($this->files, $files);
         }
         // Einstellungen erst nach der Transaktion: update_option schreibt auch in den Objekt-Cache,
         // der ein Zurückrollen der Transaktion nicht mitbekäme.
