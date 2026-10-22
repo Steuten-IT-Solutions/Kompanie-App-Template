@@ -16,7 +16,7 @@ Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwech
 ## Ämter einer Person
 Steht eine Person auch in der Mitgliederliste, siehst du ihr Foto, und ein Tipp auf ihren Namen (unter **Im Amt** oder in der Chronik) öffnet ihre Seite mit allen ihren Ämtern als Zeitstrahl. Dorthin kommst du auch, wenn du in der Mitgliederliste auf die Person tippst. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
 
-Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins → {bereich.offices}**.
+Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins → Übersicht** ganz unten.
 
 ## Für Admins
 Die Ämter sind ein eigener Bereich: **Einstellungen → Bereiche → {bereich.offices}**. Gepflegt werden sie unter **Verwaltung → {bereich.offices}** (siehe **{bereich.offices} verwalten** im Handbuch).

@@ -48,6 +48,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **„Meins → Übersicht“ wie die Seite eines Mitglieds in der Verwaltung**: Name, darunter Dienstgradabzeichen und Foto,
+  Rolle, die Kacheln Punkte und Offen, die Titel, Geburtstag und Eintritt sowie die Ämter als Zeitstrahl. Antippen
+  führt zur passenden Seite (Kacheln, Abzeichen) bzw. zu „Konto“ (Geburtstag, Eintritt); das Foto vergrößert sich.
+  Die eigenen Ämter stehen jetzt in der Übersicht statt auf einer eigenen Seite im Menü.
 - **Verwaltung mit Startseite**: Statt eines Aufklappmenüs zeigt die Verwaltung zuerst eine Übersicht, in der jeder
   Bereich (Mitglieder, Punkte, Dienstgrade, Einstellungen …) ein eigener Knopf mit Symbol ist. **‹ Verwaltung** führt
   von jeder Seite zurück. Wer nur einen Bereich pflegt, landet wie bisher direkt dort.
