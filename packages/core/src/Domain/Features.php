@@ -43,7 +43,7 @@ final class Features
         'titles' => ['label' => 'Titel', 'description' => 'Ehrentitel und Ämter der Mitglieder, z. B. Ehrenmitglied, unabhängig von Dienstgrad und Punkten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_titles']],
         'attendance' => ['label' => 'Anwesenheit', 'description' => 'Anwesenheitslisten je Termin; zusammen mit Punkten und Strafen gesammelt buchen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_attendance']],
         'documents' => ['label' => 'Dokumente', 'description' => 'Dateien wie Satzung, Protokolle und Formulare für Mitglieder, nach Kategorien, auch offline.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_documents']],
-        'board' => ['label' => 'Schwarzes Brett', 'description' => 'Dringende Nachrichten für 24 Stunden oben auf jeder Seite, mit Benachrichtigung an alle Mitglieder und Anwärter.', 'requires' => [], 'setup' => null, 'role' => ['member', 'post_board']],
+        'board' => ['label' => 'Schwarzes Brett', 'description' => 'Dringende Nachrichten für 24 Stunden oben auf jeder Seite, mit Benachrichtigung an alle Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).', 'requires' => [], 'setup' => null, 'role' => ['member', 'post_board']],
         // Umfragen (Issue #4): Laufende Umfragen stehen am Schwarzen Brett, deshalb nur zusammen mit ihm.
         'polls' => ['label' => 'Umfragen', 'description' => 'Umfragen mit einer Frage für Mitglieder, namentlich oder anonym; laufende stehen am Schwarzen Brett.', 'requires' => ['board'], 'setup' => null, 'role' => ['member', 'manage_polls']],
         // Geburtstage (Issue #1): kein eigenes Recht; das Datum anderer pflegt, wer Mitglieder anlegen darf (create_users).
@@ -51,7 +51,7 @@ final class Features
         // Inventar (Issue #6): nur für alle mit manage_inventory, Mitglieder ohne das Recht sehen es nicht.
         'inventory' => ['label' => 'Inventar', 'description' => 'Was die Kompanie besitzt, wie viel und wo, mit Umlagern und Verlauf; nur für alle, die es verwalten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_inventory']],
         // Mitgliederliste (Issue #112: öffentlich): Namen, Fotos, Dienstgrade und Titel der Mitglieder und Anwärter; kein eigenes Recht.
-        'directory' => ['label' => 'Mitglieder', 'description' => 'Liste der Mitglieder und Anwärter mit Foto, Dienstgrad und Titeln, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => null],
+        'directory' => ['label' => 'Mitglieder', 'description' => 'Liste der Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter) mit Foto, Dienstgrad und Titeln, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => null],
         // Ämter (Issue #112): Zeitstrahl aller Ämter mit früheren Inhabern, öffentlich; im Tab der Mitgliederliste.
         'offices' => ['label' => 'Ämter', 'description' => 'Wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl für alle sichtbar; laufende Ämter können Titel vergeben.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_offices']],
         // Listen (Issue #121): nur für alle mit manage_lists, Werte der Mitglieder nur, soweit sie sie ohnehin sehen.

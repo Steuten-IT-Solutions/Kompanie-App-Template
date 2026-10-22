@@ -57,8 +57,11 @@ $c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage_penal
 $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $app->roles()->delete($kasseKey, null);
 
-// Anwärter (Issue #23): Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt – nur diesen Schritt.
+// Anwärter (Issue #23) als eigene Rolle: Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt –
+// nur diesen Schritt und nur aus Rollen, die das erlauben.
 $c->section('Anwärter');
+$candKey = (string) (array_search('Kpwp Anwärter', array_column($app->roles()->all(), 'label', 'key'), true)
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key']);
 $app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => ['member', 'create_users']]);
 $aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
 $holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
@@ -67,10 +70,10 @@ if ($existingCand) {
     wp_delete_user($existingCand->ID);
 }
 wp_set_current_user($holder);
-$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => 'candidate']);
+$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => $candKey], $app->users->find($holder));
 $cand = (int) $created['id'];
 clean_user_cache($cand);
-$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'candidate', 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
+$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === $candKey, 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
 $c->ok($caps($cand) === ['calendar'], 'Anwärter: nur interner Kalender');
 try {
     $app->users->setRole($cand, 'events');
@@ -82,7 +85,7 @@ $app->members()->promote($app->users->find($holder), $cand);
 clean_user_cache($cand);
 $c->ok($app->users->find($cand)?->role === 'member' && in_array(Roles::ROLE_MEMBER, get_userdata($cand)->roles, true), 'Aufgenommen: Mitglied, mit früherer WP-Rolle');
 try {
-    $app->users->setRole($cand, 'candidate');
+    $app->users->setRole($cand, $candKey);
     $c->ok(false, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
 } catch (\DomainException) {
     $c->ok(true, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
@@ -91,6 +94,7 @@ wp_set_current_user(0);
 wp_delete_user($cand);
 wp_delete_user($holder);
 $app->roles()->delete($aufnahmeKey, null);
+$app->roles()->delete($candKey, null);
 
 // Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
 // Die früheren WP-Rollen gibt es hier nur, wenn die Installation sie hatte; für den Test anlegen.

@@ -28,7 +28,7 @@ final class DirectoryTest extends TestCase
         $this->app = TestApp::create(TestApp::connection(), $this->users);
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER);
-        $this->candidate = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $this->candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
         $this->users->current = $this->admin;
     }
@@ -82,13 +82,13 @@ final class DirectoryTest extends TestCase
         $counts = fn (int $viewer): array => array_column($this->countsAs($viewer)->data, 'count', 'group');
 
         // Ohne eigene Gruppe zählen Jungmariner (und Admins) als Mitglieder, wie in der Anwesenheit; Gäste nie.
-        $this->assertEquals([Roles::MEMBER => 3, Roles::CANDIDATE => 1], $counts($this->candidate));
+        $this->assertEquals([Roles::MEMBER => 3, TestApp::candidateRole($this->app) => 1], $counts($this->candidate));
         $this->app->attendance()->setGroups([$young => '']);
-        $this->assertEquals([Roles::MEMBER => 2, $young => 1, Roles::CANDIDATE => 1], $counts($this->m));
+        $this->assertEquals([Roles::MEMBER => 2, $young => 1, TestApp::candidateRole($this->app) => 1], $counts($this->m));
         $this->assertSame(['group', 'count'], array_keys($this->countsAs($this->m)->data[0]), 'nur Summen');
 
         // Öffentlich wie die Liste (Issue #112)
-        $this->assertEquals([Roles::MEMBER => 2, $young => 1, Roles::CANDIDATE => 1], $counts($this->guest));
+        $this->assertEquals([Roles::MEMBER => 2, $young => 1, TestApp::candidateRole($this->app) => 1], $counts($this->guest));
         $this->assertSame(200, $this->countsAs(null)->status);
         $this->users->current = $this->admin;
         $this->app->features()->update(['directory' => false]);

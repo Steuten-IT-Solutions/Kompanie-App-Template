@@ -49,7 +49,7 @@ final class PollServiceTest extends TestCase
         $this->m = $this->users->add('mitglied', Roles::MEMBER);
         $this->m2 = $this->users->add('zweite', Roles::MEMBER);
         $this->m3 = $this->users->add('dritte', Roles::MEMBER);
-        $this->cand = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
         $this->manager = $features['polls'] ?? false ? $this->users->add('umfrager', 'polls') : 0;
         $this->users->current = $this->admin;

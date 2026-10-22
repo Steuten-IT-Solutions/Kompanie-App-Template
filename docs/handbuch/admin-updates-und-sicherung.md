@@ -16,6 +16,9 @@ Schlägt ein Update fehl, läuft die bisherige Version weiter, und der Grund ste
 
 Wird eine fehlerhafte Version zurückgezogen, wechselt die App von selbst auf eine geprüfte Version (außer automatische Updates sind gesperrt); mit **Jetzt auf … wechseln** geht das sofort. Gibt es noch keine geprüfte Version, meldest du dich bei den Betreuern der App.
 
+### Was ist neu
+Unter **Verwaltung → Einstellungen → Was ist neu** (oder über den Link neben der installierten Version) steht, was sich von Version zu Version geändert hat, bis zur installierten Version. Mit **Vorabversionen erhalten** steht ganz oben, was in der Vorabversion schon dabei ist, aber noch nicht für alle freigegeben wurde.
+
 ### Auf eine ältere Version zurück
 Klappt nach einem Update etwas nicht mehr, öffnest du **Auf eine ältere Version zurück**, wählst eine frühere Version derselben Hauptversion und tippst auf **Zurückrollen**. Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein, erst wieder die nächste neuere. Hinter eine neue Hauptversion zurück geht es nicht per Klick, sondern nur mit Hilfe der Betreuer der App.
 

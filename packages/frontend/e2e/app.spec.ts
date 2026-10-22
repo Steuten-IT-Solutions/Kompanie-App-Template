@@ -360,10 +360,31 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   const name = `Anna ${last}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  // Anwärter sind eine eigene Rolle: nur Kalender, für neue Konten, als Mitglied aufzunehmen (bei WordPress ggf. schon da).
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  const rollen = page.locator('#einstellungen-rollen');
+  await expect(rollen.locator('.row-title').first()).toBeVisible();
+  if ((await rollen.locator('.row-title', { hasText: /^Anwärter$/ }).count()) === 0) {
+    await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
+    await rollen.getByLabel('Name der Rolle').fill('Anwärter');
+    await rollen.getByLabel(/^Mitgliederbereich/).uncheck();
+    await rollen.getByLabel(/^Interner Kalender/).check();
+    await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
+    await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
+    await rollen.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
+  }
+  await expect(rollen.locator('.row', { hasText: /^Anwärter/ })).toContainText('für neue Konten');
+
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByLabel('Vorname').fill('Anna');
   await page.getByLabel('Nachname').fill(last);
-  await page.getByLabel('Rolle').selectOption('candidate');
+  await page.getByLabel('Rolle').selectOption({ label: 'Anwärter' });
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
   const username = (await page.getByTestId('new-username').textContent())!.trim();
   const password = (await page.getByTestId('new-password').textContent())!.trim();
@@ -1402,6 +1423,32 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await page.goto('/app/#/einstellungen/zustand');
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
+});
+
+test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
+  // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
+  const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
+    versionen: { version: string }[];
+    unveroeffentlicht: string | null;
+  };
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Was ist neu', { exact: true }) })
+    .click();
+  await expect(page).toHaveURL(/#\/einstellungen\/neuerungen$/);
+  for (const v of changelog.versionen) {
+    await expect(page.getByRole('heading', { name: new RegExp(`^Version ${v.version.replace(/\./g, '\\.')}\\b`) })).toBeVisible();
+  }
+  await expect(page.getByRole('heading', { name: /^Vorabversion/ })).toHaveCount(changelog.unveroeffentlicht ? 1 : 0);
+  await expect(page.locator('.changelog-text h4').first()).toBeVisible();
+  await shot(page, '19-was-ist-neu');
+
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/einstellungen/neuerungen');
+  await expect(page.locator('.changelog-text')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /^Version / })).toHaveCount(0);
 });
 
 test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async ({ page }) => {

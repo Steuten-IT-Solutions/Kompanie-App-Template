@@ -281,7 +281,7 @@ final class RankBadgeTest extends TestCase
         $v = (string) $q['v'];
         $ranks = $this->app->ranks();
         $member = $this->users->find($this->m);
-        $candidate = $this->users->find($this->users->add('anwaerter', Roles::CANDIDATE));
+        $candidate = $this->users->find($this->users->add('anwaerter', TestApp::candidateRole($this->app)));
         $guest = $this->users->find($this->users->add('gast', Roles::GUEST));
 
         $res = $ranks->badgeForDelivery($member, $svgRank, $v, '128');

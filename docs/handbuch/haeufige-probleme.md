@@ -9,7 +9,7 @@ Ein erster Blick lohnt sich immer unter **Verwaltung → Einstellungen → Zusta
 Unter **Einstellungen → Bereiche** prüfen, ob er eingeschaltet ist. {bereich.calendar}, {bereich.gallery} und {bereich.news} erscheinen erst, wenn sie auch eingerichtet sind; dann steht dort „Noch nicht eingerichtet“ mit **Jetzt einrichten**. {bereich.polls} lassen sich nur zusammen mit dem {bereich.board} einschalten.
 
 ## Jemand sieht etwas nicht, das er sehen sollte
-Unter **Verwaltung → Mitglieder** die Person öffnen und unter **Konto und Rolle** ihre Rolle prüfen, dann unter **Einstellungen → Rollen**, welche Rechte diese Rolle hat. Rechte wirken nur in eingeschalteten Bereichen. {rolle.candidate} sehen zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
+Unter **Verwaltung → Mitglieder** die Person öffnen und unter **Konto und Rolle** ihre Rolle prüfen, dann unter **Einstellungen → Rollen**, welche Rechte diese Rolle hat. Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
 
 ## Jemand hat sein Passwort vergessen
 Im Mitglied unter **Konto und Rolle** ein neues Startpasswort erzeugen, siehe [Mitglieder anlegen](seite:mitglieder-anlegen).

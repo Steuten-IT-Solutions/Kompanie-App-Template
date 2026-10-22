@@ -483,6 +483,49 @@ final class OfficeService
         return $result;
     }
 
+    /**
+     * Freie Namen in Amtszeiten mit Konten verknüpfen (nach dem Import ehemaliger Mitglieder): Ein Inhaber ohne Konto,
+     * dessen Name (ohne Unterschied in Groß- und Kleinschreibung und bei Leerzeichen) einem der Konten entspricht, bekommt
+     * dieses Konto; der gespeicherte Name bleibt. Steht die Person in der Amtszeit schon, bleibt der Eintrag frei. Fehlt
+     * die Tabelle (ältere Version), gibt es nichts zu verknüpfen. Ohne $apply nur zählen.
+     *
+     * @param array<string, int|null> $accounts Name (klein) => Benutzer-ID (null: noch nicht angelegt, nur zählen)
+     * @return int verknüpfte bzw. zu verknüpfende Einträge
+     */
+    public function linkNames(array $accounts, bool $apply): int
+    {
+        if ($accounts === []) {
+            return 0;
+        }
+        try {
+            $holders = $this->repository()->holders();
+        } catch (\RuntimeException) {
+            return 0;
+        }
+        $count = 0;
+        foreach ($holders as $termHolders) {
+            $inTerm = array_filter(array_column($termHolders, 'user_id'));
+            $named = [];
+            foreach ($termHolders as $h) {
+                $key = mb_strtolower(Text::line($h['name']));
+                if ($h['user_id'] !== null || !array_key_exists($key, $accounts) || isset($named[$key])) {
+                    continue;
+                }
+                $userId = $accounts[$key];
+                if ($userId !== null && in_array($userId, $inTerm, true)) {
+                    continue;
+                }
+                $named[$key] = true;
+                $count++;
+                if ($apply && $userId !== null) {
+                    $this->app->db->update('office_holders', ['user_id' => $userId], ['id' => $h['id']]);
+                    $inTerm[] = $userId;
+                }
+            }
+        }
+        return $count;
+    }
+
     // ---- intern ----
 
     /**

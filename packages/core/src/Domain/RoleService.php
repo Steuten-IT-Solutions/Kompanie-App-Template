@@ -16,8 +16,10 @@ use KompanieApp\Core\Storage\MemberRoleRepository;
 /**
  * Rollen der App: Bezeichnung, Rechte und Punktefaktor – die einzige Stelle, die das sagt (Issue #28).
  *
- * Der Admin legt Rollen in der App an (Einstellungen → Rollen). Fest sind Gast, Anwärter, Mitglied und Admin
- * (Bezeichnungen bei der Ersteinrichtung aus kompanie.json, danach in der App). Schaltet der Admin einen
+ * Der Admin legt Rollen in der App an (Einstellungen → Rollen) und ordnet die eigenen per Ziehen. Fest sind Gast,
+ * Mitglied und Admin (Bezeichnungen bei der Ersteinrichtung aus kompanie.json, danach in der App). Eigene Rollen lassen
+ * sich beim Anlegen von Konten wählen (new_accounts) und, ohne Mitgliederbereich, von denen mit „Mitglieder anlegen“
+ * zum Mitglied machen (promotable), z. B. Anwärter (Issue #23; früher eine feste Rolle). Schaltet der Admin einen
  * Bereich ein, der Rechte braucht, kommt dessen Standardrolle dazu (Domain\Features, z. B. „Punkte
  * verwalten“); schaltet er ihn aus, verschwindet sie wieder, wenn ihr niemand zugeordnet ist.
  * Gespeichert als eine Einstellung: Die Einstellungen lädt jede Anfrage ohnehin auf einmal, die Rechte
@@ -26,7 +28,7 @@ use KompanieApp\Core\Storage\MemberRoleRepository;
  * Eine Person hat genau eine Grundrolle (Standalone users.level, WordPress Benutzer-Option) und beliebig viele
  * Zusatzrollen (Issue #66, Tabelle member_roles, Storage\MemberRoleRepository). Ihre Rechte sind die Vereinigung
  * aller ihrer Rollen (capabilitiesFor, die einzige Stelle, die das ausrechnet). Zusatzrollen sind nur eigene Rollen
- * (nicht Gast, Anwärter, Mitglied, Admin) und wirken nur, solange die Grundrolle den Mitgliederbereich hat: Ob jemand
+ * (nicht Gast, Mitglied, Admin) und wirken nur, solange die Grundrolle den Mitgliederbereich hat: Ob jemand
  * Mitglied, Anwärter oder Gast ist, entscheidet allein die Grundrolle. Der Punktefaktor (z. B. 0,5 für junge
  * Mitglieder) ist der kleinste aller Rollen der Person; er gilt beim Buchen und wird mit dem Eintrag gespeichert, eine
  * spätere Änderung ändert alte Einträge nicht.
@@ -44,11 +46,13 @@ final class RoleService
     private const NO_OVERRIDES = ['grant' => [], 'revoke' => []];
     /** Zuletzt vergebene Nummer eigener Rollen (r1, r2, …); Schlüssel gelöschter Rollen werden nie wieder vergeben. */
     public const SEQ_SETTING = 'roles_seq';
+    /** Gesetzt, sobald die frühere feste Rolle „Anwärter“ eine eigene Rolle ist (migrateCandidate). */
+    public const CANDIDATE_SETTING = 'roles_candidate_own';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
 
-    /** @var array<string, array{key: string, label: string, capabilities: string[], points_factor: float}>|null */
+    /** @var array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}>|null */
     private ?array $roles = null;
 
     /** @var array<int, list<string>>|null Zusatzrollen je Person, einmal je Anfrage geladen */
@@ -69,7 +73,7 @@ final class RoleService
     /**
      * Alle Rollen in der Reihenfolge der Anzeige (guest zuerst, admin zuletzt).
      *
-     * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float}>
+     * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}>
      */
     public function all(): array
     {
@@ -80,7 +84,7 @@ final class RoleService
         return $this->roles;
     }
 
-    /** @return array{key: string, label: string, capabilities: string[], points_factor: float}|null */
+    /** @return array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}|null */
     public function find(string $key): ?array
     {
         return $this->all()[$key] ?? null;
@@ -199,6 +203,34 @@ final class RoleService
         $o = $this->loadOverrides()[$id] ?? null;
         if ($o !== null) {
             $this->storeOverrides($id, self::overridable($baseRole) ? self::normalized($this->grantedFor($id, $baseRole), $o) : self::NO_OVERRIDES);
+        }
+    }
+
+    /**
+     * Ausnahmen einer Person, wie gespeichert (ehemalige Mitglieder merken sie sich für „Wieder aufnehmen“).
+     *
+     * @return array{grant: string[], revoke: string[]}
+     */
+    public function overridesOf(int $id): array
+    {
+        return $this->loadOverrides()[$id] ?? self::NO_OVERRIDES;
+    }
+
+    /**
+     * Früher gemerkte Ausnahmen wieder einsetzen (ehemaliges Mitglied wieder aufgenommen). Unbekannte Rechte und was die
+     * Rollen jetzt schon regeln, fallen weg.
+     */
+    public function restoreOverrides(int $id, mixed $saved, string $baseRole): void
+    {
+        if (!is_array($saved) || !self::overridable($baseRole)) {
+            return;
+        }
+        $o = [
+            'grant' => self::ordered(array_filter((array) ($saved['grant'] ?? []), 'is_string')),
+            'revoke' => self::ordered(array_filter((array) ($saved['revoke'] ?? []), 'is_string')),
+        ];
+        if ($o['grant'] !== [] || $o['revoke'] !== []) {
+            $this->storeOverrides($id, self::normalized($this->grantedFor($id, $baseRole), $o));
         }
     }
 
@@ -472,8 +504,9 @@ final class RoleService
 
     /**
      * Taugt die Rolle als Zusatzrolle? Nur eigene Rollen (auch die Standardrollen der Bereiche und frühere feste wie
-     * Verwalter): Gast, Anwärter, Mitglied und Admin bestimmen, wer überhaupt zur Kompanie gehört, und sind deshalb nur
-     * Grundrolle. Admin ginge auch sonst nicht: Er hat manage_settings, das keine andere Rolle vergeben kann.
+     * Verwalter oder Anwärter): Gast, Mitglied und Admin bestimmen, wer überhaupt zur Kompanie gehört, und sind deshalb
+     * nur Grundrolle. Eigene Rollen ohne Mitgliederbereich wirken als Zusatzrolle nicht (sie bringen höchstens den
+     * Kalender, den der Mitgliederbereich schon enthält). Admin ginge auch sonst nicht: Er hat manage_settings, das keine andere Rolle vergeben kann.
      */
     public static function canBeExtra(string $key): bool
     {
@@ -511,15 +544,22 @@ final class RoleService
     }
 
     /**
-     * Für /config: Schlüssel, Bezeichnung, Punktefaktor (die Bezeichnungen braucht die App überall) und ob die Rolle als
-     * Zusatzrolle taugt (Issue #66).
+     * Für /config: Schlüssel, Bezeichnung, Punktefaktor (die Bezeichnungen braucht die App überall), ob die Rolle als
+     * Zusatzrolle taugt (Issue #66), ob neue Konten sie bekommen können und ob sie sich zum Mitglied machen lässt.
      *
-     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool}>
+     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool, new_accounts: bool, promotable: bool}>
      */
     public function publicList(): array
     {
         return array_values(array_map(
-            static fn (array $r): array => ['key' => $r['key'], 'label' => $r['label'], 'points_factor' => $r['points_factor'], 'extra' => self::canBeExtra($r['key'])],
+            static fn (array $r): array => [
+                'key' => $r['key'],
+                'label' => $r['label'],
+                'points_factor' => $r['points_factor'],
+                'extra' => self::canBeExtra($r['key']),
+                'new_accounts' => $r['key'] === Roles::MEMBER || $r['new_accounts'],
+                'promotable' => $r['promotable'],
+            ],
             $this->all(),
         ));
     }
@@ -547,6 +587,8 @@ final class RoleService
                 'label' => $r['label'],
                 'capabilities' => array_map(static fn (Capability $c): string => $c->value, $this->granted($key)),
                 'points_factor' => $r['points_factor'],
+                'new_accounts' => $key === Roles::MEMBER || $r['new_accounts'],
+                'promotable' => $r['promotable'],
                 'users' => ($counts[$key] ?? 0) + ($extra[$key] ?? 0),
                 // Davon als Zusatzrolle (Issue #66)
                 'extra_users' => $extra[$key] ?? 0,
@@ -565,6 +607,7 @@ final class RoleService
     public function initialize(bool $existingInstallation): void
     {
         if (is_array($this->settings->get(self::SETTING))) {
+            $this->migrateCandidate();
             return;
         }
         $roles = $this->templates();
@@ -572,11 +615,43 @@ final class RoleService
             $admin = $roles[Roles::ADMIN];
             unset($roles[Roles::ADMIN]);
             foreach (Roles::LEGACY as $key => $caps) {
-                $roles[$key] = ['key' => $key, 'label' => $this->config->roleLabel($key), 'capabilities' => $caps, 'points_factor' => 1.0];
+                $roles[$key] = self::role($key, $this->config->roleLabel($key), $caps);
             }
             $roles[Roles::ADMIN] = $admin;
         }
         $this->save($roles);
+        $this->settings->set(self::CANDIDATE_SETTING, true);
+    }
+
+    /**
+     * Einmalig nach dem Update: Die frühere feste Rolle „Anwärter“ wird eine eigene Rolle mit demselben Schlüssel, damit
+     * niemand Rechte verliert. Sie behält ihren Namen und den internen Kalender, ist beim Anlegen von Konten wählbar und
+     * lässt sich zum Mitglied machen, wie bisher; der Admin kann sie danach ändern oder löschen. Gespeichert war sie nur,
+     * wenn sich die Rollen seit ihrer Einführung geändert hatten; sonst nur anlegen, wenn jemand sie hat. Sie rückt ans
+     * Ende der eigenen Rollen, wo sie bisher in den Zählern stand.
+     */
+    private function migrateCandidate(): void
+    {
+        if ($this->settings->get(self::CANDIDATE_SETTING)) {
+            return;
+        }
+        $roles = $this->all();
+        $role = $roles[Roles::CANDIDATE] ?? null;
+        if ($role === null) {
+            foreach ($this->users->list(false) as $u) {
+                if ($u->role === Roles::CANDIDATE) {
+                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->config->roleLabel(Roles::CANDIDATE), $roles), [Capability::Calendar->value]);
+                    break;
+                }
+            }
+        }
+        if ($role !== null) {
+            $role['new_accounts'] = true;
+            $role['promotable'] = !in_array(Capability::Member->value, $role['capabilities'], true);
+            unset($roles[Roles::CANDIDATE]);
+            $this->save(self::beforeAdmin($roles, $role));
+        }
+        $this->settings->set(self::CANDIDATE_SETTING, true);
     }
 
     /**
@@ -599,11 +674,7 @@ final class RoleService
                     return;
                 }
             }
-            $admin = $roles[Roles::ADMIN];
-            unset($roles[Roles::ADMIN]);
-            $roles[$key] = ['key' => $key, 'label' => $label, 'capabilities' => $capabilities, 'points_factor' => 1.0];
-            $roles[Roles::ADMIN] = $admin;
-            $this->save($roles);
+            $this->save(self::beforeAdmin($roles, self::role($key, $label, $capabilities)));
             return;
         }
         if (!isset($roles[$key]) || Roles::isSystem($key)) {
@@ -622,8 +693,8 @@ final class RoleService
     }
 
     /**
-     * @param array<string, mixed> $in label, capabilities, points_factor
-     * @return array{key: string, label: string, capabilities: string[], points_factor: float}
+     * @param array<string, mixed> $in label, capabilities, points_factor, new_accounts, promotable
+     * @return array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}
      */
     public function create(array $in): array
     {
@@ -632,26 +703,22 @@ final class RoleService
             throw ApiError::invalid(sprintf('Mehr als %d Rollen sind nicht möglich.', self::MAX_ROLES));
         }
         $label = $this->validLabel($in['label'] ?? null, null);
-        $capabilities = self::validCapabilities($in['capabilities'] ?? []);
-        $factor = array_key_exists('points_factor', $in) ? self::validFactor($in['points_factor']) : 1.0;
+        $role = self::role('', $label, self::validCapabilities($in['capabilities'] ?? []));
+        $role['points_factor'] = array_key_exists('points_factor', $in) ? self::validFactor($in['points_factor']) : 1.0;
+        $role['new_accounts'] = array_key_exists('new_accounts', $in) && self::validFlag($in['new_accounts']);
+        $role['promotable'] = array_key_exists('promotable', $in) && self::validFlag($in['promotable']);
+        self::checkPromotable($role);
         // Schlüssel erst nach der Prüfung vergeben (sonst verbrauchten ungültige Anfragen Nummern).
-        $role = ['key' => $this->newKey(), 'label' => $label, 'capabilities' => $capabilities, 'points_factor' => $factor];
-        // Neue Rollen vor admin einordnen.
-        $admin = $roles[Roles::ADMIN] ?? null;
-        unset($roles[Roles::ADMIN]);
-        $roles[$role['key']] = $role;
-        if ($admin !== null) {
-            $roles[Roles::ADMIN] = $admin;
-        }
-        $this->save($roles);
+        $role['key'] = $this->newKey();
+        $this->save(self::beforeAdmin($roles, $role));
         return $role;
     }
 
     /**
-     * Nur mitgeschickte Felder ändern. Gast und Admin: nur die Bezeichnung; Mitglied: Bezeichnung und Punktefaktor.
+     * Nur mitgeschickte Felder ändern. Gast: nur die Bezeichnung; Mitglied und Admin: Bezeichnung und Punktefaktor.
      *
-     * @param array<string, mixed> $in label, capabilities, points_factor
-     * @return array{key: string, label: string, capabilities: string[], points_factor: float}
+     * @param array<string, mixed> $in label, capabilities, points_factor, new_accounts, promotable
+     * @return array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}
      */
     public function update(string $key, array $in): array
     {
@@ -666,17 +733,26 @@ final class RoleService
         $fixed = Roles::isSystem($key);
         if (array_key_exists('capabilities', $in)) {
             if ($fixed) {
-                throw ApiError::invalid('Die Rechte der festen Rollen (Gast, Anwärter, Mitglied, Admin) lassen sich nicht ändern.');
+                throw ApiError::invalid('Die Rechte der festen Rollen (Gast, Mitglied, Admin) lassen sich nicht ändern.');
             }
             $role['capabilities'] = self::validCapabilities($in['capabilities']);
         }
         if (array_key_exists('points_factor', $in)) {
-            // Punkte bekommen nur Personen mit Mitgliederbereich; Admins zählen immer voll.
-            if ($key === Roles::GUEST || $key === Roles::CANDIDATE || $key === Roles::ADMIN) {
-                throw ApiError::invalid('Gast, Anwärter und Admin haben keinen eigenen Punktefaktor.');
+            // Punkte bekommen nur Personen mit Mitgliederbereich (Admins haben ihn immer).
+            if ($key === Roles::GUEST) {
+                throw ApiError::invalid('Gäste haben keinen Punktefaktor.');
             }
             $role['points_factor'] = self::validFactor($in['points_factor']);
         }
+        foreach (['new_accounts', 'promotable'] as $flag) {
+            if (array_key_exists($flag, $in)) {
+                if ($fixed) {
+                    throw ApiError::invalid('Das lässt sich nur bei eigenen Rollen einstellen.');
+                }
+                $role[$flag] = self::validFlag($in[$flag]);
+            }
+        }
+        self::checkPromotable($role);
         $roles[$key] = $role;
         $this->save($roles);
         return $role;
@@ -737,6 +813,48 @@ final class RoleService
     }
 
     /**
+     * Reihenfolge der eigenen Rollen (Einstellungen → Rollen, per Ziehen): $keys sind alle eigenen Rollen in der neuen
+     * Reihenfolge. Gast und Mitglied bleiben vorn, Admin hinten. Die Reihenfolge gilt überall, wo Rollen stehen (Auswahl,
+     * Zähler der Mitgliederliste und der Anwesenheit).
+     */
+    public function reorder(mixed $keys): void
+    {
+        $roles = $this->all();
+        $own = array_values(array_filter(array_keys($roles), static fn (string $k): bool => !Roles::isSystem($k)));
+        if (!is_array($keys) || !array_is_list($keys) || array_filter($keys, 'is_string') !== $keys
+            || count(array_unique($keys)) !== count($keys) || count($keys) !== count($own) || array_diff($own, $keys) !== []) {
+            throw ApiError::invalid('Bitte alle eigenen Rollen in der neuen Reihenfolge angeben.');
+        }
+        $next = [Roles::GUEST => $roles[Roles::GUEST], Roles::MEMBER => $roles[Roles::MEMBER]];
+        foreach ($keys as $k) {
+            $next[$k] = $roles[$k];
+        }
+        $next[Roles::ADMIN] = $roles[Roles::ADMIN];
+        $this->save($next);
+    }
+
+    /**
+     * Rollen, die $actor neuen Konten geben darf (Mitglieder anlegen): Mitglied und die eigenen Rollen, die der Admin
+     * dafür freigegeben hat. Wer kein Admin ist, nur solche mit höchstens dem Mitgliederbereich bzw. dem Kalender oder
+     * mit Rechten, die er selbst weitergeben darf (canHandle): Konten anlegen soll keine weiteren Rechte verschaffen.
+     */
+    public function canCreateAs(User $actor, string $key): bool
+    {
+        $role = $this->find($key);
+        if ($role === null || ($key !== Roles::MEMBER && !$role['new_accounts'])) {
+            return false;
+        }
+        $basic = array_diff(self::values($this->capabilities($key)), [Capability::Member->value, Capability::Calendar->value]) === [];
+        return $actor->isAdmin() || $basic || $this->canHandle($actor, $key);
+    }
+
+    /** Lässt sich die Rolle von denen mit „Mitglieder anlegen“ zum Mitglied machen (z. B. Anwärter, Issue #23)? */
+    public function promotable(string $key): bool
+    {
+        return $this->find($key)['promotable'] ?? false;
+    }
+
+    /**
      * Darf $actor einer Person diese Rolle geben bzw. ihre Rolle ändern (oder ihr Passwort zurücksetzen)?
      * Admins immer. Sonst nur Rollen, deren Rechte er selbst hat, und keine Rollen, die Konten anlegen
      * oder Rollen vergeben dürfen: Diese Rechte weitergeben bleibt den Admins vorbehalten.
@@ -777,28 +895,74 @@ final class RoleService
         return true;
     }
 
-    /** @param array<string, array{key: string, label: string, capabilities: string[], points_factor: float}> $roles */
+    /** @param array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}> $roles */
     private function save(array $roles): void
     {
         $this->settings->set(self::SETTING, array_values($roles));
         $this->roles = $roles;
     }
 
-    /** @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float}> */
+    /** @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}> */
     private function templates(): array
     {
         $out = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            $out[$key] = ['key' => $key, 'label' => $this->config->roleLabel($key), 'capabilities' => $caps, 'points_factor' => 1.0];
+            $out[$key] = self::role($key, $this->config->roleLabel($key), $caps);
         }
         return $out;
+    }
+
+    /**
+     * Neue Rolle mit Punktefaktor 1, nicht beim Anlegen von Konten wählbar und nicht zum Mitglied zu machen.
+     *
+     * @param string[] $capabilities
+     * @return array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}
+     */
+    private static function role(string $key, string $label, array $capabilities): array
+    {
+        return ['key' => $key, 'label' => $label, 'capabilities' => $capabilities, 'points_factor' => 1.0, 'new_accounts' => false, 'promotable' => false];
+    }
+
+    /**
+     * Rolle hinten anfügen, aber vor admin.
+     *
+     * @param array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}> $roles
+     * @param array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool} $role
+     * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}>
+     */
+    private static function beforeAdmin(array $roles, array $role): array
+    {
+        $admin = $roles[Roles::ADMIN] ?? null;
+        unset($roles[Roles::ADMIN]);
+        $roles[$role['key']] = $role;
+        if ($admin !== null) {
+            $roles[Roles::ADMIN] = $admin;
+        }
+        return $roles;
+    }
+
+    /**
+     * $base als Name, sonst mit Zusatz „(fest)“, „(fest 2)“ …, wenn schon eine Rolle so heißt (doppelte Namen ließen sich
+     * sonst nicht mehr speichern).
+     *
+     * @param array<string, array{label: string}> $roles
+     */
+    private function freeLabel(string $base, array $roles): string
+    {
+        $taken = array_map(static fn (array $r): string => mb_strtolower($r['label']), $roles);
+        $label = $base;
+        for ($n = 1; in_array(mb_strtolower($label), $taken, true); $n++) {
+            $suffix = $n === 1 ? ' (fest)' : " (fest $n)";
+            $label = rtrim(mb_substr($base, 0, self::LABEL_MAX - mb_strlen($suffix))) . $suffix;
+        }
+        return $label;
     }
 
     /**
      * Gespeicherte Liste prüfen; guest und admin sind immer da (guest zuerst, admin zuletzt).
      *
      * @param array<int|string, mixed> $saved
-     * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float}>
+     * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}>
      */
     private function normalize(array $saved): array
     {
@@ -813,32 +977,24 @@ final class RoleService
             if (in_array('manage', $caps, true)) {
                 $caps = array_values(array_unique(array_merge(array_diff($caps, ['manage']), ['manage_points', 'manage_penalties'])));
             }
+            $system = Roles::isSystem($key);
             $out[$key] = [
                 'key' => $key,
                 'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->config->roleLabel($key),
-                'capabilities' => Roles::isSystem($key) ? Roles::TEMPLATES[$key] : $caps,
-                'points_factor' => $key === Roles::GUEST || $key === Roles::ADMIN ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
+                'capabilities' => $system ? Roles::TEMPLATES[$key] : $caps,
+                'points_factor' => $key === Roles::GUEST ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
+                'new_accounts' => !$system && ($r['new_accounts'] ?? false) === true,
+                'promotable' => !$system && ($r['promotable'] ?? false) === true && !in_array(Capability::Member->value, $caps, true),
             ];
         }
         $fixed = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            if (!isset($out[$key])) {
-                // Neu hinzugekommene feste Rolle (z. B. Anwärter nach dem Update): Heißt schon eine eigene Rolle so,
-                // bekommt die feste einen anderen Namen; doppelte Namen ließen sich sonst nicht mehr speichern.
-                $base = $this->config->roleLabel($key);
-                $taken = array_map(static fn (array $r): string => mb_strtolower($r['label']), $fixed + $out);
-                $label = $base;
-                for ($n = 1; in_array(mb_strtolower($label), $taken, true); $n++) {
-                    $suffix = $n === 1 ? ' (fest)' : " (fest $n)";
-                    $label = rtrim(mb_substr($base, 0, self::LABEL_MAX - mb_strlen($suffix))) . $suffix;
-                }
-                $out[$key] = ['key' => $key, 'label' => $label, 'capabilities' => $caps, 'points_factor' => 1.0];
-            }
-            $fixed[$key] = $out[$key];
+            // Neu hinzugekommene feste Rolle nach einem Update: Heißt schon eine eigene Rolle so, bekommt die feste einen
+            // anderen Namen.
+            $fixed[$key] = $out[$key] ?? self::role($key, $this->freeLabel($this->config->roleLabel($key), $fixed + $out), $caps);
             unset($out[$key]);
         }
-        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::CANDIDATE => $fixed[Roles::CANDIDATE], Roles::MEMBER => $fixed[Roles::MEMBER]]
-            + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
+        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::MEMBER => $fixed[Roles::MEMBER]] + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
     }
 
     /**
@@ -917,5 +1073,26 @@ final class RoleService
             throw ApiError::invalid(sprintf('Der Punktefaktor muss zwischen 0 und %s liegen.', str_replace('.', ',', (string) self::FACTOR_MAX)));
         }
         return $f;
+    }
+
+    private static function validFlag(mixed $raw): bool
+    {
+        if (!is_bool($raw)) {
+            throw ApiError::invalid('Bitte ja oder nein (true/false) angeben.');
+        }
+        return $raw;
+    }
+
+    /**
+     * Zum Mitglied machen ist ein Aufstieg: nur für Rollen ohne Mitgliederbereich (sonst nähme „Mitglieder anlegen“ einer
+     * Person Rechte, die nur „Rollen vergeben“ ändern darf).
+     *
+     * @param array{capabilities: string[], promotable: bool} $role
+     */
+    private static function checkPromotable(array $role): void
+    {
+        if ($role['promotable'] && in_array(Capability::Member->value, $role['capabilities'], true)) {
+            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle ohne Mitgliederbereich.');
+        }
     }
 }

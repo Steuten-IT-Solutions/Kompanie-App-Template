@@ -177,7 +177,7 @@ final class MemberPhotoTest extends TestCase
 
     public function testDirectoryShowsPhotosOfMembersAndCandidatesToEveryone(): void
     {
-        $candidate = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $guest = $this->users->add('gast', Roles::GUEST);
         foreach ([$this->m, $guest] as $id) {
             $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);

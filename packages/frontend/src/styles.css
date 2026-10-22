@@ -1790,6 +1790,15 @@ fieldset.feature-list legend {
   margin-top: 18px;
 }
 
+/* Was ist neu (Changelog) */
+.changelog-text h4 {
+  font-size: 0.95rem;
+  margin: 14px 0 2px;
+}
+.changelog-text h4:first-child {
+  margin-top: 6px;
+}
+
 /* Fehler melden (Issue #64) */
 .hilfe-melden {
   margin-top: 18px;

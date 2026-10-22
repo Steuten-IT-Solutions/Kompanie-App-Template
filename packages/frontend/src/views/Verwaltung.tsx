@@ -5,6 +5,7 @@ import {
   config,
   levelLabel,
   personFactor,
+  roleInfo,
   roleLabels,
   type CatalogItem,
   type CreatedUser,
@@ -21,7 +22,7 @@ import { RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
-import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
+import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
@@ -42,6 +43,7 @@ import {
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
+import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 
 type Sub =
   | 'mitglieder'
@@ -63,7 +65,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'ehemalige' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -87,6 +89,10 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
+      ) : sub === 'ehemalige' && arg === 'import' && can('create_users') ? (
+        <FormerImport onToast={onToast} />
+      ) : sub === 'ehemalige' && can('create_users') ? (
+        <FormerList />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -141,7 +147,7 @@ function Members() {
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
   const [role, setRole] = useState<Level>(restore?.role ?? '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
-  // Anwärter (und Rollen nur mit Kalender) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
+  // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
   const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
   // Filter nach Titel (nur, wer Titel sieht)
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
@@ -174,13 +180,12 @@ function Members() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, query, role, activeTitle, order.sort, order.dir],
   );
-  // Rollen, die in der Liste vorkommen, dazu immer Anwärter und (wer Rollen vergibt) Gäste
+  // Rollen, die in der Liste vorkommen, dazu (wer Rollen vergibt) Gäste
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
-  present.add('candidate');
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
   // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter.
-  // Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner) in ihrer Reihenfolge, Anwärter zuletzt.
+  // Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner, Anwärter) in ihrer Reihenfolge.
   const groupCounts = useMemo(() => {
     const n = new Map<Level, number>();
     for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
@@ -217,9 +222,14 @@ function Members() {
         </p>
       )}
       {can('create_users') && (
-        <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
-          + Mitglied anlegen
-        </button>
+        <div className="button-row add-member">
+          <button className="btn" onClick={() => navigate('verwaltung/neu')}>
+            + Mitglied anlegen
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate('verwaltung/ehemalige')}>
+            Ehemalige
+          </button>
+        </div>
       )}
       <input
         className="search"
@@ -386,9 +396,15 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-        ‹ Alle Mitglieder
-      </button>
+      {m.former ? (
+        <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+          ‹ Ehemalige
+        </button>
+      ) : (
+        <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+          ‹ Alle Mitglieder
+        </button>
+      )}
       <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
       {(m.rank_title || avatar) && (
         <p className="member-rank-line">
@@ -421,7 +437,11 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
             onToast={onToast}
           />
           <p className="muted small member-level">
-            {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
+            {m.former
+              ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)}): ${formerSummary(m.former)}`
+              : (m.extra_roles ?? []).length > 0
+                ? `Rollen: ${roleLabels(m)}`
+                : `Rolle: ${levelLabel(m.level)}`}
             {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
           </p>
           <div className="stats">
@@ -449,7 +469,10 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'konto' && (
         <>
-          <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
+          {!m.former && (
+            <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          )}
           {m.rights && (
             <MemberRightsPanel
               key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
@@ -462,7 +485,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               onToast={onToast}
             />
           )}
-          {m.level === 'candidate' && can('create_users') && (
+          {roleInfo(m.level)?.promotable && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"
               disabled={busy}
@@ -474,9 +497,13 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               Als {levelLabel('member')} aufnehmen
             </button>
           )}
-          <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
+          {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+          {/* Gäste gehören nicht zur Kompanie; m.former fehlt bei älteren Servern (dann kein Bereich). */}
+          {can('create_users') && m.id !== config?.user?.id && m.former !== undefined && (m.former !== null || m.level !== 'guest') && (
+            <FormerPanel id={m.id} name={m.name} former={m.former} openCents={m.open_cents} onChanged={reload} onToast={onToast} />
+          )}
           {can('create_users') && m.id !== config?.user?.id && (
-            <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+            <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
           )}
         </>
       )}
@@ -758,7 +785,7 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 
 function NewMember() {
   const [name, setName] = useState(emptyName());
-  const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  const [level, setLevel] = useState<Level>('member');
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
@@ -852,13 +879,7 @@ function NewMember() {
         <span>E-Mail (optional)</span>
         <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
-      <label className="field">
-        <span>Rolle</span>
-        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
-          <option value="member">{levelLabel('member')}</option>
-          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
-        </select>
-      </label>
+      <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>
           <label className="field">

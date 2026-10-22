@@ -23,7 +23,7 @@ Die **Überschrift** jeder Spalte kannst du ändern; ohne eigene Überschrift ni
 Öffnet jemand die Liste, der eine Datenspalte nicht sehen darf, bleibt sie für ihn leer, auch beim Drucken und in der CSV-Datei.
 
 ## Zeilen und „Mitglieder aktualisieren“
-**Mitglieder aktualisieren** legt für jedes Mitglied eine Zeile an, das noch keine hat, und löscht die Zeilen von Konten, die es nicht mehr gibt oder die kein {rolle.member} mehr sind (z. B. jetzt {rolle.guest}). {rolle.guest}s und {rolle.candidate}s kommen nicht in die Liste. Bevor sich etwas ändert, zeigt die App, welche Zeilen dazukommen und welche gelöscht werden; erst **Übernehmen** ändert die Liste. Neue Mitglieder ordnet sie nach dem Nachnamen zwischen die vorhandenen ein.
+**Mitglieder aktualisieren** legt für jedes Mitglied eine Zeile an, das noch keine hat, und löscht die Zeilen von Konten, die es nicht mehr gibt oder die kein {rolle.member} mehr sind (z. B. jetzt {rolle.guest}). {rolle.guest}s, Ehemalige und Rollen ohne Mitgliederbereich (z. B. Anwärter) kommen nicht in die Liste. Bevor sich etwas ändert, zeigt die App, welche Zeilen dazukommen und welche gelöscht werden; erst **Übernehmen** ändert die Liste. Neue Mitglieder ordnet sie nach dem Nachnamen zwischen die vorhandenen ein.
 
 Mit **+ Leere Zeile** und **+ 5 leere Zeilen** fügst du eigene Zeilen hinzu, z. B. für Gäste, die sich vor Ort eintragen. In eine eigene Zeile kannst du einen Namen schreiben oder sie leer lassen. Eigene Zeilen bleiben beim Aktualisieren stehen.
 

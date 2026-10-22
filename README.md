@@ -20,6 +20,7 @@ Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin
 
 ## Dokumentation
 
+- [Changelog](CHANGELOG.md): was sich je Version ändert; Admins sehen es in der App unter *Einstellungen → Was ist neu*
 - [Architektur, Abläufe und Fahrplan](docs/ARCHITEKTUR.md)
 - [Planung der offenen Punkte](docs/OFFENE-PUNKTE.md)
 - [Veröffentlichen und Updates](docs/RELEASE.md)
@@ -60,6 +61,7 @@ scripts/e2e-standalone.sh                  # E2E (Playwright), eigenständige Ve
 tests/release/run-tests.sh                 # Pakete, Signatur, Update-Liste, Veröffentlichen
 tests/update/run-tests.sh                  # install.php, Update, Zurückrollen, Zurückziehen, Reparatur
 tests/handbuch/run-tests.sh                # Handbuch: Aufbau, Platzhalter, Ausgabe für App und Webseite
+tests/changelog/run-tests.sh               # Changelog: Aufbau, Prüfung zum Release, Ausgabe für die App
 ```
 
 GitHub Actions führt bei jedem Push alle Prüfungen aus, auch die WordPress-Tests, beide Datenbanken und die

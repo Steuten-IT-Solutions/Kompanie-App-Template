@@ -6,7 +6,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 
-/** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
+/** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
 export type Capability =
   | 'member'
@@ -139,8 +139,12 @@ export interface RoleInfo {
   key: Level;
   label: string;
   points_factor: number;
-  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Anwärter, Mitglied, Admin; Issue #66) */
+  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Mitglied, Admin; Issue #66) */
   extra?: boolean;
+  /** Beim Anlegen von Konten wählbar (Mitglied immer, eigene Rollen nach Einstellung) */
+  new_accounts?: boolean;
+  /** Wer Mitglieder anlegen darf, macht Personen dieser Rolle zum Mitglied (z. B. Anwärter) */
+  promotable?: boolean;
 }
 
 /** Für Einstellungen → Rollen (nur Admins). */
@@ -154,9 +158,18 @@ export interface RoleAdmin extends RoleInfo {
   deletable: boolean;
 }
 
-export type RoleInput = { label?: string; capabilities?: Capability[]; points_factor?: number | string };
+export type RoleInput = {
+  label?: string;
+  capabilities?: Capability[];
+  points_factor?: number | string;
+  new_accounts?: boolean;
+  promotable?: boolean;
+};
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
+
+/** Rollen, die neue Konten bekommen können (Mitglied und freigegebene eigene Rollen), in der Reihenfolge der Rollen. */
+export const newAccountRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
 
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
@@ -189,7 +202,14 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor, system }) => ({ key, label, points_factor, extra: !system }));
+  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable }) => ({
+    key,
+    label,
+    points_factor,
+    extra: !system,
+    new_accounts,
+    promotable,
+  }));
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -370,6 +390,65 @@ export interface MemberDetail extends MemberSummary {
   rights?: MemberRights | null;
   /** Ob man das Foto hochladen, ersetzen und entfernen darf (create_users und dieses Konto verwalten) */
   photo_editable?: boolean;
+  /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
+  former?: FormerInfo | null;
+}
+
+/** Grund des Ausscheidens */
+export type FormerReason = 'left' | 'deceased' | 'other';
+
+/** Angaben zu einem ehemaligen Mitglied. Daten als JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer. */
+export interface FormerInfo {
+  reason: FormerReason;
+  joined_on: string;
+  /** Gründungsmitglied */
+  founder: boolean;
+  left_on: string;
+  /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
+  previous_level: Level;
+}
+
+/** Eintrag der Liste „Ehemalige“ (create_users). */
+export interface FormerMember extends FormerInfo {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  /** null: nur wer Punkte bzw. Strafen vergibt */
+  points: number | null;
+  open_cents: number | null;
+}
+
+export interface FormerInput {
+  reason: FormerReason;
+  joined_on: string;
+  founder: boolean;
+  left_on: string;
+}
+
+/** Zeile der Vorschau beim Import der Ehemaligen */
+export interface FormerImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  reason?: FormerReason;
+  joined_on?: string;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface FormerImportResult {
+  rows: FormerImportRow[];
+  new: number;
+  existing: number;
+  /** Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden */
+  offices_linked?: number;
+  applied: boolean;
 }
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
@@ -1115,7 +1194,7 @@ export const api = {
       ...(all ? { all: '1' } : {}),
       ...(candidates ? { candidates: '1' } : {}),
     }),
-  /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
+  /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
@@ -1131,16 +1210,21 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
   updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
+  formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
+  markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
+  updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
+  reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
+  importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
   createUser: (
     data: PersonName & {
       username?: string;
       email?: string;
-      level?: 'member' | 'candidate';
+      level?: Level;
       initial_points?: number;
       initial_points_date?: string;
       rank_id?: number;
@@ -1274,6 +1358,8 @@ export const api = {
 
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),
+  /** Reihenfolge der eigenen Rollen (alle Schlüssel ohne Gast, Mitglied, Admin) */
+  reorderRoles: (keys: Level[]) => request<RoleAdmin[]>('PUT', '/admin/roles/order', { keys }),
   updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
   deleteRole: (key: Level, replacement?: Level) =>
     request<RoleAdmin[]>('DELETE', `/admin/roles/${encodeURIComponent(key)}`, undefined, replacement ? { replacement } : undefined),
