@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   api,
   can,
@@ -21,7 +21,7 @@ import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCent
 import { navigate, redirect as redirectTo } from '../router';
 import { neighbors, useSwipeDrag } from '../swipe';
 import { AdminNav, adminTabs, memberListAllowed } from '../adminNav';
-import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
+import { DateRow, emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
@@ -870,32 +870,6 @@ function MemberDetailView({
         )}
       </div>
     </div>
-  );
-}
-
-/** Zeile mit einem Datum der Person; mit onOpen antippbar (öffnet das Fenster zum Ändern). */
-function DateRow({ label, onOpen, children }: { label: string; onOpen?: () => void; children: ReactNode }) {
-  const content = (
-    <>
-      <span className="member-date-label">{label}</span>
-      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? 'Nicht eingetragen'}</span>
-      {onOpen && (
-        <span className="chevron" aria-hidden="true">
-          ›
-        </span>
-      )}
-    </>
-  );
-  return (
-    <li>
-      {onOpen ? (
-        <button type="button" className="member-date" onClick={onOpen}>
-          {content}
-        </button>
-      ) : (
-        <div className="member-date">{content}</div>
-      )}
-    </li>
   );
 }
 

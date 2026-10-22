@@ -44,7 +44,6 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           strafen: 'meine-strafen',
           dienstgrad: 'mein-dienstgrad',
           anwesenheit: 'meine-anwesenheit',
-          aemter: 'aemter',
         }[sub ?? 'uebersicht'] ?? 'meins-uebersicht'
       );
     case 'verwaltung':
