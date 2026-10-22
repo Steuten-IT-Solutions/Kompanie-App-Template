@@ -53,7 +53,7 @@ import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, formatB
 import { joinText, MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
-import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, REASON_OPTIONS } from './Ehemalige';
+import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_OPTIONS } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
 
 type Sub =
@@ -108,6 +108,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <BulkNewMembers canPoints={canPoints()} />
       ) : sub === 'import' && can('create_users') ? (
         <ImportPage />
+      ) : active === 'ehemalige' && arg === 'neu' ? (
+        <NewFormer />
       ) : active === 'ehemalige' && arg === 'import' ? (
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (

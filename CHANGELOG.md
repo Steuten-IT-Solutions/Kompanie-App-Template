@@ -35,6 +35,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Die Vorschau zeigt Fehler je Zeile, danach stehen die Zugangsdaten zum Ausdrucken bereit; Ehemalige bekommen ein Konto
   ohne Anmeldung. Wer schon ein Konto mit demselben Namen hat, wird übersprungen.
 - **Ehemalige importieren** nimmt jetzt auch Excel-Dateien (.xlsx).
+- **Ehemalige einzeln anlegen**: Unter *Verwaltung → Ehemalige* steht jetzt **+ Ehemalige Person anlegen**, aufgebaut wie
+  **+ Mitglied anlegen**: Name, Grund, Eintritt, Ausscheiden, Gründungsmitglied und auf Wunsch Geburtstag und Foto. Es
+  entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. **Tabelle importieren (z. B. Chronik)**
+  steht jetzt oben in diesem Formular.
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
