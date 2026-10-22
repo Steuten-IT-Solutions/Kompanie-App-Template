@@ -7,13 +7,14 @@ import { readSheet } from '../sheet';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { MemberAvatar } from '../memberPhoto';
 import {
-  DEFAULT_MEMBER_SORT,
   MEMBER_SORT_LABELS,
   defaultDir,
   dirLabel,
   listName,
   loadMemberOrder,
+  orderFor,
   saveMemberOrder,
+  setBrowseOrder,
   sortMembers,
   type MemberOrder,
   type MemberSort,
@@ -22,7 +23,7 @@ import {
 const sec = brand.labels.sections;
 
 /** Nach Namen oder Eintritt; Punkte gibt es in dieser Liste nicht. */
-const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
+export const FORMER_SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
 
 /** Auswahl beim Eintragen */
 export const REASON_OPTIONS: Record<FormerReason, string> = { left: 'Ausgetreten', deceased: 'Verstorben', other: 'Sonstiges' };
@@ -49,7 +50,7 @@ export function FormerList() {
   const [reason, setReason] = useState<FormerReason | ''>('');
   // Wie die Mitgliederliste (gemerkt je Gerät); gemerkt nach Punkten gilt hier der Nachname.
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  const order: MemberOrder = SORTS.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const order = orderFor(stored, FORMER_SORTS);
   const changeOrder = (next: MemberOrder) => {
     setStored(next);
     saveMemberOrder(next);
@@ -64,6 +65,14 @@ export function FormerList() {
     [data, query, reason, order.sort, order.dir],
   );
   const withPhotos = (data ?? []).some((f) => f.photo_url);
+
+  function open(id: number) {
+    setBrowseOrder(
+      'ehemalige',
+      list.map((f) => f.id),
+    );
+    navigate(`verwaltung/ehemalige/${id}`);
+  }
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -113,7 +122,7 @@ export function FormerList() {
               changeOrder({ sort, dir: defaultDir(sort) });
             }}
           >
-            {SORTS.map((s) => (
+            {FORMER_SORTS.map((s) => (
               <option key={s} value={s}>
                 {MEMBER_SORT_LABELS[s]}
               </option>
@@ -135,7 +144,7 @@ export function FormerList() {
       </div>
       <ul className="card-list">
         {list.map((f) => (
-          <li key={f.id} className="card row clickable member-row" onClick={() => navigate(`verwaltung/ehemalige/${f.id}`)}>
+          <li key={f.id} className="card row clickable member-row" onClick={() => open(f.id)}>
             {withPhotos && <MemberAvatar url={f.photo_url} name={f.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">{listName(f, order.sort)}</div>

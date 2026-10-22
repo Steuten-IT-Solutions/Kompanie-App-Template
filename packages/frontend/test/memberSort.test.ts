@@ -4,8 +4,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MemberSummary } from '../src/api.ts';
 import {
+  browseOrder,
   defaultDir,
   dirLabel,
+  orderFor,
+  setBrowseOrder,
   joinKey,
   listName,
   loadMemberOrder,
@@ -192,4 +195,16 @@ test('Listen (Issue #121), nach Namen sortieren: Nachname, Vorname, Umlaute wie 
     sortRowsByName(rows).map((r) => (r.deleted ? '(gelöscht)' : r.name)),
     ['Kasse', 'Anna Müller', 'Zoe Müller', 'Gast Nachbarverein', 'Bernd Özdemir', 'Ada Zander', '', '(gelöscht)'],
   );
+});
+
+test('orderFor: gemerkte Sortierung nur, wenn die Liste sie anbietet', () => {
+  assert.deepEqual(orderFor({ sort: 'points', dir: 'desc' }, ['last-name', 'points']), { sort: 'points', dir: 'desc' });
+  assert.deepEqual(orderFor({ sort: 'points', dir: 'desc' }, ['last-name', 'first-name']), { sort: 'last-name', dir: 'asc' });
+});
+
+test('browseOrder: Reihenfolge nur für dieselbe Liste und wenn die Person darin steht', () => {
+  setBrowseOrder('mitglied', [4, 2, 9]);
+  assert.deepEqual(browseOrder('mitglied', 2), [4, 2, 9]);
+  assert.equal(browseOrder('mitglied', 5), null);
+  assert.equal(browseOrder('ehemalige', 2), null);
 });
