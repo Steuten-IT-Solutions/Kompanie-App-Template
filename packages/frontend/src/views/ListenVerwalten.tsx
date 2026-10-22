@@ -622,65 +622,40 @@ function RowEditor({
 const rotated = (c: ListColumn): boolean => c.width === 'narrow' && c.field !== 'nr' && columnLabel(c).trim() !== '';
 /** Ungefähr: Millimeter je Zeichen in fetter Schrift, um 45° gedreht (Höhe) */
 const ROTATED_MM_PER_CHAR = 1.8;
-/** Druckbreite auf A4 mit 12 mm Rand (@page in PrintPortal): Spalten in Millimetern, damit der gekippte Kopf genau passt */
+/** Druckbreite auf A4 mit 12 mm Rand (@page in PrintPortal) */
 const PAGE_WIDTH_MM = { portrait: 186, landscape: 273 };
-/** Linien wie die Rahmen der Tabelle: 1 px bei 96 dpi */
-const LINE_MM = 0.265;
-/**
- * Die geraden Zellen haben oben einen Rahmen von 1 px, die gedrehten keinen: Die Oberkante der Grafik liegt deshalb um
- * dessen halbe Breite höher, damit sie gerade durchläuft (im PDF nachgemessen; in Millimetern, da Chromium beim Drucken
- * Verschiebungen der Grafik selbst auf ganze Pixel rundet).
- */
-const TOP_MM = -LINE_MM / 2;
-/**
- * Die Linie unter dem Kopf (Rahmen der ersten Zeile) zeichnet Chromium etwas unterhalb der Zellkante; ihre Mitte liegt
- * so weit unter der Grafik (im PDF nachgemessen). Die Fläche reicht bis dorthin, und unter den gekippten Feldern zeichnet
- * die Grafik die Linie selbst, sonst bliebe ein heller Streifen.
- */
-const BOTTOM_MM = 0.21;
-/** Schriftgröße der Überschriften (10,5 pt) in Millimetern */
-const HEAD_FONT_MM = 3.7;
+/** CSS-Pixel je Millimeter (96 dpi, in allen Browsern fest) */
+const PX_PER_MM = 96 / 25.4;
 
 /**
- * Gekippter Kopf über aufeinanderfolgenden gedrehten Spalten als eine Grafik in Millimetern: eine Fläche (ohne Nähte),
- * jede schräge Trennlinie und die Oberkante genau einmal, der Text mittig in seinem Feld. Die Fläche reicht unten links
- * bis an die gerade Spalte davor und oben um die Höhe des Kopfs nach rechts hinaus.
+ * Gekippter Kopf einer gedrehten Spalte: Jede Spalte zeichnet ihr Feld selbst, in ihrer tatsächlichen Breite (100 %),
+ * um 45° geschert. Dadurch beginnen die schrägen Linien genau über den senkrechten darunter, wie auch immer ein Browser
+ * die Spalten verteilt. Jedes Feld zeichnet seine linke und obere Linie, das letzte einer Folge auch die rechte: keine
+ * doppelten Linien. Vor dem ersten Feld füllt ein Dreieck die Lücke zur geraden Spalte davor. Maße in CSS-Pixeln; y =
+ * -0,5 ist die Mitte des Rahmens über der Kopfzeile (die geraden Zellen haben oben 1 px Rahmen, diese Zelle keinen);
+ * ebenso liegen die senkrechten Rahmen darunter mit ihrer Mitte 0,5 px links der Zellkante (im PDF nachgemessen).
  */
-function RotatedHead({ labels, widths, height, color }: { labels: string[]; widths: number[]; height: number; color: string }) {
+function RotatedHead({ height, first, last, color }: { height: number; first: boolean; last: boolean; color: string }) {
   const h = height;
-  const xs = widths.reduce<number[]>((acc, w) => [...acc, acc[acc.length - 1] + w], [0]);
-  const r = xs[xs.length - 1];
+  const line = { stroke: '#555', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' as const };
   return (
-    <svg className="list-th-svg" width={`${r + h}mm`} height={`${h}mm`} viewBox={`0 0 ${r + h} ${h}`} overflow="visible" aria-hidden="true">
-      {/* 0,3 mm nach links unter die gerade Zelle davor (gleiche Farbe), gegen eine helle Naht */}
-      <polygon points={`-0.3,${TOP_MM} ${r + h - TOP_MM},${TOP_MM} ${r},${h} ${r},${h + BOTTOM_MM} -0.3,${h + BOTTOM_MM}`} fill={color} />
-      <g stroke="#555" strokeWidth={LINE_MM} fill="none">
-        <line x1={-0.3} y1={TOP_MM} x2={r + h - TOP_MM} y2={TOP_MM} />
-        <line x1={-0.3} y1={h + BOTTOM_MM} x2={r + LINE_MM / 2} y2={h + BOTTOM_MM} />
-        {/* Schräge Trennlinien, unten ein kurzes Stück senkrecht bis zur Linie unter dem Kopf (wie die Rahmen darunter) */}
-        {xs.map((x, i) => (
-          <polyline key={i} points={`${x},${h + BOTTOM_MM} ${x},${h} ${x + h - TOP_MM},${TOP_MM}`} strokeLinejoin="miter" />
-        ))}
+    <svg className="list-th-svg" width="100%" height={h} overflow="visible" aria-hidden="true">
+      <g transform="translate(-0.5 0)">
+        {first && (
+          <>
+            {/* 1 px nach links unter die gerade Zelle davor (gleiche Farbe), gegen eine helle Naht */}
+            <polygon points={`-1,-0.5 ${h + 0.5},-0.5 0,${h} -1,${h}`} fill={color} />
+            <line x1={-1} y1={-0.5} x2={h + 0.5} y2={-0.5} {...line} />
+          </>
+        )}
+        {/* Scherung um die Unterkante: unten bleibt die Spalte, wo sie ist, oben liegt sie um die Höhe weiter rechts */}
+        <g transform={`translate(0 ${h}) skewX(-45) translate(0 ${-h})`}>
+          <rect x={0} y={-0.5} width="100%" height={h + 0.5} fill={color} />
+          <line x1={0} y1={-0.5} x2="100%" y2={-0.5} {...line} />
+          <line x1={0} y1={-0.5} x2={0} y2={h} {...line} />
+          {last && <line x1="100%" y1={-0.5} x2="100%" y2={h} {...line} />}
+        </g>
       </g>
-      {labels.map((label, i) => {
-        // Unten in der Spaltenmitte, 3 mm höher also 3 mm weiter rechts: auf der Mittellinie des Felds
-        const x = xs[i] + widths[i] / 2 + 3;
-        const y = h - 3;
-        return (
-          <text
-            key={i}
-            x={x}
-            y={y}
-            transform={`rotate(-45 ${x} ${y})`}
-            fill="#fff"
-            fontSize={HEAD_FONT_MM}
-            fontWeight={700}
-            dominantBaseline="central"
-          >
-            {label}
-          </text>
-        );
-      })}
     </svg>
   );
 }
@@ -694,13 +669,18 @@ function PrintSheet({ draft }: { draft: Draft }) {
   const cols = draft.columns;
   const total = cols.reduce((s, c) => s + WIDTH_WEIGHT[c.width], 0) || 1;
   const longest = Math.max(0, ...cols.filter(rotated).map((c) => columnLabel(c).length));
-  const headHeight = longest > 0 ? Math.min(50, Math.max(12, longest * ROTATED_MM_PER_CHAR + 8)) : 0;
+  // Höhe des Kopfs in ganzen Pixeln: Sonst rundet der Browser die Zeile und unter den gekippten Feldern bleibt ein Spalt.
+  const headPx = longest > 0 ? Math.round(Math.min(50, Math.max(12, longest * ROTATED_MM_PER_CHAR + 8)) * PX_PER_MM) : 0;
   // Der gekippte Kopf der letzten Spalte ragt oben um die Höhe des Kopfs nach rechts hinaus: dafür eine leere Spalte
   // ohne Rahmen ans Ende, damit die Tabelle den Platz mitrechnet.
   const last = cols[cols.length - 1];
-  const spare = last && rotated(last) ? headHeight : 0;
+  const sparePx = last && rotated(last) ? headPx : 0;
   const pageWidth = PAGE_WIDTH_MM[draft.orientation];
-  const widths = cols.map((c) => ((pageWidth - spare) * WIDTH_WEIGHT[c.width]) / total);
+  // Spaltenbreiten in ganzen Pixeln: Der Browser rastet die senkrechten Rahmen auf ganze Pixel ein, die gekippten Felder
+  // nicht; nur so beginnen die schrägen Linien genau über den senkrechten. Die letzte Spalte nimmt den Rundungsrest.
+  const available = Math.floor(pageWidth * PX_PER_MM) - sparePx;
+  const widths = cols.map((c) => Math.floor((available * WIDTH_WEIGHT[c.width]) / total));
+  if (widths.length > 0) widths[widths.length - 1] += available - widths.reduce((a, b) => a + b, 0);
   return (
     <div className="list-sheet" style={{ ['--list-color' as string]: brand.themeColor, width: `${pageWidth}mm` }}>
       <header className="list-sheet-head">
@@ -717,12 +697,12 @@ function PrintSheet({ draft }: { draft: Draft }) {
       <table className="list-table">
         <colgroup>
           {widths.map((w, i) => (
-            <col key={i} style={{ width: `${w}mm` }} />
+            <col key={i} style={{ width: `${w}px` }} />
           ))}
-          {spare > 0 && <col style={{ width: `${spare}mm` }} />}
+          {sparePx > 0 && <col style={{ width: `${sparePx}px` }} />}
         </colgroup>
         <thead>
-          <tr style={headHeight ? { height: `${headHeight}mm` } : undefined}>
+          <tr style={headPx ? { height: `${headPx}px` } : undefined}>
             {cols.map((c, i) => {
               const after = cols[i + 1];
               if (!rotated(c)) {
@@ -733,27 +713,22 @@ function PrintSheet({ draft }: { draft: Draft }) {
                   </th>
                 );
               }
-              // Die Grafik steht in der ersten Spalte einer Folge gedrehter Spalten und reicht über alle.
               const before = cols[i - 1];
-              let end = i;
-              while (end + 1 < cols.length && rotated(cols[end + 1])) end++;
               return (
                 <th key={i} className="list-th-rotated">
-                  <span className="list-sr">{columnLabel(c)}</span>
-                  {!(before && rotated(before)) && (
-                    <div style={{ height: `${headHeight}mm` }}>
-                      <RotatedHead
-                        labels={cols.slice(i, end + 1).map((x) => columnLabel(x))}
-                        widths={widths.slice(i, end + 1)}
-                        height={headHeight}
-                        color={brand.themeColor}
-                      />
-                    </div>
-                  )}
+                  <div style={{ height: `${headPx}px` }}>
+                    <RotatedHead
+                      height={headPx}
+                      first={!(before && rotated(before))}
+                      last={!(after && rotated(after))}
+                      color={brand.themeColor}
+                    />
+                    <span className="list-th-label">{columnLabel(c)}</span>
+                  </div>
                 </th>
               );
             })}
-            {spare > 0 && <th className="list-spare-head" aria-hidden="true" />}
+            {sparePx > 0 && <th className="list-spare-head" aria-hidden="true" />}
           </tr>
         </thead>
         <tbody>
@@ -769,7 +744,7 @@ function PrintSheet({ draft }: { draft: Draft }) {
                   {c.kind === 'blank' && c.checkbox ? '☐' : cellText(c, r, i)}
                 </td>
               ))}
-              {spare > 0 && <td className="list-spare" aria-hidden="true" />}
+              {sparePx > 0 && <td className="list-spare" aria-hidden="true" />}
             </tr>
           ))}
         </tbody>
