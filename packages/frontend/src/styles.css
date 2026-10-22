@@ -1978,6 +1978,51 @@ code {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 560px) {
+  .admin-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.admin-tiles li {
+  display: flex;
+}
+.admin-tile {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 112px;
+  padding: 16px 10px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  transition: transform 0.08s ease;
+}
+.admin-tile:active {
+  transform: scale(0.98);
+}
+.admin-tile svg {
+  flex: none;
+  color: var(--accent-text);
+}
+
 /* Übersicht der Einstellungen: je Seite eine Zeile */
 .settings-link {
   width: 100%;

@@ -20,7 +20,7 @@ import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
-import { AdminNav, adminTabs, memberListAllowed } from '../adminNav';
+import { AdminBack, AdminMenu, adminTabs } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import { PersonSkeleton } from '../skeleton';
@@ -83,19 +83,22 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
 
-  const subs = adminTabs().filter((t) => !t.route);
-  const active: Sub = subs.some((t) => t.id === sub) ? (sub as Sub) : 'mitglieder';
-  // Ohne Mitgliederliste (z. B. nur Schwarzes Brett): gleich den ersten Bereich öffnen.
-  const first = adminTabs()[0];
-  const redirect = !memberListAllowed() && !sub && first?.route ? first.route : null;
+  const tabs = adminTabs();
+  const subs = tabs.filter((t) => !t.route);
+  // Ohne Unterseite die Startseite mit allen Bereichen; gibt es nur einen, öffnet er gleich.
+  const only = tabs.length === 1 ? tabs[0] : null;
+  const active: Sub | null = subs.some((t) => t.id === sub) ? (sub as Sub) : !sub && only && !only.route ? (only.id as Sub) : null;
+  const redirect = !sub && only?.route ? only.route : null;
   useEffect(() => {
-    if (redirect) navigate(redirect);
+    if (redirect) redirectTo(redirect);
   }, [redirect]);
   if (redirect) return null;
+  // „‹ Verwaltung“ auf der ersten Seite eines Bereichs; Unterseiten (Mitglied, Liste, Amt …) haben ihren eigenen Rückweg.
+  const showBack = !!active && (!arg || ((active === 'punkte' || active === 'strafe') && fromList === null));
 
   return (
     <div>
-      <AdminNav active={active} />
+      {showBack && <AdminBack />}
       {sub === 'mitglied' && arg ? (
         <MemberDetailView base="mitglied" id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : active === 'ehemalige' && arg && /^\d+$/.test(arg) ? (
@@ -130,8 +133,10 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : active === 'listen' ? (
         <ListAdmin path={path.slice(1)} onToast={onToast} />
-      ) : (
+      ) : active === 'mitglieder' ? (
         <Members />
+      ) : (
+        <AdminMenu />
       )}
     </div>
   );
