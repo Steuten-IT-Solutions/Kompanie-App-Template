@@ -17,6 +17,10 @@ import { watchRuntimeErrors } from './lastError';
 import './generated/fonts';
 import './generated/theme.css';
 import './styles.css';
+import { applyTheme, loadTheme } from './theme';
+
+// Gewählte Darstellung (hell, dunkel, wie Gerät) vor dem ersten Zeichnen setzen.
+applyTheme(loadTheme());
 
 // Teilbarer Link …/installieren/ (auch ?kompanie_app=installieren oder ?r=/installieren)
 // → Anleitung in der App (#/installieren).

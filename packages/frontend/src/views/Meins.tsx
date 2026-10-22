@@ -1,8 +1,8 @@
-import { api, config, roleLabels, type Me } from '../api';
+import { api, config, isMember, roleLabels, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
-import { ErrorBox, Loading, StatCard, useAsync } from '../ui';
+import { ErrorBox, lazyView, Loading, StatCard, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
 import MeineAnwesenheit from './MeineAnwesenheit';
 import Punkte from './Punkte';
@@ -15,13 +15,16 @@ import { PersonOffices } from './Aemter';
 
 const sec = brand.labels.sections;
 
+const Konto = lazyView(() => import('./Konto'));
+
 /**
- * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad, Anwesenheit und Ämter, umschaltbar. Die Summen
- * (/me) lädt Meins einmal für alle.
+ * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad, Anwesenheit, Ämter und das Konto,
+ * umschaltbar. Die Summen (/me) lädt Meins einmal für alle, nur für Mitglieder; das Konto haben alle Angemeldeten.
  */
-export default function Meins({ sub }: { sub?: string }) {
-  const me = useAsync(api.me, [], 'me');
-  const parts = (
+export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToast: (msg: string) => void; onLogout: () => void }) {
+  const member = isMember();
+  const me = useAsync(() => (member ? api.me() : Promise.resolve(null)), [], 'me');
+  const dataParts = (
     [
       ['uebersicht', 'Übersicht', true],
       ['punkte', sec.points, config?.features.points],
@@ -30,11 +33,14 @@ export default function Meins({ sub }: { sub?: string }) {
       ['anwesenheit', sec.attendance, config?.features.attendance],
       ['aemter', sec.offices, config?.features.offices],
     ] as const
-  ).filter(([, , on]) => on);
+  )
+    .filter(([, , on]) => member && on)
+    .map(([id, label]) => [id, label] as const);
+  const parts = [...dataParts, ['konto', 'Konto'] as const];
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
   return (
     <div>
-      {parts.length > 1 && active && (
+      {parts.length > 1 && (
         <MenuNav
           label="Meine Daten"
           className="meins-menu"
@@ -42,7 +48,9 @@ export default function Meins({ sub }: { sub?: string }) {
           items={parts.map(([id, label]) => ({ id, label, onSelect: () => navigate(`meins/${id}`) }))}
         />
       )}
-      {me.loading && !me.data ? (
+      {active === 'konto' ? (
+        <Konto onToast={onToast} onLogout={onLogout} />
+      ) : me.loading && !me.data ? (
         <Loading />
       ) : me.error && !me.data ? (
         <ErrorBox message={me.error} onRetry={me.reload} />

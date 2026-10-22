@@ -12,7 +12,7 @@ Oben unter **{bereich.events}** steht die Karte **Anstehende {bereich.birthdays}
 Wer am 29. Februar Geburtstag hat, steht in Jahren ohne Schalttag am 28. Februar in der Liste.
 
 ## Deinen Geburtstag eintragen
-1. Oben rechts auf **Konto** tippen; dort steht die Karte **Geburtstag**.
+1. Auf **Meins** und dann im Menü auf **Konto** tippen; dort steht die Karte **Geburtstag**.
 2. **Tag** und **Monat** wählen. Das **Jahr** ist freiwillig.
 3. Die beiden Schalter festlegen:
    - **Anderen Mitgliedern zeigen** (von Anfang an an): Ist er aus, sieht niemand deinen Geburtstag, und es kommt auch keine Benachrichtigung an die anderen.

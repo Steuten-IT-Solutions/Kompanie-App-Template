@@ -74,6 +74,7 @@ const PATHS = [
   ['meins', 'strafen'],
   ['meins', 'dienstgrad'],
   ['meins', 'anwesenheit'],
+  ['meins', 'konto'],
   ['meins', 'aemter'],
   ['verwaltung'],
   ['verwaltung', 'mitglieder'],
@@ -139,6 +140,9 @@ test('Meins: ohne Unterseite die Übersicht, sonst die Seite zur Unterseite', ()
   assert.equal(helpSlug(['meins'], member), 'meins-uebersicht');
   assert.ok(sees('meins-uebersicht', member));
   assert.equal(helpSlug(['meins', 'strafen'], withRights(['member'])), 'meine-strafen');
+  // Konto unter „Meins“; ohne eigene Daten (z. B. Anwärter) ist es die einzige Unterseite.
+  assert.equal(helpSlug(['meins', 'konto'], member), 'anmelden-und-konto');
+  assert.equal(helpSlug(['meins'], withRights(['calendar'])), 'anmelden-und-konto');
 });
 
 test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', () => {

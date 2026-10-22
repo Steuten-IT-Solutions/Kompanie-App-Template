@@ -69,7 +69,7 @@ Wer schon ein Konto mit genau diesem Vor- und Nachnamen hat, wird übersprungen;
 Die Datei enthält persönliche Daten: Lösche sie nach dem Import, wenn du sie nicht mehr brauchst.
 
 ## Foto eines Mitglieds
-Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mitglieder anlegen darf, und zwar bei allen Konten, die er auch sonst verwalten darf (siehe den Hinweis unten). Die Person selbst sieht ihr Foto unter **Konto**, ändert es aber nicht.
+Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mitglieder anlegen darf, und zwar bei allen Konten, die er auch sonst verwalten darf (siehe den Hinweis unten). Die Person selbst sieht ihr Foto unter **Meins → Konto**, ändert es aber nicht.
 
 - Beim Anlegen: im Formular unter **Foto (optional)** (einzeln oder bei **Mehrere auf einmal**).
 - Später: auf der Seite des Mitglieds das Foto antippen; in der großen Ansicht stehen **Foto ersetzen** und **Foto entfernen**. Ohne Foto die Anfangsbuchstaben antippen und **Foto hochladen**. Das gilt sofort.
@@ -79,7 +79,7 @@ Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoa
 Ist der Bereich **{bereich.directory}** eingeschaltet, ist das Foto von {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärtern) öffentlich: Es steht in der Liste unter **{bereich.directory}**, die jeder sehen kann, auch ohne Anmeldung. Sonst sieht es nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Fotos von Gästen sind nie öffentlich. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
 
 ## Eintritt
-Auf der Seite des Mitglieds unten **Eintritt** antippen und eintragen, wann die Person eingetreten ist: das Datum als TT.MM.JJJJ oder nur das Jahr (ab 1800, nicht in der Zukunft). Dann **Eintritt speichern** tippen; **Entfernen** löscht ihn nach einer Rückfrage. Die Person kann ihn auch selbst unter **Konto** eintragen. Ob der Eintritt auf ihrer Seite unter **{bereich.directory}** steht, wählt nur sie selbst; du siehst die Auswahl hier nur zur Information. Dort steht er so, wie er eingetragen ist (das ganze Datum oder nur das Jahr). Trägst du die Person später als ehemalig ein, schlägt die App diesen Eintritt vor.
+Auf der Seite des Mitglieds unten **Eintritt** antippen und eintragen, wann die Person eingetreten ist: das Datum als TT.MM.JJJJ oder nur das Jahr (ab 1800, nicht in der Zukunft). Dann **Eintritt speichern** tippen; **Entfernen** löscht ihn nach einer Rückfrage. Die Person kann ihn auch selbst unter **Meins → Konto** eintragen. Ob der Eintritt auf ihrer Seite unter **{bereich.directory}** steht, wählt nur sie selbst; du siehst die Auswahl hier nur zur Information. Dort steht er so, wie er eingetragen ist (das ganze Datum oder nur das Jahr). Trägst du die Person später als ehemalig ein, schlägt die App diesen Eintritt vor.
 
 ## Als {rolle.member} aufnehmen
 Anwärter nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Ist es so weit, im Mitglied **Konto und Rolle** aufklappen und auf **Als {rolle.member} aufnehmen** tippen. Den Knopf gibt es nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat (Einstellungen → Rollen).

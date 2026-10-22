@@ -144,7 +144,7 @@ export default function BirthdayPage() {
         </section>
       ))}
       <p className="muted small">
-        Deinen eigenen Geburtstag trägst du unter „Mein Konto“ ein; dort legst du auch fest, ob andere ihn sehen.
+        Deinen eigenen Geburtstag trägst du unter „Meins → Konto“ ein; dort legst du auch fest, ob andere ihn sehen.
       </p>
     </div>
   );
