@@ -9,7 +9,7 @@ Unter **{bereich.directory}** (unten in der Leiste) siehst du, wer zur Kompanie 
 ## Was in der Liste steht
 Jede Zeile zeigt den Namen und vorn ein kleines rundes Foto; wer keines hat, bekommt dort seine Anfangsbuchstaben. Tippst du auf ein Foto, erscheint es groß und ganz – so kannst du dir die Gesichter besser einprägen. Schließen mit **✕** oder durch Tippen neben das Foto. Nutzt die Kompanie **{bereich.titles}**, stehen sie beim Namen. Ist der Bereich **{bereich.ranks}** eingeschaltet, steht rechts das Abzeichen mit dem {begriff.rank} darunter; wer keinen {begriff.rank} hat, hat dort nichts.
 
-Hat eine Person Ämter, steht rechts der Knopf **{bereich.offices}**; er zeigt alle ihre Ämter. Mehr zeigt die Liste nicht: keine Rollen, keine {bereich.points} oder {bereich.penalties}, keine E-Mail-Adressen oder Benutzernamen.
+Ein Tipp auf eine Person öffnet ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, und nutzt die Kompanie **{bereich.offices}**, darunter alle ihre Ämter als Zeitstrahl. **‹ Zurück** führt wieder zur Liste. Mehr zeigt die Liste nicht: keine Rollen, keine {bereich.points} oder {bereich.penalties}, keine E-Mail-Adressen oder Benutzernamen.
 
 ## Suchen und sortieren
 Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: zuerst {rolle.member}, dann eigene Rollen, die gesondert zählen, zuletzt {rolle.candidate}. Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**. Die Sortierung merkt sich die App auf diesem Gerät.

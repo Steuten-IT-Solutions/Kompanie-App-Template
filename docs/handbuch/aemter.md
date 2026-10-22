@@ -14,7 +14,7 @@ Aufgeklappt stehen oben unter **Im Amt** alle, die das Amt gerade haben, mit Fot
 Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
 
 ## Ämter einer Person
-Steht eine Person auch in der Mitgliederliste, siehst du ihr Foto, und ein Tipp auf ihren Namen (unter **Im Amt** oder in der Chronik) zeigt alle ihre Ämter auf einen Blick. In der Mitgliederliste führt der Knopf **{bereich.offices}** neben einer Person ebenfalls dorthin. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
+Steht eine Person auch in der Mitgliederliste, siehst du ihr Foto, und ein Tipp auf ihren Namen (unter **Im Amt** oder in der Chronik) öffnet ihre Seite mit allen ihren Ämtern als Zeitstrahl. Dorthin kommst du auch, wenn du in der Mitgliederliste auf die Person tippst. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
 
 Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins → {bereich.offices}**.
 

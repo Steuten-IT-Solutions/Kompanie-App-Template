@@ -21,13 +21,6 @@ export function useOffices(enabled = true) {
   return useAsync<OfficesOverview | null>(() => (enabled ? api.offices() : Promise.resolve(null)), [], enabled ? 'offices' : undefined);
 }
 
-/** Personen, die mindestens eine Amtszeit mit ihrem Konto haben (für den Knopf „Ämter“ in der Mitgliederliste). */
-export function holderIds(data: OfficesOverview | null | undefined): Set<number> {
-  const ids = new Set<number>();
-  for (const o of data?.offices ?? []) for (const t of o.terms) for (const h of t.holders) if (h.user_id) ids.add(h.user_id);
-  return ids;
-}
-
 /** Dauer in Jahren: „18 Jahre“, laufende bis heute; leer bei einzelnen Jahren. */
 export function termDuration(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>, thisYear = new Date().getFullYear()): string {
   if (t.kind === 'point') return '';
@@ -43,7 +36,7 @@ function Holders({ holders, link }: { holders: OfficeHolder[]; link: boolean }) 
       {holders.map((h, i) => (
         <li key={i}>
           {link && h.user_id ? (
-            <button type="button" className="holder-chip holder-chip-link" onClick={() => navigate(`mitglieder/aemter/${h.user_id}`)}>
+            <button type="button" className="holder-chip holder-chip-link" onClick={() => navigate(`mitglieder/${h.user_id}`)}>
               <MemberAvatar url={h.photo_url} name={h.name} />
               <span>{h.name}</span>
             </button>
@@ -77,7 +70,18 @@ function When({ term }: { term: OfficeTerm }) {
  * Chronik als Zeitleiste: links (auf breiten Bildschirmen abwechselnd gegenüber) die Jahre, in der Mitte die Linie, daneben
  * je Amtszeit eine Karte. Jahrzehnt-Marken gliedern lange Listen; laufende Amtszeiten leuchten, Ehrungen tragen einen Stern.
  */
-export function Timeline({ entries, link = true, label }: { entries: TimelineEntry[]; link?: boolean; label: string }) {
+export function Timeline({
+  entries,
+  link = true,
+  label,
+  self,
+}: {
+  entries: TimelineEntry[];
+  link?: boolean;
+  label: string;
+  /** Seite einer Person: sie selbst nicht auf jeder Karte, nur wer das Amt mit ihr teilte */
+  self?: number;
+}) {
   let decade: number | null = null;
   const rows: ReactElement[] = [];
   entries.forEach(({ key, term, office }, i) => {
@@ -110,7 +114,20 @@ export function Timeline({ entries, link = true, label }: { entries: TimelineEnt
               {duration && <span className="tl-duration">{duration}</span>}
             </div>
           )}
-          <Holders holders={term.holders} link={link} />
+          {(() => {
+            const shown = self === undefined ? term.holders : term.holders.filter((h) => h.user_id !== self);
+            return (
+              shown.length > 0 &&
+              (self === undefined ? (
+                <Holders holders={shown} link={link} />
+              ) : (
+                <div className="tl-with">
+                  <span className="tl-with-label">mit</span>
+                  <Holders holders={shown} link={link} />
+                </div>
+              ))
+            );
+          })()}
           {term.note && <div className="timeline-note">{term.note}</div>}
         </div>
       </li>,
@@ -156,7 +173,7 @@ function Spotlight({ terms, link }: { terms: OfficeTerm[]; link: boolean }) {
           return (
             <li key={i}>
               {link && h.user_id ? (
-                <button type="button" className="spotlight-person" onClick={() => navigate(`mitglieder/aemter/${h.user_id}`)}>
+                <button type="button" className="spotlight-person" onClick={() => navigate(`mitglieder/${h.user_id}`)}>
                   {body}
                 </button>
               ) : (
@@ -310,23 +327,5 @@ export function PersonOffices({ userId, empty }: { userId: number; empty: string
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const entries = personEntries(data, userId);
   if (entries.length === 0) return <Empty>{empty}</Empty>;
-  return <Timeline label={sec.offices} entries={entries} link={false} />;
-}
-
-/** Seite „Ämter von …“ im Tab Mitglieder. */
-export function PersonOfficesPage({ userId }: { userId: number }) {
-  const { data } = useOffices();
-  const name = data?.offices.flatMap((o) => o.terms.flatMap((t) => t.holders)).find((h) => h.user_id === userId)?.name;
-  return (
-    <div>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('mitglieder/aemter')}>
-        ← Alle {sec.offices}
-      </button>
-      <h2 className="section-title">
-        {sec.offices}
-        {name ? ` von ${name}` : ''}
-      </h2>
-      <PersonOffices userId={userId} empty={`Keine ${sec.offices} eingetragen.`} />
-    </div>
-  );
+  return <Timeline label={sec.offices} entries={entries} link={false} self={userId} />;
 }
