@@ -80,6 +80,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (scharf, auch auf Handys), Name als Balken im Bild, ohne Dienstgrad, nach Namen sortiert, groß beim Antippen. In
   `[kompanie_aemter]` sind die Fotos schärfer und oben ausgerichtet, damit der runde Ausschnitt keine Gesichter
   abschneidet. Schrift steht in der Textfarbe der Webseite, damit sie auch mit dunklem Hintergrund lesbar ist.
+- **`[kompanie_mitglieder]` ohne Anwärter**: Die Galerie auf der Webseite zeigt nur noch Mitglieder. Anwärter und
+  andere Personen nur mit dem internen Kalender stehen weiter in der Mitgliederliste der App.
+
+### Behoben
+
+- **Shortcodes mittig**: Manche Themes (z. B. Astra) rückten `[kompanie_mitglieder]`, `[kompanie_termine]` und die
+  Inhaber in `[kompanie_aemter]` nach rechts ein; links war mehr Platz als rechts. Die Listen stehen jetzt bündig.
 
 ## [0.2.0] – 2026-10-22
 
