@@ -1,42 +1,68 @@
 ---
-titel: Anmelden und Konto
+titel: Mein Konto
 reihenfolge: 20
 rechte: []
 ---
-Ohne Anmeldung siehst du alles, was öffentlich ist, z. B. die öffentlichen {bereich.events} und die {bereich.news}. Mitglieder melden sich an und sehen dazu ihre eigenen Daten und alles, was nur für Mitglieder ist.
+In deinem Konto stehen dein Name und deine Rolle. Hier stellst du die Benachrichtigungen und die Darstellung ein, änderst dein Passwort und meldest dich ab. Als {rolle.member} trägst du hier auch deinen Geburtstag und deinen Eintritt ein.
 
-## Anmelden
-1. Oben rechts auf **Login** tippen. Läuft die App über die Webseite der Kompanie (WordPress), öffnet sich dafür deren Anmeldeseite.
-2. Benutzernamen (oder E-Mail-Adresse) und Passwort eingeben. Beides bekommst du von der Kompanie.
-3. **Angemeldet bleiben** ist vorausgewählt: Dann bleibst du auf diesem Gerät rund ein Jahr angemeldet (400 Tage); wenn du die App zwischendurch nutzt, verlängert sich das von selbst. Ohne den Haken endet die Anmeldung, wenn du den Browser schließt, spätestens nach zwei Tagen.
+![Mein Konto mit Name, Rolle und der Karte Geburtstag](bild:anmelden-und-konto)
 
-## Seite als Link verschicken
-Oben neben **?** steht das Teilen-Symbol. Darauf tippen, und das Handy bietet das Verschicken an, z. B. per WhatsApp oder E-Mail; am Computer wird der Link kopiert. Wer den Link öffnet, landet direkt auf dieser Seite.
-- Ist die Seite nur für Angemeldete, bittet die App erst um die Anmeldung und öffnet sie danach.
-- Jede Person sieht dabei nur, was sie sehen darf. Fehlt ihr das Recht, öffnet die App ihre Startseite.
-- Verlinkt wird die Seite selbst: Einen einzelnen aufgeklappten Termin oder eine gewählte Sortierung enthält der Link nicht.
+## So öffnest du die Seite
+Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Meins** für dich sonst nichts (z. B. als Anwärter), öffnet sich das Konto direkt, ohne Menü.
 
-## Dein Konto
-Bist du angemeldet, findest du dein Konto unter **Meins**: im Menü oben auf der Seite **Konto** wählen. Hat die Kompanie für dich keine weiteren Angaben unter **Meins** (z. B. als Anwärter oder {rolle.guest}), öffnet sich das Konto direkt. Dort findest du:
-- deinen Namen und deine Rolle, z. B. {rolle.member}, und dein Foto, wenn jemand eines hochgeladen hat (ändern kann es, wer Mitglieder anlegt),
-- als {rolle.member} die Karte **Geburtstag**, wenn die Kompanie {bereich.birthdays} nutzt,
-- als {rolle.member} die Karte **Eintritt**, wenn die Kompanie die Liste {bereich.directory} nutzt: Dort wählst du auch, wer den Eintritt auf deiner Seite in dieser Liste sieht,
-- **Darstellung**: **Hell**, **Dunkel** oder **Wie Gerät** (Grundeinstellung: folgt dem hellen oder dunklen Modus deines Handys), siehe unten,
-- **Benachrichtigungen einstellen**, siehe [Benachrichtigungen](seite:benachrichtigungen),
-- **App installieren**, solange du die App im Browser benutzt, siehe [Die App aufs Handy holen](seite:app-installieren),
-- **Passwort ändern** und **Abmelden**.
+![Aufgeklapptes Menü unter Meins mit dem Eintrag Konto](bild:anmelden-und-konto-menue)
 
-Die Einstellungen der App finden {rolle.admin}s nicht hier, sondern in der **Verwaltung**.
+## Was du hier siehst
+- **Name und Rolle**: dein Name und deine Rolle, z. B. {rolle.member}, und dein Foto, wenn jemand eines hochgeladen hat. Ändern kann das Foto, wer Mitglieder anlegen darf.
+- **Geburtstag** (nur für {rolle.member}, wenn die {kompanie.name} {bereich.birthdays} nutzt): dein Geburtstag und wer ihn sieht.
+- **Eintritt** (nur für {rolle.member}, wenn die {kompanie.name} die Liste {bereich.directory} nutzt): wann du eingetreten bist und wer das auf deiner Seite in der Liste sieht.
+- **Benachrichtigungen einstellen**: worüber dich die App auf diesem Gerät benachrichtigt.
+- **Darstellung**: **Wie Gerät**, **Hell** oder **Dunkel**.
+- **App installieren**: die Anleitung, wie du die App aufs Handy holst. Die Karte fehlt, wenn du die App schon installiert geöffnet hast.
+- **Passwort ändern**: dein Passwort neu festlegen.
+- **Abmelden**: dich auf diesem Gerät abmelden.
 
-## Hell oder dunkel
-Oben rechts neben **?** wechselt der Knopf mit Mond bzw. Sonne zwischen heller und dunkler Darstellung, auch ohne Anmeldung. Wechselst du damit zurück zu der Darstellung, die dein Handy oder Computer gerade hat, richtet sich die App wieder nach dem Gerät.
+## So gehst du vor
+### Deinen Geburtstag eintragen
+1. Wähle in der Karte **Geburtstag** **Tag** und **Monat**; das **Jahr** ist freiwillig.
+2. Lege mit **Anderen Mitgliedern zeigen** und **Alter anzeigen** fest, was die anderen sehen.
+3. Tippe auf **Geburtstag speichern**.
 
-Unter **Meins → Konto → Darstellung** legst du sie fest: **Hell** oder **Dunkel** bleibt, auch wenn das Gerät umschaltet (z. B. abends in den Dunkelmodus); mit **Wie Gerät** wechselt die App mit dem Gerät. Die Wahl gilt nur auf diesem Gerät und bleibt auch nach dem Abmelden erhalten.
+Alles Weitere zu den Schaltern steht auf der Hilfeseite **{bereich.birthdays}**.
 
-## Passwort ändern
-Unter **Meins → Konto → Passwort ändern** das aktuelle Passwort und zweimal das neue eingeben (mindestens 8 Zeichen, anders als das bisherige) und **Passwort ändern** tippen. Du bleibst auf diesem Gerät angemeldet, alle anderen Geräte werden abgemeldet.
+### Deinen Eintritt eintragen
+1. Trage in der Karte **Eintritt** unter **Datum oder Jahr** das Datum ein (z. B. 12.03.2005) oder nur das Jahr (z. B. 2005).
+2. Wähle unter **Auf meiner Seite unter „{bereich.directory}“**, wer es auf deiner Seite sieht: **Nicht anzeigen**, **Mitgliedern anzeigen** oder **Öffentlich anzeigen** (jeder mit der Adresse der App, auch ohne Anmeldung).
+3. Tippe auf **Eintritt speichern**.
 
-> Passwort vergessen? Dann kann dir ein {rolle.admin} der Kompanie (oder wer Mitglieder anlegen darf) ein neues Startpasswort geben.
+Mit **Entfernen** löschst du den Eintritt wieder. Der Eintritt darf nicht in der Zukunft liegen.
 
-## Abmelden
-Unter **Meins → Konto → Abmelden**. Dabei löscht die App die auf dem Gerät gespeicherten Daten, und dein Konto bekommt auf diesem Gerät keine Benachrichtigungen mehr. Abmelden braucht eine Internetverbindung; ohne Netz bleibt alles, wie es ist.
+### Die Darstellung festlegen
+1. Tippe in der Karte **Darstellung** auf **Hell** oder **Dunkel**. Die App bleibt dann so, auch wenn dein Gerät umschaltet (z. B. abends in den Dunkelmodus).
+2. Mit **Wie Gerät** (so ist es am Anfang eingestellt) wechselt die App mit deinem Gerät.
+
+Die Wahl gilt nur auf diesem Gerät und bleibt auch nach dem Abmelden erhalten. Schnell umschalten geht auch oben mit dem Mond bzw. der Sonne.
+
+### Dein Passwort ändern
+1. Trage in der Karte **Passwort ändern** dein **Aktuelles Passwort** ein.
+2. Trage das neue Passwort zweimal ein, unter **Neues Passwort (mind. 8 Zeichen)** und **Neues Passwort wiederholen**.
+3. Tippe auf **Passwort ändern**.
+
+![Karte „Passwort ändern“ mit den drei Feldern](bild:anmelden-und-konto-passwort)
+
+Das neue Passwort muss mindestens 8 Zeichen lang sein, sich vom bisherigen unterscheiden und darf nicht mit einem Leerzeichen beginnen oder enden. Du bleibst auf diesem Gerät angemeldet; auf allen anderen Geräten musst du dich neu anmelden.
+
+### Dich abmelden
+1. Tippe ganz unten auf **Abmelden**.
+2. Die App meldet dich ab und löscht die Daten, die sie auf dem Gerät gespeichert hat.
+
+## Gut zu wissen
+- Abmelden braucht eine Internetverbindung. Ohne Netz bleibt alles, wie es ist.
+- Nach dem Abmelden bekommt dein Konto auf diesem Gerät keine Benachrichtigungen mehr.
+- Passwort vergessen? Ein {rolle.admin} der {kompanie.name} (oder wer Mitglieder anlegen darf) kann dir ein neues Startpasswort geben.
+- Die Einstellungen der App findest du als {rolle.admin} nicht hier, sondern unter **Verwaltung**.
+
+## Siehe auch
+- [Anmelden](seite:anmelden)
+- [Benachrichtigungen](seite:benachrichtigungen)
+- [Die App aufs Handy holen](seite:app-installieren)

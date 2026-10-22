@@ -17,6 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Hilfe als Bedienungsanleitung zu jedem Bildschirm**: Das „?“ oben öffnet jetzt die Anleitung genau zu der Seite,
+  auf der man gerade ist – mit Bildschirmfotos aus der eigenen App (in euren Farben und mit euren Bezeichnungen) und
+  Schritt für Schritt erklärt: wozu die Seite da ist, wie man sie öffnet, was man dort sieht und wie man vorgeht. Die
+  Texte sind neu geschrieben, verständlich und ohne Technik. Dasselbe Handbuch mit Fotos steht auf der Download-Seite.
 - **Konten in der Datensicherung** (WordPress): Die Sicherung enthält jetzt auch die Benutzer der Webseite mit
   Benutzername, E-Mail, Namen, Passwort (als Prüfwert) und Rollen. Ist die Webseite verloren, legt das Wiederherstellen
   auf einer neu installierten WordPress-Seite unter derselben Adresse die Konten mit ihrer bisherigen Nummer wieder an;
