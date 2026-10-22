@@ -9,7 +9,7 @@ Unter **Verwaltung → Einstellungen → Zustand und Updates** zeigt die Karte *
 - **Updates**: ob die App aktuell ist, ob ein Update ansteht oder fehlgeschlagen ist. Mehr unter [Updates und Datensicherung](seite:admin-updates-und-sicherung).
 - **{bereich.gallery}**: wann der letzte Abgleich mit Google Drive war, ob er geklappt hat und ob Bilder noch aufbereitet werden oder sich nicht laden ließen.
 - **{bereich.calendar}**: ob und wie der Kalender eingerichtet ist und ob die Verbindung mit Google ihn lesen darf.
-- **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen wurde.
+- **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen bzw. in Google Drive abgelegt wurde; gelb nach 30 Tagen ohne Sicherung oder wenn das Hochladen nach Google Drive scheitert.
 - **Server**: PHP-Version und Datenbank; gelb, wenn auf dem Webspace weniger als 200 MB frei sind.
 - **Push-Benachrichtigungen**: wie viele Geräte angemeldet sind, oder was dem Server fehlt, um Benachrichtigungen zu senden.
 

@@ -38,3 +38,32 @@ export const dataCache = {
     generation++;
   },
 };
+
+/** Schlüssel im Speicher für useAsync mit `key` und `deps`. */
+export function cacheKey(key: string, deps: unknown[]): string {
+  return `${key}|${JSON.stringify(deps)}`;
+}
+
+const pending = new Map<string, Promise<unknown>>();
+
+/**
+ * Daten für eine Ansicht schon laden, bevor sie geöffnet wird (z. B. das nächste Mitglied beim Wischen): Sie liegen
+ * dann unter demselben Schlüssel wie bei useAsync(fn, deps, key) und erscheinen beim Öffnen sofort. Lädt nur, wenn noch
+ * nichts gespeichert ist und keine Anfrage dafür läuft; Fehler bleiben still (die Ansicht lädt dann selbst).
+ */
+export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>): Promise<void> {
+  const k = cacheKey(key, deps);
+  if (entries.has(k)) return Promise.resolve();
+  let p = pending.get(k);
+  if (!p) {
+    const since = generation;
+    p = fn()
+      .then((d) => {
+        if (d !== null) dataCache.set(k, d, since);
+      })
+      .catch(() => {})
+      .finally(() => pending.delete(k));
+    pending.set(k, p);
+  }
+  return p.then(() => {});
+}

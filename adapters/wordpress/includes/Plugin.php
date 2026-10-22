@@ -45,17 +45,18 @@ final class Plugin
             $uploads = wp_upload_dir(null, false);
             $db = new WpdbConnection($wpdb, $wpdb->prefix . 'kompanie_');
             $config = self::config();
+            $files = new LocalFileStorage(
+                $uploads['basedir'] . '/kompanie-galerie',
+                $uploads['baseurl'] . '/kompanie-galerie',
+                $uploads['basedir'] . '/kompanie-galerie-intern',
+                get_temp_dir(),
+            );
             self::$app = new App(
                 db: $db,
                 settings: $settings,
                 cache: new WpCache(),
                 http: new WpHttpClient(),
-                files: new LocalFileStorage(
-                    $uploads['basedir'] . '/kompanie-galerie',
-                    $uploads['baseurl'] . '/kompanie-galerie',
-                    $uploads['basedir'] . '/kompanie-galerie-intern',
-                    get_temp_dir(),
-                ),
+                files: $files,
                 images: new WpImageResizer(),
                 scheduler: new WpScheduler(),
                 news: new WpNewsSource(),
@@ -66,7 +67,7 @@ final class Plugin
                 users: $users,
                 config: $config,
                 updateTarget: new WpUpdateTarget(),
-                backup: new WpBackup($db, KOMPANIE_APP_VERSION, $config->name()),
+                backup: new WpBackup($db, KOMPANIE_APP_VERSION, $config->name(), $files),
                 packageConfig: self::packageConfig(),
             );
             self::$app->watchFatals();

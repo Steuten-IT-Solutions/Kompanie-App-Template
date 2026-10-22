@@ -17,6 +17,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Konten in der Datensicherung** (WordPress): Die Sicherung enthält jetzt auch die Benutzer der Webseite mit
+  Benutzername, E-Mail, Namen, Passwort (als Prüfwert) und Rollen. Ist die Webseite verloren, legt das Wiederherstellen
+  auf einer neu installierten WordPress-Seite unter derselben Adresse die Konten mit ihrer bisherigen Nummer wieder an;
+  alle melden sich wie gewohnt an. Vorhandene Konten bleiben, wie sie sind, und bekommen nur ihre Rolle in der App
+  zurück. Passen Konten nicht zusammen, ändert das Wiederherstellen nichts und sagt, welches Konto stört.
+- **Dokumente, Abzeichen und Benachrichtigungen in der Datensicherung**: Die Sicherung enthält jetzt auch die Dateien
+  der Dokumente und die Abzeichen der Dienstgrade sowie die Anmeldungen der Geräte für Benachrichtigungen. Nach dem
+  Wiederherstellen auf einem neuen Server lassen sich die Dokumente öffnen, und Benachrichtigungen kommen weiter an.
+- **Sicherungen in Google Drive**: Unter *Einstellungen → Datensicherung* legt die App auf Wunsch einmal pro Woche eine
+  Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und behält die letzten acht. So liegt auch nach dem
+  Verlust des Servers eine aktuelle Sicherung woanders. Dafür einmal unter *Google-Zugang* die Verbindung trennen und
+  neu verbinden und dabei das Häkchen für eigene Dateien in Google Drive setzen.
 - **Mitglieder aus Excel oder CSV übernehmen**: In der Ersteinrichtung und unter *Verwaltung → Mitglied anlegen →
   Aus Datei importieren* legt die App alle Personen einer Mitgliederliste auf einmal an, mit Status (Mitglied, eine
   andere Rolle wie Anwärter oder ehemalig), E-Mail, Geburtstag, Eintritt und auf Wunsch Punkten, Dienstgrad und Titeln.
@@ -25,7 +37,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ehemalige importieren** nimmt jetzt auch Excel-Dateien (.xlsx).
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
-  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung.
+  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
+  dabei dem Finger, daneben ist die nächste Person schon zu sehen, und weil die App die Nachbarn vorlädt, steht deren
+  Seite nach dem Wechsel sofort da, ohne Laden.
 
 ### Geändert
 
@@ -33,6 +47,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   von Anfang an auf **Mitgliedern anzeigen** (bisher „Nicht anzeigen“); nur angemeldete Mitglieder sehen die Angabe.
   Das gilt auch für alle schon eingetragenen Geburtstage und Eintritte, die auf „Nicht anzeigen“ standen. Wer sie
   nicht zeigen will, stellt unter *Konto* wieder „Nicht anzeigen“ ein.
+- **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
+  (heruntergeladen oder in Google Drive).
 - **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.
   Das Abzeichen öffnet Befördern und Degradieren, das Foto die große Ansicht mit „Foto ersetzen“ und „Foto
   entfernen“, die Kacheln Punkte und Offen ein Fenster mit dem Formular nur für diese Person und ihren Einträgen,

@@ -1,7 +1,7 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
-import { DATA_UPDATED, dataCache } from './dataCache';
+import { cacheKey as keyOf, DATA_UPDATED, dataCache } from './dataCache';
 import { noteError } from './lastError';
 
 /**
@@ -14,7 +14,7 @@ import { noteError } from './lastError';
  * Stand (setData): Dann einmal neu laden.
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
-  const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
+  const cacheKey = key === undefined ? null : keyOf(key, deps);
   const cached = () => (cacheKey !== null && dataCache.has(cacheKey) ? dataCache.get<T>(cacheKey) : null);
   const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
@@ -134,9 +134,14 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     document.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Waagerecht wischen im Fenster ist keine Zurück-Geste des Browsers (die schlösse es und blätterte im Verlauf).
+    const root = document.documentElement.style;
+    const overscroll = root.overscrollBehaviorX;
+    root.overscrollBehaviorX = 'none';
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
+      root.overscrollBehaviorX = overscroll;
     };
   }, [onClose]);
   return createPortal(
