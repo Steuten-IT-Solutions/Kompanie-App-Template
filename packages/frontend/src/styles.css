@@ -3922,6 +3922,21 @@ button.spotlight-person:focus-visible {
   overflow-wrap: break-word;
   hyphens: auto;
 }
+/* Gerade Spalte, in die ein gekippter Kopf davor oben hineinragt: Text fließt um die schräge Kante (StraightLabel) */
+.list-th-straight-under {
+  display: block;
+  line-height: 1.2;
+  text-align: center;
+  padding-bottom: 0;
+  /* Wörter nicht trennen: Passt eins neben der Kante nicht, rutscht die Zeile tiefer */
+  overflow-wrap: normal;
+  hyphens: manual;
+}
+.list-th-shape {
+  float: left;
+  shape-outside: polygon(0 0, 100% 0, 0 100%);
+  shape-margin: 3px;
+}
 .list-table thead {
   display: table-header-group;
 }
