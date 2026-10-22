@@ -3,7 +3,7 @@ titel: "Google einrichten ({bereich.gallery} und Kalender)"
 reihenfolge: 115
 rechte: [manage_settings]
 ---
-Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender lässt sich über denselben Zugang lesen. Dafür braucht die App einen **Google-Zugang**. Empfohlen ist **„Mit Google verbinden“**: Du legst einmal ein kleines Projekt in der Google Cloud Console an, trägst zwei Werte in der App ein und meldest dich bei Google an. Das dauert etwa 20 Minuten und kostet nichts. Die Alternative mit einem Dienstkonto steht unten.
+Die {bereich.gallery} liest Fotos aus Google Drive. Ein privater Google Kalender lässt sich über denselben Zugang lesen, und die App kann dort wöchentlich eine Datensicherung ablegen. Dafür braucht die App einen **Google-Zugang**. Empfohlen ist **„Mit Google verbinden“**: Du legst einmal ein kleines Projekt in der Google Cloud Console an, trägst zwei Werte in der App ein und meldest dich bei Google an. Das dauert etwa 20 Minuten und kostet nichts. Die Alternative mit einem Dienstkonto steht unten.
 
 > Für den {bereich.calendar} allein brauchst du das nicht: Die **geheime Adresse im iCal-Format** geht ohne Google Cloud (siehe [Ersteinrichtung](seite:admin-einrichtung)).
 
@@ -26,7 +26,7 @@ Im Projekt jeweils die Seite öffnen und **Aktivieren** klicken:
 4. **Kontaktdaten:** eine E-Mail-Adresse eintragen, den Richtlinien zustimmen und **Erstellen** klicken.
 5. Nur bei **Extern:** Links **Zielgruppe** öffnen und unter „Veröffentlichungsstatus“ **App veröffentlichen** klicken und bestätigen. Der Status ist danach **In Produktion**. Bleibt die App im Status „Testen“, läuft die Verbindung nach 7 Tagen ab und die {bereich.gallery} hört auf, sich abzugleichen.
 
-> Unter **Datenzugriff** trägst du **nichts** ein. Dort eingetragene Berechtigungen verlangen eine Prüfung durch Google (mit Demo-Video). Die App fragt die beiden Lese-Berechtigungen beim Verbinden selbst an; das reicht.
+> Unter **Datenzugriff** trägst du **nichts** ein. Dort eingetragene Berechtigungen verlangen eine Prüfung durch Google (mit Demo-Video). Die App fragt ihre Berechtigungen beim Verbinden selbst an; das reicht.
 
 ## 4. OAuth-Client anlegen
 1. In der App auf der Seite **Google-Zugang** die **Weiterleitungs-URI** kopieren (Knopf **Adresse kopieren**). Sie ist für jede Installation anders: ohne WordPress endet sie auf `google/callback`, mit WordPress auf `wp-admin/admin-post.php`. Mit WordPress steht dieselbe Adresse auch im WP-Admin im Feld „Weiterleitungs-URI“.
@@ -41,7 +41,7 @@ Im Projekt jeweils die Seite öffnen und **Aktivieren** klicken:
 1. In der App auf der Seite **Google-Zugang** die **Client-ID** und den **Clientschlüssel (Client-Secret)** eintragen und **Speichern und mit Google verbinden** klicken.
 2. Bei Google mit dem Konto anmelden, das den Galerie-Ordner und den Kalender sehen kann.
 3. Google warnt: **„Google hat diese App nicht überprüft“**. Das ist bei einer eigenen, nicht geprüften App normal. Auf **Erweitert** klicken und dann auf **Weiter zu …** (dahinter steht die Adresse eurer App).
-4. Google fragt nach den Berechtigungen: Lesen in Google Drive und Lesen in Google Kalender. **Beide Häkchen setzen** und **Weiter** klicken.
+4. Google fragt nach den Berechtigungen: Lesen in Google Drive, Lesen in Google Kalender und eigene Dateien in Google Drive anlegen (nur die, die die App selbst anlegt; für die [Sicherungen in Google Drive](seite:admin-updates-und-sicherung)). **Alle Häkchen setzen** und **Weiter** klicken.
 5. Google schickt dich zurück in die App. Dort steht auf der Seite **Google-Zugang** „Verbunden mit Google als …“ und **„Es darf auch den Kalender lesen.“**
 
 Steht stattdessen, dass es den Kalender noch nicht lesen darf, wurde das Häkchen für den Kalender nicht gesetzt: **Verbindung trennen** und noch einmal verbinden. Client-ID und Clientschlüssel bleiben dabei gespeichert; den Clientschlüssel musst du nicht neu eintragen.
@@ -56,7 +56,7 @@ Mehr zu beiden Seiten (Reihenfolge der Quellen, iCal-Adresse, Abgleich): [Erstei
 
 ## Prüfen
 - **Jetzt abgleichen** zeigt, wie viele Alben und Bilder gefunden wurden.
-- Ließen sich Bilder nicht laden, steht darunter **„… Bilder ließen sich nicht laden – anzeigen“**. Aufgeklappt zeigt die Liste je Bild Dateiname, Album, Fehlermeldung und einen Link **In Google Drive öffnen**. Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein für den Speicher des Servers zu großes oder ein beschädigtes Bild. Abhilfe: das Bild als JPG in denselben Ordner legen und das alte entfernen. **Alle erneut versuchen** bereitet alle noch einmal auf, z. B. nachdem der Hoster mehr Speicher gibt.
+- Ließen sich Bilder nicht laden, steht darunter **„… Bilder ließen sich nicht laden – anzeigen“**. Aufgeklappt zeigt die Liste je Bild Dateiname, Album, Fehlermeldung und einen Link **In Google Drive öffnen**. Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC) oder ist ein Bild für seinen Speicher zu groß, nimmt die App das in RAW-Dateien eingebettete JPEG der Kamera oder das Vorschaubild, das Google selbst erzeugt (Großansicht dann höchstens so groß wie dieses). Übrig bleiben vor allem beschädigte Dateien und Formate, für die auch Google keine Vorschau hat. Abhilfe: das Bild als JPG in denselben Ordner legen und das alte entfernen. **Alle erneut versuchen** bereitet alle noch einmal auf, z. B. nachdem der Hoster mehr Speicher gibt.
 - **Kalender testen** zeigt die ersten Termine. Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache, z. B. Google Calendar API nicht aktiviert oder Kalender für das Konto nicht sichtbar.
 - Unter **Verwaltung → Einstellungen → Zustand und Updates** sind {bereich.gallery} und {bereich.calendar} grün (siehe [Zustand und Statusmeldungen](seite:admin-zustand)).
 
@@ -82,7 +82,8 @@ Das Dienstkonto sieht nur, was du ihm freigibst:
 Auf der Seite **Google-Zugang** **Alternative: Dienstkonto mit JSON-Schlüssel** aufklappen, den Inhalt der JSON-Datei bei **Schlüssel des Dienstkontos (JSON)** einfügen und **Schlüssel speichern** klicken. Danach steht dort die E-Mail-Adresse des Dienstkontos. {bereich.gallery} und {bereich.calendar} trägst du wie in Schritt 6 ein.
 
 ## Gut zu wissen
-- Der Zugang liest nur. Mit „Mit Google verbinden“ darf die App alles lesen, was das verbundene Konto in Drive und Kalender sehen kann, liest aber nur den eingetragenen Galerie-Ordner und die eingetragenen Kalender. Ein Dienstkonto sieht ausschließlich, was du ihm freigibst.
+- Mit „Mit Google verbinden“ darf die App alles lesen, was das verbundene Konto in Drive und Kalender sehen kann, liest aber nur den eingetragenen Galerie-Ordner und die eingetragenen Kalender. Schreiben darf sie nur in Dateien, die sie selbst angelegt hat (die Sicherungen). Ein Dienstkonto liest nur und sieht ausschließlich, was du ihm freigibst.
+- Wurde die Verbindung vor dem Update hergestellt, das die Sicherungen in Google Drive gebracht hat, fehlt ihr die Berechtigung für eigene Dateien: **Verbindung trennen** und neu verbinden, wenn du die Sicherungen nutzen willst. {bereich.gallery} und {bereich.calendar} laufen auch ohne weiter.
 - Besteht eine Verbindung mit Google, hat sie Vorrang vor dem Dienstkonto.
 - **Verbindung trennen** widerruft die Verbindung auch bei Google. Ebenso beendet es den Zugriff, wenn du in deinem Google-Konto unter „Sicherheit → Drittanbieter-Apps und -Dienste“ den Zugriff der App entfernst oder den Schlüssel des Dienstkontos in der Cloud Console löschst.
 - Wurde eine Verbindung zu Google aus einer früheren App übernommen, steht auf der Seite **Google-Zugang** „Verbunden mit Google“. Sie funktioniert weiter. Darf sie den Kalender nicht lesen, trenne sie und verbinde neu; die Client-ID ist schon eingetragen. Mit WordPress bleibt die Weiterleitungs-URI dieselbe wie in der früheren App.

@@ -46,7 +46,7 @@ final class InventoryServiceTest extends TestCase
         $this->app = TestApp::create($this->db, $this->users, [], null, null, null, $clock, $features + $off);
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER);
-        $this->cand = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
         if ($features['inventory'] ?? false) {
             // Standardrolle des Bereichs: „Inventar verwalten“ (member + manage_inventory)

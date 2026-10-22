@@ -15,6 +15,11 @@ export function badgeSrc(url: string, px: number): string {
  * stehen direkt auf der Fläche dahinter (hell wie dunkel). Ohne Abzeichen (oder wenn es nicht lädt) nichts; die
  * Bezeichnung zeigt der Aufrufer wie bisher.
  */
+/** Abzeichen schon laden (z. B. des nächsten Mitglieds beim Wischen), damit es ohne Verzögerung erscheint. */
+export function preloadBadge(url: string | null | undefined, size: RankBadgeSize = 'large'): void {
+  if (url) new Image().src = badgeSrc(url, PIXELS[size]);
+}
+
 export function RankBadge({ url, title, size = 'small' }: { url?: string | null; title: string; size?: RankBadgeSize }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
@@ -38,6 +43,16 @@ export function RankLabel({ url, title, size = 'small' }: { url?: string | null;
   return (
     <span className="rank-label">
       <RankBadge url={url} title={title} size={size} />
+      <span>{title}</span>
+    </span>
+  );
+}
+
+/** Abzeichen und darunter die Bezeichnung (Mitgliederliste); ohne Abzeichen nur die Bezeichnung. */
+export function RankStack({ url, title }: { url?: string | null; title: string }) {
+  return (
+    <span className="rank-stack">
+      <RankBadge url={url} title={title} size="medium" />
       <span>{title}</span>
     </span>
   );

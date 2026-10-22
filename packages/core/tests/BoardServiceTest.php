@@ -45,7 +45,7 @@ final class BoardServiceTest extends TestCase
         $this->app->scheduleTasks();
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER);
-        $this->cand = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
         $this->users->current = $this->admin;
     }

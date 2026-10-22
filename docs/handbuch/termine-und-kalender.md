@@ -6,7 +6,7 @@ bereiche: [events]
 ---
 Unter **{bereich.events}** stehen die kommenden Termine der {kompanie.name}, nach Monaten geordnet. Diese öffentlichen Termine siehst du auch ohne Anmeldung.
 
-> Bist du als {rolle.member} oder {rolle.candidate} angemeldet und nutzt die Kompanie auch den Bereich {bereich.calendar}, siehst du hier stattdessen den Kalender der Kompanie mit allen Terminen, auch den internen. Mehr dazu auf der Hilfeseite **{bereich.calendar}**.
+> Bist du als {rolle.member} oder mit dem internen Kalender (z. B. als Anwärter) angemeldet und nutzt die Kompanie auch den Bereich {bereich.calendar}, siehst du hier stattdessen den Kalender der Kompanie mit allen Terminen, auch den internen. Mehr dazu auf der Hilfeseite **{bereich.calendar}**.
 
 ## Einen Termin ansehen
 In der Liste stehen Datum, Titel, Uhrzeit und, falls angegeben, der Ort. Ein Tipp auf einen Termin klappt ihn auf und zeigt die Beschreibung und diese Knöpfe:

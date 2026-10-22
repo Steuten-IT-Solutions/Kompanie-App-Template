@@ -168,7 +168,7 @@ final class RankServiceTest extends TestCase
         $this->assertSame('Für „Gefreiter“ sind mindestens 30 Punkte nötig.', $res->data['message']);
         $this->assertCount($before, $this->users->users, 'kein Konto angelegt');
         $this->assertSame(400, $this->call('POST', '/users', ['name' => 'X', 'initial_points' => -1])->status);
-        $this->assertSame(400, $this->call('POST', '/users', ['name' => 'X', 'level' => 'candidate', 'rank_id' => $r['Gefreiter'], 'initial_points' => 40])->status, 'nur für Mitglieder');
+        $this->assertSame(400, $this->call('POST', '/users', ['name' => 'X', 'level' => TestApp::candidateRole($this->app), 'rank_id' => $r['Gefreiter'], 'initial_points' => 40])->status, 'nur für Mitglieder');
 
         $res = $this->call('POST', '/users', ['name' => 'Neu Dabei', 'initial_points' => 40, 'initial_points_date' => '2026-05-01', 'rank_id' => $r['Gefreiter']]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));

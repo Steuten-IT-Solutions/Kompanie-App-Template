@@ -11,6 +11,7 @@ use KompanieApp\Core\Infra\ArrayCache;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Infra\NullNewsSource;
+use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
@@ -35,7 +36,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -56,6 +57,7 @@ final class TestApp
         array $packageConfig = [],
         ?NullScheduler $scheduler = null,
         ?NewsSource $news = null,
+        ?BackupProvider $backup = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -73,6 +75,7 @@ final class TestApp
             authenticator: $users,
             users: $users,
             config: new KompanieConfig($config),
+            backup: $backup,
             packageConfig: $packageConfig,
         );
         $users->capabilities = static fn (string $role, int $id): array => $app->roles()->capabilitiesFor($id, $role);
@@ -81,5 +84,19 @@ final class TestApp
             $app->features()->update($features ?? array_fill_keys(Features::keys(), true));
         }
         return $app;
+    }
+
+    /**
+     * Eigene Rolle „Anwärter“, wie ein Admin sie einrichtet (Issue #23): nur der interne Kalender, beim Anlegen von Konten
+     * wählbar, zum Mitglied zu machen. Gibt ihren Schlüssel zurück (beim zweiten Aufruf denselben).
+     */
+    public static function candidateRole(App $app): string
+    {
+        foreach ($app->roles()->all() as $key => $r) {
+            if ($r['label'] === 'Anwärter') {
+                return $key;
+            }
+        }
+        return $app->roles()->create(['label' => 'Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key'];
     }
 }

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { api, config, roleLabels } from '../api';
 import { isStandalone } from '../install';
 import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
+import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate } from '../router';
 import { MemberAvatar } from '../memberPhoto';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
@@ -49,6 +50,7 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       </div>
 
       {birthdaysVisible() && <OwnBirthdayCard onToast={onToast} />}
+      {profileChoice() && <OwnJoinYearCard onToast={onToast} />}
 
       <div className="card account-card">
         <h3>Benachrichtigungen</h3>
