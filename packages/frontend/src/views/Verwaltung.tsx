@@ -23,7 +23,7 @@ import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { AdminBack, AdminMenu, adminTabs } from '../adminNav';
 import { DateRow, emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
-import { PersonSkeleton } from '../skeleton';
+import { PersonName, PersonSkeleton } from '../skeleton';
 import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
@@ -522,7 +522,12 @@ function MemberPeek({
           )}
         </>
       ) : (
-        <PersonSkeleton name={name} nameClass="member-peek-name" status={false} />
+        <>
+          <h2 className="member-peek-name member-name-centered with-rank">
+            <PersonName name={name} />
+          </h2>
+          <PersonSkeleton status={false} />
+        </>
       )}
     </div>
   );
@@ -633,8 +638,10 @@ function MemberDetailView({
     }
   }
 
-  // Rahmen der Seite mit Wischen, Nachbarn und Navigation; steht auch, solange die Daten laden (Name aus der Liste).
-  const frame = (former: boolean, body: ReactNode) => (
+  // Rahmen der Seite mit Wischen, Nachbarn, Navigation und Namen; steht auch, solange die Daten laden (Name aus der
+  // Liste). Die Überschrift bleibt dabei dasselbe Element: Beginnt eine Geste darauf, bevor die Daten da sind, liefe sie
+  // sonst ins Leere (der Browser schickt die weiteren Touch-Ereignisse an das entfernte Element).
+  const frame = (former: boolean, heading: ReactNode, body: ReactNode) => (
     <div className="member-detail" {...swipe.handlers}>
       <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
         {swipe.peeking && prev !== null && (
@@ -667,13 +674,22 @@ function MemberDetailView({
             </span>
           )}
         </div>
+        {heading}
         {body}
       </div>
     </div>
   );
 
-  if (loading && !data) return frame(base === 'ehemalige', <PersonSkeleton name={nameOf(id)} nameClass="member-name" />);
-  if (error) return frame(base === 'ehemalige', <ErrorBox message={error} onRetry={reload} />);
+  if (loading && !data) {
+    return frame(
+      base === 'ehemalige',
+      <h2 className="member-name member-name-centered with-rank">
+        <PersonName name={nameOf(id)} />
+      </h2>,
+      <PersonSkeleton />,
+    );
+  }
+  if (error) return frame(base === 'ehemalige', null, <ErrorBox message={error} onRetry={reload} />);
   if (target !== base) return null;
   const m = data!;
 
@@ -717,8 +733,8 @@ function MemberDetailView({
 
   return frame(
     !!m.former,
+    <h2 className={`member-name member-name-centered${m.rank_title || rankOn || avatar ? ' with-rank' : ''}`}>{m.name}</h2>,
     <>
-      <h2 className={`member-name member-name-centered${m.rank_title || rankOn || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
       {(m.rank_title || rankOn || avatar) && (
         <div className="member-rank-line">
           {/* Abzeichen mit dem Dienstgrad darunter (Antippen: befördern oder degradieren), rechts daneben das Foto

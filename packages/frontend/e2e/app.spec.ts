@@ -446,6 +446,36 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
     await expect(page.locator('.member-level').first()).toContainText('Rolle');
   });
+
+  test('Mitglied: Kommen die Daten mitten im Wischen an, blättert die Geste trotzdem', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    // Finger auf den Namen im Gerüst, ein Stück ziehen; dann kommen die Daten, die Seite baut sich auf.
+    const box = (await page.locator('.member-name').boundingBox())!;
+    const x = page.viewportSize()!.width / 2 + 60;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 40, y }] });
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+    for (const dx of [-120, -200]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  });
 });
 
 test('Mitglieder (für alle): Wischen und Pfeile blättern in der Liste, „Zurück“ führt zur Liste', async ({ page }) => {

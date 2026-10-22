@@ -23,6 +23,7 @@ import {
   type MemberSort,
 } from '../memberSort';
 import { navigate, redirect } from '../router';
+import { PersonName } from '../skeleton';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { OfficesView, PersonOffices, useOffices } from './Aemter';
 
@@ -181,19 +182,37 @@ function useDirectoryOrder(userId: number, list: DirectoryEntry[] | null, former
 
 /**
  * Kopf der Seite einer Person: Foto, Name, bei Ehemaligen Eintritt und Ausscheiden, sonst Geburtstag und Eintritt
- * (soweit sie sie zeigt), Titel und Dienstgrad. peek: als Nachbar beim Wischen (nur zum Ansehen, eigene Klasse für den
- * Namen, Foto ohne Vergrößern).
+ * (soweit sie sie zeigt), Titel und Dienstgrad. Solange die Liste lädt (waiting), der Name aus der Reihenfolge und ein
+ * Platzhalter fürs Foto; dasselbe Element mit derselben Überschrift, damit eine schon begonnene Geste weiterläuft.
+ * peek: als Nachbar beim Wischen (nur zum Ansehen, eigene Klasse für den Namen, Foto ohne Vergrößern).
  */
-function PersonHead({ name, m, f, peek = false }: { name: string; m?: DirectoryEntry; f?: DirectoryFormerEntry; peek?: boolean }) {
+function PersonHead({
+  name,
+  m,
+  f,
+  waiting = false,
+  peek = false,
+}: {
+  name?: string;
+  m?: DirectoryEntry;
+  f?: DirectoryFormerEntry;
+  waiting?: boolean;
+  peek?: boolean;
+}) {
   return (
     <div className="member-page-head">
-      {m &&
-        (peek ? (
+      {m ? (
+        peek ? (
           <MemberAvatar url={m.photo_url} name={m.name} size="large" />
         ) : (
           <ZoomableAvatar url={m.photo_url} name={m.name} size="large" />
-        ))}
-      <h2 className={`${peek ? 'member-peek-name' : 'member-name'} member-name-centered`}>{name}</h2>
+        )
+      ) : (
+        waiting && <span className="skeleton-box" style={{ width: 128, height: 128, borderRadius: '50%' }} />
+      )}
+      <h2 className={`${peek ? 'member-peek-name' : 'member-name'} member-name-centered`}>
+        <PersonName name={name} />
+      </h2>
       {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
       {m && !f && personFacts(m) && <p className="small muted member-page-facts">{personFacts(m)}</p>}
       {m?.titles && m.titles.length > 0 && (
@@ -206,18 +225,6 @@ function PersonHead({ name, m, f, peek = false }: { name: string; m?: DirectoryE
           <RankStack url={m.rank_badge_url} title={m.rank_title} />
         </div>
       )}
-    </div>
-  );
-}
-
-/** Kopf, solange die Liste noch lädt: der Name (aus der Reihenfolge) schon da, Platzhalter fürs Foto. */
-function PersonHeadSkeleton({ name, peek = false }: { name?: string; peek?: boolean }) {
-  return (
-    <div className="member-page-head">
-      <span className="skeleton-box" style={{ width: 128, height: 128, borderRadius: '50%' }} />
-      <h2 className={`${peek ? 'member-peek-name' : 'member-name'} member-name-centered`}>
-        {name ?? <span className="skeleton-text" style={{ width: '12ch' }} />}
-      </h2>
     </div>
   );
 }
@@ -328,11 +335,7 @@ function MemberPage({
     return (
       <div className={`member-peek member-peek-${side}`} aria-hidden="true" ref={(el) => el?.setAttribute('inert', '')}>
         <PageNav position={position} total={order.length} />
-        {other.m && otherName !== undefined ? (
-          <PersonHead name={otherName} m={other.m} f={other.f} peek />
-        ) : (
-          <PersonHeadSkeleton name={otherName} peek />
-        )}
+        <PersonHead name={otherName} m={other.m} f={other.f} waiting={!other.m} peek />
       </div>
     );
   };
@@ -345,10 +348,12 @@ function MemberPage({
         {peek(next, 'next', index + 2)}
         <PageNav position={index + 1} total={order.length} onStep={swipe.slide} />
         {name === undefined && waiting ? (
-          <div role="status" data-loading="">
-            <span className="visually-hidden">Lädt …</span>
-            <PersonHeadSkeleton name={nameOf(userId)} />
-          </div>
+          <>
+            <PersonHead name={nameOf(userId)} waiting />
+            <div role="status" data-loading="">
+              <span className="visually-hidden">Lädt …</span>
+            </div>
+          </>
         ) : list.error && !list.data ? (
           <ErrorBox message={list.error} onRetry={list.reload} />
         ) : name === undefined ? (
