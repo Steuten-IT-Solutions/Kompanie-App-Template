@@ -42,9 +42,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Seite nach dem Wechsel sofort da, ohne Laden.
 - **Ehemalige nach Austritt sortieren**: Die Liste der Ehemaligen (in der Verwaltung und in der Mitgliederliste) lässt
   sich jetzt auch nach dem Datum des Ausscheidens sortieren, früheste oder neueste zuerst; wer keines hat, steht am Ende.
+- **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
+  Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Logo. `[kompanie_mitglieder]`
+  zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
 
 ### Geändert
 
+- **Liste der Ehemaligen**: *Filter und Sortierung* ist wie in der Mitgliederliste zunächst eingeklappt und klappt mit
+  einem Tipp auf. Ist der Filter nach dem Grund gesetzt, steht am eingeklappten Bereich „aktiv“.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
   (heruntergeladen oder in Google Drive).
 - **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.

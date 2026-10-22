@@ -16,6 +16,9 @@ use KompanieApp\Core\App;
  */
 final class Shortcodes
 {
+    /** Einstellung: Bild aus der Mediathek (ID) für Personen ohne Foto in [kompanie_mitglieder]; leer = Anfangsbuchstaben. */
+    public const MEMBERS_PLACEHOLDER = 'members_placeholder';
+
     public static function init(App $app): void
     {
         add_shortcode('kompanie_termine', static fn ($atts) => self::events($app, is_array($atts) ? $atts : []));
@@ -315,6 +318,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         // Die Liste der API hat nur die kleine Vorschau (128 Pixel); für die Galerie die größeren Fassungen.
         $medium = $app->memberPhotos()->urls(480);
         $large = $app->memberPhotos()->urls(1024);
+        $placeholder = self::membersPlaceholder($app);
         $html .= self::lightbox() . '<ul class="ka ka-mitglieder">';
         foreach ($members as $m) {
             $name = esc_html($m['name']);
@@ -327,11 +331,32 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                     esc_url($medium[$m['id']]),
                     $caption,
                 );
+            } elseif ($placeholder !== '') {
+                // Ohne Großansicht: Das Platzhalterbild zeigt nicht die Person.
+                $html .= '<li class="ka-mitglied">' . $placeholder . $caption . '</li>';
             } else {
                 $html .= '<li class="ka-mitglied"><span class="ka-mitglied-leer" aria-hidden="true">' . esc_html(self::initials($m['name'])) . '</span>' . $caption . '</li>';
             }
         }
         return $html . '</ul>';
+    }
+
+    /**
+     * Platzhalterbild aus den Einstellungen als <img> (mit srcset der Mediathek), leer ohne Einstellung oder wenn das Bild
+     * nicht mehr in der Mediathek ist; dann bleiben die Anfangsbuchstaben.
+     */
+    private static function membersPlaceholder(App $app): string
+    {
+        $id = (int) $app->settings->get(self::MEMBERS_PLACEHOLDER, 0);
+        if ($id <= 0 || !wp_attachment_is_image($id)) {
+            return '';
+        }
+        return wp_get_attachment_image($id, 'medium_large', false, [
+            'class' => 'ka-mitglied-platzhalter',
+            'alt' => '',
+            'loading' => 'lazy',
+            'sizes' => '(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw',
+        ]);
     }
 
     /** Foto rund (Hochformat oben ausgerichtet), ohne Foto die Initialen auf der Kompaniefarbe. */
