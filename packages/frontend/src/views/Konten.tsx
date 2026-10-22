@@ -20,7 +20,15 @@ export function credentialsText(c: { name: string; username: string; password: s
 }
 
 /** Zugangsdaten anzeigen, kopieren, teilen und als Zettel ausdrucken. */
-export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?: () => void }) {
+export function Credentials({
+  people,
+  onDone,
+  doneLabel = '‹ Zur Mitgliederliste',
+}: {
+  people: CreatedUser[];
+  onDone?: () => void;
+  doneLabel?: string;
+}) {
   const [copied, setCopied] = useState(false);
   // Ohne Zugriff auf die Zwischenablage (z. B. ohne HTTPS): Text zum Markieren zeigen (mehrzeilig, anders als prompt()).
   const [showText, setShowText] = useState(false);
@@ -94,7 +102,7 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
       )}
       {onDone && (
         <button className="btn btn-link no-print" onClick={onDone}>
-          ‹ Zur Mitgliederliste
+          {doneLabel}
         </button>
       )}
     </div>
