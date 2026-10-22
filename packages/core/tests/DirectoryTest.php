@@ -101,13 +101,52 @@ final class DirectoryTest extends TestCase
         return $this->call('GET', '/directory/counts');
     }
 
+    public function testFormerMembersPublicWithYearsOnly(): void
+    {
+        $title = $this->call('POST', '/titles', ['title' => 'Ehrenmitglied'])->data['id'];
+        $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$title]]);
+        $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'deceased', 'joined_on' => '1993-05-03', 'founder' => true, 'left_on' => '2016-06-30']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+
+        // Öffentlich wie die Liste; Ehemalige stehen nicht mehr in der Liste der Mitglieder.
+        foreach ([$this->candidate, $this->guest, null] as $viewer) {
+            $this->assertNotContains($this->m, array_column($this->as($viewer)->data, 'id'));
+            $this->users->current = $viewer;
+            $res = $this->call('GET', '/directory/former');
+            $this->assertSame(200, $res->status, (string) json_encode($res->data));
+            $this->assertSame([$this->m], array_column($res->data, 'id'));
+        }
+        $entry = $res->data[0];
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'founder', 'joined_year', 'left_year', 'photo_url', 'rank_title', 'rank_badge_url', 'titles'], array_keys($entry), 'kein Grund, keine genauen Daten');
+        $this->assertSame([true, '1993', '2016'], [$entry['founder'], $entry['joined_year'], $entry['left_year']]);
+        $this->assertSame([['id' => $title, 'title' => 'Ehrenmitglied']], $entry['titles']);
+
+        // In den Ämtern öffnet der Name die Seite der Person, auch ohne Anmeldung (wie bei Personen der Liste).
+        $this->users->current = $this->admin;
+        $this->app->features()->update(['offices' => true]);
+        $office = $this->call('POST', '/offices', ['title' => 'Vorsitz'])->data['id'];
+        $this->call('POST', "/offices/$office/terms", ['kind' => 'period', 'start_year' => 1990, 'end_year' => 2000, 'holders' => [['user_id' => $this->m]]]);
+        $this->users->current = null;
+        $this->assertSame($this->m, $this->call('GET', '/offices')->data['offices'][0]['terms'][0]['holders'][0]['user_id'] ?? null);
+
+        // Ohne Daten bleiben die Jahre leer; wieder aufgenommen steht die Person nicht mehr bei den Ehemaligen.
+        $this->users->current = $this->admin;
+        $this->call('PATCH', "/members/{$this->m}/former", ['joined_on' => '', 'left_on' => '']);
+        $this->assertSame(['', ''], [$this->call('GET', '/directory/former')->data[0]['joined_year'], $this->call('GET', '/directory/former')->data[0]['left_year']]);
+        $this->call('DELETE', "/members/{$this->m}/former");
+        $this->assertSame([], $this->call('GET', '/directory/former')->data);
+    }
+
     public function testFeatureSwitch(): void
     {
         $this->app->features()->update(['directory' => false]);
         foreach ([$this->m, null] as $viewer) {
-            $res = $this->as($viewer);
-            $this->assertSame(403, $res->status);
-            $this->assertSame('feature_disabled', $res->data['code'] ?? null);
+            foreach (['/directory', '/directory/former'] as $path) {
+                $this->users->current = $viewer;
+                $res = $this->call('GET', $path);
+                $this->assertSame(403, $res->status);
+                $this->assertSame('feature_disabled', $res->data['code'] ?? null);
+            }
         }
     }
 }

@@ -2007,6 +2007,26 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /directory/former:
+    get:
+      tags: [Mitgliederliste]
+      summary: Ehemalige in der Mitgliederliste (Tab „Ehemalige“), öffentlich
+      description: |
+        Gleiche Rechte wie `GET /directory` (öffentlich, mit dem Bereich directory). Alle als ehemalig eingetragenen
+        Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied und
+        die Jahre von Eintritt und Ausscheiden; nie der Grund, genaue Daten, Punkte oder Strafen. Ohne feste Reihenfolge.
+        Bereich aus → 403 `feature_disabled`.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DirectoryFormerEntry' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /offices:
     get:
       tags: [Ämter]
@@ -2014,7 +2034,7 @@ paths:
       description: |
         Für alle, auch ohne Anmeldung. Ämter in der Reihenfolge ihrer Gruppen (ohne Gruppe zuletzt); Amtszeiten laufende
         zuerst, dann nach Beginn absteigend. Inhaber mit `user_id` und `photo_url` nur, wenn sie in der Mitgliederliste
-        stehen (Bereich directory); wer `manage_offices` hat, sieht alle Konten, jede Person ihr eigenes. `title_id` und
+        stehen oder ehemalig sind (Bereich directory); wer `manage_offices` hat, sieht alle Konten, jede Person ihr eigenes. `title_id` und
         `linked_title` nur mit `manage_offices`. Bereich aus → 403 `feature_disabled`.
       security: []
       responses:
@@ -4517,6 +4537,16 @@ components:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
+
+    DirectoryFormerEntry:
+      allOf:
+        - $ref: '#/components/schemas/DirectoryEntry'
+        - type: object
+          required: [founder, joined_year, left_year]
+          properties:
+            founder: { type: boolean, description: Gründungsmitglied }
+            joined_year: { type: string, description: 'Jahr des Eintritts (JJJJ), leer ohne Angabe' }
+            left_year: { type: string, description: 'Jahr des Ausscheidens (JJJJ), leer ohne Angabe' }
 
     MemberDetail:
       allOf:
