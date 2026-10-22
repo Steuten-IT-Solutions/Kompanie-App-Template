@@ -34,7 +34,7 @@ Wird ein Konto gelöscht, bleibt seine Zeile ohne Namen stehen, bis du die Liste
 ## Drucken und CSV
 Unter **Ausgabe** siehst du die Liste so, wie sie gedruckt wird: oben ein Balken in der Farbe der Kompanie mit Logo, Titel und Untertitel, darunter Name der Kompanie, Datum und das Datum des Ausdrucks. Die Spaltenüberschriften stehen weiß auf der Farbe der Kompanie; in **schmalen** Spalten (außer Nr.) sind sie schräg gestellt, damit auch längere Überschriften wie „Anzahl Kinder“ über eine schmale Spalte zum Ankreuzen passen. Die Zeilen sind abwechselnd leicht in der Farbe der Kompanie hinterlegt. Der Tabellenkopf steht auf jeder Seite.
 
-- **Drucken / PDF** öffnet den Druckdialog. Als PDF speichern: dort „Als PDF speichern“ als Drucker wählen.
+- **Drucken / PDF** öffnet den Druckdialog. Als PDF speichern: dort „Als PDF speichern“ als Drucker wählen. Als Dateinamen schlägt der Browser den Titel der Liste vor.
 - **CSV herunterladen** speichert die Liste als Datei für Excel oder eine andere Tabellenkalkulation, mit dem Titel als Dateinamen.
 
 Gedruckt und heruntergeladen wird der Stand auf dem Bildschirm, auch wenn du ihn noch nicht gespeichert hast.

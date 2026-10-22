@@ -5,7 +5,7 @@ import { useDragSort } from '../dragSort';
 import { formatDate, formatEuro, todayYmd } from '../format';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo-small.webp';
-import { csvFileName, toCsv } from '../lists';
+import { csvFileName, listFileBase, toCsv } from '../lists';
 import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -636,35 +636,62 @@ const PAGE_WIDTH_MM = { portrait: 186, landscape: 273 };
 const PX_PER_MM = 96 / 25.4;
 
 /**
- * Gekippter Kopf einer gedrehten Spalte: Jede Spalte zeichnet ihr Feld selbst, in ihrer tatsächlichen Breite (100 %),
- * um 45° geschert. Dadurch beginnen die schrägen Linien genau über den senkrechten darunter, wie auch immer ein Browser
- * die Spalten verteilt. Jedes Feld zeichnet seine linke und obere Linie, das letzte einer Folge auch die rechte: keine
- * doppelten Linien. Vor dem ersten Feld füllt ein Dreieck die Lücke zur geraden Spalte davor. Maße in CSS-Pixeln; y =
- * -0,5 ist die Mitte des Rahmens über der Kopfzeile (die geraden Zellen haben oben 1 px Rahmen, diese Zelle keinen);
- * ebenso liegen die senkrechten Rahmen darunter mit ihrer Mitte 0,5 px links der Zellkante (im PDF nachgemessen).
+ * Kopf ab der Spalte vor der ersten gedrehten bis zum Ende der Tabelle, als eine einzige Zelle: Chrome schneidet beim
+ * Drucken alles ab, was über eine Zelle im Kopf hinausragt (der Kopf steht auf jeder Seite), die gekippten Felder ragen
+ * aber oben um die Höhe des Kopfs nach rechts. In dieser Zelle bleibt alles innerhalb; gerade Spalten zeichnet sie mit.
+ * Maße in CSS-Pixeln wie die Spaltenbreiten; die Grafik wird auf die tatsächliche Breite der Zelle gestreckt (der
+ * Browser verteilt Bruchteile eines Pixels auf die Spalten). Die gekippten Felder sind fertig berechnete Polygone, keine
+ * SVG-Transformation: Die lässt Chrome im Druck im wiederholten Tabellenkopf weg. Die senkrechten Rahmen darunter liegen
+ * mit ihrer Mitte 0,5 px links der Spaltenkante (im PDF nachgemessen), dort beginnen auch die schrägen Linien. Vor der
+ * ersten gedrehten Spalte füllt ein Dreieck die Lücke zur geraden Spalte davor; die äußeren Linien sind der Rahmen der
+ * Zelle.
  */
-function RotatedHead({ height, first, last, color }: { height: number; first: boolean; last: boolean; color: string }) {
+function SlantedHead({ cols, widths, spare, height }: { cols: ListColumn[]; widths: number[]; spare: number; height: number }) {
   const h = height;
+  const x = widths.reduce((acc, w) => [...acc, acc[acc.length - 1] + w], [0]);
+  const total = x[x.length - 1] + spare;
+  const pct = (v: number) => `${(v / total) * 100}%`;
+  // Linien und gekippte Felder beginnen auf der Mitte des senkrechten Rahmens darunter
+  const e = (i: number) => x[i] - 0.5;
   const line = { stroke: '#555', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' as const };
+  const color = brand.themeColor;
   return (
-    <svg className="list-th-svg" width="100%" height={h} overflow="visible" aria-hidden="true">
-      <g transform="translate(-0.5 0)">
-        {first && (
-          <>
-            {/* 1 px nach links unter die gerade Zelle davor (gleiche Farbe), gegen eine helle Naht */}
-            <polygon points={`-1,-0.5 ${h + 0.5},-0.5 0,${h} -1,${h}`} fill={color} />
-            <line x1={-1} y1={-0.5} x2={h + 0.5} y2={-0.5} {...line} />
-          </>
+    <div className="list-th-slanted-inner">
+      <svg viewBox={`0 0 ${total} ${h}`} preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true">
+        {cols.map((c, i) => !rotated(c) && <rect key={i} x={x[i]} y={0} width={widths[i]} height={h} fill={color} />)}
+        {cols.map((c, i) => !rotated(c) && i > 0 && !rotated(cols[i - 1]) && <line key={i} x1={e(i)} y1={0} x2={e(i)} y2={h} {...line} />)}
+        {cols.map(
+          (c, i) =>
+            rotated(c) &&
+            !(i > 0 && rotated(cols[i - 1])) && (
+              <polygon key={i} points={`${e(i) - 1},0 ${e(i) + h},0 ${e(i)},${h} ${e(i) - 1},${h}`} fill={color} />
+            ),
         )}
-        {/* Scherung um die Unterkante: unten bleibt die Spalte, wo sie ist, oben liegt sie um die Höhe weiter rechts */}
-        <g transform={`translate(0 ${h}) skewX(-45) translate(0 ${-h})`}>
-          <rect x={0} y={-0.5} width="100%" height={h + 0.5} fill={color} />
-          <line x1={0} y1={-0.5} x2="100%" y2={-0.5} {...line} />
-          <line x1={0} y1={-0.5} x2={0} y2={h} {...line} />
-          {last && <line x1="100%" y1={-0.5} x2="100%" y2={h} {...line} />}
-        </g>
-      </g>
-    </svg>
+        {cols.map(
+          (c, i) => rotated(c) && <polygon key={i} points={`${e(i)},${h} ${e(i + 1)},${h} ${e(i + 1) + h},0 ${e(i) + h},0`} fill={color} />,
+        )}
+        {cols.map(
+          (c, i) =>
+            rotated(c) && (
+              <g key={i}>
+                <line x1={e(i)} y1={h} x2={e(i) + h} y2={0} {...line} />
+                {!(cols[i + 1] && rotated(cols[i + 1])) && <line x1={e(i + 1)} y1={h} x2={e(i + 1) + h} y2={0} {...line} />}
+              </g>
+            ),
+        )}
+      </svg>
+      {cols.map((c, i) =>
+        rotated(c) ? (
+          <span key={i} className="list-th-label" style={{ left: `calc(${pct((x[i] + x[i + 1]) / 2)} + 3mm)` }}>
+            {columnLabel(c)}
+          </span>
+        ) : (
+          <span key={i} className="list-th-straight" style={{ left: pct(x[i]), width: pct(widths[i]) }}>
+            {columnLabel(c)}
+          </span>
+        ),
+      )}
+    </div>
   );
 }
 
@@ -683,6 +710,10 @@ function PrintSheet({ draft }: { draft: Draft }) {
   // ohne Rahmen ans Ende, damit die Tabelle den Platz mitrechnet.
   const last = cols[cols.length - 1];
   const sparePx = last && rotated(last) ? headPx : 0;
+  // Der gekippte Kopf beginnt eine Spalte vor der ersten gedrehten: Deren Fläche und die gerade davor überlappen sich so
+  // in einer Grafik (zwei Flächen nebeneinander zeigen in manchen PDF-Anzeigen eine helle Naht).
+  const firstRotated = cols.findIndex(rotated);
+  const slantFrom = firstRotated < 0 ? -1 : Math.max(0, firstRotated - 1);
   const pageWidth = PAGE_WIDTH_MM[draft.orientation];
   // Spaltenbreiten in ganzen Pixeln: Der Browser rastet die senkrechten Rahmen auf ganze Pixel ein, die gekippten Felder
   // nicht; nur so beginnen die schrägen Linien genau über den senkrechten. Die letzte Spalte nimmt den Rundungsrest.
@@ -711,32 +742,19 @@ function PrintSheet({ draft }: { draft: Draft }) {
         </colgroup>
         <thead>
           <tr style={headPx ? { height: `${headPx}px` } : undefined}>
-            {cols.map((c, i) => {
-              const after = cols[i + 1];
-              if (!rotated(c)) {
-                // Vor einem gekippten Kopf ohne Linie rechts: Dort beginnt dessen Fläche in derselben Farbe.
-                return (
-                  <th key={i} className={after && rotated(after) ? 'list-th-before-rotated' : undefined}>
-                    {columnLabel(c)}
-                  </th>
-                );
-              }
-              const before = cols[i - 1];
-              return (
-                <th key={i} className="list-th-rotated">
-                  <div style={{ height: `${headPx}px` }}>
-                    <RotatedHead
-                      height={headPx}
-                      first={!(before && rotated(before))}
-                      last={!(after && rotated(after))}
-                      color={brand.themeColor}
-                    />
-                    <span className="list-th-label">{columnLabel(c)}</span>
-                  </div>
-                </th>
-              );
-            })}
-            {sparePx > 0 && <th className="list-spare-head" aria-hidden="true" />}
+            {cols.map((c, i) => (slantFrom < 0 || i < slantFrom) && <th key={i}>{columnLabel(c)}</th>)}
+            {slantFrom >= 0 && (
+              <th
+                colSpan={cols.length - slantFrom + (sparePx > 0 ? 1 : 0)}
+                className={[
+                  'list-th-slanted',
+                  !rotated(cols[slantFrom]) ? 'list-th-slanted-left' : '',
+                  sparePx === 0 ? 'list-th-slanted-right' : '',
+                ].join(' ')}
+              >
+                <SlantedHead cols={cols.slice(slantFrom)} widths={widths.slice(slantFrom)} spare={sparePx} height={headPx} />
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -763,7 +781,7 @@ function PrintSheet({ draft }: { draft: Draft }) {
 
 /**
  * Für den Druck liegt die Tabelle direkt unter <body>; beim Drucken ist nur sie zu sehen (styles.css, body.list-printing).
- * Ausrichtung und Seitenzahlen kommen als @page-Regel dazu.
+ * Ausrichtung und Seitenzahlen kommen als @page-Regel dazu, der Titel der Liste als Titel der Seite (Name der PDF-Datei).
  */
 function PrintPortal({ draft }: { draft: Draft }) {
   const [root, setRoot] = useState<HTMLElement | null>(null);
@@ -783,6 +801,16 @@ function PrintPortal({ draft }: { draft: Draft }) {
       document.body.classList.remove('list-printing');
     };
   }, []);
+  // Name der PDF-Datei: Browser schlagen beim Speichern den Titel der Seite vor, solange die Liste offen ist der der Liste.
+  useEffect(() => {
+    const before = document.title;
+    return () => {
+      document.title = before;
+    };
+  }, []);
+  useEffect(() => {
+    document.title = listFileBase(draft.title) || 'Liste';
+  }, [draft.title]);
   useEffect(() => {
     // Seitenzahlen unten rechts nur beim Drucken einer Liste (die Regel gibt es nur, solange die Liste offen ist)
     if (style.current)
