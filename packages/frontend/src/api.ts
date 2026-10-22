@@ -376,6 +376,28 @@ export interface DirectoryEntry {
   rank_badge_url?: string | null;
   /** Titel (fehlen ohne Bereich Titel) */
   titles?: TitleRef[];
+  /** Geburtstag, soweit die Person ihn dem Betrachter zeigt (fehlt ohne Bereich Geburtstage und bei Ehemaligen) */
+  birthday?: DirectoryBirthday | null;
+  /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
+  join_year?: number | null;
+}
+
+/** Geburtstag auf der Seite einer Person: Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr. */
+export interface DirectoryBirthday {
+  month: number;
+  day: number;
+  year: number | null;
+  /** heutiges Alter */
+  age: number | null;
+}
+
+/** Wem eine Angabe auf der eigenen Seite in der Mitgliederliste erscheint: nicht, nur Mitgliedern, allen. */
+export type ProfileVisibility = 'none' | 'members' | 'public';
+
+/** Eintrittsjahr eines aktiven Mitglieds mit der Anzeige auf seiner Seite. */
+export interface JoinYear {
+  year: number;
+  profile: ProfileVisibility;
 }
 
 /** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied und Jahre (JJJJ oder leer). */
@@ -393,6 +415,8 @@ export interface MemberDetail extends MemberSummary {
   rank_history?: RankHistoryEntry[];
   /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** Eintrittsjahr mit Anzeige (nur für create_users; null ohne Eintrag) */
+  join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
   rights?: MemberRights | null;
   /** Ob man das Foto hochladen, ersetzen und entfernen darf (create_users und dieses Konto verwalten) */
@@ -479,6 +503,8 @@ export interface Birthday {
   visible: boolean;
   /** Alter anzeigen */
   show_age: boolean;
+  /** Auf der eigenen Seite in der Mitgliederliste (fehlt bei älteren Servern) */
+  profile?: ProfileVisibility;
 }
 
 /** Eintrag im Inventar (Issue #6): ein Ort je Eintrag. */
@@ -552,6 +578,7 @@ export interface BirthdayInput {
   year: number | null;
   visible?: boolean;
   show_age?: boolean;
+  profile?: ProfileVisibility;
 }
 
 export interface Rank {
@@ -1297,6 +1324,12 @@ export const api = {
   setMemberBirthday: (id: number, data: { month: number; day: number; year: number | null }) =>
     request<{ birthday: Birthday | null }>('PUT', `/members/${id}/birthday`, data),
   deleteMemberBirthday: (id: number) => request<{ birthday: null }>('DELETE', `/members/${id}/birthday`),
+  myJoinYear: () => request<{ join_year: JoinYear | null }>('GET', '/me/join-year'),
+  saveMyJoinYear: (data: { year: number; profile?: ProfileVisibility }) =>
+    request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
+  deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
+  setMemberJoinYear: (id: number, year: number) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { year }),
+  deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 
   // Inventar (Issue #6)
   inventory: () => request<InventoryItem[]>('GET', '/inventory'),

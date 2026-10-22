@@ -41,6 +41,9 @@ Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoa
 
 Ist der Bereich **{bereich.directory}** eingeschaltet, ist das Foto von {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärtern) öffentlich: Es steht in der Liste unter **{bereich.directory}**, die jeder sehen kann, auch ohne Anmeldung. Sonst sieht es nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Fotos von Gästen sind nie öffentlich. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
 
+## Eintrittsjahr
+Im Mitglied unter **Eintritt** trägst du das Jahr ein, in dem die Person eingetreten ist (ab 1800, nicht in der Zukunft), und tippst **Eintrittsjahr speichern**; **Entfernen** löscht es nach einer Rückfrage. Die Person kann es auch selbst unter **Konto** eintragen. Ob es auf ihrer Seite unter **{bereich.directory}** steht, wählt nur sie selbst; du siehst die Auswahl hier nur zur Information. Trägst du die Person später als ehemalig ein, schlägt die App dieses Jahr als Eintritt vor.
+
 ## Als {rolle.member} aufnehmen
 Anwärter nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Den Knopf gibt es nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat (Einstellungen → Rollen).
 
@@ -49,7 +52,7 @@ Im Mitglied unter **Konto und Rolle**, Abschnitt **Konto**: **Angaben ändern** 
 
 Konten aus der Zeit, als es nur ein Namensfeld gab, hat die App beim Update geteilt: Das letzte Wort ist der Nachname, der Rest der Vorname. Bei Namen wie „Maria von Berg“ stimmt das nicht; dann hier korrigieren. Mit WordPress bleiben Vor- und Nachnamen, die schon im Profil gepflegt waren.
 
-**Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, Geburtstag, Foto, Antworten bei Umfragen und Benachrichtigungen; ohne WordPress werden auch alle ihre Geräte abgemeldet. Was die Person für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“ statt des Namens. Zur Sicherheit fragt die App nach und lässt den Namen (Vor- und Nachname) eintippen. Mit WordPress heißt der Knopf **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Ein Konto ganz löschen geht dort im WordPress-Backend unter *Benutzer*; auch dann löscht die App alle seine Daten. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen.
+**Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, Geburtstag, Eintrittsjahr, Foto, Antworten bei Umfragen und Benachrichtigungen; ohne WordPress werden auch alle ihre Geräte abgemeldet. Was die Person für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“ statt des Namens. Zur Sicherheit fragt die App nach und lässt den Namen (Vor- und Nachname) eintippen. Mit WordPress heißt der Knopf **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Ein Konto ganz löschen geht dort im WordPress-Backend unter *Benutzer*; auch dann löscht die App alle seine Daten. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen.
 
 Wer nur ausgetreten oder verstorben ist, muss nicht gelöscht werden: Unter **Konto und Rolle → Ehemalig** eingetragen, bleiben alle Daten erhalten (siehe [Ehemalige Mitglieder](seite:ehemalige-mitglieder)).
 

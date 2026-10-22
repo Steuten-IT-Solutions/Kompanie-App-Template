@@ -13,7 +13,9 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  * Geburtstage (Issue #1).
  *
  * - Jedes Mitglied pflegt seinen eigenen Geburtstag (Tag und Monat, Jahr freiwillig) mit zwei Schaltern: „Anderen
- *   Mitgliedern zeigen“ (visible, Standard an) und „Alter anzeigen“ (show_age, Standard aus).
+ *   Mitgliedern zeigen“ (visible, Standard an) und „Alter anzeigen“ (show_age, Standard aus). Dazu wählt es, wem der
+ *   Geburtstag auf seiner Seite in der Mitgliederliste erscheint (profile: none, members, public; Standard none,
+ *   unabhängig von visible): mit show_age und Jahr das ganze Datum und das Alter, sonst nur Tag und Monat.
  * - Wer Mitglieder anlegen darf (create_users), trägt das Datum anderer ein oder entfernt es; die beiden Schalter
  *   bleiben dabei, wie die Person sie gesetzt hat.
  * - Sehen und erscheinen: nur Konten mit Mitgliederbereich (Recht member). Gäste und Anwärter sehen keine Geburtstage
@@ -119,7 +121,7 @@ final class BirthdayService
     /* Eigener Geburtstag und Pflege                                    */
     /* ---------------------------------------------------------------- */
 
-    /** @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}|null */
+    /** @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool, profile: string}|null */
     public function of(int $userId): ?array
     {
         $b = $this->repository()->find($userId);
@@ -127,10 +129,11 @@ final class BirthdayService
     }
 
     /**
-     * Eigener Geburtstag mit Jahr und Schaltern (PUT /me/birthday); fehlende Schalter bleiben (neu: sichtbar, ohne Alter).
+     * Eigener Geburtstag mit Jahr und Schaltern (PUT /me/birthday); fehlende Schalter bleiben (neu: sichtbar, ohne Alter,
+     * nicht auf der eigenen Seite in der Mitgliederliste).
      *
-     * @param array<string, mixed> $in month, day, year, visible, show_age
-     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}|null
+     * @param array<string, mixed> $in month, day, year, visible, show_age, profile
+     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool, profile: string}|null
      */
     public function saveOwn(User $user, array $in): ?array
     {
@@ -144,16 +147,17 @@ final class BirthdayService
             }
             return $in[$key];
         };
-        $this->repository()->save($user->id, $date['month'], $date['day'], $date['year'], $flag('visible'), $flag('show_age'), $user->id, $this->app->time()->nowUtc());
+        $profile = isset($in['profile']) ? ProfileVisibility::parse($in['profile']) : null;
+        $this->repository()->save($user->id, $date['month'], $date['day'], $date['year'], $flag('visible'), $flag('show_age'), $user->id, $this->app->time()->nowUtc(), $profile);
         return $this->of($user->id);
     }
 
     /**
-     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, create_users): nur Tag, Monat und Jahr; visible und
-     * show_age bleiben, wie die Person sie gesetzt hat (mitgeschickte Schalter werden nicht übernommen).
+     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, create_users): nur Tag, Monat und Jahr; visible,
+     * show_age und profile bleiben, wie die Person sie gesetzt hat (mitgeschickte Schalter werden nicht übernommen).
      *
      * @param array<string, mixed> $in month, day, year
-     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}|null
+     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool, profile: string}|null
      */
     public function saveFor(User $actor, int $userId, array $in): ?array
     {
@@ -226,6 +230,36 @@ final class BirthdayService
         return $out;
     }
 
+    /**
+     * Geburtstage für die Seiten in der Mitgliederliste (GET /directory), soweit die Person sie $viewer zeigt (eine
+     * Abfrage): mit „Alter anzeigen“ und Jahr das ganze Datum und das heutige Alter, sonst nur Tag und Monat.
+     *
+     * @return array<int, array{month: int, day: int, year: int|null, age: int|null}> Benutzer-ID => Geburtstag
+     */
+    public function shownTo(?User $viewer): array
+    {
+        $today = $this->app->time()->today();
+        $out = [];
+        foreach ($this->repository()->withProfile(ProfileVisibility::shownTo($viewer)) as $b) {
+            $full = $b['show_age'] && $b['year'] !== null;
+            $out[$b['user_id']] = [
+                'month' => $b['month'],
+                'day' => $b['day'],
+                'year' => $full ? $b['year'] : null,
+                'age' => $full ? self::ageOn($b['month'], $b['day'], (int) $b['year'], $today) : null,
+            ];
+        }
+        return $out;
+    }
+
+    /** Alter an einem Tag: der 29.02. zählt in Jahren ohne Schalttag ab dem 28.02. */
+    public static function ageOn(int $month, int $day, int $year, \DateTimeImmutable $today): int
+    {
+        $thisYear = (int) $today->format('Y');
+        $birthday = self::inYear($month, $day, $thisYear, $today->getTimezone());
+        return $thisYear - $year - ($birthday->format('Y-m-d') > $today->format('Y-m-d') ? 1 : 0);
+    }
+
     /** Geburtstag in einem Jahr: der 29.02. in Jahren ohne Schalttag am 28.02. */
     public static function inYear(int $month, int $day, int $year, \DateTimeZone $tz): \DateTimeImmutable
     {
@@ -255,11 +289,11 @@ final class BirthdayService
 
     /**
      * @param Birthday $b
-     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool}
+     * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool, profile: string}
      */
     private static function full(array $b): array
     {
-        return ['month' => $b['month'], 'day' => $b['day'], 'year' => $b['year'], 'visible' => $b['visible'], 'show_age' => $b['show_age']];
+        return ['month' => $b['month'], 'day' => $b['day'], 'year' => $b['year'], 'visible' => $b['visible'], 'show_age' => $b['show_age'], 'profile' => $b['profile']];
     }
 
     /* ---------------------------------------------------------------- */

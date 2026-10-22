@@ -6,8 +6,10 @@ namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\TestCase;
@@ -65,14 +67,16 @@ final class DirectoryTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
 
         $entry = array_column($this->as(null)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'rank_title', 'rank_badge_url', 'titles'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'birthday', 'join_year'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertNull($entry['birthday'], 'ohne Freigabe kein Geburtstag');
+        $this->assertNull($entry['join_year'], 'ohne Freigabe kein Eintrittsjahr');
         $this->assertSame('Gefreiter', $entry['rank_title']);
         $this->assertSame([['id' => $title, 'title' => 'Ehrenmitglied']], $entry['titles']);
 
         $this->users->current = $this->admin;
-        $this->app->features()->update(['ranks' => false, 'titles' => false]);
+        $this->app->features()->update(['ranks' => false, 'titles' => false, 'birthdays' => false]);
         $entry = array_column($this->as($this->m)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad und keine Titel');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'join_year'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad, keine Titel und kein Geburtstag');
     }
 
     public function testCountsPerGroupWithoutRolesPerPerson(): void
@@ -135,6 +139,95 @@ final class DirectoryTest extends TestCase
         $this->assertSame(['', ''], [$this->call('GET', '/directory/former')->data[0]['joined_year'], $this->call('GET', '/directory/former')->data[0]['left_year']]);
         $this->call('DELETE', "/members/{$this->m}/former");
         $this->assertSame([], $this->call('GET', '/directory/former')->data);
+    }
+
+    public function testBirthdayAndJoinYearOnlyAsThePersonChooses(): void
+    {
+        $entry = function (?int $viewer): array {
+            return array_column($this->as($viewer)->data, null, 'id')[$this->m];
+        };
+        $this->users->current = $this->m;
+        $this->assertSame(200, $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'show_age' => true])->status);
+        $this->assertSame(200, $this->call('PUT', '/me/join-year', ['year' => 2005])->status);
+        foreach ([$this->m, null] as $viewer) {
+            $this->assertNull($entry($viewer)['birthday'], 'Standard: nicht auf der Seite');
+            $this->assertNull($entry($viewer)['join_year'], 'Standard: nicht auf der Seite');
+        }
+
+        // Nur Mitgliedern: angemeldete Mitglieder (Recht member) sehen es, Anwärter, Gäste und Besucher nicht.
+        $this->users->current = $this->m;
+        $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'members']);
+        $this->call('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'members']);
+        foreach ([$this->m, $this->admin] as $viewer) {
+            $e = $entry($viewer);
+            $this->assertSame(2005, $e['join_year']);
+            $this->assertSame([3, 12], [$e['birthday']['month'], $e['birthday']['day']]);
+        }
+        foreach ([$this->candidate, $this->guest, null] as $viewer) {
+            $this->assertNull($entry($viewer)['birthday']);
+            $this->assertNull($entry($viewer)['join_year']);
+        }
+
+        // Allen: auch ohne Anmeldung; mit „Alter anzeigen“ und Jahr das ganze Datum mit Alter, sonst nur Tag und Monat.
+        $this->users->current = $this->m;
+        $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'profile' => 'public']);
+        $this->call('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'public']);
+        $today = $this->app->time()->today();
+        $this->assertSame(['month' => 3, 'day' => 12, 'year' => 1988, 'age' => BirthdayService::ageOn(3, 12, 1988, $today)], $entry(null)['birthday']);
+        $this->assertSame(2005, $entry(null)['join_year']);
+        $this->users->current = $this->m;
+        $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'show_age' => false]);
+        $this->assertSame(['month' => 3, 'day' => 12, 'year' => null, 'age' => null], $entry(null)['birthday'], 'kein Geburtsjahr ohne „Alter anzeigen“');
+        $this->assertStringNotContainsString('1988', (string) json_encode($this->as(null)->data));
+
+        // Die Verwaltung ändert Datum und Jahr, nicht die Anzeige.
+        $this->users->current = $this->admin;
+        $this->assertSame(['year' => 2004, 'profile' => 'public'], $this->call('PUT', "/members/{$this->m}/join-year", ['year' => 2004, 'profile' => 'none'])->data['join_year']);
+        $this->assertSame('public', $this->call('PUT', "/members/{$this->m}/birthday", ['month' => 4, 'day' => 1, 'profile' => 'none'])->data['birthday']['profile']);
+        $this->assertSame(['year' => 2004, 'profile' => 'public'], $this->call('GET', "/members/{$this->m}")->data['join_year']);
+
+        // Der Bereich Geburtstage aus: kein Geburtstag in der Liste, das Eintrittsjahr bleibt.
+        $this->app->features()->update(['birthdays' => false]);
+        $this->assertArrayNotHasKey('birthday', $entry(null));
+        $this->assertSame(2004, $entry(null)['join_year']);
+
+        // Ehemalige haben ihre eigenen Jahre; Konto löschen entfernt das Eintrittsjahr.
+        $this->users->current = $this->admin;
+        $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left']);
+        $this->users->current = null;
+        $this->assertArrayNotHasKey('join_year', $this->call('GET', '/directory/former')->data[0]);
+        $this->users->current = $this->admin;
+        $this->assertSame(200, $this->call('DELETE', "/members/{$this->m}")->status);
+        $this->assertNull($this->app->joinYears()->of($this->m));
+        $this->assertContains('join_years', Backup::CORE_TABLES);
+    }
+
+    public function testJoinYearInput(): void
+    {
+        $this->users->current = $this->m;
+        foreach ([null, '', 'abc', 1799, (int) $this->app->time()->today()->format('Y') + 1] as $year) {
+            $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => $year])->status, (string) json_encode($year));
+        }
+        $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => 2000, 'profile' => 'alle'])->status);
+        $this->assertSame(['year' => 1800, 'profile' => 'none'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
+        $this->assertSame(403, $this->call('PUT', "/members/{$this->admin}/join-year", ['year' => 2000])->status, 'fremdes nur mit create_users');
+        $this->users->current = $this->candidate;
+        $this->assertSame(403, $this->call('PUT', '/me/join-year', ['year' => 2000])->status, 'nur Mitglieder');
+        $this->users->current = $this->admin;
+        $this->assertSame(404, $this->call('PUT', '/members/9999/join-year', ['year' => 2000])->status);
+    }
+
+    public function testAgeOnTheDay(): void
+    {
+        $tz = new \DateTimeZone('Europe/Berlin');
+        $on = static fn (string $d): \DateTimeImmutable => new \DateTimeImmutable($d, $tz);
+        $this->assertSame(37, BirthdayService::ageOn(3, 12, 1988, $on('2026-03-11')));
+        $this->assertSame(38, BirthdayService::ageOn(3, 12, 1988, $on('2026-03-12')));
+        // 29.02.: in Jahren ohne Schalttag ab dem 28.02. (wie die Liste und die Benachrichtigung)
+        $this->assertSame(26, BirthdayService::ageOn(2, 29, 2000, $on('2027-02-27')));
+        $this->assertSame(27, BirthdayService::ageOn(2, 29, 2000, $on('2027-02-28')));
+        $this->assertSame(27, BirthdayService::ageOn(2, 29, 2000, $on('2028-02-28')));
+        $this->assertSame(28, BirthdayService::ageOn(2, 29, 2000, $on('2028-02-29')));
     }
 
     public function testFeatureSwitch(): void

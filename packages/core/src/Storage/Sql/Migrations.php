@@ -982,6 +982,32 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {list_rows}_user_id ON {list_rows} (user_id)',
                 ],
             ],
+            // Seite einer Person in der Mitgliederliste: Geburtstag (birthdays.profile) und Eintrittsjahr (join_years) zeigen
+            // none (nicht), members (nur angemeldeten Mitgliedern) oder public (allen). Beides stellt nur die Person selbst
+            // ein; Standard: nicht zeigen. join_years: Jahr des Eintritts aktiver Mitglieder, einer je Konto.
+            21 => [
+                'mysql' => [
+                    "ALTER TABLE {birthdays} ADD COLUMN profile varchar(10) NOT NULL DEFAULT 'none'",
+                    'CREATE TABLE IF NOT EXISTS {join_years} (
+  user_id bigint(20) unsigned NOT NULL,
+  year smallint(4) unsigned NOT NULL,
+  profile varchar(10) NOT NULL DEFAULT \'none\',
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {birthdays} ADD COLUMN profile TEXT NOT NULL DEFAULT 'none'",
+                    'CREATE TABLE IF NOT EXISTS {join_years} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  year INTEGER NOT NULL,
+  profile TEXT NOT NULL DEFAULT \'none\',
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

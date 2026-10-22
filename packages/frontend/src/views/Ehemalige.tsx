@@ -167,6 +167,7 @@ export function FormerPanel({
   id,
   name,
   former,
+  joinYear,
   openCents,
   onChanged,
   onToast,
@@ -174,6 +175,8 @@ export function FormerPanel({
   id: number;
   name: string;
   former: FormerInfo | null;
+  /** Eintrittsjahr als aktives Mitglied: Vorschlag für den Eintritt beim Eintragen als ehemalig */
+  joinYear?: number | null;
   /** offene Beträge; null, wenn man sie nicht sieht */
   openCents: number | null;
   onChanged: () => void;
@@ -283,7 +286,7 @@ export function FormerPanel({
           <button
             className="btn btn-secondary"
             disabled={busy}
-            onClick={() => setForm({ reason: 'left', joined_on: '', founder: false, left_on: '' })}
+            onClick={() => setForm({ reason: 'left', joined_on: joinYear ? String(joinYear) : '', founder: false, left_on: '' })}
           >
             Als ehemalig eintragen …
           </button>

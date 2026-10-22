@@ -38,6 +38,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ehemalige in der Mitgliederliste**: Neuer Tab „Ehemalige“ rechts neben „Ämter“, für alle sichtbar wie die
   Mitgliederliste: Foto, Name, Dienstgrad und Titel, dazu nur „Gründungsmitglied“ und die Jahre von Eintritt und
   Ausscheiden, nie der Grund. In den Ämtern öffnet der Name einer ehemaligen Person ihre Seite.
+- **Geburtstag und Eintritt auf der Seite eines Mitglieds**: Jedes Mitglied wählt unter *Konto*, ob sein Geburtstag
+  und sein Eintrittsjahr auf seiner Seite in der Mitgliederliste stehen: nicht (Standard), nur für angemeldete
+  Mitglieder oder öffentlich. Beim Geburtstag stehen Jahr und Alter nur mit „Alter anzeigen“. Das Eintrittsjahr trägt
+  das Mitglied selbst oder die Verwaltung ein (*Mitglied → Eintritt*); beim Eintragen als ehemalig wird es als
+  Eintritt vorgeschlagen.
 - **Meins → Übersicht**: Foto, Name, Rollen, Dienstgrad, Punkte und offene Strafen auf einen Blick, dazu die eigenen
   Titel als Kachel.
 - **Fotos vergrößern**: Ein Tipp auf ein Mitgliedsfoto zeigt es groß und scharf (auch bei hoher Pixeldichte).

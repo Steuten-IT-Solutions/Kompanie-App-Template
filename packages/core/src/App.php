@@ -20,6 +20,7 @@ use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GoogleConnect;
+use KompanieApp\Core\Domain\JoinYearService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
@@ -450,6 +451,11 @@ final class App
     public function birthdays(): BirthdayService
     {
         return $this->service(BirthdayService::class, fn () => new BirthdayService($this));
+    }
+
+    public function joinYears(): JoinYearService
+    {
+        return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
     }
 
     public function memberPhotos(): MemberPhotoService
