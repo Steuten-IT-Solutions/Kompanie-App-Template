@@ -14,6 +14,12 @@ export function parseLocalDate(ymd: string): Date {
 
 export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
 
+/** Datum vom Server, das auch nur das Jahr sein kann (JJJJ-MM-TT oder JJJJ, z. B. Eintritt), zum Anzeigen. */
+export const formatYearOrDate = (value: string): string => (value.length === 4 ? value : formatDate(value));
+
+/** Dasselbe zum Bearbeiten: TT.MM.JJJJ oder das Jahr. */
+export const editYearOrDate = (value: string): string => (value.length === 10 ? value.split('-').reverse().join('.') : value);
+
 /** Zeitpunkt des Servers ('YYYY-MM-DD HH:MM:SS', UTC) als lokales Datum. */
 export const formatUtcDate = (utc: string) => dateFmt.format(new Date(utc.replace(' ', 'T') + 'Z'));
 

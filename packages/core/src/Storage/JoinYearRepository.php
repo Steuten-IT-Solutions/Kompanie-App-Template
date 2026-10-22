@@ -8,10 +8,11 @@ use KompanieApp\Core\Domain\ProfileVisibility;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
- * Eintrittsjahr aktiver Mitglieder (Tabelle join_years): eines je Konto, mit der Anzeige auf der eigenen Seite in der
- * Mitgliederliste (profile, ProfileVisibility). updated_at in UTC ('Y-m-d H:i:s').
+ * Eintritt aktiver Mitglieder (Tabelle join_years): einer je Konto, mit der Anzeige auf der eigenen Seite in der
+ * Mitgliederliste (profile, ProfileVisibility). year ist immer das Jahr, joined_on das ganze Datum (JJJJ-MM-TT) oder
+ * leer, wenn nur das Jahr bekannt ist. updated_at in UTC ('Y-m-d H:i:s').
  *
- * @phpstan-type JoinYear array{user_id: int, year: int, profile: string, updated_by: int, updated_at: string}
+ * @phpstan-type JoinYear array{user_id: int, year: int, joined_on: string, profile: string, updated_by: int, updated_at: string}
  */
 final class JoinYearRepository
 {
@@ -43,10 +44,23 @@ final class JoinYearRepository
         return $out;
     }
 
-    /** Anlegen oder ändern. Ohne $profile bleibt die Anzeige, wie sie ist (neu: nicht zeigen). */
-    public function save(int $userId, int $year, ?string $profile, int $by, string $now): void
+    /** @return array<int, string> Benutzer-ID => Eintritt (JJJJ-MM-TT oder JJJJ), alle unabhängig von der Anzeige (Verwaltung) */
+    public function all(): array
     {
-        $values = ['year' => $year, 'updated_by' => $by, 'updated_at' => $now];
+        $out = [];
+        foreach ($this->db->select('SELECT user_id, year, joined_on FROM {join_years}') as $r) {
+            $out[(int) $r['user_id']] = (string) $r['joined_on'] !== '' ? (string) $r['joined_on'] : (string) $r['year'];
+        }
+        return $out;
+    }
+
+    /**
+     * Anlegen oder ändern. $date: JJJJ-MM-TT im Jahr $year oder leer (nur das Jahr). Ohne $profile bleibt die Anzeige, wie
+     * sie ist (neu: nicht zeigen).
+     */
+    public function save(int $userId, int $year, string $date, ?string $profile, int $by, string $now): void
+    {
+        $values = ['year' => $year, 'joined_on' => $date, 'updated_by' => $by, 'updated_at' => $now];
         if ($profile !== null) {
             $values['profile'] = $profile;
         }
@@ -79,6 +93,7 @@ final class JoinYearRepository
         return [
             'user_id' => (int) $r['user_id'],
             'year' => (int) $r['year'],
+            'joined_on' => (string) ($r['joined_on'] ?? ''),
             'profile' => ProfileVisibility::stored($r['profile']),
             'updated_by' => (int) $r['updated_by'],
             'updated_at' => (string) $r['updated_at'],

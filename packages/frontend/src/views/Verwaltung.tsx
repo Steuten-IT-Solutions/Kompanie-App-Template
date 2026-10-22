@@ -13,7 +13,7 @@ import {
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro, formatPoints, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
+import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
@@ -157,8 +157,11 @@ function Members() {
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
-  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
+  // Nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users); sonst nach Nachname (die
+  // gemerkte Wahl bleibt).
+  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
+    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+  );
   const order: MemberOrder = sortOptions.includes(stored.sort)
     ? stored
     : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
@@ -286,7 +289,7 @@ function Members() {
             <select
               aria-labelledby="member-sort-label"
               value={order.sort}
-              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
+              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Eintritt früheste, Punkte die meisten zuerst).
               onChange={(e) => {
                 const sort = e.target.value as MemberSort;
                 changeOrder({ sort, dir: defaultDir(sort) });
@@ -328,6 +331,9 @@ function Members() {
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
+                {/* Nach Eintritt sortiert: das Jahr vorn, damit die Reihenfolge nachvollziehbar ist. */}
+                {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
+                {order.sort === 'joined' && m.joined_on && (canPoints() || (m.open_cents ?? 0) > 0) && ' · '}
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
                 {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
@@ -408,7 +414,7 @@ function MemberDetailView({
       label: 'Geburtstag',
       on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
     },
-    // Eintrittsjahr aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
+    // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
     { id: 'eintritt', label: 'Eintritt', on: m.join_year !== undefined && !m.former && m.level !== 'guest' },
   ].filter((p) => p.on);
   const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
@@ -525,7 +531,7 @@ function MemberDetailView({
               id={m.id}
               name={m.name}
               former={m.former}
-              joinYear={m.join_year?.year ?? null}
+              joinedOn={m.join_year ? (m.join_year.date ?? String(m.join_year.year)) : null}
               openCents={m.open_cents}
               onChanged={reload}
               onToast={onToast}

@@ -16,13 +16,13 @@ Auf seiner Seite kann jedes {rolle.member} auch seinen Geburtstag und das Jahr s
 
 So stellst du es für dich ein:
 - **Geburtstag:** unter **Konto** in der Karte **Geburtstag** bei **Auf meiner Seite unter „{bereich.directory}“** (nur wenn die Kompanie {bereich.birthdays} nutzt).
-- **Eintritt:** unter **Konto** in der Karte **Eintritt** das Jahr eintragen, die Anzeige wählen und **Eintrittsjahr speichern** tippen. **Entfernen** löscht es. Das Jahr kann auch die Verwaltung für dich eintragen; die Anzeige wählst aber nur du.
+- **Eintritt:** unter **Konto** in der Karte **Eintritt** das Datum (TT.MM.JJJJ) oder nur das Jahr eintragen, die Anzeige wählen und **Eintritt speichern** tippen. **Entfernen** löscht ihn. Auf deiner Seite steht immer nur das Jahr, auch wenn du das ganze Datum eingetragen hast. Den Eintritt kann auch die Verwaltung für dich eintragen; die Anzeige wählst aber nur du.
 
 ## Ehemalige
 Unter **Ehemalige** stehen alle, die die Verwaltung als ehemalig eingetragen hat (ausgetreten, verstorben oder sonst ausgeschieden). Die Liste sieht aus wie die der {rolle.member}, mit Suche und Sortierung; unter dem Namen stehen, soweit eingetragen, „Gründungsmitglied“ und die Jahre von Eintritt und Ausscheiden, z. B. „1985–2010“. Der Grund des Ausscheidens und genaue Daten stehen dort nicht. Ein Tipp öffnet die Seite der Person mit ihren Ämtern.
 
 ## Suchen und sortieren
-Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: {rolle.member} und die Rollen, die gesondert zählen (z. B. Anwärter), in umgekehrter Reihenfolge der Rollen, die ein {rolle.admin} festlegt (von unten nach oben). Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**. Die Sortierung merkt sich die App auf diesem Gerät.
+Über der Liste steht oben, wie viele Personen darin stehen, je Gruppe wie in der Verwaltung: {rolle.member} und die Rollen, die gesondert zählen (z. B. Anwärter), in umgekehrter Reihenfolge der Rollen, die ein {rolle.admin} festlegt (von unten nach oben). Suche und Sortierung ändern den Zähler nicht. Im Suchfeld genügt ein Teil des Namens. Unter **Sortierung** wählst du **Nachname** (dann steht „Nachname, Vorname“ in der Liste) oder **Vorname**, mit **A → Z** bzw. **Z → A**, oder **Eintritt** mit **Früheste zuerst** bzw. **Neueste zuerst**. Nach Eintritt zählt nur das Jahr, das eine Person auf ihrer Seite zeigt (unter dem Namen steht dann „Eintritt 2005“); wer kein sichtbares Jahr hat, steht am Ende. Unter **Ehemalige** stehen Gründungsmitglieder ganz vorn. Die Sortierung merkt sich die App auf diesem Gerät.
 
 ## Fotos
 Die Fotos laden die zuständigen Personen in der Verwaltung hoch (siehe **Mitglieder anlegen**). Dein eigenes Foto siehst du unter **Konto**. Möchtest du ein anderes Foto oder keines, sprich die Verwaltung an.

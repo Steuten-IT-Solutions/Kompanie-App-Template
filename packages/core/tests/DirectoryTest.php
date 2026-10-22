@@ -182,9 +182,9 @@ final class DirectoryTest extends TestCase
 
         // Die Verwaltung ändert Datum und Jahr, nicht die Anzeige.
         $this->users->current = $this->admin;
-        $this->assertSame(['year' => 2004, 'profile' => 'public'], $this->call('PUT', "/members/{$this->m}/join-year", ['year' => 2004, 'profile' => 'none'])->data['join_year']);
+        $this->assertSame(['year' => 2004, 'date' => '2004', 'profile' => 'public'], $this->call('PUT', "/members/{$this->m}/join-year", ['year' => 2004, 'profile' => 'none'])->data['join_year']);
         $this->assertSame('public', $this->call('PUT', "/members/{$this->m}/birthday", ['month' => 4, 'day' => 1, 'profile' => 'none'])->data['birthday']['profile']);
-        $this->assertSame(['year' => 2004, 'profile' => 'public'], $this->call('GET', "/members/{$this->m}")->data['join_year']);
+        $this->assertSame(['year' => 2004, 'date' => '2004', 'profile' => 'public'], $this->call('GET', "/members/{$this->m}")->data['join_year']);
 
         // Der Bereich Geburtstage aus: kein Geburtstag in der Liste, das Eintrittsjahr bleibt.
         $this->app->features()->update(['birthdays' => false]);
@@ -209,12 +209,40 @@ final class DirectoryTest extends TestCase
             $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => $year])->status, (string) json_encode($year));
         }
         $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => 2000, 'profile' => 'alle'])->status);
-        $this->assertSame(['year' => 1800, 'profile' => 'none'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
+        $this->assertSame(['year' => 1800, 'date' => '1800', 'profile' => 'none'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
         $this->assertSame(403, $this->call('PUT', "/members/{$this->admin}/join-year", ['year' => 2000])->status, 'fremdes nur mit create_users');
         $this->users->current = $this->candidate;
         $this->assertSame(403, $this->call('PUT', '/me/join-year', ['year' => 2000])->status, 'nur Mitglieder');
         $this->users->current = $this->admin;
         $this->assertSame(404, $this->call('PUT', '/members/9999/join-year', ['year' => 2000])->status);
+    }
+
+    public function testJoinDateWithDayAndMonth(): void
+    {
+        $this->users->current = $this->m;
+        $put = fn (array $body): Response => $this->call('PUT', '/me/join-year', $body);
+        $this->assertSame(['year' => 2005, 'date' => '2005-03-12', 'profile' => 'public'], $put(['date' => '12.3.2005', 'profile' => 'public'])->data['join_year']);
+        $this->assertSame('2005-03-12', $put(['date' => '2005-03-12'])->data['join_year']['date'], 'auch JJJJ-MM-TT');
+        // Auf der Seite in der Mitgliederliste nur das Jahr, wie bei den Ehemaligen
+        $this->assertSame(2005, array_column($this->as(null)->data, null, 'id')[$this->m]['join_year']);
+        $this->assertStringNotContainsString('03-12', (string) json_encode($this->as(null)->data));
+        // Verwaltung: ganzes Datum in Liste und Details
+        $this->users->current = $this->admin;
+        $this->assertSame('2005-03-12', array_column($this->call('GET', '/members')->data, null, 'id')[$this->m]['joined_on']);
+        $this->assertSame('2005-03-12', $this->call('GET', "/members/{$this->m}")->data['join_year']['date']);
+        $this->assertSame(['year' => 2004, 'date' => '2004-12-31', 'profile' => 'public'], $this->call('PUT', "/members/{$this->m}/join-year", ['date' => '31.12.2004'])->data['join_year']);
+        // Nur das Jahr: das Datum entfällt
+        $this->assertSame(['year' => 2004, 'date' => '2004', 'profile' => 'public'], $this->call('PUT', "/members/{$this->m}/join-year", ['date' => '2004'])->data['join_year']);
+        $this->assertSame('2004', array_column($this->call('GET', '/members')->data, null, 'id')[$this->m]['joined_on']);
+        // Ältere Apps schicken year: ebenso nur das Jahr
+        $this->call('PUT', "/members/{$this->m}/join-year", ['date' => '01.05.2003']);
+        $this->assertSame('2003', $this->call('PUT', "/members/{$this->m}/join-year", ['year' => 2003])->data['join_year']['date']);
+
+        $tomorrow = $this->app->time()->today()->modify('+1 day')->format('d.m.Y');
+        foreach (['', '31.02.2005', '2005-13-01', '12.03.', 'März 2005', '01.01.1799', $tomorrow, null] as $bad) {
+            $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/join-year", ['date' => $bad])->status, (string) json_encode($bad));
+        }
+        $this->assertSame('2003', $this->app->joinYears()->of($this->m)['date'] ?? null, 'Fehler ändern nichts');
     }
 
     public function testAgeOnTheDay(): void

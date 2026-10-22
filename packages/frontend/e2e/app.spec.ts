@@ -2598,16 +2598,17 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
 });
 
 test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mitglied sie zeigt', async ({ page, browser }) => {
-  // Die Verwaltung trägt das Eintrittsjahr ein; die Anzeige wählt nur die Person.
+  // Die Verwaltung trägt den Eintritt mit Datum ein; die Anzeige wählt nur die Person, auf der Seite steht nur das Jahr.
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Eintritt');
   const adminCard = page.locator('.member-join-year');
-  await adminCard.getByLabel('Jahr').fill('2005');
-  await adminCard.getByRole('button', { name: 'Eintrittsjahr speichern' }).click();
-  await expect(page.locator('.toast')).toHaveText('Eintrittsjahr gespeichert');
-  await expect(adminCard).toContainText('Eingetreten 2005');
+  await adminCard.getByLabel('Datum oder Jahr').fill('1.4.2005');
+  await adminCard.getByRole('button', { name: 'Eintritt speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
+  await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
+  await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
   await expect(adminCard).toContainText('Nicht anzeigen (wählt nur die Person selbst)');
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
 
@@ -2627,10 +2628,10 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
   const joined = member.locator('.join-year-card');
-  await expect(joined.getByLabel('Jahr')).toHaveValue('2005');
+  await expect(joined.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
   await joined.getByLabel(/Auf meiner Seite/).selectOption('members');
-  await joined.getByRole('button', { name: 'Eintrittsjahr speichern' }).click();
-  await expect(member.locator('.toast')).toHaveText('Eintrittsjahr gespeichert');
+  await joined.getByRole('button', { name: 'Eintritt speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Eintritt gespeichert');
   await joined.scrollIntoViewIfNeeded();
   await shot(member, '36b-eintritt-konto');
 
@@ -2666,7 +2667,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await birthday.getByRole('button', { name: 'Entfernen' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag entfernt');
   await joined.getByRole('button', { name: 'Entfernen' }).click();
-  await expect(member.locator('.toast')).toHaveText('Eintrittsjahr entfernt');
+  await expect(member.locator('.toast')).toHaveText('Eintritt entfernt');
   await member.close();
 });
 
