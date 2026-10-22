@@ -628,8 +628,12 @@ function RowEditor({
  * gekippt (Parallelogramm mit schrägen Linien), damit keine Linie den Text kreuzt.
  */
 const rotated = (c: ListColumn): boolean => c.width === 'narrow' && c.field !== 'nr' && columnLabel(c).trim() !== '';
-/** Ungefähr: Millimeter je Zeichen in fetter Schrift, um 45° gedreht (Höhe) */
-const ROTATED_MM_PER_CHAR = 1.8;
+/**
+ * Abstände der gedrehten Überschrift im Kopf (Millimeter): Sie beginnt 3 mm über der Unterkante (.list-th-label), oben
+ * bleibt etwas Luft bis zur Linie.
+ */
+const ROTATED_BOTTOM_MM = 3;
+const ROTATED_TOP_MM = 1.5;
 /** Druckbreite auf A4 mit 12 mm Rand (@page in PrintPortal) */
 const PAGE_WIDTH_MM = { portrait: 186, landscape: 273 };
 /** CSS-Pixel je Millimeter (96 dpi, in allen Browsern fest) */
@@ -759,23 +763,24 @@ function textWidth(texts: string[], font: string): number {
 }
 
 /**
- * Schrift der Zellen zum Messen (Schrift der App, 10,5 pt = 14 px). Ist sie noch nicht geladen, misst die Zeichenfläche
- * mit einer Ersatzschrift: dann nach dem Laden noch einmal.
+ * Schrift der Liste zum Messen (Schrift der App): normal für die Zellen, fett für die Überschriften, beide 10,5 pt =
+ * 14 px. Ist sie noch nicht geladen, misst die Zeichenfläche mit einer Ersatzschrift: dann nach dem Laden noch einmal.
  */
-function useCellFont(): string {
-  const font = `400 14px ${getComputedStyle(document.body).fontFamily}`;
+function useListFonts(): { cell: string; head: string } {
+  const family = getComputedStyle(document.body).fontFamily;
+  const cell = `400 14px ${family}`;
+  const head = `700 14px ${family}`;
   const [, setLoaded] = useState(false);
   useEffect(() => {
     let active = true;
-    document.fonts
-      ?.load(font)
+    Promise.all([document.fonts?.load(cell), document.fonts?.load(head)])
       .then(() => active && setLoaded(true))
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [font]);
-  return font;
+  }, [cell, head]);
+  return { cell, head };
 }
 
 /**
@@ -785,9 +790,14 @@ function useCellFont(): string {
  */
 function PrintSheet({ draft }: { draft: Draft }) {
   const cols = draft.columns;
-  const longest = Math.max(0, ...cols.filter(rotated).map((c) => columnLabel(c).length));
-  // Höhe des Kopfs in ganzen Pixeln: Sonst rundet der Browser die Zeile und unter den gekippten Feldern bleibt ein Spalt.
-  const headPx = longest > 0 ? Math.round(Math.min(50, Math.max(12, longest * ROTATED_MM_PER_CHAR + 8)) * PX_PER_MM) : 0;
+  const fonts = useListFonts();
+  // Höhe des Kopfs aus der längsten gedrehten Überschrift: Sie läuft um 45° nach oben (Länge / √2), dazu die halbe
+  // Zeilenhöhe (Zeilenabstand 1) an ihrem oberen Ende und die Abstände unten und oben. In ganzen Pixeln: Sonst rundet
+  // der Browser die Zeile und unter den gekippten Feldern bleibt ein Spalt.
+  const labels = cols.filter(rotated).map(columnLabel);
+  const rise = (textWidth(labels, fonts.head) + 7) / Math.SQRT2;
+  const headMm = rise / PX_PER_MM + ROTATED_BOTTOM_MM + ROTATED_TOP_MM;
+  const headPx = labels.length > 0 ? Math.round(Math.min(50, Math.max(12, headMm)) * PX_PER_MM) : 0;
   // Der gekippte Kopf beginnt eine Spalte vor der ersten gedrehten: Deren Fläche und die gerade davor überlappen sich so
   // in einer Grafik (zwei Flächen nebeneinander zeigen in manchen PDF-Anzeigen eine helle Naht).
   const firstRotated = cols.findIndex(rotated);
@@ -795,13 +805,12 @@ function PrintSheet({ draft }: { draft: Draft }) {
   const lastRotated = cols.map(rotated).lastIndexOf(true);
   const pageWidth = PAGE_WIDTH_MM[draft.orientation];
   // Namen brechen nicht um: Ihre Spalten sind mindestens so breit wie der längste Name (Schrift der Zellen, 10,5 pt).
-  const font = useCellFont();
   const minimums = cols.map((c) =>
     c.kind === 'field' && c.field !== null && NAME_FIELDS.has(c.field)
       ? Math.ceil(
           textWidth(
             draft.rows.map((r, i) => cellText(c, r, i)),
-            font,
+            fonts.cell,
           ),
         ) + CELL_EXTRA_PX
       : 0,
