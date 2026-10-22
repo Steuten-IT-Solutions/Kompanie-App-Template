@@ -15,6 +15,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Punkte in der Mitgliederliste der Verwaltung** stehen nur noch, wenn die Liste nach Punkten sortiert ist, wie
+  schon der Eintritt bei der Sortierung nach Eintritt. Offene Strafen stehen weiter immer da.
+
 ## [0.2.0] – 2026-10-22
 
 ### Neu
