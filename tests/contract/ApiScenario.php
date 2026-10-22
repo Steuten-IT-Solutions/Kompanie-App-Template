@@ -995,7 +995,10 @@ final class ApiScenario
      * Geburtstage (Issue #1): eigener mit Schaltern, Pflege durch create_users (ohne die Schalter), nur Mitglieder sehen,
      * nie das Geburtsjahr, Konto löschen entfernt den Geburtstag, Bereich aus → 403.
      */
-    /** Mitgliederliste (Bereich directory, Issue #112: öffentlich): nur Namen, Fotos, Dienstgrade und Titel. */
+    /**
+     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): nur Namen, Fotos, Dienstgrade und Titel; Geburtstag und
+     * Eintrittsjahr nur, soweit die Person sie zeigt (nicht, nur Mitgliedern, allen).
+     */
     private function directory(): void
     {
         $c = $this->c;
@@ -1013,6 +1016,57 @@ final class ApiScenario
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
         $c->ok(is_string($entry['name'] ?? null) && array_key_exists('photo_url', $entry) && array_key_exists('rank_title', $entry) && is_array($entry['titles'] ?? null), 'Name, Foto, Dienstgrad und Titel');
         $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
+        $c->ok(array_key_exists('birthday', $entry) && $entry['birthday'] === null && array_key_exists('join_year', $entry) && $entry['join_year'] === null, 'Geburtstag und Eintrittsjahr: ohne Freigabe null');
+
+        // Geburtstag und Eintrittsjahr auf der Seite der Person: wählt nur sie selbst
+        $this->d->actAs($m);
+        $c->ok($this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'alle'])[0] === 400, 'Ungültige Anzeige → 400');
+        [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'show_age' => true, 'profile' => 'public']);
+        $c->ok($s === 200 && ($d['birthday']['profile'] ?? null) === 'public', 'Geburtstag allen zeigen');
+        $c->ok($this->req('PUT', '/me/join-year', ['year' => (int) gmdate('Y') + 1])[0] === 400, 'Eintrittsjahr in der Zukunft → 400');
+        $c->ok($this->req('PUT', '/me/join-year', ['year' => 1799])[0] === 400, 'Eintrittsjahr vor 1800 → 400');
+        [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005]);
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2005, 'profile' => 'none'], 'Eigenes Eintrittsjahr, Standard: nicht zeigen');
+        [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'members']);
+        $c->ok($s === 200 && ($d['join_year']['profile'] ?? null) === 'members', 'Eintrittsjahr nur Mitgliedern zeigen');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', "/members/$m/join-year", ['year' => 2004, 'profile' => 'public']);
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'profile' => 'members'], 'Verwaltung ändert das Jahr, die Anzeige bleibt');
+        [$s, $d] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'profile' => 'members'], 'Mitgliedsdetails mit Eintrittsjahr');
+        $this->d->actAs($cand);
+        $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2000])[0] === 403, 'Ohne create_users kein fremdes Eintrittsjahr → 403');
+        $c->ok($this->req('PUT', '/me/join-year', ['year' => 2000])[0] === 403, 'Anwärter: kein eigenes Eintrittsjahr → 403');
+        $byViewer = function (?int $viewer) use ($m): array {
+            $this->d->actAs($viewer);
+            [, $d] = $this->req('GET', '/directory');
+            return array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
+        };
+        $public = $byViewer(null);
+        $age = (int) gmdate('Y') - 1988 - (gmdate('m-d') < '03-12' ? 1 : 0);
+        $c->ok(($public['birthday']['month'] ?? null) === 3 && ($public['birthday']['day'] ?? null) === 12 && ($public['birthday']['year'] ?? null) === 1988 && in_array($public['birthday']['age'] ?? null, [$age - 1, $age, $age + 1], true), 'Ohne Anmeldung: Geburtstag mit Jahr und Alter');
+        $c->ok(array_key_exists('join_year', $public) && $public['join_year'] === null, 'Ohne Anmeldung: Eintrittsjahr nur für Mitglieder nicht zu sehen');
+        $candEntry = $byViewer($cand);
+        $c->ok(array_key_exists('join_year', $candEntry) && $candEntry['join_year'] === null, 'Anwärter sieht das Eintrittsjahr für Mitglieder nicht');
+        $c->ok(($byViewer($m)['join_year'] ?? null) === 2004, 'Mitglied sieht das Eintrittsjahr');
+        $this->d->actAs($m);
+        $this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'show_age' => false]);
+        $b = $byViewer(null)['birthday'] ?? [];
+        $c->ok(($b['month'] ?? null) === 3 && array_key_exists('year', $b) && $b['year'] === null && $b['age'] === null, 'Ohne „Alter anzeigen“: nur Tag und Monat');
+        $this->d->actAs($m);
+        $this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'none']);
+        $own = $byViewer($m);
+        $c->ok(array_key_exists('birthday', $own) && $own['birthday'] === null, 'Nicht zeigen: auch Mitglieder sehen den Geburtstag dort nicht');
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('DELETE', '/me/join-year');
+        $c->ok($s === 200 && array_key_exists('join_year', (array) $d) && $d['join_year'] === null, 'Eigenes Eintrittsjahr entfernen');
+        $this->req('DELETE', '/me/birthday');
+        $this->d->actAs($admin);
+        $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2004])[0] === 200 && $this->req('DELETE', "/members/$m/join-year")[0] === 200, 'Verwaltung trägt Eintrittsjahr ein und entfernt es');
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', '/me/join-year');
+        $c->ok($s === 200 && array_key_exists('join_year', (array) $d) && $d['join_year'] === null, 'Danach kein Eintrittsjahr');
+        $this->d->actAs(null);
         [$s, $d] = $this->req('GET', '/directory/counts');
         $groups = array_column((array) $d, 'count', 'group');
         $c->ok($s === 200 && ($groups['member'] ?? 0) >= 1 && ($groups[$this->anw] ?? 0) >= 1 && !isset($groups['guest']), 'GET /directory/counts: Anzahl je Gruppe, ohne Gäste');
@@ -1180,7 +1234,7 @@ final class ApiScenario
             $year = 1996;
         }
         [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => $month, 'day' => $day, 'year' => $year, 'show_age' => true]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true], 'Eigenen Geburtstag mit Jahr eintragen');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Eigenen Geburtstag mit Jahr eintragen');
         $this->d->actAs($m2);
         [$s, $d] = $this->req('GET', '/birthdays', [], ['days' => '7']);
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['user_id'] ?? 0) === $m))[0] ?? null;
@@ -1190,7 +1244,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [$s, $d] = $this->req('PUT', "/members/$m/birthday", ['month' => $month, 'day' => $day, 'visible' => false, 'show_age' => false]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true], 'Verwaltung ändert das Datum, die Schalter bleiben');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Verwaltung ändert das Datum, die Schalter bleiben');
         [$s, $d] = $this->req('GET', "/members/$m");
         $c->ok($s === 200 && ($d['birthday']['month'] ?? null) === $month, 'Mitgliedsdetails mit Geburtstag');
 
@@ -1207,7 +1261,7 @@ final class ApiScenario
             $this->users[] = $newId;
         }
         [, $detail] = $this->req('GET', "/members/$newId");
-        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false], 'Mitglied mit Geburtstag anlegen');
+        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false, 'profile' => 'none'], 'Mitglied mit Geburtstag anlegen');
         $c->ok($this->req('DELETE', "/members/$newId")[0] === 200, 'Konto mit Geburtstag entfernen');
         $this->d->actAs($m2);
         [, $d] = $this->req('GET', '/birthdays');

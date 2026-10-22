@@ -93,7 +93,12 @@ const PATHS = [
   ['verwaltung', 'ehemalige'],
   ['verwaltung', 'ehemalige', 'import'],
   ...['mitglied', 'ehemalige'].flatMap((base) =>
-    ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag'].map((s) => ['verwaltung', base, '7', s]),
+    ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag', 'eintritt'].map((s) => [
+      'verwaltung',
+      base,
+      '7',
+      s,
+    ]),
   ),
   ['brett'],
   ['umfragen'],

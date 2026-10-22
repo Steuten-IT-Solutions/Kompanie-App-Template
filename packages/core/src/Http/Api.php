@@ -295,8 +295,9 @@ final class Api
 
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
-     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Mit $entries dieselben
-     * Angaben zu anderen Personen (Ehemalige).
+     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich
+     * Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit
+     * $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintrittsjahr: Sie haben ihre Jahre).
      *
      * @param list<array<string, mixed>>|null $entries
      * @return list<array<string, mixed>>
@@ -307,10 +308,15 @@ final class Api
         $photos = $a->memberPhotos()->urls();
         $ranks = $a->features()->enabled('ranks') ? $a->ranks()->assigned() : null;
         $titles = $a->features()->enabled('titles') ? $a->titles()->byUser() : null;
+        $viewer = $a->authContext->currentUser();
+        $birthdays = $entries === null && $a->features()->enabled('birthdays') ? $a->birthdays()->shownTo($viewer) : null;
+        $joined = $entries === null ? $a->joinYears()->shownTo($viewer) : null;
         return array_map(static fn (array $m): array => $m
             + ['photo_url' => $photos[$m['id']] ?? null]
             + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
-            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : []), $entries ?? $a->members()->directory());
+            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
+            + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
+            + ($joined !== null ? ['join_year' => $joined[$m['id']] ?? null] : []), $entries ?? $a->members()->directory());
     }
 
     /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -467,6 +473,13 @@ final class Api
                 $a->birthdays()->remove($this->user()->id);
                 return ['birthday' => null];
             }, 'birthdays', $denyBirthdays),
+            // Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
+            new Route('GET', '/me/join-year', Cap::Member, fn () => ['join_year' => $a->joinYears()->of($this->user()->id)], null, $denyMember),
+            new Route('PUT', '/me/join-year', Cap::Member, fn (Request $r) => ['join_year' => $a->joinYears()->saveOwn($this->user(), $r->body)], null, $denyMember),
+            new Route('DELETE', '/me/join-year', Cap::Member, function () use ($a) {
+                $a->joinYears()->remove($this->user()->id);
+                return ['join_year' => null];
+            }, null, $denyMember),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
                 return ['changed' => true];
@@ -679,6 +692,11 @@ final class Api
                 $a->birthdays()->removeFor($r->id());
                 return ['birthday' => null];
             }, 'birthdays', $denyRights),
+            new Route('PUT', '/members/{id}/join-year', Cap::CreateUsers, fn (Request $r) => ['join_year' => $a->joinYears()->saveFor($this->user(), $r->id(), $r->body)], null, $denyRights),
+            new Route('DELETE', '/members/{id}/join-year', Cap::CreateUsers, function (Request $r) use ($a) {
+                $a->joinYears()->removeFor($r->id());
+                return ['join_year' => null];
+            }, null, $denyRights),
 
             // Inventar (Issue #6): nur mit manage_inventory (Mitglieder ohne das Recht sehen es nicht); optional reason bei
             // allen Änderungen. Genau ein Verlaufseintrag je Änderung und betroffenem Eintrag (InventoryService).
@@ -709,7 +727,8 @@ final class Api
                 return ['deleted' => true];
             }, 'attendance', $denyRights),
 
-            // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und Titel
+            // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und
+            // Titel, dazu Geburtstag und Eintrittsjahr, soweit die Person sie dem Betrachter zeigt
             new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
             new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
             // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied und die Jahre, kein Grund
@@ -752,6 +771,8 @@ final class Api
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
                 + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
+                // Eintrittsjahr mit Anzeige, ebenso nur für create_users
+                + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
                 // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
                 + ['former' => $a->formerMembers()->of($r->id())], null, $denyManage),
             // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import

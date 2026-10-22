@@ -2515,6 +2515,79 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await member.close();
 });
 
+test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mitglied sie zeigt', async ({ page, browser }) => {
+  // Die Verwaltung trägt das Eintrittsjahr ein; die Anzeige wählt nur die Person.
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Eintritt');
+  const adminCard = page.locator('.member-join-year');
+  await adminCard.getByLabel('Jahr').fill('2005');
+  await adminCard.getByRole('button', { name: 'Eintrittsjahr speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Eintrittsjahr gespeichert');
+  await expect(adminCard).toContainText('Eingetreten 2005');
+  await expect(adminCard).toContainText('Nicht anzeigen (wählt nur die Person selbst)');
+  await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
+
+  // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
+  const member = await browser.newPage();
+  member.on('dialog', (d) => d.accept());
+  await login(member, 'mitglied2');
+  await member.getByRole('button', { name: 'Konto' }).click();
+  const birthday = member.locator('.birthday-card');
+  await birthday.getByLabel('Tag').selectOption('12');
+  await birthday.getByLabel('Monat').selectOption('3');
+  await birthday.getByLabel('Jahr', { exact: true }).fill('1988');
+  await birthday.getByLabel(/Alter anzeigen/).check();
+  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('none');
+  await birthday.getByLabel(/Auf meiner Seite/).selectOption('public');
+  await expect(birthday).toContainText('Dort steht das ganze Datum mit deinem Alter.');
+  await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  const joined = member.locator('.join-year-card');
+  await expect(joined.getByLabel('Jahr')).toHaveValue('2005');
+  await joined.getByLabel(/Auf meiner Seite/).selectOption('members');
+  await joined.getByRole('button', { name: 'Eintrittsjahr speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Eintrittsjahr gespeichert');
+  await joined.scrollIntoViewIfNeeded();
+  await shot(member, '36b-eintritt-konto');
+
+  // Ein anderes Mitglied sieht beides auf der Seite.
+  const today = new Date();
+  const age = today.getFullYear() - 1988 - (today.getMonth() < 2 || (today.getMonth() === 2 && today.getDate() < 12) ? 1 : 0);
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/mitglieder/liste');
+  await page.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
+  const facts = page.locator('.member-page .member-page-facts');
+  await expect(facts).toHaveText(new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 2005$`));
+  await shot(page, '1d-mitglied-seite');
+
+  // Ohne Anmeldung nur der Geburtstag.
+  await page.context().clearCookies();
+  await page.reload();
+  await expect(facts).toHaveText(/^Geburtstag 12\. März 1988 \(\d+ Jahre\)$/);
+
+  // Ohne „Alter anzeigen“ nur Tag und Monat; „Nicht anzeigen“ blendet ihn aus.
+  await birthday.getByLabel(/Alter anzeigen/).uncheck();
+  await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  await page.reload();
+  await expect(facts).toHaveText('Geburtstag 12. März');
+  await birthday.getByLabel(/Auf meiner Seite/).selectOption('none');
+  await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  await page.reload();
+  await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied2' })).toBeVisible();
+  await expect(facts).toHaveCount(0);
+
+  // Aufräumen (WordPress behält die Daten zwischen den Läufen)
+  await birthday.getByRole('button', { name: 'Entfernen' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag entfernt');
+  await joined.getByRole('button', { name: 'Entfernen' }).click();
+  await expect(member.locator('.toast')).toHaveText('Eintrittsjahr entfernt');
+  await member.close();
+});
+
 test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle Schritte mit Namen', async ({ page }) => {
   const title = `Bierbank ${Date.now().toString(36)}`;
   page.on('dialog', (d) => d.accept());

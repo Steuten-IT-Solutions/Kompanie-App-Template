@@ -37,7 +37,7 @@ final class QueryCountTest extends TestCase
         $large = $this->measure(40);
         foreach (self::LISTS as $label) {
             $this->assertSame($small[$label]['total'], $large[$label]['total'], "$label: gleich viele Abfragen mit 10 und 40 Mitgliedern");
-            $this->assertLessThanOrEqual(15, $large[$label]['total'], "$label: feste, kleine Zahl von Abfragen");
+            $this->assertLessThanOrEqual(16, $large[$label]['total'], "$label: feste, kleine Zahl von Abfragen");
         }
     }
 

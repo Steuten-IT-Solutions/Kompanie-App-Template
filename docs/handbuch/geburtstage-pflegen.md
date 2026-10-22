@@ -9,7 +9,7 @@ Jedes Mitglied trägt seinen Geburtstag selbst unter **Konto** (oben rechts) ein
 ## In den Mitgliedsdetails
 **Verwaltung → Mitglieder →** Mitglied antippen und im Menü unter dem Namen **Geburtstag** wählen (wie die Mitgliederliste aufgebaut ist, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen)). Dort steht das eingetragene Datum oder „Nicht eingetragen.“. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn nach einer Rückfrage.
 
-Ob **Anderen Mitgliedern zeigen** und **Alter anzeigen** an oder aus sind, siehst du dort nur zur Information. Sie gehören der Person selbst: Du kannst sie nicht ändern, und ein neu eingetragener Geburtstag ist zunächst sichtbar und ohne Alter.
+Ob **Anderen Mitgliedern zeigen** und **Alter anzeigen** an oder aus sind und (mit der Liste **{bereich.directory}**) ob der Geburtstag auf der Seite der Person steht, siehst du dort nur zur Information. Das gehört der Person selbst: Du kannst es nicht ändern, und ein neu eingetragener Geburtstag ist zunächst sichtbar, ohne Alter und nicht auf ihrer Seite.
 
 ## Beim Anlegen
 Bei **+ Mitglied anlegen** und bei **Mehrere auf einmal anlegen** gibt es je Person ein freiwilliges Feld **Geburtstag** (Tag, Monat, Jahr freiwillig). Ein ungültiges Datum (z. B. 31. Februar oder ein Tag in der Zukunft) meldet die App, bevor jemand angelegt wird.

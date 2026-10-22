@@ -218,7 +218,8 @@ paths:
       description: |
         Tag und Monat, das Jahr ist freiwillig. Gültiges Datum (29.02. nur im Schaltjahr oder ohne Jahr), Jahr ab 1900,
         nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Nicht mitgeschickte Schalter bleiben; ein neuer Eintrag
-        ist sichtbar (`visible: true`) und ohne Alter (`show_age: false`).
+        ist sichtbar (`visible: true`), ohne Alter (`show_age: false`) und nicht auf der Seite in der Mitgliederliste
+        (`profile: none`).
       x-capability: member
       requestBody:
         required: true
@@ -233,6 +234,7 @@ paths:
                 year: { type: [integer, 'null'], minimum: 1900, description: 'Geburtsjahr; null oder weglassen = ohne Jahr' }
                 visible: { type: boolean, description: Anderen Mitgliedern zeigen }
                 show_age: { type: boolean, description: 'Alter anzeigen (nur mit Jahr wirksam)' }
+                profile: { $ref: '#/components/schemas/ProfileVisibility' }
       responses:
         '200':
           description: Gespeichert
@@ -252,6 +254,58 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BirthdayResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/join-year:
+    get:
+      tags: [Mitgliederliste]
+      summary: Eigenes Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
+      x-capability: member
+      responses:
+        '200':
+          description: OK; `join_year` null, wenn keines eingetragen ist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Mitgliederliste]
+      summary: Eigenes Eintrittsjahr eintragen oder ändern
+      description: |
+        Jahr ab 1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein
+        neuer Eintrag steht nicht auf der Seite (`profile: none`).
+      x-capability: member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year: { type: integer, minimum: 1800 }
+                profile: { $ref: '#/components/schemas/ProfileVisibility' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Mitgliederliste]
+      summary: Eigenes Eintrittsjahr entfernen
+      x-capability: member
+      responses:
+        '200':
+          description: Entfernt (`join_year` ist null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -2133,8 +2187,9 @@ paths:
       description: |
         Für alle, auch Gäste und ohne Anmeldung (Issue #112). Enthält alle Mitglieder und Anwärter (auch Personen mit
         eigenen Rollen nur mit dem internen Kalender), keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch
-        den Dienstgrad, mit Bereich Titel die Titel; nie Rollen, Punkte, Strafen oder Kontodaten. Sortiert nach
-        Anzeigename. Bereich aus → 403 `feature_disabled`.
+        den Dienstgrad, mit Bereich Titel die Titel; nie Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit Bereich
+        Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (`ProfileVisibility`), sonst null.
+        Sortiert nach Anzeigename. Bereich aus → 403 `feature_disabled`.
       security: []
       responses:
         '200':
@@ -2894,6 +2949,47 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/join-year:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Mitgliederliste]
+      summary: Eintrittsjahr eines Mitglieds eintragen oder ändern
+      description: |
+        Nur das Jahr (Prüfung wie bei `PUT /me/join-year`). Die Anzeige (`profile`) entscheidet allein die Person: Sie
+        bleibt, wie sie ist (ein mitgeschickter Wert wird nicht übernommen); ein neuer Eintrag steht nicht auf der Seite.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [year]
+              properties:
+                year: { type: integer, minimum: 1800 }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Mitgliederliste]
+      summary: Eintrittsjahr eines Mitglieds entfernen
+      x-capability: create_users
+      responses:
+        '200':
+          description: Entfernt (`join_year` ist null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/birthday:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -2901,8 +2997,9 @@ paths:
       tags: [Geburtstage]
       summary: Geburtstag eines Mitglieds eintragen oder ändern (Issue #1)
       description: |
-        Nur das Datum (Prüfung wie bei `PUT /me/birthday`). `visible` und `show_age` entscheidet allein die Person: Sie
-        bleiben, wie sie sind (mitgeschickte Werte werden nicht übernommen); ein neuer Eintrag ist sichtbar und ohne Alter.
+        Nur das Datum (Prüfung wie bei `PUT /me/birthday`). `visible`, `show_age` und `profile` entscheidet allein die
+        Person: Sie bleiben, wie sie sind (mitgeschickte Werte werden nicht übernommen); ein neuer Eintrag ist sichtbar,
+        ohne Alter und nicht auf der Seite in der Mitgliederliste.
       x-capability: create_users
       requestBody:
         required: true
@@ -4702,6 +4799,47 @@ components:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
+        birthday:
+          description: |
+            Geburtstag, soweit die Person ihn dem Betrachter zeigt (`profile` members: angemeldete Mitglieder, public: alle),
+            sonst null. Nur mit Bereich Geburtstage; fehlt bei Ehemaligen.
+          oneOf:
+            - $ref: '#/components/schemas/DirectoryBirthday'
+            - type: 'null'
+        join_year:
+          description: Eintrittsjahr, soweit die Person es dem Betrachter zeigt, sonst null. Fehlt bei Ehemaligen (`joined_year`).
+          type: [integer, 'null']
+
+    DirectoryBirthday:
+      type: object
+      description: Geburtstag auf der Seite einer Person; Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr.
+      required: [month, day, year, age]
+      properties:
+        month: { type: integer, minimum: 1, maximum: 12 }
+        day: { type: integer, minimum: 1, maximum: 31 }
+        year: { type: [integer, 'null'] }
+        age: { type: [integer, 'null'], description: 'Heutiges Alter (Zeitzone der Kompanie; 29.02. in Jahren ohne Schalttag ab dem 28.02.)' }
+
+    ProfileVisibility:
+      type: string
+      description: 'Anzeige auf der eigenen Seite in der Mitgliederliste: nicht, nur angemeldeten Mitgliedern, allen'
+      enum: [none, members, public]
+
+    JoinYear:
+      type: object
+      required: [year, profile]
+      properties:
+        year: { type: integer }
+        profile: { $ref: '#/components/schemas/ProfileVisibility' }
+
+    JoinYearResponse:
+      type: object
+      required: [join_year]
+      properties:
+        join_year:
+          oneOf:
+            - $ref: '#/components/schemas/JoinYear'
+            - type: 'null'
 
     DirectoryFormerEntry:
       allOf:
@@ -4736,6 +4874,11 @@ components:
               description: Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag)
               oneOf:
                 - $ref: '#/components/schemas/Birthday'
+                - type: 'null'
+            join_year:
+              description: Eintrittsjahr mit Anzeige (nur mit Recht create_users; null ohne Eintrag)
+              oneOf:
+                - $ref: '#/components/schemas/JoinYear'
                 - type: 'null'
             rights:
               description: |
@@ -4854,13 +4997,14 @@ components:
     Birthday:
       type: object
       description: Geburtstag mit Jahr und Schaltern – nur für die Person selbst und in den Mitgliedsdetails.
-      required: [month, day, year, visible, show_age]
+      required: [month, day, year, visible, show_age, profile]
       properties:
         month: { type: integer, minimum: 1, maximum: 12 }
         day: { type: integer, minimum: 1, maximum: 31 }
         year: { type: [integer, 'null'] }
         visible: { type: boolean, description: Anderen Mitgliedern zeigen }
         show_age: { type: boolean, description: Alter anzeigen }
+        profile: { $ref: '#/components/schemas/ProfileVisibility' }
 
     BirthdayResponse:
       type: object

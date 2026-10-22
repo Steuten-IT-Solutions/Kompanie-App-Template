@@ -8,7 +8,7 @@ Wer austritt, verstirbt oder sonst ausscheidet, muss nicht gelöscht werden. Als
 ## Als ehemalig eintragen
 1. In der Mitgliederliste die Person antippen und **Konto und Rolle** öffnen.
 2. Unter **Ehemalig** auf **Als ehemalig eintragen …** tippen.
-3. Den **Grund des Ausscheidens** wählen: Ausgetreten, Verstorben oder Sonstiges. Optional das Datum des Ausscheidens (bei Verstorbenen den Todestag) und den Eintritt, jeweils als TT.MM.JJJJ oder nur das Jahr. **Gründungsmitglied** ankreuzen, wenn es passt.
+3. Den **Grund des Ausscheidens** wählen: Ausgetreten, Verstorben oder Sonstiges. Optional das Datum des Ausscheidens (bei Verstorbenen den Todestag) und den Eintritt, jeweils als TT.MM.JJJJ oder nur das Jahr. Ist unter **Eintritt** schon ein Jahr eingetragen, steht es hier bereits. **Gründungsmitglied** ankreuzen, wenn es passt.
 4. **Als ehemalig eintragen** tippen.
 
 Danach hat die Person keine Rolle mehr: Sie steht nicht mehr in der Mitgliederliste, nicht in der öffentlichen Liste der {bereich.directory}, bekommt keine Benachrichtigungen, nimmt nicht an Umfragen teil und taucht bei den Geburtstagen nicht mehr auf. Sie wird auf allen Geräten abgemeldet. In der eigenständigen Version kann sie sich nicht mehr anmelden; mit WordPress bleibt der Benutzer der Webseite bestehen, hat in der App aber keine Rolle mehr. Zusatzrollen und Ausnahmen bei den Rechten merkt sich die App für ein späteres Wiederaufnehmen.

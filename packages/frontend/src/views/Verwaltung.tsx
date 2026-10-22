@@ -41,6 +41,7 @@ import {
   type MemberSort,
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
@@ -407,6 +408,8 @@ function MemberDetailView({
       label: 'Geburtstag',
       on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
     },
+    // Eintrittsjahr aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
+    { id: 'eintritt', label: 'Eintritt', on: m.join_year !== undefined && !m.former && m.level !== 'guest' },
   ].filter((p) => p.on);
   const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
   // Foto steht oben neben dem Dienstgrad; ohne Foto die Anfangsbuchstaben, wenn es hochgeladen werden darf.
@@ -518,7 +521,15 @@ function MemberDetailView({
           {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
           {/* Gäste gehören nicht zur Kompanie; m.former fehlt bei älteren Servern (dann kein Bereich). */}
           {can('create_users') && m.id !== config?.user?.id && m.former !== undefined && (m.former !== null || m.level !== 'guest') && (
-            <FormerPanel id={m.id} name={m.name} former={m.former} openCents={m.open_cents} onChanged={reload} onToast={onToast} />
+            <FormerPanel
+              id={m.id}
+              name={m.name}
+              former={m.former}
+              joinYear={m.join_year?.year ?? null}
+              openCents={m.open_cents}
+              onChanged={reload}
+              onToast={onToast}
+            />
           )}
           {can('create_users') && m.id !== config?.user?.id && (
             <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
@@ -638,6 +649,10 @@ function MemberDetailView({
 
       {active === 'geburtstag' && m.birthday !== undefined && (
         <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
+      )}
+
+      {active === 'eintritt' && m.join_year !== undefined && (
+        <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
       )}
     </div>
   );

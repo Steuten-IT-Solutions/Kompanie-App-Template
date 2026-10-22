@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { api, config, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
+import { api, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import brand from '../generated/brand';
 import { groupCounts } from '../format';
 import { ZoomableAvatar } from '../memberPhoto';
@@ -58,6 +58,21 @@ export function formerYears(f: Partial<Pick<DirectoryFormerEntry, 'founder' | 'j
   return [f.founder ? 'Gründungsmitglied' : '', years].filter(Boolean).join(' · ');
 }
 
+const dayMonth = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' });
+const fullDate = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/**
+ * Geburtstag und Eintritt auf der Seite einer Person, soweit sie sie zeigt: „Geburtstag 12. März 1988 (38 Jahre) ·
+ * Eintritt 2005“; ohne „Alter anzeigen“ nur Tag und Monat. Leer ohne Angaben.
+ */
+export function personFacts(m: { birthday?: DirectoryBirthday | null; join_year?: number | null }): string {
+  const b = m.birthday;
+  // Ohne Jahr: 2000 als Maßstab (Schaltjahr, damit der 29.02. bleibt)
+  const date = b && (b.year ? fullDate : dayMonth).format(new Date(b.year ?? 2000, b.month - 1, b.day));
+  const birthday = b ? `Geburtstag ${date}${b.age !== null ? ` (${b.age} Jahre)` : ''}` : '';
+  return [birthday, m.join_year ? `Eintritt ${m.join_year}` : ''].filter(Boolean).join(' · ');
+}
+
 /**
  * Tab „Mitglieder“ (öffentlich, Issue #112): Mitgliederliste (Bereich directory), Zeitstrahl der Ämter (Bereich
  * offices) und die Ehemaligen (mit der Mitgliederliste), umschaltbar; der zuletzt gewählte Abschnitt bleibt auf dem
@@ -113,8 +128,9 @@ function back(): void {
 }
 
 /**
- * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu die Jahre),
- * darunter direkt ihre Ämter als Zeitstrahl. Ohne Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
+ * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu die Jahre,
+ * bei Mitgliedern Geburtstag und Eintritt, soweit sie sie zeigen), darunter direkt ihre Ämter als Zeitstrahl. Ohne
+ * Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
  */
 function MemberPage({ userId, directory, offices }: { userId: number; directory: boolean; offices: boolean }) {
   const list = useAsync(() => (directory ? api.directory() : Promise.resolve(null)), [], directory ? 'directory' : undefined);
@@ -143,6 +159,7 @@ function MemberPage({ userId, directory, offices }: { userId: number; directory:
             {m && <ZoomableAvatar url={m.photo_url} name={m.name} size="large" />}
             <h2 className="member-name member-name-centered">{name}</h2>
             {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
+            {m && !f && personFacts(m) && <p className="small muted member-page-facts">{personFacts(m)}</p>}
             {m?.titles && m.titles.length > 0 && (
               <p className="member-page-titles">
                 <TitleBadges titles={m.titles} />
