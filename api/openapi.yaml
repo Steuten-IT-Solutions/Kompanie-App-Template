@@ -2334,7 +2334,7 @@ paths:
           schema: { type: string, enum: ['1'] }
         - name: candidates
           in: query
-          description: Auch Anwärter (Rolle `candidate`) und Personen mit eigenen Rollen nur mit dem internen Kalender.
+          description: Auch Personen mit Rollen nur mit dem internen Kalender (z. B. Anwärter).
           schema: { type: string, enum: ['1'] }
       responses:
         '200':
@@ -2388,7 +2388,7 @@ paths:
         Admin-Rechte nur im WP-Backend vergeben. Der letzte Admin kann nicht herabgestuft werden.
 
         `extra_roles` (Issue #66) ersetzt die Zusatzrollen (leere Liste: keine). Nur eigene Rollen
-        (`/config` → `roles[].extra`), nicht `guest`, `candidate`, `member`, `admin`; nur zu einer Grundrolle mit
+        (`/config` → `roles[].extra`), nicht `guest`, `member`, `admin`; nur zu einer Grundrolle mit
         Mitgliederbereich und nicht für Admins (sonst 400). Mit `level` zusammen wird gegen die neue Grundrolle geprüft;
         eine neue Grundrolle ohne Mitgliederbereich entfernt die Zusatzrollen. Wer kein Admin ist, vergibt und entfernt
         nur Rollen, die er auch als Grundrolle vergeben dürfte, und nur bei Personen ohne mehr Rechte als er (sonst 403).
@@ -2463,8 +2463,10 @@ paths:
       - $ref: '#/components/parameters/Id'
     post:
       tags: [Verwaltung]
-      summary: Anwärter als Mitglied aufnehmen
-      description: Nur von `candidate` zu `member`; andere Rollenwechsel gehen über `/members/{id}/role`.
+      summary: Als Mitglied aufnehmen (z. B. Anwärter)
+      description: |
+        Nur aus einer Rolle mit `promotable` (`/config` → `roles`; eigene Rollen ohne Mitgliederbereich, vom Admin
+        freigegeben) zu `member`, sonst 400; andere Rollenwechsel gehen über `/members/{id}/role`.
       x-capability: create_users
       responses:
         '200':
@@ -2639,8 +2641,11 @@ paths:
   /users:
     post:
       tags: [Verwaltung]
-      summary: Mitglied oder Anwärter anlegen
-      description: Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt.
+      summary: Mitglied anlegen (oder mit einer Rolle für neue Konten, z. B. Anwärter)
+      description: |
+        Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt. `level`:
+        `member` oder eine Rolle mit `new_accounts` (`/config` → `roles`), sonst 400. Wer kein Admin ist, nur Rollen mit
+        höchstens `member` bzw. `calendar` oder mit Rechten, die er selbst weitergeben darf (sonst 403).
       x-capability: create_users
       requestBody:
         required: true
@@ -2655,7 +2660,7 @@ paths:
                 name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
-                level: { type: string, enum: [member, candidate], default: member }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
                 initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
                 rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
@@ -2676,7 +2681,7 @@ paths:
   /users/bulk:
     post:
       tags: [Verwaltung]
-      summary: Mehrere Mitglieder bzw. Anwärter auf einmal anlegen (Issue #24)
+      summary: Mehrere Mitglieder (bzw. mit einer Rolle für neue Konten) auf einmal anlegen (Issue #24)
       description: |
         Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
         Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
@@ -2692,7 +2697,7 @@ paths:
               type: object
               required: [people]
               properties:
-                level: { type: string, enum: [member, candidate], default: member }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
                 people:
                   type: array
                   maxItems: 50
@@ -2847,8 +2852,11 @@ paths:
       tags: [Einstellungen]
       summary: Rollen mit Rechten, Punktefaktor und Anzahl der Personen
       description: |
-        Jede Person hat genau eine Rolle. Fest sind Gast, Mitglied (Rolle neuer Konten) und Admin (nur umbenennen;
-        Bezeichnungen bei der Ersteinrichtung aus `kompanie.json`). Schaltet der Admin einen Bereich mit eigenen Rechten ein
+        Jede Person hat genau eine Grundrolle. Fest sind Gast, Mitglied (Rolle neuer Konten) und Admin (nur umbenennen;
+        Mitglied und Admin auch mit Punktefaktor; Bezeichnungen bei der Ersteinrichtung aus `kompanie.json`), in dieser
+        Reihenfolge: Gast, Mitglied, die eigenen Rollen (wie der Admin sie ordnet, `PUT /admin/roles/order`), Admin.
+        Anwärter (Issue #23) sind eine eigene Rolle; die frühere feste Rolle `candidate` bleibt in Installationen, die
+        sie hatten, als eigene Rolle mit `new_accounts` und `promotable` erhalten. Schaltet der Admin einen Bereich mit eigenen Rechten ein
         (Termine, Punkte, Strafen), kommt dessen Standardrolle dazu; schaltet er ihn aus, verschwindet sie, wenn niemand sie hat.
         Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten, ohne `create_users` und `promote_users`.
       x-capability: manage_settings
@@ -2878,13 +2886,42 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/roles/order:
+    put:
+      tags: [Einstellungen]
+      summary: Reihenfolge der eigenen Rollen
+      description: |
+        `keys`: alle eigenen Rollen (ohne `guest`, `member`, `admin`) in der neuen Reihenfolge, jede genau einmal (sonst
+        400). Gast und Mitglied bleiben vorn, Admin hinten. Die Reihenfolge gilt überall, wo Rollen stehen (`/config`,
+        Zusatzrollen, Zähler).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keys]
+              properties:
+                keys: { type: array, items: { $ref: '#/components/schemas/Level' } }
+      responses:
+        '200':
+          description: Neuer Stand aller Rollen
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAdmin' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/roles/{key}:
     parameters:
       - { name: key, in: path, required: true, schema: { $ref: '#/components/schemas/Level' } }
     patch:
       tags: [Einstellungen]
       summary: Rolle umbenennen, Rechte oder Punktefaktor ändern (nur mitgeschickte Felder)
-      description: Bei guest und admin nur die Bezeichnung, bei member Bezeichnung und Punktefaktor. Ein geänderter Faktor gilt für künftige Buchungen.
+      description: |
+        Bei guest nur die Bezeichnung, bei member und admin Bezeichnung und Punktefaktor; `new_accounts` und `promotable`
+        nur bei eigenen Rollen (`promotable` nur ohne `member`). Ein geänderter Faktor gilt für künftige Buchungen.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -3981,9 +4018,10 @@ components:
       type: string
       maxLength: 10
       description: |
-        Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `candidate` (Anwärter: nur interner Kalender), `member`
-        (Mitgliederbereich mit Kalender, Rolle neuer Konten) und `admin` (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
-        `r1`, `r2`, …; ältere Installationen haben außerdem `organizer` und `manager`. Bezeichnungen und Punktefaktor stehen in
+        Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `member` (Mitgliederbereich mit Kalender, Rolle neuer
+        Konten) und `admin` (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
+        `r1`, `r2`, …; ältere Installationen haben außerdem `organizer` und `manager` bzw. `candidate` (die frühere feste
+        Rolle Anwärter, jetzt eine eigene Rolle). Bezeichnungen und Punktefaktor stehen in
         `/config` (`roles`), Rechte unter `/admin/roles`. `level` ist überall die Grundrolle; Zusatzrollen stehen in
         `extra_roles` (Issue #66).
 
@@ -4001,7 +4039,9 @@ components:
         key: { $ref: '#/components/schemas/Level' }
         label: { type: string }
         points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5; bei mehreren Rollen der kleinste' }
-        extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, candidate, member, admin)' }
+        extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, member, admin)' }
+        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten wählbar (POST /users): immer bei member, sonst nach Einstellung' }
+        promotable: { type: boolean, description: 'Personen mit dieser Rolle lassen sich mit create_users als Mitglied aufnehmen (POST /members/{id}/promote), z. B. Anwärter' }
 
     RoleAdmin:
       allOf:
@@ -4015,8 +4055,8 @@ components:
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
-            system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
-            deletable: { type: boolean, description: 'false für guest, candidate, member und admin' }
+            system: { type: boolean, description: 'guest, member und admin: Rechte fest, nicht löschbar, nicht verschiebbar' }
+            deletable: { type: boolean, description: 'false für guest, member und admin' }
 
     RoleInput:
       type: object
@@ -4027,6 +4067,8 @@ components:
           items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
+        new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
+        promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
 
     AppUser:
       type: object
@@ -4787,7 +4829,7 @@ components:
         last_name: { type: string }
         username: { type: string }
         email: { type: string }
-        level: { type: string, enum: [member, candidate] }
+        level: { $ref: '#/components/schemas/Level' }
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort }

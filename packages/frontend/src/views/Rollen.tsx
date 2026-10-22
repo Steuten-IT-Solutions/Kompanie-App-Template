@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import { CAPABILITIES } from '../capabilities';
+import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
@@ -10,20 +11,41 @@ const sec = brand.labels.sections;
 const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
 
 /**
- * Einstellungen → Rollen (Issue #28): Rollen anlegen, umbenennen, Rechte und Punktefaktor festlegen,
- * löschen. Gast und Admin sind fest (nur umbenennen), Mitglied ist die Rolle neuer Konten.
+ * Einstellungen → Rollen (Issue #28): Rollen anlegen, umbenennen, Rechte und Punktefaktor festlegen, ordnen (per
+ * Ziehen), löschen. Gast, Mitglied und Admin sind fest (nur umbenennen, Mitglied und Admin mit Punktefaktor) und stehen
+ * vorn bzw. hinten; Mitglied ist die Rolle neuer Konten. Anwärter sind eine eigene Rolle (z. B. nur mit dem Kalender).
  */
 export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string) => void; refresh?: number }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.roles(), [refresh], 'admin/roles');
   const [editing, setEditing] = useState<Level | 'neu' | null>(null);
+  const own = (data ?? []).filter((r) => !r.system);
+
+  const show = (list: RoleAdmin[]) => {
+    setData(list);
+    applyRoles(list);
+  };
+  const saveOrder = useSaveQueue();
+  function reorder(next: RoleAdmin[]) {
+    // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
+    const all = data ?? [];
+    show([...all.filter((r) => r.system && r.key !== 'admin'), ...next, ...all.filter((r) => r.key === 'admin')]);
+    saveOrder(
+      () => api.reorderRoles(next.map((r) => r.key)),
+      show,
+      (e) => {
+        onToast(e.message);
+        reload();
+      },
+    );
+  }
+  const sort = useDragSort(own, reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const roles = data!;
 
   const saved = (list: RoleAdmin[], msg: string) => {
-    setData(list);
-    applyRoles(list);
+    show(list);
     setEditing(null);
     onToast(msg);
   };
@@ -33,18 +55,23 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
       <h3>Rollen</h3>
       <p className="small muted">
         Jede Person hat eine Grundrolle und auf Wunsch weitere eigene Rollen als Zusatzrollen; sie hat dann die Rechte aller ihrer Rollen
-        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen.{' '}
+        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen. Die Reihenfolge der eigenen Rollen gilt überall, wo Rollen
+        stehen; zum Ändern eine Rolle am Griff links ziehen.{' '}
         {config?.features.points &&
           `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder; bei mehreren Rollen der kleinste.`}
       </p>
       <ul className="card-list role-list">
-        {roles.map((r) =>
-          editing === r.key ? (
-            <li key={r.key} className="role-item">
+        {roles.map((r) => {
+          // Nur eigene Rollen lassen sich verschieben; Gast und Mitglied stehen vorn, Admin hinten.
+          const i = own.indexOf(r);
+          const drag = (className: string) => (i >= 0 ? sort.itemProps(i, className) : { className });
+          return editing === r.key ? (
+            <li key={r.key} {...drag('role-item')}>
               <RoleForm role={r} roles={roles} onSaved={saved} onCancel={() => setEditing(null)} />
             </li>
           ) : (
-            <li key={r.key} className="row role-item">
+            <li key={r.key} {...drag('row role-item')}>
+              {i >= 0 && own.length > 1 && sort.handle(i, r.label)}
               <div className="row-main">
                 <div className="row-title">
                   {r.label}
@@ -55,6 +82,8 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                 <div className="row-sub">
                   {r.users === 1 ? '1 Person' : `${r.users} Personen`}
                   {(r.extra_users ?? 0) > 0 && ` (davon ${r.extra_users} als Zusatzrolle)`}
+                  {!r.system && r.new_accounts && ' · für neue Konten'}
+                  {r.promotable && ` · aufnehmen als ${levelLabel('member')}`}
                   {' · '}
                   {r.key === 'admin'
                     ? 'alle Rechte'
@@ -82,8 +111,8 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                 </button>
               </div>
             </li>
-          ),
-        )}
+          );
+        })}
       </ul>
       {editing === 'neu' ? (
         <RoleForm roles={roles} onSaved={saved} onCancel={() => setEditing(null)} />
@@ -189,6 +218,8 @@ function RoleForm({
   const [label, setLabel] = useState(role?.label ?? '');
   const [capabilities, setCapabilities] = useState<Capability[]>(role?.capabilities ?? ['member']);
   const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString('de-DE'));
+  const [newAccounts, setNewAccounts] = useState(role?.new_accounts ?? false);
+  const [promotable, setPromotable] = useState(role?.promotable ?? false);
   const [replacement, setReplacement] = useState<Level>('member');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -198,14 +229,18 @@ function RoleForm({
     // Ohne Mitgliederbereich gibt es keine weiteren Rechte (die Person sähe ihre Mitglieder nicht), außer dem Kalender.
     if (cap === 'member' && !on) return setCapabilities([]);
     if (cap === 'calendar') return setCapabilities(on ? ['calendar'] : []);
+    // Zum Mitglied machen gibt es nur aus Rollen ohne Mitgliederbereich.
+    setPromotable(false);
     // Der Mitgliederbereich enthält den Kalender: nicht zusätzlich speichern.
     setCapabilities((prev) =>
       on ? Array.from(new Set<Capability>([...prev.filter((c) => c !== 'calendar'), 'member', cap])) : prev.filter((c) => c !== cap),
     );
   };
 
-  // Punkte bekommen nur Personen mit Mitgliederbereich: Faktor nur für „Mitglied“ und eigene Rollen mit Mitgliederbereich.
-  const withFactor = !!config?.features.points && (fixed ? role?.key === 'member' : capabilities.includes('member'));
+  // Punkte bekommen nur Personen mit Mitgliederbereich: Faktor für Mitglied, Admin und eigene Rollen mit Mitgliederbereich.
+  const withFactor =
+    !!config?.features.points && (fixed ? role?.key === 'member' || role?.key === 'admin' : capabilities.includes('member'));
+  const withMember = capabilities.includes('member');
 
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
     setBusy(true);
@@ -221,7 +256,11 @@ function RoleForm({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const data = { label, ...(fixed ? {} : { capabilities }), ...(withFactor ? { points_factor: factor } : {}) };
+    const data = {
+      label,
+      ...(fixed ? {} : { capabilities, new_accounts: newAccounts, promotable: promotable && !withMember }),
+      ...(withFactor ? { points_factor: factor } : {}),
+    };
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
   }
 
@@ -244,12 +283,10 @@ function RoleForm({
       {fixed ? (
         <p className="small muted">
           {role?.key === 'admin'
-            ? 'Admins dürfen alles; das lässt sich nicht ändern.'
+            ? 'Admins dürfen alles; die Rechte lassen sich nicht ändern.'
             : role?.key === 'member'
               ? 'Rolle neuer Konten mit dem Mitgliederbereich; die Rechte lassen sich nicht ändern.'
-              : role?.key === 'candidate'
-                ? `Sieht den internen Kalender, aber nicht den Mitgliederbereich. Wer Mitglieder anlegen darf, nimmt sie als „${levelLabel('member')}“ auf; die Rechte lassen sich nicht ändern.`
-                : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
+              : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
         </p>
       ) : (
         <fieldset className="feature-list">
@@ -265,6 +302,27 @@ function RoleForm({
               <span>{c.label}</span>
             </label>
           ))}
+        </fieldset>
+      )}
+      {!fixed && (
+        <fieldset className="feature-list">
+          <legend className="field-label">Konten</legend>
+          <label className="toggle feature-toggle">
+            <input type="checkbox" checked={newAccounts} onChange={(e) => setNewAccounts(e.target.checked)} />
+            <span>Beim Anlegen neuer Konten wählbar (sonst sind neue Konten {levelLabel('member')})</span>
+          </label>
+          <label className="toggle feature-toggle">
+            <input
+              type="checkbox"
+              checked={promotable && !withMember}
+              disabled={withMember}
+              onChange={(e) => setPromotable(e.target.checked)}
+            />
+            <span>
+              Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {levelLabel('member')} auf (z. B. Anwärter)
+              {withMember && '; nur ohne Mitgliederbereich'}
+            </span>
+          </label>
         </fieldset>
       )}
       {withFactor && (

@@ -192,7 +192,8 @@ final class PreviewTest extends TestCase
                 $this->app->preview()->begin(null);
             }
         };
-        $this->assertSame([200, 'no-store'], [$badge('candidate')['status'], $badge('candidate')['headers']['Cache-Control']]);
+        $cand = TestApp::candidateRole($this->app);
+        $this->assertSame([200, 'no-store'], [$badge($cand)['status'], $badge($cand)['headers']['Cache-Control']]);
         $this->assertNotSame('no-store', $badge(null)['headers']['Cache-Control']);
         // Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen, sonst nur Mitglieder und Anwärter.
         $this->assertSame(200, $badge('guest')['status']);

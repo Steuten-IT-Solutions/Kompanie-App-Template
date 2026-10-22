@@ -27,7 +27,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     setError(null);
     if (text.trim() === '') return setError('Bitte einen Text eingeben.');
     const question = push
-      ? 'Nachricht jetzt veröffentlichen? Alle Mitglieder und Anwärter werden sofort benachrichtigt.'
+      ? 'Nachricht jetzt veröffentlichen? Alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter) werden sofort benachrichtigt.'
       : 'Nachricht jetzt veröffentlichen? Es wird keine Benachrichtigung gesendet.';
     if (!window.confirm(question)) return;
     setBusy(true);
@@ -58,7 +58,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
       </label>
       <p className="muted small">
         {push
-          ? 'Alle Mitglieder und Anwärter bekommen sofort eine Benachrichtigung.'
+          ? 'Alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter) bekommen sofort eine Benachrichtigung.'
           : 'Ohne Benachrichtigung: Die Nachricht erscheint nur in der App.'}{' '}
         Die Nachricht steht 24 Stunden oben auf jeder Seite der App und verschwindet dann von selbst. Nur für Dringendes, nur reiner Text.
       </p>

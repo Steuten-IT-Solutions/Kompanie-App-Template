@@ -105,7 +105,7 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testInvalidRequests(): void
     {
-        $candidate = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $guest = $this->users->add('gast', Roles::GUEST);
         $this->assertSame(400, $this->rights($candidate, ['manage_points'])->status, 'Verwalten braucht den Mitgliederbereich');
         $this->assertSame(200, $this->rights($candidate, ['member', 'manage_points'])->status);
@@ -144,7 +144,7 @@ final class CapabilityOverridesTest extends TestCase
         $this->users->current = $chef;
         $this->assertSame(403, $this->rights($this->m, [])->status);
         $this->assertNull($this->call('GET', "/members/{$this->m}")->data['rights']);
-        $this->assertSame(403, $this->call('PATCH', "/members/{$this->m}/role", ['level' => Roles::CANDIDATE])->status);
+        $this->assertSame(403, $this->call('PATCH', "/members/{$this->m}/role", ['level' => TestApp::candidateRole($this->app)])->status);
     }
 
     public function testOverridesSurviveRoleChangesWithoutWhatTheRoleCovers(): void
@@ -163,7 +163,7 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertTrue($this->can($this->m, Capability::ManageEvents));
 
         // Anwärter: ohne Mitgliederbereich wirken Rechte zum Verwalten nicht.
-        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['level' => Roles::CANDIDATE])->status);
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['level' => TestApp::candidateRole($this->app)])->status);
         $this->assertSame([Capability::Calendar], $this->users->find($this->m)?->capabilities);
         $this->assertSame(200, $this->call('POST', "/members/{$this->m}/promote")->status);
         $this->assertTrue($this->can($this->m, Capability::ManagePolls));

@@ -178,7 +178,7 @@ final class Api
         foreach (array_values($people) as $i => $p) {
             $p = is_array($p) ? $p : [];
             try {
-                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken);
+                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken, $this->user());
                 $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
@@ -415,13 +415,13 @@ final class Api
         $P = Route::PUBLIC;
         $L = Route::LOGIN;
         $denyMember = 'Dieser Bereich ist nur für Mitglieder.';
-        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Anwärter.';
+        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
         $denyManage = 'Dafür fehlen dir die Rechte.';
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
-        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
+        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
         $denyPolls = 'Umfragen sind nur für Mitglieder.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
@@ -758,7 +758,7 @@ final class Api
                 }
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
                 $photo = $this->photoInput($r->body['photo'] ?? null);
-                $created = $a->members()->create($r->body);
+                $created = $a->members()->create($r->body, $this->user());
                 try {
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
                 } catch (\Throwable $e) {
@@ -793,6 +793,11 @@ final class Api
             new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->create($r->body);
                 return Response::created($a->roles()->describe());
+            }, null, $denySettings),
+            // Reihenfolge der eigenen Rollen (Einstellungen → Rollen, per Ziehen)
+            new Route('PUT', '/admin/roles/order', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->reorder($r->input('keys'));
+                return $a->roles()->describe();
             }, null, $denySettings),
             new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->update((string) $r->params['key'], $r->body);

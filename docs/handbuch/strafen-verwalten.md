@@ -11,7 +11,7 @@ Wer die Rolle „{bereich.penalties} verwalten“ oder eine Rolle mit diesem Rec
 2. Betrag (z. B. 2,50, höchstens 1.000 € je Eintrag), Grund und Datum (heute vorausgewählt) eintragen.
 3. Ein oder mehrere Mitglieder ankreuzen (die Suche hilft bei vielen Namen, **Alle** kreuzt alle gefundenen an) und **Eintragen** tippen.
 
-Einträge gibt es nur für Mitglieder, nicht für {rolle.candidate} oder Gäste. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, sobald ein neuer Eintrag für ihn angelegt ist.
+Einträge gibt es nur für Mitglieder, nicht für Rollen ohne Mitgliederbereich (z. B. Anwärter) oder Gäste. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, sobald ein neuer Eintrag für ihn angelegt ist.
 
 ## Bezahlt markieren und stornieren
 Unter **Verwaltung → Mitglieder** das Mitglied öffnen, im Menü unter dem Namen **{bereich.penalties}** wählen und beim Eintrag **Bezahlt** tippen. Versehentlich markiert? **Doch offen** setzt ihn zurück. Ein falscher Eintrag verschwindet mit **Stornieren**.

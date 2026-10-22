@@ -4,7 +4,7 @@ reihenfolge: 60
 rechte: [manage_events]
 bereiche: [events]
 ---
-Öffentliche Termine sehen alle ohne Anmeldung in der App und (mit WordPress) über den Shortcode `[kompanie_termine]` auch auf der Webseite. Ist der Bereich {bereich.calendar} eingeschaltet, sehen {rolle.member} und {rolle.candidate} unter **{bereich.events}** stattdessen den Kalender der Kompanie mit allen Terminen; tragt öffentliche Termine dann auch dort ein.
+Öffentliche Termine sehen alle ohne Anmeldung in der App und (mit WordPress) über den Shortcode `[kompanie_termine]` auch auf der Webseite. Ist der Bereich {bereich.calendar} eingeschaltet, sehen {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) unter **{bereich.events}** stattdessen den Kalender der Kompanie mit allen Terminen; tragt öffentliche Termine dann auch dort ein.
 
 ## Anlegen
 1. Unter **{bereich.events}** auf **Öffentliche Termine verwalten** tippen.

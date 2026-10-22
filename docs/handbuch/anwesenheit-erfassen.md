@@ -13,7 +13,7 @@ Wer die Rolle „{bereich.attendance} verwalten“ oder eine Rolle mit diesem Re
 Titel und Datum werden mit der Liste gespeichert. Sie bleibt also erhalten, auch wenn der Termin später im Kalender verschoben oder gelöscht wird. Unter **Letzte Listen** findest du die bisherigen Listen wieder.
 
 ## Eintragen
-In der Liste stehen alle mit einer Rolle (ohne Gäste), auch {rolle.candidate}. Je Person ein Häkchen setzen; ein zweiter Tipp auf dasselbe Häkchen entfernt es wieder. **Alle anwesend** setzt alle gefundenen (bei einer Suche nur diese) auf anwesend. Danach **Speichern** tippen. Oben steht, wie viele anwesend, entschuldigt und fehlend sind; nach dem Speichern auch aufgeteilt nach Gruppen (siehe unten).
+In der Liste stehen alle mit einer Rolle (ohne Gäste), auch Personen mit dem internen Kalender (z. B. Anwärter). Je Person ein Häkchen setzen; ein zweiter Tipp auf dasselbe Häkchen entfernt es wieder. **Alle anwesend** setzt alle gefundenen (bei einer Suche nur diese) auf anwesend. Danach **Speichern** tippen. Oben steht, wie viele anwesend, entschuldigt und fehlend sind; nach dem Speichern auch aufgeteilt nach Gruppen (siehe unten).
 
 Eine Liste, die nicht mehr gebraucht wird, entfernst du unten mit **Liste löschen**. Schon gebuchte {bereich.points} bleiben dabei erhalten.
 
@@ -22,7 +22,7 @@ Darfst du zusätzlich {bereich.points} bzw. {bereich.penalties} vergeben, stehen
 - **{bereich.points} für … Anwesende:** öffnet das Formular für {bereich.points} mit allen Anwesenden, die für diese Liste noch keine {bereich.points} haben; Grund und Datum sind aus der Liste übernommen. Wer schon welche hat, ist in der Liste mit „{bereich.points} gebucht“ markiert und bekommt sie kein zweites Mal. Der {bereich.points}faktor der Rolle gilt wie immer.
 - **Eintrag für … Fehlende:** öffnet das Formular für {bereich.penalties} mit allen, die gefehlt haben (Grund „Gefehlt: …“). Anders als bei {bereich.points} merkt sich die Liste hier nicht, wer schon einen Eintrag hat; buche also nicht zweimal.
 
-{bereich.points} und {bereich.penalties} gibt es nur für Mitglieder, nicht für {rolle.candidate}. Die Auswahl lässt sich vor dem Buchen noch ändern.
+{bereich.points} und {bereich.penalties} gibt es nur für Mitglieder, nicht für Rollen ohne Mitgliederbereich (z. B. Anwärter). Die Auswahl lässt sich vor dem Buchen noch ändern.
 
 ## Gruppen im Zähler
-Welche Rollen im Zähler gesondert erscheinen, stellt ein {rolle.admin} unter **Verwaltung → Einstellungen → Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** ein. Jede Rolle zählt dort als eigene Gruppe oder als eine andere Rolle, z. B. „{bereich.points} verwalten“ als {rolle.member}. Ohne Einstellung zählen alle Rollen mit Mitgliederbereich als {rolle.member}, die übrigen (z. B. {rolle.candidate}) gesondert. Im Zähler steht {rolle.member} zuerst, dann eigene Rollen, die gesondert zählen, zuletzt {rolle.candidate}.
+Welche Rollen im Zähler gesondert erscheinen, stellt ein {rolle.admin} unter **Verwaltung → Einstellungen → Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** ein. Jede Rolle zählt dort als eigene Gruppe oder als eine andere Rolle, z. B. „{bereich.points} verwalten“ als {rolle.member}. Ohne Einstellung zählen alle Rollen mit Mitgliederbereich als {rolle.member}, die übrigen (z. B. Anwärter) gesondert. Im Zähler steht {rolle.member} zuerst, dann die Rollen, die gesondert zählen, in der Reihenfolge unter **Einstellungen → Rollen**.
