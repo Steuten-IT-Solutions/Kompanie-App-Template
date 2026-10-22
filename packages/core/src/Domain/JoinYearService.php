@@ -13,7 +13,8 @@ use KompanieApp\Core\Storage\JoinYearRepository;
  * Eintritt aktiver Mitglieder: das Jahr oder das ganze Datum.
  *
  * - Jedes Mitglied trägt seinen Eintritt selbst ein und wählt, wem er auf seiner Seite in der Mitgliederliste erscheint
- *   (profile: none, members, public; Standard none). Dort steht immer nur das Jahr, wie bei den Ehemaligen.
+ *   (profile: none, members, public; Standard members). Dort steht der Eintritt, wie er eingetragen ist (das ganze
+ *   Datum oder nur das Jahr), wie bei den Ehemaligen.
  * - Wer Mitglieder anlegen darf (create_users), trägt den Eintritt anderer ein oder entfernt ihn; die Anzeige bleibt
  *   dabei, wie die Person sie gewählt hat.
  * - Eingabe date als TT.MM.JJJJ, JJJJ-MM-TT oder JJJJ (wie bei den Ehemaligen, FormerMemberService::date); ältere Apps
@@ -116,7 +117,7 @@ final class JoinYearService
         $this->remove($userId);
     }
 
-    /** @return array<int, int> Benutzer-ID => Eintrittsjahr, soweit die Person es $viewer zeigt (eine Abfrage) */
+    /** @return array<int, array{year: int, date: string}> Benutzer-ID => Eintritt, soweit die Person ihn $viewer zeigt (eine Abfrage) */
     public function shownTo(?User $viewer): array
     {
         return $this->repository()->withProfile(ProfileVisibility::shownTo($viewer));

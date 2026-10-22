@@ -731,6 +731,8 @@ test.describe('ohne Service Worker', () => {
             founder: true,
             joined_year: '1985',
             left_year: '2010',
+            joined_on: '1985-04-01',
+            left_on: '2010',
           },
         ],
       }),
@@ -740,7 +742,7 @@ test.describe('ohne Service Worker', () => {
     const list = page.locator('.directory .card-list');
     await list.locator('.member-row', { hasText: 'Ehemalig, Erwin' }).locator('.member-row-open').click();
     await expect(page).toHaveURL(/#\/mitglieder\/987654$/);
-    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 1985–2010');
+    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 01.04.1985 – 2010');
     await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'true');
     await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'false');
 
@@ -2942,7 +2944,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
   await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
   await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
-  await expect(adminCard).toContainText('Nicht anzeigen (wählt nur die Person selbst)');
+  await expect(adminCard).toContainText('Mitgliedern anzeigen (wählt nur die Person selbst)');
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
@@ -2955,7 +2957,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await birthday.getByLabel('Monat').selectOption('3');
   await birthday.getByLabel('Jahr', { exact: true }).fill('1988');
   await birthday.getByLabel(/Alter anzeigen/).check();
-  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('none');
+  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('members');
   await birthday.getByLabel(/Auf meiner Seite/).selectOption('public');
   await expect(birthday).toContainText('Dort steht das ganze Datum mit deinem Alter.');
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
@@ -2975,7 +2977,9 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await page.goto('/app/#/mitglieder/liste');
   await page.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
   const facts = page.locator('.member-page .member-page-facts');
-  await expect(facts).toHaveText(new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 2005$`));
+  await expect(facts).toHaveText(
+    new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 01\\.04\\.2005$`),
+  );
   await shot(page, '1d-mitglied-seite');
 
   // Ohne Anmeldung nur der Geburtstag.

@@ -54,7 +54,7 @@ final class BirthdayRepository
 
     /**
      * Anlegen oder ändern. Ohne $visible, $showAge bzw. $profile bleiben die Schalter, wie sie sind (neu: sichtbar, ohne
-     * Alter, nicht auf der Seite in der Mitgliederliste).
+     * Alter, auf der Seite in der Mitgliederliste nur für Mitglieder).
      */
     public function save(int $userId, int $month, int $day, ?int $year, ?bool $visible, ?bool $showAge, int $by, string $now, ?string $profile = null): void
     {
@@ -73,7 +73,7 @@ final class BirthdayRepository
             return;
         }
         try {
-            $this->db->insert('birthdays', ['user_id' => $userId] + $values + ['visible' => 1, 'show_age' => 0, 'profile' => ProfileVisibility::NONE]);
+            $this->db->insert('birthdays', ['user_id' => $userId] + $values + ['visible' => 1, 'show_age' => 0, 'profile' => ProfileVisibility::MEMBERS]);
         } catch (\RuntimeException $e) {
             // Gleichzeitig angelegt: dann eben ändern.
             if ($this->find($userId) === null) {

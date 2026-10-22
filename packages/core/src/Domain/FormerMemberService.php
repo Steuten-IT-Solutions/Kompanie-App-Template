@@ -100,10 +100,11 @@ final class FormerMemberService
     }
 
     /**
-     * Ehemalige für die öffentliche Mitgliederliste (Tab „Ehemalige“, Bereich directory): nur Name, Gründungsmitglied und
-     * die Jahre von Eintritt und Ausscheiden. Kein Grund, keine genauen Daten, keine Punkte.
+     * Ehemalige für die öffentliche Mitgliederliste (Tab „Ehemalige“, Bereich directory): nur Name, Gründungsmitglied,
+     * Eintritt und Ausscheiden (joined_on, left_on wie eingetragen: JJJJ-MM-TT, JJJJ oder leer; dazu die Jahre für ältere
+     * Apps). Kein Grund, keine Punkte.
      *
-     * @return list<array{id: int, name: string, first_name: string, last_name: string, founder: bool, joined_year: string, left_year: string}>
+     * @return list<array{id: int, name: string, first_name: string, last_name: string, founder: bool, joined_year: string, left_year: string, joined_on: string, left_on: string}>
      */
     public function directory(): array
     {
@@ -123,6 +124,8 @@ final class FormerMemberService
                 'founder' => $row['founder'],
                 'joined_year' => substr($row['joined_on'], 0, 4),
                 'left_year' => substr($row['left_on'], 0, 4),
+                'joined_on' => $row['joined_on'],
+                'left_on' => $row['left_on'],
             ];
         }
         return $out;

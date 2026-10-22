@@ -29,17 +29,18 @@ final class JoinYearRepository
 
     /**
      * @param list<string> $profiles
-     * @return array<int, int> Benutzer-ID => Jahr, nur mit einer dieser Anzeigen
+     * @return array<int, array{year: int, date: string}> Benutzer-ID => Jahr und Eintritt (JJJJ-MM-TT oder JJJJ), nur mit
+     *         einer dieser Anzeigen
      */
     public function withProfile(array $profiles): array
     {
         if ($profiles === []) {
             return [];
         }
-        $rows = $this->db->select('SELECT user_id, year FROM {join_years} WHERE profile IN (' . implode(', ', array_fill(0, count($profiles), '?')) . ')', $profiles);
+        $rows = $this->db->select('SELECT user_id, year, joined_on FROM {join_years} WHERE profile IN (' . implode(', ', array_fill(0, count($profiles), '?')) . ')', $profiles);
         $out = [];
         foreach ($rows as $r) {
-            $out[(int) $r['user_id']] = (int) $r['year'];
+            $out[(int) $r['user_id']] = ['year' => (int) $r['year'], 'date' => (string) $r['joined_on'] !== '' ? (string) $r['joined_on'] : (string) $r['year']];
         }
         return $out;
     }
@@ -56,7 +57,7 @@ final class JoinYearRepository
 
     /**
      * Anlegen oder ändern. $date: JJJJ-MM-TT im Jahr $year oder leer (nur das Jahr). Ohne $profile bleibt die Anzeige, wie
-     * sie ist (neu: nicht zeigen).
+     * sie ist (neu: nur Mitgliedern zeigen).
      */
     public function save(int $userId, int $year, string $date, ?string $profile, int $by, string $now): void
     {
@@ -69,7 +70,7 @@ final class JoinYearRepository
             return;
         }
         try {
-            $this->db->insert('join_years', ['user_id' => $userId] + $values + ['profile' => ProfileVisibility::NONE]);
+            $this->db->insert('join_years', ['user_id' => $userId] + $values + ['profile' => ProfileVisibility::MEMBERS]);
         } catch (\RuntimeException $e) {
             // Gleichzeitig angelegt: dann eben ändern.
             if ($this->find($userId) === null) {

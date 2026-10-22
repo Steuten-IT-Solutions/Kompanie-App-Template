@@ -10,7 +10,8 @@ use KompanieApp\Core\Http\ApiError;
 /**
  * Wem eine Angabe auf der Seite einer Person in der Mitgliederliste (Bereich directory) erscheint: nicht (none), nur
  * angemeldeten Mitgliedern (members, Recht member wie bei den Geburtstagen) oder allen (public, auch ohne Anmeldung).
- * Stellt nur die Person selbst ein; Standard: nicht zeigen.
+ * Stellt nur die Person selbst ein; Standard für neue Einträge: nur Mitgliedern zeigen. Unbekannte gespeicherte Werte
+ * gelten als nicht zeigen.
  */
 final class ProfileVisibility
 {
