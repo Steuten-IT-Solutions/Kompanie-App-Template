@@ -383,6 +383,8 @@ export interface DirectoryEntry {
   birthday?: DirectoryBirthday | null;
   /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
   join_year?: number | null;
+  /** Eintritt wie eingetragen (JJJJ-MM-TT oder JJJJ), soweit gezeigt; fehlt bei Ehemaligen und älteren Servern */
+  join_date?: string | null;
 }
 
 /** Geburtstag auf der Seite einer Person: Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr. */
@@ -397,7 +399,7 @@ export interface DirectoryBirthday {
 /** Wem eine Angabe auf der eigenen Seite in der Mitgliederliste erscheint: nicht, nur Mitgliedern, allen. */
 export type ProfileVisibility = 'none' | 'members' | 'public';
 
-/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht nur das Jahr). */
+/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht er, wie er eingetragen ist). */
 export interface JoinYear {
   year: number;
   /** JJJJ-MM-TT oder nur das Jahr JJJJ; fehlt bei älteren Servern (nur year) */
@@ -405,11 +407,15 @@ export interface JoinYear {
   profile: ProfileVisibility;
 }
 
-/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied und Jahre (JJJJ oder leer). */
+/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied, Eintritt und Ausscheiden. */
 export interface DirectoryFormerEntry extends DirectoryEntry {
   founder: boolean;
+  /** Jahre (JJJJ oder leer) */
   joined_year: string;
   left_year: string;
+  /** wie eingetragen (JJJJ-MM-TT, JJJJ oder leer); fehlen bei älteren Servern */
+  joined_on?: string;
+  left_on?: string;
 }
 
 export interface MemberDetail extends MemberSummary {

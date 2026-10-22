@@ -29,17 +29,18 @@ final class JoinYearRepository
 
     /**
      * @param list<string> $profiles
-     * @return array<int, int> Benutzer-ID => Jahr, nur mit einer dieser Anzeigen
+     * @return array<int, array{year: int, date: string}> Benutzer-ID => Jahr und Eintritt (JJJJ-MM-TT oder JJJJ), nur mit
+     *         einer dieser Anzeigen
      */
     public function withProfile(array $profiles): array
     {
         if ($profiles === []) {
             return [];
         }
-        $rows = $this->db->select('SELECT user_id, year FROM {join_years} WHERE profile IN (' . implode(', ', array_fill(0, count($profiles), '?')) . ')', $profiles);
+        $rows = $this->db->select('SELECT user_id, year, joined_on FROM {join_years} WHERE profile IN (' . implode(', ', array_fill(0, count($profiles), '?')) . ')', $profiles);
         $out = [];
         foreach ($rows as $r) {
-            $out[(int) $r['user_id']] = (int) $r['year'];
+            $out[(int) $r['user_id']] = ['year' => (int) $r['year'], 'date' => (string) $r['joined_on'] !== '' ? (string) $r['joined_on'] : (string) $r['year']];
         }
         return $out;
     }

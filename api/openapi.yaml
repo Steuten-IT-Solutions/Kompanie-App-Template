@@ -276,7 +276,7 @@ paths:
       description: |
         `date` als TT.MM.JJJJ, JJJJ-MM-TT oder nur das Jahr JJJJ; ohne `date` gilt `year` (ältere Apps, nur das Jahr). Ab
         1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein neuer
-        Eintrag steht nur für Mitglieder auf der Seite (`profile: members`). Auf der Seite steht immer nur das Jahr.
+        Eintrag steht nur für Mitglieder auf der Seite (`profile: members`). Auf der Seite steht der Eintritt, wie er eingetragen ist.
       x-capability: member
       requestBody:
         required: true
@@ -2189,7 +2189,7 @@ paths:
         Für alle, auch Gäste und ohne Anmeldung (Issue #112). Enthält alle Mitglieder und Anwärter (auch Personen mit
         eigenen Rollen nur mit dem internen Kalender), keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch
         den Dienstgrad, mit Bereich Titel die Titel; nie Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit Bereich
-        Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (`ProfileVisibility`), sonst null.
+        Geburtstage) und Eintritt nur, soweit die Person sie dem Betrachter zeigt (`ProfileVisibility`), sonst null.
         Sortiert nach Anzeigename. Bereich aus → 403 `feature_disabled`.
       security: []
       responses:
@@ -2233,8 +2233,9 @@ paths:
       summary: Ehemalige in der Mitgliederliste (Tab „Ehemalige“), öffentlich
       description: |
         Gleiche Rechte wie `GET /directory` (öffentlich, mit dem Bereich directory). Alle als ehemalig eingetragenen
-        Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied und
-        die Jahre von Eintritt und Ausscheiden; nie der Grund, genaue Daten, Punkte oder Strafen. Ohne feste Reihenfolge.
+        Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied,
+        Eintritt und Ausscheiden (wie eingetragen: ganzes Datum oder nur das Jahr); nie der Grund, Punkte oder Strafen.
+        Ohne feste Reihenfolge.
         Bereich aus → 403 `feature_disabled`.
       security: []
       responses:
@@ -4918,6 +4919,11 @@ components:
         join_year:
           description: Eintrittsjahr, soweit die Person es dem Betrachter zeigt, sonst null. Fehlt bei Ehemaligen (`joined_year`).
           type: [integer, 'null']
+        join_date:
+          description: |
+            Eintritt wie eingetragen (JJJJ-MM-TT oder nur das Jahr JJJJ), soweit die Person ihn dem Betrachter zeigt, sonst
+            null. Fehlt bei Ehemaligen (`joined_on`) und bei älteren Servern (dann nur `join_year`).
+          type: [string, 'null']
 
     DirectoryBirthday:
       type: object
@@ -4955,11 +4961,13 @@ components:
       allOf:
         - $ref: '#/components/schemas/DirectoryEntry'
         - type: object
-          required: [founder, joined_year, left_year]
+          required: [founder, joined_year, left_year, joined_on, left_on]
           properties:
             founder: { type: boolean, description: Gründungsmitglied }
             joined_year: { type: string, description: 'Jahr des Eintritts (JJJJ), leer ohne Angabe' }
             left_year: { type: string, description: 'Jahr des Ausscheidens (JJJJ), leer ohne Angabe' }
+            joined_on: { type: string, description: 'Eintritt wie eingetragen (JJJJ-MM-TT oder JJJJ), leer ohne Angabe' }
+            left_on: { type: string, description: 'Ausscheiden wie eingetragen (JJJJ-MM-TT oder JJJJ), leer ohne Angabe' }
 
     MemberDetail:
       allOf:

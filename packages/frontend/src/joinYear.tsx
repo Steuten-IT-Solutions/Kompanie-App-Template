@@ -1,6 +1,6 @@
 // Seite einer Person in der Mitgliederliste: wem Geburtstag und Eintrittsjahr dort erscheinen (wählt nur die Person
 // selbst), dazu der Eintritt (Datum oder nur das Jahr) unter „Mein Konto“ und in den Mitgliedsdetails (wer Mitglieder
-// anlegen darf). Auf der Seite steht immer nur das Jahr.
+// anlegen darf). Auf der Seite steht er, wie er eingetragen ist (Datum oder nur das Jahr).
 
 import { useState, type FormEvent } from 'react';
 import { api, can, config, type JoinYear, type ProfileVisibility } from './api';
@@ -142,7 +142,7 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
   return (
     <form className="form card account-card join-year-card" onSubmit={save}>
       <h3>Eintritt</h3>
-      <p className="muted small">Wann du eingetreten bist: das Datum oder nur das Jahr. Auf deiner Seite steht nur das Jahr.</p>
+      <p className="muted small">Wann du eingetreten bist: das Datum oder nur das Jahr. So steht es auch auf deiner Seite.</p>
       <DateField value={v} onChange={setValue} disabled={busy || pending} />
       <ProfileSelect value={p} onChange={setProfile} disabled={busy || pending} />
       <p className="muted small">{profileHint(p)}</p>

@@ -47,6 +47,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   von Anfang an auf **Mitgliedern anzeigen** (bisher „Nicht anzeigen“); nur angemeldete Mitglieder sehen die Angabe.
   Das gilt auch für alle schon eingetragenen Geburtstage und Eintritte, die auf „Nicht anzeigen“ standen. Wer sie
   nicht zeigen will, stellt unter *Konto* wieder „Nicht anzeigen“ ein.
+- **Eintritt und Austritt mit ganzem Datum**: Auf der Seite eines Mitglieds steht der Eintritt jetzt so, wie er
+  eingetragen ist, z. B. „Eintritt 01.04.2005“ (bisher nur das Jahr). Bei den Ehemaligen stehen Eintritt und
+  Ausscheiden ebenso mit ganzem Datum, z. B. „01.04.1985 – 03.05.2010“; wer dort nur Jahre eingetragen hat, sieht
+  weiter nur die Jahre. Das gilt für alle, die die Angaben sehen dürfen, bei den Ehemaligen also auch ohne Anmeldung.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
   (heruntergeladen oder in Google Drive).
 - **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.

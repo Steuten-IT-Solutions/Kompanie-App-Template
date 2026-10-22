@@ -296,8 +296,9 @@ final class Api
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
      * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich
-     * Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit
-     * $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintrittsjahr: Sie haben ihre Jahre).
+     * Geburtstage) und Eintritt (join_year, join_date) nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility),
+     * sonst null. Mit $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintritt: Sie haben
+     * ihre eigenen Daten).
      * Öffentlich, damit der Shortcode [kompanie_mitglieder] dieselbe Liste zeigt.
      *
      * @param list<array<string, mixed>>|null $entries
@@ -317,7 +318,7 @@ final class Api
             + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
             + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
             + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
-            + ($joined !== null ? ['join_year' => $joined[$m['id']] ?? null] : []), $entries ?? $a->members()->directory());
+            + ($joined !== null ? ['join_year' => $joined[$m['id']]['year'] ?? null, 'join_date' => $joined[$m['id']]['date'] ?? null] : []), $entries ?? $a->members()->directory());
     }
 
     /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -729,10 +730,10 @@ final class Api
             }, 'attendance', $denyRights),
 
             // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und
-            // Titel, dazu Geburtstag und Eintrittsjahr, soweit die Person sie dem Betrachter zeigt
+            // Titel, dazu Geburtstag und Eintritt, soweit die Person sie dem Betrachter zeigt
             new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
             new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
-            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied und die Jahre, kein Grund
+            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied, Eintritt und Ausscheiden, kein Grund
             new Route('GET', '/directory/former', $P, fn () => $this->directory($a->formerMembers()->directory()), 'directory'),
 
             // Mitglieder
