@@ -8,7 +8,7 @@
 #
 # Umgebung: REPO (Organisation/Name), KOMPANIE_SHA (Commit des Kompanie-Repos), CONFIG (dessen kompanie.json),
 #   DIST (gebaute Oberfläche), BRAND (Ordner mit brand.json, theme.css, logo.png, favicon.png),
-#   SCREENSHOTS (Ordner mit PNGs, optional), GH_TOKEN (Schreibrecht auf das Kompanie-Repo), KOMPANIE_SIGNING_KEY,
+#   SCREENSHOTS (Ordner mit PNGs, optional; Fotos des Handbuchs kommen aus DIST/handbuch/bilder), GH_TOKEN (Schreibrecht auf das Kompanie-Repo), KOMPANIE_SIGNING_KEY,
 #   optional STATUS_URL (Empfang der Statusmeldungen, https://…), REPORT_URL (Empfang der Fehlermeldungen, https://…)
 #   und SUPPORT (Kontakt für Hilfe).
 #   Für Tests: GIT_REMOTE (statt GitHub), GH (Befehl statt gh), STABLE_CORE (statt der Datei), TRUST_SIGNING_KEY=1.
@@ -131,6 +131,9 @@ fi
 $GH release create "v$VERSION" "${FILES[@]}" --repo "$REPO" --target "$KOMPANIE_SHA" --draft \
   --title "Version $VERSION" --notes "Kern $CORE. Pakete und Prüfsummen: release.json (signiert)."
 
+# Bildschirmfotos des Handbuchs (scripts/handbuch-bilder.sh im Build-Job) liegen in der gebauten Oberfläche.
+BILDER=""
+[ -d "$DIST/handbuch/bilder" ] && BILDER="$DIST/handbuch/bilder"
 # Update-Liste und Download-Seite; bei gleichzeitiger Änderung (Push abgelehnt) neu holen und wiederholen
 for attempt in 1 2 3 4 5; do
   [ "$attempt" -gt 1 ] && fetch_pages
@@ -143,7 +146,7 @@ for attempt in 1 2 3 4 5; do
   fi
   CHANNEL="$(sed -n 's/.*(Kanal \(early\|stable\)).*/\1/p' <<< "$ADDED")"
   php "$ROOT/scripts/download-page.php" --updates="$WORK/site/updates.json" --out="$WORK/site" \
-    ${SCREENSHOTS:+--screenshots="$SCREENSHOTS"} --brand="$BRAND"
+    ${SCREENSHOTS:+--screenshots="$SCREENSHOTS"} --brand="$BRAND" ${BILDER:+--bilder="$BILDER"}
   touch "$WORK/site/.nojekyll"
   git -C "$WORK/site" add -A
   git -C "$WORK/site" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
