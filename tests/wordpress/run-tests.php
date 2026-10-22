@@ -788,15 +788,18 @@ $offices->createTerm($officeB['id'], ['start_year' => 2018, 'holders' => [['name
 wp_set_current_user(0);
 $html = do_shortcode('[kompanie_aemter]');
 $c->ok(str_contains($html, 'Kpwp Kapitän') && str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'class="ka-gruppe">Kpwp Kompanie<'), '[kompanie_aemter]: alle Gruppen mit Überschrift');
-$c->ok(str_contains($html, esc_html($memberName)) && str_contains($html, 'seit 2020 · Kpwp Zusatz') && str_contains($html, esc_url((string) $photo['photo_url'])), 'Laufende Amtszeit mit Foto aus der Mitgliederliste und Zusatz');
+$c->ok(str_contains($html, esc_html($memberName)) && str_contains($html, 'seit 2020 · Kpwp Zusatz') && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])), 'Laufende Amtszeit mit Foto (480 Pixel) aus der Mitgliederliste und Zusatz');
 $c->ok(str_contains($html, 'Chronik seit 1980') && str_contains($html, '1980–1990') && str_contains($html, 'Kpwp Früher'), 'Frühere Amtszeiten als Chronik');
 $html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
 $html = do_shortcode('[kompanie_aemter gruppe=”Kpwp Bruderschaft”]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän'), 'gruppe mit typografischen Anführungszeichen');
 $html = do_shortcode('[kompanie_mitglieder]');
-$c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, esc_html($memberName)) && str_contains($html, esc_url((string) $photo['photo_url'])), '[kompanie_mitglieder]: Mitglied mit Foto');
-$c->ok(!str_contains($html, 'Kpwp_gast_amt') && !str_contains($html, 'punkte') && !str_contains($html, 'role'), 'Ohne Gäste, Punkte oder Rollen');
+$c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
+    && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
+$c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
+$c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');
 $app->features()->update(['offices' => false, 'directory' => false]);
 $c->ok(do_shortcode('[kompanie_aemter]') === '' && do_shortcode('[kompanie_mitglieder]') === '', 'Bereich aus: keine Ausgabe');
 $app->features()->update(['offices' => true, 'directory' => true]);
