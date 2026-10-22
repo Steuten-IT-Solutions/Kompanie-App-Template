@@ -286,6 +286,8 @@ test('Mitglied: Beim Wischen steht der Nachbar schon daneben, gewechselt wird oh
   await page.getByLabel('Mitglied suchen').fill('Mitglied');
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  // Erst wenn die Seite ganz geladen ist (auch Teile mit eigenem Laden wie die Ämter): Sonst zählte deren „Lädt …“.
+  await expect(page.locator('[data-loading]')).toHaveCount(0);
   // Merken, ob irgendwann „Lädt …“ bzw. das Gerüst erscheint.
   await page.evaluate(() => {
     const w = window as unknown as { sawLoading: boolean };
