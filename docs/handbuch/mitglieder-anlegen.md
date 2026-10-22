@@ -7,8 +7,8 @@ Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), fi
 
 ## Die Mitgliederliste
 - Ganz oben steht, wie viele Personen es je Gruppe gibt (ohne Gäste): zuerst {rolle.member}, dann eigene Rollen, die gesondert zählen, in ihrer Reihenfolge (z. B. Anwärter). Die Gruppen sind dieselben wie im Zähler der {bereich.attendance} (Einstellungen → Rollen → {bereich.attendance}); Suche und Rollenfilter ändern den Zähler nicht.
-- Darunter stehen **+ Mitglied anlegen** und **Ehemalige** (ausgetretene und verstorbene Mitglieder, siehe [Ehemalige Mitglieder](seite:ehemalige-mitglieder)), dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
-- In der Liste stehen auch Personen mit Rollen nur für den internen Kalender (z. B. Anwärter).
+- Darunter steht **+ Mitglied anlegen**, dann das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
+- In der Liste stehen auch Personen mit Rollen nur für den internen Kalender (z. B. Anwärter). Ausgetretene und verstorbene Mitglieder stehen nicht hier, sondern im Menü unter **Ehemalige** (siehe [Ehemalige Mitglieder](seite:ehemalige-mitglieder)).
 - **Filter und Sortierung** ist zunächst eingeklappt; ein Tipp klappt es auf. Darin stehen die Filter nach Rolle und {bereich.titles}, die Sortierung und das Häkchen für Gast-Konten. Ist ein Filter gesetzt, steht am eingeklappten Bereich **aktiv**.
 - **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** gibt es nur für alle, die auch Rollen vergeben dürfen.
 - **Sortierung**: nach Nachname, nach Vorname oder (wer {bereich.points} vergeben darf) nach {bereich.points}. Der Knopf **Reihenfolge** daneben dreht sie um: bei Namen A → Z oder Z → A, bei {bereich.points} die meisten oder die wenigsten zuerst. Eine neu gewählte Sortierung beginnt mit A → Z bzw. mit den meisten {bereich.points}. Dein Gerät merkt sich die Wahl.
