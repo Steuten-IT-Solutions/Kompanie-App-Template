@@ -563,8 +563,15 @@ Jede Kompanie kann in der App unter *Einstellungen → Zustand und Updates* auf 
 ### Sicherung
 
 - Vor jedem Update mit Migrationen und vor jeder neuen Hauptversion: automatische Sicherung im Export-Format (die letzten fünf, im geschützten Datenbereich).
-- Admins können jederzeit **„Datensicherung herunterladen“** und eine Sicherung wieder einspielen.
-- Die App erinnert Admins regelmäßig an eine Sicherung, wenn länger keine heruntergeladen wurde.
+- Admins können jederzeit **„Datensicherung herunterladen“** und eine Sicherung wieder einspielen. Die Sicherung enthält
+  Tabellen, Einstellungen, Konten (Standalone: Tabelle `users`; WordPress: `accounts` mit den Benutzern der Website),
+  die Dateien der Dokumente und Abzeichen (`files`, Base64) sowie Push-Abos und ihren Schlüssel. Nicht enthalten:
+  Galeriebilder (kommen neu aus Drive), Warteschlangen, Fehlermeldungen und der Zustand der Installation
+  (`Backup::LOCAL_SETTINGS`).
+- **Sicherungen in Google Drive** (`BackupUploadService`, optional): wöchentlich in einen eigenen Ordner des über
+  „Mit Google verbinden“ verbundenen Kontos (Berechtigung `drive.file`, die App sieht nur eigene Dateien), die letzten
+  acht bleiben.
+- Die Ampel wird gelb, wenn 30 Tage lang keine Sicherung außerhalb des Servers entstand (heruntergeladen oder in Google Drive).
 
 ### Update-Liste und gestaffelte Verteilung
 
@@ -626,7 +633,9 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 - Die Rolle in der App (Grundrolle) steht in der Benutzer-Option `kompanie_app_role` (je Website, auch bei Multisite), die Rechte dazu kommen aus der App; Auswahl auch im Benutzerprofil des WP-Backends. Zusatzrollen (Issue #66) stehen in der Tabelle des Kerns, nicht in WP-Rollen; das Backend zeigt und ändert sie nicht. Die früheren WP-Rollen `kompanie_member`, `kompanie_organizer` und `kompanie_manager` bleiben angelegt und werden für diese Rollen weiter vergeben: Bis zur einmaligen Übernahme nach dem Update (`Roles::migrateUsers`) und nach einem Zurückrollen gelten sie.
 - Einstellungsseite im WP-Admin (Google-Zugang, Kalender, Galerie); Assistent, Statusseite, Updates und Datensicherung für WordPress-Administratoren in der App.
 - **Updates** über den Upgrader von WordPress mit dem geprüften Paket (Sicherung des Plugin-Ordners ab WordPress 6.3); verlangt WordPress FTP-Zugangsdaten, erklärt die App den Ausweg.
-- **Datensicherung** der App-Daten und Einstellungen; Wiederherstellen nur auf derselben Website (die Benutzer sind WordPress-Konten).
+- **Datensicherung** der App-Daten, Einstellungen und WordPress-Benutzer; Wiederherstellen nur auf derselben Website
+  (Adresse). Fehlende Benutzer legt `WpBackup` mit ihrer bisherigen ID an (nach dem Verlust der Website), vorhandene
+  behalten ihre Anmeldedaten; widersprechen sich IDs und Benutzernamen, ändert es nichts.
 - Shortcodes `[kompanie_termine]`, `[kompanie_galerie]`, `[kompanie_aemter]` und `[kompanie_mitglieder]` (dieselbe Liste wie `GET /directory` über `Api::directory`, als Bildergalerie: Fotos im Hochformat 2:3 mit 480 Pixeln, Name als Balken im Bild, nach Namen sortiert, Großansicht mit 1024 Pixeln; Fotos der Inhaber in `[kompanie_aemter]` ebenfalls mit 480 Pixeln, oben ausgerichtet wie in der App; Schrift in der Textfarbe der Webseite, die Kompaniefarbe nur für Flächen, damit helle und dunkle Themes lesbar bleiben; Bereich aus → keine Ausgabe).
 - „Angemeldet bleiben“ 400 Tage mit automatischer Verlängerung.
 - **Verträglich mit typischen WordPress-Umgebungen:** App-Seite und API senden „nicht zwischenspeichern“ an Cache-Plugins und CDNs; später soll der Assistent erkennen, wenn ein Sicherheits-Plugin die REST-API sperrt, und die Freigabe erklären. Nur Einzelseiten, kein Multisite (vorerst).

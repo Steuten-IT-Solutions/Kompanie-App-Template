@@ -43,8 +43,9 @@ final class PushService
     public const TASK_WATCH = 'push_watch';
     public const WATCH_INTERVAL = 900;
 
-    /** Diese Einstellungen gehören zur Installation (Backup::LOCAL_SETTINGS). */
+    /** Schlüssel für Web Push; mit den Abos in der Sicherung, damit Benachrichtigungen nach einem Umzug weiter ankommen. */
     public const VAPID_SETTING = 'push_vapid';
+    /** Diese Einstellungen gehören zur Installation (Backup::LOCAL_SETTINGS). */
     public const CALENDAR_SETTING = 'push_calendar_seen';
     public const NEWS_SETTING = 'push_news_seen';
     /** Neue Art „Schwarzes Brett“ den bestehenden Abos schon einmal hinzugefügt (beim ersten Einschalten des Bereichs). */
