@@ -11,6 +11,8 @@ use KompanieApp\Core\App;
  *
  * [kompanie_termine anzahl="10"]  Kommende öffentliche Termine aus der App.
  * [kompanie_galerie]              Galerie (Jahre → Alben → Bilder).
+ * [kompanie_aemter gruppe="…"]    Ämter mit Inhabern und Chronik (optional nur eine Gruppe).
+ * [kompanie_mitglieder]           Mitgliederliste mit Foto und Dienstgrad.
  */
 final class Shortcodes
 {
@@ -18,6 +20,8 @@ final class Shortcodes
     {
         add_shortcode('kompanie_termine', static fn ($atts) => self::events($app, is_array($atts) ? $atts : []));
         add_shortcode('kompanie_galerie', static fn () => self::gallery($app));
+        add_shortcode('kompanie_aemter', static fn ($atts) => self::offices($app, is_array($atts) ? $atts : []));
+        add_shortcode('kompanie_mitglieder', static fn () => self::members($app));
     }
 
     /**
@@ -53,6 +57,19 @@ final class Shortcodes
 .ka-lb button{position:absolute;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:999px;width:48px;height:48px;font-size:1.6rem;cursor:pointer}
 .ka-lb .ka-lb-close{top:16px;right:16px}.ka-lb .ka-lb-prev{left:12px}.ka-lb .ka-lb-next{right:12px}
 .ka-lb-count{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#fff;font-size:.9rem}
+.ka-gruppe{margin:28px 0 12px;font-size:1.4rem;color:var(--ka-primary);border-bottom:2px solid var(--ka-accent);padding-bottom:4px}
+.ka-aemter{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;align-items:start}
+.ka-amt{border:1px solid rgba(0,0,0,.12);border-top:4px solid var(--ka-primary);border-radius:10px;padding:14px 16px}
+.ka-amt-titel{margin:0 0 10px;font-size:1.1rem;color:var(--ka-primary)}
+.ka-inhaber{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ka-person{display:flex;gap:10px;align-items:center}
+.ka-bild{flex:none;width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--ka-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem}
+.ka-name{font-weight:700}.ka-klein{display:block;font-size:.85rem;opacity:.75}
+.ka-chronik{margin-top:10px}.ka-chronik summary{cursor:pointer;font-size:.92rem;color:var(--ka-primary)}
+.ka-chronik ol{list-style:none;margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--ka-accent);display:flex;flex-direction:column;gap:6px;font-size:.92rem}
+.ka-jahre{font-weight:700;margin-right:6px}
+.ka-mitglieder{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px}
+.ka-mitglied{text-align:center}.ka-mitglied .ka-bild{width:96px;height:96px;margin:0 auto 6px;font-size:1.6rem}
 </style>';
     }
 
@@ -178,5 +195,121 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '</div>';
         }
         return $html . '</div>';
+    }
+
+    private static function offices(App $app, array $atts): string
+    {
+        if (!$app->features()->enabled('offices')) {
+            return '';
+        }
+        // Immer die Sicht eines Gastes: Fotos nur von Personen, die auch in der öffentlichen Mitgliederliste stehen.
+        $overview = $app->offices()->overview(null);
+        $wanted = trim((string) ($atts['gruppe'] ?? ''));
+        $groups = [];
+        foreach ($overview['groups'] as $g) {
+            if ($wanted === '' || mb_strtolower($g['title']) === mb_strtolower($wanted)) {
+                $groups[$g['id']] = $g['title'];
+            }
+        }
+        $byGroup = [];
+        foreach ($overview['offices'] as $o) {
+            if ($o['group_id'] === null ? $wanted === '' : isset($groups[$o['group_id']])) {
+                $byGroup[$o['group_id'] ?? 0][] = $o;
+            }
+        }
+        $html = self::styles($app);
+        if ($byGroup === []) {
+            return $html . '<p class="ka">Noch keine Ämter eingetragen.</p>';
+        }
+        $html .= '<div class="ka">';
+        // Überschrift nur, wenn mehrere Gruppen erscheinen; mit gruppe="…" steht sie meist schon auf der Seite.
+        $headings = count($byGroup) > 1;
+        foreach ($byGroup as $groupId => $offices) {
+            if ($headings) {
+                $html .= '<h3 class="ka-gruppe">' . esc_html($groups[$groupId] ?? 'Weitere Ämter') . '</h3>';
+            }
+            $html .= '<div class="ka-aemter">';
+            foreach ($offices as $o) {
+                $html .= self::office($o);
+            }
+            $html .= '</div>';
+        }
+        return $html . '</div>';
+    }
+
+    /** Ein Amt: laufende Amtszeiten (sonst die letzte) mit Fotos, darunter die übrigen als aufklappbare Chronik. */
+    private static function office(array $o): string
+    {
+        $current = array_values(array_filter($o['terms'], static fn (array $t): bool => $t['current']));
+        $shown = $current !== [] ? $current : array_slice($o['terms'], 0, 1);
+        $rest = array_slice($o['terms'], count($shown));
+        $html = '<section class="ka-amt"><h4 class="ka-amt-titel">' . esc_html($o['title']) . '</h4>';
+        if ($shown === []) {
+            return $html . '<p class="ka-klein">Noch nicht besetzt.</p></section>';
+        }
+        $html .= '<ul class="ka-inhaber">';
+        foreach ($shown as $t) {
+            foreach ($t['holders'] as $h) {
+                $html .= '<li class="ka-person">' . self::photo($h['name'], $h['photo_url'] ?? null, 44)
+                    . '<span><span class="ka-name">' . esc_html($h['name']) . '</span>'
+                    . '<span class="ka-klein">' . esc_html(self::years($t)) . ($t['note'] !== '' && $t['note'] !== null ? ' · ' . esc_html($t['note']) : '') . '</span></span></li>';
+            }
+        }
+        $html .= '</ul>';
+        if ($rest !== []) {
+            $since = min(array_column($o['terms'], 'start_year'));
+            $html .= '<details class="ka-chronik"><summary>' . esc_html(sprintf('Chronik seit %d', $since)) . '</summary><ol>';
+            foreach ($rest as $t) {
+                $names = implode(', ', array_map(static fn (array $h): string => $h['name'], $t['holders']));
+                $html .= '<li><span class="ka-jahre">' . esc_html(self::years($t)) . '</span>' . esc_html($names)
+                    . ($t['note'] !== '' && $t['note'] !== null ? '<span class="ka-klein">' . esc_html($t['note']) . '</span>' : '') . '</li>';
+            }
+            $html .= '</ol></details>';
+        }
+        return $html . '</section>';
+    }
+
+    /** „2007–2020“, „seit 2020“ (läuft), „2025“ (einzelnes Jahr), wie in der App (Aemter.tsx, termYears). */
+    private static function years(array $t): string
+    {
+        if ($t['kind'] === 'point' || $t['end_year'] === $t['start_year']) {
+            return (string) $t['start_year'];
+        }
+        return $t['end_year'] === null ? 'seit ' . $t['start_year'] : $t['start_year'] . '–' . $t['end_year'];
+    }
+
+    private static function members(App $app): string
+    {
+        if (!$app->features()->enabled('directory')) {
+            return '';
+        }
+        $members = $app->api()->directory();
+        $collator = class_exists(\Collator::class) ? new \Collator('de_DE') : null;
+        $key = static fn (array $m): string => trim($m['last_name'] . ' ' . $m['first_name']) ?: $m['name'];
+        usort($members, static fn (array $a, array $b): int => $collator !== null ? (int) $collator->compare($key($a), $key($b)) : strcasecmp($key($a), $key($b)));
+        $html = self::styles($app);
+        if ($members === []) {
+            return $html . '<p class="ka">Noch keine Mitglieder eingetragen.</p>';
+        }
+        $html .= '<ul class="ka ka-mitglieder">';
+        foreach ($members as $m) {
+            $html .= '<li class="ka-mitglied">' . self::photo($m['name'], $m['photo_url'] ?? null, 96)
+                . '<span class="ka-name">' . esc_html($m['name']) . '</span>'
+                . (($m['rank_title'] ?? null) ? '<span class="ka-klein">' . esc_html($m['rank_title']) . '</span>' : '') . '</li>';
+        }
+        return $html . '</ul>';
+    }
+
+    /** Foto rund, ohne Foto die Initialen auf der Kompaniefarbe. */
+    private static function photo(string $name, ?string $url, int $size): string
+    {
+        if ($url) {
+            return sprintf('<img class="ka-bild" src="%s" alt="" loading="lazy" width="%2$d" height="%2$d" />', esc_url($url), $size);
+        }
+        $initials = '';
+        foreach (array_slice(preg_split('/\s+/u', trim($name)) ?: [], 0, 2) as $part) {
+            $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+        }
+        return '<span class="ka-bild" aria-hidden="true">' . esc_html($initials) . '</span>';
     }
 }

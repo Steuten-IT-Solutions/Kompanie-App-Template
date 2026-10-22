@@ -4,7 +4,7 @@ reihenfolge: 39
 rechte: []
 bereiche: [directory]
 ---
-Unter **{bereich.directory}** (unten in der Leiste) siehst du, wer zur Kompanie gehört: alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter). Sehen kann die Liste jeder, auch Gäste und ohne Anmeldung; Gäste stehen nicht darin. Oben wechselst du zwischen der Liste, dem Zeitstrahl der Ämter (nutzt die Kompanie **{bereich.offices}**, siehe dort im Handbuch) und den **Ehemaligen**.
+Unter **{bereich.directory}** (unten in der Leiste) siehst du, wer zur Kompanie gehört: alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter). Sehen kann die Liste jeder, auch Gäste und ohne Anmeldung; Gäste stehen nicht darin. Oben wechselst du zwischen der Liste, dem Zeitstrahl der Ämter (nutzt die Kompanie **{bereich.offices}**, siehe dort im Handbuch) und den **Ehemaligen**. Mit WordPress zeigt der Shortcode `[kompanie_mitglieder]` die Liste (Foto, Name, {begriff.rank}) auch auf der Webseite.
 
 ## Was in der Liste steht
 Jede Zeile zeigt den Namen und vorn ein kleines rundes Foto; wer keines hat, bekommt dort seine Anfangsbuchstaben. Tippst du auf ein Foto, erscheint es groß und ganz – so kannst du dir die Gesichter besser einprägen. Schließen mit **✕** oder durch Tippen neben das Foto. Nutzt die Kompanie **{bereich.titles}**, stehen sie beim Namen. Ist der Bereich **{bereich.ranks}** eingeschaltet, steht rechts das Abzeichen mit dem {begriff.rank} darunter; wer keinen {begriff.rank} hat, hat dort nichts.

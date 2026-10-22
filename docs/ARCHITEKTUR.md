@@ -318,7 +318,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Import** (`POST /offices/import`, Ersterfassung): CSV mit Semikolon oder Tabulator `gruppe;amt;beginn;ende;art;personen;zusatz`, höchstens 200 KB bzw. 2000 Zeilen. Ohne `apply` Vorschau je Zeile (Fehler, `duplicate`), mit `apply` alles in einer Transaktion (bei einem Fehler nichts). Gruppen und Ämter nach Namen gefunden oder angelegt; gleiche Amtszeiten (Amt, Art, Jahre, Namen) übersprungen, damit ein zweiter Lauf nichts verdoppelt. `link`: eindeutiger Kontoname → verknüpft.
 - Konto löschen: Amtszeiten bleiben mit Namen stehen (`UserData::purge` setzt `office_holders.user_id` auf `NULL`).
 - App: im Tab *Mitglieder* (s. o.) je Amt eine aufklappbare Karte: zugeklappt Siegel (Monogramm der Bezeichnung), aktuelle Inhaber mit Fotos (sonst die letzte Amtszeit) und „Chronik seit …“; aufgeklappt oben *Im Amt* (laufende Amtszeiten auf der Kompaniefarbe, Foto, Dauer), darunter *Frühere* als Chronik: Jahr | Linie | Karte (Personen als Chips, Dauer, Zusatz; einzelne Jahre mit Stern), Jahrzehnt-Marken ab fünf Einträgen; ab 720 px Breite Linie in der Mitte, Karte und Jahr abwechselnd gegenüber. *Meins → Ämter* und die Mitgliedsdetails der Verwaltung zeigen die Ämter einer Person. Pflege unter *Verwaltung → Ämter* (`#/verwaltung/aemter`, `/<id>`, `/import`).
-- Offen: Shortcode `[kompanie_aemter]` für die Webseite (Punkt 18 im Issue), als eigenes Issue.
+- Webseite (WordPress): Shortcode `[kompanie_aemter]` (Punkt 18 im Issue) mit `OfficeService::overview(null)`, also immer der Sicht eines Gastes; Karte je Amt mit laufenden Amtszeiten (sonst der letzten) und den übrigen als aufklappbare Chronik (`<details>`, ohne JavaScript). `gruppe="…"` zeigt nur eine Gruppe (ohne Groß-/Kleinschreibung); Bereich aus → keine Ausgabe.
 
 ### Listen (Issue #121)
 
@@ -626,7 +626,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 - Einstellungsseite im WP-Admin (Google-Zugang, Kalender, Galerie); Assistent, Statusseite, Updates und Datensicherung für WordPress-Administratoren in der App.
 - **Updates** über den Upgrader von WordPress mit dem geprüften Paket (Sicherung des Plugin-Ordners ab WordPress 6.3); verlangt WordPress FTP-Zugangsdaten, erklärt die App den Ausweg.
 - **Datensicherung** der App-Daten und Einstellungen; Wiederherstellen nur auf derselben Website (die Benutzer sind WordPress-Konten).
-- Shortcodes `[kompanie_termine]` und `[kompanie_galerie]`.
+- Shortcodes `[kompanie_termine]`, `[kompanie_galerie]`, `[kompanie_aemter]` und `[kompanie_mitglieder]` (dieselbe Liste wie `GET /directory` über `Api::directory`, nach Nachnamen sortiert, mit Foto und Dienstgrad; Bereich aus → keine Ausgabe).
 - „Angemeldet bleiben“ 400 Tage mit automatischer Verlängerung.
 - **Verträglich mit typischen WordPress-Umgebungen:** App-Seite und API senden „nicht zwischenspeichern“ an Cache-Plugins und CDNs; später soll der Assistent erkennen, wenn ein Sicherheits-Plugin die REST-API sperrt, und die Freigabe erklären. Nur Einzelseiten, kein Multisite (vorerst).
 

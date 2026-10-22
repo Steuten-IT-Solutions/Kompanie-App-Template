@@ -15,8 +15,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.2.0] – 2026-10-22
+
 ### Neu
 
+- **Ämter und Mitglieder auf der Webseite** (WordPress): Die Shortcodes `[kompanie_aemter]` und
+  `[kompanie_mitglieder]` zeigen die Ämter mit Inhabern und Chronik bzw. die Mitgliederliste mit Foto und Dienstgrad,
+  in den Farben der Kompanie und mit denselben öffentlichen Angaben wie die App. `[kompanie_aemter gruppe="…"]` zeigt
+  nur die Ämter einer Gruppe. So steht alles nur noch an einer Stelle, in der App.
 - **Listen** (neuer Bereich, anfangs aus): Listen zum Ausdrucken, als PDF oder als CSV für Excel, z. B.
   Unterschriften-, Teilnehmer- oder Abhaklisten, unter *Verwaltung → Listen* mit dem neuen Recht dafür. Titel und
   Spalten wählt man selbst: Angaben der Mitglieder (Name, Dienstgrad, Titel, Punkte …, jeweils nur, soweit man sie in

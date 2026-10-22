@@ -298,11 +298,12 @@ final class Api
      * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich
      * Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit
      * $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintrittsjahr: Sie haben ihre Jahre).
+     * Öffentlich, damit der Shortcode [kompanie_mitglieder] dieselbe Liste zeigt.
      *
      * @param list<array<string, mixed>>|null $entries
      * @return list<array<string, mixed>>
      */
-    private function directory(?array $entries = null): array
+    public function directory(?array $entries = null): array
     {
         $a = $this->app;
         $photos = $a->memberPhotos()->urls();
