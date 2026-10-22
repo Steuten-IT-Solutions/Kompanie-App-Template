@@ -69,10 +69,7 @@ export function FormerList() {
   const withPhotos = (data ?? []).some((f) => f.photo_url);
 
   function open(id: number) {
-    setBrowseOrder(
-      'ehemalige',
-      list.map((f) => f.id),
-    );
+    setBrowseOrder('ehemalige', list);
     navigate(`verwaltung/ehemalige/${id}`);
   }
 

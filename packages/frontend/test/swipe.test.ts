@@ -1,7 +1,7 @@
 // Wischen in der Mitgliederansicht (src/swipe.ts): weit oder schnell genug gezogen blättert, am Ende der Liste ist Schluss.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dragOffset, neighbors, releaseStep } from '../src/swipe.ts';
+import { dragOffset, neighbors, prefetchOrder, releaseStep } from '../src/swipe.ts';
 
 test('weit genug gezogen: nach links weiter, nach rechts zurück', () => {
   // Breite 400: ab einem Viertel (100 px)
@@ -42,4 +42,12 @@ test('Nachbarn in der Reihenfolge der Liste', () => {
   assert.deepEqual(neighbors([7, 3, 9], 9), { prev: 3, next: null, index: 2 });
   assert.deepEqual(neighbors([7, 3, 9], 5), { prev: null, next: null, index: -1 });
   assert.deepEqual(neighbors([], 5), { prev: null, next: null, index: -1 });
+});
+
+test('Vorladen von der aktuellen Stelle nach außen, abwechselnd, bis die ganze Liste dran war', () => {
+  assert.deepEqual(prefetchOrder([1, 2, 3, 4, 5, 6], 2), [4, 2, 5, 1, 6]);
+  assert.deepEqual(prefetchOrder([1, 2, 3, 4], 0), [2, 3, 4]);
+  assert.deepEqual(prefetchOrder([1, 2, 3, 4], 3), [3, 2, 1]);
+  assert.deepEqual(prefetchOrder([1], 0), []);
+  assert.deepEqual(prefetchOrder([1, 2], -1), []);
 });

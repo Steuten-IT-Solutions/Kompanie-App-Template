@@ -35,6 +35,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Die Vorschau zeigt Fehler je Zeile, danach stehen die Zugangsdaten zum Ausdrucken bereit; Ehemalige bekommen ein Konto
   ohne Anmeldung. Wer schon ein Konto mit demselben Namen hat, wird übersprungen.
 - **Ehemalige importieren** nimmt jetzt auch Excel-Dateien (.xlsx).
+- **Wischen auch im Tab „Mitglieder“**: Auf der Seite einer Person blättert Wischen wie in der Verwaltung zur nächsten
+  bzw. vorherigen Person der Liste (mit Suche und Sortierung), auch bei den Ehemaligen; am Computer mit den Pfeilen oben
+  rechts. **‹ Zurück** führt weiter direkt zur Liste.
+- **Ganze Liste vorgeladen**: Auf der Seite einer Person lädt die App jetzt nacheinander alle Personen der Liste vor,
+  zuerst die direkten Nachbarn, dann immer weiter nach außen. Ist eine Seite beim Wischen doch noch nicht geladen,
+  steht ihr Name schon da, darunter das Gerüst, und man kann gleich weiterwischen.
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt

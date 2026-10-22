@@ -240,8 +240,16 @@ test('orderFor: gemerkte Sortierung nur, wenn die Liste sie anbietet', () => {
 });
 
 test('browseOrder: Reihenfolge nur für dieselbe Liste und wenn die Person darin steht', () => {
-  setBrowseOrder('mitglied', [4, 2, 9]);
-  assert.deepEqual(browseOrder('mitglied', 2), [4, 2, 9]);
+  setBrowseOrder('mitglied', [
+    { id: 4, name: 'Anna' },
+    { id: 2, name: 'Bernd' },
+    { id: 9, name: 'Carla' },
+  ]);
+  assert.deepEqual(
+    browseOrder('mitglied', 2)?.map((e) => `${e.id} ${e.name}`),
+    ['4 Anna', '2 Bernd', '9 Carla'],
+  );
   assert.equal(browseOrder('mitglied', 5), null);
   assert.equal(browseOrder('ehemalige', 2), null);
+  assert.equal(browseOrder('directory', 2), null);
 });
