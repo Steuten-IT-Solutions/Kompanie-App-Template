@@ -838,6 +838,28 @@ select {
 .back {
   margin-bottom: 4px;
 }
+/* Mitglied in der Verwaltung: zurück zur Liste, daneben vorheriges und nächstes (auch per Wischen). */
+.member-detail {
+  /* Waagerecht wischt die App selbst; sonst blättert der Browser zusätzlich im Verlauf zurück oder vor. */
+  touch-action: pan-y pinch-zoom;
+}
+.member-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.member-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.member-step .btn-link {
+  min-width: 40px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
 .add-member {
   margin-top: 14px;
 }

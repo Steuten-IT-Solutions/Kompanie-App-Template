@@ -189,6 +189,54 @@ test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stel
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+/** Waagerecht wischen (Touch-Ereignisse über CDP, wie ein Finger). */
+async function swipe(page: Page, dx: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const { width } = page.viewportSize()!;
+  const x = width / 2 - dx / 2;
+  const y = 300;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * f, y }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+test('Mitglied: Wischen blättert in der Liste und bleibt auf derselben Unterseite', async ({ page }) => {
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await expect(page.getByRole('button', { name: 'Vorheriges Mitglied' })).toBeDisabled();
+  await memberMenu(page, 'Kasse');
+
+  // Nach links: nächstes Mitglied, weiter auf „Kasse“.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page).toHaveURL(/\/strafen$/);
+  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  // Am Ende der Liste geht es nicht weiter.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Nach rechts bzw. mit dem Pfeil wieder zurück und vor.
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
+
+  // Wischen legt keine Einträge im Verlauf an: „Zurück“ nimmt die Wahl der Unterseite zurück, dann geht es zur Liste.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/mitglied\/\d+$/);
+  await page.goBack();
+  await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
+});
+
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();

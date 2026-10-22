@@ -16,6 +16,8 @@ Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), fi
 
 Ein Tipp auf eine Person öffnet ihre Seite. Unter dem Namen steht mittig ihr Abzeichen mit dem {begriff.rank} darunter und rechts daneben ihr Foto (ohne Foto die Anfangsbuchstaben, wenn du Fotos hochladen darfst). Darunter wählst du im Menü die Unterseite: **Übersicht**, **Konto und Rolle**, {bereich.points}, {bereich.penalties}, {begriff.rank}, {bereich.titles} und **Geburtstag**. Du siehst nur die Unterseiten, für die du die Rechte hast und deren Bereich eingeschaltet ist. **‹ Alle Mitglieder** (oder die Zurück-Taste) führt zurück zur Liste, und zwar an dieselbe Stelle, mit demselben Suchbegriff und denselben Filtern. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
 
+Zur nächsten oder vorherigen Person wischst du auf ihrer Seite nach links oder rechts; am Computer gibt es dafür oben rechts die Pfeile **‹** und **›** mit der Position in der Liste (z. B. „3 / 25“). Du bleibst dabei auf derselben Unterseite und blätterst in der Reihenfolge, in der die Liste gerade sortiert und gefiltert ist. Gibt es die Unterseite bei einer Person nicht, siehst du dort die **Übersicht**; bei der nächsten Person geht es wieder mit deiner Unterseite weiter.
+
 ## Neues Mitglied
 1. In der Mitgliederliste **+ Mitglied anlegen** tippen.
 2. **Vorname** und **Nachname** eintragen. Nur der Vorname ist Pflicht; ohne Nachnamen geht es z. B. für ein Funktionskonto wie „Kassenwart“. **Benutzername** und **E-Mail** sind freiwillig; ohne Benutzernamen bildet die App ihn aus dem Namen. Ein Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten. Benutzername und E-Mail dürfen nicht schon vergeben sein.

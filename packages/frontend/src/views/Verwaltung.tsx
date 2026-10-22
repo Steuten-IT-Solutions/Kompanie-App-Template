@@ -15,6 +15,7 @@ import {
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
+import { neighbors, useSwipe } from '../swipe';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
@@ -137,6 +138,9 @@ type MembersState = {
 };
 let savedMembers: MembersState | null = null;
 
+/** Reihenfolge der Liste beim Öffnen eines Mitglieds (gefiltert und sortiert): In der Ansicht wischt man in ihr weiter. */
+let memberOrder: number[] = [];
+
 function Members() {
   const canPromote = can('promote_users');
   // Nur einmal übernehmen: Wer die Liste danach neu öffnet, fängt wieder oben an.
@@ -215,6 +219,7 @@ function Members() {
 
   function open(id: number) {
     savedMembers = { query, role, title, showGuests, filtersOpen, scrollY: window.scrollY };
+    memberOrder = list.map((m) => m.id);
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -381,6 +386,11 @@ function MemberDetailView({
   useEffect(() => {
     if (target !== base) redirectTo(`verwaltung/${target}/${id}${page ? `/${page}` : ''}`);
   }, [target, base, id, page]);
+  // Wischen blättert durch die Liste, aus der das Mitglied geöffnet wurde; die gewählte Seite bleibt dabei (auch über
+  // Mitglieder hinweg, bei denen es sie nicht gibt). Ohne Verlaufseintrag, damit „Zurück“ nicht durch jedes Mitglied führt.
+  const { prev, next, index } = neighbors(memberOrder, id);
+  const show = (other: number | null) => other !== null && redirectTo(`verwaltung/${base}/${other}${page ? `/${page}` : ''}`);
+  const swipe = useSwipe((step) => show(step === 1 ? next : prev));
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -422,16 +432,31 @@ function MemberDetailView({
   const avatar = !!m.photo_url || !!m.photo_editable;
 
   return (
-    <div>
-      {m.former ? (
-        <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
-          ‹ Ehemalige
-        </button>
-      ) : (
-        <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-          ‹ Alle Mitglieder
-        </button>
-      )}
+    <div className="member-detail" {...swipe}>
+      <div className="member-nav">
+        {m.former ? (
+          <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+            ‹ Ehemalige
+          </button>
+        ) : (
+          <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+            ‹ Alle Mitglieder
+          </button>
+        )}
+        {index >= 0 && memberOrder.length > 1 && (
+          <span className="member-step">
+            <button className="btn btn-link" disabled={prev === null} onClick={() => show(prev)} aria-label="Vorheriges Mitglied">
+              ‹
+            </button>
+            <span className="muted small">
+              {index + 1} / {memberOrder.length}
+            </span>
+            <button className="btn btn-link" disabled={next === null} onClick={() => show(next)} aria-label="Nächstes Mitglied">
+              ›
+            </button>
+          </span>
+        )}
+      </div>
       <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
       {(m.rank_title || avatar) && (
         <p className="member-rank-line">
