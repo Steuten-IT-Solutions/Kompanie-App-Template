@@ -10,6 +10,7 @@ import {
   type CatalogItem,
   type CreatedUser,
   type Level,
+  type FormerMember,
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
@@ -30,22 +31,25 @@ import { OfficeAdmin } from './AemterVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { PersonOffices } from './Aemter';
 import {
-  DEFAULT_MEMBER_SORT,
+  browseOrder,
   defaultDir,
   dirLabel,
   listName,
   loadMemberOrder,
   MEMBER_SORT_LABELS,
+  orderFor,
   saveMemberOrder,
+  setBrowseOrder,
   sortMembers,
   type MemberOrder,
+  type BrowseList,
   type MemberSort,
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
-import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
+import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 
 type Sub =
   | 'mitglieder'
@@ -138,8 +142,11 @@ type MembersState = {
 };
 let savedMembers: MembersState | null = null;
 
-/** Reihenfolge der Liste beim Öffnen eines Mitglieds (gefiltert und sortiert): In der Ansicht wischt man in ihr weiter. */
-let memberOrder: number[] = [];
+/** Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users). */
+const memberSorts = (): MemberSort[] =>
+  (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
+    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+  );
 
 function Members() {
   const canPromote = can('promote_users');
@@ -161,14 +168,8 @@ function Members() {
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  // Nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users); sonst nach Nachname (die
-  // gemerkte Wahl bleibt).
-  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
-    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
-  );
-  const order: MemberOrder = sortOptions.includes(stored.sort)
-    ? stored
-    : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const sortOptions = memberSorts();
+  const order = orderFor(stored, sortOptions);
   const changeOrder = (next: MemberOrder) => {
     setStored(next);
     saveMemberOrder(next);
@@ -219,7 +220,10 @@ function Members() {
 
   function open(id: number) {
     savedMembers = { query, role, title, showGuests, filtersOpen, scrollY: window.scrollY };
-    memberOrder = list.map((m) => m.id);
+    setBrowseOrder(
+      'mitglied',
+      list.map((m) => m.id),
+    );
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -363,6 +367,26 @@ function Members() {
 /* ------------------------------------------------------------------ */
 
 /**
+ * Reihenfolge zum Blättern auf der Seite einer Person: die der Liste, aus der sie geöffnet wurde. Sonst (Link, Neustart
+ * der App, aus einem anderen Bereich) die ganze Liste ohne Suche und Filter in der gemerkten Sortierung, wie sie beim
+ * Öffnen der Liste erscheint.
+ */
+function useBrowseOrder(list: BrowseList, id: number): number[] {
+  const stored = browseOrder(list, id);
+  const former = list === 'ehemalige';
+  // Nur laden, wenn nötig; Schlüssel wie bei den Listen, daher meist ohne Wartezeit aus dem Speicher.
+  const { data } = useAsync<Array<MemberSummary | FormerMember> | null>(
+    () => (stored ? Promise.resolve(null) : former ? api.formerMembers() : api.members(false, true)),
+    former ? [] : [false],
+    former ? 'former-members' : 'members',
+  );
+  return useMemo(
+    () => stored ?? sortMembers(data ?? [], orderFor(loadMemberOrder(), former ? FORMER_SORTS : memberSorts())).map((m) => m.id),
+    [stored, data, former],
+  );
+}
+
+/**
  * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
  * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht. Ehemalige haben dieselbe Seite unter
  * verwaltung/ehemalige/<id>/<seite>; steht eine Person unter der falschen Adresse (alter Link, gerade als ehemalig
@@ -388,7 +412,8 @@ function MemberDetailView({
   }, [target, base, id, page]);
   // Wischen blättert durch die Liste, aus der das Mitglied geöffnet wurde; die gewählte Seite bleibt dabei (auch über
   // Mitglieder hinweg, bei denen es sie nicht gibt). Ohne Verlaufseintrag, damit „Zurück“ nicht durch jedes Mitglied führt.
-  const { prev, next, index } = neighbors(memberOrder, id);
+  const order = useBrowseOrder(base, id);
+  const { prev, next, index } = neighbors(order, id);
   const show = (other: number | null) => other !== null && redirectTo(`verwaltung/${base}/${other}${page ? `/${page}` : ''}`);
   const swipe = useSwipe((step) => show(step === 1 ? next : prev));
 
@@ -443,13 +468,13 @@ function MemberDetailView({
             ‹ Alle Mitglieder
           </button>
         )}
-        {index >= 0 && memberOrder.length > 1 && (
+        {index >= 0 && order.length > 1 && (
           <span className="member-step">
             <button className="btn btn-link" disabled={prev === null} onClick={() => show(prev)} aria-label="Vorheriges Mitglied">
               ‹
             </button>
             <span className="muted small">
-              {index + 1} / {memberOrder.length}
+              {index + 1} / {order.length}
             </span>
             <button className="btn btn-link" disabled={next === null} onClick={() => show(next)} aria-label="Nächstes Mitglied">
               ›
