@@ -4,7 +4,7 @@ reihenfolge: 64
 rechte: [manage_polls]
 bereiche: [polls]
 ---
-Wer {bereich.polls} verwalten darf (Rolle „{bereich.polls} verwalten“ oder eine Rolle mit diesem Recht), findet sie unter **Verwaltung** → **{bereich.polls}** (Menü oben). Auch auf der Seite des {bereich.board} und in der Liste aller {bereich.polls} führt **{bereich.polls} verwalten** dorthin.
+Wer {bereich.polls} verwalten darf (Rolle „{bereich.polls} verwalten“ oder eine Rolle mit diesem Recht), findet sie unter **Verwaltung** → **{bereich.polls}** (Knopf auf der Startseite der Verwaltung). Auch auf der Seite des {bereich.board} und in der Liste aller {bereich.polls} führt **{bereich.polls} verwalten** dorthin.
 
 ## Anlegen
 Oben steht das Formular **Neue Umfrage**:
