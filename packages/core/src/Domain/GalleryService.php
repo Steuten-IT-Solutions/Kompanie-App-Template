@@ -448,7 +448,11 @@ final class GalleryService
     {
         $attempts = (int) ($photo['attempts'] ?? 0);
         if ($attempts >= self::MAX_ATTEMPTS) {
-            return $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+            // Das Original bringt PHP jedes Mal zum Abbruch (Speicher, Zeitlimit); Googles kleineres Vorschaubild geht oft noch.
+            // Vorher als fehlgeschlagen vermerken: Bricht auch das ab, wird es nicht bei jedem Lauf wieder versucht.
+            $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+            $size = $this->fromDriveThumbnail($photo);
+            return $size !== null && $this->markReady($photo, $size);
         }
         // Den Versuch vorab vermerken: Bricht PHP mittendrin ab (Speicher, Zeitlimit), kommt das Bild
         // beim nächsten Lauf nach den anderen dran (nextPending) und hält sie nicht auf.
@@ -459,16 +463,68 @@ final class GalleryService
             return $this->markFailed($photo, $e->getMessage());
         }
         try {
-            $size = null;
-            foreach (self::SIZES as $name => $max) {
-                $size = $this->images->resizeToJpeg($tmp, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
-            }
+            $size = $this->render($photo, $tmp);
         } catch (\Throwable $e) {
-            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException
-            return $this->markFailed($photo, $e->getMessage());
+            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException.
+            // Formate, die der Server nicht lesen kann (RAW, TIFF, oft auch HEIC): erst das eingebettete JPEG
+            // einer RAW-Datei, dann das Vorschaubild von Google.
+            $size = $this->fromRawPreview($photo, $tmp) ?? $this->fromDriveThumbnail($photo);
+            if ($size === null) {
+                return $this->markFailed($photo, $e->getMessage());
+            }
         } finally {
             @unlink($tmp);
         }
+        return $this->markReady($photo, $size);
+    }
+
+    /**
+     * Beide Größen aus einer Bilddatei.
+     *
+     * @return array{width: int, height: int}|null Größe der Großansicht
+     */
+    private function render(array $photo, string $file): ?array
+    {
+        $size = null;
+        foreach (self::SIZES as $name => $max) {
+            $size = $this->images->resizeToJpeg($file, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
+        }
+        return $size;
+    }
+
+    /** @return array{width: int, height: int}|null */
+    private function fromRawPreview(array $photo, string $file): ?array
+    {
+        $preview = $this->files->tempFile();
+        try {
+            return RawPreview::extract($file, $preview, self::SIZES['thumb']) ? $this->render($photo, $preview) : null;
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            @unlink($preview);
+        }
+    }
+
+    /** @return array{width: int, height: int}|null */
+    private function fromDriveThumbnail(array $photo): ?array
+    {
+        try {
+            $thumb = $this->drive->thumbnail((string) $photo['drive_file_id'], self::SIZES['large']);
+        } catch (\RuntimeException) {
+            return null;
+        }
+        try {
+            return $this->render($photo, $thumb);
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            @unlink($thumb);
+        }
+    }
+
+    /** @param array{width: int, height: int}|null $size */
+    private function markReady(array $photo, ?array $size): bool
+    {
         $this->repo->updatePhoto((int) $photo['id'], [
             'status' => GalleryRepository::READY,
             'error' => '',

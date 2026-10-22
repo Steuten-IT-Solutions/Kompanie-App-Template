@@ -4,7 +4,7 @@ reihenfolge: 35
 rechte: [calendar]
 bereiche: [calendar]
 ---
-Angemeldete {rolle.member} und {rolle.candidate} sehen unter **{bereich.events}** den Kalender der Kompanie mit allen kommenden Terminen, auch den internen, nach Monaten geordnet. Gäste ohne Anmeldung sehen dort nur die öffentlichen Termine (wenn die Kompanie sie nutzt).
+Angemeldete {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) sehen unter **{bereich.events}** den Kalender der Kompanie mit allen kommenden Terminen, auch den internen, nach Monaten geordnet. Gäste ohne Anmeldung sehen dort nur die öffentlichen Termine (wenn die Kompanie sie nutzt).
 
 ## Was im Kalender steht
 Die Termine kommen aus dem Kalender der Kompanie (z. B. Google Kalender), bis etwa ein Jahr im Voraus. Termine, die dort als privat markiert oder abgesagt sind, erscheinen nicht. Neue oder geänderte Termine erscheinen nicht sofort, sondern nach kurzer Zeit.

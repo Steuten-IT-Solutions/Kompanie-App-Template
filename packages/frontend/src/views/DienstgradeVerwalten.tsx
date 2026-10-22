@@ -80,7 +80,7 @@ function BadgePreview({ rank: r }: { rank: Rank }) {
  * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad.
  */
 export function RankList({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.ranks(true), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.ranks(true), [], 'ranks-all');
   const [title, setTitle] = useState('');
   const [min, setMin] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
@@ -359,7 +359,7 @@ function RankForm({
 
 /** Verwaltung → Beförderungen (nur mit Punkten): erreichte Schwellen oben, dann nach fehlenden Punkten. */
 export function Promotions() {
-  const { data, error, loading, reload } = useAsync(api.promotions, []);
+  const { data, error, loading, reload } = useAsync(api.promotions, [], 'promotions');
   const [below, setBelow] = useState(false);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -446,7 +446,7 @@ export function MemberRank({
   focus?: boolean;
 }) {
   // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
-  const ranks = useAsync(() => api.ranks(true), []);
+  const ranks = useAsync(() => api.ranks(true), [], 'ranks-all');
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);

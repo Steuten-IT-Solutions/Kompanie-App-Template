@@ -1,46 +1,73 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   api,
   can,
   config,
   levelLabel,
   personFactor,
+  roleInfo,
   roleLabels,
   type CatalogItem,
   type CreatedUser,
   type Level,
+  type FormerMember,
+  type MemberDetail,
   type MemberSummary,
+  type Penalty,
+  type PointEntry,
 } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
-import { navigate } from '../router';
-import { AdminBack, AdminMenu, adminTabs, MenuNav } from '../adminNav';
-import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
+import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
+import { navigate, redirect as redirectTo } from '../router';
+import { neighbors, useSwipeDrag } from '../swipe';
+import { AdminBack, AdminMenu, adminTabs } from '../adminNav';
+import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, Sheet, StatCard, trimName, useAsync } from '../ui';
+import { cacheKey, dataCache, prefetch } from '../dataCache';
 import Anwesenheit from './Anwesenheit';
-import { RankLabel } from '../RankBadge';
+import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
-import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
+import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
+import { OfficeAdmin } from './AemterVerwalten';
+import { ListAdmin } from './ListenVerwalten';
+import { PersonOffices } from './Aemter';
 import {
-  DEFAULT_MEMBER_SORT,
+  browseOrder,
   defaultDir,
   dirLabel,
   listName,
   loadMemberOrder,
   MEMBER_SORT_LABELS,
+  orderFor,
   saveMemberOrder,
+  setBrowseOrder,
   sortMembers,
   type MemberOrder,
+  type BrowseList,
   type MemberSort,
 } from '../memberSort';
-import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, formatBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { joinText, MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
-import { MemberAvatar, MemberPhotoPanel, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
+import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
+import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, REASON_OPTIONS } from './Ehemalige';
+import { MemberImport } from './MitgliederImport';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
+type Sub =
+  | 'mitglieder'
+  | 'ehemalige'
+  | 'punkte'
+  | 'strafe'
+  | 'katalog'
+  | 'dienstgrade'
+  | 'befoerderungen'
+  | 'titel'
+  | 'aemter'
+  | 'anwesenheit'
+  | 'listen';
 
 const sec = brand.labels.sections;
 
@@ -50,7 +77,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'import' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -62,19 +89,29 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   const active: Sub | null = subs.some((t) => t.id === sub) ? (sub as Sub) : !sub && only && !only.route ? (only.id as Sub) : null;
   const redirect = !sub && only?.route ? only.route : null;
   useEffect(() => {
-    if (redirect) navigate(redirect);
+    if (redirect) redirectTo(redirect);
   }, [redirect]);
   if (redirect) return null;
+  // „‹ Verwaltung“ auf der ersten Seite eines Bereichs; Unterseiten (Mitglied, Liste, Amt …) haben ihren eigenen Rückweg.
+  const showBack = !!active && (!arg || ((active === 'punkte' || active === 'strafe') && fromList === null));
 
   return (
     <div>
-      {active && !(active === 'anwesenheit' && arg) && fromList === null && <AdminBack />}
+      {showBack && <AdminBack />}
       {sub === 'mitglied' && arg ? (
-        <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} />
+        <MemberDetailView base="mitglied" id={Number(arg)} page={path[2]} onToast={onToast} />
+      ) : active === 'ehemalige' && arg && /^\d+$/.test(arg) ? (
+        <MemberDetailView base="ehemalige" id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
+      ) : sub === 'import' && can('create_users') ? (
+        <ImportPage />
+      ) : active === 'ehemalige' && arg === 'import' ? (
+        <FormerImport onToast={onToast} />
+      ) : active === 'ehemalige' ? (
+        <FormerList />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -89,8 +126,12 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Promotions />
       ) : active === 'titel' ? (
         <TitleList onToast={onToast} />
+      ) : active === 'aemter' ? (
+        <OfficeAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
+      ) : active === 'listen' ? (
+        <ListAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'mitglieder' ? (
         <Members />
       ) : (
@@ -102,16 +143,44 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 
 /* ------------------------------------------------------------------ */
 
+/** Verwaltung → Mitglied anlegen → Aus Datei importieren (auch Anwärter und Ehemalige). */
+function ImportPage() {
+  return (
+    <div>
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
+        ‹ Einzeln anlegen
+      </button>
+      <h2 className="member-name">Mitglieder importieren</h2>
+      <MemberImport onDone={() => navigate('verwaltung/mitglieder')} />
+    </div>
+  );
+}
+
 /** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
 type MembersState = {
   query: string;
   role: Level;
   title: number | null;
   showGuests: boolean;
-  showCandidates: boolean;
+  filtersOpen: boolean;
   scrollY: number;
 };
 let savedMembers: MembersState | null = null;
+
+/**
+ * Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt
+ * (create_users); nach Austritt nur bei den Ehemaligen.
+ */
+const memberSorts = (): MemberSort[] =>
+  (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
+    (s) => s !== 'left' && (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+  );
+
+/** Rolle als Titel in der Liste, solange die Person noch als Mitglied aufzunehmen ist (Häkchen an der Rolle, z. B. Anwärter). */
+const admitRole = (level: Level) => {
+  const r = roleInfo(level);
+  return r?.promotable ? r.label : undefined;
+};
 
 function Members() {
   const canPromote = can('promote_users');
@@ -122,28 +191,27 @@ function Members() {
     return s;
   });
   const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
-  // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
-  const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
-  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste und Anwärter lassen sich auch ohne Häkchen wählen.
+  // Filter und Sortierung zunächst eingeklappt; beim Zurückkommen wie verlassen.
+  const [filtersOpen, setFiltersOpen] = useState(restore?.filtersOpen ?? false);
+  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
   const [role, setRole] = useState<Level>(restore?.role ?? '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
-  const loadCandidates = showCandidates || role === 'candidate';
-  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, loadCandidates), [loadGuests, loadCandidates], 'members');
+  // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
+  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
   // Filter nach Titel (nur, wer Titel sieht)
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
-  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
-  const order: MemberOrder = sortOptions.includes(stored.sort)
-    ? stored
-    : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const sortOptions = memberSorts();
+  const order = orderFor(stored, sortOptions);
   const changeOrder = (next: MemberOrder) => {
     setStored(next);
     saveMemberOrder(next);
   };
   // Gemerkter Titel, den niemand mehr trägt: nicht still weiterfiltern.
   const activeTitle = title !== null && (data ?? []).some((m) => (m.titles ?? []).some((t) => t.id === title)) ? title : null;
+  // Hinweis am eingeklappten Bereich, damit ein gesetzter Filter nicht übersehen wird (die Sortierung zählt nicht).
+  const filtersActive = role !== '' || activeTitle !== null || showGuests;
   const list = useMemo(
     () =>
       sortMembers(
@@ -158,11 +226,17 @@ function Members() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, query, role, activeTitle, order.sort, order.dir],
   );
-  // Rollen, die in der Liste vorkommen, dazu immer Anwärter und (wer Rollen vergibt) Gäste
+  // Rollen, die in der Liste vorkommen, dazu (wer Rollen vergibt) Gäste
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
-  present.add('candidate');
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+  // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter.
+  // In umgekehrter Reihenfolge der Rollen (Einstellungen → Rollen, von unten nach oben).
+  const groupCounts = useMemo(() => {
+    const n = new Map<Level, number>();
+    for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
+    return countLabels(config?.roles ?? [], n);
+  }, [data]);
   // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
   const withPhotos = (data ?? []).some((m) => m.photo_url);
   // Titel, die in der Liste vorkommen, alphabetisch
@@ -179,7 +253,11 @@ function Members() {
   }, [data]);
 
   function open(id: number) {
-    savedMembers = { query, role, title, showGuests, showCandidates, scrollY: window.scrollY };
+    savedMembers = { query, role, title, showGuests, filtersOpen, scrollY: window.scrollY };
+    setBrowseOrder(
+      'mitglied',
+      list.map((m) => m.id),
+    );
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -188,10 +266,17 @@ function Members() {
 
   return (
     <div>
+      {groupCounts.length > 0 && (
+        <p className="member-counts small muted" role="status">
+          {groupCounts.join(' · ')}
+        </p>
+      )}
       {can('create_users') && (
-        <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
-          + Mitglied anlegen
-        </button>
+        <div className="button-row add-member">
+          <button className="btn" onClick={() => navigate('verwaltung/neu')}>
+            + Mitglied anlegen
+          </button>
+        </div>
       )}
       <input
         className="search"
@@ -201,99 +286,107 @@ function Members() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Mitglied suchen"
       />
-      {roleOptions.length > 1 && (
-        <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
-          <option value="">Alle Rollen</option>
-          {roleOptions.map((r) => (
-            <option key={r.key} value={r.key}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      )}
-      {titleOptions.length > 0 && (
-        <select
-          className="role-filter"
-          value={activeTitle ?? ''}
-          onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
-          aria-label={`Nach ${sec.titles} filtern`}
-        >
-          <option value="">Alle {sec.titles}</option>
-          {titleOptions.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="field-row member-sort">
-        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
-        <div className="field">
-          <span id="member-sort-label">Sortierung</span>
-          <select
-            aria-labelledby="member-sort-label"
-            value={order.sort}
-            // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
-            onChange={(e) => {
-              const sort = e.target.value as MemberSort;
-              changeOrder({ sort, dir: defaultDir(sort) });
-            }}
-          >
-            {sortOptions.map((s) => (
-              <option key={s} value={s}>
-                {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+      <button
+        type="button"
+        className="member-filters-toggle"
+        aria-expanded={filtersOpen}
+        aria-controls="member-filters"
+        onClick={() => setFiltersOpen(!filtersOpen)}
+      >
+        Filter und Sortierung
+        {filtersActive && <span className="badge badge-role">aktiv</span>}
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      <div id="member-filters" className="member-filters" hidden={!filtersOpen}>
+        {roleOptions.length > 1 && (
+          <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
+            <option value="">Alle Rollen</option>
+            {roleOptions.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
               </option>
             ))}
           </select>
-        </div>
-        <div className="field member-sort-dir">
-          <span id="member-sort-dir-label">Reihenfolge</span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-labelledby="member-sort-dir-label member-sort-dir-value"
-            title="Reihenfolge umkehren"
-            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+        )}
+        {titleOptions.length > 0 && (
+          <select
+            className="role-filter"
+            value={activeTitle ?? ''}
+            onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
+            aria-label={`Nach ${sec.titles} filtern`}
           >
-            <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
-          </button>
+            <option value="">Alle {sec.titles}</option>
+            {titleOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="field-row member-sort">
+          {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+          <div className="field">
+            <span id="member-sort-label">Sortierung</span>
+            <select
+              aria-labelledby="member-sort-label"
+              value={order.sort}
+              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Eintritt früheste, Punkte die meisten zuerst).
+              onChange={(e) => {
+                const sort = e.target.value as MemberSort;
+                changeOrder({ sort, dir: defaultDir(sort) });
+              }}
+            >
+              {sortOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field member-sort-dir">
+            <span id="member-sort-dir-label">Reihenfolge</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-labelledby="member-sort-dir-label member-sort-dir-value"
+              title="Reihenfolge umkehren"
+              onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+            >
+              <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+            </button>
+          </div>
         </div>
+        {canPromote && (
+          <label className="toggle">
+            <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
+            Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
+          </label>
+        )}
       </div>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showCandidates || showGuests}
-          disabled={showGuests}
-          onChange={(e) => setShowCandidates(e.target.checked)}
-        />
-        Auch {levelLabel('candidate')} anzeigen
-      </label>
-      {canPromote && (
-        <label className="toggle">
-          <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
-          Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
-        </label>
-      )}
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
-            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} />}
+          <li key={m.id} className="card row clickable member-row" onClick={() => open(m.id)}>
+            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">
-                {listName(m, order.sort)} <TitleBadges titles={m.titles} />
+                {listName(m, order.sort)} <TitleBadges titles={m.titles} role={admitRole(m.level)} />
               </div>
               <div className="row-sub">
-                {m.rank_title !== undefined && (
-                  <>
-                    {m.rank_title ? <RankLabel url={m.rank_badge_url} title={m.rank_title} /> : `Kein ${brand.labels.rank}`}
-                    {canPoints() ? ' · ' : ''}
-                  </>
-                )}
-                {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
-                {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
+                {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
+                {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
+                {order.sort === 'joined' && m.joined_on && (m.open_cents ?? 0) > 0 && ' · '}
+                {order.sort === 'points' && canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
+                {order.sort === 'points' && canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
+            {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. Ohne Dienstgrad bleibt die
+                Spalte leer, damit der Text in allen Zeilen gleich mittig steht. */}
+            {m.rank_title !== undefined && (
+              <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
+            )}
             <span className="chevron" aria-hidden="true">
               ›
             </span>
@@ -308,12 +401,213 @@ function Members() {
 /* ------------------------------------------------------------------ */
 
 /**
- * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
- * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht.
+ * Reihenfolge zum Blättern auf der Seite einer Person: die der Liste, aus der sie geöffnet wurde. Sonst (Link, Neustart
+ * der App, aus einem anderen Bereich) die ganze Liste ohne Suche und Filter in der gemerkten Sortierung, wie sie beim
+ * Öffnen der Liste erscheint.
  */
-function MemberDetailView({ id, page, onToast }: { id: number; page?: string; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.member(id), [id]);
+function useBrowseOrder(list: BrowseList, id: number): number[] {
+  const stored = browseOrder(list, id);
+  const former = list === 'ehemalige';
+  // Nur laden, wenn nötig; Schlüssel wie bei den Listen, daher meist ohne Wartezeit aus dem Speicher.
+  const { data } = useAsync<Array<MemberSummary | FormerMember> | null>(
+    () => (stored ? Promise.resolve(null) : former ? api.formerMembers() : api.members(false, true)),
+    former ? [] : [false],
+    former ? 'former-members' : 'members',
+  );
+  return useMemo(
+    () => stored ?? sortMembers(data ?? [], orderFor(loadMemberOrder(), former ? FORMER_SORTS : memberSorts())).map((m) => m.id),
+    [stored, data, former],
+  );
+}
+
+/** Dienstgrad dieser Person lässt sich ändern (Abzeichen antippen). */
+function rankEditable(m: MemberDetail): boolean {
+  return !!m.rank && (m.member || !!m.rank.rank);
+}
+
+/** Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. */
+function roleLine(m: MemberDetail): string {
+  const role = m.former
+    ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)})`
+    : (m.extra_roles ?? []).length > 0
+      ? `Rollen: ${roleLabels(m)}`
+      : `Rolle: ${levelLabel(m.level)}`;
+  return role + (hasOverrides(m.rights) ? ' · mit Ausnahmen bei den Rechten' : '');
+}
+
+/**
+ * Nachbar beim Wischen: oberer Teil seiner Seite (Navigation, Name, Abzeichen, Foto, Rolle, Kacheln) aus den
+ * vorgeladenen Daten, so wie er gleich erscheint. Nur zum Ansehen: inert und aria-hidden, und eigene Klasse für den
+ * Namen, damit ihn niemand mit der echten Seite verwechselt. Sind die Daten noch nicht da, Platzhalter wie im Gerüst.
+ */
+function MemberPeek({ id, side, position, total }: { id: number; side: 'prev' | 'next'; position: number; total: number }) {
+  const key = cacheKey('member', [id]);
+  const m = dataCache.has(key) ? dataCache.get<MemberDetail>(key) : null;
+  const rankOn = !!m && rankEditable(m);
+  const avatar = !!m && (!!m.photo_url || !!m.photo_editable);
+  const none = () => {};
+  return (
+    <div className={`member-peek member-peek-${side}`} aria-hidden="true" ref={(el) => el?.setAttribute('inert', '')}>
+      <div className="member-nav">
+        <button type="button" className="btn btn-link back">
+          {m?.former ? '‹ Ehemalige' : '‹ Alle Mitglieder'}
+        </button>
+        <span className="member-step">
+          <button type="button" className="btn btn-link" disabled={position === 1}>
+            ‹
+          </button>
+          <span className="muted small">
+            {position} / {total}
+          </span>
+          <button type="button" className="btn btn-link" disabled={position === total}>
+            ›
+          </button>
+        </span>
+      </div>
+      {m ? (
+        <>
+          <h2 className={`member-peek-name member-name-centered${m.rank_title || rankOn || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
+          {(m.rank_title || rankOn || avatar) && (
+            <div className="member-rank-line">
+              {(m.rank_title || rankOn) && (
+                <span className={`member-rank-badge${rankOn ? ' member-rank-open' : ''}`}>
+                  {m.rank_title ? (
+                    <>
+                      <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
+                      <span>{m.rank_title}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="rank-badge-none">+</span>
+                      <span>Kein {brand.labels.rank}</span>
+                    </>
+                  )}
+                </span>
+              )}
+              {avatar && (
+                <span className="member-photo-open">
+                  <MemberAvatar url={m.photo_url} name={m.name} size="large" />
+                </span>
+              )}
+            </div>
+          )}
+          <p className="muted small member-level">{roleLine(m)}</p>
+          {(canPoints() || canPenalties()) && (
+            <div className="stats member-stats">
+              {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
+              {canPenalties() && (
+                <StatCard
+                  label="Offen"
+                  value={formatEuro(m.open_cents ?? 0)}
+                  tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'}
+                  onClick={none}
+                />
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <h2 className="member-peek-name member-name-centered">
+          <span className="skeleton-text" style={{ width: '12ch' }} />
+        </h2>
+      )}
+    </div>
+  );
+}
+
+/** Fenster auf der Seite eines Mitglieds; stehen in der Adresse (verwaltung/mitglied/<id>/<fenster>), damit „Zurück“ sie schließt. */
+type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'geburtstag' | 'eintritt' | 'austritt';
+const MEMBER_SHEETS: MemberSheet[] = ['punkte', 'strafen', 'dienstgrad', 'titel', 'geburtstag', 'eintritt', 'austritt'];
+/** Fenster in der App geöffnet (eigener Verlaufseintrag): Schließen geht dann zurück, sonst (Link) ersetzt es die Adresse. */
+let sheetOpenedHere = false;
+
+/**
+ * Mitglied in der Verwaltung, alles auf einer Seite: Name, Dienstgradabzeichen und Foto, Rolle, Kacheln für Punkte,
+ * Offen und Titel, Ämter, Geburtstag, Eintritt und Austritt, ganz unten „Konto und Rolle“ zum Aufklappen. Bearbeitet
+ * wird durch Antippen: Es öffnet sich ein Fenster (verwaltung/mitglied/<id>/<fenster>; ältere Links auf die früheren
+ * Unterseiten öffnen so das passende Fenster). Ehemalige haben dieselbe Seite unter verwaltung/ehemalige/<id>; steht
+ * eine Person unter der falschen Adresse (alter Link, gerade als ehemalig eingetragen oder wieder aufgenommen), leitet
+ * die Seite um.
+ */
+function MemberDetailView({
+  base,
+  id,
+  page,
+  onToast,
+}: {
+  base: 'mitglied' | 'ehemalige';
+  id: number;
+  page?: string;
+  onToast: (msg: string) => void;
+}) {
+  const { data, error, loading, reload } = useAsync(() => api.member(id), [id], 'member');
   const [busy, setBusy] = useState(false);
+  // Erst nach dem Laden entscheiden: Daten aus dem Speicher könnten veraltet sein.
+  const target = !loading && data?.id === id ? (data.former ? 'ehemalige' : 'mitglied') : base;
+  useEffect(() => {
+    if (target !== base) redirectTo(`verwaltung/${target}/${id}${page ? `/${page}` : ''}`);
+  }, [target, base, id, page]);
+  // Wischen blättert durch die Liste, aus der das Mitglied geöffnet wurde. Ohne Verlaufseintrag, damit „Zurück“ nicht
+  // durch jedes Mitglied führt.
+  const order = useBrowseOrder(base, id);
+  const { prev, next, index } = neighbors(order, id);
+  const show = (other: number | null) => other !== null && redirectTo(`verwaltung/${base}/${other}`);
+  // Karussell: Die Karte folgt dem Finger, daneben stehen die Nachbarn; beim Loslassen gleitet sie hinüber.
+  const track = useRef<HTMLDivElement>(null);
+  const swipe = useSwipeDrag(track, {
+    canPrev: prev !== null,
+    canNext: next !== null,
+    onCommit: (step) => show(step === 1 ? next : prev),
+  });
+  // Nachbarn vorladen (Daten, Foto, Abzeichen): Nach dem Wechsel steht ihre Seite sofort, ohne Gerüst. Erneut nach jedem
+  // Laden, denn eigene Änderungen leeren den Speicher.
+  const [, setPrefetched] = useState(0);
+  useEffect(() => {
+    if (!data) return;
+    let alive = true;
+    for (const n of [prev, next]) {
+      if (n === null) continue;
+      void prefetch('member', [n], () => api.member(n)).then(() => {
+        const key = cacheKey('member', [n]);
+        if (!alive || !dataCache.has(key)) return;
+        const other = dataCache.get<MemberDetail>(key);
+        preloadAvatar(other.photo_url);
+        preloadBadge(other.rank_badge_url);
+        setPrefetched((t) => t + 1);
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [data, prev, next]);
+  const here = `verwaltung/${base}/${id}`;
+  const sheet = MEMBER_SHEETS.find((s) => s === page) ?? null;
+  // Fenster zu (auch mit der Zurück-Taste des Browsers): Ein später über einen Link geöffnetes ist nicht von hier.
+  useEffect(() => {
+    if (!sheet) sheetOpenedHere = false;
+  }, [sheet]);
+  // Aus „Beförderungen“ (Link, nicht hier geöffnet): im Dienstgrad-Fenster den nächsten Dienstgrad vorschlagen.
+  const rankFocus = sheet === 'dienstgrad' && !sheetOpenedHere;
+  const openSheet = (s: MemberSheet) => {
+    sheetOpenedHere = true;
+    navigate(`${here}/${s}`);
+  };
+  const closeSheet = useCallback(() => {
+    if (sheetOpenedHere) {
+      sheetOpenedHere = false;
+      window.history.back();
+    } else {
+      redirectTo(here);
+    }
+  }, [here]);
+  // Konto und Rolle aufgeklappt, wenn ein älterer Link auf die Unterseite zeigt.
+  const accountRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (page === 'konto' && accountRef.current) {
+      accountRef.current.open = true;
+      accountRef.current.scrollIntoView({ block: 'start' });
+    }
+  }, [page, data !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -330,76 +624,172 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (target !== base) return null;
   const m = data!;
 
-  const pages = [
-    { id: 'uebersicht', label: 'Übersicht', on: true },
-    { id: 'konto', label: 'Konto und Rolle', on: true },
-    { id: 'punkte', label: sec.points, on: canPoints() },
-    { id: 'strafen', label: sec.penalties, on: canPenalties() },
-    { id: 'dienstgrad', label: brand.labels.rank, on: !!m.rank && (m.member || !!m.rank.rank) },
-    { id: 'titel', label: sec.titles, on: !!m.titles && (m.member || m.titles.length > 0) },
-    {
-      id: 'geburtstag',
-      label: 'Geburtstag',
-      on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
-    },
-  ].filter((p) => p.on);
-  const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
+  const self = m.id === config?.user?.id;
+  const rankOn = rankEditable(m);
+  const titlesOn = !!m.titles && (m.member || m.titles.length > 0);
+  // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
+  const officesOn = !!config?.features.offices && (!!config.features.directory || can('manage_offices'));
+  const birthdayOn = m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays());
+  // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt bei den Angaben zum Ausscheiden, Gäste keinen.
+  const joinOn = m.join_year !== undefined && !m.former && m.level !== 'guest';
+  // Als ehemalig eintragen bzw. die Angaben ändern; m.former fehlt bei älteren Servern (dann nicht).
+  const formerEditable = can('create_users') && !self && m.former !== undefined && (m.former !== null || m.level !== 'guest');
+  const avatar = !!m.photo_url || !!m.photo_editable;
+  const rankBadge = m.rank_title ? (
+    <>
+      <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
+      <span>{m.rank_title}</span>
+    </>
+  ) : (
+    <>
+      <span className="rank-badge-none" aria-hidden="true">
+        +
+      </span>
+      <span>Kein {brand.labels.rank}</span>
+    </>
+  );
+  const formerPanel = (editing: boolean) => (
+    <FormerPanel
+      id={m.id}
+      name={m.name}
+      former={m.former ?? null}
+      joinedOn={m.join_year ? (m.join_year.date ?? String(m.join_year.year)) : null}
+      openCents={m.open_cents}
+      editing={editing}
+      onChanged={reload}
+      onCancel={editing ? closeSheet : undefined}
+      onToast={onToast}
+    />
+  );
 
   return (
-    <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-        ‹ Alle Mitglieder
-      </button>
-      <h2 className="member-name">{m.name}</h2>
-      <MenuNav
-        label="Mitglied"
-        className="member-menu"
-        active={active}
-        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/mitglied/${m.id}/${p.id}`) }))}
-      />
-
-      {active === 'uebersicht' && (
-        <>
-          <MemberPhotoPanel
-            id={m.id}
-            name={m.name}
-            url={m.photo_url ?? null}
-            editable={!!m.photo_editable}
-            onChanged={reload}
-            onToast={onToast}
-          />
-          <p className="muted small member-level">
-            {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
-            {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
-          </p>
-          <div className="stats">
-            {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
-            {canPenalties() && (
-              <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
+    <div className="member-detail" {...swipe.handlers}>
+      <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
+        {swipe.peeking && prev !== null && <MemberPeek id={prev} side="prev" position={index} total={order.length} />}
+        {swipe.peeking && next !== null && <MemberPeek id={next} side="next" position={index + 2} total={order.length} />}
+        <div className="member-nav">
+          {m.former ? (
+            <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+              ‹ Ehemalige
+            </button>
+          ) : (
+            <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+              ‹ Alle Mitglieder
+            </button>
+          )}
+          {index >= 0 && order.length > 1 && (
+            <span className="member-step">
+              <button className="btn btn-link" disabled={prev === null} onClick={() => swipe.slide(-1)} aria-label="Vorheriges Mitglied">
+                ‹
+              </button>
+              <span className="muted small">
+                {index + 1} / {order.length}
+              </span>
+              <button className="btn btn-link" disabled={next === null} onClick={() => swipe.slide(1)} aria-label="Nächstes Mitglied">
+                ›
+              </button>
+            </span>
+          )}
+        </div>
+        <h2 className={`member-name member-name-centered${m.rank_title || rankOn || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
+        {(m.rank_title || rankOn || avatar) && (
+          <div className="member-rank-line">
+            {/* Abzeichen mit dem Dienstgrad darunter (Antippen: befördern oder degradieren), rechts daneben das Foto
+              (Antippen: vergrößern, ersetzen oder entfernen) */}
+            {rankOn ? (
+              <button type="button" className="member-rank-badge member-rank-open" onClick={() => openSheet('dienstgrad')}>
+                {rankBadge}
+              </button>
+            ) : (
+              m.rank_title && <span className="member-rank-badge">{rankBadge}</span>
+            )}
+            {avatar && (
+              <ZoomableAvatar
+                url={m.photo_url}
+                name={m.name}
+                edit={m.photo_editable ? { id: m.id, onChanged: reload, onToast } : undefined}
+              />
             )}
           </div>
-          {m.member && (
-            <div className="button-row">
-              {canPoints() && (
-                <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
-                  {sec.points} vergeben
-                </button>
-              )}
-              {canPenalties() && (
-                <button className="btn btn-warn" onClick={() => navigate(`verwaltung/strafe/${m.id}`)}>
-                  {sec.penalties}: Eintrag
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      )}
+        )}
+        <p className="muted small member-level">{roleLine(m)}</p>
 
-      {active === 'konto' && (
-        <>
-          <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+        {(canPoints() || canPenalties()) && (
+          <div className="stats member-stats">
+            {canPoints() && (
+              <StatCard
+                label={sec.points}
+                value={(m.points ?? 0).toLocaleString('de-DE')}
+                tone="good"
+                onClick={() => openSheet('punkte')}
+              />
+            )}
+            {canPenalties() && (
+              <StatCard
+                label="Offen"
+                value={formatEuro(m.open_cents ?? 0)}
+                tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'}
+                onClick={() => openSheet('strafen')}
+              />
+            )}
+          </div>
+        )}
+
+        {titlesOn && (
+          <button type="button" className="card member-tile member-titles-tile" onClick={() => openSheet('titel')}>
+            <span className="member-tile-label">{sec.titles}</span>
+            <span className="member-tile-value">
+              {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">Keine</span>}
+            </span>
+            <span className="chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+        )}
+
+        {(birthdayOn || joinOn || !!m.former || formerEditable) && (
+          <ul className="card member-dates">
+            {birthdayOn && (
+              <DateRow label="Geburtstag" onOpen={() => openSheet('geburtstag')}>
+                {m.birthday ? formatBirthday(m.birthday) : null}
+              </DateRow>
+            )}
+            {joinOn && (
+              <DateRow label="Eintritt" onOpen={() => openSheet('eintritt')}>
+                {m.join_year ? joinText(m.join_year) : null}
+              </DateRow>
+            )}
+            {m.former && (
+              <DateRow label="Eintritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
+                {[m.former.founder && 'Gründungsmitglied', m.former.joined_on && formatYearOrDate(m.former.joined_on)]
+                  .filter(Boolean)
+                  .join(' · ') || null}
+              </DateRow>
+            )}
+            {(m.former || formerEditable) && (
+              <DateRow label="Austritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
+                {m.former ? `${REASON_OPTIONS[m.former.reason]}${m.former.left_on ? ` ${formatYearOrDate(m.former.left_on)}` : ''}` : null}
+              </DateRow>
+            )}
+          </ul>
+        )}
+
+        {officesOn && (
+          <section className="member-offices">
+            <h3 className="section-title">{sec.offices}</h3>
+            <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />
+          </section>
+        )}
+
+        <details className="member-account" ref={accountRef}>
+          <summary>Konto und Rolle</summary>
+          {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
+          {!m.former && (
+            <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          )}
           {m.rights && (
             <MemberRightsPanel
               key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
@@ -412,7 +802,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               onToast={onToast}
             />
           )}
-          {m.level === 'candidate' && can('create_users') && (
+          {roleInfo(m.level)?.promotable && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"
               disabled={busy}
@@ -424,118 +814,183 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               Als {levelLabel('member')} aufnehmen
             </button>
           )}
-          <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
-          {can('create_users') && m.id !== config?.user?.id && (
-            <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+          {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+          {/* Gäste gehören nicht zur Kompanie. */}
+          {formerEditable && formerPanel(false)}
+          {can('create_users') && !self && (
+            <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
           )}
-        </>
-      )}
+        </details>
 
-      {active === 'punkte' && (
-        <>
-          {canPoints() && <h3 className="section-title">{sec.points}</h3>}
-          {!canPoints() ? null : m.point_list.length === 0 ? (
-            <Empty>Keine Einträge.</Empty>
-          ) : (
-            <ul className="card-list">
-              {m.point_list.map((p) => (
-                <li key={p.id} className="card row">
-                  <div className="row-main">
-                    <div className="row-title">{p.reason}</div>
-                    <div className="row-sub">
-                      {formatDate(p.date)}
-                      {p.created_by_name && ` · von ${p.created_by_name}`}
-                    </div>
-                    <div className="row-actions">
-                      <button
-                        className="btn btn-small btn-danger"
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
-                          run(() => api.deletePoints(p.id), 'Storniert')
-                        }
-                      >
-                        Stornieren
-                      </button>
-                    </div>
-                  </div>
-                  <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+        {sheet === 'punkte' && canPoints() && (
+          <Sheet title={sec.points} onClose={closeSheet}>
+            {m.member && <GivePoints preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
+            <h3 className="section-title">Einträge</h3>
+            <PointEntries entries={m.point_list} busy={busy} run={run} />
+          </Sheet>
+        )}
 
-      {active === 'strafen' && (
-        <>
-          {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
-          {!canPenalties() ? null : m.penalties.length === 0 ? (
-            <Empty>Keine Einträge.</Empty>
-          ) : (
-            <ul className="card-list">
-              {m.penalties.map((p) => (
-                <PenaltyRow
-                  key={p.id}
-                  p={p}
-                  actions={
-                    <>
-                      {p.status === 'open' ? (
-                        <button
-                          className="btn btn-small"
-                          disabled={busy}
-                          onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
-                        >
-                          Bezahlt
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-small btn-secondary"
-                          disabled={busy}
-                          onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
-                        >
-                          Doch offen
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-small btn-danger"
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
-                          run(() => api.deletePenalty(p.id), 'Storniert')
-                        }
-                      >
-                        Stornieren
-                      </button>
-                    </>
-                  }
-                />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+        {sheet === 'strafen' && canPenalties() && (
+          <Sheet title={sec.penalties} onClose={closeSheet}>
+            {m.member && <GivePenalty preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
+            <h3 className="section-title">Einträge</h3>
+            <PenaltyEntries entries={m.penalties} busy={busy} run={run} />
+          </Sheet>
+        )}
 
-      {active === 'titel' && m.titles && (
-        <MemberTitles key={m.id} id={m.id} member={m.member} titles={m.titles} onChanged={reload} onToast={onToast} />
-      )}
+        {sheet === 'dienstgrad' && rankOn && m.rank && (
+          <Sheet title={brand.labels.rank} onClose={closeSheet}>
+            <MemberRank
+              id={m.id}
+              member={m.member}
+              status={m.rank}
+              history={m.rank_history ?? []}
+              onChanged={reload}
+              onToast={onToast}
+              focus={rankFocus}
+            />
+          </Sheet>
+        )}
 
-      {active === 'dienstgrad' && m.rank && (
-        <MemberRank
-          id={m.id}
-          member={m.member}
-          status={m.rank}
-          history={m.rank_history ?? []}
-          onChanged={reload}
-          onToast={onToast}
-          focus={page === 'dienstgrad'}
-        />
-      )}
+        {sheet === 'titel' && titlesOn && m.titles && (
+          <Sheet title={sec.titles} onClose={closeSheet}>
+            <MemberTitles
+              key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
+              id={m.id}
+              member={m.member}
+              titles={m.titles}
+              onChanged={reload}
+              onToast={onToast}
+            />
+          </Sheet>
+        )}
 
-      {active === 'geburtstag' && m.birthday !== undefined && (
-        <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
-      )}
+        {sheet === 'geburtstag' && birthdayOn && m.birthday !== undefined && (
+          <Sheet title="Geburtstag" onClose={closeSheet}>
+            <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
+          </Sheet>
+        )}
+
+        {sheet === 'eintritt' && joinOn && m.join_year !== undefined && (
+          <Sheet title="Eintritt" onClose={closeSheet}>
+            <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
+          </Sheet>
+        )}
+
+        {sheet === 'austritt' && formerEditable && (
+          <Sheet title="Austritt" onClose={closeSheet}>
+            {formerPanel(true)}
+          </Sheet>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** Zeile mit einem Datum der Person; mit onOpen antippbar (öffnet das Fenster zum Ändern). */
+function DateRow({ label, onOpen, children }: { label: string; onOpen?: () => void; children: ReactNode }) {
+  const content = (
+    <>
+      <span className="member-date-label">{label}</span>
+      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? 'Nicht eingetragen'}</span>
+      {onOpen && (
+        <span className="chevron" aria-hidden="true">
+          ›
+        </span>
+      )}
+    </>
+  );
+  return (
+    <li>
+      {onOpen ? (
+        <button type="button" className="member-date" onClick={onOpen}>
+          {content}
+        </button>
+      ) : (
+        <div className="member-date">{content}</div>
+      )}
+    </li>
+  );
+}
+
+type Run = (action: () => Promise<unknown>, msg: string) => Promise<void>;
+
+/** Punkte einer Person mit „Stornieren“. */
+function PointEntries({ entries, busy, run }: { entries: PointEntry[]; busy: boolean; run: Run }) {
+  if (entries.length === 0) return <Empty>Keine Einträge.</Empty>;
+  return (
+    <ul className="card-list">
+      {entries.map((p) => (
+        <li key={p.id} className="card row">
+          <div className="row-main">
+            <div className="row-title">{p.reason}</div>
+            <div className="row-sub">
+              {formatDate(p.date)}
+              {p.created_by_name && ` · von ${p.created_by_name}`}
+            </div>
+            <div className="row-actions">
+              <button
+                className="btn btn-small btn-danger"
+                disabled={busy}
+                onClick={() =>
+                  window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
+                  run(() => api.deletePoints(p.id), 'Storniert')
+                }
+              >
+                Stornieren
+              </button>
+            </div>
+          </div>
+          <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Strafen einer Person mit „Bezahlt“ bzw. „Doch offen“ und „Stornieren“. */
+function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: boolean; run: Run }) {
+  if (entries.length === 0) return <Empty>Keine Einträge.</Empty>;
+  return (
+    <ul className="card-list">
+      {entries.map((p) => (
+        <PenaltyRow
+          key={p.id}
+          p={p}
+          actions={
+            <>
+              {p.status === 'open' ? (
+                <button
+                  className="btn btn-small"
+                  disabled={busy}
+                  onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
+                >
+                  Bezahlt
+                </button>
+              ) : (
+                <button
+                  className="btn btn-small btn-secondary"
+                  disabled={busy}
+                  onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
+                >
+                  Doch offen
+                </button>
+              )}
+              <button
+                className="btn btn-small btn-danger"
+                disabled={busy}
+                onClick={() =>
+                  window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
+                  run(() => api.deletePenalty(p.id), 'Storniert')
+                }
+              >
+                Stornieren
+              </button>
+            </>
+          }
+        />
+      ))}
+    </ul>
   );
 }
 
@@ -699,12 +1154,12 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 
 function NewMember() {
   const [name, setName] = useState(emptyName());
-  const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  const [level, setLevel] = useState<Level>('member');
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
   const [rankId, setRankId] = useState('');
-  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), []);
+  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), [], 'new-member-ranks');
   const extras = level === 'member';
   const pointsNum = Number(initialPoints || 0);
   const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
@@ -777,6 +1232,9 @@ function NewMember() {
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
         Mehrere auf einmal anlegen
       </button>
+      <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/import')}>
+        Aus Datei importieren (Excel oder CSV)
+      </button>
       <NameFields value={name} onChange={setName} />
       <label className="field">
         <span>Benutzername (optional)</span>
@@ -793,13 +1251,7 @@ function NewMember() {
         <span>E-Mail (optional)</span>
         <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
-      <label className="field">
-        <span>Rolle</span>
-        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
-          <option value="member">{levelLabel('member')}</option>
-          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
-        </select>
-      </label>
+      <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>
           <label className="field">
@@ -858,12 +1310,12 @@ function NewMember() {
 /* ------------------------------------------------------------------ */
 
 function useMembersAndCatalog() {
-  return useAsync(() => Promise.all([api.members(), api.catalog()]));
+  return useAsync(() => Promise.all([api.members(), api.catalog()]), [], 'members-catalog');
 }
 
 /** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
 function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId]);
+  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId], 'attendance');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
@@ -893,11 +1345,14 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
 function GivePoints({
   preselect,
   attendance,
+  fixed = false,
   onToast,
   onDone,
 }: {
   preselect: number[];
   attendance?: { id: number; title: string; date: string };
+  /** Auf der Seite eines Mitglieds: nur für die vorgewählte Person, ohne Auswahl; danach ist das Formular wieder leer. */
+  fixed?: boolean;
   onToast: (msg: string) => void;
   onDone?: () => void;
 }) {
@@ -955,7 +1410,13 @@ function GivePoints({
       });
       // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
       onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
-      setSelected([]);
+      if (fixed) {
+        setCatalogId('');
+        setPoints('');
+        setReason('');
+      } else {
+        setSelected([]);
+      }
       onDone?.();
     } catch (err) {
       setFormError((err as Error).message);
@@ -991,18 +1452,24 @@ function GivePoints({
         <span>Grund</span>
         <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} required />
       </label>
-      <div className="field">
-        <span>Mitglieder</span>
-        <MemberPicker members={members} selected={selected} onChange={setSelected} note={factorNote} />
-      </div>
+      {!fixed && (
+        <div className="field">
+          <span>Mitglieder</span>
+          <MemberPicker members={members} selected={selected} onChange={setSelected} note={factorNote} />
+        </div>
+      )}
       {withFactor.length > 0 && (
         <label className="toggle">
           <input type="checkbox" checked={applyFactor} onChange={(e) => setApplyFactor(e.target.checked)} />
           <span>
             {sec.points}faktor der Rolle anwenden
             <span className="small muted feature-desc">
-              {withFactor.length === 1 ? 'Ein ausgewähltes Mitglied hat' : `${withFactor.length} ausgewählte Mitglieder haben`} einen
-              anderen Faktor als 1
+              {fixed
+                ? 'Die Rolle hat'
+                : withFactor.length === 1
+                  ? 'Ein ausgewähltes Mitglied hat'
+                  : `${withFactor.length} ausgewählte Mitglieder haben`}{' '}
+              einen anderen Faktor als 1
               {Number(points) && applyFactor
                 ? `, z. B. ×${factorOf(withFactor[0]).toLocaleString('de-DE')} → ${(Number(points) * factorOf(withFactor[0])).toLocaleString('de-DE')} ${sec.points}`
                 : ''}
@@ -1026,18 +1493,26 @@ function GivePoints({
 function GivePenalty({
   preselect,
   attendance,
+  fixed = false,
   onToast,
   onDone,
 }: {
   preselect: number[];
   attendance?: { title: string; date: string };
+  /** Auf der Seite eines Mitglieds: nur für die vorgewählte Person, ohne Auswahl und ohne Summe aller offenen Beträge. */
+  fixed?: boolean;
   onToast: (msg: string) => void;
   onDone?: () => void;
 }) {
-  const { data, error, loading, reload } = useAsync(api.members);
+  const { data, error, loading, reload } = useAsync(
+    () => (fixed ? Promise.resolve([]) : api.members()),
+    [],
+    fixed ? undefined : 'penalty-members',
+  );
   // Summe aller offenen Strafen (Mitglieder und Anwärter, ohne Gast-Konten): gleichzeitig mit der Auswahl geladen und
   // gemerkt, damit die Karte zusammen mit dem Formular erscheint. Beim Eintragen aus einer Anwesenheitsliste nicht.
-  const total = useAsync(() => (attendance ? Promise.resolve(null) : api.members(false, true)), [], 'penalty-total');
+  const noTotal = !!attendance || fixed;
+  const total = useAsync(() => (noTotal ? Promise.resolve(null) : api.members(false, true)), [], noTotal ? undefined : 'penalty-total');
   const [selected, setSelected] = useState<number[]>(preselect);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState(attendance ? `Gefehlt: ${attendance.title}` : '');
@@ -1045,7 +1520,7 @@ function GivePenalty({
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if ((loading && !data) || (total.loading && !total.data && !attendance)) return <Loading />;
+  if ((loading && !data) || (total.loading && !total.data && !noTotal)) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const totalOpen = total.data?.filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
 
@@ -1061,7 +1536,7 @@ function GivePenalty({
     try {
       await api.givePenalty({ user_ids: selected, amount_cents: cents, reason: reason.trim(), date });
       onToast(`${formatEuro(cents)} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} eingetragen`);
-      setSelected([]);
+      if (!fixed) setSelected([]);
       setAmount('');
       setReason('');
       total.reload();
@@ -1075,7 +1550,7 @@ function GivePenalty({
 
   return (
     <form className="form" onSubmit={submit}>
-      {!attendance && totalOpen !== undefined && (
+      {!noTotal && totalOpen !== undefined && (
         <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />
       )}
       <div className="field-row">
@@ -1099,10 +1574,12 @@ function GivePenalty({
           required
         />
       </label>
-      <div className="field">
-        <span>Mitglieder</span>
-        <MemberPicker members={data ?? []} selected={selected} onChange={setSelected} />
-      </div>
+      {!fixed && (
+        <div className="field">
+          <span>Mitglieder</span>
+          <MemberPicker members={data ?? []} selected={selected} onChange={setSelected} />
+        </div>
+      )}
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -1118,7 +1595,7 @@ function GivePenalty({
 /* ------------------------------------------------------------------ */
 
 function Catalog({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.catalog(true));
+  const { data, error, loading, reload } = useAsync(() => api.catalog(true), [], 'catalog-all');
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('');
   const [busy, setBusy] = useState(false);

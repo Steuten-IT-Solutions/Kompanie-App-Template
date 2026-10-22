@@ -10,6 +10,6 @@ Unter **{bereich.news}** stehen die Beiträge der {kompanie.name}, die neuesten 
 Ein Tipp auf einen Beitrag öffnet ihn ganz. **Auf der Webseite öffnen** zeigt ihn im Browser auf der Webseite, von der er stammt; **‹ Alle Neuigkeiten** führt zurück zur Liste. Ältere Beiträge lädst du unten mit **Ältere Beiträge** nach.
 
 ## Bei neuen Beiträgen benachrichtigt werden
-Ohne Konto tippst du unter der Liste auf **Bei neuen Beiträgen benachrichtigen**. Mit Konto stellst du das unter **Konto → Benachrichtigungen einstellen** ein. Mehr dazu: [Benachrichtigungen](seite:benachrichtigungen).
+Ohne Konto tippst du unter der Liste auf **Bei neuen Beiträgen benachrichtigen**. Mit Konto stellst du das unter **Meins → Konto → Benachrichtigungen einstellen** ein. Mehr dazu: [Benachrichtigungen](seite:benachrichtigungen).
 
 > Woher die Beiträge kommen (z. B. aus der Webseite der Kompanie), legt ein {rolle.admin} fest.

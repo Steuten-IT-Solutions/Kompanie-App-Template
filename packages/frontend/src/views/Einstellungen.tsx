@@ -12,6 +12,7 @@ import {
   type NewsSourceType,
 } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Neuerungen from './Neuerungen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import { MaintenanceCard } from '../maintenance';
@@ -31,6 +32,7 @@ const PAGES = [
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
   { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
+  { id: 'neuerungen', title: 'Was ist neu', text: 'Änderungen von Version zu Version.' },
 ] as const;
 
 /**
@@ -58,6 +60,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
+      {page.id === 'neuerungen' && <Neuerungen />}
       {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
@@ -93,15 +96,16 @@ function Overview() {
 
 /** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
 function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
+  const { data, error, loading, reload, setData, revision } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
+  // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
   const props = { settings: s, onSaved: setData, onToast };
-  if (page === 'google') return <GoogleAccess {...props} />;
-  if (page === 'kalender') return <Calendar {...props} />;
-  if (page === 'galerie') return <Gallery {...props} />;
-  return s.news ? <News {...props} /> : null;
+  if (page === 'google') return <GoogleAccess key={revision} {...props} />;
+  if (page === 'kalender') return <Calendar key={revision} {...props} />;
+  if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  return s.news ? <News key={revision} {...props} /> : null;
 }
 
 /**
@@ -109,7 +113,7 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
  * wann am Geburtstag benachrichtigt wird.
  */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
@@ -181,7 +185,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       <p className="small muted">
-        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
+        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).
       </p>
     </section>
   );
@@ -274,6 +278,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
         return list;
       }),
     [],
+    'features',
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -836,9 +841,9 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
     <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
       <p className="small muted">
-        Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein Bild, das für den Speicher des
-        Servers zu groß ist, oder eine beschädigte Datei. Abhilfe: das Bild als JPG in denselben Ordner in Google Drive legen (das alte
-        entfernen); der nächste Abgleich nimmt es neu auf.
+        Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das
+        Vorschaubild von Google. Hier stehen Bilder, bei denen auch das nicht ging, z. B. beschädigte Dateien. Abhilfe: das Bild als JPG in
+        denselben Ordner in Google Drive legen (das alte entfernen); der nächste Abgleich nimmt es neu auf.
       </p>
       {error && (
         <p className="form-error small" role="alert">

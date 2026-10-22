@@ -14,7 +14,7 @@ Oben steht das Formular **Neue Umfrage**:
 - **Wer sieht die Ergebnisse?** **Alle, sobald sie geantwortet haben** (nach dem Ende alle), **Alle nach dem Ende** oder **Nur die Verwalter der Umfragen**. Wer {bereich.polls} verwalten darf, sieht die Ergebnisse immer.
 - **Ende** (optional): Datum und Uhrzeit in der Zukunft. Ohne Ende läuft die Umfrage, bis sie jemand beendet.
 
-Mit **Veröffentlichen** fragt die App noch einmal nach. Dann bekommen alle {rolle.member} (außer dir) eine Benachrichtigung, sofern sie Benachrichtigungen für {bereich.polls} eingeschaltet haben, und die Umfrage steht am {bereich.board}. 24 Stunden vor dem Ende erinnert die App alle, die noch nicht geantwortet haben, einmal; endet die Umfrage schon innerhalb von 24 Stunden nach dem Veröffentlichen, entfällt die Erinnerung. {rolle.candidate} nehmen an Umfragen nicht teil.
+Mit **Veröffentlichen** fragt die App noch einmal nach. Dann bekommen alle {rolle.member} (außer dir) eine Benachrichtigung, sofern sie Benachrichtigungen für {bereich.polls} eingeschaltet haben, und die Umfrage steht am {bereich.board}. 24 Stunden vor dem Ende erinnert die App alle, die noch nicht geantwortet haben, einmal; endet die Umfrage schon innerhalb von 24 Stunden nach dem Veröffentlichen, entfällt die Erinnerung. Rollen ohne Mitgliederbereich (z. B. Anwärter) nehmen an Umfragen nicht teil.
 
 ## Ändern, beenden, löschen
 Darunter stehen unter **Alle {bereich.polls}** alle Umfragen, auch beendete, mit Ergebnissen. Namen stehen nur bei namentlichen Umfragen dabei. Ändern, beenden und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Umfrage angelegt hat.

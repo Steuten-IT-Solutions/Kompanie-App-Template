@@ -10,10 +10,12 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
 const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
+const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
+const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen oder Rollen vergeben. */
-function memberListAllowed(): boolean {
+export function memberListAllowed(): boolean {
   return canPoints() || canPenalties() || canRanks() || canTitles() || canAttendance() || can('create_users') || can('promote_users');
 }
 
@@ -25,13 +27,16 @@ export function adminTabs(): AdminTab[] {
   return (
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
+      { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: `${sec.points}katalog`, on: points },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles() },
+      { id: 'aemter', label: sec.offices, on: canOffices() },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
+      { id: 'listen', label: sec.lists, on: canLists() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
@@ -117,6 +122,13 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M16.5 14.1c2.9.3 5 2.4 5 5.4" />
     </>
   ),
+  ehemalige: (
+    <>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
+      <path d="M18 3.5a3 3 0 0 1 0 4" />
+    </>
+  ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,
   strafe: (
     <>
@@ -138,10 +150,22 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M8 3l2.5 7.5M16 3l-2.5 7.5M8 3h8" />
     </>
   ),
+  aemter: (
+    <>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18" />
+    </>
+  ),
   anwesenheit: (
     <>
       <rect x="5" y="4" width="14" height="17" rx="2" />
       <path d="M9 4V3h6v1M9 13l2 2 4-4" />
+    </>
+  ),
+  listen: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
     </>
   ),
   brett: (

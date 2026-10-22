@@ -126,6 +126,9 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
   und zwar als GitHub App (`KOMPANIE_APP_ID`); diese App unter **Bypass list** des Rulesets eintragen, sonst lehnt
   GitHub den Push ab (die Action meldet es als Warnung, dann `STABLE_CORE` per Pull Request über `develop`). Der
   Commit trägt `[skip ci]`, damit der Push der App keine Workflows startet.
+- Pull Requests nach `main` ohne Abschnitt für die Kern-Version in `CHANGELOG.md` (oder mit Einträgen unter
+  `[Unveröffentlicht]`) macht der Check **Changelog zur Version** rot (gleicher Workflow; ebenso als Pflicht-Check
+  eintragen).
 - Nach einem Release `main` zurück nach `develop` mergen (nimmt den `STABLE_CORE`-Eintrag mit).
 - Der Zeitplan von „Kompanien abgleichen“ läuft auf `main`: Änderungen eines Kompanie-Repos (Logo, Farben) kommen
   mit dem freigegebenen Kern, also direkt als `stable`.
@@ -136,7 +139,16 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
 
 ## Einen Kern veröffentlichen
 
-1. `VERSION` erhöhen (Pull Request nach `develop`). Für das Release Tags setzen:
+Laufend: Jeder Pull Request nach `develop`, der für die Nutzer etwas ändert, trägt das in
+[`CHANGELOG.md`](../CHANGELOG.md) unter `[Unveröffentlicht]` ein (Aufbau und Regeln stehen oben in der Datei).
+Admins sehen das Changelog in der App unter *Einstellungen → Was ist neu*; es wird mit der App gebaut
+(`scripts/changelog.php`). Wie die Doku zählt es nicht zum `coreCode`: Eine reine Änderung am Changelog ergibt
+keine neue Version, sie kommt mit der nächsten.
+
+1. `VERSION` erhöhen und im selben Pull Request nach `develop` in `CHANGELOG.md` aus `[Unveröffentlicht]` den Abschnitt
+   `## [x.y.z] – JJJJ-MM-TT` machen (darüber ein neues, leeres `[Unveröffentlicht]`). Ohne diesen Abschnitt macht der
+   Check **Changelog zur Version** den Release-PR rot (`php scripts/changelog.php --check --require-version`).
+   Für das Release Tags setzen:
    `git tag v1.4.0 && git tag -f v1 && git push origin v1.4.0 && git push -f origin v1`.
 2. Jeder Merge nach `develop` baut für jede Kompanie eine neue Version im Kanal `early`.
 3. Auf einer Installation mit **Vorabversionen erhalten** testen.

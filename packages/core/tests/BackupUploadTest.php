@@ -1,0 +1,248 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Core\Tests;
+
+use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\BackupUploadService;
+use KompanieApp\Core\Domain\DriveClient;
+use KompanieApp\Core\Domain\StatusService;
+use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Port\BackupProvider;
+use KompanieApp\Core\Storage\Backup;
+use KompanieApp\Core\Tests\Support\FakeHttpClient;
+use KompanieApp\Core\Tests\Support\FakeUsers;
+use KompanieApp\Core\Tests\Support\FixedClock;
+use KompanieApp\Core\Tests\Support\NullScheduler;
+use KompanieApp\Core\Tests\Support\TestApp;
+use PHPUnit\Framework\TestCase;
+
+/** Sicherungen automatisch in Google Drive (Google simuliert: Ordner, fortsetzbares Hochladen, Liste, Löschen). */
+final class BackupUploadTest extends TestCase
+{
+    private FixedClock $clock;
+    private NullScheduler $scheduler;
+    private App $app;
+    /** @var array<string, array{name: string, parent: string, content: string}> Dateien in Drive */
+    private array $drive = [];
+    /** @var string[] angelegte Ordner */
+    private array $folders = [];
+    /** Antwort beim Hochladen der Daten (z. B. 507, wenn der Speicher voll ist). */
+    private int $putStatus = 200;
+    private int $ids = 0;
+
+    protected function setUp(): void
+    {
+        $users = new FakeUsers();
+        $this->clock = new FixedClock(new \DateTimeImmutable('2026-10-20 12:00:00 UTC'));
+        $this->scheduler = new NullScheduler();
+        $holder = new \stdClass();
+        $backup = new class ($holder) implements BackupProvider {
+            public function __construct(private readonly \stdClass $holder)
+            {
+            }
+
+            public function export(): array
+            {
+                return ['format' => Backup::FORMAT, 'formatVersion' => Backup::FORMAT_VERSION, 'tables' => (new Backup($this->holder->app->db))->dump(Backup::CORE_TABLES)];
+            }
+
+            public function import(string $json): void
+            {
+            }
+
+            public function canImport(): bool
+            {
+                return false;
+            }
+        };
+        $this->app = TestApp::create(TestApp::connection(), $users, ['name' => 'Testkompanie'], $this->http(), clock: $this->clock, scheduler: $this->scheduler, backup: $backup);
+        $holder->app = $this->app;
+        $users->current = $users->add('anna', 'admin');
+    }
+
+    private function http(): FakeHttpClient
+    {
+        return new FakeHttpClient(function (string $method, string $url, array $headers, ?string $body): array {
+            if (str_starts_with($url, DriveClient::TOKEN_URI)) {
+                return ['status' => 200, 'body' => (string) json_encode(['access_token' => 'TOKEN', 'expires_in' => 3600])];
+            }
+            if (str_starts_with($url, 'https://upload.example/session/')) {
+                if ($this->putStatus !== 200) {
+                    return ['status' => $this->putStatus, 'body' => '{"error":{"message":"The user\'s Drive storage quota has been exceeded."}}'];
+                }
+                $id = substr($url, strlen('https://upload.example/session/'));
+                $this->drive[$id]['content'] = (string) $body;
+                return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+            }
+            if (($headers['Authorization'] ?? '') !== 'Bearer TOKEN') {
+                return ['status' => 401, 'body' => '{"error":{"message":"Kein Token"}}'];
+            }
+            if (str_starts_with($url, DriveClient::UPLOAD_URL) && $method === 'POST') {
+                $meta = json_decode((string) $body, true);
+                $id = 'F' . ++$this->ids;
+                $this->drive[$id] = ['name' => $meta['name'], 'parent' => $meta['parents'][0], 'content' => ''];
+                return ['status' => 200, 'headers' => ['location' => 'https://upload.example/session/' . $id], 'body' => ''];
+            }
+            if ($method === 'POST' && str_starts_with($url, DriveClient::FILES_URL . '?')) {
+                $id = 'D' . ++$this->ids;
+                $this->folders[] = $id;
+                return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+            }
+            $id = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\?.*$#', '$1', $url));
+            if ($method === 'DELETE') {
+                unset($this->drive[$id]);
+                return ['status' => 204, 'body' => ''];
+            }
+            if ($method === 'GET' && str_contains($url, 'fields=id,trashed')) {
+                return in_array($id, $this->folders, true)
+                    ? ['status' => 200, 'body' => (string) json_encode(['id' => $id, 'trashed' => false])]
+                    : ['status' => 404, 'body' => '{"error":{"message":"File not found"}}'];
+            }
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
+            preg_match("/'([^']+)' in parents/", (string) ($q['q'] ?? ''), $m);
+            $files = [];
+            foreach ($this->drive as $fid => $f) {
+                if ($f['parent'] === ($m[1] ?? '')) {
+                    $files[] = ['id' => $fid, 'name' => $f['name'], 'mimeType' => 'application/json'];
+                }
+            }
+            return ['status' => 200, 'body' => (string) json_encode(['files' => $files])];
+        });
+    }
+
+    /** Verbindung über „Mit Google verbinden“, mit oder ohne drive.file. */
+    private function connect(bool $withFiles = true): void
+    {
+        $this->app->drive()->saveOAuth([
+            'client_id' => 'c.apps.googleusercontent.com',
+            'client_secret' => 'GOCSPX-x',
+            'refresh_token' => 'R',
+            'email' => 'kompanie@example.org',
+            'scope' => $withFiles ? DriveClient::oauthScopes() : DriveClient::scopes(),
+        ]);
+    }
+
+    /** @return array{0: int, 1: mixed} */
+    private function api(string $method, string $path, array $body = []): array
+    {
+        $res = $this->app->api()->handle(new Request($method, $path, [], $body));
+        return [$res->status, json_decode((string) json_encode($res->data), true)];
+    }
+
+    private function backupItem(): array
+    {
+        return array_values(array_filter($this->app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'backup'))[0];
+    }
+
+    public function testNeedsConnectionWithFileAccess(): void
+    {
+        [$s, $r] = $this->api('GET', '/admin/backup/drive');
+        $this->assertSame(200, $s);
+        $this->assertFalse($r['available']);
+        [$s, $r] = $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertSame(400, $s);
+        $this->assertStringContainsString('Mit Google verbinden', $r['message']);
+
+        $this->connect(false);
+        [$s, $r] = $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertSame(400, $s, 'ältere Verbindung ohne drive.file: neu verbinden');
+        $this->assertStringContainsString('neu mit Google verbinden', $r['message']);
+        $this->assertArrayNotHasKey(BackupUploadService::TASK, $this->scheduler->scheduled);
+    }
+
+    public function testWeeklyUploadIntoOwnFolderKeepsTheLastEight(): void
+    {
+        $this->connect();
+        [$s, $r] = $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertSame(200, $s, (string) json_encode($r));
+        $this->assertTrue($r['enabled'] && $r['access']);
+        $this->assertSame(BackupUploadService::INTERVAL, $this->scheduler->scheduled[BackupUploadService::TASK] ?? null, 'Aufgabe eingeplant');
+
+        $this->app->runTask(BackupUploadService::TASK);
+        $this->assertCount(1, $this->folders, 'eigener Ordner angelegt');
+        $file = array_values($this->drive)[0];
+        $this->assertMatchesRegularExpression('/^sicherung-2026-10-20-\d{6}\.json$/', $file['name'], 'Datum und Uhrzeit (Ortszeit) im Namen');
+        $this->assertSame($this->folders[0], $file['parent']);
+        $this->assertSame(Backup::FORMAT, json_decode($file['content'], true)['format'] ?? null, 'Inhalt ist die Sicherung');
+        $status = $this->app->backupUpload()->status();
+        $this->assertSame($this->clock->now()->getTimestamp(), $status['last_ok']);
+        $this->assertSame('https://drive.google.com/drive/folders/' . $this->folders[0], $status['folder_url']);
+
+        // Innerhalb der Woche nicht noch einmal.
+        $this->clock->at = new \DateTimeImmutable('2026-10-26 12:00:00 UTC');
+        $this->app->runTask(BackupUploadService::TASK);
+        $this->assertCount(1, $this->drive);
+
+        // Danach wöchentlich, in denselben Ordner; mehr als acht: die ältesten gehen.
+        for ($week = 1; $week <= 9; $week++) {
+            $this->clock->at = (new \DateTimeImmutable('2026-10-20 12:00:00 UTC'))->modify('+' . (7 * $week) . ' days');
+            $this->app->runTask(BackupUploadService::TASK);
+        }
+        $this->assertCount(1, $this->folders);
+        $names = array_column($this->drive, 'name');
+        sort($names);
+        $this->assertCount(BackupUploadService::KEEP, $names);
+        $this->assertStringStartsWith('sicherung-2026-11-03-', $names[0]);
+        $this->assertStringStartsWith('sicherung-2026-12-22-', $names[7]);
+    }
+
+    public function testErrorIsShownAndRetried(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->putStatus = 403;
+        [$s, $r] = $this->api('POST', '/admin/backup/drive/upload');
+        $this->assertSame(502, $s);
+        $this->assertStringContainsString('storage quota', $r['message']);
+        $status = $this->app->backupUpload()->status();
+        $this->assertNull($status['last_ok']);
+        $this->assertStringContainsString('storage quota', (string) $status['error']);
+        $item = $this->backupItem();
+        $this->assertSame('warn', $item['level']);
+        $this->assertStringContainsString('fehlgeschlagen', $item['text']);
+
+        // Am nächsten Tag klappt es; der Fehler ist weg, die Ampel grün.
+        $this->putStatus = 200;
+        $this->clock->at = new \DateTimeImmutable('2026-10-21 12:00:00 UTC');
+        $this->app->runTask(BackupUploadService::TASK);
+        $status = $this->app->backupUpload()->status();
+        $this->assertNull($status['error']);
+        $this->assertNotNull($status['last_ok']);
+        $this->assertSame('ok', $this->backupItem()['level']);
+    }
+
+    public function testDeletedFolderIsCreatedAgain(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->app->backupUpload()->upload();
+        $this->folders = [];
+        $this->app->backupUpload()->upload();
+        $this->assertCount(1, $this->folders);
+        $this->assertSame($this->folders[0], array_values($this->drive)[1]['parent']);
+    }
+
+    public function testReminderAfterThirtyDaysWithoutBackupOutsideTheServer(): void
+    {
+        $this->assertSame('warn', $this->backupItem()['level'], 'noch nie gesichert');
+        $this->app->settings->set(StatusService::BACKUP_SETTING, $this->clock->now()->getTimestamp() - 29 * 86400);
+        $this->assertSame('ok', $this->backupItem()['level']);
+        $this->app->settings->set(StatusService::BACKUP_SETTING, $this->clock->now()->getTimestamp() - 31 * 86400);
+        $this->assertSame('warn', $this->backupItem()['level'], 'nach 30 Tagen gelb (früher 90)');
+        // Eine Sicherung in Google Drive zählt ebenso.
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->app->backupUpload()->upload();
+        $item = $this->backupItem();
+        $this->assertSame('ok', $item['level']);
+        $this->assertStringContainsString('Google Drive', $item['text']);
+    }
+
+    public function testStateStaysWithTheInstallation(): void
+    {
+        $this->assertContains(BackupUploadService::STATE_SETTING, Backup::LOCAL_SETTINGS);
+        $this->assertNotContains(BackupUploadService::SETTING, Backup::LOCAL_SETTINGS, 'Ein/aus und Ordner kommen mit der Sicherung zurück');
+    }
+}

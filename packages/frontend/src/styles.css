@@ -96,17 +96,26 @@ select {
 }
 @media (max-width: 430px) {
   .topbar {
-    gap: 10px;
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .topbar .logo {
+    height: 42px;
   }
   .topbar-title {
     letter-spacing: 0.03em;
   }
-  .topbar .topbar-help {
-    margin-right: 0;
+  /* Teilen, Hilfe, Darstellung und „Login“ nebeneinander: Platz für den Titel lassen */
+  .topbar .topbar-help,
+  .topbar .topbar-share,
+  .topbar .topbar-theme {
+    width: 30px;
+    height: 30px;
   }
   .topbar .topbar-account {
-    padding: 6px 11px;
-    letter-spacing: 0.06em;
+    padding: 6px 9px;
+    letter-spacing: 0.04em;
   }
 }
 .topbar-sub {
@@ -132,7 +141,9 @@ select {
   color: var(--on-accent);
   border-color: var(--accent);
 }
-.topbar .topbar-help {
+.topbar .topbar-help,
+.topbar .topbar-share,
+.topbar .topbar-theme {
   color: var(--on-primary);
   font-weight: 700;
   font-size: 1rem;
@@ -141,7 +152,6 @@ select {
   height: 32px;
   min-height: 0;
   padding: 0;
-  margin-right: 8px;
   flex: none;
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
@@ -604,6 +614,52 @@ select {
     transform: rotate(360deg);
   }
 }
+/* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
+ * steht wie der echte Inhalt; Text als graue Balken, alles entfärbt und nicht bedienbar. */
+.skeleton,
+.skeleton-parts {
+  display: contents;
+}
+.skeleton-parts > * {
+  filter: grayscale(1);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-parts > * {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.skeleton-text {
+  display: inline-block;
+  max-width: 100%;
+  height: 0.7em;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.2;
+  vertical-align: middle;
+}
+.skeleton-box {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 6px;
+  background: var(--line);
+  vertical-align: middle;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .error {
   background: #f6dcd3;
   color: #6b1d0d;
@@ -631,7 +687,7 @@ select {
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
-  z-index: 20;
+  z-index: 60; /* auch über Fenstern (Sheet) und der Foto-Ansicht */
   background: #1d1f24;
   color: #fff;
   padding: 11px 16px 11px 14px;
@@ -794,18 +850,330 @@ select {
   width: 100%;
   margin: 14px 0;
 }
-.member-name {
+.member-name,
+.member-peek-name {
   margin: 4px 0 14px;
   font-family: var(--font-head);
   font-weight: 700;
   font-size: 1.6rem;
   letter-spacing: 0.02em;
 }
+.member-name.with-rank,
+.member-peek-name.with-rank {
+  margin-bottom: 4px;
+}
+/* Mitgliedsdetails: Name mittig */
+.member-name-centered {
+  text-align: center;
+}
+/* Mitgliedsdetails unter dem Namen, mittig: Abzeichen mit dem Dienstgrad darunter, rechts daneben das Foto */
+.member-rank-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+.member-rank-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+/* Abzeichen und Foto im Profil gleich hoch, kleiner als die große Stufe (die hohe Auflösung bleibt scharf) */
+.member-rank-line .rank-badge-large {
+  height: 96px;
+  max-width: 192px;
+}
+.member-rank-line .member-avatar-large {
+  width: 96px;
+  height: 96px;
+  font-size: 1.8rem;
+}
+/* Abzeichen antippen: befördern oder degradieren (Fenster); ohne Dienstgrad ein Kreis mit „+“ in Größe des Abzeichens */
+.member-rank-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.rank-badge-none {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px dashed var(--line-strong);
+  color: var(--accent-text);
+  font-size: 2rem;
+}
+/* Mitgliedsdetails: Kacheln antippbar, darunter Titel, Ämter, Daten und „Konto und Rolle“ */
+.member-stats {
+  margin-bottom: 12px;
+}
+.stat-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.stat-button > span {
+  display: block;
+}
+.member-tile,
+.member-date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px 13px 16px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+button.member-tile,
+button.member-date {
+  cursor: pointer;
+}
+.member-tile {
+  margin-bottom: 12px;
+}
+.member-tile-label,
+.member-date-label {
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.member-tile-value,
+.member-date-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+.member-offices .section-title {
+  margin-top: 18px;
+}
+.member-dates {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+.member-dates li + li {
+  border-top: 1px solid var(--line);
+}
+.member-date {
+  border: 0;
+  background: none;
+}
+.member-account {
+  margin: 20px 0 12px;
+}
+.member-account > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-family: var(--font-head);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+.member-account > summary::-webkit-details-marker {
+  display: none;
+}
+.member-account > summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.member-account[open] > summary {
+  margin-bottom: 14px;
+}
+.member-account[open] > summary::after {
+  transform: rotate(180deg);
+}
+.member-account > summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Fenster über der Seite (ui.tsx, Sheet): auf dem Handy von unten, ab 560 px mittig */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+.sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(92vh / var(--kompanie-zoom, 1));
+  border-radius: 18px 18px 0 0;
+  border-top: 2px solid var(--accent);
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 -8px 30px rgb(0 0 0 / 35%);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 10px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sheet-close {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+}
+/* Die Überschrift des Inhalts steht schon oben im Fenster. */
+.sheet-body > :first-child > h3.section-title:first-child {
+  display: none;
+}
+@media (min-width: 560px) {
+  .sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+  .sheet {
+    border-radius: 18px;
+    border: 2px solid var(--accent);
+  }
+}
+/* Foto ersetzen und entfernen in der vergrößerten Ansicht, unter dem Bild */
+.member-photo-zoom .member-photo {
+  justify-content: center;
+  margin: 0;
+}
 .back {
   margin-bottom: 4px;
 }
+/* Mitglied in der Verwaltung: zurück zur Liste, daneben vorheriges und nächstes (auch per Wischen). */
+.member-detail {
+  /* Waagerecht wischt die App selbst; sonst blättert der Browser zusätzlich im Verlauf zurück oder vor. */
+  touch-action: pan-y pinch-zoom;
+  /* Karussell: Die Nachbarn stehen neben der Karte im Seitenrand und darüber hinaus; abgeschnitten wird erst am Rand
+     von .content, ohne dass die Seite seitlich scrollt. */
+  margin: 0 -16px;
+  padding: 0 16px;
+  overflow-x: clip;
+}
+/* Spur mit der Karte; beim Ziehen setzt swipe.ts den Versatz, beim Loslassen gleitet sie. */
+.member-track {
+  position: relative;
+  transition: transform 0.22s ease-out;
+}
+.member-track.peeking {
+  will-change: transform;
+}
+/* Nachbarn links und rechts, Abstand wie PEEK_GAP in swipe.ts */
+.member-peek {
+  position: absolute;
+  top: var(--peek-top, 0);
+  width: 100%;
+  pointer-events: none;
+}
+.member-peek-prev {
+  right: calc(100% + 32px);
+}
+.member-peek-next {
+  left: calc(100% + 32px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-track {
+    transition: none;
+  }
+}
+.member-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.member-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.member-step .btn-link {
+  min-width: 40px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
 .add-member {
   margin-top: 14px;
+}
+.member-counts {
+  margin: 14px 2px 0;
+}
+.member-filters-toggle {
+  min-height: 44px;
+  padding: 6px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+.member-filters-arrow {
+  display: inline-block;
+  font-size: 1.3rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.member-filters-toggle[aria-expanded='true'] .member-filters-arrow {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-filters-arrow {
+    transition: none;
+  }
 }
 
 .form {
@@ -1474,6 +1842,9 @@ code {
 .install-konto {
   margin-top: 12px;
 }
+.theme-choice {
+  margin: 12px 0 0;
+}
 
 @media (prefers-color-scheme: dark) {
   .install-warn {
@@ -1561,7 +1932,8 @@ code {
   flex: none;
   color: var(--accent-text);
 }
-.admin-menu-current {
+.admin-menu-current,
+.member-peek-menu-current {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1770,6 +2142,15 @@ fieldset.feature-list legend {
   margin-top: 18px;
 }
 
+/* Was ist neu (Changelog) */
+.changelog-text h4 {
+  font-size: 0.95rem;
+  margin: 14px 0 2px;
+}
+.changelog-text h4:first-child {
+  margin-top: 6px;
+}
+
 /* Fehler melden (Issue #64) */
 .hilfe-melden {
   margin-top: 18px;
@@ -1921,11 +2302,18 @@ fieldset.feature-list legend {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Hochformat-Porträts oben ausrichten, sonst schneidet der runde Ausschnitt Kopf und Mütze ab */
+  object-position: 50% 0;
 }
 .member-avatar-small {
   width: 40px;
   height: 40px;
   font-size: 0.9rem;
+}
+.member-avatar-medium {
+  width: 48px;
+  height: 48px;
+  font-size: 1rem;
 }
 .member-avatar-large {
   width: 128px;
@@ -1940,8 +2328,69 @@ fieldset.feature-list legend {
   gap: 12px 16px;
   margin-bottom: 12px;
 }
+/* Antippen des Fotos in den Details vergrößert es (ganzes Bild statt runder Ausschnitt). */
+.member-photo-open {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: zoom-in;
+}
+.member-photo-open .member-avatar img {
+  pointer-events: none;
+}
+.member-photo-zoom {
+  touch-action: auto;
+}
+.member-photo-zoom figure {
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+/* Feste Breite statt Bildgröße: Auch kleine hochgeladene Fotos erscheinen groß; Hochformat passt per contain. */
+.member-photo-zoom img {
+  width: min(480px, calc((100vw - 32px) / var(--kompanie-zoom, 1)));
+  height: auto;
+  max-width: none;
+  max-height: calc(78vh / var(--kompanie-zoom, 1));
+  object-fit: contain;
+}
+/* Platzhalter in Größe des Fotos, solange es lädt: Die Bildunterschrift springt nicht, und die Schnecke steht mittig. */
+.member-photo-zoom-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(480px, calc((100vw - 32px) / var(--kompanie-zoom, 1)));
+  height: min(480px, calc((100vw - 32px) / var(--kompanie-zoom, 1)), calc(78vh / var(--kompanie-zoom, 1)));
+}
+.member-photo-zoom-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border-width: 4px;
+  border-color: rgb(255 255 255 / 25%);
+  border-top-color: #fff;
+}
+.member-photo-zoom-error {
+  margin: 0;
+  color: #fff;
+  text-align: center;
+}
+.member-photo-zoom figcaption {
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
 .account-card .member-avatar-large {
   margin-bottom: 8px;
+}
+.my-overview-rank {
+  margin: 8px 0 0;
 }
 
 /* Abzeichen der Dienstgrade (Issue #17): ohne eigenen Hintergrund, Rahmen oder Farbfilter, damit transparente
@@ -1975,6 +2424,45 @@ fieldset.feature-list legend {
   align-items: center;
   gap: 6px;
   vertical-align: middle;
+}
+/* Mitgliederliste: Dienstgrad rechts (wie das Foto links), Name und Punkte mittig dazwischen */
+.member-row .row-main {
+  text-align: center;
+}
+/* Titel in eigener Zeile unter dem Namen, mittig; auch Titel mit Umbruch (Text in der Plakette mittig). */
+.member-row .title-badges {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 0;
+}
+.member-row .badge-title {
+  text-align: center;
+  border-radius: 1em;
+}
+.member-row-rank {
+  flex: none;
+  width: 88px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.rank-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.rank-stack .rank-badge-medium {
+  height: 56px;
+  max-width: 88px;
+}
+/* Foto in der Mitgliederliste so hoch wie das Abzeichen rechts */
+.member-row .member-avatar-medium {
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
 }
 .rank-badge-hero {
   display: flex;
@@ -2035,11 +2523,16 @@ fieldset.feature-list legend {
   color: var(--primary-text);
   border: 1px solid currentColor;
 }
-.my-titles {
-  margin: 0 0 12px;
+/* Titel und Rollen wie eingegeben: in Großbuchstaben würde aus „ß“ ein „SS“. */
+.badge-title,
+.badge-name {
+  text-transform: none;
+}
+.my-overview .stats {
+  margin-bottom: 16px;
 }
 .my-titles .title-badges {
-  margin-left: 0;
+  margin: 6px 0 0;
 }
 .my-titles .badge-title {
   font-size: 0.85rem;
@@ -2356,6 +2849,12 @@ fieldset.feature-list legend {
   flex: 1 1 auto;
   font-size: 0.64rem;
   letter-spacing: 0.02em;
+}
+/* Sieben Tabs (mit der Mitgliederliste): noch etwas kleiner und ohne Sperrung. */
+.tabbar button:first-child:nth-last-child(n + 7),
+.tabbar button:first-child:nth-last-child(n + 7) ~ button {
+  font-size: 0.58rem;
+  letter-spacing: 0;
 }
 @media (max-width: 380px) {
   .tabbar button {
@@ -3015,4 +3514,819 @@ fieldset.feature-list legend {
   padding: 0.5rem 0;
   border-top: 1px solid var(--line);
   overflow-wrap: anywhere;
+}
+
+/* Ämter (Issue #112): Tab Mitglieder mit Umschalter, je Amt eine aufklappbare Karte („Ehrentafel“) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.members-switch {
+  margin-bottom: 14px;
+}
+.offices-tools {
+  justify-content: flex-end;
+  margin: 0 0 4px;
+}
+.office-group .section-title {
+  margin-top: 18px;
+}
+.office-card {
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.office-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+/* Siegel: Monogramm in der Kompaniefarbe mit Ring in der Akzentfarbe */
+.office-mono {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
+  color: var(--accent-on-primary);
+  box-shadow:
+    inset 0 0 0 2px var(--primary-deep),
+    inset 0 0 0 4px var(--accent);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+.office-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.office-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 1.08rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+.office-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.office-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.office-summary-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Fotos der aktuellen Inhaber, leicht übereinander */
+.office-faces {
+  display: flex;
+  flex: none;
+}
+.office-faces .member-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.62rem;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.office-faces > * + * {
+  margin-left: -5px;
+}
+.office-faces-more {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-text);
+  color: var(--card);
+  box-shadow: 0 0 0 2px var(--card);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.office-arrow {
+  flex: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--accent-dark);
+  transition: transform 0.15s ease;
+}
+.office-head[aria-expanded='true'] .office-arrow {
+  transform: rotate(90deg);
+}
+.office-body {
+  padding: 0 0 16px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card));
+}
+
+/* „Im Amt“: die aktuellen Inhaber auf der Kompaniefarbe, wie die Kopfleiste */
+.spotlight {
+  position: relative;
+  padding: 14px 14px 16px;
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
+    linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
+  color: var(--on-primary);
+  border-bottom: 3px solid var(--accent);
+}
+.spotlight-label {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-on-primary);
+  margin-bottom: 10px;
+}
+.spotlight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.spotlight-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--on-primary) 18%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--on-primary) 8%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+button.spotlight-person {
+  cursor: pointer;
+}
+button.spotlight-person:hover,
+button.spotlight-person:focus-visible {
+  background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+}
+.spotlight-avatar {
+  flex: none;
+  display: flex;
+}
+.spotlight-person .member-avatar {
+  flex: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.spotlight-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.spotlight-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.spotlight-since {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.spotlight-note {
+  font-size: 0.8rem;
+  font-style: italic;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.tl-heading {
+  margin: 16px 14px 4px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Chronik: Jahre | Linie | Karte; ab 720 px Linie in der Mitte, Karte und Jahr gegenüber */
+.tl {
+  --tl-years: 58px;
+  --tl-gap: 26px;
+  position: relative;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0 14px;
+}
+.tl::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: calc(14px + var(--tl-years) + var(--tl-gap) / 2 - 1px);
+  width: 2px;
+  background: linear-gradient(180deg, var(--primary-text), var(--line-strong) 40%, color-mix(in srgb, var(--line-strong) 30%, transparent));
+}
+.tl-item,
+.tl-decade {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--tl-years) var(--tl-gap) minmax(0, 1fr);
+  align-items: start;
+}
+.tl-item {
+  padding-bottom: 12px;
+}
+.tl-item:last-child {
+  padding-bottom: 0;
+}
+.tl-when {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-top: 8px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tl-when-year {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--primary-text);
+}
+.tl-when-small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.tl-dot {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-top: 12px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 3px solid var(--primary-text);
+  font-size: 0.7rem;
+  line-height: 1;
+  z-index: 1;
+}
+.tl-item.current .tl-dot {
+  background: var(--primary-text);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.tl-item.point .tl-dot {
+  width: 22px;
+  height: 22px;
+  margin-top: 8px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.85rem;
+}
+.tl-card {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  padding: 9px 12px 10px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+.tl-item.current .tl-card {
+  border-color: color-mix(in srgb, var(--primary-text) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary-text) 7%, var(--card));
+}
+.tl-item.point .tl-card {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+}
+.tl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+}
+.tl-office {
+  font-weight: 600;
+}
+.tl-with {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tl-with-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.tl-duration {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+/* Jahrzehnt-Marke auf der Linie */
+.tl-decade {
+  margin: 4px 0 10px;
+}
+.tl-decade-label {
+  grid-column: 1 / span 3;
+  grid-row: 1;
+  justify-self: start;
+  margin-left: calc(var(--tl-years) + var(--tl-gap) / 2);
+  transform: translateX(-50%);
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  z-index: 1;
+}
+.timeline-now {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.timeline-honor {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent-text);
+}
+.timeline-holders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.timeline-holders li {
+  min-width: 0;
+}
+.holder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 10px 2px 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.holder-chip .member-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.66rem;
+}
+.holder-chip-link {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--line));
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.holder-chip-link:hover,
+.holder-chip-link:focus-visible {
+  background: color-mix(in srgb, var(--primary-text) 12%, transparent);
+}
+.timeline-note {
+  margin-top: 6px;
+  font-size: 0.86rem;
+  font-style: italic;
+  color: var(--muted);
+}
+@media (min-width: 720px) {
+  .tl {
+    --tl-years: minmax(0, 1fr);
+  }
+  .tl::before {
+    left: calc(50% - 1px);
+  }
+  .tl-item,
+  .tl-decade {
+    grid-template-columns: minmax(0, 1fr) var(--tl-gap) minmax(0, 1fr);
+  }
+  .tl-decade-label {
+    grid-column: 2;
+    justify-self: center;
+    margin-left: 0;
+    transform: none;
+    white-space: nowrap;
+  }
+  /* Karte links, Jahr rechts der Linie */
+  .tl-left .tl-card {
+    grid-column: 1;
+    text-align: right;
+  }
+  .tl-left .tl-meta,
+  .tl-left .timeline-holders {
+    justify-content: flex-end;
+  }
+  .tl-left .tl-when {
+    grid-column: 3;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-arrow {
+    transition: none;
+  }
+}
+
+/* Mitgliederliste: die ganze Zeile öffnet die Seite der Person, das Foto (darüber) vergrößert; Pflege der Ämter */
+.member-row-link {
+  cursor: pointer;
+}
+.member-row-link:hover {
+  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--line));
+}
+.member-row-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.member-row-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.member-row-link .member-photo-open,
+.member-row-link > .member-avatar {
+  position: relative;
+  z-index: 1;
+}
+.member-page-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+  text-align: center;
+}
+.member-page-head .member-name {
+  margin: 6px 0 0;
+}
+.member-page-titles {
+  margin: 0;
+}
+.office-admin-group {
+  margin-bottom: 18px;
+}
+.office-admin-terms {
+  margin: 8px 0 0;
+}
+.office-term-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.office-term-row .row-actions {
+  margin-left: auto;
+}
+.office-holder-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+.office-holder-row .field {
+  flex: 1 1 140px;
+  min-width: 0;
+  margin: 0;
+}
+.office-import textarea {
+  width: 100%;
+  min-height: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+.office-import-rows {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.office-import-rows li {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.office-import-rows .form-error {
+  margin: 2px 0 0;
+}
+
+/* Listen (Issue #121): Bearbeiten, Vorschau und Druck */
+.list-editor .card + .card,
+.list-editor .card + .list-save {
+  margin-top: 0;
+}
+.list-output {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.list-output h3 {
+  margin-top: 0;
+}
+.list-columns .row,
+.list-rows .row {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.list-columns .row-actions {
+  align-items: center;
+  margin-top: 8px;
+}
+.list-columns .field.narrow {
+  flex-basis: 124px;
+}
+.list-columns .toggle {
+  margin: 0 8px 0 2px;
+}
+.list-add-column {
+  align-items: flex-end;
+}
+.list-add-column .btn {
+  flex: none;
+  min-height: 46px;
+}
+.list-rows {
+  gap: 6px;
+}
+.list-row-nr {
+  flex: none;
+  min-width: 2ch;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.list-row input[type='text'] {
+  min-height: 40px;
+  padding: 6px 10px;
+}
+.list-sync {
+  padding: 12px 14px;
+  border-color: var(--accent);
+}
+.list-sync p {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.list-sync .button-row {
+  margin-bottom: 0;
+}
+/* Unten am Bildschirm, damit Speichern auch bei langen Listen erreichbar ist */
+.list-save {
+  position: sticky;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 8px);
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 16px;
+  pointer-events: none;
+}
+.list-save .btn {
+  pointer-events: auto;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 18%);
+}
+/* Vorschau: ein Blatt Papier, scrollt in sich (breite Tabellen), die Seite selbst nicht */
+.list-preview {
+  max-height: 70vh;
+  overflow: auto;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.list-preview .list-sheet {
+  /* Breite wie gedruckt (PrintSheet), der Rand der Vorschau kommt dazu */
+  box-sizing: content-box;
+  padding: 16px;
+}
+.list-sheet {
+  --list-color: #333;
+  color: #000;
+  background: #fff;
+  font-size: 10.5pt;
+  /* Farbige Flächen auch drucken (sonst lassen Browser Hintergründe weg) */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* Titelbalken wie in den Tabellen der Kompanie: Farbe der Kompanie, weiße fette Schrift, zentriert */
+.list-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 12mm;
+  padding: 6px 10px;
+  background: var(--list-color);
+  color: #fff;
+}
+.list-sheet-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex: none;
+  /* Weißer Grund: Logos in der Farbe der Kompanie bleiben auf dem Balken sichtbar */
+  background: #fff;
+  border-radius: 6px;
+  padding: 2px;
+}
+.list-sheet-heading {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  /* Gegengewicht zum Logo, damit der Titel in der Mitte steht */
+  margin-right: 46px;
+}
+.list-sheet-title {
+  font-size: 17pt;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.list-sheet-subtitle {
+  margin: 2px 0 0;
+  font-size: 10pt;
+  color: #fff;
+}
+.list-sheet-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+  font-size: 8.5pt;
+  color: #444;
+}
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.list-table th,
+.list-table td {
+  border: 1px solid #555;
+  padding: 3px 6px;
+  height: 8.5mm;
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  color: #000;
+}
+/* Kopfzeile: weiß und fett auf der Farbe der Kompanie, zentriert */
+.list-table th {
+  background: var(--list-color);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  height: auto;
+  padding: 5px 6px;
+}
+/*
+ * Gedrehte Überschrift wie in Tabellenkalkulationen (SlantedHead in ListenVerwalten.tsx): Ab der ersten gedrehten
+ * Spalte (ab der Spalte davor) ist der Kopf eine Zelle, die alles selbst als Grafik zeichnet, ohne über sich
+ * hinauszuragen (Chrome schneidet das beim Drucken ab). Rahmen hat sie oben, links nur vor einer geraden Spalte, rechts
+ * nur, wenn keine gedrehte Spalte am Ende überragt; unten liegen die Rahmen der Zeilen.
+ */
+.list-table th.list-th-slanted {
+  position: relative;
+  padding: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-bottom-width: 0;
+  background: none;
+}
+.list-table th.list-th-slanted-left {
+  border-left-width: 1px;
+}
+.list-table th.list-th-slanted-right {
+  border-right-width: 1px;
+}
+.list-th-slanted-inner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.list-th-slanted-inner > svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+/* Mitte des Textes auf der Mittellinie des Felds: unten in der Spaltenmitte, 3 mm höher also 3 mm weiter rechts */
+.list-th-label {
+  position: absolute;
+  bottom: 3mm;
+  transform-origin: 0 50%;
+  transform: translateY(50%) rotate(-45deg);
+  white-space: nowrap;
+  line-height: 1;
+}
+/* Gerade Spalte hinter einer gedrehten: Überschrift wie in den anderen Kopfzellen */
+.list-th-straight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 6px;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+/* Gerade Spalte, in die ein gekippter Kopf davor oben hineinragt: Text fließt um die schräge Kante (StraightLabel) */
+.list-th-straight-under {
+  display: block;
+  line-height: 1.2;
+  text-align: center;
+  padding-bottom: 0;
+  /* Wörter nicht trennen: Passt eins neben der Kante nicht, rutscht die Zeile tiefer */
+  overflow-wrap: normal;
+  hyphens: manual;
+}
+.list-th-shape {
+  float: left;
+  shape-outside: polygon(0 0, 100% 0, 0 100%);
+  shape-margin: 3px;
+}
+.list-table thead {
+  display: table-header-group;
+}
+.list-table tr {
+  break-inside: avoid;
+}
+.list-table .list-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.list-table .list-spare {
+  border: 0;
+  background: none;
+}
+/*
+ * Zeilen abwechselnd leicht in der Farbe der Kompanie über alle Spalten (wie die Tabellenformatvorlage der
+ * Kompanie-Tabellen: erste Zeile gefärbt, Farbe um 80 % aufgehellt)
+ */
+.list-table tbody tr:nth-child(odd) td:not(.list-spare) {
+  background: color-mix(in srgb, var(--list-color) 20%, #fff);
+}
+.list-table .list-blank {
+  text-align: center;
+  font-size: 13pt;
+}
+/* Nur beim Drucken: die Tabelle unter <body> (ListenVerwalten.tsx, PrintPortal) */
+.list-print-root {
+  display: none;
+}
+@media print {
+  body.list-printing > *:not(.list-print-root) {
+    display: none !important;
+  }
+  body.list-printing .list-print-root {
+    display: block;
+  }
+  html:has(> body.list-printing),
+  body.list-printing {
+    background: #fff !important;
+  }
 }

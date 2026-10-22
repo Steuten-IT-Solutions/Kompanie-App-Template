@@ -15,7 +15,7 @@ Ein {begriff.rank}, den niemand hat, lässt sich **löschen**. Ein {begriff.rank
 Zu jedem {begriff.rank} kannst du direkt in dieser Liste ein Abzeichen (Bild) hochladen: **Abzeichen hochladen**, später **Ersetzen** oder **Entfernen**. Welche Dateien gehen, wie das Abzeichen auf hellem und dunklem Hintergrund gut aussieht und was bei SVG zu beachten ist, steht unter [Abzeichen für {bereich.ranks}](seite:dienstgrade-abzeichen).
 
 ## Befördern und degradieren
-Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{begriff.rank}**) unter **Neuer {begriff.rank}** den {begriff.rank} wählen, optional eine Begründung eintragen und **{begriff.rank} ändern** tippen. Jede Änderung steht im Verlauf des Mitglieds, mit Datum, Begründung und wer sie vorgenommen hat. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn sich sein {begriff.rank} ändert.
+Im Mitglied (**Verwaltung → Mitglieder**, dann das Abzeichen unter dem Namen antippen; ohne {begriff.rank} der Kreis mit „+“) unter **Neuer {begriff.rank}** den {begriff.rank} wählen, optional eine Begründung eintragen und **{begriff.rank} ändern** tippen. Jede Änderung steht im Verlauf des Mitglieds, mit Datum, Begründung und wer sie vorgenommen hat. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn sich sein {begriff.rank} ändert.
 
 Einen {begriff.rank} bekommen nur Mitglieder. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seinen {begriff.rank}; du kannst ihn dort jederzeit auf „Kein {begriff.rank}“ setzen.
 

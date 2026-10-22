@@ -1,39 +1,46 @@
-import { api, config } from '../api';
+import { api, config, isMember, roleLabels, type Me } from '../api';
 import brand from '../generated/brand';
+import { formatEuro } from '../format';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { ErrorBox, lazyView, Loading, StatCard, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
 import MeineAnwesenheit from './MeineAnwesenheit';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 import { TitleBadges } from '../TitleBadges';
 import { MenuNav } from '../adminNav';
+import { MemberAvatar } from '../memberPhoto';
+import { RankLabel } from '../RankBadge';
+import { PersonOffices } from './Aemter';
+
+const sec = brand.labels.sections;
+
+const Konto = lazyView(() => import('./Konto'));
 
 /**
- * „Meins“: eigene Titel oben, darunter Punkte, Strafen und Dienstgrad, umschaltbar. Die Summen (/me) lädt Meins einmal
- * für alle.
+ * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad, Anwesenheit, Ämter und das Konto,
+ * umschaltbar. Die Summen (/me) lädt Meins einmal für alle, nur für Mitglieder; das Konto haben alle Angemeldeten.
  */
-export default function Meins({ sub }: { sub?: string }) {
-  const me = useAsync(api.me, [], 'me');
-  const parts = (
+export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToast: (msg: string) => void; onLogout: () => void }) {
+  const member = isMember();
+  const me = useAsync(() => (member ? api.me() : Promise.resolve(null)), [], 'me');
+  const dataParts = (
     [
-      ['punkte', brand.labels.sections.points, config?.features.points],
-      ['strafen', brand.labels.sections.penalties, config?.features.penalties],
+      ['uebersicht', 'Übersicht', true],
+      ['punkte', sec.points, config?.features.points],
+      ['strafen', sec.penalties, config?.features.penalties],
       ['dienstgrad', brand.labels.rank, config?.features.ranks],
-      ['anwesenheit', brand.labels.sections.attendance, config?.features.attendance],
+      ['anwesenheit', sec.attendance, config?.features.attendance],
+      ['aemter', sec.offices, config?.features.offices],
     ] as const
-  ).filter(([, , on]) => on);
+  )
+    .filter(([, , on]) => member && on)
+    .map(([id, label]) => [id, label] as const);
+  const parts = [...dataParts, ['konto', 'Konto'] as const];
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
-  const titles = me.data?.titles ?? [];
   return (
     <div>
-      {titles.length > 0 && (
-        <p className="my-titles" aria-label={brand.labels.sections.titles}>
-          <TitleBadges titles={titles} />
-        </p>
-      )}
-      {parts.length === 0 && me.data && titles.length === 0 && <Empty>Du hast zurzeit keine {brand.labels.sections.titles}.</Empty>}
-      {parts.length > 1 && active && (
+      {parts.length > 1 && (
         <MenuNav
           label="Meine Daten"
           className="meins-menu"
@@ -41,10 +48,14 @@ export default function Meins({ sub }: { sub?: string }) {
           items={parts.map(([id, label]) => ({ id, label, onSelect: () => navigate(`meins/${id}`) }))}
         />
       )}
-      {me.loading && !me.data ? (
+      {active === 'konto' ? (
+        <Konto onToast={onToast} onLogout={onLogout} />
+      ) : me.loading && !me.data ? (
         <Loading />
       ) : me.error && !me.data ? (
         <ErrorBox message={me.error} onRetry={me.reload} />
+      ) : active === 'uebersicht' ? (
+        <Uebersicht me={me.data!} />
       ) : active === 'punkte' ? (
         <Punkte me={me.data!} />
       ) : active === 'strafen' ? (
@@ -53,7 +64,52 @@ export default function Meins({ sub }: { sub?: string }) {
         <Dienstgrad />
       ) : active === 'anwesenheit' ? (
         <MeineAnwesenheit />
+      ) : active === 'aemter' && config?.user ? (
+        <PersonOffices userId={config.user.id} empty={`Du hast keine ${brand.labels.sections.offices} eingetragen.`} />
       ) : null}
+    </div>
+  );
+}
+
+/** „Meins“ → Übersicht: die eigenen Angaben wie in den Mitgliedsdetails der Verwaltung, nur zum Ansehen. */
+function Uebersicht({ me }: { me: Me }) {
+  const f = config?.features;
+  // Foto: hochladen und ändern nur, wer Mitglieder anlegt (in der Verwaltung), wie unter „Mein Konto“.
+  const photo = config?.user?.id === me.id ? config.user.photo_url : null;
+  return (
+    <div className="my-overview">
+      <div className="card account-card">
+        {photo && <MemberAvatar url={photo} name={me.name} size="large" />}
+        <h2 className="account-name">{me.name}</h2>
+        <p className="muted small">
+          {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
+        </p>
+        {f?.ranks && me.rank !== undefined && (
+          <p className="my-overview-rank">
+            {me.rank ? (
+              <>
+                {brand.labels.rank}: <RankLabel url={me.rank.badge_url} title={me.rank.title} />
+              </>
+            ) : (
+              `Noch kein ${brand.labels.rank}`
+            )}
+          </p>
+        )}
+      </div>
+      {(f?.points || f?.penalties) && (
+        <div className="stats">
+          {f.points && <StatCard label={`Meine ${sec.points}`} value={me.points.toLocaleString('de-DE')} tone="good" />}
+          {f.penalties && (
+            <StatCard label={`Offen: ${sec.penalties}`} value={formatEuro(me.open_cents)} tone={me.open_cents > 0 ? 'warn' : 'good'} />
+          )}
+        </div>
+      )}
+      {f?.titles && me.titles !== undefined && (
+        <div className="card account-card my-titles">
+          <h3>{sec.titles}</h3>
+          {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <p className="muted small">Du hast zurzeit keine {sec.titles}.</p>}
+        </div>
+      )}
     </div>
   );
 }

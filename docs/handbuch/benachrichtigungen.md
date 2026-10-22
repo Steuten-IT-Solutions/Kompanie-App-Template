@@ -6,7 +6,7 @@ rechte: []
 Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas Neues gibt – auch wenn sie gerade geschlossen ist. Du wählst selbst, worüber.
 
 ## Einschalten
-1. Mit Konto: oben rechts auf **Konto** und dann auf **Benachrichtigungen einstellen** tippen. Ohne Konto: unter **{bereich.events}** auf **Bei neuen Terminen benachrichtigen** oder unter **{bereich.news}** auf **Bei neuen Beiträgen benachrichtigen** tippen.
+1. Mit Konto: auf **Meins**, im Menü auf **Konto** und dann auf **Benachrichtigungen einstellen** tippen. Ohne Konto: unter **{bereich.events}** auf **Bei neuen Terminen benachrichtigen** oder unter **{bereich.news}** auf **Bei neuen Beiträgen benachrichtigen** tippen.
 2. Es sind alle Arten angekreuzt, die es für dich gibt. Nimm die Haken weg, die du nicht möchtest.
 3. **Benachrichtigungen einschalten** tippen und die Nachfrage des Browsers mit **Erlauben** bestätigen.
 
@@ -22,9 +22,9 @@ Für alle, auch ohne Konto:
 - **Erinnerung am Vortag**: eine Nachricht mit allen Terminen von morgen, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 18 Uhr).
 - **{bereich.news}: neue Beiträge**: wenn ein neuer Beitrag erscheint.
 
-Du bekommst diese Nachrichten zu den Terminen, die du unter **{bereich.events}** siehst: ohne Konto zu den öffentlichen Terminen, als {rolle.member} oder {rolle.candidate} zum Kalender der Kompanie, wenn sie den Bereich {bereich.calendar} nutzt.
+Du bekommst diese Nachrichten zu den Terminen, die du unter **{bereich.events}** siehst: ohne Konto zu den öffentlichen Terminen, als {rolle.member} oder mit dem internen Kalender (z. B. Anwärter) zum Kalender der Kompanie, wenn sie den Bereich {bereich.calendar} nutzt.
 
-Für {rolle.member} und {rolle.candidate}:
+Für {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter):
 - **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt (außer wenn er die Benachrichtigung dabei abschaltet).
 
 Nur für {rolle.member}:

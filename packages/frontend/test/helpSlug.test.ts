@@ -22,6 +22,9 @@ const ALL_FEATURES = [
   'polls',
   'birthdays',
   'inventory',
+  'directory',
+  'offices',
+  'lists',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -61,11 +64,18 @@ const PATHS = [
   ['dokumente'],
   ['dokumente', '5'],
   ['dokumente', 'verwalten'],
+  ['mitglieder'],
+  ['mitglieder', 'liste'],
+  ['mitglieder', 'aemter'],
+  ['mitglieder', 'aemter', '7'],
   ['meins'],
+  ['meins', 'uebersicht'],
   ['meins', 'punkte'],
   ['meins', 'strafen'],
   ['meins', 'dienstgrad'],
   ['meins', 'anwesenheit'],
+  ['meins', 'konto'],
+  ['meins', 'aemter'],
   ['verwaltung'],
   ['verwaltung', 'mitglieder'],
   ['verwaltung', 'punkte'],
@@ -74,10 +84,24 @@ const PATHS = [
   ['verwaltung', 'dienstgrade'],
   ['verwaltung', 'befoerderungen'],
   ['verwaltung', 'titel'],
+  ['verwaltung', 'aemter'],
+  ['verwaltung', 'aemter', 'import'],
   ['verwaltung', 'anwesenheit'],
+  ['verwaltung', 'listen'],
+  ['verwaltung', 'listen', '3'],
   ['verwaltung', 'neu'],
   ['verwaltung', 'neu-mehrere'],
-  ...['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'geburtstag'].map((s) => ['verwaltung', 'mitglied', '7', s]),
+  ['verwaltung', 'import'],
+  ['verwaltung', 'ehemalige'],
+  ['verwaltung', 'ehemalige', 'import'],
+  ...['mitglied', 'ehemalige'].flatMap((base) =>
+    ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag', 'eintritt'].map((s) => [
+      'verwaltung',
+      base,
+      '7',
+      s,
+    ]),
+  ),
   ['brett'],
   ['umfragen'],
   ['umfragen', '4'],
@@ -111,10 +135,14 @@ test('Termine: passend zu Kalender, öffentlichen Terminen und Geburtstagen', ()
   assert.equal(helpSlug(['termine'], withRights(['member'], ['birthdays'])), 'geburtstage');
 });
 
-test('Meins: erste Unterseite, sonst die Titel', () => {
-  assert.equal(helpSlug(['meins'], withRights(['member'], ALL_FEATURES, { meinsFirst: 'strafen' })), 'meine-strafen');
-  assert.equal(helpSlug(['meins'], withRights(['member'], ['titles'])), 'meine-titel');
-  assert.equal(helpSlug(['meins'], withRights(['member'], [])), null);
+test('Meins: ohne Unterseite die Übersicht, sonst die Seite zur Unterseite', () => {
+  const member = withRights(['member'], ['titles']);
+  assert.equal(helpSlug(['meins'], member), 'meins-uebersicht');
+  assert.ok(sees('meins-uebersicht', member));
+  assert.equal(helpSlug(['meins', 'strafen'], withRights(['member'])), 'meine-strafen');
+  // Konto unter „Meins“; ohne eigene Daten (z. B. Anwärter) ist es die einzige Unterseite.
+  assert.equal(helpSlug(['meins', 'konto'], member), 'anmelden-und-konto');
+  assert.equal(helpSlug(['meins'], withRights(['calendar'])), 'anmelden-und-konto');
 });
 
 test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', () => {
@@ -126,6 +154,8 @@ test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', ()
     [['manage_ranks'], ['ranks'], 'dienstgrade-verwalten'],
     [['manage_titles'], ['titles'], 'titel-verwalten'],
     [['manage_attendance'], ['attendance'], 'anwesenheit-erfassen'],
+    [['manage_offices'], ['offices'], 'aemter-verwalten'],
+    [['manage_lists'], ['lists'], 'listen'],
   ];
   for (const [rights, features, expected] of cases) {
     const ctx = withRights(['member', ...rights], features);
@@ -137,6 +167,12 @@ test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', ()
   }
   // Geburtstag eines Mitglieds: Pflegeseite nur mit dem Recht dazu
   assert.equal(helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['create_users'])), 'geburtstage-pflegen');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(
+    helpSlug(['verwaltung', 'ehemalige', '7', 'punkte'], withRights(['create_users', 'manage_points'], ['points'])),
+    'punkte-vergeben',
+  );
   assert.equal(
     helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_points'], ['points', 'birthdays'])),
     'punkte-vergeben',
