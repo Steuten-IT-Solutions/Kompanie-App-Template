@@ -20,7 +20,7 @@
  *   Markdown: ## und ### Überschriften, Absätze, Listen (- oder 1.), **fett**, *kursiv*, `Code`,
  *   [Text](https://…), [Text](seite:name) für eine andere Handbuchseite, > Hinweis.
  *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory|directory|offices}, {begriff.rank},
- *   {rolle.guest|candidate|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
+ *   {rolle.guest|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
  */
 
 declare(strict_types=1);
@@ -33,12 +33,12 @@ const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_poi
 const FEATURE_REQUIRES = ['polls' => ['board']];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
 const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
-const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'bereich.directory', 'bereich.offices', 'begriff.rank', 'rolle.guest', 'rolle.candidate', 'rolle.member', 'rolle.admin'];
+const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'bereich.directory', 'bereich.offices', 'begriff.rank', 'rolle.guest', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
     'bereich.events' => 'Termine', 'bereich.calendar' => 'Kalender', 'bereich.news' => 'News', 'bereich.gallery' => 'Galerie',
     'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'bereich.titles' => 'Titel', 'bereich.attendance' => 'Anwesenheit', 'bereich.documents' => 'Dokumente', 'bereich.board' => 'Schwarzes Brett', 'bereich.polls' => 'Umfragen', 'bereich.birthdays' => 'Geburtstage', 'bereich.inventory' => 'Inventar', 'bereich.directory' => 'Mitglieder', 'bereich.offices' => 'Ämter', 'begriff.rank' => 'Dienstgrad',
-    'rolle.guest' => 'Gast', 'rolle.candidate' => 'Anwärter', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
+    'rolle.guest' => 'Gast', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
 ];
 
 $root = dirname(__DIR__);

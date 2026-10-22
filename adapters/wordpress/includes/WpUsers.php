@@ -53,9 +53,14 @@ final class WpUsers implements UserDirectory, AuthContext
      * @param (\Closure(string, int): array<int, Capability>)|null $capabilities Rechte je Grundrolle und Benutzer-ID, mit den
      *        Zusatzrollen aus der Tabelle des Kerns (Domain\RoleService::capabilitiesFor; keine eigenen WP-Rollen dafür)
      * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? (für frühere WP-Rollen)
+     * @param (\Closure(string): bool)|null $promotable Lässt sich die Rolle mit „Mitglieder anlegen“ zum Mitglied machen?
+     *        (Domain\RoleService::promotable)
      */
-    public function __construct(private readonly ?\Closure $capabilities = null, private readonly ?\Closure $known = null)
-    {
+    public function __construct(
+        private readonly ?\Closure $capabilities = null,
+        private readonly ?\Closure $known = null,
+        private readonly ?\Closure $promotable = null,
+    ) {
     }
 
     public function currentUser(): ?User
@@ -127,7 +132,7 @@ final class WpUsers implements UserDirectory, AuthContext
             'nickname' => $name,
             'first_name' => $firstName,
             'last_name' => $lastName,
-            // Die frühere WP-Rolle nur für Mitglieder (Rückfall bei einem Zurückrollen); Anwärter sind Abonnenten.
+            // Die frühere WP-Rolle nur für Mitglieder (Rückfall bei einem Zurückrollen); andere Rollen sind Abonnenten.
             'role' => $role === AppRoles::MEMBER ? Roles::ROLE_MEMBER : 'subscriber',
         ]);
         if (is_wp_error($id)) {
@@ -154,8 +159,10 @@ final class WpUsers implements UserDirectory, AuthContext
         }
         // Wer handelt, braucht das Recht in WordPress oder über seine Rolle in der App (der Kern hat die
         // Regeln der App schon geprüft). Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
-        // Anwärter zum Mitglied machen darf auch, wer Konten anlegen darf (Issue #23).
-        $promotion = $role === AppRoles::MEMBER && $this->find($id)?->role === AppRoles::CANDIDATE && $this->currentUser()?->can(Capability::CreateUsers);
+        // Zum Mitglied machen (z. B. Anwärter) darf auch, wer Konten anlegen darf, wenn die Rolle dafür freigegeben ist (Issue #23).
+        $from = $this->find($id)?->role;
+        $promotion = $role === AppRoles::MEMBER && $from !== null && $this->promotable !== null && ($this->promotable)($from)
+            && $this->currentUser()?->can(Capability::CreateUsers);
         if (!$promotion && !$this->actorMay('promote_user', $id, Capability::PromoteUsers)) {
             throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }

@@ -82,4 +82,18 @@ final class TestApp
         }
         return $app;
     }
+
+    /**
+     * Eigene Rolle „Anwärter“, wie ein Admin sie einrichtet (Issue #23): nur der interne Kalender, beim Anlegen von Konten
+     * wählbar, zum Mitglied zu machen. Gibt ihren Schlüssel zurück (beim zweiten Aufruf denselben).
+     */
+    public static function candidateRole(App $app): string
+    {
+        foreach ($app->roles()->all() as $key => $r) {
+            if ($r['label'] === 'Anwärter') {
+                return $key;
+            }
+        }
+        return $app->roles()->create(['label' => 'Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key'];
+    }
 }

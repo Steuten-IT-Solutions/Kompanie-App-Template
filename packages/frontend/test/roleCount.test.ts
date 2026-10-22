@@ -15,15 +15,15 @@ test('eigene Bezeichnungen bleiben unverändert', () => {
   assert.equal(roleCount('Jungmariner', 3), 'Jungmariner 3');
 });
 
-test('Gruppen: Mitglieder zuerst, eigene Rollen dazwischen, Anwärter zuletzt, leere fehlen', () => {
+test('Gruppen: Mitglieder zuerst, dann die übrigen Rollen in ihrer Reihenfolge, leere fehlen', () => {
   const roles = [
-    { key: 'admin', label: 'Admin' },
-    { key: 'candidate', label: 'Anwärter' },
     { key: 'jung', label: 'Jungmariner' },
     { key: 'member', label: 'Mitglied' },
+    { key: 'r2', label: 'Anwärter' },
+    { key: 'admin', label: 'Admin' },
   ];
   const counts = new Map([
-    ['candidate', 5],
+    ['r2', 5],
     ['jung', 3],
     ['member', 45],
     ['admin', 0],

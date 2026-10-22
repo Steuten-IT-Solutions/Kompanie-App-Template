@@ -52,7 +52,6 @@ function labels(): Record<string, string> {
     'bereich.offices': sec.offices,
     'begriff.rank': brand.labels.rank,
     'rolle.guest': levelLabel('guest'),
-    'rolle.candidate': levelLabel('candidate'),
     'rolle.member': levelLabel('member'),
     'rolle.admin': levelLabel('admin'),
   };

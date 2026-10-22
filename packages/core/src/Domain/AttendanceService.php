@@ -131,9 +131,9 @@ final class AttendanceService
                 $counts[$status][$group] = ($counts[$status][$group] ?? 0) + 1;
             }
         }
-        // Mitglieder zuerst, dann die eigenen Rollen in ihrer Reihenfolge, Anwärter zuletzt (wie die Mitgliederliste)
+        // Mitglieder zuerst, dann die übrigen Rollen in ihrer Reihenfolge (Einstellungen → Rollen; wie die Mitgliederliste)
         $order = array_flip(array_keys($roles->all()));
-        $tier = static fn (string $g): int => $g === Roles::MEMBER ? 0 : ($g === Roles::CANDIDATE ? 2 : 1);
+        $tier = static fn (string $g): int => $g === Roles::MEMBER ? 0 : 1;
         $byGroup = [];
         foreach (self::STATUSES as $s) {
             $row = $counts[$s] ?? [];
