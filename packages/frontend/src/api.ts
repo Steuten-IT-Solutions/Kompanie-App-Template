@@ -837,6 +837,8 @@ export interface PrintListInput {
   orientation?: 'portrait' | 'landscape';
   columns?: Omit<ListColumn, 'available'>[];
   rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
+  /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */
+  updated_at?: string;
 }
 
 export interface ListSyncResult {

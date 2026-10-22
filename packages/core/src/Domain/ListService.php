@@ -150,14 +150,21 @@ final class ListService
     }
 
     /**
-     * Liste ganz ersetzen: Titel, Untertitel, Datum, Ausrichtung, Spalten und Zeilen.
+     * Liste ganz ersetzen: Titel, Untertitel, Datum, Ausrichtung, Spalten und Zeilen. Mit updated_at (Stand, den die
+     * App geladen hat) nur, wenn niemand die Liste inzwischen geändert hat; sonst 409 conflict, statt dessen Änderungen
+     * zu überschreiben. updated_at hat Sekunden: Zwei Änderungen in derselben Sekunde unterscheidet das nicht.
      *
      * @param array<string, mixed> $in
      * @return array<string, mixed>
      */
     public function save(User $actor, int $id, array $in): array
     {
-        $this->find($id);
+        $list = $this->find($id);
+        $loaded = $in['updated_at'] ?? null;
+        if (is_string($loaded) && $loaded !== Time::utcToIso($list['updated_at'])) {
+            $by = (new UserNames($this->app->users))->name($list['updated_by']) ?? 'Jemand';
+            throw new ApiError(409, 'conflict', $by . ' hat die Liste inzwischen geändert. Bitte die Liste neu laden und deine Änderungen noch einmal eintragen.');
+        }
         $repo = $this->repository();
         $data = $this->validate($in, $repo->rows($id));
         $now = $this->app->time()->nowUtc();
@@ -234,7 +241,7 @@ final class ListService
             $kept[] = $r;
         }
         $new = array_values(array_diff_key($members, $inList));
-        usort($new, static fn (User $a, User $b): int => self::sortKey($a) <=> self::sortKey($b));
+        usort($new, self::compareNames(...));
         $added = array_map(static fn (User $u): array => ['user_id' => $u->id, 'name' => $u->name], $new);
 
         if (!$apply || ($added === [] && $removed === [])) {
@@ -243,9 +250,7 @@ final class ListService
         if (count($kept) + count($new) > self::ROWS_MAX) {
             throw ApiError::invalid(sprintf('Die Liste hätte dann mehr als %d Zeilen.', self::ROWS_MAX));
         }
-        foreach ($new as $u) {
-            $kept = self::insertSorted($kept, $u, $members);
-        }
+        $kept = self::mergeSorted($kept, $new, $members);
         $now = $this->app->time()->nowUtc();
         $this->app->db->transaction(function () use ($repo, $id, $kept, $actor, $now): void {
             $repo->replaceRows($id, $kept);
@@ -310,7 +315,8 @@ final class ListService
                     'name' => $u->name,
                     'first_name' => $u->firstName,
                     'last_name' => $u->lastName,
-                    'role' => $this->app->roles()->label($u->role),
+                    // Grundrolle, dahinter die Zusatzrollen (Issue #66), wie roleLabels in der App
+                    'role' => implode(', ', array_map($this->app->roles()->label(...), [$u->role, ...$this->app->roles()->extraRolesOf($u)])),
                     'rank' => $ranks[$id] ?? null,
                     'titles' => array_map(static fn (array $t): string => $t['title'], $titles[$id] ?? []),
                     // Geburtstage nur von Mitgliedern (BirthdayService::list)
@@ -450,40 +456,78 @@ final class ListService
     }
 
     /**
-     * Neue Mitgliedszeile vor der ersten Mitgliedszeile einordnen, die nach Namen später kommt; sonst hinter die letzte
-     * Mitgliedszeile, ohne Mitgliedszeilen an den Anfang.
+     * Neue Mitgliedszeilen (nach Namen sortiert) einordnen, in einem Durchgang: jede vor die erste vorhandene
+     * Mitgliedszeile, die nach Namen später kommt, sonst hinter die letzte; ohne Mitgliedszeilen an den Anfang.
      *
      * @param list<Row> $rows
+     * @param list<User> $new
      * @param array<int, User> $members
      * @return list<Row>
      */
-    private static function insertSorted(array $rows, User $user, array $members): array
+    private static function mergeSorted(array $rows, array $new, array $members): array
     {
-        $key = self::sortKey($user);
+        $row = static fn (User $u): array => ['kind' => self::ROW_MEMBER, 'user_id' => $u->id, 'name' => ''];
         $lastMember = -1;
         foreach ($rows as $i => $r) {
-            if ($r['kind'] !== self::ROW_MEMBER || $r['user_id'] === null || !isset($members[$r['user_id']])) {
-                continue;
+            if ($r['kind'] === self::ROW_MEMBER && $r['user_id'] !== null && isset($members[$r['user_id']])) {
+                $lastMember = $i;
             }
-            if (self::sortKey($members[$r['user_id']]) > $key) {
-                array_splice($rows, $i, 0, [['kind' => self::ROW_MEMBER, 'user_id' => $user->id, 'name' => '']]);
-                return $rows;
-            }
-            $lastMember = $i;
         }
-        array_splice($rows, $lastMember + 1, 0, [['kind' => self::ROW_MEMBER, 'user_id' => $user->id, 'name' => '']]);
-        return $rows;
+        $out = [];
+        foreach ($rows as $i => $r) {
+            if ($r['kind'] === self::ROW_MEMBER && $r['user_id'] !== null && isset($members[$r['user_id']])) {
+                while ($new !== [] && self::compareNames($new[0], $members[$r['user_id']]) < 0) {
+                    $out[] = $row(array_shift($new));
+                }
+            }
+            if ($i === 0 && $lastMember === -1) {
+                array_push($out, ...array_map($row, $new));
+                $new = [];
+            }
+            $out[] = $r;
+            if ($i === $lastMember) {
+                array_push($out, ...array_map($row, $new));
+                $new = [];
+            }
+        }
+        // Leere Liste
+        array_push($out, ...array_map($row, $new));
+        return $out;
     }
 
     /**
-     * Nach Nachname, dann Vorname, wie die App (memberSort.ts): ohne Nachnamen (z. B. Funktionskonto) zählt der Vorname;
-     * Umlaute wie ihr Grundbuchstabe (DIN 5007-1).
+     * Nach Nachname, dann Vorname, wie die App (memberSort.ts: localeCompare 'de', Grundbuchstaben, Zahlen nach Wert):
+     * ohne Nachnamen (z. B. Funktionskonto) zählt der Vorname.
      */
-    private static function sortKey(User $u): string
+    private static function compareNames(User $a, User $b): int
     {
-        $fold = static fn (string $s): string => strtr(mb_strtolower(trim($s)), ['ä' => 'a', 'ö' => 'o', 'ü' => 'u', 'ß' => 'ss']);
-        $last = trim($u->lastName) !== '' ? $u->lastName : $u->firstName;
-        return $fold($last) . "\0" . $fold($u->firstName) . "\0" . sprintf('%012d', $u->id);
+        $last = static fn (User $u): string => trim($u->lastName) !== '' ? $u->lastName : $u->firstName;
+        return self::compareText($last($a), $last($b)) ?: self::compareText($a->firstName, $b->firstName) ?: $a->id <=> $b->id;
+    }
+
+    private static function compareText(string $a, string $b): int
+    {
+        static $collator = null;
+        // Mit der Erweiterung intl wie die App; sonst Akzente und Umlaute als Grundbuchstabe, Zahlen nach Wert.
+        if ($collator === null && class_exists(\Collator::class)) {
+            $collator = new \Collator('de_DE');
+            $collator->setStrength(\Collator::PRIMARY);
+            $collator->setAttribute(\Collator::NUMERIC_COLLATION, \Collator::ON);
+        }
+        if ($collator instanceof \Collator) {
+            return (int) $collator->compare(trim($a), trim($b));
+        }
+        return strnatcasecmp(self::fold($a), self::fold($b));
+    }
+
+    /** Kleinbuchstaben, Akzente und Umlaute als Grundbuchstabe (DIN 5007-1), ß als ss. */
+    private static function fold(string $s): string
+    {
+        return strtr(mb_strtolower(trim($s)), [
+            'ä' => 'a', 'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a', 'ç' => 'c', 'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i', 'ñ' => 'n', 'ö' => 'o', 'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ý' => 'y', 'ÿ' => 'y', 'ß' => 'ss',
+        ]);
     }
 
     /** @return ListRow */

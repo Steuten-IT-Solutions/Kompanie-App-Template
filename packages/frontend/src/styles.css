@@ -3940,10 +3940,4 @@ button.spotlight-person:focus-visible {
   body.list-printing {
     background: #fff !important;
   }
-  @page {
-    @bottom-right {
-      content: 'Seite ' counter(page) ' von ' counter(pages);
-      font-size: 8pt;
-    }
-  }
 }

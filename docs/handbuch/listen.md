@@ -11,7 +11,7 @@ Unter **Neue Liste** einen Titel eintragen und **Anlegen** tippen. Die neue List
 
 In der Übersicht öffnet ein Tipp eine Liste. **Kopieren** legt eine Kopie mit allen Spalten und Zeilen an, z. B. die Liste vom letzten Jahr als Vorlage. **Löschen** löscht die Liste.
 
-Änderungen speicherst du mit **Speichern** unten in der Liste.
+Änderungen speicherst du mit **Speichern** unten in der Liste. Hat jemand anderes die Liste inzwischen geändert, speichert die App nicht, sondern meldet das; lade die Liste dann neu und trage deine Änderungen noch einmal ein.
 
 ## Spalten
 Es gibt zwei Arten von Spalten:

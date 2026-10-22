@@ -230,6 +230,37 @@ final class ListServiceTest extends TestCase
         $this->assertSame(['frei:Gast', 'Nora Neumann', 'Bernd Özdemir', 'Ada Zander', 'frei:'], self::rows($done['list']));
     }
 
+    public function testSortLikeTheApp(): void
+    {
+        $this->setUpApp();
+        $this->users->create('Cem', 'Çelik', 'cem', 'cem@example.org', 'geheim123');
+        $this->users->create('Max', 'Muster10', 'm10', 'm10@example.org', 'geheim123');
+        $this->users->create('Max', 'Muster2', 'm2', 'm2@example.org', 'geheim123');
+        $this->users->create('Kasse', '', 'kasse', 'kasse@example.org', 'geheim123');
+        $id = $this->ok('POST', '/lists', ['title' => 'Alle'])['id'];
+        // Akzente und Umlaute wie Grundbuchstaben, Zahlen nach Wert, ohne Nachnamen zählt der Vorname (wie memberSort.ts)
+        $this->assertSame(
+            ['Cem Çelik', 'Kasse', 'Lena Listig', 'Anna Müller', 'Max Muster2', 'Max Muster10', 'Bernd Özdemir', 'Ada Zander'],
+            array_column($this->ok('POST', "/lists/$id/sync-members")['added'], 'name'),
+        );
+    }
+
+    public function testConflictInsteadOfOverwriting(): void
+    {
+        $this->setUpApp();
+        $list = $this->ok('POST', '/lists', ['title' => 'Liste']);
+        // Geladen um 11 Uhr; um 12 Uhr aktualisiert jemand anderes die Liste.
+        $this->app->db->execute("UPDATE {lists} SET updated_at = '2026-10-22 11:00:00'");
+        $loaded = $this->ok('GET', "/lists/{$list['id']}")['updated_at'];
+        $this->as($this->lister, 'POST', "/lists/{$list['id']}/sync-members", ['apply' => true]);
+        $res = $this->call('PUT', "/lists/{$list['id']}", ['title' => 'Alt', 'columns' => $list['columns'], 'rows' => [], 'updated_at' => $loaded]);
+        $this->assertSame([409, 'conflict'], [$res->status, $res->data['code'] ?? null]);
+        $this->assertStringStartsWith('Lena Listig hat die Liste inzwischen geändert.', (string) ($res->data['message'] ?? ''));
+        $this->assertNotSame([], $this->ok('GET', "/lists/{$list['id']}")['rows'], 'nichts überschrieben');
+        $current = $this->ok('GET', "/lists/{$list['id']}");
+        $this->assertSame('Neu', $this->ok('PUT', "/lists/{$list['id']}", ['title' => 'Neu', 'columns' => $current['columns'], 'rows' => [], 'updated_at' => $current['updated_at']])['title']);
+    }
+
     public function testFieldsFollowFeaturesAndRights(): void
     {
         $this->setUpApp();
@@ -244,13 +275,15 @@ final class ListServiceTest extends TestCase
         $this->users->current = $this->bernd;
         $this->ok('PUT', '/me/birthday', ['month' => 4, 'day' => 1, 'visible' => false]);
         $this->users->current = $this->admin;
+        // Zusatzrolle (Issue #66): steht hinter der Grundrolle
+        $this->ok('PATCH', "/members/{$this->anna}/role", ['extra_roles' => ['points']]);
 
         $columns = array_map(static fn (string $f): array => ['kind' => 'field', 'field' => $f], ['nr', 'name', 'first_name', 'last_name', 'role', 'rank', 'titles', 'birthday', 'points', 'penalties']);
         $list = $this->ok('POST', '/lists', ['title' => 'Alles', 'columns' => $columns]);
         $list = $this->ok('POST', "/lists/{$list['id']}/sync-members", ['apply' => true])['list'];
         $byId = array_column($list['rows'], null, 'user_id');
         $this->assertEquals((object) [
-            'name' => 'Anna Müller', 'first_name' => 'Anna', 'last_name' => 'Müller', 'role' => 'Mitglied', 'rank' => 'Gefreiter',
+            'name' => 'Anna Müller', 'first_name' => 'Anna', 'last_name' => 'Müller', 'role' => 'Mitglied, Punkte verwalten', 'rank' => 'Gefreiter',
             'titles' => ['Ehrenmitglied'], 'birthday' => '09.03.', 'points' => 5, 'penalties' => 250,
         ], $byId[$this->anna]['values']);
         $this->assertNull($byId[$this->bernd]['values']->birthday, 'nicht freigegeben');

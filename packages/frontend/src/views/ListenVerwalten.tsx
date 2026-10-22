@@ -5,8 +5,8 @@ import { useDragSort } from '../dragSort';
 import { formatDate, formatEuro, todayYmd } from '../format';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo-small.webp';
-import { csvFileName, sortRowsByName, toCsv } from '../lists';
-import { splitName } from '../memberSort';
+import { csvFileName, toCsv } from '../lists';
+import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
@@ -226,9 +226,12 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
   const saved = useMemo(() => JSON.stringify(toInput(toDraft(list))), [list]);
   const dirty = JSON.stringify(toInput(draft)) !== saved;
   const update = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  // Stand, auf dem der Entwurf beruht: Beim Speichern prüft der Server, dass niemand die Liste inzwischen geändert hat.
+  const [basis, setBasis] = useState(list.updated_at);
   /** Stand vom Server übernehmen (nach Speichern bzw. Aktualisieren): Entwurf neu, mit den aktuellen Werten. */
   function adopt(l: PrintList) {
     setDraft(toDraft(l));
+    setBasis(l.updated_at);
     onSaved(l);
   }
 
@@ -246,7 +249,7 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
   }
 
   async function save(): Promise<boolean> {
-    const result = await run(() => api.saveList(list.id, toInput(draft)));
+    const result = await run(() => api.saveList(list.id, { ...toInput(draft), updated_at: basis }));
     if (!result) return false;
     onToast('Gespeichert');
     adopt(result);
@@ -262,12 +265,17 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     else setSync(result);
   }
 
+  /** Übernehmen: Änderungen, die während der Übersicht dazukamen, erst speichern, damit sie nicht verloren gehen. */
   async function applySync() {
+    if (dirty && !(await save())) return;
     const result = await run(() => api.syncListMembers(list.id, true));
     setSync(null);
     if (result?.list) {
       onToast('Mitglieder aktualisiert');
       adopt(result.list);
+    } else if (result) {
+      // Inzwischen schon aktualisiert (z. B. von jemand anderem)
+      onToast('Die Liste ist aktuell');
     }
   }
 
@@ -755,7 +763,7 @@ function PrintSheet({ draft }: { draft: Draft }) {
 
 /**
  * Für den Druck liegt die Tabelle direkt unter <body>; beim Drucken ist nur sie zu sehen (styles.css, body.list-printing).
- * Die Ausrichtung kommt als @page-Regel dazu.
+ * Ausrichtung und Seitenzahlen kommen als @page-Regel dazu.
  */
 function PrintPortal({ draft }: { draft: Draft }) {
   const [root, setRoot] = useState<HTMLElement | null>(null);
@@ -776,7 +784,9 @@ function PrintPortal({ draft }: { draft: Draft }) {
     };
   }, []);
   useEffect(() => {
-    if (style.current) style.current.textContent = `@page { size: A4 ${draft.orientation}; margin: 12mm; }`;
+    // Seitenzahlen unten rechts nur beim Drucken einer Liste (die Regel gibt es nur, solange die Liste offen ist)
+    if (style.current)
+      style.current.textContent = `@page { size: A4 ${draft.orientation}; margin: 12mm; @bottom-right { content: 'Seite ' counter(page) ' von ' counter(pages); font-size: 8pt; } }`;
   }, [draft.orientation, root]);
   return root ? createPortal(<PrintSheet draft={draft} />, root) : null;
 }

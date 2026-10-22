@@ -1,7 +1,7 @@
-// Listen (src/lists.ts, Issue #121): CSV für ein deutsches Excel, Schutz vor CSV-Injection, Dateiname, Sortieren nach Namen.
+// Listen (src/lists.ts, Issue #121): CSV für ein deutsches Excel, Schutz vor CSV-Injection, Dateiname.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { csvField, csvFileName, sortRowsByName, toCsv, type SortableRow } from '../src/lists.ts';
+import { csvField, csvFileName, toCsv } from '../src/lists.ts';
 
 const BOM = String.fromCharCode(0xfeff);
 
@@ -32,27 +32,4 @@ test('Dateiname aus dem Titel', () => {
   assert.equal(csvFileName('Ausflug: Xanten / 2026?'), 'Ausflug Xanten 2026.csv');
   assert.equal(csvFileName('  '), 'liste.csv');
   assert.equal(csvFileName('a'.repeat(120)), 'a'.repeat(80) + '.csv');
-});
-
-test('Nach Namen sortieren: Nachname, Vorname, Umlaute wie Grundbuchstaben; leere und gelöschte Zeilen ans Ende', () => {
-  const member = (first: string, last: string): SortableRow => ({
-    kind: 'member',
-    name: `${first} ${last}`.trim(),
-    first_name: first,
-    last_name: last,
-  });
-  const rows: SortableRow[] = [
-    { kind: 'free', name: '' },
-    member('Ada', 'Zander'),
-    { kind: 'member', name: '', deleted: true },
-    { kind: 'free', name: 'Gast Nachbarverein' },
-    member('Bernd', 'Özdemir'),
-    member('Kasse', ''),
-    member('Anna', 'Müller'),
-    member('Zoe', 'Müller'),
-  ];
-  assert.deepEqual(
-    sortRowsByName(rows).map((r) => (r.deleted ? '(gelöscht)' : r.name)),
-    ['Kasse', 'Anna Müller', 'Zoe Müller', 'Gast Nachbarverein', 'Bernd Özdemir', 'Ada Zander', '', '(gelöscht)'],
-  );
 });

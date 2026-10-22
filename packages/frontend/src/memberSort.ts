@@ -2,6 +2,8 @@ import type { MemberSummary } from './api';
 
 /** Was die Sortierung braucht: Mitgliederliste der Verwaltung und die für alle (DirectoryEntry). */
 type Sortable = Pick<MemberSummary, 'id' | 'name' | 'first_name' | 'last_name'> & { points?: number | null };
+/** Was der Name braucht; ohne first_name wird name geteilt (z. B. freie Zeilen einer Liste). */
+type Named = Pick<Sortable, 'name' | 'first_name' | 'last_name'>;
 
 /** Sortierung der Mitgliederliste in der Verwaltung und der für alle. */
 export type MemberSort = 'last-name' | 'first-name' | 'points';
@@ -67,7 +69,7 @@ export function splitName(name: string): { first: string; last: string } {
   return { first: parts.join(' '), last };
 }
 
-function nameParts(m: Sortable): { first: string; last: string } {
+function nameParts(m: Named): { first: string; last: string } {
   return m.first_name !== undefined ? { first: m.first_name, last: m.last_name ?? '' } : splitName(m.name);
 }
 
@@ -81,11 +83,13 @@ export function listName(m: Sortable, sort: MemberSort): string {
 const cmp = (a: string, b: string) => a.localeCompare(b, 'de', { sensitivity: 'base', numeric: true });
 
 /** Ohne Nachnamen (z. B. Funktionskonto) zählt beim Nachnamen der Vorname. */
-const byLastName = (a: Sortable, b: Sortable) => {
+const byName = (a: Named, b: Named) => {
   const x = nameParts(a);
   const y = nameParts(b);
-  return cmp(x.last || x.first, y.last || y.first) || cmp(x.first, y.first) || a.id - b.id;
+  return cmp(x.last || x.first, y.last || y.first) || cmp(x.first, y.first);
 };
+
+const byLastName = (a: Sortable, b: Sortable) => byName(a, b) || a.id - b.id;
 
 const byFirstName = (a: Sortable, b: Sortable) => {
   const x = nameParts(a);
@@ -104,4 +108,14 @@ export function sortMembers<T extends Sortable>(members: T[], { sort, dir }: Mem
       ? (a: T, b: T) => sign * byPoints(a, b) || byLastName(a, b)
       : (a: T, b: T) => sign * (sort === 'last-name' ? byLastName : byFirstName)(a, b);
   return [...members].sort(compare);
+}
+
+/**
+ * „Nach Namen sortieren“ in Listen (Issue #121): Zeilen mit Namen nach Nachname wie die Mitgliederliste, leere Zeilen
+ * und Zeilen gelöschter Konten danach, in ihrer Reihenfolge.
+ */
+export function sortRowsByName<T extends Named & { deleted?: boolean }>(rows: T[]): T[] {
+  const named = rows.filter((r) => !r.deleted && r.name.trim() !== '');
+  const rest = rows.filter((r) => r.deleted || r.name.trim() === '');
+  return [...[...named].sort(byName), ...rest];
 }

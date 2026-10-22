@@ -1016,7 +1016,8 @@ paths:
       summary: Liste ganz ersetzen (Titel, Untertitel, Datum, Ausrichtung, Spalten, Zeilen)
       description: |
         Mitgliedszeilen nur für Konten, die schon in der Liste stehen (z. B. beim Umsortieren), oder für Mitglieder (Recht
-        `member`); jedes Konto höchstens einmal. `user_id: null` steht für ein gelöschtes Konto.
+        `member`); jedes Konto höchstens einmal. `user_id: null` steht für ein gelöschtes Konto. Mit `updated_at` (der
+        geladene Stand) nur, wenn niemand die Liste inzwischen geändert hat, sonst 409 `conflict`.
       x-capability: manage_lists
       requestBody:
         required: true
@@ -1032,6 +1033,7 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
     delete:
       tags: [Listen]
       summary: Liste löschen
@@ -4764,6 +4766,7 @@ components:
               kind: { type: string, enum: [member, free] }
               user_id: { type: [integer, 'null'], description: Nur bei member }
               name: { type: string, maxLength: 100, description: Nur bei free }
+        updated_at: { type: string, format: date-time, description: 'Nur beim Ersetzen (PUT): der geladene Stand' }
 
     OfficeGroup:
       type: object

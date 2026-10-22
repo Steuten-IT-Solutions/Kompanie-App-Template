@@ -1099,6 +1099,8 @@ final class ApiScenario
         $columns = [['kind' => 'field', 'field' => 'name'], ['kind' => 'field', 'field' => 'points']];
         [, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [['kind' => 'member', 'user_id' => $m]]]);
         $c->ok(($d['columns'][1]['available'] ?? null) === true && is_numeric($d['rows'][0]['values']['points'] ?? null), 'Admin sieht die Punkte');
+        [$s, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [], 'updated_at' => '2000-01-01T00:00:00+00:00']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict, nichts überschrieben');
         [, $roles] = $this->req('GET', '/admin/roles');
         $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === ['member', 'manage_lists'], 'Standardrolle „Listen verwalten“');
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['lists']]);
