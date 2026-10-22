@@ -2,12 +2,13 @@ import type { MemberSummary } from './api';
 
 /**
  * Was die Sortierung braucht: Mitgliederliste der Verwaltung und die für alle (DirectoryEntry), dazu die Ehemaligen.
- * Eintritt: join_year bei Mitgliedern, joined_on (JJJJ-MM-TT oder JJJJ) bzw. joined_year und founder bei Ehemaligen.
- * Austritt (Ausscheiden): left_on bzw. left_year, nur bei Ehemaligen.
+ * Eintritt: join_date (JJJJ-MM-TT oder JJJJ) bzw. join_year bei Mitgliedern, joined_on (JJJJ-MM-TT oder JJJJ) bzw. joined_year und founder bei Ehemaligen.
+ * Austritt (Ausscheiden): left_on (JJJJ-MM-TT oder JJJJ) bzw. left_year, nur bei Ehemaligen.
  */
 type Sortable = Pick<MemberSummary, 'id' | 'name' | 'first_name' | 'last_name'> & {
   points?: number | null;
   join_year?: number | null;
+  join_date?: string | null;
   joined_on?: string;
   joined_year?: string;
   founder?: boolean;
@@ -140,7 +141,7 @@ const byPoints = (a: Sortable, b: Sortable) => (a.points ?? 0) - (b.points ?? 0)
  * ohne Datum vor allen anderen; null ohne Angabe (oder nicht sichtbar).
  */
 export function joinKey(m: Sortable): string | null {
-  const v = m.joined_on || m.joined_year || (m.join_year ? String(m.join_year) : '');
+  const v = m.joined_on || m.joined_year || m.join_date || (m.join_year ? String(m.join_year) : '');
   return v !== '' ? v : m.founder ? '' : null;
 }
 

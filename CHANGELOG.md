@@ -48,6 +48,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Geburtstag und Eintritt auf der eigenen Seite**: Unter *Konto* steht die Auswahl „Auf meiner Seite …“ jetzt
+  von Anfang an auf **Mitgliedern anzeigen** (bisher „Nicht anzeigen“); nur angemeldete Mitglieder sehen die Angabe.
+  Das gilt auch für alle schon eingetragenen Geburtstage und Eintritte, die auf „Nicht anzeigen“ standen. Wer sie
+  nicht zeigen will, stellt unter *Konto* wieder „Nicht anzeigen“ ein.
+- **Eintritt und Austritt mit ganzem Datum**: Auf der Seite eines Mitglieds steht der Eintritt jetzt so, wie er
+  eingetragen ist, z. B. „Eintritt 01.04.2005“ (bisher nur das Jahr). Bei den Ehemaligen stehen Eintritt und
+  Ausscheiden ebenso mit ganzem Datum, z. B. „01.04.1985 – 03.05.2010“; wer dort nur Jahre eingetragen hat, sieht
+  weiter nur die Jahre. Das gilt für alle, die die Angaben sehen dürfen, bei den Ehemaligen also auch ohne Anmeldung.
 - **Liste der Ehemaligen**: *Filter und Sortierung* ist wie in der Mitgliederliste zunächst eingeklappt und klappt mit
   einem Tipp auf. Ist der Filter nach dem Grund gesetzt, steht am eingeklappten Bereich „aktiv“.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
@@ -55,8 +63,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.
   Das Abzeichen öffnet Befördern und Degradieren, das Foto die große Ansicht mit „Foto ersetzen“ und „Foto
   entfernen“, die Kacheln Punkte und Offen ein Fenster mit dem Formular nur für diese Person und ihren Einträgen,
-  die neue Kachel Titel die Auswahl der Titel. Darunter stehen die Ämter, ganz unten Geburtstag, Eintritt und
-  Austritt (Austritt trägt als ehemalig ein bzw. ändert die Angaben) und zum Aufklappen „Konto und Rolle“. Die
+  die neue Kachel Titel die Auswahl der Titel. Darunter stehen Geburtstag, Eintritt und Austritt (Austritt trägt als
+  ehemalig ein bzw. ändert die Angaben), dann die Ämter als Zeitstrahl und zum Aufklappen „Konto und Rolle“. Die
   Knöpfe unter dem Foto und unter den Kacheln entfallen. Gilt auch für Ehemalige.
 - **Seiten beim Laden**: Statt „Lädt …“ steht eine Seite, deren Daten noch nicht da sind, sofort in ihrem gewohnten
   Aufbau da (Karten, Zeilen, Knöpfe als graue Platzhalter), bis die Daten kommen. Die App merkt sich dafür nur den

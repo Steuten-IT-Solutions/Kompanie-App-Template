@@ -1026,7 +1026,7 @@ final class ApiScenario
         $c->ok($this->req('PUT', '/me/join-year', ['year' => (int) gmdate('Y') + 1])[0] === 400, 'Eintrittsjahr in der Zukunft → 400');
         $c->ok($this->req('PUT', '/me/join-year', ['year' => 1799])[0] === 400, 'Eintrittsjahr vor 1800 → 400');
         [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005]);
-        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2005, 'date' => '2005', 'profile' => 'none'], 'Eigenes Eintrittsjahr, Standard: nicht zeigen');
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2005, 'date' => '2005', 'profile' => 'members'], 'Eigenes Eintrittsjahr, Standard: nur Mitgliedern zeigen');
         [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'members']);
         $c->ok($s === 200 && ($d['join_year']['profile'] ?? null) === 'members', 'Eintrittsjahr nur Mitgliedern zeigen');
         $this->d->actAs($admin);
@@ -1243,7 +1243,7 @@ final class ApiScenario
             $year = 1996;
         }
         [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => $month, 'day' => $day, 'year' => $year, 'show_age' => true]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Eigenen Geburtstag mit Jahr eintragen');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true, 'profile' => 'members'], 'Eigenen Geburtstag mit Jahr eintragen');
         $this->d->actAs($m2);
         [$s, $d] = $this->req('GET', '/birthdays', [], ['days' => '7']);
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['user_id'] ?? 0) === $m))[0] ?? null;
@@ -1253,7 +1253,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [$s, $d] = $this->req('PUT', "/members/$m/birthday", ['month' => $month, 'day' => $day, 'visible' => false, 'show_age' => false]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Verwaltung ändert das Datum, die Schalter bleiben');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'members'], 'Verwaltung ändert das Datum, die Schalter bleiben');
         [$s, $d] = $this->req('GET', "/members/$m");
         $c->ok($s === 200 && ($d['birthday']['month'] ?? null) === $month, 'Mitgliedsdetails mit Geburtstag');
 
@@ -1270,7 +1270,7 @@ final class ApiScenario
             $this->users[] = $newId;
         }
         [, $detail] = $this->req('GET', "/members/$newId");
-        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false, 'profile' => 'none'], 'Mitglied mit Geburtstag anlegen');
+        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false, 'profile' => 'members'], 'Mitglied mit Geburtstag anlegen');
         $c->ok($this->req('DELETE', "/members/$newId")[0] === 200, 'Konto mit Geburtstag entfernen');
         $this->d->actAs($m2);
         [, $d] = $this->req('GET', '/birthdays');

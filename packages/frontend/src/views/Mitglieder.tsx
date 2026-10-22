@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import brand from '../generated/brand';
-import { groupCounts } from '../format';
+import { formatYearOrDate, groupCounts } from '../format';
 import { ZoomableAvatar } from '../memberPhoto';
 import { RankStack } from '../RankBadge';
 import { TitleBadges } from '../TitleBadges';
@@ -23,7 +23,7 @@ import { OfficesView, PersonOffices, useOffices } from './Aemter';
 
 /** Nach Namen oder Eintritt; Punkte stehen in dieser Liste nicht. */
 const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
-/** Ehemalige zusätzlich nach Austritt (nur das Jahr, wie unter dem Namen). */
+/** Ehemalige zusätzlich nach Austritt (wie unter dem Namen: Datum oder nur das Jahr). */
 const FORMER_SORTS: MemberSort[] = [...SORTS, 'left'];
 
 const sec = brand.labels.sections;
@@ -47,32 +47,47 @@ function storeSection(section: Section): void {
   }
 }
 
-/** Jahre einer ehemaligen Person: „Gründungsmitglied · 1985–2010“, „Eintritt 1985“, „bis 2010“; leer ohne Angaben. */
-export function formerYears(f: Partial<Pick<DirectoryFormerEntry, 'founder' | 'joined_year' | 'left_year'>>): string {
+/**
+ * Eintritt und Ausscheiden einer ehemaligen Person, wie eingetragen (ganzes Datum oder nur das Jahr): „Gründungsmitglied ·
+ * 01.04.1985 – 03.05.2010“, „1985–2010“, „Eintritt 1985“, „bis 2010“; leer ohne Angaben. Ältere Server: nur die Jahre.
+ */
+export function formerYears(
+  f: Partial<Pick<DirectoryFormerEntry, 'founder' | 'joined_year' | 'left_year' | 'joined_on' | 'left_on'>>,
+): string {
+  const show = (v: string | undefined) => (v ? formatYearOrDate(v) : '');
+  const joined = show(f.joined_on || f.joined_year);
+  const left = show(f.left_on || f.left_year);
   const years =
-    f.joined_year && f.left_year
-      ? `${f.joined_year}–${f.left_year}`
-      : f.joined_year
-        ? `Eintritt ${f.joined_year}`
-        : f.left_year
-          ? `bis ${f.left_year}`
+    joined && left
+      ? joined.length > 4 || left.length > 4
+        ? `${joined} – ${left}`
+        : `${joined}–${left}`
+      : joined
+        ? `Eintritt ${joined}`
+        : left
+          ? `bis ${left}`
           : '';
   return [f.founder ? 'Gründungsmitglied' : '', years].filter(Boolean).join(' · ');
 }
+
+/** Eintritt eines Mitglieds, wie eingetragen: „01.04.2005“ oder „2005“ (ältere Server: nur das Jahr); leer ohne. */
+export const joinedText = (m: { join_year?: number | null; join_date?: string | null }): string =>
+  m.join_date ? formatYearOrDate(m.join_date) : m.join_year ? String(m.join_year) : '';
 
 const dayMonth = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' });
 const fullDate = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
 
 /**
  * Geburtstag und Eintritt auf der Seite einer Person, soweit sie sie zeigt: „Geburtstag 12. März 1988 (38 Jahre) ·
- * Eintritt 2005“; ohne „Alter anzeigen“ nur Tag und Monat. Leer ohne Angaben.
+ * Eintritt 01.04.2005“ (bzw. „Eintritt 2005“ mit nur dem Jahr); ohne „Alter anzeigen“ nur Tag und Monat. Leer ohne Angaben.
  */
-export function personFacts(m: { birthday?: DirectoryBirthday | null; join_year?: number | null }): string {
+export function personFacts(m: { birthday?: DirectoryBirthday | null; join_year?: number | null; join_date?: string | null }): string {
   const b = m.birthday;
   // Ohne Jahr: 2000 als Maßstab (Schaltjahr, damit der 29.02. bleibt)
   const date = b && (b.year ? fullDate : dayMonth).format(new Date(b.year ?? 2000, b.month - 1, b.day));
   const birthday = b ? `Geburtstag ${date}${b.age !== null ? ` (${b.age} Jahre)` : ''}` : '';
-  return [birthday, m.join_year ? `Eintritt ${m.join_year}` : ''].filter(Boolean).join(' · ');
+  const joined = joinedText(m);
+  return [birthday, joined ? `Eintritt ${joined}` : ''].filter(Boolean).join(' · ');
 }
 
 /**
@@ -142,7 +157,7 @@ function back(): void {
 }
 
 /**
- * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu die Jahre,
+ * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu Eintritt und Ausscheiden,
  * bei Mitgliedern Geburtstag und Eintritt, soweit sie sie zeigen), darunter direkt ihre Ämter als Zeitstrahl. Ohne
  * Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
  */
@@ -206,7 +221,7 @@ function MemberPage({
 /**
  * Mitgliederliste (Bereich directory): Namen, Fotos, Dienstgrade und Titel, mit Suche und Sortierung wie in der
  * Verwaltung. Keine Rollen, Punkte oder Strafen. Antippen öffnet die Seite der Person (mit ihren Ämtern).
- * former: dieselbe Liste für die Ehemaligen, je Person dazu Gründungsmitglied und die Jahre (kein Grund).
+ * former: dieselbe Liste für die Ehemaligen, je Person dazu Gründungsmitglied, Eintritt und Ausscheiden (kein Grund).
  */
 function MemberList({ former = false }: { former?: boolean }) {
   const { data, error, loading, reload } = useAsync<(DirectoryEntry & Partial<DirectoryFormerEntry>)[]>(
@@ -300,7 +315,7 @@ function MemberList({ former = false }: { former?: boolean }) {
               </button>
               {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
               {/* Nach Eintritt sortiert: das Jahr, soweit die Person es zeigt (Ehemalige haben ihre Jahre oben). */}
-              {!former && order.sort === 'joined' && m.join_year && <div className="row-sub">Eintritt {m.join_year}</div>}
+              {!former && order.sort === 'joined' && joinedText(m) && <div className="row-sub">Eintritt {joinedText(m)}</div>}
             </div>
             {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
             {m.rank_title !== undefined && (

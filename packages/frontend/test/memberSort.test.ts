@@ -123,6 +123,7 @@ test('nach Eintritt: früheste bzw. neueste zuerst, nur das Jahr vor den Tagen d
   // Mitglieder (Jahr bzw. Datum) und Ehemalige in der Liste für alle (nur Jahre)
   assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: 2004 }), '2004');
   assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: null }), null);
+  assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: 2004, join_date: '2004-06-01' }), '2004-06-01', 'ganzes Datum vor dem Jahr');
   assert.equal(joinKey({ ...m(8, 'I', 'J'), joined_year: '1975', founder: true }), '1975');
   assert.equal(defaultDir('joined'), 'asc');
   assert.equal(dirLabel('joined', 'asc'), 'Früheste zuerst');

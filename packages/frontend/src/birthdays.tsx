@@ -167,7 +167,7 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
   const v = value ?? toBirthdayValue(current);
   const vis = visible ?? current?.visible ?? true;
   const age = showAge ?? current?.show_age ?? false;
-  const prof = profile ?? current?.profile ?? 'none';
+  const prof = profile ?? current?.profile ?? 'members';
   const withProfile = profileChoice();
 
   const done = (birthday: Birthday | null, msg: string) => {

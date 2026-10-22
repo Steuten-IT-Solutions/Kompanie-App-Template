@@ -1014,6 +1014,18 @@ final class Migrations
                 'mysql' => ["ALTER TABLE {join_years} ADD COLUMN joined_on varchar(10) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {join_years} ADD COLUMN joined_on TEXT NOT NULL DEFAULT ''"],
             ],
+            // Seite in der Mitgliederliste: Standard ist jetzt „Mitgliedern anzeigen“ (members). Auch bestehende Geburtstage
+            // und Eintritte mit none stellen auf members um (neue Einträge setzt das Programm selbst auf members).
+            23 => [
+                'mysql' => [
+                    "UPDATE {birthdays} SET profile = 'members' WHERE profile = 'none'",
+                    "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
+                ],
+                'sqlite' => [
+                    "UPDATE {birthdays} SET profile = 'members' WHERE profile = 'none'",
+                    "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
+                ],
+            ],
         ];
     }
 

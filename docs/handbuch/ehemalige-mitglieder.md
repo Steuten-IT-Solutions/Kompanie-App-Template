@@ -6,7 +6,7 @@ rechte: [create_users]
 Wer austritt, verstirbt oder sonst ausscheidet, muss nicht gelöscht werden. Als **ehemalig** eingetragen bleibt das Konto mit allen Daten erhalten: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, {bereich.offices}, Geburtstag und Foto. Das darf, wer Mitglieder anlegen darf, mit denselben Grenzen wie beim Löschen (Konten von {rolle.admin}s nur {rolle.admin}s).
 
 ## Als ehemalig eintragen
-1. In der Mitgliederliste die Person antippen und ganz unten **Austritt** antippen (oder **Konto und Rolle** aufklappen und unter **Ehemalig** auf **Als ehemalig eintragen …** tippen).
+1. In der Mitgliederliste die Person antippen und unter den Kacheln **Austritt** antippen (oder **Konto und Rolle** aufklappen und unter **Ehemalig** auf **Als ehemalig eintragen …** tippen).
 2. Es öffnet sich das Formular.
 3. Den **Grund des Ausscheidens** wählen: Ausgetreten, Verstorben oder Sonstiges. Optional das Datum des Ausscheidens (bei Verstorbenen den Todestag) und den Eintritt, jeweils als TT.MM.JJJJ oder nur das Jahr. Ist unter **Eintritt** schon ein Jahr eingetragen, steht es hier bereits. **Gründungsmitglied** ankreuzen, wenn es passt.
 4. **Als ehemalig eintragen** tippen.
@@ -21,7 +21,7 @@ Ist ein Amt mit einem Titel verknüpft, verliert eine ehemalige Person diesen Ti
 In der Verwaltung im Menü oben **Ehemalige** wählen. Oben steht, wie viele ausgetreten, verstorben und sonst ausgeschieden sind. Die Liste lässt sich durchsuchen. **Filter und Sortierung** ist zunächst eingeklappt; ein Tipp klappt es auf. Darin filterst du nach dem Grund, und unter **Sortierung** wählst du Nachname, Vorname, Eintritt (Gründungsmitglieder zuerst, wer keinen Eintritt hat, am Ende) oder Austritt (das Datum des Ausscheidens, auch bei Verstorbenen; wer keines hat, am Ende), daneben die **Reihenfolge**. Ist ein Filter gesetzt, steht am eingeklappten Bereich **aktiv**. Die Sortierung gilt auch für die Mitgliederliste (dort ohne Austritt) und bleibt auf dem Gerät gemerkt. Jede Zeile zeigt Eintritt und Ausscheiden und, wer {bereich.penalties} sieht, offene Beträge. Ein Tipp öffnet die Seite der Person wie gewohnt; **‹ Ehemalige** führt zurück. Mit Wischen nach links oder rechts (oder den Pfeilen oben rechts) blätterst du wie in der Mitgliederliste zur nächsten bzw. vorherigen Person.
 
 ## Angaben ändern und wieder aufnehmen
-Auf der Seite einer ehemaligen Person stehen unten **Eintritt** und **Austritt**; ein Tipp darauf öffnet gleich das Formular, um Grund, Daten und Gründungsmitglied zu korrigieren. Unter **Konto und Rolle** (ganz unten aufklappen), Abschnitt **Ehemalig**:
+Auf der Seite einer ehemaligen Person stehen unter den Kacheln (über den {bereich.offices}) **Eintritt** und **Austritt**; ein Tipp darauf öffnet gleich das Formular, um Grund, Daten und Gründungsmitglied zu korrigieren. Unter **Konto und Rolle** (ganz unten aufklappen), Abschnitt **Ehemalig**:
 - **Angaben ändern**: wie oben.
 - **Wieder aufnehmen** (z. B. bei einem Wiedereintritt): Die Person bekommt ihre Rolle von vorher zurück, dazu ihre Zusatzrollen, soweit es sie noch gibt und du sie vergeben darfst; Ausnahmen bei den Rechten stellt nur ein {rolle.admin} wieder her. Gibt es die Rolle nicht mehr, wird sie {rolle.member}. Danach unter **Konto und Rolle** ein neues Startpasswort erzeugen, damit sie sich wieder anmelden kann.
 

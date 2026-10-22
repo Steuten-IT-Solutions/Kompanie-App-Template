@@ -739,13 +739,6 @@ function MemberDetailView({
           </button>
         )}
 
-        {officesOn && (
-          <section className="member-offices">
-            <h3 className="section-title">{sec.offices}</h3>
-            <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />
-          </section>
-        )}
-
         {(birthdayOn || joinOn || !!m.former || formerEditable) && (
           <ul className="card member-dates">
             {birthdayOn && (
@@ -771,6 +764,13 @@ function MemberDetailView({
               </DateRow>
             )}
           </ul>
+        )}
+
+        {officesOn && (
+          <section className="member-offices">
+            <h3 className="section-title">{sec.offices}</h3>
+            <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />
+          </section>
         )}
 
         <details className="member-account" ref={accountRef}>
