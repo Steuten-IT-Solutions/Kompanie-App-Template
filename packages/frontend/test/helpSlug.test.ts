@@ -153,6 +153,8 @@ test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', ()
   }
   // Geburtstag eines Mitglieds: Pflegeseite nur mit dem Recht dazu
   assert.equal(helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['create_users'])), 'geburtstage-pflegen');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['create_users'])), 'ehemalige-mitglieder');
   assert.equal(
     helpSlug(['verwaltung', 'ehemalige', '7', 'punkte'], withRights(['create_users', 'manage_points'], ['points'])),
     'punkte-vergeben',
