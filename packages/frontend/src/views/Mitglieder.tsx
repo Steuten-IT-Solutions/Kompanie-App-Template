@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { api, config } from '../api';
+import { api, config, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import brand from '../generated/brand';
 import { groupCounts } from '../format';
 import { ZoomableAvatar } from '../memberPhoto';
@@ -35,7 +35,9 @@ function storedSection(): string | null {
   }
 }
 
-function storeSection(section: 'liste' | 'aemter'): void {
+type Section = 'liste' | 'aemter' | 'ehemalige';
+
+function storeSection(section: Section): void {
   try {
     localStorage.setItem(SECTION_KEY, section);
   } catch {
@@ -43,38 +45,60 @@ function storeSection(section: 'liste' | 'aemter'): void {
   }
 }
 
+/** Jahre einer ehemaligen Person: „Gründungsmitglied · 1985–2010“, „Eintritt 1985“, „bis 2010“; leer ohne Angaben. */
+export function formerYears(f: Partial<Pick<DirectoryFormerEntry, 'founder' | 'joined_year' | 'left_year'>>): string {
+  const years =
+    f.joined_year && f.left_year
+      ? `${f.joined_year}–${f.left_year}`
+      : f.joined_year
+        ? `Eintritt ${f.joined_year}`
+        : f.left_year
+          ? `bis ${f.left_year}`
+          : '';
+  return [f.founder ? 'Gründungsmitglied' : '', years].filter(Boolean).join(' · ');
+}
+
 /**
- * Tab „Mitglieder“ (öffentlich, Issue #112): Mitgliederliste (Bereich directory) und Zeitstrahl der Ämter (Bereich
- * offices), umschaltbar; der zuletzt gewählte Abschnitt bleibt auf dem Gerät gemerkt. Ist nur ein Bereich an, steht nur
- * dieser da. mitglieder/<id>: Seite einer Person mit ihren Ämtern als Zeitstrahl (ältere Adresse mitglieder/aemter/<id>).
+ * Tab „Mitglieder“ (öffentlich, Issue #112): Mitgliederliste (Bereich directory), Zeitstrahl der Ämter (Bereich
+ * offices) und die Ehemaligen (mit der Mitgliederliste), umschaltbar; der zuletzt gewählte Abschnitt bleibt auf dem
+ * Gerät gemerkt. Ist nur der Bereich Ämter an, steht nur dieser da. mitglieder/<id>: Seite einer Person mit ihren
+ * Ämtern als Zeitstrahl (ältere Adresse mitglieder/aemter/<id>).
  */
 export default function Mitglieder({ path = [] }: { path?: string[] }) {
   const directory = !!config?.features.directory;
   const offices = !!config?.features.offices;
   const id = /^\d+$/.test(path[0] ?? '') ? path[0] : path[0] === 'aemter' && /^\d+$/.test(path[1] ?? '') ? path[1] : null;
   const person = id !== null ? Number(id) : null;
-  const wanted = path[0] === 'aemter' ? 'aemter' : path[0] === 'liste' ? 'liste' : storedSection();
-  const section: 'liste' | 'aemter' = !directory || (offices && wanted === 'aemter' && person === null) ? 'aemter' : 'liste';
-  const open = (next: 'liste' | 'aemter') => {
+  const wanted = ['liste', 'aemter', 'ehemalige'].includes(path[0] ?? '') ? path[0] : storedSection();
+  const section: Section = !directory
+    ? 'aemter'
+    : person === null && ((offices && wanted === 'aemter') || wanted === 'ehemalige')
+      ? (wanted as Section)
+      : 'liste';
+  const open = (next: Section) => {
     storeSection(next);
     navigate(`mitglieder/${next}`);
   };
+  const tab = (key: Section, label: string) => (
+    <button className={section === key ? 'active' : ''} aria-pressed={section === key} onClick={() => open(key)}>
+      {label}
+    </button>
+  );
   return (
     <div>
-      {directory && offices && (
+      {directory && (
         <nav className="segmented members-switch" aria-label="Abschnitt">
-          <button className={section === 'liste' ? 'active' : ''} aria-pressed={section === 'liste'} onClick={() => open('liste')}>
-            {sec.directory}
-          </button>
-          <button className={section === 'aemter' ? 'active' : ''} aria-pressed={section === 'aemter'} onClick={() => open('aemter')}>
-            {sec.offices}
-          </button>
+          {tab('liste', sec.directory)}
+          {offices && tab('aemter', sec.offices)}
+          {tab('ehemalige', 'Ehemalige')}
         </nav>
       )}
       {person !== null ? (
         <MemberPage userId={person} directory={directory} offices={offices} />
       ) : section === 'liste' ? (
-        <MemberList />
+        <MemberList key="liste" />
+      ) : section === 'ehemalige' ? (
+        <MemberList key="ehemalige" former />
       ) : (
         <OfficesView />
       )}
@@ -89,16 +113,22 @@ function back(): void {
 }
 
 /**
- * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste, darunter direkt ihre Ämter als
- * Zeitstrahl. Ohne Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
+ * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu die Jahre),
+ * darunter direkt ihre Ämter als Zeitstrahl. Ohne Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
  */
 function MemberPage({ userId, directory, offices }: { userId: number; directory: boolean; offices: boolean }) {
   const list = useAsync(() => (directory ? api.directory() : Promise.resolve(null)), [], directory ? 'directory' : undefined);
+  const former = useAsync(
+    () => (directory ? api.directoryFormer() : Promise.resolve(null)),
+    [],
+    directory ? 'directory-former' : undefined,
+  );
   const officeData = useOffices(offices);
-  const m = list.data?.find((e) => e.id === userId);
+  const f = former.data?.find((e) => e.id === userId);
+  const m: DirectoryEntry | undefined = list.data?.find((e) => e.id === userId) ?? f;
   const name =
     m?.name ?? officeData.data?.offices.flatMap((o) => o.terms.flatMap((t) => t.holders)).find((h) => h.user_id === userId)?.name;
-  if ((list.loading && !list.data) || (officeData.loading && !officeData.data)) return <Loading />;
+  if ((list.loading && !list.data) || (former.loading && !former.data) || (officeData.loading && !officeData.data)) return <Loading />;
   if (list.error && !list.data) return <ErrorBox message={list.error} onRetry={list.reload} />;
   return (
     <div className="member-page">
@@ -112,6 +142,7 @@ function MemberPage({ userId, directory, offices }: { userId: number; directory:
           <div className="member-page-head">
             {m && <ZoomableAvatar url={m.photo_url} name={m.name} size="large" />}
             <h2 className="member-name member-name-centered">{name}</h2>
+            {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
             {m?.titles && m.titles.length > 0 && (
               <p className="member-page-titles">
                 <TitleBadges titles={m.titles} />
@@ -138,11 +169,16 @@ function MemberPage({ userId, directory, offices }: { userId: number; directory:
 /**
  * Mitgliederliste (Bereich directory): Namen, Fotos, Dienstgrade und Titel, mit Suche und Sortierung wie in der
  * Verwaltung. Keine Rollen, Punkte oder Strafen. Antippen öffnet die Seite der Person (mit ihren Ämtern).
+ * former: dieselbe Liste für die Ehemaligen, je Person dazu Gründungsmitglied und die Jahre (kein Grund).
  */
-function MemberList() {
-  const { data, error, loading, reload } = useAsync(() => api.directory(), [], 'directory');
-  // Zähler je Gruppe wie in der Verwaltung; ohne (ältere Server, Fehler) bleibt die Gesamtzahl.
-  const counts = useAsync(() => api.directoryCounts(), [], 'directory-counts');
+function MemberList({ former = false }: { former?: boolean }) {
+  const { data, error, loading, reload } = useAsync<(DirectoryEntry & Partial<DirectoryFormerEntry>)[]>(
+    () => (former ? api.directoryFormer() : api.directory()),
+    [],
+    former ? 'directory-former' : 'directory',
+  );
+  // Zähler je Gruppe wie in der Verwaltung; ohne (ältere Server, Fehler) bleibt die Gesamtzahl. Ehemalige ohne Gruppen.
+  const counts = useAsync(() => (former ? Promise.resolve([]) : api.directoryCounts()), [], former ? undefined : 'directory-counts');
   const [query, setQuery] = useState('');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Gemerkt ist vielleicht die Sortierung nach Punkten aus der Verwaltung: hier dann nach Nachname.
@@ -169,15 +205,19 @@ function MemberList() {
   return (
     <div className="directory">
       <p className="member-counts small muted" role="status">
-        {groups.length > 0 ? groups.join(' · ') : total === 1 ? '1 Person' : `${total} Personen`}
+        {groups.length > 0
+          ? groups.join(' · ')
+          : total === 1
+            ? `1 ${former ? 'ehemalige ' : ''}Person`
+            : `${total} ${former ? 'ehemalige ' : ''}Personen`}
       </p>
       <input
         className="search"
         type="search"
-        placeholder="Mitglied suchen …"
+        placeholder={former ? 'Ehemalige suchen …' : 'Mitglied suchen …'}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Mitglied suchen"
+        aria-label={former ? 'Ehemalige suchen' : 'Mitglied suchen'}
       />
       <div className="field-row member-sort">
         {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
@@ -220,6 +260,7 @@ function MemberList() {
               <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </button>
+              {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
             </div>
             {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
             {m.rank_title !== undefined && (

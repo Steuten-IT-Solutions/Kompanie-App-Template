@@ -27,7 +27,7 @@ final class QueryCountTest extends TestCase
     private const LISTS = [
         'GET /members', 'GET /members?all=1', 'GET /members/{m}', 'GET /promotions', 'GET /ranks?all=1', 'GET /titles',
         'GET /attendance', 'GET /attendance/{list}', 'GET /birthdays', 'GET /inventory', 'GET /inventory/log',
-        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /offices', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
+        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
     ];
 
     public function testListsDoNotGrowWithMembers(): void
@@ -110,6 +110,13 @@ final class QueryCountTest extends TestCase
             $app->push()->subscribe($users->find($id), 'https://fcm.googleapis.com/fcm/send/d' . $i, ['p256dh' => WebPushCrypto::b64uEncode(WebPushCrypto::rawPublic($key)), 'auth' => WebPushCrypto::b64uEncode(random_bytes(16))], null, null, '');
         }
         $users->current = $admin;
+        // Ehemalige (Tab der Mitgliederliste): je zehn Mitglieder eine weitere Person, mit Dienstgrad und Titel
+        for ($i = 0; $i < intdiv($n, 10); $i++) {
+            $id = $users->add('e' . $i, Roles::MEMBER);
+            $call('PUT', "/members/$id/rank", ['rank_id' => $ranks[0], 'reason' => 'x']);
+            $call('PUT', "/members/$id/titles", ['title_ids' => [$titles[0]]]);
+            $call('PUT', "/members/$id/former", ['reason' => 'left', 'joined_on' => '1990', 'left_on' => '2020']);
+        }
         $entries = [];
         foreach ($members as $i => $id) {
             $entries[$id] = $i % 3 === 0 ? 'absent' : 'present';
