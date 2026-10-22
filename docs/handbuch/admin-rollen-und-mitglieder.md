@@ -37,7 +37,7 @@ Mit **+ Neue Rolle** legst du weitere Rollen an (zusammen höchstens 30), z. B. 
 
 Unter **Konten** stellst du bei eigenen Rollen zwei Dinge ein:
 - **Beim Anlegen neuer Konten wählbar:** Wer Mitglieder anlegt, kann neuen Konten diese Rolle statt {rolle.member} geben. Ohne solche Rollen sind neue Konten immer {rolle.member}.
-- **Als {rolle.member} aufnehmen:** Wer Mitglieder anlegen darf, macht Personen mit dieser Rolle mit **Als {rolle.member} aufnehmen** zum {rolle.member}, auch ohne „Rollen vergeben“. Das geht nur bei Rollen ohne Mitgliederbereich.
+- **Als {rolle.member} aufnehmen:** Wer Mitglieder anlegen darf, macht Personen mit dieser Rolle mit **Als {rolle.member} aufnehmen** zum {rolle.member}, auch ohne „Rollen vergeben“. Das geht nur bei Rollen ohne Mitgliederbereich. In der Mitgliederliste der Verwaltung steht der Name der Rolle dann neben dem Namen wie ein Titel.
 
 ## Anwärter einrichten
 Nehmt ihr Personen vor der Aufnahme schon mit (Anwärter), legst du dafür eine eigene Rolle an, z. B. „Anwärter“: nur mit dem **internen Kalender**, ohne Mitgliederbereich, mit **Beim Anlegen neuer Konten wählbar** und **Als {rolle.member} aufnehmen**. Anwärter sehen dann den internen Kalender und das {bereich.board}, stehen in der Mitgliederliste und in der {bereich.attendance}, bekommen aber keine {bereich.points} oder {bereich.penalties}. Gab es die Rolle schon vor diesem Update als feste Rolle, ist sie jetzt eine eigene Rolle mit genau diesen Einstellungen; du kannst sie ändern oder löschen.
