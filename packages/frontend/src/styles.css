@@ -3445,6 +3445,15 @@ button.spotlight-person:focus-visible {
 .tl-office {
   font-weight: 600;
 }
+.tl-with {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tl-with-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
 .tl-duration {
   font-size: 0.78rem;
   color: var(--muted);
@@ -3562,9 +3571,47 @@ button.spotlight-person:focus-visible {
   }
 }
 
-/* Mitgliederliste: Knopf „Ämter“ je Person; Pflege der Ämter */
-.member-row-offices {
-  flex: none;
+/* Mitgliederliste: die ganze Zeile öffnet die Seite der Person, das Foto (darüber) vergrößert; Pflege der Ämter */
+.member-row-link {
+  cursor: pointer;
+}
+.member-row-link:hover {
+  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--line));
+}
+.member-row-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.member-row-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.member-row-link .member-photo-open,
+.member-row-link > .member-avatar {
+  position: relative;
+  z-index: 1;
+}
+.member-page-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+  text-align: center;
+}
+.member-page-head .member-name {
+  margin: 6px 0 0;
+}
+.member-page-titles {
+  margin: 0;
 }
 .office-admin-group {
   margin-bottom: 18px;

@@ -19,7 +19,7 @@ import {
   type MemberSort,
 } from '../memberSort';
 import { navigate } from '../router';
-import { holderIds, OfficesView, PersonOfficesPage, useOffices } from './Aemter';
+import { OfficesView, PersonOffices, useOffices } from './Aemter';
 
 /** Nach Namen; Punkte stehen in dieser Liste nicht. */
 const SORTS: MemberSort[] = ['last-name', 'first-name'];
@@ -46,14 +46,15 @@ function storeSection(section: 'liste' | 'aemter'): void {
 /**
  * Tab „Mitglieder“ (öffentlich, Issue #112): Mitgliederliste (Bereich directory) und Zeitstrahl der Ämter (Bereich
  * offices), umschaltbar; der zuletzt gewählte Abschnitt bleibt auf dem Gerät gemerkt. Ist nur ein Bereich an, steht nur
- * dieser da. mitglieder/aemter/<id>: „Ämter von …“.
+ * dieser da. mitglieder/<id>: Seite einer Person mit ihren Ämtern als Zeitstrahl (ältere Adresse mitglieder/aemter/<id>).
  */
 export default function Mitglieder({ path = [] }: { path?: string[] }) {
   const directory = !!config?.features.directory;
   const offices = !!config?.features.offices;
+  const id = /^\d+$/.test(path[0] ?? '') ? path[0] : path[0] === 'aemter' && /^\d+$/.test(path[1] ?? '') ? path[1] : null;
+  const person = id !== null ? Number(id) : null;
   const wanted = path[0] === 'aemter' ? 'aemter' : path[0] === 'liste' ? 'liste' : storedSection();
-  const section: 'liste' | 'aemter' = !directory || (offices && wanted === 'aemter') ? 'aemter' : 'liste';
-  const person = section === 'aemter' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : null;
+  const section: 'liste' | 'aemter' = !directory || (offices && wanted === 'aemter' && person === null) ? 'aemter' : 'liste';
   const open = (next: 'liste' | 'aemter') => {
     storeSection(next);
     navigate(`mitglieder/${next}`);
@@ -70,19 +71,76 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
           </button>
         </nav>
       )}
-      {section === 'liste' ? <MemberList offices={offices} /> : person !== null ? <PersonOfficesPage userId={person} /> : <OfficesView />}
+      {person !== null ? (
+        <MemberPage userId={person} directory={directory} offices={offices} />
+      ) : section === 'liste' ? (
+        <MemberList />
+      ) : (
+        <OfficesView />
+      )}
+    </div>
+  );
+}
+
+/** Zurück, wo die Person geöffnet wurde (Liste oder Zeitstrahl); ohne Verlauf (direkt geöffnet) zur Liste. */
+function back(): void {
+  if (window.history.length > 1) window.history.back();
+  else navigate('mitglieder/liste');
+}
+
+/**
+ * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste, darunter direkt ihre Ämter als
+ * Zeitstrahl. Ohne Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
+ */
+function MemberPage({ userId, directory, offices }: { userId: number; directory: boolean; offices: boolean }) {
+  const list = useAsync(() => (directory ? api.directory() : Promise.resolve(null)), [], directory ? 'directory' : undefined);
+  const officeData = useOffices(offices);
+  const m = list.data?.find((e) => e.id === userId);
+  const name =
+    m?.name ?? officeData.data?.offices.flatMap((o) => o.terms.flatMap((t) => t.holders)).find((h) => h.user_id === userId)?.name;
+  if ((list.loading && !list.data) || (officeData.loading && !officeData.data)) return <Loading />;
+  if (list.error && !list.data) return <ErrorBox message={list.error} onRetry={list.reload} />;
+  return (
+    <div className="member-page">
+      <button type="button" className="btn btn-link back" onClick={back}>
+        ‹ Zurück
+      </button>
+      {name === undefined ? (
+        <Empty>Diese Person steht nicht (mehr) in der Liste.</Empty>
+      ) : (
+        <>
+          <div className="member-page-head">
+            {m && <ZoomableAvatar url={m.photo_url} name={m.name} size="large" />}
+            <h2 className="member-name member-name-centered">{name}</h2>
+            {m?.titles && m.titles.length > 0 && (
+              <p className="member-page-titles">
+                <TitleBadges titles={m.titles} />
+              </p>
+            )}
+            {m?.rank_title && (
+              <div className="member-page-rank">
+                <RankStack url={m.rank_badge_url} title={m.rank_title} />
+              </div>
+            )}
+          </div>
+          {offices && (
+            <section>
+              <h3 className="section-title">{sec.offices}</h3>
+              <PersonOffices userId={userId} empty={`Keine ${sec.offices} eingetragen.`} />
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
 /**
  * Mitgliederliste (Bereich directory): Namen, Fotos, Dienstgrade und Titel, mit Suche und Sortierung wie in der
- * Verwaltung. Keine Rollen, Punkte oder Strafen. Mit dem Bereich Ämter führt „Ämter“ zu den Ämtern einer Person.
+ * Verwaltung. Keine Rollen, Punkte oder Strafen. Antippen öffnet die Seite der Person (mit ihren Ämtern).
  */
-function MemberList({ offices }: { offices: boolean }) {
+function MemberList() {
   const { data, error, loading, reload } = useAsync(() => api.directory(), [], 'directory');
-  const officeData = useOffices(offices);
-  const holders = useMemo(() => holderIds(officeData.data), [officeData.data]);
   // Zähler je Gruppe wie in der Verwaltung; ohne (ältere Server, Fehler) bleibt die Gesamtzahl.
   const counts = useAsync(() => api.directoryCounts(), [], 'directory-counts');
   const [query, setQuery] = useState('');
@@ -155,26 +213,17 @@ function MemberList({ offices }: { offices: boolean }) {
       </div>
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row member-row">
+          <li key={m.id} className="card row member-row member-row-link">
             <ZoomableAvatar url={m.photo_url} name={m.name} size="medium" />
             <div className="row-main">
-              <div className="row-title">
+              {/* Die ganze Zeile öffnet die Seite der Person; das Foto vergrößert weiterhin (liegt darüber). */}
+              <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
-              </div>
+              </button>
             </div>
             {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
             {m.rank_title !== undefined && (
               <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
-            )}
-            {holders.has(m.id) && (
-              <button
-                type="button"
-                className="btn btn-small btn-secondary member-row-offices"
-                aria-label={`${sec.offices} von ${m.name}`}
-                onClick={() => navigate(`mitglieder/aemter/${m.id}`)}
-              >
-                {sec.offices}
-              </button>
             )}
           </li>
         ))}

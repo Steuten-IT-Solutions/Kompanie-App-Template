@@ -468,10 +468,16 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await page.setViewportSize({ width: 360, height: 740 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  // Personen der Mitgliederliste: Tipp auf den Namen zeigt alle ihre Ämter
+  // Personen der Mitgliederliste: Tipp auf den Namen öffnet ihre Seite mit den Ämtern als Zeitstrahl
   await spotlight.getByRole('button', { name: /^Mitglied1/ }).click();
-  await expect(page.getByRole('heading', { name: 'Ämter von Mitglied1' })).toBeVisible();
-  await expect(page.locator('.tl-item', { hasText: office })).toContainText('seit 2020');
+  await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied1' })).toBeVisible();
+  await expect(page.locator('.member-page .tl-item', { hasText: office })).toContainText('seit 2020');
+  // Ebenso aus der Liste: ganze Zeile antippen, ohne eigenen Knopf
+  await page.goto('/app/#/mitglieder/liste');
+  await expect(page.locator('.member-row', { hasText: 'Mitglied1' }).getByRole('button', { name: 'Ämter' })).toHaveCount(0);
+  await page.locator('.member-row', { hasText: 'Mitglied1' }).locator('.member-row-open').click();
+  await expect(page).toHaveURL(/#\/mitglieder\/\d+$/);
+  await expect(page.locator('.member-page .tl-item', { hasText: office })).toBeVisible();
 
   // Aufräumen (WordPress behält die Daten zwischen den Läufen)
   await login(page, 'admin', ADMIN_PASSWORD);
