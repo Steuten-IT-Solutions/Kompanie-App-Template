@@ -1,4 +1,4 @@
-// Sortierung der Mitgliederliste (src/memberSort.ts): nach Nachname, Vorname, Eintritt oder Punkten, auf- oder absteigend;
+// Sortierung der Mitgliederliste (src/memberSort.ts): nach Nachname, Vorname, Eintritt, Austritt oder Punkten, auf- oder absteigend;
 // die Wahl merkt sich das Gerät.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -10,6 +10,7 @@ import {
   orderFor,
   setBrowseOrder,
   joinKey,
+  leftKey,
   listName,
   loadMemberOrder,
   saveMemberOrder,
@@ -127,6 +128,41 @@ test('nach Eintritt: früheste bzw. neueste zuerst, nur das Jahr vor den Tagen d
   assert.equal(defaultDir('joined'), 'asc');
   assert.equal(dirLabel('joined', 'asc'), 'Früheste zuerst');
   assert.equal(dirLabel('joined', 'desc'), 'Neueste zuerst');
+});
+
+test('nach Austritt (Ehemalige): früheste bzw. neueste zuerst, nur das Jahr vor den Tagen des Jahres, ohne Angabe immer am Ende', () => {
+  const f = (id: number, first: string, last: string, left_on: string) => ({ ...m(id, first, last), left_on, founder: id === 4 });
+  const former = [
+    f(1, 'Anna', 'Zimmer', '2010-05-01'),
+    f(2, 'Bernd', 'Becker', ''),
+    f(3, 'Carl', 'Adam', '2010'),
+    f(4, 'Dora', 'Gründer', ''),
+    f(5, 'Emil', 'Berg', '2021-02-03'),
+    f(6, 'Fritz', 'Alt', '2010-05-01'),
+  ];
+  // Gründungsmitglied zählt hier nicht (anders als beim Eintritt).
+  assert.deepEqual(names(sortMembers(former, { sort: 'left', dir: 'asc' })), [
+    'Carl Adam',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Emil Berg',
+    'Bernd Becker',
+    'Dora Gründer',
+  ]);
+  assert.deepEqual(names(sortMembers(former, { sort: 'left', dir: 'desc' })), [
+    'Emil Berg',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Carl Adam',
+    'Bernd Becker',
+    'Dora Gründer',
+  ]);
+  // Liste für alle: nur Jahre
+  assert.equal(leftKey({ ...m(7, 'G', 'H'), left_year: '1999' }), '1999');
+  assert.equal(leftKey({ ...m(7, 'G', 'H'), left_year: '' }), null);
+  assert.equal(defaultDir('left'), 'asc');
+  assert.equal(dirLabel('left', 'asc'), 'Früheste zuerst');
+  assert.equal(dirLabel('left', 'desc'), 'Neueste zuerst');
 });
 
 test('Anzeige: bei Nachname „Nachname, Vorname“, sonst der Anzeigename', () => {
