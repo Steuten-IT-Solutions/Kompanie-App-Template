@@ -19,7 +19,8 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert), in der
  *   Datenbank (MemberPhotoRepository).
  * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
- *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste (Issue #112, inDirectory).
+ *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste und der Ehemaligen (Issue #112,
+ *   inDirectory).
  *   Ausgeliefert über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide
  *   Adapter gleich antworten.
  */
@@ -176,8 +177,8 @@ final class MemberPhotoService
     }
 
     /**
-     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): Die Fotos der Personen darin sieht jeder, auch ohne
-     * Anmeldung; die von Gästen nicht.
+     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): Die Fotos der Personen darin und der Ehemaligen (Tab
+     * daneben) sieht jeder, auch ohne Anmeldung; die anderer Gäste nicht.
      */
     private function inDirectory(int $userId): bool
     {
@@ -185,7 +186,7 @@ final class MemberPhotoService
             return false;
         }
         $target = $this->app->users->find($userId);
-        return $target !== null && MemberService::inDirectory($target);
+        return $target !== null && (MemberService::inDirectory($target) || $this->app->formerMembers()->previousRole($target) !== null);
     }
 
     /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */

@@ -378,6 +378,13 @@ export interface DirectoryEntry {
   titles?: TitleRef[];
 }
 
+/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied und Jahre (JJJJ oder leer). */
+export interface DirectoryFormerEntry extends DirectoryEntry {
+  founder: boolean;
+  joined_year: string;
+  left_year: string;
+}
+
 export interface MemberDetail extends MemberSummary {
   point_list: PointEntry[];
   penalties: Penalty[];
@@ -1189,6 +1196,8 @@ export const api = {
   directory: () => request<DirectoryEntry[]>('GET', '/directory'),
   /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
   directoryCounts: () => request<{ group: Level; count: number }[]>('GET', '/directory/counts'),
+  /** Ehemalige für den Tab neben den Ämtern (öffentlich wie die Liste) */
+  directoryFormer: () => request<DirectoryFormerEntry[]>('GET', '/directory/former'),
   members: (all = false, candidates = false) =>
     request<MemberSummary[]>('GET', '/members', undefined, {
       ...(all ? { all: '1' } : {}),

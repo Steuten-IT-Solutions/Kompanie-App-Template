@@ -295,11 +295,13 @@ final class Api
 
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
-     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten.
+     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Mit $entries dieselben
+     * Angaben zu anderen Personen (Ehemalige).
      *
+     * @param list<array<string, mixed>>|null $entries
      * @return list<array<string, mixed>>
      */
-    private function directory(): array
+    private function directory(?array $entries = null): array
     {
         $a = $this->app;
         $photos = $a->memberPhotos()->urls();
@@ -308,7 +310,7 @@ final class Api
         return array_map(static fn (array $m): array => $m
             + ['photo_url' => $photos[$m['id']] ?? null]
             + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
-            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : []), $a->members()->directory());
+            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : []), $entries ?? $a->members()->directory());
     }
 
     /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -710,6 +712,8 @@ final class Api
             // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und Titel
             new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
             new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
+            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied und die Jahre, kein Grund
+            new Route('GET', '/directory/former', $P, fn () => $this->directory($a->formerMembers()->directory()), 'directory'),
 
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {

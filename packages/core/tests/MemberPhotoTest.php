@@ -193,6 +193,11 @@ final class MemberPhotoTest extends TestCase
         $this->assertSame(200, $deliver(null, $this->m), 'ohne Anmeldung ebenso');
         $this->assertSame(403, $deliver($candidate, $guest), 'Gäste stehen nicht in der Liste: Foto bleibt verborgen');
         $this->assertSame(401, $deliver(null, $guest));
+        // Ehemalige stehen im Tab neben der Liste: ihr Foto bleibt öffentlich, auch als Gast-Konto.
+        $former = $this->users->add('ehemalig', Roles::MEMBER);
+        $this->call('PUT', "/members/$former/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);
+        $this->call('PUT', "/members/$former/former", ['reason' => 'left', 'joined_on' => '', 'left_on' => '2020']);
+        $this->assertSame(200, $deliver(null, $former), 'Ehemalige: Foto öffentlich');
         $this->app->features()->update(['directory' => false]);
         $this->assertSame(403, $deliver($candidate, $this->m), 'Bereich aus');
         $this->assertSame(401, $deliver(null, $this->m), 'Bereich aus');

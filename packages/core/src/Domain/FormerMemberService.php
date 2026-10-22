@@ -100,6 +100,35 @@ final class FormerMemberService
     }
 
     /**
+     * Ehemalige für die öffentliche Mitgliederliste (Tab „Ehemalige“, Bereich directory): nur Name, Gründungsmitglied und
+     * die Jahre von Eintritt und Ausscheiden. Kein Grund, keine genauen Daten, keine Punkte.
+     *
+     * @return list<array{id: int, name: string, first_name: string, last_name: string, founder: bool, joined_year: string, left_year: string}>
+     */
+    public function directory(): array
+    {
+        $rows = $this->all();
+        $users = $this->app->users->findMany(array_keys($rows));
+        $out = [];
+        foreach ($rows as $id => $row) {
+            $user = $users[$id] ?? null;
+            if ($user === null || $user->role !== Roles::GUEST) {
+                continue; // wie in list()
+            }
+            $out[] = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'first_name' => $user->firstName,
+                'last_name' => $user->lastName,
+                'founder' => $row['founder'],
+                'joined_year' => substr($row['joined_on'], 0, 4),
+                'left_year' => substr($row['left_on'], 0, 4),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Angaben zum Ausscheiden einer Person für ihre Seite in der Verwaltung; null, wenn sie nicht ehemalig ist.
      *
      * @return array{reason: string, joined_on: string, founder: bool, left_on: string, previous_level: string}|null
