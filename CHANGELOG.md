@@ -48,6 +48,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **„Meins → Übersicht“ wie die Seite eines Mitglieds in der Verwaltung**: Name, darunter Dienstgradabzeichen und Foto,
+  Rolle, die Kacheln Punkte und Offen, die Titel, Geburtstag und Eintritt sowie die Ämter als Zeitstrahl. Antippen
+  führt zur passenden Seite (Kacheln, Abzeichen) bzw. zu „Konto“ (Geburtstag, Eintritt); das Foto vergrößert sich.
+  Die eigenen Ämter stehen jetzt in der Übersicht statt auf einer eigenen Seite im Menü.
 - **Anwärter in der Mitgliederliste erkennbar**: In der Mitgliederliste der Verwaltung steht bei Personen, deren
   Rolle das Häkchen *Als Mitglied aufnehmen* hat (z. B. Anwärter), der Name der Rolle neben dem Namen wie ein Titel.
 - **Geburtstag und Eintritt auf der eigenen Seite**: Unter *Konto* steht die Auswahl „Auf meiner Seite …“ jetzt
