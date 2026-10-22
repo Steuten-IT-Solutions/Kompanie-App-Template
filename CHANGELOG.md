@@ -25,12 +25,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ehemalige importieren** nimmt jetzt auch Excel-Dateien (.xlsx).
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
-  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung, und die gewählte
-  Unterseite (z. B. Punkte) bleibt. Die Seite folgt dabei dem Finger, daneben ist die nächste Person schon zu sehen,
-  und weil die App die Nachbarn vorlädt, steht deren Seite nach dem Wechsel sofort da, ohne Laden.
+  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
+  dabei dem Finger, daneben ist die nächste Person schon zu sehen, und weil die App die Nachbarn vorlädt, steht deren
+  Seite nach dem Wechsel sofort da, ohne Laden.
 
 ### Geändert
 
+- **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.
+  Das Abzeichen öffnet Befördern und Degradieren, das Foto die große Ansicht mit „Foto ersetzen“ und „Foto
+  entfernen“, die Kacheln Punkte und Offen ein Fenster mit dem Formular nur für diese Person und ihren Einträgen,
+  die neue Kachel Titel die Auswahl der Titel. Darunter stehen die Ämter, ganz unten Geburtstag, Eintritt und
+  Austritt (Austritt trägt als ehemalig ein bzw. ändert die Angaben) und zum Aufklappen „Konto und Rolle“. Die
+  Knöpfe unter dem Foto und unter den Kacheln entfallen. Gilt auch für Ehemalige.
 - **Seiten beim Laden**: Statt „Lädt …“ steht eine Seite, deren Daten noch nicht da sind, sofort in ihrem gewohnten
   Aufbau da (Karten, Zeilen, Knöpfe als graue Platzhalter), bis die Daten kommen. Die App merkt sich dafür nur den
   Aufbau, keine Inhalte; beim Abmelden wird er gelöscht.

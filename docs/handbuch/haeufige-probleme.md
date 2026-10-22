@@ -9,10 +9,10 @@ Ein erster Blick lohnt sich immer unter **Verwaltung → Einstellungen → Zusta
 Unter **Einstellungen → Bereiche** prüfen, ob er eingeschaltet ist. {bereich.calendar}, {bereich.gallery} und {bereich.news} erscheinen erst, wenn sie auch eingerichtet sind; dann steht dort „Noch nicht eingerichtet“ mit **Jetzt einrichten**. {bereich.polls} lassen sich nur zusammen mit dem {bereich.board} einschalten.
 
 ## Jemand sieht etwas nicht, das er sehen sollte
-Unter **Verwaltung → Mitglieder** die Person öffnen und unter **Konto und Rolle** ihre Rolle prüfen, dann unter **Einstellungen → Rollen**, welche Rechte diese Rolle hat. Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
+Unter **Verwaltung → Mitglieder** die Person öffnen, ganz unten **Konto und Rolle** aufklappen und ihre Rolle prüfen, dann unter **Einstellungen → Rollen**, welche Rechte diese Rolle hat. Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
 
 ## Jemand hat sein Passwort vergessen
-Im Mitglied unter **Konto und Rolle** ein neues Startpasswort erzeugen, siehe [Mitglieder anlegen](seite:mitglieder-anlegen).
+Im Mitglied **Konto und Rolle** aufklappen und ein neues Startpasswort erzeugen, siehe [Mitglieder anlegen](seite:mitglieder-anlegen).
 
 ## Fotos erscheinen grau
 Neue Bilder bereitet die App beim ersten Abruf und im Hintergrund auf. Bei vielen neuen Bildern zeigt sie für einige kurz einen grauen Platzhalter und lädt sie dann von selbst nach. Ohne WordPress geht das zügiger mit einem Cronjob beim Hoster (die Adresse steht in der Zeile **Hintergrundaufgaben** der Ampel); mit WordPress hilft es, wenn die Webseite regelmäßig aufgerufen wird.
