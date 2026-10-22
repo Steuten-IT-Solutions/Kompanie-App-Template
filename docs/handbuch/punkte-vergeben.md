@@ -14,7 +14,7 @@ Unter **Verwaltung → {bereich.points}katalog** legst du häufige Anlässe mit 
 2. Unter **Vorlage aus dem Katalog** eine Vorlage wählen (sie füllt Punktzahl und Grund aus, beides lässt sich noch ändern) oder Punktzahl und Grund selbst eintragen. Das Datum ist heute vorausgewählt. Die Punktzahl ist eine ganze Zahl außer 0, höchstens 10.000; Abzüge gehen mit einer negativen Zahl.
 3. Ein oder mehrere Mitglieder ankreuzen (die Suche hilft bei vielen Namen, **Alle** kreuzt alle gefundenen an) und **{bereich.points} vergeben** tippen.
 
-{bereich.points} gibt es nur für Mitglieder, nicht für {rolle.candidate} oder Gäste. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn er {bereich.points} erhält oder ihm welche abgezogen werden.
+{bereich.points} gibt es nur für Mitglieder, nicht für Rollen ohne Mitgliederbereich (z. B. Anwärter) oder Gäste. Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn er {bereich.points} erhält oder ihm welche abgezogen werden.
 
 ## {bereich.points}faktor
 Manche Rollen haben einen {bereich.points}faktor, z. B. ×0,5 für junge Mitglieder; den legt ein {rolle.admin} unter **Verwaltung → Einstellungen → Rollen** fest. Hat eine Rolle einen anderen Faktor als 1, steht er beim Namen, z. B. „×0,5“. Er gilt beim Vergeben und wird mit dem Eintrag gespeichert. Ist so jemand angekreuzt, erscheint **{bereich.points}faktor der Rolle anwenden**; ohne Häkchen zählt der Eintrag für alle voll.

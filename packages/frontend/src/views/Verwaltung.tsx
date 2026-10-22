@@ -5,6 +5,7 @@ import {
   config,
   levelLabel,
   personFactor,
+  roleInfo,
   roleLabels,
   type CatalogItem,
   type CreatedUser,
@@ -21,7 +22,7 @@ import { RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
-import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
+import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
@@ -133,7 +134,7 @@ function Members() {
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
   const [role, setRole] = useState<Level>(restore?.role ?? '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
-  // Anwärter (und Rollen nur mit Kalender) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
+  // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
   const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
   // Filter nach Titel (nur, wer Titel sieht)
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
@@ -166,13 +167,12 @@ function Members() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, query, role, activeTitle, order.sort, order.dir],
   );
-  // Rollen, die in der Liste vorkommen, dazu immer Anwärter und (wer Rollen vergibt) Gäste
+  // Rollen, die in der Liste vorkommen, dazu (wer Rollen vergibt) Gäste
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
-  present.add('candidate');
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
   // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter.
-  // Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner) in ihrer Reihenfolge, Anwärter zuletzt.
+  // Mitglieder zuerst, dann die eigenen Rollen (z. B. Jungmariner, Anwärter) in ihrer Reihenfolge.
   const groupCounts = useMemo(() => {
     const n = new Map<Level, number>();
     for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
@@ -472,7 +472,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               onToast={onToast}
             />
           )}
-          {m.level === 'candidate' && can('create_users') && (
+          {roleInfo(m.level)?.promotable && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"
               disabled={busy}
@@ -772,7 +772,7 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 
 function NewMember() {
   const [name, setName] = useState(emptyName());
-  const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  const [level, setLevel] = useState<Level>('member');
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
@@ -866,13 +866,7 @@ function NewMember() {
         <span>E-Mail (optional)</span>
         <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
-      <label className="field">
-        <span>Rolle</span>
-        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
-          <option value="member">{levelLabel('member')}</option>
-          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
-        </select>
-      </label>
+      <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>
           <label className="field">

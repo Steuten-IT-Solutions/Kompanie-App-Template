@@ -6,7 +6,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 
-/** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
+/** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
 export type Capability =
   | 'member'
@@ -137,8 +137,12 @@ export interface RoleInfo {
   key: Level;
   label: string;
   points_factor: number;
-  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Anwärter, Mitglied, Admin; Issue #66) */
+  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Mitglied, Admin; Issue #66) */
   extra?: boolean;
+  /** Beim Anlegen von Konten wählbar (Mitglied immer, eigene Rollen nach Einstellung) */
+  new_accounts?: boolean;
+  /** Wer Mitglieder anlegen darf, macht Personen dieser Rolle zum Mitglied (z. B. Anwärter) */
+  promotable?: boolean;
 }
 
 /** Für Einstellungen → Rollen (nur Admins). */
@@ -152,9 +156,18 @@ export interface RoleAdmin extends RoleInfo {
   deletable: boolean;
 }
 
-export type RoleInput = { label?: string; capabilities?: Capability[]; points_factor?: number | string };
+export type RoleInput = {
+  label?: string;
+  capabilities?: Capability[];
+  points_factor?: number | string;
+  new_accounts?: boolean;
+  promotable?: boolean;
+};
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
+
+/** Rollen, die neue Konten bekommen können (Mitglied und freigegebene eigene Rollen), in der Reihenfolge der Rollen. */
+export const newAccountRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
 
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
@@ -187,7 +200,14 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor, system }) => ({ key, label, points_factor, extra: !system }));
+  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable }) => ({
+    key,
+    label,
+    points_factor,
+    extra: !system,
+    new_accounts,
+    promotable,
+  }));
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -1093,7 +1113,7 @@ export const api = {
       ...(all ? { all: '1' } : {}),
       ...(candidates ? { candidates: '1' } : {}),
     }),
-  /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
+  /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
@@ -1109,7 +1129,7 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
   updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
@@ -1123,7 +1143,7 @@ export const api = {
     data: PersonName & {
       username?: string;
       email?: string;
-      level?: 'member' | 'candidate';
+      level?: Level;
       initial_points?: number;
       initial_points_date?: string;
       rank_id?: number;
@@ -1248,6 +1268,8 @@ export const api = {
 
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),
+  /** Reihenfolge der eigenen Rollen (alle Schlüssel ohne Gast, Mitglied, Admin) */
+  reorderRoles: (keys: Level[]) => request<RoleAdmin[]>('PUT', '/admin/roles/order', { keys }),
   updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
   deleteRole: (key: Level, replacement?: Level) =>
     request<RoleAdmin[]>('DELETE', `/admin/roles/${encodeURIComponent(key)}`, undefined, replacement ? { replacement } : undefined),

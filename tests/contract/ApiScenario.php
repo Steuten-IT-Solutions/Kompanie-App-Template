@@ -108,6 +108,13 @@ final class ApiScenario
             $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
         }
         $c->ok($this->leitung !== '', 'Rolle „Kptest Leitung“ vorhanden');
+        // Anwärter sind eine eigene Rolle, wie ein Admin sie einrichtet.
+        $this->anw = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Anwärter'] ?? '');
+        if ($this->anw === '') {
+            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true]);
+            $this->anw = (string) (array_column((array) $d, 'key', 'label')['Kptest Anwärter'] ?? '');
+        }
+        $c->ok($this->anw !== '', 'Rolle „Kptest Anwärter“ vorhanden');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/events')[0] === 200, 'Eingeschalteter Bereich wieder erreichbar');
     }
@@ -210,6 +217,8 @@ final class ApiScenario
     private int $spiess = 0;
     /** Schlüssel der Rolle „Kptest Leitung“ (in features() angelegt) */
     private string $leitung = '';
+    /** Eigene Rolle „Kptest Anwärter“ (Issue #23): nur Kalender, für neue Konten, zum Mitglied zu machen */
+    private string $anw = '';
     private int $m1 = 0;
     private int $m2 = 0;
     private int $catalogId = 0;
@@ -437,7 +446,7 @@ final class ApiScenario
         $c->section('Zusatzrollen');
         $admin = $this->user('kptest_zusatz_admin', 'admin');
         $m = $this->user('kptest_zusatz_m', 'member');
-        $cand = $this->user('kptest_zusatz_anw', 'candidate');
+        $cand = $this->user('kptest_zusatz_anw', $this->anw);
         $this->d->actAs($admin);
         [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Zusatz Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
         $young = (string) (array_column((array) $d, 'key', 'label')['Kptest Zusatz Jugend'] ?? '');
@@ -468,7 +477,7 @@ final class ApiScenario
         $c->ok($this->req('PATCH', "/members/$admin/role", ['extra_roles' => []])[0] === 400, 'Eigene Rollen nicht änderbar → 400');
         [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'member', 'extra_roles' => ['events']]);
         $c->ok($s === 200 && ($d['extra_roles'] ?? null) === ['events'], 'Grundrolle und Zusatzrollen in einem Schritt');
-        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'candidate']);
+        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => $this->anw]);
         $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Grundrolle ohne Mitgliederbereich: Zusatzrollen fallen weg');
 
         $c->ok($this->req('DELETE', '/admin/roles/' . $young)[0] === 400, 'Rolle nur als Zusatzrolle zugeordnet: Löschen ohne Ersatz → 400');
@@ -603,13 +612,16 @@ final class ApiScenario
         $c->ok(($this->req('GET', "/members/$m")[1]['rights']['revoke'] ?? null) === [], 'Zusatzrolle weg: Ausnahme fällt weg');
     }
 
-    /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */
+    /**
+     * Anwärter (Issue #23) als eigene Rolle: interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, legt sie an
+     * und nimmt sie auf. Dazu Reihenfolge der Rollen und Punktefaktor für Admins.
+     */
     private function candidates(): void
     {
         $c = $this->c;
         $c->section('Anwärter');
         $admin = $this->user('kptest_anw_admin', 'admin');
-        $cand = $this->user('kptest_anwaerter', 'candidate');
+        $cand = $this->user('kptest_anwaerter', $this->anw);
         $guest = $this->user('kptest_anw_gast', 'guest');
 
         // Kalender wie ein Mitglied (ohne eingerichteten Kalender ggf. 503, aber nie „keine Rechte“), sonst nichts.
@@ -628,7 +640,7 @@ final class ApiScenario
         $caps = (array) ($cfg['user']['capabilities'] ?? []);
         $c->ok(in_array('calendar', $caps, true) && !in_array('member', $caps, true), '/config: Recht calendar, nicht member');
         $roles = array_column((array) ($cfg['roles'] ?? []), 'label', 'key');
-        $c->ok(isset($roles['candidate']), 'Rolle „Anwärter“ in /config');
+        $c->ok(isset($roles[$this->anw]), 'Rolle „Anwärter“ in /config');
 
         // Wer Konten anlegt, legt Anwärter an und nimmt sie auf – nur von Anwärter zu Mitglied.
         $this->d->actAs($admin);
@@ -638,16 +650,17 @@ final class ApiScenario
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
         $holder = $this->user('kptest_anw_aufnahme', $aufnahme);
         $this->d->actAs($holder);
-        [$s, $u] = $this->req('POST', '/users', ['name' => 'Kptest Anwärterin', 'level' => 'candidate']);
+        [$s, $u] = $this->req('POST', '/users', ['name' => 'Kptest Anwärterin', 'level' => $this->anw]);
         if (isset($u['id'])) {
             $this->users[] = $u['id'];
         }
-        $c->ok($s === 201 && ($u['level'] ?? '') === 'candidate', 'Konto als Anwärter anlegen');
+        $c->ok($s === 201 && ($u['level'] ?? '') === $this->anw, 'Konto als Anwärter anlegen');
         $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 400, 'Neues Konto als Admin → 400');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => $this->leitung])[0] === 400, 'Rolle nicht für neue Konten freigegeben → 400');
         $c->ok($this->req('POST', '/members/' . ($u['id'] ?? 0) . '/password')[0] === 200, 'Passwort eines Anwärters zurücksetzen');
         $list = array_column((array) $this->req('GET', '/members')[1], 'level', 'id');
         $withCand = array_column((array) $this->req('GET', '/members', [], ['candidates' => '1'])[1], 'level', 'id');
-        $c->ok(!isset($list[$u['id'] ?? 0]) && ($withCand[$u['id'] ?? 0] ?? '') === 'candidate' && !isset($withCand[$guest]), 'Mitgliederliste: Anwärter nur auf Wunsch, Gäste nie');
+        $c->ok(!isset($list[$u['id'] ?? 0]) && ($withCand[$u['id'] ?? 0] ?? '') === $this->anw && !isset($withCand[$guest]), 'Mitgliederliste: Anwärter nur auf Wunsch, Gäste nie');
         $c->ok($this->req('POST', "/members/{$this->m2}/promote")[0] === 400, 'Mitglied „aufnehmen“ → 400');
         $c->ok($this->req('POST', "/members/$guest/promote")[0] === 400, 'Gast aufnehmen → 400');
         [$s, $d] = $this->req('POST', '/members/' . ($u['id'] ?? 0) . '/promote');
@@ -655,9 +668,28 @@ final class ApiScenario
         $this->d->actAs($this->spiess);
         $c->ok($this->req('POST', "/members/$cand/promote")[0] === 403, 'Ohne „Mitglieder anlegen“ keine Aufnahme → 403');
 
+        // Aus einer Rolle, die nicht dafür freigegeben ist, nimmt niemand so auf.
         $this->d->actAs($admin);
-        $this->req('DELETE', '/admin/roles/' . $aufnahme, [], ['replacement' => 'member']);
         $nur = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Nur Kalender'] ?? '');
+        $friend = $this->user('kptest_anw_freund', $nur !== '' ? $nur : 'guest');
+        $this->d->actAs($holder);
+        $c->ok($this->req('POST', "/members/$friend/promote")[0] === 400, 'Rolle nicht zum Aufnehmen freigegeben → 400');
+
+        // Reihenfolge der eigenen Rollen per Ziehen; Gast und Mitglied vorn, Admin hinten.
+        $this->d->actAs($admin);
+        $own = array_values(array_column(array_filter((array) $this->req('GET', '/admin/roles')[1], static fn (mixed $r): bool => is_array($r) && !($r['system'] ?? true)), 'key'));
+        [$s, $d] = $this->req('PUT', '/admin/roles/order', ['keys' => array_reverse($own)]);
+        $keys = array_column((array) $d, 'key');
+        $c->ok($s === 200 && array_slice($keys, 0, 2) === ['guest', 'member'] && end($keys) === 'admin' && array_slice($keys, 2, -1) === array_reverse($own), 'Eigene Rollen umsortiert');
+        $c->ok($this->req('PUT', '/admin/roles/order', ['keys' => array_slice($own, 1)])[0] === 400, 'Nicht alle eigenen Rollen → 400');
+        $this->req('PUT', '/admin/roles/order', ['keys' => $own]);
+
+        // Punktefaktor auch für Admins
+        [$s, $d] = $this->req('PATCH', '/admin/roles/admin', ['points_factor' => 0.5]);
+        $c->ok($s === 200 && (array_column((array) $d, 'points_factor', 'key')['admin'] ?? null) == 0.5, 'Punktefaktor für Admins');
+        $this->req('PATCH', '/admin/roles/admin', ['points_factor' => 1]);
+
+        $this->req('DELETE', '/admin/roles/' . $aufnahme, [], ['replacement' => 'member']);
         if ($nur !== '') {
             $this->req('DELETE', '/admin/roles/' . $nur, [], ['replacement' => 'member']);
         }
@@ -789,7 +821,7 @@ final class ApiScenario
         $c->section('Anwesenheit');
         $admin = $this->user('kptest_anw_admin', 'admin');
         $m = $this->user('kptest_anw_m', 'member');
-        $cand = $this->user('kptest_anw_anw', 'candidate');
+        $cand = $this->user('kptest_anw_anw', $this->anw);
         $guest = $this->user('kptest_anw_gast', 'guest');
         $this->d->actAs($m);
         $c->ok($this->req('GET', '/attendance')[0] === 403, 'Mitglied: GET /attendance → 403');
@@ -849,7 +881,7 @@ final class ApiScenario
         $c->section('Schwarzes Brett');
         $admin = $this->user('kptest_brett_admin', 'admin');
         $m = $this->user('kptest_brett_m', 'member');
-        $cand = $this->user('kptest_brett_anw', 'candidate');
+        $cand = $this->user('kptest_brett_anw', $this->anw);
         $guest = $this->user('kptest_brett_gast', 'guest');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/board')[0] === 401, 'GET /board ohne Anmeldung → 401');
@@ -894,7 +926,7 @@ final class ApiScenario
         $admin = $this->user('kptest_umfrage_admin', 'admin');
         $m = $this->user('kptest_umfrage_m', 'member');
         $m2 = $this->user('kptest_umfrage_m2', 'member');
-        $cand = $this->user('kptest_umfrage_anw', 'candidate');
+        $cand = $this->user('kptest_umfrage_anw', $this->anw);
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/polls')[0] === 401, 'GET /polls ohne Anmeldung → 401');
         $this->d->actAs($cand);
@@ -968,7 +1000,7 @@ final class ApiScenario
         $c->section('Mitgliederliste für alle');
         $admin = $this->user('kptest_liste_admin', 'admin');
         $m = $this->user('kptest_liste_m', 'member');
-        $cand = $this->user('kptest_liste_anw', 'candidate');
+        $cand = $this->user('kptest_liste_anw', $this->anw);
         $guest = $this->user('kptest_liste_gast', 'guest');
         foreach ([$m => 'Mitglied', $cand => 'Anwärter', $guest => 'Gast-Konto', 0 => 'Ohne Anmeldung'] as $who => $label) {
             $this->d->actAs($who === 0 ? null : $who);
@@ -981,7 +1013,7 @@ final class ApiScenario
         $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
         [$s, $d] = $this->req('GET', '/directory/counts');
         $groups = array_column((array) $d, 'count', 'group');
-        $c->ok($s === 200 && ($groups['member'] ?? 0) >= 1 && ($groups['candidate'] ?? 0) >= 1 && !isset($groups['guest']), 'GET /directory/counts: Anzahl je Gruppe, ohne Gäste');
+        $c->ok($s === 200 && ($groups['member'] ?? 0) >= 1 && ($groups[$this->anw] ?? 0) >= 1 && !isset($groups['guest']), 'GET /directory/counts: Anzahl je Gruppe, ohne Gäste');
         $c->ok(array_filter((array) $d, static fn (mixed $e): bool => array_keys((array) $e) !== ['group', 'count']) === [], 'Zähler: nur Gruppe und Anzahl');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/directory/counts')[0] === 200, 'Ohne Anmeldung: GET /directory/counts → 200 (öffentlich wie die Liste)');
@@ -1065,7 +1097,7 @@ final class ApiScenario
         $admin = $this->user('kptest_geb_admin', 'admin');
         $m = $this->user('kptest_geb_m', 'member');
         $m2 = $this->user('kptest_geb_m2', 'member');
-        $cand = $this->user('kptest_geb_anw', 'candidate');
+        $cand = $this->user('kptest_geb_anw', $this->anw);
         $guest = $this->user('kptest_geb_gast', 'guest');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/birthdays')[0] === 401, 'GET /birthdays ohne Anmeldung → 401');

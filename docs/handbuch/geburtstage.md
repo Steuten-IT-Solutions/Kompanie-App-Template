@@ -4,7 +4,7 @@ reihenfolge: 34
 rechte: [member]
 bereiche: [birthdays]
 ---
-Unter **{bereich.birthdays}** siehst du, wer von den {rolle.member} bald Geburtstag hat, und trägst deinen eigenen ein. {rolle.candidate} und Gäste sehen keine Geburtstage, und ihre erscheinen nirgends.
+Unter **{bereich.birthdays}** siehst du, wer von den {rolle.member} bald Geburtstag hat, und trägst deinen eigenen ein. Personen ohne Mitgliederbereich (z. B. Anwärter) und Gäste sehen keine Geburtstage, und ihre erscheinen nirgends.
 
 ## Wo du sie findest
 Oben unter **{bereich.events}** steht die Karte **Anstehende {bereich.birthdays}**: alle, die heute oder in den nächsten 7 Tagen Geburtstag haben. Wer heute Geburtstag hat, ist mit **Heute** hervorgehoben. Gibt es keine anstehenden, fehlt die Karte (außer die Kompanie nutzt weder {bereich.events} noch {bereich.calendar}; dann steht dort „In den nächsten 7 Tagen hat niemand Geburtstag.“). **Alle {bereich.birthdays}** zeigt die ganze Liste, nach Monaten geordnet und mit dem nächsten Geburtstag zuerst.

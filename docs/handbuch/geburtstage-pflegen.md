@@ -16,5 +16,5 @@ Bei **+ Mitglied anlegen** und bei **Mehrere auf einmal anlegen** gibt es je Per
 
 ## Gut zu wissen
 - Erlaubt sind nur echte Daten: der 29. Februar nur in einem Schaltjahr (oder ohne Jahr), Jahre ab 1900 und nichts in der Zukunft.
-- Geburtstage sehen nur {rolle.member}. Von {rolle.candidate} kannst du schon einen eintragen; er erscheint, sobald die Person als {rolle.member} aufgenommen ist.
+- Geburtstage sehen nur {rolle.member}. Von Personen ohne Mitgliederbereich (z. B. Anwärtern) kannst du schon einen eintragen; er erscheint, sobald die Person als {rolle.member} aufgenommen ist.
 - Wird ein Konto gelöscht, ist auch der Geburtstag weg.

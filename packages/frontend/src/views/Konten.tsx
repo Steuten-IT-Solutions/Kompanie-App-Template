@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, levelLabel, type AccountProfile, type BulkResult, type CreatedUser, type Level, type NewPerson } from '../api';
+import { api, config, newAccountRoles, type AccountProfile, type BulkResult, type CreatedUser, type Level, type NewPerson } from '../api';
 import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
@@ -103,6 +103,27 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
 
 type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null };
 
+/**
+ * Rolle neuer Konten: Mitglied oder eine eigene Rolle, die der Admin dafür freigegeben hat (Einstellungen → Rollen,
+ * z. B. Anwärter). Ohne freigegebene Rollen keine Auswahl: Neue Konten sind dann Mitglieder.
+ */
+export function NewAccountRole({ label, value, onChange }: { label: string; value: Level; onChange: (level: Level) => void }) {
+  const roles = newAccountRoles();
+  if (roles.length < 2) return null;
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {roles.map((r) => (
+          <option key={r.key} value={r.key}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', email: '', points: '', bday: emptyBirthday(), picture: null });
 
 /**
@@ -112,7 +133,7 @@ const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', emai
  */
 export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   const [rows, setRows] = useState([emptyRow(), emptyRow(), emptyRow()]);
-  const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  const [level, setLevel] = useState<Level>('member');
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -191,13 +212,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
         ‹ Einzeln anlegen
       </button>
-      <label className="field">
-        <span>Rolle für alle</span>
-        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
-          <option value="member">{levelLabel('member')}</option>
-          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
-        </select>
-      </label>
+      <NewAccountRole label="Rolle für alle" value={level} onChange={setLevel} />
       {rows.map((r, i) => (
         <fieldset key={i} className="fieldset bulk-row">
           <legend>Person {i + 1}</legend>

@@ -360,10 +360,31 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   const name = `Anna ${last}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  // Anwärter sind eine eigene Rolle: nur Kalender, für neue Konten, als Mitglied aufzunehmen (bei WordPress ggf. schon da).
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  const rollen = page.locator('#einstellungen-rollen');
+  await expect(rollen.locator('.row-title').first()).toBeVisible();
+  if ((await rollen.locator('.row-title', { hasText: /^Anwärter$/ }).count()) === 0) {
+    await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
+    await rollen.getByLabel('Name der Rolle').fill('Anwärter');
+    await rollen.getByLabel(/^Mitgliederbereich/).uncheck();
+    await rollen.getByLabel(/^Interner Kalender/).check();
+    await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
+    await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
+    await rollen.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
+  }
+  await expect(rollen.locator('.row', { hasText: /^Anwärter/ })).toContainText('für neue Konten');
+
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByLabel('Vorname').fill('Anna');
   await page.getByLabel('Nachname').fill(last);
-  await page.getByLabel('Rolle').selectOption('candidate');
+  await page.getByLabel('Rolle').selectOption({ label: 'Anwärter' });
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
   const username = (await page.getByTestId('new-username').textContent())!.trim();
   const password = (await page.getByTestId('new-password').textContent())!.trim();
