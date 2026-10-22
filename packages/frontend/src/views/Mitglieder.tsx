@@ -21,8 +21,8 @@ import {
 import { navigate } from '../router';
 import { OfficesView, PersonOffices, useOffices } from './Aemter';
 
-/** Nach Namen; Punkte stehen in dieser Liste nicht. */
-const SORTS: MemberSort[] = ['last-name', 'first-name'];
+/** Nach Namen oder Eintritt; Punkte stehen in dieser Liste nicht. */
+const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
 
 const sec = brand.labels.sections;
 const SECTION_KEY = 'kompanie-members-section';
@@ -296,6 +296,8 @@ function MemberList({ former = false }: { former?: boolean }) {
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </button>
               {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
+              {/* Nach Eintritt sortiert: das Jahr, soweit die Person es zeigt (Ehemalige haben ihre Jahre oben). */}
+              {!former && order.sort === 'joined' && m.join_year && <div className="row-sub">Eintritt {m.join_year}</div>}
             </div>
             {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
             {m.rank_title !== undefined && (

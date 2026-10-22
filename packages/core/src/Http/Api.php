@@ -761,6 +761,11 @@ final class Api
                     $titles = $a->titles()->byUser();
                     $list = array_map(static fn (array $m): array => $m + ['titles' => $titles[$m['id']] ?? []], $list);
                 }
+                // Eintritt (zum Sortieren), wie in den Mitgliedsdetails nur für create_users
+                if ($this->user()->can(Cap::CreateUsers)) {
+                    $joined = $a->joinYears()->repository()->all();
+                    $list = array_map(static fn (array $m): array => $m + ['joined_on' => isset($joined[$m['id']]) ? (string) $joined[$m['id']] : ''], $list);
+                }
                 return $list;
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())

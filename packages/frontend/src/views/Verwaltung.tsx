@@ -44,7 +44,7 @@ import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberB
 import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
-import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
+import { FormerImport, FormerList, FormerPanel, formerDate, formerSummary } from './Ehemalige';
 
 type Sub =
   | 'mitglieder'
@@ -157,8 +157,11 @@ function Members() {
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
-  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
+  // Nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users); sonst nach Nachname (die
+  // gemerkte Wahl bleibt).
+  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
+    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+  );
   const order: MemberOrder = sortOptions.includes(stored.sort)
     ? stored
     : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
@@ -286,7 +289,7 @@ function Members() {
             <select
               aria-labelledby="member-sort-label"
               value={order.sort}
-              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
+              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Eintritt früheste, Punkte die meisten zuerst).
               onChange={(e) => {
                 const sort = e.target.value as MemberSort;
                 changeOrder({ sort, dir: defaultDir(sort) });
@@ -328,6 +331,9 @@ function Members() {
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
+                {/* Nach Eintritt sortiert: das Jahr vorn, damit die Reihenfolge nachvollziehbar ist. */}
+                {order.sort === 'joined' && m.joined_on && `Eintritt ${formerDate(m.joined_on)}`}
+                {order.sort === 'joined' && m.joined_on && (canPoints() || (m.open_cents ?? 0) > 0) && ' · '}
                 {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
                 {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}

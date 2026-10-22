@@ -361,6 +361,8 @@ export interface MemberSummary {
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
+  /** Eintritt als JJJJ (nur für create_users; leer ohne Eintrag, fehlt bei älteren Servern) */
+  joined_on?: string;
 }
 
 /** Eintrag der Mitgliederliste (Bereich directory, öffentlich): nur Name, Foto, Dienstgrad, Titel. */

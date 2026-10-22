@@ -43,6 +43,16 @@ final class JoinYearRepository
         return $out;
     }
 
+    /** @return array<int, int> Benutzer-ID => Jahr, alle unabhängig von der Anzeige (Verwaltung) */
+    public function all(): array
+    {
+        $out = [];
+        foreach ($this->db->select('SELECT user_id, year FROM {join_years}') as $r) {
+            $out[(int) $r['user_id']] = (int) $r['year'];
+        }
+        return $out;
+    }
+
     /** Anlegen oder ändern. Ohne $profile bleibt die Anzeige, wie sie ist (neu: nicht zeigen). */
     public function save(int $userId, int $year, ?string $profile, int $by, string $now): void
     {

@@ -5,9 +5,23 @@ import { formatDate, formatEuro } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { MemberAvatar } from '../memberPhoto';
-import { DEFAULT_MEMBER_SORT, listName, loadMemberOrder, sortMembers, type MemberOrder } from '../memberSort';
+import {
+  DEFAULT_MEMBER_SORT,
+  MEMBER_SORT_LABELS,
+  defaultDir,
+  dirLabel,
+  listName,
+  loadMemberOrder,
+  saveMemberOrder,
+  sortMembers,
+  type MemberOrder,
+  type MemberSort,
+} from '../memberSort';
 
 const sec = brand.labels.sections;
+
+/** Nach Namen oder Eintritt; Punkte gibt es in dieser Liste nicht. */
+const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
 
 /** Auswahl beim Eintragen */
 export const REASON_OPTIONS: Record<FormerReason, string> = { left: 'Ausgetreten', deceased: 'Verstorben', other: 'Sonstiges' };
@@ -38,9 +52,13 @@ export function FormerList() {
   const { data, error, loading, reload } = useAsync(() => api.formerMembers(), [], 'former-members');
   const [query, setQuery] = useState('');
   const [reason, setReason] = useState<FormerReason | ''>('');
-  // Wie die Mitgliederliste nach Vor- oder Nachname; nach Punkten gibt es hier nicht.
-  const stored = loadMemberOrder();
-  const order: MemberOrder = stored.sort === 'points' ? { sort: DEFAULT_MEMBER_SORT, dir: 'asc' } : stored;
+  // Wie die Mitgliederliste (gemerkt je Gerät); gemerkt nach Punkten gilt hier der Nachname.
+  const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
+  const order: MemberOrder = SORTS.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const changeOrder = (next: MemberOrder) => {
+    setStored(next);
+    saveMemberOrder(next);
+  };
   const list = useMemo(
     () =>
       sortMembers(
@@ -88,6 +106,38 @@ export function FormerList() {
           </option>
         ))}
       </select>
+      <div className="field-row member-sort">
+        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+        <div className="field">
+          <span id="former-sort-label">Sortierung</span>
+          <select
+            aria-labelledby="former-sort-label"
+            value={order.sort}
+            onChange={(e) => {
+              const sort = e.target.value as MemberSort;
+              changeOrder({ sort, dir: defaultDir(sort) });
+            }}
+          >
+            {SORTS.map((s) => (
+              <option key={s} value={s}>
+                {MEMBER_SORT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field member-sort-dir">
+          <span id="former-sort-dir-label">Reihenfolge</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            aria-labelledby="former-sort-dir-label former-sort-dir-value"
+            title="Reihenfolge umkehren"
+            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+          >
+            <span id="former-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+          </button>
+        </div>
+      </div>
       <ul className="card-list">
         {list.map((f) => (
           <li key={f.id} className="card row clickable member-row" onClick={() => navigate(`verwaltung/ehemalige/${f.id}`)}>

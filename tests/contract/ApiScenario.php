@@ -1034,6 +1034,12 @@ final class ApiScenario
         $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'profile' => 'members'], 'Verwaltung ändert das Jahr, die Anzeige bleibt');
         [$s, $d] = $this->req('GET', "/members/$m");
         $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'profile' => 'members'], 'Mitgliedsdetails mit Eintrittsjahr');
+        $listed = static fn (mixed $d): array => array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
+        [$s, $d] = $this->req('GET', '/members');
+        $c->ok($s === 200 && ($listed($d)['joined_on'] ?? null) === '2004', 'Mitgliederliste der Verwaltung mit Eintrittsjahr (unabhängig von der Anzeige)');
+        $this->d->actAs($this->user('kptest_liste_punkte', 'points'));
+        [$s, $d] = $this->req('GET', '/members');
+        $c->ok($s === 200 && $listed($d) !== [] && !array_key_exists('joined_on', $listed($d)), 'Ohne create_users kein Eintrittsjahr in der Liste');
         $this->d->actAs($cand);
         $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2000])[0] === 403, 'Ohne create_users kein fremdes Eintrittsjahr → 403');
         $c->ok($this->req('PUT', '/me/join-year', ['year' => 2000])[0] === 403, 'Anwärter: kein eigenes Eintrittsjahr → 403');

@@ -4783,6 +4783,9 @@ components:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
+        joined_on:
+          description: Eintritt als JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
+          type: string
 
     DirectoryEntry:
       type: object
