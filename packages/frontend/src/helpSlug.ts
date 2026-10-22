@@ -94,6 +94,7 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
     titel: 'titel-verwalten',
     aemter: 'aemter-verwalten',
     anwesenheit: 'anwesenheit-erfassen',
+    listen: 'listen',
   };
   if (sub && tabs[sub]) return tabs[sub];
   if (sub === 'neu' || sub === 'neu-mehrere') return 'mitglieder-anlegen';
@@ -118,6 +119,7 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
     ['manage_titles', 'titel-verwalten', 'titles'],
     ['manage_attendance', 'anwesenheit-erfassen', 'attendance'],
     ['manage_offices', 'aemter-verwalten', 'offices'],
+    ['manage_lists', 'listen', 'lists'],
   ];
   return byRight.find(([cap, , feature]) => ctx.can(cap) && (feature === null || !!ctx.features[feature]))?.[1] ?? null;
 }

@@ -25,6 +25,7 @@ import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
+import { ListAdmin } from './ListenVerwalten';
 import { PersonOffices } from './Aemter';
 import {
   DEFAULT_MEMBER_SORT,
@@ -42,7 +43,17 @@ import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberB
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'aemter' | 'anwesenheit';
+type Sub =
+  | 'mitglieder'
+  | 'punkte'
+  | 'strafe'
+  | 'katalog'
+  | 'dienstgrade'
+  | 'befoerderungen'
+  | 'titel'
+  | 'aemter'
+  | 'anwesenheit'
+  | 'listen';
 
 const sec = brand.labels.sections;
 
@@ -94,6 +105,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <OfficeAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
+      ) : active === 'listen' ? (
+        <ListAdmin path={path.slice(1)} onToast={onToast} />
       ) : (
         <Members />
       )}

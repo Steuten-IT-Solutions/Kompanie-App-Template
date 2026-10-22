@@ -24,6 +24,7 @@ const ALL_FEATURES = [
   'inventory',
   'directory',
   'offices',
+  'lists',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -85,6 +86,8 @@ const PATHS = [
   ['verwaltung', 'aemter'],
   ['verwaltung', 'aemter', 'import'],
   ['verwaltung', 'anwesenheit'],
+  ['verwaltung', 'listen'],
+  ['verwaltung', 'listen', '3'],
   ['verwaltung', 'neu'],
   ['verwaltung', 'neu-mehrere'],
   ...['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag'].map((s) => [
@@ -143,6 +146,7 @@ test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', ()
     [['manage_titles'], ['titles'], 'titel-verwalten'],
     [['manage_attendance'], ['attendance'], 'anwesenheit-erfassen'],
     [['manage_offices'], ['offices'], 'aemter-verwalten'],
+    [['manage_lists'], ['lists'], 'listen'],
   ];
   for (const [rights, features, expected] of cases) {
     const ctx = withRights(['member', ...rights], features);

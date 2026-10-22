@@ -872,6 +872,83 @@ final class Migrations
                 'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge mediumtext DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge TEXT DEFAULT NULL'],
             ],
+            // Listen (Issue #121): gespeicherte Listen mit Titel, Spalten und Zeilen zum Drucken und als CSV. Spalten:
+            // kind field (Wert aus der App, field nennt ihn) oder blank (leer zum Ausfüllen auf Papier). Zeilen: kind member
+            // (Konto; user_id wird NULL, wenn das Konto gelöscht wird) oder free (name ist ein freier Name oder leer).
+            // Werte der Mitglieder werden nicht gespeichert, sondern beim Lesen ermittelt.
+            19 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {lists} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(120) NOT NULL,
+  subtitle varchar(200) NOT NULL DEFAULT \'\',
+  list_date date DEFAULT NULL,
+  orientation varchar(10) NOT NULL DEFAULT \'portrait\',
+  created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {list_columns} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  list_id bigint(20) unsigned NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  kind varchar(10) NOT NULL DEFAULT \'blank\',
+  field varchar(20) DEFAULT NULL,
+  label varchar(60) NOT NULL DEFAULT \'\',
+  width varchar(10) NOT NULL DEFAULT \'normal\',
+  checkbox tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY list_id (list_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {list_rows} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  list_id bigint(20) unsigned NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  kind varchar(10) NOT NULL DEFAULT \'free\',
+  user_id bigint(20) unsigned DEFAULT NULL,
+  name varchar(100) NOT NULL DEFAULT \'\',
+  PRIMARY KEY (id),
+  KEY list_id (list_id),
+  KEY user_id (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {lists} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  subtitle TEXT NOT NULL DEFAULT \'\',
+  list_date TEXT DEFAULT NULL,
+  orientation TEXT NOT NULL DEFAULT \'portrait\',
+  created_by INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {list_columns} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT \'blank\',
+  field TEXT DEFAULT NULL,
+  label TEXT NOT NULL DEFAULT \'\',
+  width TEXT NOT NULL DEFAULT \'normal\',
+  checkbox INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE INDEX IF NOT EXISTS {list_columns}_list_id ON {list_columns} (list_id)',
+                    'CREATE TABLE IF NOT EXISTS {list_rows} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT \'free\',
+  user_id INTEGER DEFAULT NULL,
+  name TEXT NOT NULL DEFAULT \'\'
+)',
+                    'CREATE INDEX IF NOT EXISTS {list_rows}_list_id ON {list_rows} (list_id)',
+                    'CREATE INDEX IF NOT EXISTS {list_rows}_user_id ON {list_rows} (user_id)',
+                ],
+            ],
         ];
     }
 

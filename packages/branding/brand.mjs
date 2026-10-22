@@ -67,6 +67,7 @@ const DEFAULTS = {
     inventory: 'Inventar',
     directory: 'Mitglieder',
     offices: 'Ämter',
+    lists: 'Listen',
   },
   rank: 'Dienstgrad',
 };

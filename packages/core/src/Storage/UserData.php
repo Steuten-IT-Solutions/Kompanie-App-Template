@@ -13,7 +13,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * (namentliche über user_id, anonyme über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag, Foto, wartende
  * Fehlermeldungen mit ihrem Namen (Issue #64). Was sie für andere eingetragen hat (created_by, updated_by), bleibt; ebenso
  * Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“). Amtszeiten (Issue #112) bleiben als Chronik
- * mit dem gespeicherten Namen stehen; nur die Verknüpfung mit dem Konto wird gelöst. Ohne App: WordPress-Multisite löscht
+ * mit dem gespeicherten Namen stehen; nur die Verknüpfung mit dem Konto wird gelöst. Zeilen in Listen (Issue #121) bleiben
+ * ohne Verknüpfung und ohne Namen stehen, bis die Liste aktualisiert wird. Ohne App: WordPress-Multisite löscht
  * damit auch in den Tabellen anderer Seiten des Netzwerks.
  */
 final class UserData
@@ -54,6 +55,11 @@ final class UserData
         }
         try {
             $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
+        } catch (\RuntimeException) {
+            $ok = false;
+        }
+        try {
+            $db->execute('UPDATE {list_rows} SET user_id = NULL WHERE user_id = ?', [$userId]);
         } catch (\RuntimeException) {
             $ok = false;
         }

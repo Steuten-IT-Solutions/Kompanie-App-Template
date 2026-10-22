@@ -202,7 +202,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 ### Konten verwalten (Issue #24)
 
 - Wer Konten anlegt (`create_users`), ändert Name, E-Mail und (nur Standalone) Benutzernamen und löscht Konten, mit denselben Grenzen wie beim Passwort-Zurücksetzen (`MemberService::guardAccount`: Admins nur durch Admins, Personen ohne Mitgliederbereich nur durch Admins, nie mehr Rechte als man selbst). Nicht das eigene Konto, nicht den letzten Admin.
-- Löschen: Port `UserDirectory::removeAccount()` beendet alle Sitzungen; Standalone löscht das Konto, WordPress entfernt nur die Rolle in der App (Entscheidung: der Benutzer der Webseite bleibt). Danach löscht `App::userDeleted()` alle eigenen Daten (Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos), auch wenn WordPress einen Benutzer im Backend löscht. Amtszeiten (Issue #112) bleiben als Chronik mit dem gespeicherten Namen stehen; nur `office_holders.user_id` wird `NULL` (Entscheidung im Issue). Was die Person für andere eingetragen hat, bleibt; angezeigt als „gelöschtes Konto“ (`UserNames`).
+- Löschen: Port `UserDirectory::removeAccount()` beendet alle Sitzungen; Standalone löscht das Konto, WordPress entfernt nur die Rolle in der App (Entscheidung: der Benutzer der Webseite bleibt). Danach löscht `App::userDeleted()` alle eigenen Daten (Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos), auch wenn WordPress einen Benutzer im Backend löscht. Amtszeiten (Issue #112) bleiben als Chronik mit dem gespeicherten Namen stehen; nur `office_holders.user_id` wird `NULL` (Entscheidung im Issue). Zeilen in Listen (Issue #121) bleiben ohne Namen stehen (`list_rows.user_id` wird `NULL`), bis die Liste aktualisiert wird. Was die Person für andere eingetragen hat, bleibt; angezeigt als „gelöschtes Konto“ (`UserNames`).
 - Mehrere anlegen (`POST /users/bulk`, höchstens 50): erst alles prüfen (`MemberService::prepare`, Benutzernamen und E-Mail auch untereinander, Anfangspunkte und Dienstgrad), dann anlegen. Die Zugangsdaten enthalten den Link zur Installationsanleitung und lassen sich als Zettel je Person ausdrucken.
 
 #### Fotos der Mitglieder
@@ -310,6 +310,15 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - App: im Tab *Mitglieder* (s. o.) je Amt eine aufklappbare Karte: zugeklappt Siegel (Monogramm der Bezeichnung), aktuelle Inhaber mit Fotos (sonst die letzte Amtszeit) und „Chronik seit …“; aufgeklappt oben *Im Amt* (laufende Amtszeiten auf der Kompaniefarbe, Foto, Dauer), darunter *Frühere* als Chronik: Jahr | Linie | Karte (Personen als Chips, Dauer, Zusatz; einzelne Jahre mit Stern), Jahrzehnt-Marken ab fünf Einträgen; ab 720 px Breite Linie in der Mitte, Karte und Jahr abwechselnd gegenüber. *Meins → Ämter* und die Mitgliedsdetails der Verwaltung zeigen die Ämter einer Person. Pflege unter *Verwaltung → Ämter* (`#/verwaltung/aemter`, `/<id>`, `/import`).
 - Offen: Shortcode `[kompanie_aemter]` für die Webseite (Punkt 18 im Issue), als eigenes Issue.
 
+### Listen (Issue #121)
+
+- Bereich `lists` (Bezeichnung „Listen“, `labels.sections.lists`; aus, nie automatisch eingeschaltet), Recht `manage_lists` (Standardrolle „Listen verwalten“: `member`, `manage_lists`). Alle mit dem Recht sehen und bearbeiten dieselben Listen (Entscheidung im Issue).
+- Tabellen (Migration 19): `lists` (`title` ≤ 120, `subtitle` ≤ 200, `list_date` nullable, `orientation` = `portrait` | `landscape`, angelegt/geändert von/am), `list_columns` (`kind` = `field` | `blank`, `field`, `label` ≤ 60, `width` = `narrow` | `normal` | `wide`, `checkbox` nur bei `blank`), `list_rows` (`kind` = `member` | `free`, `user_id` nullable, `name` ≤ 100 nur bei `free`). Höchstens 20 Spalten und 500 Zeilen. Spalten und Zeilen werden beim Speichern als Ganzes ersetzt. In Sicherungen (`Backup::CORE_TABLES`).
+- **Werte werden nie gespeichert**, sondern bei `GET /lists/{id}` ermittelt (feste Zahl von Abfragen, `QueryCountTest`), und nur, soweit die anfragende Person sie in der App ohnehin sieht (`ListService::availableFields`, je Spalte `available`): Name immer; Rolle nur mit Zugang zur Mitgliederliste der Verwaltung (`Capability::memberList()`); Dienstgrad und Titel mit Bereich und öffentlicher Mitgliederliste (`directory`) oder dem Recht, sie zu pflegen; Geburtstag (nur „TT.MM.“, nur freigegebene, Issue #1) für Mitglieder; Punkte nur mit `manage_points`, offene Strafen nur mit `manage_penalties`. `nr` zählt die App.
+- **Mitglieder aktualisieren** (`POST /lists/{id}/sync-members`, ohne `apply` nur die Übersicht): Zeilen für alle Konten mit `member` ohne Zeile anlegen, Mitgliedszeilen gelöschter Konten und von Konten ohne `member` löschen; freie Zeilen bleiben. Neue Zeilen nach Nachname (ohne Nachnamen der Vorname, Umlaute wie Grundbuchstaben, wie `memberSort.ts`) vor die erste Mitgliedszeile, die später kommt, sonst hinter die letzte; ohne Mitgliedszeilen an den Anfang. Per `PUT` kommen Mitgliedszeilen nur für Konten, die schon in der Liste stehen, oder für Mitglieder dazu.
+- **Konto löschen**: `UserData::purge` setzt `list_rows.user_id` auf `NULL`; die Zeile bleibt ohne Namen („Konto gelöscht“), bis die Liste aktualisiert wird. Personenbezogene Werte stehen nicht in den Tabellen.
+- App: *Verwaltung → Listen* (`#/verwaltung/listen`, `/<id>`): Übersicht (anlegen, kopieren, löschen), Bearbeiten mit Entwurf und *Speichern*, Spalten und Zeilen per Griff sortierbar, *Nach Namen sortieren* (`lists.ts`). Ausgabe: Vorschau wie gedruckt, gestaltet wie die Tabellen der Kompanie (Titelbalken und Kopfzeile weiß auf `themeColor`, Überschriften schmaler Spalten außer Nr. um 45° gedreht, `print-color-adjust: exact`); *Drucken / PDF* über `window.print()` mit einer Kopie der Tabelle direkt unter `<body>` (beim Drucken nur sie, `body.list-printing`), A4 hoch oder quer (`@page`), Tabellenkopf auf jeder Seite, Zeilen nicht geteilt; *CSV* im Browser erzeugt: UTF-8 mit BOM, Semikolon, CRLF, RFC 4180, Texte mit `= + - @` am Anfang mit `'` entschärft (CSV-Injection). Gedruckt und exportiert wird der Entwurf auf dem Bildschirm.
+
 ### Rechte und Rollen
 
 | Recht | Bedeutung |
@@ -327,6 +336,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_polls` | Umfragen anlegen, ändern, beenden und löschen; alle Ergebnisse sehen |
 | `manage_inventory` | Inventar sehen und pflegen: anlegen, ändern, umlagern, löschen, Verlauf |
 | `manage_offices` | Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere; Import (Issue #112) |
+| `manage_lists` | Listen zum Drucken und als CSV anlegen, bearbeiten und löschen; Werte nur, soweit sichtbar (Issue #121) |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen; Geburtstage anderer eintragen (nur das Datum) |
 | `promote_users` | Rollen vergeben (Einschränkungen siehe unten) |
 | `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |
@@ -357,6 +367,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Umfragen | Umfragen verwalten | `member`, `manage_polls` |
   | Inventar | Inventar verwalten | `member`, `manage_inventory` |
   | Ämter | Ämter verwalten | `member`, `manage_offices` |
+  | Listen | Listen verwalten | `member`, `manage_lists` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.
@@ -567,7 +578,7 @@ Eine einzelne Datei, auf die Kompanie zugeschnitten (Repo-Name und Signaturschl�
 
 Beim ersten Öffnen durch einen Admin bietet die App den Assistenten an:
 
-1. **Bereiche wählen** (alle 16 aus `Domain\Features`: Termine, Kalender, News, Galerie, Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, Dokumente, Schwarzes Brett, Umfragen, Geburtstage, Inventar, Mitglieder, Ämter), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
+1. **Bereiche wählen** (alle 17 aus `Domain\Features`: Termine, Kalender, News, Galerie, Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, Dokumente, Schwarzes Brett, Umfragen, Geburtstage, Inventar, Mitglieder, Ämter, Listen), je Bereich ein Satz, wofür er da ist. Eine neue Installation hat **keine** Bereiche; dieser Schritt lässt sich deshalb nicht überspringen.
 2. Google-Zugang („Mit Google verbinden“ oder Dienstkonto) beim ersten Schritt, der ihn braucht: Galerie, sonst Kalender (für Kalender-IDs)
 3. Kalender (nur wenn gewählt): Kalender-IDs über den Google-Zugang oder geheime iCal-Adresse (mit Anleitung, wo man sie in Google findet), Testabruf
 4. Galerie (nur wenn gewählt): Link zum Ordner, Abgleich mit Fortschritt

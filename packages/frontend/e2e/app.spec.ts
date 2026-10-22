@@ -503,6 +503,106 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
 });
 
+test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
+  const title = `Unterschriften ${Date.now() % 1000000}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Listen');
+  const create = page.locator('form', { hasText: 'Neue Liste' });
+  await create.getByLabel('Titel').fill(title);
+  await create.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/listen\/\d+$/);
+  await expect(page.locator('.list-rows')).toHaveCount(0);
+
+  // Mitglieder aktualisieren: erst die Übersicht, dann übernehmen
+  await page.getByRole('button', { name: 'Mitglieder aktualisieren' }).click();
+  const sync = page.getByRole('dialog', { name: 'Mitglieder aktualisieren' });
+  await expect(sync).toContainText('Mitglied1');
+  await sync.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Mitglieder aktualisiert');
+  await expect(page.locator('.list-row', { hasText: 'Mitglied1' })).toHaveCount(1);
+  const members = await page.locator('.list-row').count();
+  // Nichts mehr zu tun
+  await page.getByRole('button', { name: 'Mitglieder aktualisieren' }).click();
+  await expect(page.locator('.toast')).toHaveText('Die Liste ist aktuell');
+  // Zeile eines Mitglieds von Hand entfernt (noch nicht gespeichert): Aktualisieren speichert erst und bietet sie wieder an
+  await page
+    .locator('.list-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /entfernen$/ })
+    .click();
+  await page.getByRole('button', { name: 'Mitglieder aktualisieren' }).click();
+  await expect(sync).toContainText('1 Zeile kommt dazu: Mitglied1');
+  await expect(page.locator('.list-row', { hasText: 'Mitglied1' })).toHaveCount(0);
+  await sync.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.list-row', { hasText: 'Mitglied1' })).toHaveCount(1);
+  await expect(page.locator('.list-row')).toHaveCount(members);
+
+  // Leere Spalte mit Kästchen, zwei eigene Zeilen (eine mit Namen), speichern
+  await page.getByRole('button', { name: '+ Leere Spalte' }).click();
+  const column = page.locator('.list-column').last();
+  await column.getByLabel('Überschrift').fill('Bezahlt');
+  await column.getByLabel('Breite').selectOption('narrow');
+  await column.getByLabel('Kästchen zum Abhaken').check();
+  await page.getByRole('button', { name: '+ Leere Spalte' }).click();
+  const count = page.locator('.list-column').last();
+  await count.getByLabel('Überschrift').fill('Anzahl Kinder');
+  await count.getByLabel('Breite').selectOption('narrow');
+  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
+  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
+  await page.getByLabel(`Zeile ${members + 1}: Name`).fill('Gast vom Nachbarverein');
+  await page.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(page.getByRole('button', { name: 'Speichern' })).toHaveCount(0);
+
+  // Vorschau wie gedruckt: Kopf mit Titel, Spalten, Kästchen, eigene Zeilen
+  const preview = page.locator('.list-preview');
+  await expect(preview.locator('.list-sheet-title')).toHaveText(title);
+  await expect(preview.locator('thead th:not(.list-spare-head)')).toHaveText(['Nr.', 'Name', 'Unterschrift', 'Bezahlt', 'Anzahl Kinder']);
+  // Schmale Spalten mit gedrehter Überschrift (wie in den Tabellen der Kompanie), Nr. nicht
+  await expect(preview.locator('thead th.list-th-rotated')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
+  await expect(preview.locator('tbody tr')).toHaveCount(members + 2);
+  await expect(preview.locator('tbody tr').nth(members)).toHaveText(`${members + 1}Gast vom Nachbarverein☐`);
+
+  // CSV für Excel: BOM, Semikolon
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'CSV herunterladen' }).click()]);
+  expect(download.suggestedFilename()).toBe(`${title}.csv`);
+  const csv = readFileSync((await download.path())!, 'utf8');
+  expect(csv.startsWith(String.fromCharCode(0xfeff) + 'Nr.;Name;Unterschrift;Bezahlt;Anzahl Kinder\r\n')).toBe(true);
+  expect(csv).toContain(';Mitglied1;;;\r\n');
+  expect(csv).toContain(`${members + 1};Gast vom Nachbarverein;;;\r\n`);
+
+  // Druck: nur die Liste, ohne Kopf- und Tab-Leiste der App
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('.list-print-root .list-table')).toBeVisible();
+  await expect(page.locator('.tabbar')).toBeHidden();
+  await expect(page.locator('.list-editor')).toBeHidden();
+  await shot(page, '40b-liste-druck');
+  // Auf A4, wie gedruckt (nur mit Bildschirmfotos)
+  if (SHOTS) await page.pdf({ path: `${SHOTS}/40c-liste.pdf`, format: 'A4', preferCSSPageSize: true });
+  await page.emulateMedia({ media: 'screen' });
+  await expect(page.locator('.list-print-root')).toBeHidden();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/40a-liste-bearbeiten.png`, fullPage: true });
+
+  // Schmaler Bildschirm: nichts ragt seitlich heraus (die Vorschau scrollt in sich)
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen)
+  await page.getByRole('button', { name: /Alle Listen/ }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
+  await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
+  await expect(page.locator('.toast')).toHaveText('Liste kopiert');
+  for (const t of [`${title} (Kopie)`, title]) {
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.locator('.row-title', { hasText: new RegExp(`^${t.replace(/[()]/g, '\\$&')}$`) }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+  await expect(page.locator('.row', { hasText: title })).toHaveCount(0);
+});
+
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
   await login(page, 'verwalter');
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
