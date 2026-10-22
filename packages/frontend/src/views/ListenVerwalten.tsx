@@ -617,26 +617,84 @@ function RowEditor({
 /**
  * Gedrehte Überschrift (45°, wie in Tabellenkalkulationen): in schmalen Spalten außer Nr., damit auch längere
  * Überschriften wie „Anzahl Kinder“ über eine schmale Spalte zum Ankreuzen passen. Wie dort ist die Zelle im Kopf mit
- * gekippt (Parallelogramm mit schrägen Linien), damit keine senkrechte Linie den Text kreuzt.
+ * gekippt (Parallelogramm mit schrägen Linien), damit keine Linie den Text kreuzt.
  */
 const rotated = (c: ListColumn): boolean => c.width === 'narrow' && c.field !== 'nr' && columnLabel(c).trim() !== '';
 /** Ungefähr: Millimeter je Zeichen in fetter Schrift, um 45° gedreht (Höhe) */
 const ROTATED_MM_PER_CHAR = 1.8;
+/** Druckbreite auf A4 mit 12 mm Rand (@page in PrintPortal): Spalten in Millimetern, damit der gekippte Kopf genau passt */
+const PAGE_WIDTH_MM = { portrait: 186, landscape: 273 };
+/** Linien wie die Rahmen der Tabelle: 1 px bei 96 dpi */
+const LINE_MM = 0.265;
+/**
+ * Die geraden Zellen haben oben einen Rahmen von 1 px, die gedrehten keinen: Die Oberkante der Grafik liegt deshalb um
+ * dessen halbe Breite höher, damit sie gerade durchläuft (im PDF nachgemessen; in Millimetern, da Chromium beim Drucken
+ * Verschiebungen der Grafik selbst auf ganze Pixel rundet).
+ */
+const TOP_MM = -LINE_MM / 2;
+/** Schriftgröße der Überschriften (10,5 pt) in Millimetern */
+const HEAD_FONT_MM = 3.7;
+
+/**
+ * Gekippter Kopf über aufeinanderfolgenden gedrehten Spalten als eine Grafik in Millimetern: eine Fläche (ohne Nähte),
+ * jede schräge Trennlinie und die Oberkante genau einmal, der Text mittig in seinem Feld. Die Fläche reicht unten links
+ * bis an die gerade Spalte davor und oben um die Höhe des Kopfs nach rechts hinaus.
+ */
+function RotatedHead({ labels, widths, height, color }: { labels: string[]; widths: number[]; height: number; color: string }) {
+  const h = height;
+  const xs = widths.reduce<number[]>((acc, w) => [...acc, acc[acc.length - 1] + w], [0]);
+  const r = xs[xs.length - 1];
+  return (
+    <svg className="list-th-svg" width={`${r + h}mm`} height={`${h}mm`} viewBox={`0 0 ${r + h} ${h}`} overflow="visible" aria-hidden="true">
+      {/* 0,3 mm nach links unter die gerade Zelle davor (gleiche Farbe), gegen eine helle Naht */}
+      <polygon points={`-0.3,${TOP_MM} ${r + h - TOP_MM},${TOP_MM} ${r},${h} -0.3,${h}`} fill={color} />
+      <g stroke="#555" strokeWidth={LINE_MM} fill="none">
+        <line x1={-0.3} y1={TOP_MM} x2={r + h - TOP_MM} y2={TOP_MM} />
+        {xs.map((x, i) => (
+          <line key={i} x1={x} y1={h} x2={x + h - TOP_MM} y2={TOP_MM} />
+        ))}
+      </g>
+      {labels.map((label, i) => {
+        // Unten in der Spaltenmitte, 3 mm höher also 3 mm weiter rechts: auf der Mittellinie des Felds
+        const x = xs[i] + widths[i] / 2 + 3;
+        const y = h - 3;
+        return (
+          <text
+            key={i}
+            x={x}
+            y={y}
+            transform={`rotate(-45 ${x} ${y})`}
+            fill="#fff"
+            fontSize={HEAD_FONT_MM}
+            fontWeight={700}
+            dominantBaseline="central"
+          >
+            {label}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
 
 /**
  * Die Tabelle, wie sie gedruckt wird: Titelbalken in der Farbe der Kompanie, Kopfzeile ebenso (weiß auf Farbe, schmale
- * Spalten mit gedrehter Überschrift), darunter die Zeilen mit dünnen Rahmen; der Tabellenkopf steht auf jeder Seite.
+ * Spalten mit gedrehter Überschrift), darunter die Zeilen mit dünnen Rahmen, abwechselnd leicht hinterlegt; der
+ * Tabellenkopf steht auf jeder Seite.
  */
 function PrintSheet({ draft }: { draft: Draft }) {
-  const total = draft.columns.reduce((s, c) => s + WIDTH_WEIGHT[c.width], 0) || 1;
-  const longest = Math.max(0, ...draft.columns.filter(rotated).map((c) => columnLabel(c).length));
-  const headHeight = longest > 0 ? Math.min(50, Math.max(12, longest * ROTATED_MM_PER_CHAR + 8)) : undefined;
-  // Die gekippte Zelle der letzten Spalte ragt oben um die Höhe des Kopfs nach rechts hinaus: dafür eine leere Spalte
+  const cols = draft.columns;
+  const total = cols.reduce((s, c) => s + WIDTH_WEIGHT[c.width], 0) || 1;
+  const longest = Math.max(0, ...cols.filter(rotated).map((c) => columnLabel(c).length));
+  const headHeight = longest > 0 ? Math.min(50, Math.max(12, longest * ROTATED_MM_PER_CHAR + 8)) : 0;
+  // Der gekippte Kopf der letzten Spalte ragt oben um die Höhe des Kopfs nach rechts hinaus: dafür eine leere Spalte
   // ohne Rahmen ans Ende, damit die Tabelle den Platz mitrechnet.
-  const last = draft.columns[draft.columns.length - 1];
-  const spare = last && rotated(last) && headHeight ? headHeight : 0;
+  const last = cols[cols.length - 1];
+  const spare = last && rotated(last) ? headHeight : 0;
+  const pageWidth = PAGE_WIDTH_MM[draft.orientation];
+  const widths = cols.map((c) => ((pageWidth - spare) * WIDTH_WEIGHT[c.width]) / total);
   return (
-    <div className="list-sheet" style={{ ['--list-color' as string]: brand.themeColor }}>
+    <div className="list-sheet" style={{ ['--list-color' as string]: brand.themeColor, width: `${pageWidth}mm` }}>
       <header className="list-sheet-head">
         <img src={logoUrl} alt="" className="list-sheet-logo" />
         <div className="list-sheet-heading">
@@ -650,32 +708,50 @@ function PrintSheet({ draft }: { draft: Draft }) {
       </div>
       <table className="list-table">
         <colgroup>
-          {draft.columns.map((c, i) => (
-            <col key={i} style={{ width: `${((WIDTH_WEIGHT[c.width] / total) * 100).toFixed(2)}%` }} />
+          {widths.map((w, i) => (
+            <col key={i} style={{ width: `${w}mm` }} />
           ))}
           {spare > 0 && <col style={{ width: `${spare}mm` }} />}
         </colgroup>
         <thead>
           <tr style={headHeight ? { height: `${headHeight}mm` } : undefined}>
-            {draft.columns.map((c, i) =>
-              rotated(c) ? (
+            {cols.map((c, i) => {
+              const after = cols[i + 1];
+              if (!rotated(c)) {
+                // Vor einem gekippten Kopf ohne Linie rechts: Dort beginnt dessen Fläche in derselben Farbe.
+                return (
+                  <th key={i} className={after && rotated(after) ? 'list-th-before-rotated' : undefined}>
+                    {columnLabel(c)}
+                  </th>
+                );
+              }
+              // Die Grafik steht in der ersten Spalte einer Folge gedrehter Spalten und reicht über alle.
+              const before = cols[i - 1];
+              let end = i;
+              while (end + 1 < cols.length && rotated(cols[end + 1])) end++;
+              return (
                 <th key={i} className="list-th-rotated">
-                  <div style={{ height: `${headHeight}mm` }}>
-                    <div className="list-th-band" aria-hidden="true" />
-                    <span>{columnLabel(c)}</span>
-                  </div>
+                  <span className="list-sr">{columnLabel(c)}</span>
+                  {!(before && rotated(before)) && (
+                    <div style={{ height: `${headHeight}mm` }}>
+                      <RotatedHead
+                        labels={cols.slice(i, end + 1).map((x) => columnLabel(x))}
+                        widths={widths.slice(i, end + 1)}
+                        height={headHeight}
+                        color={brand.themeColor}
+                      />
+                    </div>
+                  )}
                 </th>
-              ) : (
-                <th key={i}>{columnLabel(c)}</th>
-              ),
-            )}
+              );
+            })}
             {spare > 0 && <th className="list-spare-head" aria-hidden="true" />}
           </tr>
         </thead>
         <tbody>
           {draft.rows.map((r, i) => (
             <tr key={r.key}>
-              {draft.columns.map((c, j) => (
+              {cols.map((c, j) => (
                 <td
                   key={j}
                   className={

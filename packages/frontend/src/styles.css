@@ -3774,7 +3774,8 @@ button.spotlight-person:focus-visible {
   background: #fff;
 }
 .list-preview .list-sheet {
-  min-width: 560px;
+  /* Breite wie gedruckt (PrintSheet), der Rand der Vorschau kommt dazu */
+  box-sizing: content-box;
   padding: 16px;
 }
 .list-sheet {
@@ -3860,49 +3861,43 @@ button.spotlight-person:focus-visible {
   padding: 5px 6px;
 }
 /*
- * Gedrehte Überschrift wie in Tabellenkalkulationen: In der Zelle liegt ein um 45° gekipptes Feld (Parallelogramm,
- * unten so breit wie die Spalte) in der Farbe der Kompanie mit schrägen Linien, und der Text läuft mittig darin. So
- * kreuzt keine Linie den Text. Positioniert ist nur das innere div, nicht die Zelle: So liegen die Felder über den
- * Hintergründen der Nachbarzellen. Die Zelle selbst ist ebenfalls farbig (oben und unten mit Rahmen): Sie füllt das
- * Dreieck zwischen einer geraden Spalte und dem ersten gekippten Feld; sonst liegt sie ganz unter den Feldern.
+ * Gedrehte Überschrift wie in Tabellenkalkulationen (RotatedHead in ListenVerwalten.tsx): eine Grafik in der ersten
+ * Zelle einer Folge gedrehter Spalten, die über alle reicht. Die Zellen selbst haben weder Farbe noch Rahmen, die gerade
+ * Zelle davor keine Linie rechts. Positioniert ist nur das innere div: So liegt die Grafik über den Nachbarzellen.
  */
 .list-table th.list-th-rotated {
   padding: 0;
-  border-width: 1px 0;
-  vertical-align: bottom;
-  /* 1 px über den rechten Rand, gegen eine helle Naht zur Nachbarzelle (liegt unter den gekippten Feldern) */
-  box-shadow: 1px 0 0 var(--list-color);
+  border-width: 0;
+  background: none;
+  vertical-align: top;
+}
+.list-table th.list-th-before-rotated {
+  border-right-width: 0;
 }
 .list-th-rotated > div {
   position: relative;
 }
-.list-th-band {
+.list-th-svg {
   position: absolute;
-  inset: 0;
-  transform-origin: left bottom;
-  transform: skewX(-45deg);
-  background: var(--list-color);
-  border: 1px solid #555;
-  border-bottom: 0;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  font-family: inherit;
 }
-/* Mitte des Textes auf der Mittellinie des Felds: unten in der Spaltenmitte, 3 mm höher also 3 mm weiter rechts */
-.list-th-rotated span {
+/* Nur für Vorleser und Tests, die Grafik zeigt den Text */
+.list-sr {
   position: absolute;
-  left: calc(50% + 3mm);
-  bottom: 3mm;
-  transform-origin: 0 50%;
-  transform: translateY(50%) rotate(-45deg);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
   white-space: nowrap;
-  line-height: 1;
 }
-/*
- * Platz für das gekippte Feld der letzten Spalte (so breit wie der Kopf hoch, also quadratisch): oben links bis zur
- * Kante dieses Felds farbig, darunter weiß und ohne Rahmen
- */
+/* Platz für den gekippten Kopf der letzten Spalte: ohne Farbe und Rahmen */
 .list-table th.list-spare-head {
-  border-width: 1px 0 0;
+  border-width: 0;
   padding: 0;
-  background: linear-gradient(to bottom right, var(--list-color) 50%, #fff 50%);
+  background: none;
 }
 .list-table thead {
   display: table-header-group;
@@ -3919,10 +3914,10 @@ button.spotlight-person:focus-visible {
   background: none;
 }
 /*
- * Zeilen abwechselnd leicht in der Farbe der Kompanie (wie die Tabellenformatvorlage der Kompanie-Tabellen: erste Zeile
- * gefärbt, Farbe um 80 % aufgehellt); Spalten zum Ausfüllen bleiben weiß
+ * Zeilen abwechselnd leicht in der Farbe der Kompanie über alle Spalten (wie die Tabellenformatvorlage der
+ * Kompanie-Tabellen: erste Zeile gefärbt, Farbe um 80 % aufgehellt)
  */
-.list-table tbody tr:nth-child(odd) td:not(.list-blank, .list-spare) {
+.list-table tbody tr:nth-child(odd) td:not(.list-spare) {
   background: color-mix(in srgb, var(--list-color) 20%, #fff);
 }
 .list-table .list-blank {

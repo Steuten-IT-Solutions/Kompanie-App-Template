@@ -557,9 +557,10 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   // Vorschau wie gedruckt: Kopf mit Titel, Spalten, Kästchen, eigene Zeilen
   const preview = page.locator('.list-preview');
   await expect(preview.locator('.list-sheet-title')).toHaveText(title);
-  await expect(preview.locator('thead th:not(.list-spare-head)')).toHaveText(['Nr.', 'Name', 'Unterschrift', 'Bezahlt', 'Anzahl Kinder']);
+  await expect(preview.locator('thead th:not(.list-spare-head, .list-th-rotated)')).toHaveText(['Nr.', 'Name', 'Unterschrift']);
   // Schmale Spalten mit gedrehter Überschrift (wie in den Tabellen der Kompanie), Nr. nicht
-  await expect(preview.locator('thead th.list-th-rotated')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
+  await expect(preview.locator('thead th.list-th-rotated .list-sr')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
+  await expect(preview.locator('thead svg text')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
   await expect(preview.locator('tbody tr')).toHaveCount(members + 2);
   await expect(preview.locator('tbody tr').nth(members)).toHaveText(`${members + 1}Gast vom Nachbarverein☐`);
 
