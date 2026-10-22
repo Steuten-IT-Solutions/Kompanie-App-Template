@@ -7,7 +7,7 @@ bereiche: [lists]
 Wer die Rolle „{bereich.lists} verwalten“ oder eine Rolle mit diesem Recht hat, legt unter **Verwaltung → {bereich.lists}** Listen zum Ausdrucken oder als CSV für Excel an, z. B. Unterschriftenlisten, Teilnehmerlisten oder Listen zum Abhaken. Alle mit diesem Recht sehen und bearbeiten dieselben Listen.
 
 ## Liste anlegen
-Unter **Neue Liste** einen Titel eintragen und **Anlegen** tippen. Die neue Liste hat die Spalten *Nr.*, *Name* und eine breite leere Spalte *Unterschrift*, aber noch keine Zeilen. Unter **Liste** trägst du Titel, einen Untertitel oder Hinweis (z. B. „Bitte bis Freitag eintragen“) und ein Datum ein und wählst Hoch- oder Querformat für den Druck.
+Unter **Neue Liste** einen Titel eintragen und **Anlegen** tippen. Die neue Liste hat die Spalten *Name* (Nachname), *Vorname* und eine breite leere Spalte *Unterschrift*, aber noch keine Zeilen; eine Nummer je Zeile bekommst du mit der Datenspalte *Nr.* Unter **Liste** trägst du Titel, einen Untertitel oder Hinweis (z. B. „Bitte bis Freitag eintragen“) und ein Datum ein und wählst Hoch- oder Querformat für den Druck.
 
 In der Übersicht öffnet ein Tipp eine Liste. **Kopieren** legt eine Kopie mit allen Spalten und Zeilen an, z. B. die Liste vom letzten Jahr als Vorlage. **Löschen** löscht die Liste.
 

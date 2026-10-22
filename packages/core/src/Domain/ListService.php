@@ -122,7 +122,8 @@ final class ListService
     }
 
     /**
-     * Neue Liste. Ohne Spalten: Nr., Name und eine breite leere Spalte „Unterschrift“; ohne Zeilen leer.
+     * Neue Liste. Ohne Spalten wie die Tabellen der Kompanie: Name (Nachname), Vorname und eine breite leere Spalte
+     * „Unterschrift“; ohne Zeilen leer.
      *
      * @param array<string, mixed> $in
      * @return array<string, mixed>
@@ -131,8 +132,8 @@ final class ListService
     {
         $in += [
             'columns' => [
-                ['kind' => self::KIND_FIELD, 'field' => 'nr', 'width' => 'narrow'],
-                ['kind' => self::KIND_FIELD, 'field' => 'name'],
+                ['kind' => self::KIND_FIELD, 'field' => 'last_name', 'label' => 'Name'],
+                ['kind' => self::KIND_FIELD, 'field' => 'first_name'],
                 ['kind' => self::KIND_BLANK, 'label' => 'Unterschrift', 'width' => 'wide'],
             ],
             'rows' => [],

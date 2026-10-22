@@ -1078,7 +1078,7 @@ final class ApiScenario
         $this->d->actAs($admin);
         [$s, $list] = $this->req('POST', '/lists', ['title' => 'Kptest Unterschriften', 'rows' => [['kind' => 'free', 'name' => 'Kptest Gast']]]);
         $id = (int) ($list['id'] ?? 0);
-        $c->ok($s === 201 && array_column($list['columns'] ?? [], 'field') === ['nr', 'name', null] && count($list['rows'] ?? []) === 1, 'Liste anlegen → 201, mit Vorgabespalten');
+        $c->ok($s === 201 && array_column($list['columns'] ?? [], 'field') === ['last_name', 'first_name', null] && count($list['rows'] ?? []) === 1, 'Liste anlegen → 201, mit Vorgabespalten');
         $c->ok($this->req('PUT', "/lists/$id", ['title' => '', 'columns' => $list['columns'] ?? [], 'rows' => []])[0] === 400, 'Ohne Titel → 400');
         $c->ok($this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $list['columns'] ?? [], 'rows' => [['kind' => 'member', 'user_id' => $guest]]])[0] === 400, 'Gast als Mitgliedszeile → 400');
         [$s, $d] = $this->req('POST', "/lists/$id/sync-members");

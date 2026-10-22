@@ -115,7 +115,7 @@ final class ListServiceTest extends TestCase
         $this->assertSame([null, null, 'portrait'], [$list['subtitle'], $list['date'], $list['orientation']]);
         $this->assertSame([], $list['rows'], 'neue Liste beginnt leer');
         $this->assertSame(
-            [['field', 'nr', '', 'narrow', false], ['field', 'name', '', 'normal', false], ['blank', null, 'Unterschrift', 'wide', false]],
+            [['field', 'last_name', 'Name', 'normal', false], ['field', 'first_name', '', 'normal', false], ['blank', null, 'Unterschrift', 'wide', false]],
             array_map(static fn (array $c): array => [$c['kind'], $c['field'], $c['label'], $c['width'], $c['checkbox']], $list['columns']),
         );
         $this->assertSame('Ada Zander', $list['created_by_name']);

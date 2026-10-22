@@ -973,7 +973,7 @@ paths:
       tags: [Listen]
       summary: Liste anlegen
       description: |
-        Ohne `columns`: Nr., Name und eine breite leere Spalte „Unterschrift“. Ohne `rows` beginnt die Liste leer;
+        Ohne `columns`: Name (Nachname), Vorname und eine breite leere Spalte „Unterschrift“. Ohne `rows` beginnt die Liste leer;
         Mitglieder kommen über `POST /lists/{id}/sync-members` dazu.
       x-capability: manage_lists
       requestBody:

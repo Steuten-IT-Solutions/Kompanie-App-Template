@@ -557,19 +557,25 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   // Vorschau wie gedruckt: Kopf mit Titel, Spalten, Kästchen, eigene Zeilen
   const preview = page.locator('.list-preview');
   await expect(preview.locator('.list-sheet-title')).toHaveText(title);
-  await expect(preview.locator('thead th:not(.list-spare-head)')).toHaveText(['Nr.', 'Name', 'Unterschrift', 'Bezahlt', 'Anzahl Kinder']);
+  await expect(preview.locator('thead th:not(.list-spare-head)')).toHaveText([
+    'Name',
+    'Vorname',
+    'Unterschrift',
+    'Bezahlt',
+    'Anzahl Kinder',
+  ]);
   // Schmale Spalten mit gedrehter Überschrift (wie in den Tabellen der Kompanie), Nr. nicht
   await expect(preview.locator('thead th.list-th-rotated')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
   await expect(preview.locator('tbody tr')).toHaveCount(members + 2);
-  await expect(preview.locator('tbody tr').nth(members)).toHaveText(`${members + 1}Gast vom Nachbarverein☐`);
+  await expect(preview.locator('tbody tr').nth(members)).toHaveText('NachbarvereinGast vom☐');
 
   // CSV für Excel: BOM, Semikolon
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'CSV herunterladen' }).click()]);
   expect(download.suggestedFilename()).toBe(`${title}.csv`);
   const csv = readFileSync((await download.path())!, 'utf8');
-  expect(csv.startsWith(String.fromCharCode(0xfeff) + 'Nr.;Name;Unterschrift;Bezahlt;Anzahl Kinder\r\n')).toBe(true);
+  expect(csv.startsWith(String.fromCharCode(0xfeff) + 'Name;Vorname;Unterschrift;Bezahlt;Anzahl Kinder\r\n')).toBe(true);
   expect(csv).toContain(';Mitglied1;;;\r\n');
-  expect(csv).toContain(`${members + 1};Gast vom Nachbarverein;;;\r\n`);
+  expect(csv).toContain('\r\nNachbarverein;Gast vom;;;\r\n');
 
   // Druck: nur die Liste, ohne Kopf- und Tab-Leiste der App
   await page.emulateMedia({ media: 'print' });
