@@ -4,7 +4,7 @@ reihenfolge: 39
 rechte: []
 bereiche: [offices]
 ---
-Unter **{bereich.directory}** (unten in der Leiste) steht neben der Mitgliederliste der Abschnitt **{bereich.offices}**: wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl. Sehen kann ihn jeder, auch ohne Anmeldung. Oben wechselst du zwischen **{bereich.directory}** und **{bereich.offices}**; die App merkt sich auf diesem Gerät, was du zuletzt gewählt hast. Nutzt die Kompanie keine Mitgliederliste, heißt der Tab **{bereich.offices}**.
+Unter **{bereich.directory}** (unten in der Leiste) steht neben der Mitgliederliste der Abschnitt **{bereich.offices}**: wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl. Sehen kann ihn jeder, auch ohne Anmeldung. Oben wechselst du zwischen **{bereich.directory}** und **{bereich.offices}**; die App merkt sich auf diesem Gerät, was du zuletzt gewählt hast. Nutzt die Kompanie keine Mitgliederliste, heißt der Tab **{bereich.offices}**. Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe.
 
 ## Ämter und Chronik
 Die Ämter stehen nach Gruppen geordnet. Jede Karte zeigt zugeklappt ein Siegel mit den Anfangsbuchstaben des Amts, wer es gerade hat (mit Fotos), sonst die letzte Amtszeit, und seit wann die Chronik reicht. Ein Tipp auf die Karte klappt sie auf, **Alle aufklappen** öffnet alle Karten auf einmal.

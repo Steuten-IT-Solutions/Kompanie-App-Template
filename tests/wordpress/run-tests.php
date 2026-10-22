@@ -770,6 +770,42 @@ $size = getimagesizefromstring((string) (KompanieApp\WordPress\AppPage::memberPh
 $c->ok($size !== false && $size[0] === 1024 && abs($size[1] - 683) <= 1, 'Eigenes Foto: 1024 Pixel für die vergrößerte Ansicht');
 unset($_GET['v'], $_GET['s']);
 $c->ok(($app->api()->config()['user']['photo_url'] ?? null) === $photo['photo_url'], '/config: eigenes Foto');
+
+// Shortcodes aus Ämtern und Mitgliederliste: dieselben öffentlichen Angaben wie die App, auch für Gäste.
+$c->section('Shortcodes: Ämter und Mitglieder');
+wp_set_current_user($admin);
+$app->features()->update(['offices' => true, 'directory' => true]);
+$guestHolder = $d->createUser('kpwp_gast_amt', 'guest');
+$memberName = (string) $app->users->find($member)?->name;
+$offices = $app->offices();
+$groupA = $offices->createGroup('Kpwp Kompanie');
+$groupB = $offices->createGroup('Kpwp Bruderschaft');
+$officeA = $offices->createOffice(['title' => 'Kpwp Kapitän', 'group_id' => $groupA['id']]);
+$officeB = $offices->createOffice(['title' => 'Kpwp Brudermeister', 'group_id' => $groupB['id']]);
+$offices->createTerm($officeA['id'], ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kpwp Früher'], ['user_id' => $guestHolder]]]);
+$offices->createTerm($officeA['id'], ['start_year' => 2020, 'holders' => [['user_id' => $member]], 'note' => 'Kpwp Zusatz']);
+$offices->createTerm($officeB['id'], ['start_year' => 2018, 'holders' => [['name' => 'Kpwp Frei']]]);
+wp_set_current_user(0);
+$html = do_shortcode('[kompanie_aemter]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'class="ka-gruppe">Kpwp Kompanie<'), '[kompanie_aemter]: alle Gruppen mit Überschrift');
+$c->ok(str_contains($html, esc_html($memberName)) && str_contains($html, 'seit 2020 · Kpwp Zusatz') && str_contains($html, esc_url((string) $photo['photo_url'])), 'Laufende Amtszeit mit Foto aus der Mitgliederliste und Zusatz');
+$c->ok(str_contains($html, 'Chronik seit 1980') && str_contains($html, '1980–1990') && str_contains($html, 'Kpwp Früher'), 'Frühere Amtszeiten als Chronik');
+$html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
+$c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
+$html = do_shortcode('[kompanie_mitglieder]');
+$c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, esc_html($memberName)) && str_contains($html, esc_url((string) $photo['photo_url'])), '[kompanie_mitglieder]: Mitglied mit Foto');
+$c->ok(!str_contains($html, 'Kpwp_gast_amt') && !str_contains($html, 'punkte') && !str_contains($html, 'role'), 'Ohne Gäste, Punkte oder Rollen');
+$app->features()->update(['offices' => false, 'directory' => false]);
+$c->ok(do_shortcode('[kompanie_aemter]') === '' && do_shortcode('[kompanie_mitglieder]') === '', 'Bereich aus: keine Ausgabe');
+$app->features()->update(['offices' => true, 'directory' => true]);
+wp_set_current_user($admin);
+foreach ([$officeA, $officeB] as $o) {
+    $offices->deleteOffice($o['id']);
+}
+$offices->deleteGroup($groupA['id']);
+$offices->deleteGroup($groupB['id']);
+wp_delete_user($guestHolder);
+
 wp_set_current_user($admin);
 $app->memberPhotos()->remove($app->users->find($admin), $member);
 $c->ok($app->memberPhotos()->url($member) === null, 'Foto entfernt');
