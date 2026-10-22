@@ -2770,6 +2770,44 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /members/import:
+    post:
+      tags: [Verwaltung]
+      summary: Mitglieder aus einer Tabelle übernehmen, auch Ehemalige (Ersterfassung); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
+        Windows-1252, höchstens 200 KB und 500 Personen. Die erste Zeile enthält die Spaltennamen (Reihenfolge und Groß- und
+        Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
+        geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden, grund. Unbekannte Spalten und
+        Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
+        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
+        Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
+        „Gründer“, ausgeschieden und grund nur dann). Punkte, Dienstgrad (Bezeichnung) und Titel (Bezeichnungen) nur für
+        Rollen mit Mitgliederbereich. Geburtstag als TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT; Eintritt als TT.MM.JJJJ oder Jahr.
+        Wer genau so heißt wie ein vorhandenes Konto, wird übersprungen (`existing`); gleiche Namen in der Tabelle sind ein
+        Fehler. Mit `apply` und einem Fehler in einer Zeile → 400 (nichts angelegt). Sonst stehen die Zugangsdaten der neuen
+        aktiven Konten (mit Startpasswort, nur in dieser Antwort) in `created`; bricht das Anlegen mittendrin ab, steht der
+        Grund in `error` und die schon angelegten in `created`.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /members/{id}/former:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -5039,6 +5077,68 @@ components:
         existing: { type: integer }
         offices_linked: { type: integer, description: 'Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden' }
         applied: { type: boolean }
+
+    MemberImportResult:
+      type: object
+      required: [columns, rows, new, existing, offices_linked, applied, created]
+      properties:
+        columns:
+          type: object
+          required: [used, ignored]
+          properties:
+            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason)' }
+            ignored:
+              type: array
+              items:
+                type: object
+                required: [column, reason]
+                properties:
+                  column: { type: string }
+                  reason: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              status: { type: string, enum: [active, former] }
+              level: { type: [string, 'null'], description: 'Rolle des neuen Kontos; null bei Ehemaligen' }
+              username: { type: string, description: 'leer bei Ehemaligen' }
+              email: { type: string }
+              birthday: { type: string, description: 'JJJJ-MM-TT oder MM-TT; leer ohne' }
+              joined_on: { $ref: '#/components/schemas/FormerDate' }
+              points: { type: integer }
+              rank: { type: string }
+              titles: { type: array, items: { type: string } }
+              reason: { $ref: '#/components/schemas/FormerReason' }
+              founder: { type: boolean }
+              left_on: { $ref: '#/components/schemas/FormerDate' }
+              existing:
+                description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  former: { type: boolean }
+              error: { type: string }
+        new:
+          type: object
+          description: Vorschau, was angelegt würde; mit apply, was angelegt wurde
+          required: [active, former]
+          properties:
+            active: { type: integer }
+            former: { type: integer }
+        existing: { type: integer }
+        offices_linked: { type: integer }
+        applied: { type: boolean }
+        created:
+          type: array
+          items: { $ref: '#/components/schemas/CreatedUser' }
+        error: { type: string, description: 'Anlegen mittendrin abgebrochen (nur mit apply)' }
 
     GrantableCapability:
       type: string

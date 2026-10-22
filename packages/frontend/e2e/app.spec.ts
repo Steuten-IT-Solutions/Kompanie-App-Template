@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { devices, expect, test, type Page } from '@playwright/test';
+import { strToU8, zipSync } from 'fflate';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -311,6 +312,52 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await login(page, username, fresh);
   await expect(page.locator('.topbar-sub')).toHaveText('Hallo, Neue Testperson');
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+});
+
+test('Konten: aus einer Excel-Datei importieren, mit Ehemaligen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  // Kleinste .xlsx-Datei wie aus Excel: Texte inline, Geburtstag als Datumszahl mit Datumsformat.
+  const cell = (ref: string, v: string) => `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`;
+  const rows = [
+    ['Vorname', 'Nachname', 'Status', 'Geburtstag', 'Ausgeschieden', 'Grund'],
+    ['Karla', id, 'Mitglied', '', '', ''],
+    ['Lutz', id, 'ehemalig', '', '2001', 'verstorben'],
+  ];
+  const sheet =
+    '<worksheet><sheetData>' +
+    rows
+      .map(
+        (r, i) =>
+          `<row r="${i + 1}">${r.map((v, j) => (v ? cell(`${'ABCDEF'[j]}${i + 1}`, v) : '')).join('')}${i === 1 ? '<c r="D2" s="1"><v>29254</v></c>' : ''}</row>`,
+      )
+      .join('') +
+    '</sheetData></worksheet>';
+  const xlsx = zipSync({
+    'xl/workbook.xml': strToU8('<workbook><sheets><sheet name="A" sheetId="1"/></sheets></workbook>'),
+    'xl/styles.xml': strToU8('<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>'),
+    'xl/worksheets/sheet1.xml': strToU8(sheet),
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
+  await page.getByRole('button', { name: 'Aus Datei importieren (Excel oder CSV)' }).click();
+  await page.getByLabel('Datei wählen (Excel .xlsx oder CSV)').setInputFiles({
+    name: 'mitglieder.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from(xlsx),
+  });
+  await expect(page.getByLabel('Inhalt von mitglieder.xlsx')).toHaveValue(new RegExp(`Karla\t${id}\tMitglied\t03\.02\.1980`));
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.getByRole('status')).toContainText('Neu: 1 Konto mit Anmeldung · 1 ehemalig');
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.getByRole('heading', { name: 'Import übernommen' })).toBeVisible();
+  await expect(page.locator('.print-sheet')).toHaveCount(1);
+  await expect(page.locator('.print-sheet')).toContainText(`Karla ${id}`);
+  await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
+  await expect(page.locator('.row', { hasText: `${id}, Karla` })).toBeVisible();
+  await expect(page.locator('.row', { hasText: `${id}, Lutz` })).toHaveCount(0);
+  await adminMenu(page, 'Ehemalige');
+  await expect(page.locator('.row', { hasText: `${id}, Lutz` })).toBeVisible();
 });
 
 test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen', async ({ page }) => {
@@ -1138,6 +1185,44 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
+  await page.context().clearCookies();
+  const layouts = () =>
+    page.evaluate(async () => {
+      const cache = await caches.open('kompanie-ansicht-geruest-v1');
+      return Promise.all((await cache.keys()).map(async (k) => decodeURIComponent(k.url) + (await (await cache.match(k))!.text())));
+    });
+  // Erst über die Navigation zu den News, später direkt: Das Gerüst muss trotzdem passen.
+  await page.goto('/app/');
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await page.getByRole('button', { name: 'News' }).click();
+  await expect(page.locator('.news-card').first()).toBeVisible();
+  // Sofort weiter (wie in WordPress, wo die Daten schnell da sind): Das Gerüst ist trotzdem gemerkt.
+  await page.getByRole('button', { name: 'Termine' }).click();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await expect.poll(async () => (await layouts()).some((l) => l.includes('/news|'))).toBe(true);
+  // Nur der Aufbau, kein Text
+  expect((await layouts()).join('')).not.toContain('Tag der offenen Tür');
+
+  // Keine gespeicherten Daten (auch nicht beim Service Worker), News antworten sehr langsam.
+  await page.evaluate(() => caches.delete('kompanie-data-v2'));
+  await page.context().route(/news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.goto('/app/#/news');
+    await page.reload();
+    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.loading')).toHaveCount(0);
+    await shot(page, 'geruest-news');
+    await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.skeleton')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
@@ -1526,10 +1611,13 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Kalender für Mitglieder' })).toBeVisible();
   // Kalender (und bei der eigenständigen Version Neuigkeiten) lassen sich überspringen.
+  let importStep = false;
   while ((await page.getByRole('heading', { name: 'Fast fertig' }).count()) === 0) {
+    importStep ||= (await page.getByRole('heading', { name: 'Mitglieder übernehmen' }).count()) > 0;
     await expect(page.getByRole('heading', { name: 'Galerie aus Google Drive' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   }
+  expect(importStep).toBe(true);
   await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
   await expect(page).toHaveURL(/#\/verwaltung$/);
   await expect(hint).toHaveCount(0);

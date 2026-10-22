@@ -72,13 +72,8 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   return { data, error, loading, reload, setData, revision };
 }
 
-export function Loading() {
-  return (
-    <div className="loading" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" /> Lädt …
-    </div>
-  );
-}
+// Lädt …, mit dem Gerüst der Seite, sobald die App es kennt (skeleton.tsx)
+export { Loading } from './skeleton';
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (

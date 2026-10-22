@@ -1420,6 +1420,23 @@ final class ApiScenario
         $c->ok($s === 200 && ($d['applied'] ?? false) === true && count($imported) === 2, 'Import: Konten angelegt und als ehemalig eingetragen');
         [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
         $c->ok($s === 200 && ($d['new'] ?? -1) === 0 && ($d['existing'] ?? 0) === 2, 'Import: zweiter Lauf legt nichts doppelt an');
+
+        // Mitglieder aus einer Tabelle, mit Ehemaligen (POST /members/import)
+        $csv = "Nachname;Vorname;Status;E-Mail;Eintritt;Ausgeschieden;Telefon\nImport$sfx;Kptest;;kptest$sfx@example.org;1999;;0\nAlt$sfx;Kptest;ehemalig;;Gründer;2001;\n";
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv]);
+        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
+        $created = (array) ($d['created'] ?? []);
+        foreach ($created as $u) {
+            $this->users[] = (int) $u['id'];
+        }
+        $former = array_values(array_filter((array) $this->req('GET', '/members/former')[1], static fn (array $f): bool => ($f['name'] ?? '') === "Kptest Alt$sfx"));
+        foreach ($former as $f) {
+            $this->users[] = (int) $f['id'];
+        }
+        $c->ok($s === 200 && count($created) === 1 && ($created[0]['password'] ?? '') !== '' && count($former) === 1 && ($former[0]['founder'] ?? false) === true, 'Mitglieder-Import: Mitglied mit Startpasswort, Ehemaliger ohne');
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
+        $c->ok($s === 200 && ($d['existing'] ?? 0) === 2 && ($d['created'] ?? null) === [], 'Mitglieder-Import: zweiter Lauf legt nichts doppelt an');
     }
 
     private function events(): void

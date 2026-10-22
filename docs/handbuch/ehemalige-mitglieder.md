@@ -28,13 +28,13 @@ Auf der Seite einer ehemaligen Person unter **Konto und Rolle**, Abschnitt **Ehe
 Rolle und Passwort einer ehemaligen Person lassen sich erst nach dem Wiederaufnehmen ändern. **Konto löschen** (mit WordPress **Aus der App entfernen**) geht weiterhin und entfernt dann wirklich alle Daten.
 
 ## Ehemalige importieren (z. B. aus einer Chronik)
-Gibt es schon eine Liste aller früheren Mitglieder, lässt sie sich auf einmal übernehmen: In der Liste der Ehemaligen auf **Tabelle importieren (z. B. Chronik)** tippen.
+Gibt es schon eine Liste aller früheren Mitglieder, lässt sie sich auf einmal übernehmen: In der Liste der Ehemaligen auf **Tabelle importieren (z. B. Chronik)** tippen. Aktive und Ehemalige aus einer gemeinsamen Liste übernimmst du dagegen unter [Mitglieder anlegen → Aus Datei importieren](seite:mitglieder-anlegen) (Spalte „Status“ mit „ehemalig“).
 
 Eine Zeile je Person, Spalten getrennt durch Semikolon oder Tabulator: `vorname;nachname;eintritt;ausgeschieden;grund`. Eine Kopfzeile mit genau diesen Namen ist erlaubt.
 - **eintritt** und **ausgeschieden**: TT.MM.JJJJ oder nur das Jahr, oder leer. Eintritt „Gründer“ trägt ein Gründungsmitglied ohne Datum ein.
 - **grund**: ausgetreten (auch leer), verstorben oder sonstiges. Bei Verstorbenen ist „ausgeschieden“ der Todestag.
 
-Aus einer Tabellenkalkulation speicherst du die Tabelle als „CSV (Trennzeichen-getrennt)“ und wählst die Datei aus, oder du kopierst die Zellen und fügst sie ins Feld ein. **Vorschau** zeigt jede Zeile mit dem, was die App verstanden hat, und Fehler je Zeile. Erst wenn keine Zeile einen Fehler hat, legt **Übernehmen** die Personen an.
+Eine Excel-Datei (.xlsx) wählst du direkt aus (die App liest das erste Tabellenblatt), ebenso eine CSV-Datei; oder du kopierst die Zellen und fügst sie ins Feld ein. **Vorschau** zeigt jede Zeile mit dem, was die App verstanden hat, und Fehler je Zeile. Erst wenn keine Zeile einen Fehler hat, legt **Übernehmen** die Personen an.
 
 Für jede Person entsteht ein Konto (ohne Startpasswort, also ohne Anmeldung), das gleich als ehemalig eingetragen ist. Wer schon ein Konto mit genau diesem Vor- und Nachnamen hat, wird übersprungen; ein zweiter Import mit derselben Tabelle legt deshalb niemanden doppelt an.
 

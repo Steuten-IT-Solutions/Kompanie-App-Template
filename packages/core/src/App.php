@@ -22,6 +22,7 @@ use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
+use KompanieApp\Core\Domain\MemberImportService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
@@ -504,6 +505,11 @@ final class App
     public function formerMembers(): FormerMemberService
     {
         return $this->service(FormerMemberService::class, fn () => new FormerMemberService($this));
+    }
+
+    public function memberImport(): MemberImportService
+    {
+        return $this->service(MemberImportService::class, fn () => new MemberImportService($this));
     }
 
     public function roles(): RoleService
