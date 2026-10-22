@@ -94,6 +94,8 @@ function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose:
   const closeRef = useRef<HTMLButtonElement>(null);
   // Vor Datenbankversion 18 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
   const [fallback, setFallback] = useState(false);
+  // Bis das Bild da ist, dreht sich die Ladeschnecke (die 1024er-Fassung braucht im Mobilnetz einen Moment).
+  const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading');
   const src = url.startsWith('data:') ? url : badgeSrc(url, fallback ? PIXELS.large : ZOOM_PIXELS);
   useEffect(() => {
     closeRef.current?.focus();
@@ -115,7 +117,23 @@ function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose:
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <figure onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <img src={src} alt={`Foto von ${name}`} decoding="async" onError={() => setFallback(true)} />
+        {state === 'loading' && (
+          <span className="member-photo-zoom-loading" role="status" aria-label="Foto lädt">
+            <span className="spinner" aria-hidden="true" />
+          </span>
+        )}
+        {state === 'failed' ? (
+          <p className="member-photo-zoom-error">Das Foto lässt sich gerade nicht laden.</p>
+        ) : (
+          <img
+            src={src}
+            alt={`Foto von ${name}`}
+            decoding="async"
+            hidden={state === 'loading'}
+            onLoad={() => setState('loaded')}
+            onError={() => (fallback || url.startsWith('data:') ? setState('failed') : setFallback(true))}
+          />
+        )}
         <figcaption>{name}</figcaption>
       </figure>
       <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
