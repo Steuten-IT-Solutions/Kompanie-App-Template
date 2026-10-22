@@ -85,11 +85,23 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
   const id = /^\d+$/.test(path[0] ?? '') ? path[0] : path[0] === 'aemter' && /^\d+$/.test(path[1] ?? '') ? path[1] : null;
   const person = id !== null ? Number(id) : null;
   const wanted = ['liste', 'aemter', 'ehemalige'].includes(path[0] ?? '') ? path[0] : storedSection();
+  // Auf der Seite einer ehemaligen Person ist „Ehemalige“ markiert, nicht die Mitgliederliste. Die Seite der Person
+  // nutzt dieselben Daten mit (meist schon aus der Liste geladen). Ein anderer Pfad baut die Ansicht neu auf (viewKey).
+  const showsFormer = directory && person !== null;
+  const former = useAsync<DirectoryFormerEntry[] | null>(
+    () => (showsFormer ? api.directoryFormer() : Promise.resolve(null)),
+    [],
+    showsFormer ? 'directory-former' : undefined,
+  );
   const section: Section = !directory
     ? 'aemter'
-    : person === null && ((offices && wanted === 'aemter') || wanted === 'ehemalige')
-      ? (wanted as Section)
-      : 'liste';
+    : person !== null
+      ? former.data?.some((e) => e.id === person)
+        ? 'ehemalige'
+        : 'liste'
+      : (offices && wanted === 'aemter') || wanted === 'ehemalige'
+        ? (wanted as Section)
+        : 'liste';
   const open = (next: Section) => {
     storeSection(next);
     navigate(`mitglieder/${next}`);
@@ -109,7 +121,7 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
         </nav>
       )}
       {person !== null ? (
-        <MemberPage userId={person} directory={directory} offices={offices} />
+        <MemberPage userId={person} directory={directory} offices={offices} former={former} />
       ) : section === 'liste' ? (
         <MemberList key="liste" />
       ) : section === 'ehemalige' ? (
@@ -132,13 +144,19 @@ function back(): void {
  * bei Mitgliedern Geburtstag und Eintritt, soweit sie sie zeigen), darunter direkt ihre Ämter als Zeitstrahl. Ohne
  * Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
  */
-function MemberPage({ userId, directory, offices }: { userId: number; directory: boolean; offices: boolean }) {
+function MemberPage({
+  userId,
+  directory,
+  offices,
+  former,
+}: {
+  userId: number;
+  directory: boolean;
+  offices: boolean;
+  /** Ehemalige, geladen von Mitglieder (dort für die Markierung „Ehemalige“ gebraucht) */
+  former: ReturnType<typeof useAsync<DirectoryFormerEntry[] | null>>;
+}) {
   const list = useAsync(() => (directory ? api.directory() : Promise.resolve(null)), [], directory ? 'directory' : undefined);
-  const former = useAsync(
-    () => (directory ? api.directoryFormer() : Promise.resolve(null)),
-    [],
-    directory ? 'directory-former' : undefined,
-  );
   const officeData = useOffices(offices);
   const f = former.data?.find((e) => e.id === userId);
   const m: DirectoryEntry | undefined = list.data?.find((e) => e.id === userId) ?? f;

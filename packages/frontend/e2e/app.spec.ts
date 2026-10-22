@@ -456,11 +456,69 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   await expect(list).not.toContainText(/Punkte|offen/);
 });
 
+test.describe('ohne Service Worker', () => {
+  // page.route sieht Anfragen des Service Workers nicht
+  test.use({ serviceWorkers: 'block' });
+
+  test('Ehemalige: auf der Seite einer ehemaligen Person bleibt „Ehemalige“ markiert', async ({ page }) => {
+    // Die Liste kommt aus dem Test, damit keine Daten zurückbleiben.
+    await page.route(/directory\/former(?![\w/])/, (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 987654,
+            name: 'Erwin Ehemalig',
+            first_name: 'Erwin',
+            last_name: 'Ehemalig',
+            photo_url: null,
+            founder: true,
+            joined_year: '1985',
+            left_year: '2010',
+          },
+        ],
+      }),
+    );
+    await page.goto('/app/#/mitglieder/ehemalige');
+    const switcher = page.locator('.members-switch');
+    const list = page.locator('.directory .card-list');
+    await list.locator('.member-row', { hasText: 'Ehemalig, Erwin' }).locator('.member-row-open').click();
+    await expect(page).toHaveURL(/#\/mitglieder\/987654$/);
+    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 1985–2010');
+    await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'false');
+
+    // Bei Mitgliedern bleibt es „Mitglieder“
+    await switcher.getByRole('button', { name: 'Mitglieder' }).click();
+    await list.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
+    await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied2' })).toBeVisible();
+    await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
 test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitglieder', async ({ page }) => {
   const id = Date.now() % 1000000;
   const group = `Verein ${id}`;
   const office = `Kassenprüfer ${id}`;
+  const former = `Erich Ehemalig${id}`;
   await login(page, 'admin', ADMIN_PASSWORD);
+  // Ein Ehemaliger mit Konto (Import wie aus einer Chronik), wählbar als Inhaber
+  const formerId = await page.evaluate(async (name) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const headers = { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' };
+    const csv = `vorname;nachname;eintritt;ausgeschieden;grund\n${name.split(' ').join(';')};1980;2010;ausgetreten`;
+    await fetch(cfg.apiBase + 'members/former/import', {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ csv, apply: true }),
+    });
+    const list: { id: number; name: string }[] = await (
+      await fetch(cfg.apiBase + 'members/former', { headers, credentials: 'same-origin' })
+    ).json();
+    return list.find((m) => m.name === name)?.id;
+  }, former);
+  expect(formerId).toBeTruthy();
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Ämter');
   await page.getByLabel('Neue Gruppe').fill(group);
@@ -479,14 +537,27 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await form.getByLabel('Von (Jahr)').fill('1990');
   await form.getByLabel('Bis (leer: bis heute)').fill('2005');
   await form.getByLabel('Name', { exact: true }).fill(`Frieda Früher ${id}`);
+  // Zweite Person: ein Ehemaliger mit Konto
+  await form.getByRole('button', { name: 'Weitere Person' }).click();
+  const formerRow = form.locator('.office-holder-row').nth(1);
+  await formerRow.getByRole('combobox', { name: 'Profil' }).selectOption({ label: 'Ehemaliger' });
+  await formerRow.getByRole('combobox', { name: 'Ehemaliger', exact: true }).selectOption({ label: former });
   await form.getByLabel(/Zusatz/).fill('Gründungsmitglied');
   await form.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+  // Beim Bearbeiten stehen beide wieder unter ihrem Profil
+  await page.locator('.office-term-row', { hasText: '1990' }).getByRole('button', { name: 'Bearbeiten' }).click();
+  form = page.locator('form', { hasText: 'Amtszeit bearbeiten' });
+  await expect(form.locator('.office-holder-row').nth(0).getByRole('combobox', { name: 'Profil' })).toHaveValue('name');
+  await expect(form.locator('.office-holder-row').nth(1).getByRole('combobox', { name: 'Profil' })).toHaveValue('former');
+  await expect(form.getByRole('combobox', { name: 'Ehemaliger', exact: true })).toHaveValue(String(formerId));
+  await form.getByRole('button', { name: 'Abbrechen' }).click();
   // Laufende Amtszeit mit einem Konto und einem zweiten Namen
   await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
   form = page.locator('form', { hasText: 'Neue Amtszeit' });
   await form.getByLabel('Von (Jahr)').fill('2020');
-  await form.getByLabel('Konto', { exact: false }).first().selectOption({ label: 'Mitglied1' });
+  await form.getByRole('combobox', { name: 'Profil' }).first().selectOption({ label: 'Mitglied' });
+  await form.getByRole('combobox', { name: 'Mitglied', exact: true }).selectOption({ label: 'Mitglied1' });
   await form.getByRole('button', { name: 'Weitere Person' }).click();
   await form.locator('.office-holder-row').nth(1).getByLabel('Name', { exact: true }).fill(`Paul Partner ${id}`);
   await form.getByRole('button', { name: 'Speichern' }).click();
@@ -511,6 +582,7 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await expect(items).toHaveCount(1);
   await expect(items.nth(0)).toContainText('1990–2005');
   await expect(items.nth(0)).toContainText('Gründungsmitglied');
+  await expect(items.nth(0)).toContainText(former);
   await shot(page, '1b-aemter-zeitstrahl');
   if (SHOTS) {
     // Breiter Bildschirm: abwechselnd links und rechts
@@ -543,6 +615,17 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   page.once('dialog', (d) => d.accept());
   await page.locator('.row', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  const deleted = await page.evaluate(async (formerId) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    return (
+      await fetch(cfg.apiBase + `members/${formerId}`, {
+        method: 'DELETE',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+        credentials: 'same-origin',
+      })
+    ).status;
+  }, formerId);
+  expect(deleted).toBeLessThan(300);
 });
 
 test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
