@@ -241,6 +241,12 @@ final class OfficeServiceTest extends TestCase
         $this->assertSame([], $this->app->titles()->of($other));
         $this->assertSame([], $this->app->titles()->of($this->guest));
         $this->assertSame(['id' => $o, 'title' => 'Vorsitzende'], array_column($this->ok('GET', '/titles'), 'office', 'id')[$title]);
+        // Der Titel ist die Einzahl für den Zeitstrahl einer Person, für alle sichtbar; ohne Bereich Titel keine
+        $this->assertSame('Vorsitz', $this->overviewOffice($o, null)['holder_title']);
+        $this->assertNull($this->overviewOffice($this->office('Beisitzer'), null)['holder_title'], 'ohne Verknüpfung');
+        $this->app->features()->update(['titles' => false]);
+        $this->assertNull($this->overviewOffice($o, null)['holder_title']);
+        $this->app->features()->update(['titles' => true]);
 
         // Von Hand nicht mehr zu vergeben oder zu entziehen
         $this->assertSame(400, $this->call('PUT', "/members/$other/titles", ['title_ids' => [$title]])->status);

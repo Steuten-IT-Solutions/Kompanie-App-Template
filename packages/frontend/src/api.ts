@@ -888,6 +888,8 @@ export interface Office {
   id: number;
   group_id: number | null;
   title: string;
+  /** Einzahl für den Zeitstrahl einer Person: Name des verknüpften Titels (nur mit Bereich Titel, nur in GET /offices) */
+  holder_title?: string | null;
   /** Laufende zuerst, dann nach Beginn absteigend */
   terms: OfficeTerm[];
   /** Nur für die Pflege: verknüpfter Titel */

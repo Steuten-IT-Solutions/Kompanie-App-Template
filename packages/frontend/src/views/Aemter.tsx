@@ -300,7 +300,10 @@ export function OfficesView() {
   );
 }
 
-/** Alle Amtszeiten einer Person über alle Ämter, als ein Zeitstrahl (laufende zuerst, dann nach Beginn). */
+/**
+ * Alle Amtszeiten einer Person über alle Ämter, als ein Zeitstrahl (laufende zuerst, dann nach Beginn). Je Karte die
+ * Einzahl („Kompaniekönig“) aus dem verknüpften Titel, ohne Verknüpfung die Bezeichnung des Amtes mit seiner Gruppe.
+ */
 export function personEntries(data: OfficesOverview | null | undefined, userId: number): TimelineEntry[] {
   const groups = new Map((data?.groups ?? []).map((g) => [g.id, g.title]));
   const out: TimelineEntry[] = [];
@@ -308,7 +311,9 @@ export function personEntries(data: OfficesOverview | null | undefined, userId: 
     for (const t of o.terms) {
       if (t.holders.some((h) => h.user_id === userId)) {
         const group = o.group_id !== null ? groups.get(o.group_id) : undefined;
-        out.push({ key: t.id, term: t, office: group ? `${o.title} · ${group}` : o.title });
+        // Der Titel nennt die Gruppe meist schon („Kompaniekönig“); nur die Bezeichnung des Amtes bekommt sie dazu.
+        const office = o.holder_title || (group ? `${o.title} · ${group}` : o.title);
+        out.push({ key: t.id, term: t, office });
       }
     }
   }

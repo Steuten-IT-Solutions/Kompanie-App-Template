@@ -28,6 +28,7 @@ Nutzt die Kompanie **{bereich.titles}**, kannst du ein Amt unter **{bereich.titl
 - Von Hand lässt sich ein verknüpfter Titel nicht mehr vergeben oder entfernen.
 - Einzelne Jahre (Ehrungen) vergeben keinen Titel.
 - **Verknüpfung lösen** ändert an den vergebenen Titeln nichts; danach vergibst du sie wieder von Hand.
+- Auf der Seite einer Person (und unter **Meins**) steht bei ihren Amtszeiten der Name des Titels statt der Bezeichnung des Amtes und ihrer Gruppe. Benenne das Amt also in der Mehrzahl („Kompaniekönige“) und den Titel in der Einzahl („Kompaniekönig“).
 
 Ein Titel gehört zu höchstens einem Amt.
 

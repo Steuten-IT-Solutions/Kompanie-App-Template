@@ -5416,6 +5416,9 @@ components:
             terms:
               type: array
               items: { $ref: '#/components/schemas/OfficeTerm' }
+            holder_title:
+              type: [string, 'null']
+              description: Einzahl für den Zeitstrahl einer Person („Kompaniekönig“ statt „Kompaniekönige“) = Name des verknüpften Titels; null ohne Verknüpfung oder ohne Bereich `titles`
             linked_title: { type: [string, 'null'], description: Nur mit manage_offices }
 
     OfficesOverview:
