@@ -1319,6 +1319,32 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await shot(page, '19-wartung');
 });
 
+test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
+  // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
+  const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
+    versionen: { version: string }[];
+    unveroeffentlicht: string | null;
+  };
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Was ist neu', { exact: true }) })
+    .click();
+  await expect(page).toHaveURL(/#\/einstellungen\/neuerungen$/);
+  for (const v of changelog.versionen) {
+    await expect(page.getByRole('heading', { name: new RegExp(`^Version ${v.version.replace(/\./g, '\\.')}\\b`) })).toBeVisible();
+  }
+  await expect(page.getByRole('heading', { name: /^Vorabversion/ })).toHaveCount(changelog.unveroeffentlicht ? 1 : 0);
+  await expect(page.locator('.changelog-text h4').first()).toBeVisible();
+  await shot(page, '19-was-ist-neu');
+
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/einstellungen/neuerungen');
+  await expect(page.locator('.changelog-text')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /^Version / })).toHaveCount(0);
+});
+
 test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
