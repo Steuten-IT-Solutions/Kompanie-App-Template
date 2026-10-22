@@ -1145,7 +1145,10 @@ test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „L
       const cache = await caches.open('kompanie-ansicht-geruest-v1');
       return Promise.all((await cache.keys()).map(async (k) => decodeURIComponent(k.url) + (await (await cache.match(k))!.text())));
     });
-  await page.goto('/app/#/news');
+  // Erst über die Navigation zu den News, später direkt: Das Gerüst muss trotzdem passen.
+  await page.goto('/app/');
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await page.getByRole('button', { name: 'News' }).click();
   await expect(page.locator('.news-card').first()).toBeVisible();
   // Sofort weiter (wie in WordPress, wo die Daten schnell da sind): Das Gerüst ist trotzdem gemerkt.
   await page.getByRole('button', { name: 'Termine' }).click();

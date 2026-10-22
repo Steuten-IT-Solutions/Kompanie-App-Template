@@ -1,4 +1,4 @@
-import { createElement, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeviceStore } from './deviceStore';
 import { capture, type DomNode, type Part } from './skeletonCapture';
 
@@ -9,7 +9,7 @@ import { capture, type DomNode, type Part } from './skeletonCapture';
  *
  * Gemerkt wird nur der Aufbau: Elemente, ihre Klassen, ungefähre Textlängen (in Stufen) und die Größe von Bildern und
  * Eingabefeldern – kein Text, keine Bilder, keine Adressen. Jedes Loading merkt sich, was nach dem Laden an seine
- * Stelle getreten ist (Schlüssel: Seite und Position im Baum, useId). Gibt es noch kein Gerüst, bleibt es bei „Lädt …“.
+ * Stelle getreten ist (Schlüssel: Seite und Stelle im DOM, placeOf). Gibt es noch kein Gerüst, bleibt es bei „Lädt …“.
  * Die Gerüste liegen im Speicher und auf dem Gerät (deviceStore, Bereich wie bei den Daten); in der Vorschau
  * „App als Rolle ansehen“ wird nichts gemerkt und nichts gezeigt.
  */
@@ -84,21 +84,41 @@ function learn(parent: Element, before: Set<Node>, key: string, route: string) {
 
 const currentRoute = () => window.location.hash.replace(/^#\/?/, '');
 
+/**
+ * Stelle eines Loading auf der Seite: Elternelemente bis zum Inhaltsbereich (Tag und Klassen) und welches ladende
+ * Element darin es ist. Bleibt gleich, solange die Seite gleich aufgebaut ist (anders als useId, das beim Rendern im
+ * Browser einfach weiterzählt).
+ */
+function placeOf(el: Element): string {
+  const parent = el.parentElement!;
+  const index = Array.from(parent.children)
+    .filter((c) => c.matches(LOADING))
+    .indexOf(el);
+  const chain: string[] = [];
+  for (let p: Element | null = parent; p && p !== document.body && chain.length < 8; p = p.parentElement) {
+    const classes = typeof p.className === 'string' ? p.className.trim().split(/\s+/).filter(Boolean) : [];
+    chain.unshift([p.tagName.toLowerCase(), ...classes].join('.'));
+    if (p.tagName === 'MAIN') break;
+  }
+  return `${chain.join('>')}#${index}`;
+}
+
 export function Loading() {
   const ref = useRef<HTMLDivElement>(null);
-  const id = useId();
-  const [route] = useState(currentRoute);
-  const key = `${route}|${id}`;
-  const [parts] = useState(() => skeletons.get(key));
+  const [parts, setParts] = useState<Part[] | undefined>();
 
+  // Vor dem ersten Zeichnen: Die Stelle steht erst im DOM fest; mit Gerüst wird „Lädt …“ so nie sichtbar.
   useLayoutEffect(() => {
     const el = ref.current;
     const parent = el?.parentElement;
     if (!el || !parent || !enabled) return;
+    const route = currentRoute();
+    const key = `${route}|${placeOf(el)}`;
+    setParts(skeletons.get(key));
     // Was schon neben dem Loading steht (z. B. Navigation der Verwaltung), gehört nicht zum Gerüst.
     const before = new Set(Array.from(parent.childNodes).filter((n) => n !== el));
     return () => learn(parent, before, key, route);
-  }, [key, route]);
+  }, []);
 
   if (!parts) {
     return (
