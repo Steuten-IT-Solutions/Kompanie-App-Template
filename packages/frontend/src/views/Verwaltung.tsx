@@ -11,16 +11,18 @@ import {
   type CreatedUser,
   type Level,
   type FormerMember,
+  type MemberDetail,
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
-import { neighbors, useSwipe } from '../swipe';
+import { neighbors, useSwipeDrag } from '../swipe';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
+import { cacheKey, dataCache, prefetch } from '../dataCache';
 import Anwesenheit from './Anwesenheit';
-import { RankBadge, RankStack } from '../RankBadge';
+import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
@@ -48,7 +50,7 @@ import {
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
 import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
-import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
+import { MemberAvatar, MemberPhotoPanel, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
 
@@ -402,6 +404,109 @@ function useBrowseOrder(list: BrowseList, id: number): number[] {
   );
 }
 
+/** Unterseiten auf der Seite einer Person, je nach Rechten und Daten. */
+function memberPages(m: MemberDetail) {
+  return [
+    { id: 'uebersicht', label: 'Übersicht', on: true },
+    { id: 'konto', label: 'Konto und Rolle', on: true },
+    { id: 'punkte', label: sec.points, on: canPoints() },
+    { id: 'strafen', label: sec.penalties, on: canPenalties() },
+    { id: 'dienstgrad', label: brand.labels.rank, on: !!m.rank && (m.member || !!m.rank.rank) },
+    { id: 'titel', label: sec.titles, on: !!m.titles && (m.member || m.titles.length > 0) },
+    // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
+    { id: 'aemter', label: sec.offices, on: !!config?.features.offices && (!!config.features.directory || can('manage_offices')) },
+    {
+      id: 'geburtstag',
+      label: 'Geburtstag',
+      on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
+    },
+    // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
+    { id: 'eintritt', label: 'Eintritt', on: m.join_year !== undefined && !m.former && m.level !== 'guest' },
+  ].filter((p) => p.on);
+}
+
+/**
+ * Nachbar beim Wischen: Kopf seiner Seite (Navigation, Name, Dienstgrad, Foto, Menü) aus den vorgeladenen Daten, so wie
+ * er gleich erscheint. Nur zum Ansehen: aria-hidden, nichts anklickbar, und eigene Klassen für den Namen und das Menü,
+ * damit ihn niemand mit der echten Seite verwechselt. Sind die Daten noch nicht da, Platzhalter wie im Gerüst.
+ */
+function MemberPeek({
+  id,
+  side,
+  base,
+  page,
+  position,
+  total,
+}: {
+  id: number;
+  side: 'prev' | 'next';
+  base: 'mitglied' | 'ehemalige';
+  page?: string;
+  position: number;
+  total: number;
+}) {
+  const key = cacheKey('member', [id]);
+  const m = dataCache.has(key) ? dataCache.get<MemberDetail>(key) : null;
+  const pages = m ? memberPages(m) : [];
+  const current = pages.find((p) => p.id === page) ?? pages[0];
+  const avatar = !!m && (!!m.photo_url || !!m.photo_editable);
+  return (
+    <div className={`member-peek member-peek-${side}`} aria-hidden="true">
+      <div className="member-nav">
+        <button type="button" className="btn btn-link back" tabIndex={-1}>
+          {base === 'ehemalige' ? '‹ Ehemalige' : '‹ Alle Mitglieder'}
+        </button>
+        <span className="member-step">
+          <button type="button" className="btn btn-link" tabIndex={-1} disabled={position === 1}>
+            ‹
+          </button>
+          <span className="muted small">
+            {position} / {total}
+          </span>
+          <button type="button" className="btn btn-link" tabIndex={-1} disabled={position === total}>
+            ›
+          </button>
+        </span>
+      </div>
+      {m ? (
+        <>
+          <h2 className={`member-peek-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
+          {(m.rank_title || avatar) && (
+            <p className="member-rank-line">
+              {m.rank_title && (
+                <span className="member-rank-badge">
+                  <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
+                  <span>{m.rank_title}</span>
+                </span>
+              )}
+              {avatar && (
+                <span className={m.photo_url ? 'member-photo-open' : undefined}>
+                  <MemberAvatar url={m.photo_url} name={m.name} size="large" />
+                </span>
+              )}
+            </p>
+          )}
+          {pages.length > 1 && (
+            <nav className="admin-menu">
+              <button type="button" className="admin-menu-toggle" tabIndex={-1}>
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor" />
+                </svg>
+                <span className="member-peek-menu-current">{current.label}</span>
+                <span className="admin-menu-chevron">▾</span>
+              </button>
+            </nav>
+          )}
+        </>
+      ) : (
+        <h2 className="member-peek-name member-name-centered">
+          <span className="skeleton-text" style={{ width: '12ch' }} />
+        </h2>
+      )}
+    </div>
+  );
+}
+
 /**
  * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
  * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht. Ehemalige haben dieselbe Seite unter
@@ -431,7 +536,34 @@ function MemberDetailView({
   const order = useBrowseOrder(base, id);
   const { prev, next, index } = neighbors(order, id);
   const show = (other: number | null) => other !== null && redirectTo(`verwaltung/${base}/${other}${page ? `/${page}` : ''}`);
-  const swipe = useSwipe((step) => show(step === 1 ? next : prev));
+  // Karussell: Die Karte folgt dem Finger, daneben stehen die Nachbarn; beim Loslassen gleitet sie hinüber.
+  const track = useRef<HTMLDivElement>(null);
+  const swipe = useSwipeDrag(track, {
+    canPrev: prev !== null,
+    canNext: next !== null,
+    onCommit: (step) => show(step === 1 ? next : prev),
+  });
+  // Nachbarn vorladen (Daten, Foto, Abzeichen): Nach dem Wechsel steht ihre Seite sofort, ohne Gerüst. Erneut nach jedem
+  // Laden, denn eigene Änderungen leeren den Speicher.
+  const [, setPrefetched] = useState(0);
+  useEffect(() => {
+    if (!data) return;
+    let alive = true;
+    for (const n of [prev, next]) {
+      if (n === null) continue;
+      void prefetch('member', [n], () => api.member(n)).then(() => {
+        const key = cacheKey('member', [n]);
+        if (!alive || !dataCache.has(key)) return;
+        const other = dataCache.get<MemberDetail>(key);
+        preloadAvatar(other.photo_url);
+        preloadBadge(other.rank_badge_url);
+        setPrefetched((t) => t + 1);
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [data, prev, next]);
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -451,281 +583,273 @@ function MemberDetailView({
   if (target !== base) return null;
   const m = data!;
 
-  const pages = [
-    { id: 'uebersicht', label: 'Übersicht', on: true },
-    { id: 'konto', label: 'Konto und Rolle', on: true },
-    { id: 'punkte', label: sec.points, on: canPoints() },
-    { id: 'strafen', label: sec.penalties, on: canPenalties() },
-    { id: 'dienstgrad', label: brand.labels.rank, on: !!m.rank && (m.member || !!m.rank.rank) },
-    { id: 'titel', label: sec.titles, on: !!m.titles && (m.member || m.titles.length > 0) },
-    // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
-    { id: 'aemter', label: sec.offices, on: !!config?.features.offices && (!!config.features.directory || can('manage_offices')) },
-    {
-      id: 'geburtstag',
-      label: 'Geburtstag',
-      on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
-    },
-    // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
-    { id: 'eintritt', label: 'Eintritt', on: m.join_year !== undefined && !m.former && m.level !== 'guest' },
-  ].filter((p) => p.on);
+  const pages = memberPages(m);
   const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
   // Foto steht oben neben dem Dienstgrad; ohne Foto die Anfangsbuchstaben, wenn es hochgeladen werden darf.
   const avatar = !!m.photo_url || !!m.photo_editable;
 
   return (
-    <div className="member-detail" {...swipe}>
-      <div className="member-nav">
-        {m.former ? (
-          <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
-            ‹ Ehemalige
-          </button>
-        ) : (
-          <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-            ‹ Alle Mitglieder
-          </button>
+    <div className="member-detail" {...swipe.handlers}>
+      <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
+        {swipe.peeking && prev !== null && (
+          <MemberPeek id={prev} side="prev" base={base} page={page} position={index} total={order.length} />
         )}
-        {index >= 0 && order.length > 1 && (
-          <span className="member-step">
-            <button className="btn btn-link" disabled={prev === null} onClick={() => show(prev)} aria-label="Vorheriges Mitglied">
-              ‹
-            </button>
-            <span className="muted small">
-              {index + 1} / {order.length}
-            </span>
-            <button className="btn btn-link" disabled={next === null} onClick={() => show(next)} aria-label="Nächstes Mitglied">
-              ›
-            </button>
-          </span>
+        {swipe.peeking && next !== null && (
+          <MemberPeek id={next} side="next" base={base} page={page} position={index + 2} total={order.length} />
         )}
-      </div>
-      <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
-      {(m.rank_title || avatar) && (
-        <p className="member-rank-line">
-          {/* Abzeichen mit dem Dienstgrad darunter, rechts daneben das Foto (gleich hoch wie das Abzeichen) */}
-          {m.rank_title && (
-            <span className="member-rank-badge">
-              <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
-              <span>{m.rank_title}</span>
+        <div className="member-nav">
+          {m.former ? (
+            <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+              ‹ Ehemalige
+            </button>
+          ) : (
+            <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+              ‹ Alle Mitglieder
+            </button>
+          )}
+          {index >= 0 && order.length > 1 && (
+            <span className="member-step">
+              <button className="btn btn-link" disabled={prev === null} onClick={() => swipe.slide(-1)} aria-label="Vorheriges Mitglied">
+                ‹
+              </button>
+              <span className="muted small">
+                {index + 1} / {order.length}
+              </span>
+              <button className="btn btn-link" disabled={next === null} onClick={() => swipe.slide(1)} aria-label="Nächstes Mitglied">
+                ›
+              </button>
             </span>
           )}
-          {avatar && <ZoomableAvatar url={m.photo_url} name={m.name} />}
-        </p>
-      )}
-      <MenuNav
-        label="Mitglied"
-        className="member-menu"
-        active={active}
-        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/${base}/${m.id}/${p.id}`) }))}
-      />
+        </div>
+        <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
+        {(m.rank_title || avatar) && (
+          <p className="member-rank-line">
+            {/* Abzeichen mit dem Dienstgrad darunter, rechts daneben das Foto (gleich hoch wie das Abzeichen) */}
+            {m.rank_title && (
+              <span className="member-rank-badge">
+                <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
+                <span>{m.rank_title}</span>
+              </span>
+            )}
+            {avatar && <ZoomableAvatar url={m.photo_url} name={m.name} />}
+          </p>
+        )}
+        <MenuNav
+          label="Mitglied"
+          className="member-menu"
+          active={active}
+          items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/${base}/${m.id}/${p.id}`) }))}
+        />
 
-      {active === 'uebersicht' && (
-        <>
-          <MemberPhotoPanel
+        {active === 'uebersicht' && (
+          <>
+            <MemberPhotoPanel
+              id={m.id}
+              name={m.name}
+              url={m.photo_url ?? null}
+              editable={!!m.photo_editable}
+              showAvatar={false}
+              onChanged={reload}
+              onToast={onToast}
+            />
+            <p className="muted small member-level">
+              {m.former
+                ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)}): ${formerSummary(m.former)}`
+                : (m.extra_roles ?? []).length > 0
+                  ? `Rollen: ${roleLabels(m)}`
+                  : `Rolle: ${levelLabel(m.level)}`}
+              {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
+            </p>
+            <div className="stats">
+              {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
+              {canPenalties() && (
+                <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
+              )}
+            </div>
+            {m.member && (
+              <div className="button-row">
+                {canPoints() && (
+                  <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
+                    {sec.points} vergeben
+                  </button>
+                )}
+                {canPenalties() && (
+                  <button className="btn btn-warn" onClick={() => navigate(`verwaltung/strafe/${m.id}`)}>
+                    {sec.penalties}: Eintrag
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {active === 'konto' && (
+          <>
+            {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
+            {!m.former && (
+              <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+            )}
+            {m.rights && (
+              <MemberRightsPanel
+                key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
+                id={m.id}
+                name={m.name}
+                roles={roleLabels(m)}
+                plural={(m.extra_roles ?? []).length > 0}
+                rights={m.rights}
+                onChanged={reload}
+                onToast={onToast}
+              />
+            )}
+            {roleInfo(m.level)?.promotable && can('create_users') && (
+              <button
+                className="btn btn-block promote-candidate"
+                disabled={busy}
+                onClick={() =>
+                  window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
+                  run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
+                }
+              >
+                Als {levelLabel('member')} aufnehmen
+              </button>
+            )}
+            {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+            {/* Gäste gehören nicht zur Kompanie; m.former fehlt bei älteren Servern (dann kein Bereich). */}
+            {can('create_users') && m.id !== config?.user?.id && m.former !== undefined && (m.former !== null || m.level !== 'guest') && (
+              <FormerPanel
+                id={m.id}
+                name={m.name}
+                former={m.former}
+                joinedOn={m.join_year ? (m.join_year.date ?? String(m.join_year.year)) : null}
+                openCents={m.open_cents}
+                onChanged={reload}
+                onToast={onToast}
+              />
+            )}
+            {can('create_users') && m.id !== config?.user?.id && (
+              <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
+            )}
+          </>
+        )}
+
+        {active === 'punkte' && (
+          <>
+            {canPoints() && <h3 className="section-title">{sec.points}</h3>}
+            {!canPoints() ? null : m.point_list.length === 0 ? (
+              <Empty>Keine Einträge.</Empty>
+            ) : (
+              <ul className="card-list">
+                {m.point_list.map((p) => (
+                  <li key={p.id} className="card row">
+                    <div className="row-main">
+                      <div className="row-title">{p.reason}</div>
+                      <div className="row-sub">
+                        {formatDate(p.date)}
+                        {p.created_by_name && ` · von ${p.created_by_name}`}
+                      </div>
+                      <div className="row-actions">
+                        <button
+                          className="btn btn-small btn-danger"
+                          disabled={busy}
+                          onClick={() =>
+                            window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
+                            run(() => api.deletePoints(p.id), 'Storniert')
+                          }
+                        >
+                          Stornieren
+                        </button>
+                      </div>
+                    </div>
+                    <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {active === 'strafen' && (
+          <>
+            {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
+            {!canPenalties() ? null : m.penalties.length === 0 ? (
+              <Empty>Keine Einträge.</Empty>
+            ) : (
+              <ul className="card-list">
+                {m.penalties.map((p) => (
+                  <PenaltyRow
+                    key={p.id}
+                    p={p}
+                    actions={
+                      <>
+                        {p.status === 'open' ? (
+                          <button
+                            className="btn btn-small"
+                            disabled={busy}
+                            onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
+                          >
+                            Bezahlt
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-small btn-secondary"
+                            disabled={busy}
+                            onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
+                          >
+                            Doch offen
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-small btn-danger"
+                          disabled={busy}
+                          onClick={() =>
+                            window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
+                            run(() => api.deletePenalty(p.id), 'Storniert')
+                          }
+                        >
+                          Stornieren
+                        </button>
+                      </>
+                    }
+                  />
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {active === 'titel' && m.titles && (
+          <MemberTitles
+            key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
             id={m.id}
-            name={m.name}
-            url={m.photo_url ?? null}
-            editable={!!m.photo_editable}
-            showAvatar={false}
+            member={m.member}
+            titles={m.titles}
             onChanged={reload}
             onToast={onToast}
           />
-          <p className="muted small member-level">
-            {m.former
-              ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)}): ${formerSummary(m.former)}`
-              : (m.extra_roles ?? []).length > 0
-                ? `Rollen: ${roleLabels(m)}`
-                : `Rolle: ${levelLabel(m.level)}`}
-            {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
-          </p>
-          <div className="stats">
-            {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" />}
-            {canPenalties() && (
-              <StatCard label="Offen" value={formatEuro(m.open_cents ?? 0)} tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'} />
-            )}
-          </div>
-          {m.member && (
-            <div className="button-row">
-              {canPoints() && (
-                <button className="btn" onClick={() => navigate(`verwaltung/punkte/${m.id}`)}>
-                  {sec.points} vergeben
-                </button>
-              )}
-              {canPenalties() && (
-                <button className="btn btn-warn" onClick={() => navigate(`verwaltung/strafe/${m.id}`)}>
-                  {sec.penalties}: Eintrag
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      )}
+        )}
 
-      {active === 'konto' && (
-        <>
-          {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
-          {!m.former && (
-            <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
-          )}
-          {m.rights && (
-            <MemberRightsPanel
-              key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
-              id={m.id}
-              name={m.name}
-              roles={roleLabels(m)}
-              plural={(m.extra_roles ?? []).length > 0}
-              rights={m.rights}
-              onChanged={reload}
-              onToast={onToast}
-            />
-          )}
-          {roleInfo(m.level)?.promotable && can('create_users') && (
-            <button
-              className="btn btn-block promote-candidate"
-              disabled={busy}
-              onClick={() =>
-                window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
-                run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
-              }
-            >
-              Als {levelLabel('member')} aufnehmen
-            </button>
-          )}
-          {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
-          {/* Gäste gehören nicht zur Kompanie; m.former fehlt bei älteren Servern (dann kein Bereich). */}
-          {can('create_users') && m.id !== config?.user?.id && m.former !== undefined && (m.former !== null || m.level !== 'guest') && (
-            <FormerPanel
-              id={m.id}
-              name={m.name}
-              former={m.former}
-              joinedOn={m.join_year ? (m.join_year.date ?? String(m.join_year.year)) : null}
-              openCents={m.open_cents}
-              onChanged={reload}
-              onToast={onToast}
-            />
-          )}
-          {can('create_users') && m.id !== config?.user?.id && (
-            <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
-          )}
-        </>
-      )}
+        {active === 'aemter' && <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />}
 
-      {active === 'punkte' && (
-        <>
-          {canPoints() && <h3 className="section-title">{sec.points}</h3>}
-          {!canPoints() ? null : m.point_list.length === 0 ? (
-            <Empty>Keine Einträge.</Empty>
-          ) : (
-            <ul className="card-list">
-              {m.point_list.map((p) => (
-                <li key={p.id} className="card row">
-                  <div className="row-main">
-                    <div className="row-title">{p.reason}</div>
-                    <div className="row-sub">
-                      {formatDate(p.date)}
-                      {p.created_by_name && ` · von ${p.created_by_name}`}
-                    </div>
-                    <div className="row-actions">
-                      <button
-                        className="btn btn-small btn-danger"
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
-                          run(() => api.deletePoints(p.id), 'Storniert')
-                        }
-                      >
-                        Stornieren
-                      </button>
-                    </div>
-                  </div>
-                  <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+        {active === 'dienstgrad' && m.rank && (
+          <MemberRank
+            id={m.id}
+            member={m.member}
+            status={m.rank}
+            history={m.rank_history ?? []}
+            onChanged={reload}
+            onToast={onToast}
+            focus={page === 'dienstgrad'}
+          />
+        )}
 
-      {active === 'strafen' && (
-        <>
-          {canPenalties() && <h3 className="section-title">{sec.penalties}</h3>}
-          {!canPenalties() ? null : m.penalties.length === 0 ? (
-            <Empty>Keine Einträge.</Empty>
-          ) : (
-            <ul className="card-list">
-              {m.penalties.map((p) => (
-                <PenaltyRow
-                  key={p.id}
-                  p={p}
-                  actions={
-                    <>
-                      {p.status === 'open' ? (
-                        <button
-                          className="btn btn-small"
-                          disabled={busy}
-                          onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
-                        >
-                          Bezahlt
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-small btn-secondary"
-                          disabled={busy}
-                          onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
-                        >
-                          Doch offen
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-small btn-danger"
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
-                          run(() => api.deletePenalty(p.id), 'Storniert')
-                        }
-                      >
-                        Stornieren
-                      </button>
-                    </>
-                  }
-                />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+        {active === 'geburtstag' && m.birthday !== undefined && (
+          <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
+        )}
 
-      {active === 'titel' && m.titles && (
-        <MemberTitles
-          key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
-          id={m.id}
-          member={m.member}
-          titles={m.titles}
-          onChanged={reload}
-          onToast={onToast}
-        />
-      )}
-
-      {active === 'aemter' && <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />}
-
-      {active === 'dienstgrad' && m.rank && (
-        <MemberRank
-          id={m.id}
-          member={m.member}
-          status={m.rank}
-          history={m.rank_history ?? []}
-          onChanged={reload}
-          onToast={onToast}
-          focus={page === 'dienstgrad'}
-        />
-      )}
-
-      {active === 'geburtstag' && m.birthday !== undefined && (
-        <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
-      )}
-
-      {active === 'eintritt' && m.join_year !== undefined && (
-        <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
-      )}
+        {active === 'eintritt' && m.join_year !== undefined && (
+          <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
+        )}
+      </div>
     </div>
   );
 }

@@ -239,6 +239,46 @@ test('Mitglied: Wischen blättert in der Liste und bleibt auf derselben Untersei
   await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
 });
 
+test('Mitglied: Beim Wischen steht der Nachbar schon daneben, gewechselt wird ohne Laden', async ({ page }) => {
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  // Merken, ob irgendwann „Lädt …“ bzw. das Gerüst erscheint.
+  await page.evaluate(() => {
+    const w = window as unknown as { sawLoading: boolean };
+    w.sawLoading = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-loading]')) w.sawLoading = true;
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+
+  // Finger noch auf dem Bildschirm: Die Karte ist verschoben, rechts daneben steht schon das nächste Mitglied.
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 + 60;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [-20, -60, -120]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  }
+  await expect(page.locator('.member-peek-next .member-peek-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-peek-next .member-step')).toContainText('2 / 2');
+  expect(await page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('translateX(-120px)');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-peek')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false);
+
+  // Nur kurz gezogen: Die Karte schnappt zurück, es bleibt beim selben Mitglied.
+  await swipe(page, 30);
+  await expect(page.locator('.member-peek')).toHaveCount(0);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  expect(await page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('');
+});
+
 test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neustart)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const last = `Altwisch${id}`;

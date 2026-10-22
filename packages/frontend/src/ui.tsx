@@ -1,6 +1,6 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import type { MemberSummary, PersonName } from './api';
-import { DATA_UPDATED, dataCache } from './dataCache';
+import { cacheKey as keyOf, DATA_UPDATED, dataCache } from './dataCache';
 import { noteError } from './lastError';
 
 /**
@@ -13,7 +13,7 @@ import { noteError } from './lastError';
  * Stand (setData): Dann einmal neu laden.
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
-  const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
+  const cacheKey = key === undefined ? null : keyOf(key, deps);
   const cached = () => (cacheKey !== null && dataCache.has(cacheKey) ? dataCache.get<T>(cacheKey) : null);
   const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
