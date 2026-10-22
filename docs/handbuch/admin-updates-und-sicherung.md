@@ -26,15 +26,30 @@ Klappt nach einem Update etwas nicht mehr, öffnest du **Auf eine ältere Versio
 Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist – noch bevor sie für alle freigegeben wird. Beim Einschalten fragt die App nach. Das ist für eine Testseite gedacht: Vorabversionen können noch Fehler enthalten. Schaltest du es wieder aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
 
 ## Datensicherung
-Unter **Verwaltung → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen und Zugangsschlüssel, ohne WordPress auch die Konten. Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf. Die Ampel unter **Zustand und Updates** wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
+Unter **Verwaltung → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen, die Zugangsschlüssel und die Konten (mit WordPress alle Benutzer der Webseite, mit Passwort als Prüfwert). Dazu kommen die Dateien der {bereich.documents}, die Abzeichen der {bereich.ranks} und die Anmeldungen der Geräte für Benachrichtigungen. Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf, nicht nur auf dem Server: Die automatischen Sicherungen vor Updates liegen auf demselben Server und sind mit ihm verloren. Die Ampel unter **Zustand und Updates** wird gelb, wenn 30 Tage lang keine Sicherung heruntergeladen oder in Google Drive abgelegt wurde.
+
+### Sicherungen in Google Drive
+Darunter schaltest du **Wöchentlich in Google Drive sichern** ein. Die App legt dann im verbundenen Google-Konto einen Ordner „Sicherungen …“ an, lädt einmal pro Woche eine Sicherung hoch und behält die letzten acht; ältere löscht sie. **Jetzt in Google Drive sichern** lädt sofort eine hoch, **Ordner öffnen** zeigt den Ordner in Google Drive. Scheitert das Hochladen (z. B. weil der Speicher in Google Drive voll ist), steht der Grund dort und in der Ampel; die App versucht es am nächsten Tag wieder.
+- Dafür braucht die App eine Verbindung über **„Mit Google verbinden“** (siehe [Google einrichten](seite:admin-google)), bei der du das Häkchen für **eigene Dateien in Google Drive** gesetzt hast. Wurde die Verbindung vor diesem Update hergestellt, trenne sie unter **Google-Zugang** und verbinde neu. Mit einem Dienstkonto geht es nicht: Es hat in Google Drive keinen eigenen Speicherplatz.
+- Die App sieht und ändert in Google Drive nur Dateien, die sie selbst angelegt hat.
+- Die Sicherungen enthalten Zugangsschlüssel und Passwort-Prüfwerte. Gib den Ordner deshalb nicht frei.
+- Zum Wiederherstellen lädst du die neueste Sicherung aus dem Ordner herunter und spielst sie wie unten ein.
 
 ### Wiederherstellen
 Mit **Sicherung wiederherstellen …** wählst du eine Sicherungsdatei. Nach einer Rückfrage ersetzt sie **alle** Daten der App; rückgängig machen lässt sich das nur mit einer anderen Sicherung.
-- Mit WordPress geht das nur auf derselben Webseite, z. B. nach einem missglückten Update.
+- Mit WordPress geht das nur auf derselben Webseite (Adresse), z. B. nach einem missglückten Update oder auf einer neu installierten WordPress-Seite, wenn die alte verloren ist. Fehlende Konten legt die App dabei mit ihrer bisherigen ID wieder an; alle melden sich mit ihrem bisherigen Benutzernamen und Passwort an. Vorhandene Konten behalten Anmeldedaten und E-Mail und bekommen nur ihre Rolle in der App aus der Sicherung. Konten anlegen darf nur ein WordPress-Administrator.
 - Ohne WordPress auch auf einer neuen Installation (z. B. beim Umzug), aber nicht aus einer Sicherung des WordPress-Plugins. Danach melden sich alle neu an.
 - Eine Sicherung aus einer neueren Version lässt sich erst einspielen, wenn die App aktualisiert ist.
 
+### Nach dem Verlust der Webseite (WordPress)
+1. WordPress unter derselben Adresse neu installieren. Den Administrator dabei mit dem **Benutzernamen und der E-Mail deines bisherigen Kontos** anlegen (oder mit einem Namen und einer E-Mail, die es bisher nicht gab). Gehört die neue Konto-Nummer in der Sicherung jemand anderem, bricht das Wiederherstellen ab und nennt das Konto; geändert wird dann nichts.
+2. Das Plugin der Kompanie installieren (Download-Seite der Kompanie) und die App öffnen.
+3. Unter **Verwaltung → Einstellungen → Datensicherung** die neueste Sicherung einspielen (heruntergeladen oder aus dem Ordner in Google Drive).
+4. Beiträge der Webseite (Neuigkeiten), Seiten und andere Plugins gehören zu WordPress selbst und sind nicht in der Sicherung der App; dafür braucht es eine Sicherung von WordPress bzw. vom Webhoster.
+
 ### Was nicht in der Sicherung ist
-Die Fotos der {bereich.gallery} sind nicht in der Sicherung; die App holt sie danach neu aus Google Drive. Auch die Dateien der {bereich.documents} und die Abzeichen der {bereich.ranks} sind nicht in der Sicherung, nur ihre Angaben (Titel, Kategorie, Stand bzw. welcher {begriff.rank} welches Abzeichen hat). Sie bleiben auf dem Server. Beim Umzug ohne WordPress nimm die Ordner `data/files/dokumente` und `data/files/abzeichen` mit (bzw. das Datenverzeichnis, falls es woanders liegt). Sonst lassen sich die Dokumente danach nicht öffnen und müssen neu hochgeladen werden; fehlende Abzeichen zeigt die App nicht an, bis du sie neu hochlädst. Die Fotos der Mitglieder liegen dagegen in der Datenbank und sind in der Sicherung enthalten.
+Die Fotos der {bereich.gallery} sind nicht in der Sicherung; die App holt sie danach neu aus Google Drive (bei vielen Fotos dauert das einige Stunden). Mit WordPress gehören außerdem Beiträge, Seiten, Design und andere Plugins zu WordPress selbst (siehe oben). Wartende Fehlermeldungen und der Zustand dieser Installation (z. B. Update-Stand, Fehlerprotokoll) sind ebenfalls nicht enthalten.
+
+Ältere Sicherungen (vor dieser Version) enthalten noch keine Dateien der {bereich.documents}, keine Abzeichen und mit WordPress keine Konten. Lade nach dem Update deshalb einmal eine neue Sicherung herunter.
 
 Was die Ampel bedeutet, steht unter [Zustand und Statusmeldungen](seite:admin-zustand).
