@@ -1,7 +1,6 @@
 /** Was die Hilfe über die Person und die App wissen muss, um die passende Seite zu wählen. */
 export interface HelpContext {
   boardWriter: boolean;
-  meinsFirst?: string;
   /** Recht der Person (wie can() in api.ts). */
   can: (cap: string) => boolean;
   /** Eingeschaltete Bereiche. */
@@ -34,11 +33,19 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'galerie';
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : 'dokumente';
+    case 'mitglieder':
+      // Ämter (Issue #112): eigener Abschnitt im Tab, ohne Mitgliederliste der ganze Tab
+      return on('offices') && (sub === 'aemter' || !on('directory')) ? 'aemter' : 'mitglieder';
     case 'meins':
       return (
-        { punkte: 'meine-punkte', strafen: 'meine-strafen', dienstgrad: 'mein-dienstgrad', anwesenheit: 'meine-anwesenheit' }[
-          sub ?? ctx.meinsFirst ?? ''
-        ] ?? (on('titles') ? 'meine-titel' : null)
+        {
+          uebersicht: 'meins-uebersicht',
+          punkte: 'meine-punkte',
+          strafen: 'meine-strafen',
+          dienstgrad: 'mein-dienstgrad',
+          anwesenheit: 'meine-anwesenheit',
+          aemter: 'aemter',
+        }[sub ?? 'uebersicht'] ?? 'meins-uebersicht'
       );
     case 'verwaltung':
       return adminSlug(path.slice(1), ctx);
@@ -76,8 +83,9 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
   }
 }
 
-/** Verwaltung: Reiter, Mitgliederliste und die Seiten eines Mitglieds (verwaltung/mitglied/<id>/<seite>). */
-function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
+/** Verwaltung: Reiter, Mitgliederliste und die Seiten eines Mitglieds (verwaltung/mitglied/<id>/<seite>, bei Ehemaligen
+ * verwaltung/ehemalige/<id>/<seite>). */
+function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null {
   const tabs: Record<string, string> = {
     punkte: 'punkte-vergeben',
     katalog: 'punkte-vergeben',
@@ -85,16 +93,21 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
     dienstgrade: 'dienstgrade-verwalten',
     befoerderungen: 'dienstgrade-verwalten',
     titel: 'titel-verwalten',
+    aemter: 'aemter-verwalten',
     anwesenheit: 'anwesenheit-erfassen',
+    listen: 'listen',
   };
   if (sub && tabs[sub]) return tabs[sub];
-  if (sub === 'neu' || sub === 'neu-mehrere') return 'mitglieder-anlegen';
-  if (sub === 'mitglied') {
+  if (sub === 'neu' || sub === 'neu-mehrere' || sub === 'import') return 'mitglieder-anlegen';
+  // Liste der Ehemaligen und Import (die Seiten einer ehemaligen Person wie bei Mitgliedern, unten)
+  if (sub === 'ehemalige' && (!arg || arg === 'import')) return 'ehemalige-mitglieder';
+  if (sub === 'mitglied' || (sub === 'ehemalige' && /^\d+$/.test(arg ?? ''))) {
     const memberPages: Record<string, string> = {
       punkte: 'punkte-vergeben',
       strafen: 'strafen-verwalten',
       dienstgrad: 'dienstgrade-verwalten',
       titel: 'titel-verwalten',
+      aemter: 'aemter',
     };
     if (page && memberPages[page]) return memberPages[page];
     if (page === 'geburtstag' && ctx.can('create_users')) return 'geburtstage-pflegen';
@@ -108,6 +121,8 @@ function adminSlug([sub, , page]: string[], ctx: HelpContext): string | null {
     ['manage_ranks', 'dienstgrade-verwalten', 'ranks'],
     ['manage_titles', 'titel-verwalten', 'titles'],
     ['manage_attendance', 'anwesenheit-erfassen', 'attendance'],
+    ['manage_offices', 'aemter-verwalten', 'offices'],
+    ['manage_lists', 'listen', 'lists'],
   ];
   return byRight.find(([cap, , feature]) => ctx.can(cap) && (feature === null || !!ctx.features[feature]))?.[1] ?? null;
 }

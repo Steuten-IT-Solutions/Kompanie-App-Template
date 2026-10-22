@@ -39,6 +39,7 @@ final class Plugin
             $users = new WpUsers(
                 static fn (string $role, int $id): array => self::app()->roles()->capabilitiesFor($id, $role),
                 static fn (string $role): bool => self::app()->roles()->exists($role),
+                static fn (string $role): bool => self::app()->roles()->promotable($role),
             );
             $settings = new WpSettings();
             $uploads = wp_upload_dir(null, false);

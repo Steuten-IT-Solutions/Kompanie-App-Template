@@ -556,6 +556,38 @@ final class DriveClient
     }
 
     /**
+     * Lädt das Vorschaubild, das Google selbst für eine Datei erzeugt (thumbnailLink), in eine temporäre Datei;
+     * der Aufrufer löscht sie. Für Formate, die der eigene Server nicht lesen kann (z. B. TIFF). Die Größe wird
+     * über die Endung „=s<Pixel>“ der Adresse gewählt; das ist bei Google nicht dokumentiert, ohne die Endung
+     * kommt das Bild in Googles Standardgröße.
+     *
+     * @throws \RuntimeException wenn Google kein Vorschaubild hat oder der Abruf scheitert
+     */
+    public function thumbnail(string $fileId, int $maxEdge): string
+    {
+        $token = $this->accessToken();
+        $headers = ['Authorization' => 'Bearer ' . $token];
+        $res = $this->http->request('GET', self::FILES_URL . '/' . rawurlencode($fileId) . '?fields=thumbnailLink&supportsAllDrives=true', $headers, null, 20);
+        $body = json_decode($res['body'], true);
+        if ($res['status'] !== 200 || !is_array($body)) {
+            throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+        }
+        $link = (string) ($body['thumbnailLink'] ?? '');
+        if (!str_starts_with($link, 'https://')) {
+            throw new \RuntimeException('Google Drive hat für diese Datei kein Vorschaubild.');
+        }
+        $link = (string) preg_replace('/=s\d+$/', '=s' . $maxEdge, $link);
+        // Nicht öffentlich geteilte Dateien: Abruf mit Anmeldung (laut Drive-API-Referenz zu thumbnailLink).
+        $res = $this->http->request('GET', $link, $headers, null, 30);
+        if ($res['status'] !== 200 || @getimagesizefromstring($res['body']) === false) {
+            throw new \RuntimeException('Das Vorschaubild von Google ließ sich nicht laden: HTTP ' . $res['status']);
+        }
+        $tmp = $this->files->tempFile();
+        file_put_contents($tmp, $res['body']);
+        return $tmp;
+    }
+
+    /**
      * Fehlermeldung aus einer Google-Antwort ({error: {message}} oder {error, error_description}), immer mit
      * HTTP-Status (den braucht auch die Ursache in den Statusmeldungen, Telemetry\Detail).
      */

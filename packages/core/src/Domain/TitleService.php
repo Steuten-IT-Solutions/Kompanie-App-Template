@@ -17,6 +17,8 @@ use KompanieApp\Core\Storage\TitleRepository;
  * - Nur Mitglieder bekommen Titel; wer keines mehr ist, behält sie, bis sie entfernt werden.
  * - Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren. Deaktivierte Titel werden nicht
  *   mehr neu vergeben; wer sie hat, behält sie.
+ * - Ein Titel kann mit einem Amt verknüpft sein (Issue #112, office): Dann vergeben ihn die laufenden Amtszeiten
+ *   (OfficeService::syncTitles), nicht mehr die Hand.
  *
  * @phpstan-import-type Title from TitleRepository
  */
@@ -36,20 +38,22 @@ final class TitleService
     }
 
     /**
-     * Die Titelliste für die Pflege: alle, mit wie vielen Mitgliedern sie zugewiesen sind.
+     * Die Titelliste für die Pflege: alle, mit wie vielen Mitgliedern sie zugewiesen sind und mit welchem Amt sie
+     * verknüpft sind (office, null ohne).
      *
-     * @return list<array{id: int, title: string, sort: int, active: bool, assigned: int}>
+     * @return list<array{id: int, title: string, sort: int, active: bool, assigned: int, office: array{id: int, title: string}|null}>
      */
     public function list(): array
     {
         $this->forgetUnknownUsers();
         $counts = $this->repository()->assignedCounts();
-        return array_map(static fn (array $t): array => $t + ['assigned' => $counts[$t['id']] ?? 0], $this->repository()->all(false));
+        $linked = $this->app->offices()->linkedTitles();
+        return array_map(static fn (array $t): array => $t + ['assigned' => $counts[$t['id']] ?? 0, 'office' => $linked[$t['id']] ?? null], $this->repository()->all(false));
     }
 
     /**
      * @param array<string, mixed> $in title
-     * @return array{id: int, title: string, sort: int, active: bool, assigned: int}
+     * @return array{id: int, title: string, sort: int, active: bool, assigned: int, office: array{id: int, title: string}|null}
      */
     public function create(array $in): array
     {
@@ -60,7 +64,7 @@ final class TitleService
 
     /**
      * @param array<string, mixed> $in title, active
-     * @return array{id: int, title: string, sort: int, active: bool, assigned: int}
+     * @return array{id: int, title: string, sort: int, active: bool, assigned: int, office: array{id: int, title: string}|null}
      */
     public function update(int $id, array $in): array
     {
@@ -80,7 +84,7 @@ final class TitleService
         return $this->one($id);
     }
 
-    /** Nur Titel, die niemand hat. */
+    /** Nur Titel, die niemand hat; ein Amt, das mit ihm verknüpft war, verliert die Verknüpfung. */
     public function delete(int $id): void
     {
         $repo = $this->repository();
@@ -94,12 +98,13 @@ final class TitleService
             ));
         }
         $repo->delete($id);
+        $this->app->offices()->repository()->unlinkTitle($id);
     }
 
     /**
      * Neue Reihenfolge: alle IDs in der gewünschten Anzeigereihenfolge.
      *
-     * @return list<array{id: int, title: string, sort: int, active: bool, assigned: int}>
+     * @return list<array{id: int, title: string, sort: int, active: bool, assigned: int, office: array{id: int, title: string}|null}>
      */
     public function reorder(mixed $ids): array
     {
@@ -152,7 +157,8 @@ final class TitleService
 
     /**
      * Titel eines Mitglieds ersetzen. Neu vergeben werden nur aktive Titel; deaktivierte, die es schon hat, darf es
-     * behalten. Benachrichtigt über neu verliehene Titel.
+     * behalten. Titel, die mit einem Amt verknüpft sind, bleiben, wie sie sind (sie folgen den Amtszeiten).
+     * Benachrichtigt über neu verliehene Titel.
      *
      * @return list<array{id: int, title: string}>
      */
@@ -168,11 +174,15 @@ final class TitleService
             $titles[$t['id']] = $t;
         }
         $current = $repo->titleIdsOf($userId);
+        $linked = $this->app->offices()->linkedTitles();
         $ids = [];
         foreach ($titleIds as $raw) {
             $id = Input::integer($raw);
             if ($id === null || !isset($titles[$id])) {
                 throw ApiError::invalid('Unbekannter Titel.');
+            }
+            if (isset($linked[$id]) && !in_array($id, $current, true)) {
+                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $linked[$id]['title']));
             }
             // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann Titel nur verlieren.
             if (!$user->isMember() && !in_array($id, $current, true)) {
@@ -182,6 +192,11 @@ final class TitleService
                 throw ApiError::invalid(sprintf('Der Titel „%s“ ist deaktiviert und wird nicht mehr vergeben.', $titles[$id]['title']));
             }
             $ids[$id] = $id;
+        }
+        foreach (array_intersect($current, array_keys($linked)) as $id) {
+            if (!isset($ids[$id])) {
+                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $linked[$id]['title']));
+            }
         }
         $ids = array_values($ids);
         $repo->replace($userId, $ids, $this->app->time()->nowUtc());
@@ -227,11 +242,16 @@ final class TitleService
         return $out;
     }
 
-    /** @return array{id: int, title: string, sort: int, active: bool, assigned: int} */
+    /** @return array{id: int, title: string, sort: int, active: bool, assigned: int, office: array{id: int, title: string}|null} */
     private function one(int $id): array
     {
         $t = $this->repository()->find($id) ?? throw ApiError::notFound('Titel nicht gefunden.');
-        return $t + ['assigned' => $this->repository()->assignedCount($id)];
+        return $t + ['assigned' => $this->repository()->assignedCount($id), 'office' => $this->app->offices()->linkedTitles()[$id] ?? null];
+    }
+
+    private static function linkedMessage(string $title, string $office): string
+    {
+        return sprintf('Den Titel „%s“ vergibt das Amt „%s“ über die Amtszeiten.', $title, $office);
     }
 
     private function validTitle(mixed $raw, ?int $id): string

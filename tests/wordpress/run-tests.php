@@ -57,8 +57,11 @@ $c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage_penal
 $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $app->roles()->delete($kasseKey, null);
 
-// Anwärter (Issue #23): Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt – nur diesen Schritt.
+// Anwärter (Issue #23) als eigene Rolle: Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt –
+// nur diesen Schritt und nur aus Rollen, die das erlauben.
 $c->section('Anwärter');
+$candKey = (string) (array_search('Kpwp Anwärter', array_column($app->roles()->all(), 'label', 'key'), true)
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key']);
 $app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => ['member', 'create_users']]);
 $aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
 $holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
@@ -67,10 +70,10 @@ if ($existingCand) {
     wp_delete_user($existingCand->ID);
 }
 wp_set_current_user($holder);
-$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => 'candidate']);
+$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => $candKey], $app->users->find($holder));
 $cand = (int) $created['id'];
 clean_user_cache($cand);
-$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'candidate', 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
+$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === $candKey, 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
 $c->ok($caps($cand) === ['calendar'], 'Anwärter: nur interner Kalender');
 try {
     $app->users->setRole($cand, 'events');
@@ -82,7 +85,7 @@ $app->members()->promote($app->users->find($holder), $cand);
 clean_user_cache($cand);
 $c->ok($app->users->find($cand)?->role === 'member' && in_array(Roles::ROLE_MEMBER, get_userdata($cand)->roles, true), 'Aufgenommen: Mitglied, mit früherer WP-Rolle');
 try {
-    $app->users->setRole($cand, 'candidate');
+    $app->users->setRole($cand, $candKey);
     $c->ok(false, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
 } catch (\DomainException) {
     $c->ok(true, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
@@ -91,6 +94,7 @@ wp_set_current_user(0);
 wp_delete_user($cand);
 wp_delete_user($holder);
 $app->roles()->delete($aufnahmeKey, null);
+$app->roles()->delete($candKey, null);
 
 // Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
 // Die früheren WP-Rollen gibt es hier nur, wenn die Installation sie hatte; für den Test anlegen.
@@ -714,6 +718,10 @@ parse_str((string) wp_parse_url((string) $badge['badge_url'], PHP_URL_QUERY), $q
 $_GET['v'] = (string) ($q['v'] ?? '');
 $_GET['s'] = '128';
 wp_set_current_user(0);
+// Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen, sonst nur mit Anmeldung.
+$res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
+$c->ok($res['status'] === 200 && str_starts_with($res['headers']['Cache-Control'], 'public'), 'Mit Mitgliederliste: Abzeichen ohne Anmeldung, öffentlich zu speichern');
+$app->features()->update(['directory' => false]);
 $res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
 $c->ok($res['status'] === 401 && ($res['headers']['X-Content-Type-Options'] ?? '') === 'nosniff' && !isset($res['path']), 'Abzeichen ohne Anmeldung → 401');
 wp_set_current_user($member);
@@ -721,6 +729,7 @@ $res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
 $c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/svg+xml' && $res['headers']['X-Content-Type-Options'] === 'nosniff'
     && ($res['headers']['Content-Security-Policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Mitglied: SVG mit strenger CSP und nosniff');
 $c->ok(str_starts_with($res['headers']['Cache-Control'], 'private') && !str_contains((string) file_get_contents((string) ($res['path'] ?? '')), 'script'), 'Privat gespeichert, ausgeliefert wird das bereinigte SVG');
+$app->features()->update(['directory' => true]);
 wp_set_current_user($admin);
 $im = imagecreatetruecolor(300, 300);
 ob_start();
@@ -745,14 +754,63 @@ parse_str((string) wp_parse_url((string) $photo['photo_url'], PHP_URL_QUERY), $q
 $_GET['v'] = (string) ($q['v'] ?? '');
 $_GET['s'] = '480';
 wp_set_current_user(0);
+// Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung.
+$res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
+$c->ok($res['status'] === 200 && $res['headers']['Cache-Control'] === 'public, max-age=86400', 'Mit Mitgliederliste: Foto ohne Anmeldung, öffentlich');
+$app->features()->update(['directory' => false]);
 $res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
 $c->ok($res['status'] === 401 && !isset($res['body']), 'Foto ohne Anmeldung → 401');
+$app->features()->update(['directory' => true]);
 wp_set_current_user($member);
 $res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
 $size = getimagesizefromstring((string) ($res['body'] ?? ''));
 $c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/jpeg' && $size !== false && [$size[0], $size[1], $size['mime']] === [480, 320, 'image/jpeg'], 'Eigenes Foto: JPEG in 480 Pixeln über den Bildeditor von WordPress');
+$_GET['s'] = '1024';
+$size = getimagesizefromstring((string) (KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member)['body'] ?? ''));
+$c->ok($size !== false && $size[0] === 1024 && abs($size[1] - 683) <= 1, 'Eigenes Foto: 1024 Pixel für die vergrößerte Ansicht');
 unset($_GET['v'], $_GET['s']);
 $c->ok(($app->api()->config()['user']['photo_url'] ?? null) === $photo['photo_url'], '/config: eigenes Foto');
+
+// Shortcodes aus Ämtern und Mitgliederliste: dieselben öffentlichen Angaben wie die App, auch für Gäste.
+$c->section('Shortcodes: Ämter und Mitglieder');
+wp_set_current_user($admin);
+$app->features()->update(['offices' => true, 'directory' => true]);
+$guestHolder = $d->createUser('kpwp_gast_amt', 'guest');
+$memberName = (string) $app->users->find($member)?->name;
+$offices = $app->offices();
+$groupA = $offices->createGroup('Kpwp Kompanie');
+$groupB = $offices->createGroup('Kpwp Bruderschaft');
+$officeA = $offices->createOffice(['title' => 'Kpwp Kapitän', 'group_id' => $groupA['id']]);
+$officeB = $offices->createOffice(['title' => 'Kpwp Brudermeister', 'group_id' => $groupB['id']]);
+$offices->createTerm($officeA['id'], ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kpwp Früher'], ['user_id' => $guestHolder]]]);
+$offices->createTerm($officeA['id'], ['start_year' => 2020, 'holders' => [['user_id' => $member]], 'note' => 'Kpwp Zusatz']);
+$offices->createTerm($officeB['id'], ['start_year' => 2018, 'holders' => [['name' => 'Kpwp Frei']]]);
+wp_set_current_user(0);
+$html = do_shortcode('[kompanie_aemter]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'class="ka-gruppe">Kpwp Kompanie<'), '[kompanie_aemter]: alle Gruppen mit Überschrift');
+$c->ok(str_contains($html, esc_html($memberName)) && str_contains($html, 'seit 2020 · Kpwp Zusatz') && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])), 'Laufende Amtszeit mit Foto (480 Pixel) aus der Mitgliederliste und Zusatz');
+$c->ok(str_contains($html, 'Chronik seit 1980') && str_contains($html, '1980–1990') && str_contains($html, 'Kpwp Früher'), 'Frühere Amtszeiten als Chronik');
+$html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
+$c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
+$html = do_shortcode('[kompanie_aemter gruppe=”Kpwp Bruderschaft”]');
+$c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän'), 'gruppe mit typografischen Anführungszeichen');
+$html = do_shortcode('[kompanie_mitglieder]');
+$c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
+    && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
+$c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
+$c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');
+$app->features()->update(['offices' => false, 'directory' => false]);
+$c->ok(do_shortcode('[kompanie_aemter]') === '' && do_shortcode('[kompanie_mitglieder]') === '', 'Bereich aus: keine Ausgabe');
+$app->features()->update(['offices' => true, 'directory' => true]);
+wp_set_current_user($admin);
+foreach ([$officeA, $officeB] as $o) {
+    $offices->deleteOffice($o['id']);
+}
+$offices->deleteGroup($groupA['id']);
+$offices->deleteGroup($groupB['id']);
+wp_delete_user($guestHolder);
+
 wp_set_current_user($admin);
 $app->memberPhotos()->remove($app->users->find($admin), $member);
 $c->ok($app->memberPhotos()->url($member) === null, 'Foto entfernt');

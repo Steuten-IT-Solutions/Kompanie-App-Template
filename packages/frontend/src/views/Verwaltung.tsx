@@ -5,42 +5,65 @@ import {
   config,
   levelLabel,
   personFactor,
+  roleInfo,
   roleLabels,
   type CatalogItem,
   type CreatedUser,
   type Level,
+  type FormerMember,
   type MemberSummary,
 } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
-import { navigate } from '../router';
+import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
+import { navigate, redirect as redirectTo } from '../router';
+import { neighbors, useSwipe } from '../swipe';
 import { AdminNav, adminTabs, memberListAllowed, MenuNav } from '../adminNav';
 import { emptyName, Empty, ErrorBox, Loading, MemberPicker, NameFields, StatCard, trimName, useAsync } from '../ui';
 import Anwesenheit from './Anwesenheit';
-import { RankLabel } from '../RankBadge';
+import { RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { PenaltyRow } from './Strafen';
-import { AccountPanel, BulkNewMembers, Credentials } from './Konten';
+import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
+import { OfficeAdmin } from './AemterVerwalten';
+import { ListAdmin } from './ListenVerwalten';
+import { PersonOffices } from './Aemter';
 import {
-  DEFAULT_MEMBER_SORT,
+  browseOrder,
   defaultDir,
   dirLabel,
   listName,
   loadMemberOrder,
   MEMBER_SORT_LABELS,
+  orderFor,
   saveMemberOrder,
+  setBrowseOrder,
   sortMembers,
   type MemberOrder,
+  type BrowseList,
   type MemberSort,
 } from '../memberSort';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
-import { MemberAvatar, MemberPhotoPanel, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
+import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
+import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
+import { MemberImport } from './MitgliederImport';
 
-type Sub = 'mitglieder' | 'punkte' | 'strafe' | 'katalog' | 'dienstgrade' | 'befoerderungen' | 'titel' | 'anwesenheit';
+type Sub =
+  | 'mitglieder'
+  | 'ehemalige'
+  | 'punkte'
+  | 'strafe'
+  | 'katalog'
+  | 'dienstgrade'
+  | 'befoerderungen'
+  | 'titel'
+  | 'aemter'
+  | 'anwesenheit'
+  | 'listen';
 
 const sec = brand.labels.sections;
 
@@ -50,7 +73,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'import' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -69,11 +92,19 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
     <div>
       <AdminNav active={active} />
       {sub === 'mitglied' && arg ? (
-        <MemberDetailView id={Number(arg)} page={path[2]} onToast={onToast} />
+        <MemberDetailView base="mitglied" id={Number(arg)} page={path[2]} onToast={onToast} />
+      ) : active === 'ehemalige' && arg && /^\d+$/.test(arg) ? (
+        <MemberDetailView base="ehemalige" id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : sub === 'neu' && can('create_users') ? (
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
+      ) : sub === 'import' && can('create_users') ? (
+        <ImportPage />
+      ) : active === 'ehemalige' && arg === 'import' ? (
+        <FormerImport onToast={onToast} />
+      ) : active === 'ehemalige' ? (
+        <FormerList />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -88,8 +119,12 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Promotions />
       ) : active === 'titel' ? (
         <TitleList onToast={onToast} />
+      ) : active === 'aemter' ? (
+        <OfficeAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
+      ) : active === 'listen' ? (
+        <ListAdmin path={path.slice(1)} onToast={onToast} />
       ) : (
         <Members />
       )}
@@ -99,16 +134,35 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 
 /* ------------------------------------------------------------------ */
 
+/** Verwaltung → Mitglied anlegen → Aus Datei importieren (auch Anwärter und Ehemalige). */
+function ImportPage() {
+  return (
+    <div>
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
+        ‹ Einzeln anlegen
+      </button>
+      <h2 className="member-name">Mitglieder importieren</h2>
+      <MemberImport onDone={() => navigate('verwaltung/mitglieder')} />
+    </div>
+  );
+}
+
 /** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
 type MembersState = {
   query: string;
   role: Level;
   title: number | null;
   showGuests: boolean;
-  showCandidates: boolean;
+  filtersOpen: boolean;
   scrollY: number;
 };
 let savedMembers: MembersState | null = null;
+
+/** Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users). */
+const memberSorts = (): MemberSort[] =>
+  (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
+    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+  );
 
 function Members() {
   const canPromote = can('promote_users');
@@ -119,28 +173,27 @@ function Members() {
     return s;
   });
   const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
-  // Anwärter auf Wunsch; wer Mitglieder anlegt (und Anwärter aufnimmt), sieht sie von Anfang an.
-  const [showCandidates, setShowCandidates] = useState(restore?.showCandidates ?? can('create_users'));
-  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste und Anwärter lassen sich auch ohne Häkchen wählen.
+  // Filter und Sortierung zunächst eingeklappt; beim Zurückkommen wie verlassen.
+  const [filtersOpen, setFiltersOpen] = useState(restore?.filtersOpen ?? false);
+  // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
   const [role, setRole] = useState<Level>(restore?.role ?? '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
-  const loadCandidates = showCandidates || role === 'candidate';
-  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, loadCandidates), [loadGuests, loadCandidates], 'members');
+  // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
+  const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
   // Filter nach Titel (nur, wer Titel sieht)
   const [title, setTitle] = useState<number | null>(restore?.title ?? null);
   const [query, setQuery] = useState(restore?.query ?? '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  // Nach Punkten nur, wer sie sieht; sonst nach Nachname (die gemerkte Wahl bleibt).
-  const sortOptions = (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter((s) => s !== 'points' || canPoints());
-  const order: MemberOrder = sortOptions.includes(stored.sort)
-    ? stored
-    : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const sortOptions = memberSorts();
+  const order = orderFor(stored, sortOptions);
   const changeOrder = (next: MemberOrder) => {
     setStored(next);
     saveMemberOrder(next);
   };
   // Gemerkter Titel, den niemand mehr trägt: nicht still weiterfiltern.
   const activeTitle = title !== null && (data ?? []).some((m) => (m.titles ?? []).some((t) => t.id === title)) ? title : null;
+  // Hinweis am eingeklappten Bereich, damit ein gesetzter Filter nicht übersehen wird (die Sortierung zählt nicht).
+  const filtersActive = role !== '' || activeTitle !== null || showGuests;
   const list = useMemo(
     () =>
       sortMembers(
@@ -155,11 +208,17 @@ function Members() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, query, role, activeTitle, order.sort, order.dir],
   );
-  // Rollen, die in der Liste vorkommen, dazu immer Anwärter und (wer Rollen vergibt) Gäste
+  // Rollen, die in der Liste vorkommen, dazu (wer Rollen vergibt) Gäste
   const present = new Set((data ?? []).flatMap((m) => [m.level, ...(m.extra_roles ?? [])]));
-  present.add('candidate');
   if (canPromote) present.add('guest');
   const roleOptions = (config?.roles ?? []).filter((r) => present.has(r.key));
+  // Zähler je Gruppe wie in der Anwesenheit: alle mit Rolle (ohne Gäste), unabhängig von Suche und Filter.
+  // In umgekehrter Reihenfolge der Rollen (Einstellungen → Rollen, von unten nach oben).
+  const groupCounts = useMemo(() => {
+    const n = new Map<Level, number>();
+    for (const m of data ?? []) if (m.group) n.set(m.group, (n.get(m.group) ?? 0) + 1);
+    return countLabels(config?.roles ?? [], n);
+  }, [data]);
   // Fotos nur, wenn es welche gibt: sonst bliebe die Liste wie bisher, ohne Spalte nur mit Anfangsbuchstaben.
   const withPhotos = (data ?? []).some((m) => m.photo_url);
   // Titel, die in der Liste vorkommen, alphabetisch
@@ -176,7 +235,11 @@ function Members() {
   }, [data]);
 
   function open(id: number) {
-    savedMembers = { query, role, title, showGuests, showCandidates, scrollY: window.scrollY };
+    savedMembers = { query, role, title, showGuests, filtersOpen, scrollY: window.scrollY };
+    setBrowseOrder(
+      'mitglied',
+      list.map((m) => m.id),
+    );
     navigate(`verwaltung/mitglied/${id}`);
   }
 
@@ -185,10 +248,17 @@ function Members() {
 
   return (
     <div>
+      {groupCounts.length > 0 && (
+        <p className="member-counts small muted" role="status">
+          {groupCounts.join(' · ')}
+        </p>
+      )}
       {can('create_users') && (
-        <button className="btn btn-block add-member" onClick={() => navigate('verwaltung/neu')}>
-          + Mitglied anlegen
-        </button>
+        <div className="button-row add-member">
+          <button className="btn" onClick={() => navigate('verwaltung/neu')}>
+            + Mitglied anlegen
+          </button>
+        </div>
       )}
       <input
         className="search"
@@ -198,99 +268,107 @@ function Members() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Mitglied suchen"
       />
-      {roleOptions.length > 1 && (
-        <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
-          <option value="">Alle Rollen</option>
-          {roleOptions.map((r) => (
-            <option key={r.key} value={r.key}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      )}
-      {titleOptions.length > 0 && (
-        <select
-          className="role-filter"
-          value={activeTitle ?? ''}
-          onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
-          aria-label={`Nach ${sec.titles} filtern`}
-        >
-          <option value="">Alle {sec.titles}</option>
-          {titleOptions.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
-        </select>
-      )}
-      <div className="field-row member-sort">
-        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
-        <div className="field">
-          <span id="member-sort-label">Sortierung</span>
-          <select
-            aria-labelledby="member-sort-label"
-            value={order.sort}
-            // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Punkte die meisten zuerst).
-            onChange={(e) => {
-              const sort = e.target.value as MemberSort;
-              changeOrder({ sort, dir: defaultDir(sort) });
-            }}
-          >
-            {sortOptions.map((s) => (
-              <option key={s} value={s}>
-                {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+      <button
+        type="button"
+        className="member-filters-toggle"
+        aria-expanded={filtersOpen}
+        aria-controls="member-filters"
+        onClick={() => setFiltersOpen(!filtersOpen)}
+      >
+        Filter und Sortierung
+        {filtersActive && <span className="badge badge-role">aktiv</span>}
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      <div id="member-filters" className="member-filters" hidden={!filtersOpen}>
+        {roleOptions.length > 1 && (
+          <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
+            <option value="">Alle Rollen</option>
+            {roleOptions.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
               </option>
             ))}
           </select>
-        </div>
-        <div className="field member-sort-dir">
-          <span id="member-sort-dir-label">Reihenfolge</span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-labelledby="member-sort-dir-label member-sort-dir-value"
-            title="Reihenfolge umkehren"
-            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+        )}
+        {titleOptions.length > 0 && (
+          <select
+            className="role-filter"
+            value={activeTitle ?? ''}
+            onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
+            aria-label={`Nach ${sec.titles} filtern`}
           >
-            <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
-          </button>
+            <option value="">Alle {sec.titles}</option>
+            {titleOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="field-row member-sort">
+          {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+          <div className="field">
+            <span id="member-sort-label">Sortierung</span>
+            <select
+              aria-labelledby="member-sort-label"
+              value={order.sort}
+              // Neue Sortierung beginnt in ihrer üblichen Richtung (Namen A → Z, Eintritt früheste, Punkte die meisten zuerst).
+              onChange={(e) => {
+                const sort = e.target.value as MemberSort;
+                changeOrder({ sort, dir: defaultDir(sort) });
+              }}
+            >
+              {sortOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'points' ? sec.points : MEMBER_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field member-sort-dir">
+            <span id="member-sort-dir-label">Reihenfolge</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-labelledby="member-sort-dir-label member-sort-dir-value"
+              title="Reihenfolge umkehren"
+              onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+            >
+              <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+            </button>
+          </div>
         </div>
+        {canPromote && (
+          <label className="toggle">
+            <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
+            Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
+          </label>
+        )}
       </div>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showCandidates || showGuests}
-          disabled={showGuests}
-          onChange={(e) => setShowCandidates(e.target.checked)}
-        />
-        Auch {levelLabel('candidate')} anzeigen
-      </label>
-      {canPromote && (
-        <label className="toggle">
-          <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
-          Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
-        </label>
-      )}
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row clickable" onClick={() => open(m.id)}>
-            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} />}
+          <li key={m.id} className="card row clickable member-row" onClick={() => open(m.id)}>
+            {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
-                {m.rank_title !== undefined && (
-                  <>
-                    {m.rank_title ? <RankLabel url={m.rank_badge_url} title={m.rank_title} /> : `Kein ${brand.labels.rank}`}
-                    {canPoints() ? ' · ' : ''}
-                  </>
-                )}
-                {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
-                {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
+                {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
+                {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
+                {order.sort === 'joined' && m.joined_on && (m.open_cents ?? 0) > 0 && ' · '}
+                {order.sort === 'points' && canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
+                {order.sort === 'points' && canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
+            {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. Ohne Dienstgrad bleibt die
+                Spalte leer, damit der Text in allen Zeilen gleich mittig steht. */}
+            {m.rank_title !== undefined && (
+              <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
+            )}
             <span className="chevron" aria-hidden="true">
               ›
             </span>
@@ -305,12 +383,55 @@ function Members() {
 /* ------------------------------------------------------------------ */
 
 /**
- * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
- * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht.
+ * Reihenfolge zum Blättern auf der Seite einer Person: die der Liste, aus der sie geöffnet wurde. Sonst (Link, Neustart
+ * der App, aus einem anderen Bereich) die ganze Liste ohne Suche und Filter in der gemerkten Sortierung, wie sie beim
+ * Öffnen der Liste erscheint.
  */
-function MemberDetailView({ id, page, onToast }: { id: number; page?: string; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.member(id), [id]);
+function useBrowseOrder(list: BrowseList, id: number): number[] {
+  const stored = browseOrder(list, id);
+  const former = list === 'ehemalige';
+  // Nur laden, wenn nötig; Schlüssel wie bei den Listen, daher meist ohne Wartezeit aus dem Speicher.
+  const { data } = useAsync<Array<MemberSummary | FormerMember> | null>(
+    () => (stored ? Promise.resolve(null) : former ? api.formerMembers() : api.members(false, true)),
+    former ? [] : [false],
+    former ? 'former-members' : 'members',
+  );
+  return useMemo(
+    () => stored ?? sortMembers(data ?? [], orderFor(loadMemberOrder(), former ? FORMER_SORTS : memberSorts())).map((m) => m.id),
+    [stored, data, former],
+  );
+}
+
+/**
+ * Mitglied in der Verwaltung: Name oben, darunter ein Menü mit je einer Seite pro Bereich
+ * (verwaltung/mitglied/<id>/<seite>), damit nicht alles untereinander steht. Ehemalige haben dieselbe Seite unter
+ * verwaltung/ehemalige/<id>/<seite>; steht eine Person unter der falschen Adresse (alter Link, gerade als ehemalig
+ * eingetragen oder wieder aufgenommen), leitet die Seite um.
+ */
+function MemberDetailView({
+  base,
+  id,
+  page,
+  onToast,
+}: {
+  base: 'mitglied' | 'ehemalige';
+  id: number;
+  page?: string;
+  onToast: (msg: string) => void;
+}) {
+  const { data, error, loading, reload } = useAsync(() => api.member(id), [id], 'member');
   const [busy, setBusy] = useState(false);
+  // Erst nach dem Laden entscheiden: Daten aus dem Speicher könnten veraltet sein.
+  const target = !loading && data?.id === id ? (data.former ? 'ehemalige' : 'mitglied') : base;
+  useEffect(() => {
+    if (target !== base) redirectTo(`verwaltung/${target}/${id}${page ? `/${page}` : ''}`);
+  }, [target, base, id, page]);
+  // Wischen blättert durch die Liste, aus der das Mitglied geöffnet wurde; die gewählte Seite bleibt dabei (auch über
+  // Mitglieder hinweg, bei denen es sie nicht gibt). Ohne Verlaufseintrag, damit „Zurück“ nicht durch jedes Mitglied führt.
+  const order = useBrowseOrder(base, id);
+  const { prev, next, index } = neighbors(order, id);
+  const show = (other: number | null) => other !== null && redirectTo(`verwaltung/${base}/${other}${page ? `/${page}` : ''}`);
+  const swipe = useSwipe((step) => show(step === 1 ? next : prev));
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -327,6 +448,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (target !== base) return null;
   const m = data!;
 
   const pages = [
@@ -336,25 +458,64 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
     { id: 'strafen', label: sec.penalties, on: canPenalties() },
     { id: 'dienstgrad', label: brand.labels.rank, on: !!m.rank && (m.member || !!m.rank.rank) },
     { id: 'titel', label: sec.titles, on: !!m.titles && (m.member || m.titles.length > 0) },
+    // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
+    { id: 'aemter', label: sec.offices, on: !!config?.features.offices && (!!config.features.directory || can('manage_offices')) },
     {
       id: 'geburtstag',
       label: 'Geburtstag',
       on: m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays()),
     },
+    // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt unter „Ehemalig“, Gäste keinen.
+    { id: 'eintritt', label: 'Eintritt', on: m.join_year !== undefined && !m.former && m.level !== 'guest' },
   ].filter((p) => p.on);
   const active = pages.some((p) => p.id === page) ? page! : 'uebersicht';
+  // Foto steht oben neben dem Dienstgrad; ohne Foto die Anfangsbuchstaben, wenn es hochgeladen werden darf.
+  const avatar = !!m.photo_url || !!m.photo_editable;
 
   return (
-    <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-        ‹ Alle Mitglieder
-      </button>
-      <h2 className="member-name">{m.name}</h2>
+    <div className="member-detail" {...swipe}>
+      <div className="member-nav">
+        {m.former ? (
+          <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+            ‹ Ehemalige
+          </button>
+        ) : (
+          <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+            ‹ Alle Mitglieder
+          </button>
+        )}
+        {index >= 0 && order.length > 1 && (
+          <span className="member-step">
+            <button className="btn btn-link" disabled={prev === null} onClick={() => show(prev)} aria-label="Vorheriges Mitglied">
+              ‹
+            </button>
+            <span className="muted small">
+              {index + 1} / {order.length}
+            </span>
+            <button className="btn btn-link" disabled={next === null} onClick={() => show(next)} aria-label="Nächstes Mitglied">
+              ›
+            </button>
+          </span>
+        )}
+      </div>
+      <h2 className={`member-name member-name-centered${m.rank_title || avatar ? ' with-rank' : ''}`}>{m.name}</h2>
+      {(m.rank_title || avatar) && (
+        <p className="member-rank-line">
+          {/* Abzeichen mit dem Dienstgrad darunter, rechts daneben das Foto (gleich hoch wie das Abzeichen) */}
+          {m.rank_title && (
+            <span className="member-rank-badge">
+              <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
+              <span>{m.rank_title}</span>
+            </span>
+          )}
+          {avatar && <ZoomableAvatar url={m.photo_url} name={m.name} />}
+        </p>
+      )}
       <MenuNav
         label="Mitglied"
         className="member-menu"
         active={active}
-        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/mitglied/${m.id}/${p.id}`) }))}
+        items={pages.map((p) => ({ id: p.id, label: p.label, onSelect: () => navigate(`verwaltung/${base}/${m.id}/${p.id}`) }))}
       />
 
       {active === 'uebersicht' && (
@@ -364,11 +525,16 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
             name={m.name}
             url={m.photo_url ?? null}
             editable={!!m.photo_editable}
+            showAvatar={false}
             onChanged={reload}
             onToast={onToast}
           />
           <p className="muted small member-level">
-            {(m.extra_roles ?? []).length > 0 ? `Rollen: ${roleLabels(m)}` : `Rolle: ${levelLabel(m.level)}`}
+            {m.former
+              ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)}): ${formerSummary(m.former)}`
+              : (m.extra_roles ?? []).length > 0
+                ? `Rollen: ${roleLabels(m)}`
+                : `Rolle: ${levelLabel(m.level)}`}
             {hasOverrides(m.rights) && ' · mit Ausnahmen bei den Rechten'}
           </p>
           <div className="stats">
@@ -396,7 +562,10 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'konto' && (
         <>
-          <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
+          {!m.former && (
+            <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
+          )}
           {m.rights && (
             <MemberRightsPanel
               key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
@@ -409,7 +578,7 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               onToast={onToast}
             />
           )}
-          {m.level === 'candidate' && can('create_users') && (
+          {roleInfo(m.level)?.promotable && can('create_users') && (
             <button
               className="btn btn-block promote-candidate"
               disabled={busy}
@@ -421,9 +590,21 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
               Als {levelLabel('member')} aufnehmen
             </button>
           )}
-          <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />
+          {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+          {/* Gäste gehören nicht zur Kompanie; m.former fehlt bei älteren Servern (dann kein Bereich). */}
+          {can('create_users') && m.id !== config?.user?.id && m.former !== undefined && (m.former !== null || m.level !== 'guest') && (
+            <FormerPanel
+              id={m.id}
+              name={m.name}
+              former={m.former}
+              joinedOn={m.join_year ? (m.join_year.date ?? String(m.join_year.year)) : null}
+              openCents={m.open_cents}
+              onChanged={reload}
+              onToast={onToast}
+            />
+          )}
           {can('create_users') && m.id !== config?.user?.id && (
-            <AccountPanel id={m.id} level={m.level} onChanged={reload} onToast={onToast} />
+            <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
           )}
         </>
       )}
@@ -514,8 +695,17 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
       )}
 
       {active === 'titel' && m.titles && (
-        <MemberTitles key={m.id} id={m.id} member={m.member} titles={m.titles} onChanged={reload} onToast={onToast} />
+        <MemberTitles
+          key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
+          id={m.id}
+          member={m.member}
+          titles={m.titles}
+          onChanged={reload}
+          onToast={onToast}
+        />
       )}
+
+      {active === 'aemter' && <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />}
 
       {active === 'dienstgrad' && m.rank && (
         <MemberRank
@@ -531,6 +721,10 @@ function MemberDetailView({ id, page, onToast }: { id: number; page?: string; on
 
       {active === 'geburtstag' && m.birthday !== undefined && (
         <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
+      )}
+
+      {active === 'eintritt' && m.join_year !== undefined && (
+        <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
       )}
     </div>
   );
@@ -696,12 +890,12 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 
 function NewMember() {
   const [name, setName] = useState(emptyName());
-  const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  const [level, setLevel] = useState<Level>('member');
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
   const [rankId, setRankId] = useState('');
-  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), []);
+  const ranks = useAsync(() => (canRanks() ? api.ranks() : Promise.resolve([])), [], 'new-member-ranks');
   const extras = level === 'member';
   const pointsNum = Number(initialPoints || 0);
   const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
@@ -774,6 +968,9 @@ function NewMember() {
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
         Mehrere auf einmal anlegen
       </button>
+      <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/import')}>
+        Aus Datei importieren (Excel oder CSV)
+      </button>
       <NameFields value={name} onChange={setName} />
       <label className="field">
         <span>Benutzername (optional)</span>
@@ -790,13 +987,7 @@ function NewMember() {
         <span>E-Mail (optional)</span>
         <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
-      <label className="field">
-        <span>Rolle</span>
-        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
-          <option value="member">{levelLabel('member')}</option>
-          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
-        </select>
-      </label>
+      <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>
           <label className="field">
@@ -855,12 +1046,12 @@ function NewMember() {
 /* ------------------------------------------------------------------ */
 
 function useMembersAndCatalog() {
-  return useAsync(() => Promise.all([api.members(), api.catalog()]));
+  return useAsync(() => Promise.all([api.members(), api.catalog()]), [], 'members-catalog');
 }
 
 /** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
 function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId]);
+  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId], 'attendance');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
@@ -1031,7 +1222,7 @@ function GivePenalty({
   onToast: (msg: string) => void;
   onDone?: () => void;
 }) {
-  const { data, error, loading, reload } = useAsync(api.members);
+  const { data, error, loading, reload } = useAsync(api.members, [], 'penalty-members');
   // Summe aller offenen Strafen (Mitglieder und Anwärter, ohne Gast-Konten): gleichzeitig mit der Auswahl geladen und
   // gemerkt, damit die Karte zusammen mit dem Formular erscheint. Beim Eintragen aus einer Anwesenheitsliste nicht.
   const total = useAsync(() => (attendance ? Promise.resolve(null) : api.members(false, true)), [], 'penalty-total');
@@ -1115,7 +1306,7 @@ function GivePenalty({
 /* ------------------------------------------------------------------ */
 
 function Catalog({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.catalog(true));
+  const { data, error, loading, reload } = useAsync(() => api.catalog(true), [], 'catalog-all');
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('');
   const [busy, setBusy] = useState(false);

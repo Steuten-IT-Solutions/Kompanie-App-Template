@@ -12,8 +12,10 @@ Unter **Verwaltung → {bereich.titles}** legst du die {bereich.titles} an: Beze
 Ein Titel, den niemand hat, lässt sich **löschen**. Ein Titel, den jemand hat, lässt sich nur umbenennen oder **deaktivieren**: Ein deaktivierter Titel wird nicht mehr neu vergeben, wer ihn hat, behält ihn. **Aktivieren** macht das rückgängig.
 
 ## {bereich.titles} vergeben
-Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{bereich.titles}**) die passenden {bereich.titles} ankreuzen und **Titel speichern** tippen; ein Häkchen wegnehmen entfernt den Titel. Ein Mitglied kann mehrere {bereich.titles} haben. In der Mitgliederliste stehen die {bereich.titles} neben dem Namen; über **Alle {bereich.titles}** filterst du die Liste nach einem Titel.
+Im Mitglied (**Verwaltung → Mitglieder**, dann im Menü unter dem Namen **{bereich.titles}**) die passenden {bereich.titles} ankreuzen und **Titel speichern** tippen; ein Häkchen wegnehmen entfernt den Titel. Ein Mitglied kann mehrere {bereich.titles} haben. In der Mitgliederliste stehen die {bereich.titles} neben dem Namen; unter **Filter und Sortierung** filterst du über **Alle {bereich.titles}** die Liste nach einem Titel.
 
 Neue {bereich.titles} bekommt nur, wer Mitglied ist. Wer kein Mitglied mehr ist (z. B. nach einem Wechsel zur Rolle {rolle.guest}), behält seine {bereich.titles}, bis du sie dort entfernst.
+
+Ist ein Titel mit einem Amt verknüpft (Bereich **{bereich.offices}**), vergibt ihn die App über die laufenden Amtszeiten: Wer das Amt hat, bekommt ihn, wer es nicht mehr hat, verliert ihn. Solche Titel lassen sich im Mitglied nicht von Hand ankreuzen; in der Liste steht, welches Amt sie vergibt (siehe **{bereich.offices} verwalten** im Handbuch). Ein verknüpfter Titel lässt sich trotzdem umbenennen; wird er gelöscht, fällt die Verknüpfung weg.
 
 Wer [Benachrichtigungen](seite:benachrichtigungen) eingeschaltet hat, bekommt eine, wenn ihm ein neuer Titel verliehen wird; beim Entfernen nicht.

@@ -65,6 +65,9 @@ const DEFAULTS = {
     polls: 'Umfragen',
     birthdays: 'Geburtstage',
     inventory: 'Inventar',
+    directory: 'Mitglieder',
+    offices: 'Ämter',
+    lists: 'Listen',
   },
   rank: 'Dienstgrad',
 };

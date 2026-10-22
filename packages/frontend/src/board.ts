@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, can, config, type BoardItem } from './api';
+import { DATA_UPDATED } from './dataCache';
 
 /** Höchstlänge einer Nachricht (wie BoardService::TEXT_MAX im Kern). */
 export const BOARD_TEXT_MAX = 500;
@@ -107,11 +108,14 @@ export function useBoard(): { items: BoardItem[]; dismissed: (item: BoardItem) =
     const visible = () => {
       if (document.visibilityState === 'visible') void refreshBoard();
     };
+    const updated = () => void refreshBoard();
     window.addEventListener(BOARD_CHANGED, changed);
+    window.addEventListener(DATA_UPDATED, updated);
     document.addEventListener('visibilitychange', visible);
     if (items === null) void refreshBoard();
     return () => {
       window.removeEventListener(BOARD_CHANGED, changed);
+      window.removeEventListener(DATA_UPDATED, updated);
       document.removeEventListener('visibilitychange', visible);
     };
   }, []);

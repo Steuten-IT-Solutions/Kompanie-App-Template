@@ -39,7 +39,11 @@ final class ApiScenario
             $this->polls();
             $this->birthdays();
             $this->inventory();
+            $this->directory();
+            $this->offices();
+            $this->lists();
             $this->accounts();
+            $this->formerMembers();
             $this->events();
             $this->push();
             $this->reports();
@@ -90,7 +94,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -105,6 +109,13 @@ final class ApiScenario
             $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
         }
         $c->ok($this->leitung !== '', 'Rolle „Kptest Leitung“ vorhanden');
+        // Anwärter sind eine eigene Rolle, wie ein Admin sie einrichtet.
+        $this->anw = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Anwärter'] ?? '');
+        if ($this->anw === '') {
+            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true]);
+            $this->anw = (string) (array_column((array) $d, 'key', 'label')['Kptest Anwärter'] ?? '');
+        }
+        $c->ok($this->anw !== '', 'Rolle „Kptest Anwärter“ vorhanden');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/events')[0] === 200, 'Eingeschalteter Bereich wieder erreichbar');
     }
@@ -207,6 +218,8 @@ final class ApiScenario
     private int $spiess = 0;
     /** Schlüssel der Rolle „Kptest Leitung“ (in features() angelegt) */
     private string $leitung = '';
+    /** Eigene Rolle „Kptest Anwärter“ (Issue #23): nur Kalender, für neue Konten, zum Mitglied zu machen */
+    private string $anw = '';
     private int $m1 = 0;
     private int $m2 = 0;
     private int $catalogId = 0;
@@ -434,7 +447,7 @@ final class ApiScenario
         $c->section('Zusatzrollen');
         $admin = $this->user('kptest_zusatz_admin', 'admin');
         $m = $this->user('kptest_zusatz_m', 'member');
-        $cand = $this->user('kptest_zusatz_anw', 'candidate');
+        $cand = $this->user('kptest_zusatz_anw', $this->anw);
         $this->d->actAs($admin);
         [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Zusatz Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
         $young = (string) (array_column((array) $d, 'key', 'label')['Kptest Zusatz Jugend'] ?? '');
@@ -465,7 +478,7 @@ final class ApiScenario
         $c->ok($this->req('PATCH', "/members/$admin/role", ['extra_roles' => []])[0] === 400, 'Eigene Rollen nicht änderbar → 400');
         [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'member', 'extra_roles' => ['events']]);
         $c->ok($s === 200 && ($d['extra_roles'] ?? null) === ['events'], 'Grundrolle und Zusatzrollen in einem Schritt');
-        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => 'candidate']);
+        [$s, $d] = $this->req('PATCH', "/members/$cand/role", ['level' => $this->anw]);
         $c->ok($s === 200 && ($d['extra_roles'] ?? null) === [], 'Grundrolle ohne Mitgliederbereich: Zusatzrollen fallen weg');
 
         $c->ok($this->req('DELETE', '/admin/roles/' . $young)[0] === 400, 'Rolle nur als Zusatzrolle zugeordnet: Löschen ohne Ersatz → 400');
@@ -600,13 +613,16 @@ final class ApiScenario
         $c->ok(($this->req('GET', "/members/$m")[1]['rights']['revoke'] ?? null) === [], 'Zusatzrolle weg: Ausnahme fällt weg');
     }
 
-    /** Anwärter (Issue #23): interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, nimmt sie auf. */
+    /**
+     * Anwärter (Issue #23) als eigene Rolle: interner Kalender ja, Mitgliederbereich nein; wer Konten anlegt, legt sie an
+     * und nimmt sie auf. Dazu Reihenfolge der Rollen und Punktefaktor für Admins.
+     */
     private function candidates(): void
     {
         $c = $this->c;
         $c->section('Anwärter');
         $admin = $this->user('kptest_anw_admin', 'admin');
-        $cand = $this->user('kptest_anwaerter', 'candidate');
+        $cand = $this->user('kptest_anwaerter', $this->anw);
         $guest = $this->user('kptest_anw_gast', 'guest');
 
         // Kalender wie ein Mitglied (ohne eingerichteten Kalender ggf. 503, aber nie „keine Rechte“), sonst nichts.
@@ -625,7 +641,7 @@ final class ApiScenario
         $caps = (array) ($cfg['user']['capabilities'] ?? []);
         $c->ok(in_array('calendar', $caps, true) && !in_array('member', $caps, true), '/config: Recht calendar, nicht member');
         $roles = array_column((array) ($cfg['roles'] ?? []), 'label', 'key');
-        $c->ok(isset($roles['candidate']), 'Rolle „Anwärter“ in /config');
+        $c->ok(isset($roles[$this->anw]), 'Rolle „Anwärter“ in /config');
 
         // Wer Konten anlegt, legt Anwärter an und nimmt sie auf – nur von Anwärter zu Mitglied.
         $this->d->actAs($admin);
@@ -635,16 +651,17 @@ final class ApiScenario
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
         $holder = $this->user('kptest_anw_aufnahme', $aufnahme);
         $this->d->actAs($holder);
-        [$s, $u] = $this->req('POST', '/users', ['name' => 'Kptest Anwärterin', 'level' => 'candidate']);
+        [$s, $u] = $this->req('POST', '/users', ['name' => 'Kptest Anwärterin', 'level' => $this->anw]);
         if (isset($u['id'])) {
             $this->users[] = $u['id'];
         }
-        $c->ok($s === 201 && ($u['level'] ?? '') === 'candidate', 'Konto als Anwärter anlegen');
+        $c->ok($s === 201 && ($u['level'] ?? '') === $this->anw, 'Konto als Anwärter anlegen');
         $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 400, 'Neues Konto als Admin → 400');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => $this->leitung])[0] === 400, 'Rolle nicht für neue Konten freigegeben → 400');
         $c->ok($this->req('POST', '/members/' . ($u['id'] ?? 0) . '/password')[0] === 200, 'Passwort eines Anwärters zurücksetzen');
         $list = array_column((array) $this->req('GET', '/members')[1], 'level', 'id');
         $withCand = array_column((array) $this->req('GET', '/members', [], ['candidates' => '1'])[1], 'level', 'id');
-        $c->ok(!isset($list[$u['id'] ?? 0]) && ($withCand[$u['id'] ?? 0] ?? '') === 'candidate' && !isset($withCand[$guest]), 'Mitgliederliste: Anwärter nur auf Wunsch, Gäste nie');
+        $c->ok(!isset($list[$u['id'] ?? 0]) && ($withCand[$u['id'] ?? 0] ?? '') === $this->anw && !isset($withCand[$guest]), 'Mitgliederliste: Anwärter nur auf Wunsch, Gäste nie');
         $c->ok($this->req('POST', "/members/{$this->m2}/promote")[0] === 400, 'Mitglied „aufnehmen“ → 400');
         $c->ok($this->req('POST', "/members/$guest/promote")[0] === 400, 'Gast aufnehmen → 400');
         [$s, $d] = $this->req('POST', '/members/' . ($u['id'] ?? 0) . '/promote');
@@ -652,9 +669,29 @@ final class ApiScenario
         $this->d->actAs($this->spiess);
         $c->ok($this->req('POST', "/members/$cand/promote")[0] === 403, 'Ohne „Mitglieder anlegen“ keine Aufnahme → 403');
 
+        // Aus einer Rolle, die nicht dafür freigegeben ist, nimmt niemand so auf.
         $this->d->actAs($admin);
-        $this->req('DELETE', '/admin/roles/' . $aufnahme, [], ['replacement' => 'member']);
         $nur = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Nur Kalender'] ?? '');
+        $friend = $this->user('kptest_anw_freund', $nur !== '' ? $nur : 'guest');
+        $this->d->actAs($holder);
+        $c->ok($this->req('POST', "/members/$friend/promote")[0] === 400, 'Rolle nicht zum Aufnehmen freigegeben → 400');
+
+        // Reihenfolge aller Rollen per Ziehen, auch der festen (z. B. Anwärter zwischen Gast und Mitglied).
+        $this->d->actAs($admin);
+        $before = array_column((array) $this->req('GET', '/admin/roles')[1], 'key');
+        $wanted = array_values(array_merge(['guest', $this->anw, 'member'], array_diff($before, ['guest', $this->anw, 'member'])));
+        [$s, $d] = $this->req('PUT', '/admin/roles/order', ['keys' => $wanted]);
+        $c->ok($s === 200 && array_column((array) $d, 'key') === $wanted, 'Rollen umsortiert, auch feste');
+        $c->ok(array_column((array) ($this->req('GET', '/config')[1]['roles'] ?? []), 'key') === $wanted, '/config in der neuen Reihenfolge');
+        $c->ok($this->req('PUT', '/admin/roles/order', ['keys' => array_slice($wanted, 1)])[0] === 400, 'Nicht alle Rollen → 400');
+        $this->req('PUT', '/admin/roles/order', ['keys' => $before]);
+
+        // Punktefaktor auch für Admins
+        [$s, $d] = $this->req('PATCH', '/admin/roles/admin', ['points_factor' => 0.5]);
+        $c->ok($s === 200 && (array_column((array) $d, 'points_factor', 'key')['admin'] ?? null) == 0.5, 'Punktefaktor für Admins');
+        $this->req('PATCH', '/admin/roles/admin', ['points_factor' => 1]);
+
+        $this->req('DELETE', '/admin/roles/' . $aufnahme, [], ['replacement' => 'member']);
         if ($nur !== '') {
             $this->req('DELETE', '/admin/roles/' . $nur, [], ['replacement' => 'member']);
         }
@@ -786,7 +823,7 @@ final class ApiScenario
         $c->section('Anwesenheit');
         $admin = $this->user('kptest_anw_admin', 'admin');
         $m = $this->user('kptest_anw_m', 'member');
-        $cand = $this->user('kptest_anw_anw', 'candidate');
+        $cand = $this->user('kptest_anw_anw', $this->anw);
         $guest = $this->user('kptest_anw_gast', 'guest');
         $this->d->actAs($m);
         $c->ok($this->req('GET', '/attendance')[0] === 403, 'Mitglied: GET /attendance → 403');
@@ -846,7 +883,7 @@ final class ApiScenario
         $c->section('Schwarzes Brett');
         $admin = $this->user('kptest_brett_admin', 'admin');
         $m = $this->user('kptest_brett_m', 'member');
-        $cand = $this->user('kptest_brett_anw', 'candidate');
+        $cand = $this->user('kptest_brett_anw', $this->anw);
         $guest = $this->user('kptest_brett_gast', 'guest');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/board')[0] === 401, 'GET /board ohne Anmeldung → 401');
@@ -891,7 +928,7 @@ final class ApiScenario
         $admin = $this->user('kptest_umfrage_admin', 'admin');
         $m = $this->user('kptest_umfrage_m', 'member');
         $m2 = $this->user('kptest_umfrage_m2', 'member');
-        $cand = $this->user('kptest_umfrage_anw', 'candidate');
+        $cand = $this->user('kptest_umfrage_anw', $this->anw);
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/polls')[0] === 401, 'GET /polls ohne Anmeldung → 401');
         $this->d->actAs($cand);
@@ -958,6 +995,226 @@ final class ApiScenario
      * Geburtstage (Issue #1): eigener mit Schaltern, Pflege durch create_users (ohne die Schalter), nur Mitglieder sehen,
      * nie das Geburtsjahr, Konto löschen entfernt den Geburtstag, Bereich aus → 403.
      */
+    /**
+     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): nur Namen, Fotos, Dienstgrade und Titel; Geburtstag und
+     * Eintrittsjahr nur, soweit die Person sie zeigt (nicht, nur Mitgliedern, allen).
+     */
+    private function directory(): void
+    {
+        $c = $this->c;
+        $c->section('Mitgliederliste für alle');
+        $admin = $this->user('kptest_liste_admin', 'admin');
+        $m = $this->user('kptest_liste_m', 'member');
+        $cand = $this->user('kptest_liste_anw', $this->anw);
+        $guest = $this->user('kptest_liste_gast', 'guest');
+        foreach ([$m => 'Mitglied', $cand => 'Anwärter', $guest => 'Gast-Konto', 0 => 'Ohne Anmeldung'] as $who => $label) {
+            $this->d->actAs($who === 0 ? null : $who);
+            [$s, $d] = $this->req('GET', '/directory');
+            $ids = array_column((array) $d, 'id');
+            $c->ok($s === 200 && in_array($m, $ids, true) && in_array($cand, $ids, true) && !in_array($guest, $ids, true), "$label sieht Mitglieder und Anwärter, keine Gäste");
+        }
+        $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
+        $c->ok(is_string($entry['name'] ?? null) && array_key_exists('photo_url', $entry) && array_key_exists('rank_title', $entry) && is_array($entry['titles'] ?? null), 'Name, Foto, Dienstgrad und Titel');
+        $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
+        $c->ok(array_key_exists('birthday', $entry) && $entry['birthday'] === null && array_key_exists('join_year', $entry) && $entry['join_year'] === null, 'Geburtstag und Eintrittsjahr: ohne Freigabe null');
+
+        // Geburtstag und Eintrittsjahr auf der Seite der Person: wählt nur sie selbst
+        $this->d->actAs($m);
+        $c->ok($this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'alle'])[0] === 400, 'Ungültige Anzeige → 400');
+        [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'show_age' => true, 'profile' => 'public']);
+        $c->ok($s === 200 && ($d['birthday']['profile'] ?? null) === 'public', 'Geburtstag allen zeigen');
+        $c->ok($this->req('PUT', '/me/join-year', ['year' => (int) gmdate('Y') + 1])[0] === 400, 'Eintrittsjahr in der Zukunft → 400');
+        $c->ok($this->req('PUT', '/me/join-year', ['year' => 1799])[0] === 400, 'Eintrittsjahr vor 1800 → 400');
+        [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005]);
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2005, 'date' => '2005', 'profile' => 'none'], 'Eigenes Eintrittsjahr, Standard: nicht zeigen');
+        [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'members']);
+        $c->ok($s === 200 && ($d['join_year']['profile'] ?? null) === 'members', 'Eintrittsjahr nur Mitgliedern zeigen');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', "/members/$m/join-year", ['year' => 2004, 'profile' => 'public']);
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'date' => '2004', 'profile' => 'members'], 'Verwaltung ändert das Jahr, die Anzeige bleibt');
+        [$s, $d] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'date' => '2004', 'profile' => 'members'], 'Mitgliedsdetails mit Eintrittsjahr');
+        [$s, $d] = $this->req('PUT', "/members/$m/join-year", ['date' => '12.03.2004']);
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2004, 'date' => '2004-03-12', 'profile' => 'members'], 'Eintritt mit Tag und Monat');
+        $c->ok($this->req('PUT', "/members/$m/join-year", ['date' => '30.02.2004'])[0] === 400, 'Eintritt an einem Tag, den es nicht gibt → 400');
+        $listed = static fn (mixed $d): array => array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
+        [$s, $d] = $this->req('GET', '/members');
+        $c->ok($s === 200 && ($listed($d)['joined_on'] ?? null) === '2004-03-12', 'Mitgliederliste der Verwaltung mit Eintritt (unabhängig von der Anzeige)');
+        $this->d->actAs($this->user('kptest_liste_punkte', 'points'));
+        [$s, $d] = $this->req('GET', '/members');
+        $c->ok($s === 200 && $listed($d) !== [] && !array_key_exists('joined_on', $listed($d)), 'Ohne create_users kein Eintrittsjahr in der Liste');
+        $this->d->actAs($cand);
+        $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2000])[0] === 403, 'Ohne create_users kein fremdes Eintrittsjahr → 403');
+        $c->ok($this->req('PUT', '/me/join-year', ['year' => 2000])[0] === 403, 'Anwärter: kein eigenes Eintrittsjahr → 403');
+        $byViewer = function (?int $viewer) use ($m): array {
+            $this->d->actAs($viewer);
+            [, $d] = $this->req('GET', '/directory');
+            return array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
+        };
+        $public = $byViewer(null);
+        $age = (int) gmdate('Y') - 1988 - (gmdate('m-d') < '03-12' ? 1 : 0);
+        $c->ok(($public['birthday']['month'] ?? null) === 3 && ($public['birthday']['day'] ?? null) === 12 && ($public['birthday']['year'] ?? null) === 1988 && in_array($public['birthday']['age'] ?? null, [$age - 1, $age, $age + 1], true), 'Ohne Anmeldung: Geburtstag mit Jahr und Alter');
+        $c->ok(array_key_exists('join_year', $public) && $public['join_year'] === null, 'Ohne Anmeldung: Eintrittsjahr nur für Mitglieder nicht zu sehen');
+        $candEntry = $byViewer($cand);
+        $c->ok(array_key_exists('join_year', $candEntry) && $candEntry['join_year'] === null, 'Anwärter sieht das Eintrittsjahr für Mitglieder nicht');
+        $c->ok(($byViewer($m)['join_year'] ?? null) === 2004, 'Mitglied sieht das Eintrittsjahr');
+        $this->d->actAs($m);
+        $this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'show_age' => false]);
+        $b = $byViewer(null)['birthday'] ?? [];
+        $c->ok(($b['month'] ?? null) === 3 && array_key_exists('year', $b) && $b['year'] === null && $b['age'] === null, 'Ohne „Alter anzeigen“: nur Tag und Monat');
+        $this->d->actAs($m);
+        $this->req('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'none']);
+        $own = $byViewer($m);
+        $c->ok(array_key_exists('birthday', $own) && $own['birthday'] === null, 'Nicht zeigen: auch Mitglieder sehen den Geburtstag dort nicht');
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('DELETE', '/me/join-year');
+        $c->ok($s === 200 && array_key_exists('join_year', (array) $d) && $d['join_year'] === null, 'Eigenes Eintrittsjahr entfernen');
+        $this->req('DELETE', '/me/birthday');
+        $this->d->actAs($admin);
+        $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2004])[0] === 200 && $this->req('DELETE', "/members/$m/join-year")[0] === 200, 'Verwaltung trägt Eintrittsjahr ein und entfernt es');
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', '/me/join-year');
+        $c->ok($s === 200 && array_key_exists('join_year', (array) $d) && $d['join_year'] === null, 'Danach kein Eintrittsjahr');
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/directory/counts');
+        $groups = array_column((array) $d, 'count', 'group');
+        $c->ok($s === 200 && ($groups['member'] ?? 0) >= 1 && ($groups[$this->anw] ?? 0) >= 1 && !isset($groups['guest']), 'GET /directory/counts: Anzahl je Gruppe, ohne Gäste');
+        $c->ok(array_filter((array) $d, static fn (mixed $e): bool => array_keys((array) $e) !== ['group', 'count']) === [], 'Zähler: nur Gruppe und Anzahl');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/directory/counts')[0] === 200, 'Ohne Anmeldung: GET /directory/counts → 200 (öffentlich wie die Liste)');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['directory' => false]);
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/directory');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['directory' => true]);
+    }
+
+    /**
+     * Ämter (Issue #112): öffentlich lesen, Pflege mit manage_offices, Amtszeiten mit Konten und freien Namen, verknüpfter
+     * Titel folgt den laufenden Amtszeiten, gelöschtes Konto bleibt mit Namen stehen, Bereich aus → 403.
+     */
+    private function offices(): void
+    {
+        $c = $this->c;
+        $c->section('Ämter');
+        $admin = $this->user('kptest_amt_admin', 'admin');
+        $m = $this->user('kptest_amt_m', 'member');
+        $gone = $this->user('kptest_amt_weg', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('POST', '/office-groups', ['title' => 'Kptest Verein'])[0] === 403, 'Pflege ohne manage_offices → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('POST', '/offices', ['title' => 'Kptest'])[0] === 401, 'Pflege ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $group] = $this->req('POST', '/office-groups', ['title' => 'Kptest Verein']);
+        $c->ok($s === 201 && is_int($group['id'] ?? null), 'Gruppe anlegen → 201');
+        [$s, $office] = $this->req('POST', '/offices', ['title' => 'Kptest Vorsitz', 'group_id' => $group['id'] ?? null]);
+        $c->ok($s === 201 && ($office['group_id'] ?? null) === ($group['id'] ?? 0), 'Amt anlegen → 201');
+        $oid = (int) ($office['id'] ?? 0);
+        [$s, $title] = $this->req('POST', '/titles', ['title' => 'Kptest Vorsitz']);
+        $tid = (int) ($title['id'] ?? 0);
+        [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kptest Früher']]]);
+        $c->ok($s === 201 && ($d['current'] ?? null) === false, 'Amtszeit mit freiem Namen');
+        [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 2020, 'holders' => [['user_id' => $m], ['user_id' => $gone]]]);
+        $termId = (int) ($d['id'] ?? 0);
+        $c->ok($s === 201 && ($d['current'] ?? null) === true && array_column($d['holders'] ?? [], 'user_id') === [$m, $gone], 'Laufende Amtszeit mit zwei Konten');
+        $c->ok($this->req('POST', "/offices/$oid/terms", ['start_year' => 2000, 'end_year' => 1999, 'holders' => [['name' => 'X']]])[0] === 400, 'Ende vor Beginn → 400');
+        [$s, $d] = $this->req('GET', "/offices/$oid/title-preview", [], ['title_id' => (string) $tid]);
+        $c->ok($s === 200 && count($d['add'] ?? []) === 2 && ($d['remove'] ?? null) === [], 'Vorschau der Verknüpfung: zwei bekommen den Titel');
+        [$s, $d] = $this->req('PATCH', "/offices/$oid", ['title_id' => $tid]);
+        $c->ok($s === 200 && ($d['title_id'] ?? null) === $tid, 'Amt mit Titel verknüpfen');
+        [, $d] = $this->req('GET', "/members/$m");
+        $c->ok(in_array($tid, array_column($d['titles'] ?? [], 'id'), true), 'Laufende Amtszeit vergibt den Titel');
+        $c->ok($this->req('PUT', "/members/$m/titles", ['title_ids' => []])[0] === 400, 'Verknüpften Titel nicht von Hand entziehen → 400');
+
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/offices');
+        $o = array_values(array_filter((array) ($d['offices'] ?? []), static fn (mixed $x): bool => is_array($x) && ($x['id'] ?? 0) === $oid))[0] ?? [];
+        $c->ok($s === 200 && count($o['terms'] ?? []) === 2 && ($o['terms'][0]['current'] ?? null) === true, 'Öffentlich lesbar, laufende Amtszeit zuerst');
+        $holder = $o['terms'][0]['holders'][0] ?? [];
+        $c->ok(($holder['user_id'] ?? null) === $m && array_key_exists('photo_url', $holder) && !array_key_exists('title_id', $o), 'Personen der Mitgliederliste mit Konto und Foto, ohne Pflegeangaben');
+
+        $this->d->actAs($admin);
+        [$s] = $this->req('DELETE', "/members/$gone");
+        [, $d] = $this->req('GET', '/offices');
+        $o = array_values(array_filter((array) ($d['offices'] ?? []), static fn (mixed $x): bool => is_array($x) && ($x['id'] ?? 0) === $oid))[0] ?? [];
+        $kept = $o['terms'][0]['holders'][1] ?? [];
+        $c->ok($s === 200 && is_string($kept['name'] ?? null) && $kept['name'] !== '' && !array_key_exists('user_id', $kept), 'Gelöschtes Konto: Amtszeit bleibt mit Namen');
+        [$s, $d] = $this->req('PATCH', "/office-terms/$termId", ['end_year' => 2024]);
+        [, $member] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && !in_array($tid, array_column($member['titles'] ?? [], 'id'), true), 'Amtszeit beendet: Titel entzogen');
+
+        $this->req('PUT', '/admin/features', ['offices' => false]);
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/offices');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['offices' => true]);
+        $c->ok($this->req('DELETE', "/offices/$oid")[0] === 200 && $this->req('DELETE', '/office-groups/' . (int) ($group['id'] ?? 0))[0] === 200 && $this->req('DELETE', "/titles/$tid")[0] === 200, 'Aufräumen: Amt, Gruppe und Titel löschen');
+    }
+
+    /**
+     * Listen (Issue #121): nur mit manage_lists, „Mitglieder aktualisieren“ mit Übersicht, freie Zeilen bleiben, gelöschtes
+     * Konto bleibt bis zum Aktualisieren ohne Namen stehen, Punkte nur mit dem Recht dazu, Bereich aus → 403.
+     */
+    private function lists(): void
+    {
+        $c = $this->c;
+        $c->section('Listen');
+        $admin = $this->user('kptest_liste_admin', 'admin');
+        $m = $this->user('kptest_liste_m', 'member');
+        $gone = $this->user('kptest_liste_weg', 'member');
+        $guest = $this->user('kptest_liste_gast', 'guest');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/lists')[0] === 403, 'Ohne manage_lists → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('POST', '/lists', ['title' => 'Kptest'])[0] === 401, 'Ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $list] = $this->req('POST', '/lists', ['title' => 'Kptest Unterschriften', 'rows' => [['kind' => 'free', 'name' => 'Kptest Gast']]]);
+        $id = (int) ($list['id'] ?? 0);
+        $c->ok($s === 201 && array_column($list['columns'] ?? [], 'field') === ['last_name', 'first_name', null] && count($list['rows'] ?? []) === 1, 'Liste anlegen → 201, mit Vorgabespalten');
+        $c->ok($this->req('PUT', "/lists/$id", ['title' => '', 'columns' => $list['columns'] ?? [], 'rows' => []])[0] === 400, 'Ohne Titel → 400');
+        $c->ok($this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $list['columns'] ?? [], 'rows' => [['kind' => 'member', 'user_id' => $guest]]])[0] === 400, 'Gast als Mitgliedszeile → 400');
+        [$s, $d] = $this->req('POST', "/lists/$id/sync-members");
+        $added = array_column($d['added'] ?? [], 'user_id');
+        $c->ok($s === 200 && ($d['applied'] ?? null) === false && in_array($m, $added, true) && in_array($gone, $added, true) && !in_array($guest, $added, true), 'Mitglieder aktualisieren: Übersicht ohne Gäste');
+        [$s, $d] = $this->req('POST', "/lists/$id/sync-members", ['apply' => true]);
+        $rows = $d['list']['rows'] ?? [];
+        $c->ok($s === 200 && ($d['applied'] ?? null) === true && in_array($m, array_column($rows, 'user_id'), true) && end($rows) === ['kind' => 'free', 'name' => 'Kptest Gast'], 'Mitglieder aktualisieren: Zeilen angelegt, freie Zeile bleibt');
+
+        [$s] = $this->req('DELETE', "/members/$gone");
+        [, $d] = $this->req('GET', "/lists/$id");
+        $c->ok($s === 200 && count(array_filter($d['rows'] ?? [], static fn (mixed $r): bool => is_array($r) && ($r['deleted'] ?? false) === true)) === 1, 'Gelöschtes Konto: Zeile bleibt ohne Namen');
+        [, $d] = $this->req('POST', "/lists/$id/sync-members", ['apply' => true]);
+        $c->ok(($d['removed'] ?? null) === [['user_id' => null, 'name' => null]] && ($d['added'] ?? null) === [], 'Aktualisieren löscht die Zeile des gelöschten Kontos');
+
+        // Ohne manage_points keine Punkte, auch nicht in der Liste.
+        $this->req('PUT', '/admin/features', ['points' => true]);
+        $columns = [['kind' => 'field', 'field' => 'name'], ['kind' => 'field', 'field' => 'points']];
+        [, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [['kind' => 'member', 'user_id' => $m]]]);
+        $c->ok(($d['columns'][1]['available'] ?? null) === true && is_numeric($d['rows'][0]['values']['points'] ?? null), 'Admin sieht die Punkte');
+        [$s, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [], 'updated_at' => '2000-01-01T00:00:00+00:00']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict, nichts überschrieben');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === ['member', 'manage_lists'], 'Standardrolle „Listen verwalten“');
+        $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['lists']]);
+        $this->d->actAs($m);
+        [$s, $d] = $this->req('GET', "/lists/$id");
+        $c->ok($s === 200 && ($d['columns'][1]['available'] ?? null) === false && !array_key_exists('points', (array) ($d['rows'][0]['values'] ?? [])), 'Nur manage_lists: Punkte nicht sichtbar');
+
+        $this->d->actAs($admin);
+        [$s, $copy] = $this->req('POST', "/lists/$id/copy");
+        $c->ok($s === 201 && ($copy['title'] ?? '') === 'Kptest (Kopie)', 'Liste kopieren → 201');
+        $this->req('PUT', '/admin/features', ['lists' => false]);
+        [$s, $d] = $this->req('GET', '/lists');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['lists' => true]);
+        $c->ok($this->req('DELETE', "/lists/$id")[0] === 200 && $this->req('DELETE', '/lists/' . (int) ($copy['id'] ?? 0))[0] === 200 && $this->req('GET', "/lists/$id")[0] === 404, 'Aufräumen: Listen löschen');
+    }
+
     private function birthdays(): void
     {
         $c = $this->c;
@@ -965,7 +1222,7 @@ final class ApiScenario
         $admin = $this->user('kptest_geb_admin', 'admin');
         $m = $this->user('kptest_geb_m', 'member');
         $m2 = $this->user('kptest_geb_m2', 'member');
-        $cand = $this->user('kptest_geb_anw', 'candidate');
+        $cand = $this->user('kptest_geb_anw', $this->anw);
         $guest = $this->user('kptest_geb_gast', 'guest');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/birthdays')[0] === 401, 'GET /birthdays ohne Anmeldung → 401');
@@ -986,7 +1243,7 @@ final class ApiScenario
             $year = 1996;
         }
         [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => $month, 'day' => $day, 'year' => $year, 'show_age' => true]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true], 'Eigenen Geburtstag mit Jahr eintragen');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Eigenen Geburtstag mit Jahr eintragen');
         $this->d->actAs($m2);
         [$s, $d] = $this->req('GET', '/birthdays', [], ['days' => '7']);
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['user_id'] ?? 0) === $m))[0] ?? null;
@@ -996,7 +1253,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [$s, $d] = $this->req('PUT', "/members/$m/birthday", ['month' => $month, 'day' => $day, 'visible' => false, 'show_age' => false]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true], 'Verwaltung ändert das Datum, die Schalter bleiben');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Verwaltung ändert das Datum, die Schalter bleiben');
         [$s, $d] = $this->req('GET', "/members/$m");
         $c->ok($s === 200 && ($d['birthday']['month'] ?? null) === $month, 'Mitgliedsdetails mit Geburtstag');
 
@@ -1013,7 +1270,7 @@ final class ApiScenario
             $this->users[] = $newId;
         }
         [, $detail] = $this->req('GET', "/members/$newId");
-        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false], 'Mitglied mit Geburtstag anlegen');
+        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false, 'profile' => 'none'], 'Mitglied mit Geburtstag anlegen');
         $c->ok($this->req('DELETE', "/members/$newId")[0] === 200, 'Konto mit Geburtstag entfernen');
         $this->d->actAs($m2);
         [, $d] = $this->req('GET', '/birthdays');
@@ -1123,6 +1380,63 @@ final class ApiScenario
         $detail = $this->req('GET', "/members/$b");
         $c->ok($detail[0] === 404 || ($detail[1]['level'] ?? '') === 'guest', 'Entfernt: gelöscht bzw. (WordPress) Gast ohne Rolle');
         $c->ok($this->req('DELETE', "/members/$admin")[0] === 400, 'Eigenes Konto → 400');
+    }
+
+    /** Ehemalige Mitglieder: Konto stilllegen (Daten bleiben), Anmeldung gesperrt (eigenständig), wieder aufnehmen, Import. */
+    private function formerMembers(): void
+    {
+        $c = $this->c;
+        $c->section('Ehemalige Mitglieder');
+        $admin = $this->user('kptest_ehem_admin', 'admin');
+        $m = $this->user('kptest_ehem_m', 'member');
+        $this->d->setPassword($m, 'kptest-passwort-1');
+        $this->d->actAs($admin);
+        $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 3, 'reason' => 'Kptest Ehemalig']);
+        [$s, $d] = $this->req('PUT', "/members/$m/former", ['reason' => 'deceased', 'joined_on' => '1980', 'left_on' => '14.03.2024']);
+        $c->ok($s === 200 && ($d['reason'] ?? '') === 'deceased' && ($d['left_on'] ?? '') === '2024-03-14' && ($d['previous_level'] ?? '') === 'member', 'Als verstorben eintragen');
+        $c->ok(!in_array($m, array_column((array) $this->req('GET', '/members')[1], 'id'), true), 'Nicht mehr in der Mitgliederliste');
+        $former = array_column((array) $this->req('GET', '/members/former')[1], null, 'id');
+        $c->ok((float) ($former[$m]['points'] ?? 0) === 3.0, 'In der Liste der Ehemaligen, Punkte bleiben');
+        $c->ok(($this->req('GET', "/members/$m")[1]['level'] ?? '') === 'guest', 'Rolle Gast');
+        $c->ok($this->req('PATCH', "/members/$m/role", ['level' => 'member'])[0] === 400, 'Rolle ändern erst nach „Wieder aufnehmen“ → 400');
+        if ($this->d->canAssignAdmin()) {
+            $this->d->actAs(null);
+            $c->ok($this->req('POST', '/auth/login', ['username' => 'kptest_ehem_m', 'password' => 'kptest-passwort-1'])[0] >= 400, 'Anmeldung gesperrt');
+            $this->d->actAs($admin);
+        }
+        [$s, $d] = $this->req('DELETE', "/members/$m/former");
+        $c->ok($s === 200 && ($d['level'] ?? '') === 'member', 'Wieder aufnehmen: Rolle von vorher');
+        $c->ok(in_array($m, array_column((array) $this->req('GET', '/members')[1], 'id'), true), 'Wieder in der Mitgliederliste');
+
+        $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
+        $csv = "Vorname;Nachname;Eintritt;Ausgeschieden;Grund\nKptest$sfx;Altmann;Gründer;01.06.1977;\nKptest$sfx;Seemann;1990;2001;verstorben\n";
+        [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv]);
+        $c->ok($s === 200 && ($d['new'] ?? 0) === 2 && ($d['applied'] ?? true) === false, 'Import: Vorschau');
+        [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
+        $imported = array_values(array_filter((array) $this->req('GET', '/members/former')[1], static fn (array $f): bool => str_starts_with((string) ($f['name'] ?? ''), "Kptest$sfx ")));
+        foreach ($imported as $f) {
+            $this->users[] = (int) $f['id'];
+        }
+        $c->ok($s === 200 && ($d['applied'] ?? false) === true && count($imported) === 2, 'Import: Konten angelegt und als ehemalig eingetragen');
+        [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
+        $c->ok($s === 200 && ($d['new'] ?? -1) === 0 && ($d['existing'] ?? 0) === 2, 'Import: zweiter Lauf legt nichts doppelt an');
+
+        // Mitglieder aus einer Tabelle, mit Ehemaligen (POST /members/import)
+        $csv = "Nachname;Vorname;Status;E-Mail;Eintritt;Ausgeschieden;Telefon\nImport$sfx;Kptest;;kptest$sfx@example.org;1999;;0\nAlt$sfx;Kptest;ehemalig;;Gründer;2001;\n";
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv]);
+        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
+        $created = (array) ($d['created'] ?? []);
+        foreach ($created as $u) {
+            $this->users[] = (int) $u['id'];
+        }
+        $former = array_values(array_filter((array) $this->req('GET', '/members/former')[1], static fn (array $f): bool => ($f['name'] ?? '') === "Kptest Alt$sfx"));
+        foreach ($former as $f) {
+            $this->users[] = (int) $f['id'];
+        }
+        $c->ok($s === 200 && count($created) === 1 && ($created[0]['password'] ?? '') !== '' && count($former) === 1 && ($former[0]['founder'] ?? false) === true, 'Mitglieder-Import: Mitglied mit Startpasswort, Ehemaliger ohne');
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
+        $c->ok($s === 200 && ($d['existing'] ?? 0) === 2 && ($d['created'] ?? null) === [], 'Mitglieder-Import: zweiter Lauf legt nichts doppelt an');
     }
 
     private function events(): void

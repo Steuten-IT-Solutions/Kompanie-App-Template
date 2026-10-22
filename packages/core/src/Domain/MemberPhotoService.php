@@ -16,18 +16,21 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  * - Hochladen, ersetzen und entfernen nur, wer Konten anlegen darf (create_users), und nur bei Konten, die er verwalten
  *   darf (MemberService::guardAccount); optional schon beim Anlegen (auch mehrere auf einmal).
  * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
- *   gedreht, ohne Metadaten wie GPS) in 128 und 480 Pixeln an der längeren Kante, in der Datenbank
- *   (MemberPhotoRepository).
- * - Sehen: die Person selbst (Konto) und alle, die die Mitglieder in der Verwaltung sehen (VIEWERS). Ausgeliefert
- *   über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide Adapter gleich
- *   antworten.
+ *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert), in der
+ *   Datenbank (MemberPhotoRepository).
+ * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
+ *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste und der Ehemaligen (Issue #112,
+ *   inDirectory).
+ *   Ausgeliefert über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide
+ *   Adapter gleich antworten.
  */
 final class MemberPhotoService
 {
     public const MAX_BYTES = 5 * 1024 * 1024;
     /** Größte Kantenlänge eines hochgeladenen Bilds (schützt den Arbeitsspeicher beim Verkleinern). */
     public const MAX_EDGE = 4096;
-    public const SIZES = [128, 480];
+    /** 1024: vergrößerte Ansicht in der App, scharf auch auf Handys mit hoher Pixeldichte. */
+    public const SIZES = [128, 480, 1024];
     /** photo_url zeigt auf diese Größe; die App ändert s bei Bedarf. */
     public const DEFAULT_SIZE = 128;
     public const QUALITY = 82;
@@ -141,7 +144,7 @@ final class MemberPhotoService
             @unlink($target);
             @unlink($tmp);
         }
-        $version = substr(hash('sha256', $images[self::SIZES[0]] . $images[self::SIZES[1]] . random_bytes(8)), 0, 16);
+        $version = substr(hash('sha256', implode('', $images) . random_bytes(8)), 0, 16);
         $this->repository()->save($userId, $images, $version, $actor->id, $this->app->time()->nowUtc());
     }
 
@@ -152,12 +155,13 @@ final class MemberPhotoService
         return $photo === null ? null : $this->app->env->memberPhotoUrl($userId, $photo['version'], self::DEFAULT_SIZE);
     }
 
-    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel), für Listen mit einer Abfrage */
-    public function urls(): array
+    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel oder eine andere aus SIZES), für Listen mit einer Abfrage */
+    public function urls(int $size = self::DEFAULT_SIZE): array
     {
+        $size = in_array($size, self::SIZES, true) ? $size : self::DEFAULT_SIZE;
         $out = [];
         foreach ($this->repository()->versions() as $userId => $version) {
-            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, self::DEFAULT_SIZE);
+            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, $size);
         }
         return $out;
     }
@@ -171,6 +175,19 @@ final class MemberPhotoService
             }
         }
         return false;
+    }
+
+    /**
+     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): Die Fotos der Personen darin und der Ehemaligen (Tab
+     * daneben) sieht jeder, auch ohne Anmeldung; die anderer Gäste nicht.
+     */
+    private function inDirectory(int $userId): bool
+    {
+        if (!$this->app->features()->enabled('directory')) {
+            return false;
+        }
+        $target = $this->app->users->find($userId);
+        return $target !== null && (MemberService::inDirectory($target) || $this->app->formerMembers()->previousRole($target) !== null);
     }
 
     /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */
@@ -202,10 +219,11 @@ final class MemberPhotoService
         if ($this->app->maintenance()->blocks($viewer)) {
             return $deny(503);
         }
-        if ($viewer === null) {
+        $public = $this->inDirectory($userId);
+        if ($viewer === null && !$public) {
             return $deny(401);
         }
-        if ($viewer->id !== $userId && !self::canSeeOthers($viewer)) {
+        if ($viewer !== null && $viewer->id !== $userId && !self::canSeeOthers($viewer) && !$public) {
             return $deny(403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;
@@ -218,10 +236,10 @@ final class MemberPhotoService
         return ['status' => 200, 'headers' => [
             'Content-Type' => 'image/jpeg',
             'X-Content-Type-Options' => 'nosniff',
-            // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag und nur im Browser speichern: Ein entferntes Foto
-            // oder entzogene Rechte gelten so bald auch auf Geräten, die es schon geladen haben. In der Vorschau (Issue #63)
-            // nie speichern.
-            'Cache-Control' => $this->app->preview()->cacheControl($current ? 'private, max-age=86400' : 'private, no-cache'),
+            // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag speichern, nur im Browser, solange das Foto nicht
+            // öffentlich in der Mitgliederliste steht: Ein entferntes Foto oder entzogene Rechte gelten so bald auch auf
+            // Geräten, die es schon geladen haben. In der Vorschau (Issue #63) nie speichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(($public ? 'public' : 'private') . ($current ? ', max-age=86400' : ', no-cache')),
             'X-Robots-Tag' => 'noindex',
             'ETag' => '"' . $photo['version'] . '-' . $size . '"',
         ], 'body' => $body];
