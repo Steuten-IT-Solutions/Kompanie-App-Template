@@ -16,8 +16,8 @@ use KompanieApp\Core\Storage\MemberRoleRepository;
 /**
  * Rollen der App: Bezeichnung, Rechte und Punktefaktor – die einzige Stelle, die das sagt (Issue #28).
  *
- * Der Admin legt Rollen in der App an (Einstellungen → Rollen) und ordnet die eigenen per Ziehen. Fest sind Gast,
- * Mitglied und Admin (Bezeichnungen bei der Ersteinrichtung aus kompanie.json, danach in der App). Eigene Rollen lassen
+ * Der Admin legt Rollen in der App an (Einstellungen → Rollen) und ordnet sie per Ziehen, auch die festen. Fest sind
+ * Gast, Mitglied und Admin (Bezeichnungen bei der Ersteinrichtung aus kompanie.json, danach in der App). Eigene Rollen lassen
  * sich beim Anlegen von Konten wählen (new_accounts) und, ohne Mitgliederbereich, von denen mit „Mitglieder anlegen“
  * zum Mitglied machen (promotable), z. B. Anwärter (Issue #23; früher eine feste Rolle). Schaltet der Admin einen
  * Bereich ein, der Rechte braucht, kommt dessen Standardrolle dazu (Domain\Features, z. B. „Punkte
@@ -71,7 +71,7 @@ final class RoleService
     }
 
     /**
-     * Alle Rollen in der Reihenfolge der Anzeige (guest zuerst, admin zuletzt).
+     * Alle Rollen in der Reihenfolge der Anzeige (wie der Admin sie ordnet; anfangs guest zuerst, admin zuletzt).
      *
      * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}>
      */
@@ -627,8 +627,8 @@ final class RoleService
      * Einmalig nach dem Update: Die frühere feste Rolle „Anwärter“ wird eine eigene Rolle mit demselben Schlüssel, damit
      * niemand Rechte verliert. Sie behält ihren Namen und den internen Kalender, ist beim Anlegen von Konten wählbar und
      * lässt sich zum Mitglied machen, wie bisher; der Admin kann sie danach ändern oder löschen. Gespeichert war sie nur,
-     * wenn sich die Rollen seit ihrer Einführung geändert hatten; sonst nur anlegen, wenn jemand sie hat. Sie rückt ans
-     * Ende der eigenen Rollen, wo sie bisher in den Zählern stand.
+     * wenn sich die Rollen seit ihrer Einführung geändert hatten; sonst nur anlegen, wenn jemand sie hat. Sie steht zwischen
+     * Gast und Mitglied: Die Zähler zeigen die Rollen von unten nach oben, Anwärter also wie bisher nach den Mitgliedern.
      */
     private function migrateCandidate(): void
     {
@@ -649,7 +649,14 @@ final class RoleService
             $role['new_accounts'] = true;
             $role['promotable'] = !in_array(Capability::Member->value, $role['capabilities'], true);
             unset($roles[Roles::CANDIDATE]);
-            $this->save(self::beforeAdmin($roles, $role));
+            $next = [];
+            foreach ($roles as $key => $r) {
+                if ($key === Roles::MEMBER) {
+                    $next[Roles::CANDIDATE] = $role;
+                }
+                $next[$key] = $r;
+            }
+            $this->save($next + [Roles::CANDIDATE => $role]);
         }
         $this->settings->set(self::CANDIDATE_SETTING, true);
     }
@@ -813,23 +820,21 @@ final class RoleService
     }
 
     /**
-     * Reihenfolge der eigenen Rollen (Einstellungen → Rollen, per Ziehen): $keys sind alle eigenen Rollen in der neuen
-     * Reihenfolge. Gast und Mitglied bleiben vorn, Admin hinten. Die Reihenfolge gilt überall, wo Rollen stehen (Auswahl,
-     * Zähler der Mitgliederliste und der Anwesenheit).
+     * Reihenfolge der Rollen (Einstellungen → Rollen, per Ziehen): $keys sind alle Rollen in der neuen Reihenfolge, auch
+     * die festen (z. B. Anwärter zwischen Gast und Mitglied). Die Reihenfolge gilt überall, wo Rollen stehen (Auswahl,
+     * Zusatzrollen; die Zähler der Mitgliederliste und der Anwesenheit von unten nach oben).
      */
     public function reorder(mixed $keys): void
     {
         $roles = $this->all();
-        $own = array_values(array_filter(array_keys($roles), static fn (string $k): bool => !Roles::isSystem($k)));
         if (!is_array($keys) || !array_is_list($keys) || array_filter($keys, 'is_string') !== $keys
-            || count(array_unique($keys)) !== count($keys) || count($keys) !== count($own) || array_diff($own, $keys) !== []) {
-            throw ApiError::invalid('Bitte alle eigenen Rollen in der neuen Reihenfolge angeben.');
+            || count(array_unique($keys)) !== count($keys) || count($keys) !== count($roles) || array_diff(array_keys($roles), $keys) !== []) {
+            throw ApiError::invalid('Bitte alle Rollen in der neuen Reihenfolge angeben.');
         }
-        $next = [Roles::GUEST => $roles[Roles::GUEST], Roles::MEMBER => $roles[Roles::MEMBER]];
+        $next = [];
         foreach ($keys as $k) {
             $next[$k] = $roles[$k];
         }
-        $next[Roles::ADMIN] = $roles[Roles::ADMIN];
         $this->save($next);
     }
 
@@ -924,7 +929,7 @@ final class RoleService
     }
 
     /**
-     * Rolle hinten anfügen, aber vor admin.
+     * Neue Rolle hinten anfügen; steht Admin am Ende (wie anfangs), davor.
      *
      * @param array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}> $roles
      * @param array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool} $role
@@ -932,8 +937,10 @@ final class RoleService
      */
     private static function beforeAdmin(array $roles, array $role): array
     {
-        $admin = $roles[Roles::ADMIN] ?? null;
-        unset($roles[Roles::ADMIN]);
+        $admin = array_key_last($roles) === Roles::ADMIN ? $roles[Roles::ADMIN] : null;
+        if ($admin !== null) {
+            unset($roles[Roles::ADMIN]);
+        }
         $roles[$role['key']] = $role;
         if ($admin !== null) {
             $roles[Roles::ADMIN] = $admin;
@@ -959,7 +966,8 @@ final class RoleService
     }
 
     /**
-     * Gespeicherte Liste prüfen; guest und admin sind immer da (guest zuerst, admin zuletzt).
+     * Gespeicherte Liste prüfen, in der gespeicherten Reihenfolge; guest, member und admin sind immer da (fehlen sie,
+     * kommen guest und member nach vorn, admin ans Ende).
      *
      * @param array<int|string, mixed> $saved
      * @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}>
@@ -987,14 +995,21 @@ final class RoleService
                 'promotable' => !$system && ($r['promotable'] ?? false) === true && !in_array(Capability::Member->value, $caps, true),
             ];
         }
-        $fixed = [];
+        $front = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            // Neu hinzugekommene feste Rolle nach einem Update: Heißt schon eine eigene Rolle so, bekommt die feste einen
+            if (isset($out[$key])) {
+                continue;
+            }
+            // Fehlende feste Rolle (z. B. nach einem Update): Heißt schon eine eigene Rolle so, bekommt die feste einen
             // anderen Namen.
-            $fixed[$key] = $out[$key] ?? self::role($key, $this->freeLabel($this->config->roleLabel($key), $fixed + $out), $caps);
-            unset($out[$key]);
+            $role = self::role($key, $this->freeLabel($this->config->roleLabel($key), $front + $out), $caps);
+            if ($key === Roles::ADMIN) {
+                $out[$key] = $role;
+            } else {
+                $front[$key] = $role;
+            }
         }
-        return [Roles::GUEST => $fixed[Roles::GUEST], Roles::MEMBER => $fixed[Roles::MEMBER]] + $out + [Roles::ADMIN => $fixed[Roles::ADMIN]];
+        return $front + $out;
     }
 
     /**

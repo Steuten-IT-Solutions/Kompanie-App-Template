@@ -15,11 +15,12 @@ test('eigene Bezeichnungen bleiben unverändert', () => {
   assert.equal(roleCount('Jungmariner', 3), 'Jungmariner 3');
 });
 
-test('Gruppen: Mitglieder zuerst, dann die übrigen Rollen in ihrer Reihenfolge, leere fehlen', () => {
+test('Gruppen in umgekehrter Reihenfolge der Rollen (von unten nach oben), leere fehlen', () => {
   const roles = [
-    { key: 'jung', label: 'Jungmariner' },
-    { key: 'member', label: 'Mitglied' },
+    { key: 'guest', label: 'Gast' },
     { key: 'r2', label: 'Anwärter' },
+    { key: 'member', label: 'Mitglied' },
+    { key: 'jung', label: 'Jungmariner' },
     { key: 'admin', label: 'Admin' },
   ];
   const counts = new Map([
@@ -28,5 +29,6 @@ test('Gruppen: Mitglieder zuerst, dann die übrigen Rollen in ihrer Reihenfolge,
     ['member', 45],
     ['admin', 0],
   ]);
-  assert.deepEqual(groupCounts(roles, counts), ['Mitglieder 45', 'Jungmariner 3', 'Anwärter 5']);
+  assert.deepEqual(groupCounts(roles, counts), ['Jungmariner 3', 'Mitglieder 45', 'Anwärter 5']);
+  assert.equal(roles[0].key, 'guest', 'Eingabe unverändert');
 });
