@@ -1,5 +1,5 @@
 // Speicher der Ansichten auf dem Gerät (src/deviceStore.ts): nur Einträge des eigenen Bereichs (Version und Benutzer),
-// Schreiben in der richtigen Reihenfolge, Begrenzung der Anzahl.
+// Begrenzung der Anzahl.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { deviceStore } from '../src/deviceStore.ts';
@@ -52,20 +52,6 @@ test('Nach dem Neustart sind die Einträge des Bereichs da, die anderer Konten w
   assert.equal((await d.open('1.1|8')).size, 0, 'neue Version: altes Format nicht zeigen');
 });
 
-test('Leeren überholt kein vorher begonnenes Speichern', async () => {
-  const { storage, caches } = fakeStorage();
-  const s = deviceStore('t', 10, storage);
-  await s.open('v|1');
-  s.put('a', 1);
-  s.clear();
-  s.put('b', 2);
-  await settle();
-  assert.deepEqual(
-    [...caches.get('t')!.entries.keys()].map((u) => u.slice(u.lastIndexOf('/') + 1)),
-    ['b'],
-  );
-});
-
 test('Ohne open() wird nichts gespeichert, und es bleiben höchstens max Einträge (die ältesten fallen heraus)', async () => {
   const { storage, caches } = fakeStorage();
   const s = deviceStore('t', 5, storage);
@@ -86,5 +72,4 @@ test('Ohne Cache Storage (z. B. ohne HTTPS) läuft alles, nur ohne Speicher', as
   const s = deviceStore('t', 5, undefined);
   assert.equal((await s.open('v|1')).size, 0);
   s.put('a', 1);
-  s.clear();
 });

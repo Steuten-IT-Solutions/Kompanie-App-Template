@@ -10,6 +10,15 @@
  *   App-Seite (nicht z. B. ein direkt geöffnetes Foto).
  * - API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version (höchstens DATA_MAX Einträge, die ältesten
  *   fallen zuerst heraus; die App-Seite zählt nicht mit).
+ *   Mit dem Header X-Kompanie-Stale-Ok (setzt die App bei GET, Issue #108): Ist eine Version für dieselbe Person
+ *   gespeichert (X-Kompanie-User, beim Speichern an der Antwort vermerkt), kommt sie sofort; die Antwort aus dem Netz
+ *   holt der Service Worker im Hintergrund. So sieht nach einem Wechsel des Kontos niemand die Daten der Person davor.
+ *   Ist die Antwort anders (oder ein Fehler), meldet er das den Fenstern der App ({type: 'kompanie-data', url}), die
+ *   die Ansicht dann neu lädt: Dieses Neuladen (bis FRESH_MS danach) kommt aus dem Speicher, ohne zweite Anfrage; nach
+ *   einem Fehler geht es direkt ans Netz, damit die App ihn sieht. Jede eigene Änderung (API-Anfrage außer GET; nicht
+ *   die Abfrage des Push-Status beim Start) beendet das sofort, und was vor ihr gespeichert wurde, kommt erst wieder
+ *   sofort, wenn es danach einmal aus dem Netz kam (Zeitpunkt der Änderung bleibt gespeichert, auch über ein Neuladen
+ *   hinweg).
  * - Dokumente (<App>/dokument/<id>?v=<Fassung>, Issue #2) → zuerst aus dem Speicher: Die Adresse wechselt mit
  *   jeder neuen Fassung. Was einmal geöffnet wurde, ist so offline verfügbar; gespeichert wird je Dokument nur die
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
@@ -34,13 +43,35 @@ const STATIC_CACHE = 'kompanie-static-' + BUILD;
 const DATA_CACHE = 'kompanie-data-v2';
 const DOCS_CACHE = 'kompanie-docs-v1';
 const BADGES_CACHE = 'kompanie-badges-v1';
-// Daten und Gerüste der Ansichten, von der App selbst gespeichert (src/deviceStore.ts); bleiben bei einem Update.
+// Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
 const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
 const NAVIGATION_TIMEOUT_MS = 2500;
 const DATA_MAX = 100;
+const FRESH_MS = 10000;
+/** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok }, für das Neuladen danach. */
+const announced = new Map();
+/** Laufende Abfragen im Hintergrund je Adresse: keine zweite gleichzeitig. */
+const revalidating = new Map();
+const USER_HEADER = 'X-Kompanie-User';
+const STORED_AT_HEADER = 'X-Kompanie-Stored-At';
+/**
+ * Letzte eigene Änderung (API-Anfrage außer GET, z. B. Anmeldung); null: noch nicht aus dem Speicher gelesen (nach
+ * einem Neustart des Service Workers). Kurz danach kommt die App-Seite nicht aus dem Speicher.
+ */
+let changedAt = null;
+const CHANGE_WAIT_MS = 60000;
+const CHANGED_KEY = self.registration.scope + '?kompanie-changed';
+
+async function lastChange() {
+  if (changedAt === null) {
+    const marker = await (await caches.open(DATA_CACHE)).match(CHANGED_KEY);
+    changedAt = Math.max(changedAt ?? -Infinity, marker ? Number(await marker.text()) || 0 : -Infinity);
+  }
+  return changedAt;
+}
 // Gespeichert wird je Adresse genau eine Antwort. Manche Hoster schicken „Vary: accept“ auf jeder Antwort; ohne
 // ignoreVary passte ein Eintrag nur zu einer Anfrage mit genau denselben Kopfzeilen (die App fragt mal mit, mal ohne).
 const MATCH = { ignoreVary: true };
@@ -73,7 +104,7 @@ async function precachePage() {
 /** Daten-Speicher begrenzen: die ältesten Einträge zuerst löschen (Reihenfolge des Speicherns); die App-Seite bleibt. */
 async function trimData() {
   const cache = await caches.open(DATA_CACHE);
-  const keys = (await cache.keys()).filter((k) => k.url !== self.registration.scope);
+  const keys = (await cache.keys()).filter((k) => k.url !== self.registration.scope && k.url !== CHANGED_KEY);
   await Promise.all(keys.slice(0, Math.max(0, keys.length - DATA_MAX)).map((k) => cache.delete(k)));
 }
 
@@ -109,15 +140,17 @@ function isApi(url) {
   return API !== '' && url.href.startsWith(API);
 }
 
-function isAdmin(url) {
-  // Auch in der Form index.php?r=/api/v1/admin/… (Adresse ggf. kodiert)
-  let href = url.href;
+/** Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. */
+function decodedHref(url) {
   try {
-    href = decodeURIComponent(href);
+    return decodeURIComponent(url.href);
   } catch {
-    // unvollständig kodiert: wie angegeben prüfen
+    return url.href; // unvollständig kodiert: wie angegeben prüfen
   }
-  return href.includes('/admin/');
+}
+
+function isAdmin(url) {
+  return decodedHref(url).includes('/admin/');
 }
 
 /** Rückkehr von Google nach „Mit Google verbinden“: <App>/google/callback oder ?r=/google/callback */
@@ -225,11 +258,19 @@ async function store(key, res) {
  * Zuerst aus dem Netz. Mit timeoutMs: Ist eine gespeicherte Fassung da und antwortet das Netz nicht
  * rechtzeitig, kommt die gespeicherte; die Antwort aus dem Netz aktualisiert den Speicher danach trotzdem.
  */
+/** Antwort mit der Person, für die sie gilt (Header der App), zum Speichern. */
+function tagged(res, request) {
+  const headers = new Headers(res.headers);
+  headers.set(USER_HEADER, request.headers.get(USER_HEADER) || '');
+  headers.set(STORED_AT_HEADER, String(Date.now()));
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 async function networkFirst(request, fallbackUrl, timeoutMs, event) {
   const key = fallbackUrl || request;
   const network = fetch(request).then((res) => {
     if (fallbackUrl ? isPage(res) : cacheable(res)) {
-      const saving = store(key, res.clone());
+      const saving = store(key, fallbackUrl ? res.clone() : tagged(res.clone(), request));
       try {
         if (event) event.waitUntil(saving);
       } catch {
@@ -255,10 +296,66 @@ async function networkFirst(request, fallbackUrl, timeoutMs, event) {
   }
 }
 
+/**
+ * API mit X-Kompanie-Stale-Ok: gespeicherte Version sofort, aus dem Netz im Hintergrund (siehe oben). Ohne gespeicherte
+ * Version oder nach einem Fehler eben im Hintergrund wie networkFirst.
+ */
+async function staleWhileRevalidate(request, event) {
+  const key = request.url;
+  const user = request.headers.get(USER_HEADER) || '';
+  const found = await caches.match(key, MATCH);
+  // Nur für dieselbe Person und nur, was nach der letzten eigenen Änderung gespeichert wurde.
+  const stored =
+    found && user !== '' && found.headers.get(USER_HEADER) === user && Number(found.headers.get(STORED_AT_HEADER)) > (await lastChange())
+      ? found
+      : undefined;
+  const last = announced.get(key);
+  const recent = last && Date.now() - last.at < FRESH_MS;
+  if (recent) announced.delete(key); // nur für das eine Neuladen nach der Meldung
+  if (!stored || (recent && !last.ok)) return networkFirst(request, undefined, 0, event);
+  if (recent || revalidating.has(key)) return stored;
+  const running = revalidate(request, key, await stored.clone().text()).finally(() => revalidating.delete(key));
+  revalidating.set(key, running);
+  try {
+    event.waitUntil(running);
+  } catch {
+    // Ereignis schon beendet: Die Abfrage läuft trotzdem weiter.
+  }
+  return stored;
+}
+
+async function revalidate(request, key, before) {
+  let res;
+  try {
+    res = await fetch(request);
+  } catch {
+    return; // ohne Netz: Die gespeicherte Version bleibt.
+  }
+  const ok = cacheable(res);
+  if (ok) {
+    const text = await res.clone().text();
+    await store(key, tagged(res, request));
+    if (text === before) return;
+  }
+  announced.set(key, { at: Date.now(), ok });
+  const windows = await self.clients.matchAll({ type: 'window' });
+  for (const w of windows) w.postMessage({ type: 'kompanie-data', url: key });
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  if (request.method !== 'GET') {
+    // Eigene Änderung: Nichts gilt mehr als eben frisch geholt.
+    // Ausnahme wie in der App (api.ts): die Abfrage des Push-Status beim Start ändert nichts an den Daten.
+    if (isApi(url) && !decodedHref(url).includes('/push/status')) {
+      announced.clear();
+      changedAt = Date.now();
+      const saving = caches.open(DATA_CACHE).then((c) => c.put(CHANGED_KEY, new Response(String(changedAt))));
+      event.waitUntil(saving.catch(() => undefined));
+    }
+    return;
+  }
   if (url.origin !== self.location.origin) return;
   if (isGoogleCallback(url)) return;
   if (isPreview(request, url)) return;
@@ -273,9 +370,16 @@ self.addEventListener('fetch', (event) => {
   } else if (isStatic(url)) {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === 'navigate' && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {
-    event.respondWith(networkFirst(request, self.registration.scope, NAVIGATION_TIMEOUT_MS, event));
+    // Kurz nach einer Änderung (z. B. Anmeldung) auf das Netz warten: Die gespeicherte Seite enthält evtl. die
+    // Konfiguration der Person davor, und mit ihr gäbe es deren gespeicherte Daten.
+    const wait = changedAt !== null && Date.now() - changedAt < CHANGE_WAIT_MS ? 0 : NAVIGATION_TIMEOUT_MS;
+    event.respondWith(networkFirst(request, self.registration.scope, wait, event));
   } else if (isApi(url) && !isAdmin(url)) {
-    event.respondWith(networkFirst(request, undefined, 0, event));
+    event.respondWith(
+      request.headers.get('X-Kompanie-Stale-Ok') === '1'
+        ? staleWhileRevalidate(request, event)
+        : networkFirst(request, undefined, 0, event),
+    );
   }
 });
 

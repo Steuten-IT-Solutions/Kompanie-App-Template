@@ -110,6 +110,12 @@ final class Migrations
                     "ALTER TABLE {users} ADD COLUMN last_name TEXT NOT NULL DEFAULT ''",
                 ],
             ],
+            // Stillgelegte Konten (ehemalige Mitglieder, PdoUsers::deactivate): Zeitpunkt; solange gesetzt, ist die Anmeldung
+            // gesperrt.
+            3 => [
+                'mysql' => ['ALTER TABLE {users} ADD COLUMN disabled_at datetime DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {users} ADD COLUMN disabled_at TEXT DEFAULT NULL'],
+            ],
         ];
     }
 }

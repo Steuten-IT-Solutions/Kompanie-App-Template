@@ -6,6 +6,7 @@ namespace KompanieApp\Core;
 
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\PreviewEnvironment;
+use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BirthdayService;
@@ -16,8 +17,10 @@ use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GoogleConnect;
+use KompanieApp\Core\Domain\JoinYearService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
@@ -30,6 +33,8 @@ use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
+use KompanieApp\Core\Domain\OfficeService;
+use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
@@ -448,6 +453,11 @@ final class App
         return $this->service(BirthdayService::class, fn () => new BirthdayService($this));
     }
 
+    public function joinYears(): JoinYearService
+    {
+        return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
+    }
+
     public function memberPhotos(): MemberPhotoService
     {
         return $this->service(MemberPhotoService::class, fn () => new MemberPhotoService($this));
@@ -463,9 +473,31 @@ final class App
         return $this->service(TitleService::class, fn () => new TitleService($this));
     }
 
+    public function offices(): OfficeService
+    {
+        return $this->service(OfficeService::class, fn () => new OfficeService($this));
+    }
+
+    public function lists(): ListService
+    {
+        return $this->service(ListService::class, fn () => new ListService($this));
+    }
+
     public function members(): MemberService
     {
-        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache, $this->roles()));
+        return $this->service(MemberService::class, fn () => new MemberService(
+            $this->users,
+            $this->scores(),
+            $this->authenticator,
+            $this->cache,
+            $this->roles(),
+            fn (User $user): ?string => $this->formerMembers()->previousRole($user),
+        ));
+    }
+
+    public function formerMembers(): FormerMemberService
+    {
+        return $this->service(FormerMemberService::class, fn () => new FormerMemberService($this));
     }
 
     public function roles(): RoleService

@@ -2,7 +2,7 @@
 // einer Änderung begonnen hat, legt ihre (möglicherweise veralteten) Daten nicht mehr ab.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dataCache } from '../src/dataCache.ts';
+import { dataCache, MAX_ENTRIES } from '../src/dataCache.ts';
 
 test('Daten sind beim nächsten Öffnen da, eine eigene Änderung verwirft sie', () => {
   dataCache.set('termine|[]', ['a']);
@@ -21,23 +21,14 @@ test('Antwort einer Anfrage, die vor einer Änderung begann, wird nicht gespeich
   assert.deepEqual(dataCache.get('me/points|[]'), ['neu']);
 });
 
-test('Daten vom Gerät erscheinen nach dem Neustart; eigene Änderungen leeren auch den Speicher auf dem Gerät', async () => {
+test('Höchstens MAX_ENTRIES Einträge: der am längsten nicht gespeicherte fällt heraus', () => {
   dataCache.clear();
-  const calls: string[] = [];
-  const stored = new Map<string, unknown>([
-    ['termine|[]', ['vom Gerät']],
-    ['me|[]', { alt: true }],
-  ]);
-  dataCache.set('me|[]', { frisch: true }); // schon frisch geladen, bevor der Speicher da war
-  await dataCache.restore('v|1', {
-    open: async () => stored,
-    put: (key) => calls.push(`put ${key}`),
-    clear: () => calls.push('clear'),
-  });
-  assert.deepEqual(dataCache.get('termine|[]'), ['vom Gerät']);
-  assert.deepEqual(dataCache.get('me|[]'), { frisch: true });
-  dataCache.set('news|[1]', ['n']);
-  dataCache.set('settings|[]', { geheim: 1 }, dataCache.generation(), false); // Verwaltung: nicht auf das Gerät
-  dataCache.clear();
-  assert.deepEqual(calls, ['put news|[1]', 'clear']);
+  for (let i = 0; i < MAX_ENTRIES; i++) dataCache.set(`member|[${i}]`, i);
+  dataCache.set('member|[0]', 'neu'); // erneut gespeichert: rückt nach hinten
+  dataCache.set('documents|[]', []);
+  assert.equal(dataCache.has('member|[0]'), true);
+  assert.equal(dataCache.get('member|[0]'), 'neu');
+  assert.equal(dataCache.has('member|[1]'), false);
+  assert.equal(dataCache.has(`member|[${MAX_ENTRIES - 1}]`), true);
+  assert.equal(dataCache.has('documents|[]'), true);
 });

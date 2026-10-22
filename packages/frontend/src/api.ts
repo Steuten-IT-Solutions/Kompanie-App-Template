@@ -6,7 +6,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 
-/** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
+/** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
 export type Capability =
   | 'member'
@@ -21,6 +21,8 @@ export type Capability =
   | 'post_board'
   | 'manage_polls'
   | 'manage_inventory'
+  | 'manage_offices'
+  | 'manage_lists'
   | 'create_users'
   | 'promote_users'
   | 'manage_settings';
@@ -38,7 +40,10 @@ export type Feature =
   | 'board'
   | 'polls'
   | 'birthdays'
-  | 'inventory';
+  | 'inventory'
+  | 'directory'
+  | 'offices'
+  | 'lists';
 
 export interface AppUser {
   id: number;
@@ -134,8 +139,12 @@ export interface RoleInfo {
   key: Level;
   label: string;
   points_factor: number;
-  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Anwärter, Mitglied, Admin; Issue #66) */
+  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Mitglied, Admin; Issue #66) */
   extra?: boolean;
+  /** Beim Anlegen von Konten wählbar (Mitglied immer, eigene Rollen nach Einstellung) */
+  new_accounts?: boolean;
+  /** Wer Mitglieder anlegen darf, macht Personen dieser Rolle zum Mitglied (z. B. Anwärter) */
+  promotable?: boolean;
 }
 
 /** Für Einstellungen → Rollen (nur Admins). */
@@ -149,9 +158,18 @@ export interface RoleAdmin extends RoleInfo {
   deletable: boolean;
 }
 
-export type RoleInput = { label?: string; capabilities?: Capability[]; points_factor?: number | string };
+export type RoleInput = {
+  label?: string;
+  capabilities?: Capability[];
+  points_factor?: number | string;
+  new_accounts?: boolean;
+  promotable?: boolean;
+};
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
+
+/** Rollen, die neue Konten bekommen können (Mitglied und freigegebene eigene Rollen), in der Reihenfolge der Rollen. */
+export const newAccountRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
 
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
@@ -184,7 +202,14 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor, system }) => ({ key, label, points_factor, extra: !system }));
+  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable }) => ({
+    key,
+    label,
+    points_factor,
+    extra: !system,
+    new_accounts,
+    promotable,
+  }));
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -323,7 +348,9 @@ export interface MemberSummary {
   extra_roles?: Level[];
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
-  /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
+  /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
+  group?: Level | null;
+  /** Dienstgrad (nur mit Bereich Dienstgrade) */
   rank_title?: string | null;
   /** Abzeichen des Dienstgrads (wie rank_title) */
   rank_badge_url?: string | null;
@@ -334,6 +361,54 @@ export interface MemberSummary {
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
+  /** Eintritt als JJJJ-MM-TT oder JJJJ (nur für create_users; leer ohne Eintrag, fehlt bei älteren Servern) */
+  joined_on?: string;
+}
+
+/** Eintrag der Mitgliederliste (Bereich directory, öffentlich): nur Name, Foto, Dienstgrad, Titel. */
+export interface DirectoryEntry {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  /** Foto (128 Pixel), null ohne */
+  photo_url: string | null;
+  /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */
+  rank_title?: string | null;
+  rank_badge_url?: string | null;
+  /** Titel (fehlen ohne Bereich Titel) */
+  titles?: TitleRef[];
+  /** Geburtstag, soweit die Person ihn dem Betrachter zeigt (fehlt ohne Bereich Geburtstage und bei Ehemaligen) */
+  birthday?: DirectoryBirthday | null;
+  /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
+  join_year?: number | null;
+}
+
+/** Geburtstag auf der Seite einer Person: Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr. */
+export interface DirectoryBirthday {
+  month: number;
+  day: number;
+  year: number | null;
+  /** heutiges Alter */
+  age: number | null;
+}
+
+/** Wem eine Angabe auf der eigenen Seite in der Mitgliederliste erscheint: nicht, nur Mitgliedern, allen. */
+export type ProfileVisibility = 'none' | 'members' | 'public';
+
+/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht nur das Jahr). */
+export interface JoinYear {
+  year: number;
+  /** JJJJ-MM-TT oder nur das Jahr JJJJ; fehlt bei älteren Servern (nur year) */
+  date?: string;
+  profile: ProfileVisibility;
+}
+
+/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied und Jahre (JJJJ oder leer). */
+export interface DirectoryFormerEntry extends DirectoryEntry {
+  founder: boolean;
+  joined_year: string;
+  left_year: string;
 }
 
 export interface MemberDetail extends MemberSummary {
@@ -344,10 +419,71 @@ export interface MemberDetail extends MemberSummary {
   rank_history?: RankHistoryEntry[];
   /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** Eintritt mit Anzeige (nur für create_users; null ohne Eintrag) */
+  join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
   rights?: MemberRights | null;
   /** Ob man das Foto hochladen, ersetzen und entfernen darf (create_users und dieses Konto verwalten) */
   photo_editable?: boolean;
+  /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
+  former?: FormerInfo | null;
+}
+
+/** Grund des Ausscheidens */
+export type FormerReason = 'left' | 'deceased' | 'other';
+
+/** Angaben zu einem ehemaligen Mitglied. Daten als JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer. */
+export interface FormerInfo {
+  reason: FormerReason;
+  joined_on: string;
+  /** Gründungsmitglied */
+  founder: boolean;
+  left_on: string;
+  /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
+  previous_level: Level;
+}
+
+/** Eintrag der Liste „Ehemalige“ (create_users). */
+export interface FormerMember extends FormerInfo {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  /** null: nur wer Punkte bzw. Strafen vergibt */
+  points: number | null;
+  open_cents: number | null;
+}
+
+export interface FormerInput {
+  reason: FormerReason;
+  joined_on: string;
+  founder: boolean;
+  left_on: string;
+}
+
+/** Zeile der Vorschau beim Import der Ehemaligen */
+export interface FormerImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  reason?: FormerReason;
+  joined_on?: string;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface FormerImportResult {
+  rows: FormerImportRow[];
+  new: number;
+  existing: number;
+  /** Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden */
+  offices_linked?: number;
+  applied: boolean;
 }
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
@@ -371,6 +507,8 @@ export interface Birthday {
   visible: boolean;
   /** Alter anzeigen */
   show_age: boolean;
+  /** Auf der eigenen Seite in der Mitgliederliste (fehlt bei älteren Servern) */
+  profile?: ProfileVisibility;
 }
 
 /** Eintrag im Inventar (Issue #6): ein Ort je Eintrag. */
@@ -444,6 +582,7 @@ export interface BirthdayInput {
   year: number | null;
   visible?: boolean;
   show_age?: boolean;
+  profile?: ProfileVisibility;
 }
 
 export interface Rank {
@@ -666,11 +805,164 @@ export interface Title {
   active: boolean;
   /** Wie vielen Mitgliedern zugewiesen */
   assigned: number;
+  /** Amt, das den Titel über die laufenden Amtszeiten vergibt (Issue #112); null ohne, fehlt bei älteren Servern */
+  office?: { id: number; title: string } | null;
 }
 
 export interface TitleRef {
   id: number;
   title: string;
+}
+
+/** Ämter (Issue #112): Gruppe der Anzeige */
+export interface OfficeGroup {
+  id: number;
+  title: string;
+}
+
+/** Inhaber einer Amtszeit: user_id und Foto nur bei Personen der Mitgliederliste (bzw. für die Pflege) */
+export interface OfficeHolder {
+  name: string;
+  user_id?: number | null;
+  photo_url?: string | null;
+}
+
+export type OfficeTermKind = 'period' | 'point';
+
+export interface OfficeTerm {
+  id: number;
+  /** period: Zeitraum (ohne Ende bis heute), point: ein einzelnes Jahr */
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  /** Zeitraum ohne Ende */
+  current: boolean;
+  holders: OfficeHolder[];
+}
+
+export interface Office {
+  id: number;
+  group_id: number | null;
+  title: string;
+  /** Laufende zuerst, dann nach Beginn absteigend */
+  terms: OfficeTerm[];
+  /** Nur für die Pflege: verknüpfter Titel */
+  title_id?: number | null;
+  linked_title?: string | null;
+}
+
+export interface OfficesOverview {
+  groups: OfficeGroup[];
+  offices: Office[];
+}
+
+export interface OfficeTermInput {
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  holders: ({ user_id: number } | { name: string })[];
+}
+
+export interface OfficeImportRow {
+  line: number;
+  group?: string;
+  office?: string;
+  kind?: OfficeTermKind;
+  start_year?: number;
+  end_year?: number | null;
+  note?: string;
+  holders?: { name: string; user_id: number | null }[];
+  duplicate?: boolean;
+  error?: string;
+}
+
+export interface OfficeImportResult {
+  rows: OfficeImportRow[];
+  groups_new: number;
+  offices_new: number;
+  terms_new: number;
+  applied: boolean;
+}
+
+/** Listen (Issue #121): Datenspalten; nr zählt die Zeilen. */
+export type ListField = 'nr' | 'name' | 'first_name' | 'last_name' | 'role' | 'rank' | 'titles' | 'birthday' | 'points' | 'penalties';
+export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
+
+export interface ListColumn {
+  /** field: Wert aus der App, blank: leer zum Ausfüllen auf Papier */
+  kind: 'field' | 'blank';
+  field: ListField | null;
+  /** Überschrift; leer: Standardbezeichnung der Datenspalte */
+  label: string;
+  width: ListColumnWidth;
+  /** Kästchen zum Abhaken (nur leere Spalten) */
+  checkbox: boolean;
+  /** Nur in Antworten: Die Person sieht die Werte (leere Spalten immer). */
+  available?: boolean;
+}
+
+/** Werte der sichtbaren Datenspalten eines Mitglieds. */
+export interface ListValues {
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  rank?: string | null;
+  titles?: string[];
+  /** „TT.MM.“ oder null (nicht freigegeben) */
+  birthday?: string | null;
+  points?: number;
+  /** Offene Strafen in Cent */
+  penalties?: number;
+}
+
+export type ListRow =
+  | { kind: 'member'; user_id: number | null; name: string; first_name?: string; last_name?: string; deleted: boolean; values: ListValues }
+  | { kind: 'free'; name: string };
+
+export interface PrintListSummary {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  date: string | null;
+  rows: number;
+  updated_by_name: string | null;
+  updated_at: string;
+}
+
+export interface PrintList {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  date: string | null;
+  orientation: 'portrait' | 'landscape';
+  created_by_name: string | null;
+  created_at: string;
+  updated_by_name: string | null;
+  updated_at: string;
+  columns: ListColumn[];
+  rows: ListRow[];
+  fields: { key: ListField; available: boolean }[];
+}
+
+export interface PrintListInput {
+  title: string;
+  subtitle?: string;
+  date?: string | null;
+  orientation?: 'portrait' | 'landscape';
+  columns?: Omit<ListColumn, 'available'>[];
+  rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
+  /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */
+  updated_at?: string;
+}
+
+export interface ListSyncResult {
+  added: { user_id: number; name: string }[];
+  removed: { user_id: number | null; name: string | null }[];
+  applied: boolean;
+  list: PrintList | null;
 }
 
 export interface RankRef {
@@ -807,6 +1099,9 @@ function url(path: string, query?: Record<string, string>): string {
 }
 
 const CSRF_ERRORS = ['csrf_invalid', 'rest_cookie_invalid_nonce'];
+/** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
+const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
+const USER_HEADER = 'X-Kompanie-User';
 
 async function requestFull<T>(
   method: string,
@@ -821,12 +1116,19 @@ async function requestFull<T>(
     throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
   }
   let res: Response;
+  // Service Worker (Issue #108): gespeicherte Antwort sofort, die aus dem Netz kommt im Hintergrund nach. Was vor der
+  // letzten eigenen Änderung gespeichert wurde, holt er zuerst aus dem Netz (public/sw.js). Nicht /config: Damit prüft
+  // die App den aktuellen Stand (z. B. „Erneut versuchen“ auf der Wartungsseite).
+  const staleOk = method === 'GET' && !previewRole() && path !== '/config';
   try {
     res = await fetch(url(path, query), {
       method,
       credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
+        // Für wen die Antwort gilt: Nur dieselbe Person bekommt sie später sofort aus dem Speicher.
+        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) } : {}),
+        ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
@@ -922,12 +1224,17 @@ export const api = {
   updateCatalogItem: (id: number, data: Partial<Pick<CatalogItem, 'title' | 'points' | 'active' | 'sort'>>) =>
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
 
+  directory: () => request<DirectoryEntry[]>('GET', '/directory'),
+  /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
+  directoryCounts: () => request<{ group: Level; count: number }[]>('GET', '/directory/counts'),
+  /** Ehemalige für den Tab neben den Ämtern (öffentlich wie die Liste) */
+  directoryFormer: () => request<DirectoryFormerEntry[]>('GET', '/directory/former'),
   members: (all = false, candidates = false) =>
     request<MemberSummary[]>('GET', '/members', undefined, {
       ...(all ? { all: '1' } : {}),
       ...(candidates ? { candidates: '1' } : {}),
     }),
-  /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
+  /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
@@ -943,16 +1250,21 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
   updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
+  formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
+  markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
+  updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
+  reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
+  importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
   createUser: (
     data: PersonName & {
       username?: string;
       email?: string;
-      level?: 'member' | 'candidate';
+      level?: Level;
       initial_points?: number;
       initial_points_date?: string;
       rank_id?: number;
@@ -1016,6 +1328,12 @@ export const api = {
   setMemberBirthday: (id: number, data: { month: number; day: number; year: number | null }) =>
     request<{ birthday: Birthday | null }>('PUT', `/members/${id}/birthday`, data),
   deleteMemberBirthday: (id: number) => request<{ birthday: null }>('DELETE', `/members/${id}/birthday`),
+  myJoinYear: () => request<{ join_year: JoinYear | null }>('GET', '/me/join-year'),
+  saveMyJoinYear: (data: { date: string; profile?: ProfileVisibility }) =>
+    request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
+  deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
+  setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
+  deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 
   // Inventar (Issue #6)
   inventory: () => request<InventoryItem[]>('GET', '/inventory'),
@@ -1052,8 +1370,42 @@ export const api = {
   reorderTitles: (ids: number[]) => request<Title[]>('PUT', '/titles/order', { ids }),
   setMemberTitles: (id: number, title_ids: number[]) => request<{ titles: TitleRef[] }>('PUT', `/members/${id}/titles`, { title_ids }),
 
+  // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
+  offices: () => request<OfficesOverview>('GET', '/offices'),
+  createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
+  updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
+  reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
+  createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),
+  updateOffice: (id: number, data: { title?: string; group_id?: number | null; title_id?: number | null }) =>
+    request<Office>('PATCH', `/offices/${id}`, data),
+  deleteOffice: (id: number) => request<{ deleted: boolean }>('DELETE', `/offices/${id}`),
+  reorderOffices: (ids: number[]) => request<Office[]>('PUT', '/offices/order', { ids }),
+  officeTitlePreview: (id: number, titleId: number | null) =>
+    request<{ add: { name: string; title: string }[]; remove: { name: string; title: string }[] }>(
+      'GET',
+      `/offices/${id}/title-preview`,
+      undefined,
+      titleId === null ? {} : { title_id: String(titleId) },
+    ),
+  createOfficeTerm: (officeId: number, data: OfficeTermInput) => request<OfficeTerm>('POST', `/offices/${officeId}/terms`, data),
+  updateOfficeTerm: (id: number, data: OfficeTermInput) => request<OfficeTerm>('PATCH', `/office-terms/${id}`, data),
+  deleteOfficeTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-terms/${id}`),
+  importOffices: (csv: string, apply: boolean, link = true) => request<OfficeImportResult>('POST', '/offices/import', { csv, apply, link }),
+
+  // Listen (Issue #121): nur mit manage_lists
+  lists: () => request<PrintListSummary[]>('GET', '/lists'),
+  list: (id: number) => request<PrintList>('GET', `/lists/${id}`),
+  createList: (data: PrintListInput) => request<PrintList>('POST', '/lists', data),
+  saveList: (id: number, data: PrintListInput) => request<PrintList>('PUT', `/lists/${id}`, data),
+  copyList: (id: number) => request<PrintList>('POST', `/lists/${id}/copy`),
+  deleteList: (id: number) => request<{ deleted: boolean }>('DELETE', `/lists/${id}`),
+  syncListMembers: (id: number, apply: boolean) => request<ListSyncResult>('POST', `/lists/${id}/sync-members`, { apply }),
+
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),
+  /** Reihenfolge der eigenen Rollen (alle Schlüssel ohne Gast, Mitglied, Admin) */
+  reorderRoles: (keys: Level[]) => request<RoleAdmin[]>('PUT', '/admin/roles/order', { keys }),
   updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
   deleteRole: (key: Level, replacement?: Level) =>
     request<RoleAdmin[]>('DELETE', `/admin/roles/${encodeURIComponent(key)}`, undefined, replacement ? { replacement } : undefined),

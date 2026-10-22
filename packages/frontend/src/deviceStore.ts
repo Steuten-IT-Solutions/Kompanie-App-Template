@@ -1,18 +1,17 @@
 /**
- * Speicher der Ansichten auf dem Gerät (Cache Storage, wie der Service Worker): Daten und Gerüste der Seiten, damit
- * sie auch nach einem Neustart der App sofort erscheinen. Beim Abmelden löscht die App alle Speicher außer den
- * Programmdateien, also auch diese (App.tsx, clearCaches); der Service Worker behält sie bei einem Update.
+ * Speicher der App auf dem Gerät (Cache Storage, wie der Service Worker), z. B. für die Gerüste der Seiten
+ * (skeleton.tsx), damit sie auch nach einem Neustart der App sofort erscheinen. Beim Abmelden löscht die App alle
+ * Speicher außer den Programmdateien, also auch diesen (App.tsx, clearCaches); der Service Worker behält ihn bei einem
+ * Update.
  *
  * Jeder Eintrag gehört zu einem Bereich aus Version der App und Benutzer: Was zu einer anderen Version (anderes Format)
  * oder einem anderen Konto gehört (Sitzung abgelaufen, jemand anderes angemeldet), wird beim Laden gelöscht und nie
- * gezeigt. Alle Schreibvorgänge laufen nacheinander, damit ein Leeren nicht von einem älteren Speichern überholt wird.
+ * gezeigt. Alle Zugriffe laufen nacheinander, damit das Laden nicht von einem Speichern überholt wird.
  */
 export interface DeviceStore {
   /** Lädt die Einträge des Bereichs, löscht alle anderen und speichert ab jetzt im Bereich. */
   open(scope: string): Promise<Map<string, unknown>>;
   put(key: string, value: unknown): void;
-  /** Alle Einträge löschen; der Bereich bleibt. */
-  clear(): void;
 }
 
 const PREFIX = '__kompanie-ansicht/';
@@ -63,11 +62,6 @@ export function deviceStore(name: string, max: number, storage: CacheStorage | u
         await cache.delete(url);
         await cache.put(url, new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } }));
         if (++puts % 10 === 0) await trim(cache);
-      });
-    },
-    clear() {
-      run(async (cache) => {
-        await Promise.all((await cache.keys()).map((k) => cache.delete(k)));
       });
     },
   };

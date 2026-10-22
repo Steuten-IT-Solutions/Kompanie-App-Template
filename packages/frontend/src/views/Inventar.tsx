@@ -485,7 +485,7 @@ const ACTION_LABELS: Record<InventoryLogEntry['action'], string> = {
 const LOG_PAGE = 100;
 
 function History({ itemId }: { itemId?: number }) {
-  const log = useAsync(() => api.inventoryLog(itemId), [itemId]);
+  const log = useAsync(() => api.inventoryLog(itemId), [itemId], 'inventory-log');
   const [older, setOlder] = useState<InventoryLogEntry[]>([]);
   const [more, setMore] = useState<boolean | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);

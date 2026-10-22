@@ -22,9 +22,9 @@ Für alle, auch ohne Konto:
 - **Erinnerung am Vortag**: eine Nachricht mit allen Terminen von morgen, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 18 Uhr).
 - **{bereich.news}: neue Beiträge**: wenn ein neuer Beitrag erscheint.
 
-Du bekommst diese Nachrichten zu den Terminen, die du unter **{bereich.events}** siehst: ohne Konto zu den öffentlichen Terminen, als {rolle.member} oder {rolle.candidate} zum Kalender der Kompanie, wenn sie den Bereich {bereich.calendar} nutzt.
+Du bekommst diese Nachrichten zu den Terminen, die du unter **{bereich.events}** siehst: ohne Konto zu den öffentlichen Terminen, als {rolle.member} oder mit dem internen Kalender (z. B. Anwärter) zum Kalender der Kompanie, wenn sie den Bereich {bereich.calendar} nutzt.
 
-Für {rolle.member} und {rolle.candidate}:
+Für {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter):
 - **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt (außer wenn er die Benachrichtigung dabei abschaltet).
 
 Nur für {rolle.member}:

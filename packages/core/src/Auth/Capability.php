@@ -34,10 +34,25 @@ enum Capability: string
     case ManagePolls = 'manage_polls';
     /** Inventar pflegen: Einträge anlegen, ändern, umlagern, löschen, Verlauf sehen (Bereich Inventar, Issue #6). */
     case ManageInventory = 'manage_inventory';
+    /** Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere (Bereich Ämter, Issue #112). */
+    case ManageOffices = 'manage_offices';
+    /** Listen zum Drucken und als CSV anlegen, bearbeiten und löschen (Bereich Listen, Issue #121). */
+    case ManageLists = 'manage_lists';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
     /** Einstellungen und Updates (WordPress: Recht manage_options; zusätzlich gibt es dort das Formular im WP-Admin). */
     case ManageSettings = 'manage_settings';
+
+    /**
+     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade oder Titel pflegt,
+     * Mitglieder anlegt oder Rollen vergibt.
+     *
+     * @return list<self>
+     */
+    public static function memberList(): array
+    {
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::CreateUsers, self::PromoteUsers];
+    }
 }

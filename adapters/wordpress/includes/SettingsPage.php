@@ -98,7 +98,8 @@ final class SettingsPage
                 <a href="<?php echo esc_url($app->env->appUrl()); ?>" target="_blank"><?php echo esc_html($app->env->appUrl()); ?></a>.
                 Rollen in der App legt ein Admin in der App unter Mitglieder fest oder im jeweiligen
                 <a href="<?php echo esc_url(admin_url('users.php')); ?>">Benutzerprofil</a>.
-                Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, die Galerie <code>[kompanie_galerie]</code>.
+                Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, die Galerie <code>[kompanie_galerie]</code>,
+                die Ämter <code>[kompanie_aemter]</code> (nur eine Gruppe: <code>[kompanie_aemter gruppe="…"]</code>) und die Mitgliederliste <code>[kompanie_mitglieder]</code>.
             </p>
 
             <?php $maintenance = $app->maintenance()->state(); ?>

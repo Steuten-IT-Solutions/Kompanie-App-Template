@@ -11,7 +11,7 @@ const sec = brand.labels.sections;
  * Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren.
  */
 export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.titles, []);
+  const { data, error, loading, reload, setData } = useAsync(api.titles, [], 'titles');
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -176,7 +176,7 @@ export function MemberTitles({
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
-  const all = useAsync(api.titles, []);
+  const all = useAsync(api.titles, [], 'titles');
   const current = titles.map((t) => t.id);
   const [selected, setSelected] = useState<number[]>(current);
   const [busy, setBusy] = useState(false);

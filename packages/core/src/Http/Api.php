@@ -178,7 +178,7 @@ final class Api
         foreach (array_values($people) as $i => $p) {
             $p = is_array($p) ? $p : [];
             try {
-                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken);
+                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken, $this->user());
                 $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
@@ -276,7 +276,51 @@ final class Api
         }
     }
 
-    /** Dienstgrade in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    /**
+     * Dienstgrad in den Mitgliedsdetails: Bezeichnung und Abzeichen wie in der Mitgliederliste für alle mit Zugang;
+     * Stand und Verlauf nur, wer Dienstgrade verwaltet.
+     *
+     * @return array<string, mixed>
+     */
+    private function memberRank(int $userId): array
+    {
+        if (!$this->app->features()->enabled('ranks')) {
+            return [];
+        }
+        $status = $this->showRanks() ? $this->app->ranks()->status($userId) : null;
+        $rank = $status !== null ? $status['rank'] : $this->app->ranks()->current($userId);
+        return ['rank_title' => $rank['title'] ?? null, 'rank_badge_url' => $rank['badge_url'] ?? null]
+            + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
+    }
+
+    /**
+     * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
+     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich
+     * Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit
+     * $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintrittsjahr: Sie haben ihre Jahre).
+     * Öffentlich, damit der Shortcode [kompanie_mitglieder] dieselbe Liste zeigt.
+     *
+     * @param list<array<string, mixed>>|null $entries
+     * @return list<array<string, mixed>>
+     */
+    public function directory(?array $entries = null): array
+    {
+        $a = $this->app;
+        $photos = $a->memberPhotos()->urls();
+        $ranks = $a->features()->enabled('ranks') ? $a->ranks()->assigned() : null;
+        $titles = $a->features()->enabled('titles') ? $a->titles()->byUser() : null;
+        $viewer = $a->authContext->currentUser();
+        $birthdays = $entries === null && $a->features()->enabled('birthdays') ? $a->birthdays()->shownTo($viewer) : null;
+        $joined = $entries === null ? $a->joinYears()->shownTo($viewer) : null;
+        return array_map(static fn (array $m): array => $m
+            + ['photo_url' => $photos[$m['id']] ?? null]
+            + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
+            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
+            + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
+            + ($joined !== null ? ['join_year' => $joined[$m['id']] ?? null] : []), $entries ?? $a->members()->directory());
+    }
+
+    /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showRanks(): bool
     {
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
@@ -380,18 +424,18 @@ final class Api
         $P = Route::PUBLIC;
         $L = Route::LOGIN;
         $denyMember = 'Dieser Bereich ist nur für Mitglieder.';
-        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Anwärter.';
+        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
         $denyManage = 'Dafür fehlen dir die Rechte.';
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
-        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
+        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
         $denyPolls = 'Umfragen sind nur für Mitglieder.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
-        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
+        $manage = Cap::memberList();
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [
@@ -430,6 +474,13 @@ final class Api
                 $a->birthdays()->remove($this->user()->id);
                 return ['birthday' => null];
             }, 'birthdays', $denyBirthdays),
+            // Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
+            new Route('GET', '/me/join-year', Cap::Member, fn () => ['join_year' => $a->joinYears()->of($this->user()->id)], null, $denyMember),
+            new Route('PUT', '/me/join-year', Cap::Member, fn (Request $r) => ['join_year' => $a->joinYears()->saveOwn($this->user(), $r->body)], null, $denyMember),
+            new Route('DELETE', '/me/join-year', Cap::Member, function () use ($a) {
+                $a->joinYears()->remove($this->user()->id);
+                return ['join_year' => null];
+            }, null, $denyMember),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
                 return ['changed' => true];
@@ -524,6 +575,49 @@ final class Api
             }, 'titles', $denyRights),
             new Route('PUT', '/members/{id}/titles', Cap::ManageTitles, fn (Request $r) => ['titles' => $a->titles()->assign($r->id(), $r->input('title_ids'))], 'titles', $denyRights),
 
+            // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
+            new Route('GET', '/offices', $P, fn () => $a->offices()->overview($a->authContext->currentUser()), 'offices'),
+            new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->input('title'))), 'offices', $denyRights),
+            new Route('PUT', '/office-groups/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderGroups($r->input('ids')), 'offices', $denyRights),
+            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->input('title')), 'offices', $denyRights),
+            new Route('DELETE', '/office-groups/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteGroup($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+            new Route('POST', '/offices', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createOffice($r->body)), 'offices', $denyRights),
+            new Route('PUT', '/offices/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderOffices($r->input('ids')), 'offices', $denyRights),
+            // Import (Ersterfassung): ohne apply nur die Vorschau
+            new Route('POST', '/offices/import', Cap::ManageOffices, fn (Request $r) => $a->offices()->import(
+                $r->input('csv'),
+                $r->input('link') === null ? true : Input::bool($r->input('link')),
+                Input::bool($r->input('apply')),
+            ), 'offices', $denyRights),
+            new Route('PATCH', '/offices/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateOffice($r->id(), $r->body), 'offices', $denyRights),
+            new Route('DELETE', '/offices/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteOffice($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+            new Route('GET', '/offices/{id}/title-preview', Cap::ManageOffices, fn (Request $r) => $a->offices()->linkPreview($r->id(), $r->query['title_id'] ?? null), 'offices', $denyRights),
+            new Route('POST', '/offices/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createTerm($r->id(), $r->body)), 'offices', $denyRights),
+            new Route('PATCH', '/office-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateTerm($r->id(), $r->body), 'offices', $denyRights),
+            new Route('DELETE', '/office-terms/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteTerm($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+
+            // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
+            new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
+            new Route('POST', '/lists', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->create($this->user(), $r->body)), 'lists', $denyRights),
+            new Route('GET', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->detail($this->user(), $r->id()), 'lists', $denyRights),
+            new Route('PUT', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->save($this->user(), $r->id(), $r->body), 'lists', $denyRights),
+            new Route('DELETE', '/lists/{id}', Cap::ManageLists, function (Request $r) use ($a) {
+                $a->lists()->delete($r->id());
+                return ['deleted' => true];
+            }, 'lists', $denyRights),
+            new Route('POST', '/lists/{id}/copy', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->copy($this->user(), $r->id())), 'lists', $denyRights),
+            // „Mitglieder aktualisieren“: ohne apply nur die Übersicht, was sich ändert
+            new Route('POST', '/lists/{id}/sync-members', Cap::ManageLists, fn (Request $r) => $a->lists()->syncMembers($this->user(), $r->id(), Input::bool($r->input('apply'))), 'lists', $denyRights),
+
             // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
             new Route('GET', '/documents', Cap::Member, fn () => $a->documents()->list($this->user()), 'documents', $denyMember),
             new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),
@@ -599,6 +693,11 @@ final class Api
                 $a->birthdays()->removeFor($r->id());
                 return ['birthday' => null];
             }, 'birthdays', $denyRights),
+            new Route('PUT', '/members/{id}/join-year', Cap::CreateUsers, fn (Request $r) => ['join_year' => $a->joinYears()->saveFor($this->user(), $r->id(), $r->body)], null, $denyRights),
+            new Route('DELETE', '/members/{id}/join-year', Cap::CreateUsers, function (Request $r) use ($a) {
+                $a->joinYears()->removeFor($r->id());
+                return ['join_year' => null];
+            }, null, $denyRights),
 
             // Inventar (Issue #6): nur mit manage_inventory (Mitglieder ohne das Recht sehen es nicht); optional reason bei
             // allen Änderungen. Genau ein Verlaufseintrag je Änderung und betroffenem Eintrag (InventoryService).
@@ -629,6 +728,13 @@ final class Api
                 return ['deleted' => true];
             }, 'attendance', $denyRights),
 
+            // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und
+            // Titel, dazu Geburtstag und Eintrittsjahr, soweit die Person sie dem Betrachter zeigt
+            new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
+            new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
+            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied und die Jahre, kein Grund
+            new Route('GET', '/directory/former', $P, fn () => $this->directory($a->formerMembers()->directory()), 'directory'),
+
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {
                 // Wer Dienstgrade bzw. Titel verwaltet, sieht auch frühere Mitglieder, die noch welche haben.
@@ -636,10 +742,16 @@ final class Api
                     $this->showRanks() ? array_keys($a->ranks()->repository()->assignments()) : [],
                     $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
                 );
+                // Ehemalige stehen in ihrer eigenen Liste (GET /members/former), auch wenn sie noch Dienstgrad oder Titel haben.
+                $holders = array_values(array_diff($holders, $a->formerMembers()->ids()));
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
+                // Gruppe für den Zähler über der Liste, wie in der Anwesenheit (Einstellungen → Rollen); Gäste ohne.
+                $groups = $a->attendance()->groupMap();
+                $list = array_map(static fn (array $m): array => $m + ['group' => $groups[$m['level']] ?? null], $list);
                 $photos = $a->memberPhotos()->urls();
                 $list = array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $list);
-                if ($this->showRanks()) {
+                // Dienstgrad mit Abzeichen sieht jede Person mit Zugang zur Liste, nicht nur wer Dienstgrade verwaltet.
+                if ($a->features()->enabled('ranks')) {
                     $ranks = $a->ranks()->assigned();
                     $list = array_map(static fn (array $m): array => $m + [
                         'rank_title' => $ranks[$m['id']]['title'] ?? null,
@@ -650,16 +762,35 @@ final class Api
                     $titles = $a->titles()->byUser();
                     $list = array_map(static fn (array $m): array => $m + ['titles' => $titles[$m['id']] ?? []], $list);
                 }
+                // Eintritt (zum Sortieren), wie in den Mitgliedsdetails nur für create_users
+                if ($this->user()->can(Cap::CreateUsers)) {
+                    $joined = $a->joinYears()->repository()->all();
+                    $list = array_map(static fn (array $m): array => $m + ['joined_on' => isset($joined[$m['id']]) ? (string) $joined[$m['id']] : ''], $list);
+                }
                 return $list;
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
                 // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
                 + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
-                + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
+                + $this->memberRank($r->id())
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
+                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
+                // Eintrittsjahr mit Anzeige, ebenso nur für create_users
+                + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
+                // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
+                + ['former' => $a->formerMembers()->of($r->id())], null, $denyManage),
+            // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
+            new Route('GET', '/members/former', Cap::CreateUsers, function () use ($a) {
+                $photos = $a->memberPhotos()->urls();
+                return array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $a->formerMembers()->list($this->user()));
+            }, null, $denyUsers),
+            // Import (Ersterfassung, z. B. aus einer Chronik): ohne apply nur die Vorschau
+            new Route('POST', '/members/former/import', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            new Route('PUT', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('PATCH', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('DELETE', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyUsers),
             // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
             // Rechte einzelner Personen zusätzlich zu ihren Rollen geben oder entziehen
@@ -685,7 +816,7 @@ final class Api
                 }
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
                 $photo = $this->photoInput($r->body['photo'] ?? null);
-                $created = $a->members()->create($r->body);
+                $created = $a->members()->create($r->body, $this->user());
                 try {
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
                 } catch (\Throwable $e) {
@@ -720,6 +851,11 @@ final class Api
             new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->create($r->body);
                 return Response::created($a->roles()->describe());
+            }, null, $denySettings),
+            // Reihenfolge der eigenen Rollen (Einstellungen → Rollen, per Ziehen)
+            new Route('PUT', '/admin/roles/order', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->reorder($r->input('keys'));
+                return $a->roles()->describe();
             }, null, $denySettings),
             new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->update((string) $r->params['key'], $r->body);

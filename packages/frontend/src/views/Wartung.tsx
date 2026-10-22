@@ -9,7 +9,7 @@ import { ErrorBox, Loading, useAsync } from '../ui';
  */
 /** Seiten „Zustand und Updates“ und „Datensicherung“ der Einstellungen. */
 export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.status(), []);
+  const { data, error, loading, reload } = useAsync(() => api.status(), [], 'admin/status');
   if (part === 'datensicherung') return <Datensicherung onToast={onToast} onChanged={reload} />;
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -108,7 +108,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
         <>
           <p className="small">
             Installiert: <strong>{u.current}</strong>
-            {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)}
+            {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)} ·{' '}
+            <a href="#/einstellungen/neuerungen">Was ist neu</a>
           </p>
           {u.withdrawn &&
             (u.fallback ? (

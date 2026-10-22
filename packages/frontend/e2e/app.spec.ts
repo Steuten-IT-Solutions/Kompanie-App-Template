@@ -189,6 +189,101 @@ test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stel
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+/** Waagerecht über den Namen auf der Seite eines Mitglieds wischen (Touch-Ereignisse über CDP, wie ein Finger). */
+async function swipe(page: Page, dx: number) {
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const cdp = await page.context().newCDPSession(page);
+  const { width } = page.viewportSize()!;
+  const x = width / 2 - dx / 2;
+  const y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * f, y }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+test('Mitglied: Wischen blättert in der Liste und bleibt auf derselben Unterseite', async ({ page }) => {
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await expect(page.getByRole('button', { name: 'Vorheriges Mitglied' })).toBeDisabled();
+  await memberMenu(page, 'Kasse');
+
+  // Nach links: nächstes Mitglied, weiter auf „Kasse“.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page).toHaveURL(/\/strafen$/);
+  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  // Am Ende der Liste geht es nicht weiter.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Nach rechts bzw. mit dem Pfeil wieder zurück und vor.
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
+
+  // Wischen legt keine Einträge im Verlauf an: „Zurück“ nimmt die Wahl der Unterseite zurück, dann geht es zur Liste.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/mitglied\/\d+$/);
+  await page.goBack();
+  await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
+});
+
+test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neustart)', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const last = `Altwisch${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.evaluate(async (last) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const headers = { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' };
+    const csv = `vorname;nachname;eintritt;ausgeschieden;grund\nAnton;${last};1970;2000;ausgetreten\nBerta;${last};1980;2010;ausgetreten`;
+    await fetch(cfg.apiBase + 'members/former/import', {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ csv, apply: true }),
+    });
+  }, last);
+  // Gemerkte Sortierung aus anderen Tests weg: nach Nachname, dann Vorname
+  await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Ehemalige');
+  await page.getByLabel('Ehemalige suchen').fill(last);
+  await page.locator('.row', { hasText: 'Anton' }).click();
+  await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText(`Berta ${last}`);
+  await expect(page).toHaveURL(/#\/verwaltung\/ehemalige\/\d+$/);
+
+  // Neu geladen (wie ein Link): ganze Liste der Ehemaligen in der gemerkten Sortierung
+  await page.reload();
+  await expect(page.locator('.member-name')).toHaveText(`Berta ${last}`);
+  await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
+  await page.getByRole('button', { name: 'Vorheriges Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
+
+  // Ebenso bei Mitgliedern, die Unterseite bleibt
+  await page.goto('/app/#/verwaltung/mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await memberMenu(page, 'Kasse');
+  await page.reload();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
+  await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
+});
+
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
@@ -298,24 +393,60 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.getByRole('heading', { name: '2 Konten angelegt' })).toBeVisible();
   await expect(page.locator('.print-sheet .form-error')).toHaveCount(0);
 
-  // Liste: Foto bzw. Anfangsbuchstaben; Details: großes Foto, entfernen
+  // Liste: Foto bzw. Anfangsbuchstaben; Details: Foto neben dem Dienstgrad, entfernen
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   await page.getByLabel('Mitglied suchen').fill(id);
   await expect(page.locator('.row', { hasText: `${id}, Hanna` }).locator('.member-avatar img')).toBeVisible();
   await expect(page.locator('.row', { hasText: `${id}, Gerd` }).locator('.member-avatar-initials')).toHaveText(`G${id[0].toUpperCase()}`);
   await page.locator('.row', { hasText: `${id}, Hanna` }).click();
-  await expect(page.locator('.member-photo .member-avatar-large img')).toBeVisible();
+  await expect(page.locator('.member-rank-line .member-avatar img')).toBeVisible();
+  // Antippen vergrößert das Foto; bis es geladen ist, dreht sich eine Ladeschnecke. Escape und ✕ schließen die Ansicht.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const bigPhoto = /[?&]s=1024(&|$)/;
+  await page.route(bigPhoto, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.getByRole('button', { name: /vergrößern/ }).click();
+  const zoom = page.getByRole('dialog', { name: /^Foto von / });
+  await expect(zoom.getByRole('status', { name: 'Foto lädt' })).toBeVisible();
+  await expect(zoom.locator('img')).toBeHidden();
+  release();
+  await expect(zoom.locator('img')).toBeVisible();
+  await expect(zoom.getByRole('status', { name: 'Foto lädt' })).toHaveCount(0);
+  await page.unroute(bigPhoto);
+  // Vergrößert die 1024-Pixel-Fassung (scharf auch bei hoher Pixeldichte)
+  await expect(zoom.locator('img')).toHaveAttribute('src', /[?&]s=1024(&|$)/);
+  await page.keyboard.press('Escape');
+  await expect(zoom).toHaveCount(0);
+  await page.getByRole('button', { name: /vergrößern/ }).click();
+  await zoom.getByRole('button', { name: 'Schließen' }).click();
+  await expect(zoom).toHaveCount(0);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Foto entfernen' }).click();
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
   await expect(page.getByRole('button', { name: 'Foto hochladen' })).toBeVisible();
-  await expect(page.locator('.member-photo .member-avatar-initials')).toBeVisible();
+  await expect(page.locator('.member-rank-line .member-avatar-initials')).toBeVisible();
 
   // Das Mitglied sieht sein Foto unter „Konto“, kann es dort aber nicht ändern.
   await login(page, username, password);
   await page.locator('.topbar-account').click();
   await expect(page.locator('.account-card .member-avatar-large img')).toBeVisible();
   await expect(page.getByRole('button', { name: /Foto/ })).toHaveCount(0);
+
+  // In der Mitgliederliste („Mitglieder“) vergrößert auch ein Mitglied ohne Verwaltungsrechte ein Foto.
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByLabel('Mitglied suchen').fill(id);
+  await page
+    .locator('.directory .member-row', { hasText: 'Fiona' })
+    .getByRole('button', { name: /vergrößern/ })
+    .click();
+  const big = page.getByRole('dialog', { name: `Foto von Fiona ${id}` }).locator('img');
+  await expect(big).toBeVisible();
+  await expect.poll(() => big.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await expect(big).toHaveCount(0);
 });
 
 test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis er aufgenommen ist', async ({ page }) => {
@@ -324,10 +455,52 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   const name = `Anna ${last}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  // Anwärter sind eine eigene Rolle: nur Kalender, für neue Konten, als Mitglied aufzunehmen (bei WordPress ggf. schon da).
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  const rollen = page.locator('#einstellungen-rollen');
+  await expect(rollen.locator('.row-title').first()).toBeVisible();
+  if ((await rollen.locator('.row-title', { hasText: /^Anwärter$/ }).count()) === 0) {
+    await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
+    await rollen.getByLabel('Name der Rolle').fill('Anwärter');
+    await rollen.getByLabel(/^Mitgliederbereich/).uncheck();
+    await rollen.getByLabel(/^Interner Kalender/).check();
+    await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
+    await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
+    await rollen.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
+  }
+  await expect(rollen.locator('.row', { hasText: /^Anwärter/ })).toContainText('für neue Konten');
+  // Auch feste Rollen lassen sich verschieben: Anwärter am Griff (Pfeil hoch) zwischen Gast und Mitglied.
+  const all = async () => (await rollen.locator('.role-item .row-title').allTextContents()).map((t) => t.trim());
+  const titles = async () => (await all()).slice(0, 3);
+  // exact: Im WordPress-Test gibt es aus dem API-Szenario auch „Kptest Anwärter“.
+  const handle = rollen.getByRole('button', { name: 'Anwärter verschieben (ziehen oder Pfeiltasten)', exact: true });
+  const saves = countOrderSaves(page, 'roles/order');
+  let moves = 0;
+  await handle.focus();
+  for (let i = (await all()).indexOf('Anwärter'); i > 1; i--, moves++) {
+    await page.keyboard.press('ArrowUp');
+    await expect.poll(async () => (await all()).indexOf('Anwärter')).toBe(i - 1);
+  }
+  if ((await all()).indexOf('Anwärter') === 0) {
+    await page.keyboard.press('ArrowDown');
+    moves++;
+  }
+  await expect.poll(titles).toEqual(['Gast', 'Anwärter', 'Mitglied']);
+  // Erst neu laden, wenn alles gespeichert ist (das Speichern läuft im Hintergrund nacheinander).
+  await expect.poll(saves, { timeout: 15_000 }).toBe(moves);
+  await page.reload();
+  await expect.poll(titles).toEqual(['Gast', 'Anwärter', 'Mitglied']);
+
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByLabel('Vorname').fill('Anna');
   await page.getByLabel('Nachname').fill(last);
-  await page.getByLabel('Rolle').selectOption('candidate');
+  await page.getByLabel('Rolle').selectOption({ label: 'Anwärter' });
   await page.getByRole('button', { name: 'Mitglied anlegen' }).click();
   const username = (await page.getByTestId('new-username').textContent())!.trim();
   const password = (await page.getByTestId('new-password').textContent())!.trim();
@@ -339,7 +512,11 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await expect(page.getByLabel('Auch Anwärter anzeigen')).toBeChecked();
+  // Zähler über „Mitglied anlegen“: Gruppen wie in der Anwesenheit
+  await expect(page.locator('.member-counts')).toContainText(/Anwärter \d+/);
+  // Filter und Sortierung sind zunächst eingeklappt.
+  await expect(page.getByRole('button', { name: 'Filter und Sortierung' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Sortierung')).toBeHidden();
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberMenu(page, 'Konto und Rolle');
   page.once('dialog', (d) => d.accept());
@@ -349,6 +526,306 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 
   await login(page, username, password);
   await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+});
+
+test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte oder Rollen', async ({ page }) => {
+  await login(page, 'mitglied1');
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Mitglieder');
+  const list = page.locator('.directory .card-list');
+  await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+  await expect(list.locator('.member-row', { hasText: 'Verwalter' })).toBeVisible();
+  // Zähler je Gruppe wie in der Verwaltung
+  await expect(page.locator('.directory .member-counts')).toHaveText(/^Mitglieder? \d+/);
+  await expect(list).not.toContainText(/Punkte|offen/);
+  await page.getByLabel('Mitglied suchen').fill('mitglied2');
+  await expect(list.locator('.member-row')).toHaveCount(1);
+  await shot(page, '1-mitgliederliste');
+
+  // Öffentlich (Issue #112): auch ohne Anmeldung, ebenfalls ohne Punkte
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+  await expect(list).not.toContainText(/Punkte|offen/);
+});
+
+test.describe('ohne Service Worker', () => {
+  // page.route sieht Anfragen des Service Workers nicht
+  test.use({ serviceWorkers: 'block' });
+
+  test('Ehemalige: auf der Seite einer ehemaligen Person bleibt „Ehemalige“ markiert', async ({ page }) => {
+    // Die Liste kommt aus dem Test, damit keine Daten zurückbleiben.
+    await page.route(/directory\/former(?![\w/])/, (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 987654,
+            name: 'Erwin Ehemalig',
+            first_name: 'Erwin',
+            last_name: 'Ehemalig',
+            photo_url: null,
+            founder: true,
+            joined_year: '1985',
+            left_year: '2010',
+          },
+        ],
+      }),
+    );
+    await page.goto('/app/#/mitglieder/ehemalige');
+    const switcher = page.locator('.members-switch');
+    const list = page.locator('.directory .card-list');
+    await list.locator('.member-row', { hasText: 'Ehemalig, Erwin' }).locator('.member-row-open').click();
+    await expect(page).toHaveURL(/#\/mitglieder\/987654$/);
+    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 1985–2010');
+    await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'false');
+
+    // Bei Mitgliedern bleibt es „Mitglieder“
+    await switcher.getByRole('button', { name: 'Mitglieder' }).click();
+    await list.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
+    await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied2' })).toBeVisible();
+    await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitglieder', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const group = `Verein ${id}`;
+  const office = `Kassenprüfer ${id}`;
+  const former = `Erich Ehemalig${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Ein Ehemaliger mit Konto (Import wie aus einer Chronik), wählbar als Inhaber
+  const formerId = await page.evaluate(async (name) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const headers = { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' };
+    const csv = `vorname;nachname;eintritt;ausgeschieden;grund\n${name.split(' ').join(';')};1980;2010;ausgetreten`;
+    await fetch(cfg.apiBase + 'members/former/import', {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ csv, apply: true }),
+    });
+    const list: { id: number; name: string }[] = await (
+      await fetch(cfg.apiBase + 'members/former', { headers, credentials: 'same-origin' })
+    ).json();
+    return list.find((m) => m.name === name)?.id;
+  }, former);
+  expect(formerId).toBeTruthy();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Ämter');
+  await page.getByLabel('Neue Gruppe').fill(group);
+  await page.getByRole('button', { name: 'Gruppe anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  await newOffice.getByLabel('Bezeichnung').fill(office);
+  await newOffice.getByLabel('Gruppe').selectOption({ label: group });
+  await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.getByRole('button', { name: office, exact: true }).click();
+
+  // Frühere Amtszeit mit einem Namen ohne Konto
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  let form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)').fill('1990');
+  await form.getByLabel('Bis (leer: bis heute)').fill('2005');
+  await form.getByLabel('Name', { exact: true }).fill(`Frieda Früher ${id}`);
+  // Zweite Person: ein Ehemaliger mit Konto
+  await form.getByRole('button', { name: 'Weitere Person' }).click();
+  const formerRow = form.locator('.office-holder-row').nth(1);
+  await formerRow.getByRole('combobox', { name: 'Profil' }).selectOption({ label: 'Ehemaliger' });
+  await formerRow.getByRole('combobox', { name: 'Ehemaliger', exact: true }).selectOption({ label: former });
+  await form.getByLabel(/Zusatz/).fill('Gründungsmitglied');
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+  // Beim Bearbeiten stehen beide wieder unter ihrem Profil
+  await page.locator('.office-term-row', { hasText: '1990' }).getByRole('button', { name: 'Bearbeiten' }).click();
+  form = page.locator('form', { hasText: 'Amtszeit bearbeiten' });
+  await expect(form.locator('.office-holder-row').nth(0).getByRole('combobox', { name: 'Profil' })).toHaveValue('name');
+  await expect(form.locator('.office-holder-row').nth(1).getByRole('combobox', { name: 'Profil' })).toHaveValue('former');
+  await expect(form.getByRole('combobox', { name: 'Ehemaliger', exact: true })).toHaveValue(String(formerId));
+  await form.getByRole('button', { name: 'Abbrechen' }).click();
+  // Laufende Amtszeit mit einem Konto und einem zweiten Namen
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)').fill('2020');
+  await form.getByRole('combobox', { name: 'Profil' }).first().selectOption({ label: 'Mitglied' });
+  await form.getByRole('combobox', { name: 'Mitglied', exact: true }).selectOption({ label: 'Mitglied1' });
+  await form.getByRole('button', { name: 'Weitere Person' }).click();
+  await form.locator('.office-holder-row').nth(1).getByLabel('Name', { exact: true }).fill(`Paul Partner ${id}`);
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+  await expect(page.locator('.office-term-row').first()).toContainText('seit 2020');
+
+  // Ohne Anmeldung: Zeitstrahl im Tab Mitglieder, laufende Amtszeit oben
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByRole('button', { name: 'Ämter', exact: true }).click();
+  await expect(page).toHaveURL(/#\/mitglieder\/aemter$/);
+  const card = page.locator('.office-card', { hasText: office });
+  await expect(card.locator('.office-summary-text')).toHaveText(`Mitglied1, Paul Partner ${id} · seit 2020`);
+  await expect(card.locator('.office-meta')).toHaveText('Chronik seit 1990 · 2 Einträge');
+  await card.locator('.office-head').click();
+  // Laufende Amtszeit oben unter „Im Amt“, die frühere in der Chronik
+  const spotlight = card.locator('.spotlight');
+  await expect(spotlight.locator('.spotlight-person')).toHaveCount(2);
+  await expect(spotlight).toContainText('seit 2020');
+  const items = card.locator('.tl-item');
+  await expect(items).toHaveCount(1);
+  await expect(items.nth(0)).toContainText('1990–2005');
+  await expect(items.nth(0)).toContainText('Gründungsmitglied');
+  await expect(items.nth(0)).toContainText(former);
+  await shot(page, '1b-aemter-zeitstrahl');
+  if (SHOTS) {
+    // Breiter Bildschirm: abwechselnd links und rechts
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await shot(page, '1c-aemter-zeitstrahl-breit');
+  }
+
+  // Schmaler Bildschirm: nichts ragt seitlich heraus
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Personen der Mitgliederliste: Tipp auf den Namen öffnet ihre Seite mit den Ämtern als Zeitstrahl
+  await spotlight.getByRole('button', { name: /^Mitglied1/ }).click();
+  await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied1' })).toBeVisible();
+  await expect(page.locator('.member-page .tl-item', { hasText: office })).toContainText('seit 2020');
+  // Ebenso aus der Liste: ganze Zeile antippen, ohne eigenen Knopf
+  await page.goto('/app/#/mitglieder/liste');
+  await expect(page.locator('.member-row', { hasText: 'Mitglied1' }).getByRole('button', { name: 'Ämter' })).toHaveCount(0);
+  await page.locator('.member-row', { hasText: 'Mitglied1' }).locator('.member-row-open').click();
+  await expect(page).toHaveURL(/#\/mitglieder\/\d+$/);
+  await expect(page.locator('.member-page .tl-item', { hasText: office })).toBeVisible();
+
+  // Aufräumen (WordPress behält die Daten zwischen den Läufen)
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.row', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  const deleted = await page.evaluate(async (formerId) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    return (
+      await fetch(cfg.apiBase + `members/${formerId}`, {
+        method: 'DELETE',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+        credentials: 'same-origin',
+      })
+    ).status;
+  }, formerId);
+  expect(deleted).toBeLessThan(300);
+});
+
+test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
+  const title = `Unterschriften ${Date.now() % 1000000}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Listen');
+  const create = page.locator('form', { hasText: 'Neue Liste' });
+  await create.getByLabel('Titel').fill(title);
+  await create.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/listen\/\d+$/);
+  await expect(page.locator('.list-rows')).toHaveCount(0);
+
+  // Mitglieder aktualisieren: erst die Übersicht, dann übernehmen
+  await page.getByRole('button', { name: 'Mitglieder aktualisieren' }).click();
+  const sync = page.getByRole('dialog', { name: 'Mitglieder aktualisieren' });
+  await expect(sync).toContainText('Mitglied1');
+  await sync.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Mitglieder aktualisiert');
+  await expect(page.locator('.list-row', { hasText: 'Mitglied1' })).toHaveCount(1);
+  const members = await page.locator('.list-row').count();
+  // Nichts mehr zu tun
+  await page.getByRole('button', { name: 'Mitglieder aktualisieren' }).click();
+  await expect(page.locator('.toast')).toHaveText('Die Liste ist aktuell');
+  // Zeile eines Mitglieds von Hand entfernt (noch nicht gespeichert): Aktualisieren speichert erst und bietet sie wieder an
+  await page
+    .locator('.list-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /entfernen$/ })
+    .click();
+  await page.getByRole('button', { name: 'Mitglieder aktualisieren' }).click();
+  await expect(sync).toContainText('1 Zeile kommt dazu: Mitglied1');
+  await expect(page.locator('.list-row', { hasText: 'Mitglied1' })).toHaveCount(0);
+  await sync.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.list-row', { hasText: 'Mitglied1' })).toHaveCount(1);
+  await expect(page.locator('.list-row')).toHaveCount(members);
+
+  // Leere Spalte mit Kästchen, zwei eigene Zeilen (eine mit Namen), speichern
+  await page.getByRole('button', { name: '+ Leere Spalte' }).click();
+  const column = page.locator('.list-column').last();
+  await column.getByLabel('Überschrift').fill('Bezahlt');
+  await column.getByLabel('Breite').selectOption('narrow');
+  await column.getByLabel('Kästchen zum Abhaken').check();
+  await page.getByRole('button', { name: '+ Leere Spalte' }).click();
+  const count = page.locator('.list-column').last();
+  await count.getByLabel('Überschrift').fill('Anzahl Kinder');
+  await count.getByLabel('Breite').selectOption('narrow');
+  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
+  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
+  await page.getByLabel(`Zeile ${members + 1}: Name`).fill('Gast vom Nachbarverein');
+  await page.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(page.getByRole('button', { name: 'Speichern' })).toHaveCount(0);
+
+  // Vorschau wie gedruckt: Kopf mit Titel, Spalten, Kästchen, eigene Zeilen
+  const preview = page.locator('.list-preview');
+  await expect(preview.locator('.list-sheet-title')).toHaveText(title);
+  // Ab der Spalte vor der ersten gedrehten ist der Kopf eine Zelle (sonst schneidet Chrome ihn im Druck ab)
+  await expect(preview.locator('thead th:not(.list-th-slanted)')).toHaveText(['Name', 'Vorname']);
+  await expect(preview.locator('thead th.list-th-slanted .list-th-straight')).toHaveText(['Unterschrift']);
+  // Schmale Spalten mit gedrehter Überschrift (wie in den Tabellen der Kompanie), Nr. nicht
+  await expect(preview.locator('thead th.list-th-slanted .list-th-label')).toHaveText(['Bezahlt', 'Anzahl Kinder']);
+  // Titel der Seite = Titel der Liste: Den schlägt der Browser als Namen der PDF-Datei vor
+  await expect(page).toHaveTitle(title);
+  await expect(preview.locator('tbody tr')).toHaveCount(members + 2);
+  await expect(preview.locator('tbody tr').nth(members)).toHaveText('NachbarvereinGast vom☐');
+
+  // CSV für Excel: BOM, Semikolon
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'CSV herunterladen' }).click()]);
+  expect(download.suggestedFilename()).toBe(`${title}.csv`);
+  const csv = readFileSync((await download.path())!, 'utf8');
+  expect(csv.startsWith(String.fromCharCode(0xfeff) + 'Name;Vorname;Unterschrift;Bezahlt;Anzahl Kinder\r\n')).toBe(true);
+  expect(csv).toContain(';Mitglied1;;;\r\n');
+  expect(csv).toContain('\r\nNachbarverein;Gast vom;;;\r\n');
+
+  // Druck: nur die Liste, ohne Kopf- und Tab-Leiste der App
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('.list-print-root .list-table')).toBeVisible();
+  await expect(page.locator('.tabbar')).toBeHidden();
+  await expect(page.locator('.list-editor')).toBeHidden();
+  await shot(page, '40b-liste-druck');
+  // Auf A4, wie gedruckt (nur mit Bildschirmfotos)
+  if (SHOTS) await page.pdf({ path: `${SHOTS}/40c-liste.pdf`, format: 'A4', preferCSSPageSize: true });
+  await page.emulateMedia({ media: 'screen' });
+  await expect(page.locator('.list-print-root')).toBeHidden();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/40a-liste-bearbeiten.png`, fullPage: true });
+
+  // Schmaler Bildschirm: nichts ragt seitlich heraus (die Vorschau scrollt in sich)
+  await page.setViewportSize({ width: 360, height: 740 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen)
+  await page.getByRole('button', { name: /Alle Listen/ }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
+  await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
+  await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
+  await expect(page.locator('.toast')).toHaveText('Liste kopiert');
+  for (const t of [`${title} (Kopie)`, title]) {
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.locator('.row-title', { hasText: new RegExp(`^${t.replace(/[()]/g, '\\$&')}$`) }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+  await expect(page.locator('.row', { hasText: title })).toHaveCount(0);
 });
 
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
@@ -364,6 +841,15 @@ test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async 
 test('Mitglied 1 sieht eigene Punkte und Kasse', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Meins' }).click();
+  // Übersicht zuerst: Name, Rolle und beide Summen
+  const overview = page.locator('.my-overview');
+  await expect(overview.locator('.account-name')).toBeVisible();
+  await expect(overview.locator('.stat-value')).toHaveText(['5', /2,50/]);
+  await shot(page, 'meins-uebersicht');
+
+  await meinsMenu(page, 'Punkte');
+  // Erst wenn die Übersicht weg ist, gibt es nur noch eine Kachel.
+  await expect(overview).toHaveCount(0);
   await expect(page.locator('.stat-value')).toHaveText('5');
   await expect(page.getByText('Teilnahme Sommerfest')).toBeVisible();
   await shot(page, '2-punkte');
@@ -379,6 +865,7 @@ test('Mitglied 2 sieht keine fremden Einträge und keine Verwaltungsdaten', asyn
   await login(page, 'mitglied2');
   await page.getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Kasse');
+  await expect(page.locator('.my-overview')).toHaveCount(0);
   await expect(page.locator('.stat-value')).toContainText('0,00');
   await expect(page.getByText('Zu spät gekommen')).toHaveCount(0);
 
@@ -437,7 +924,7 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
 
   // Sitzung bleibt gültig: Daten laden weiterhin (neues Token wurde geholt).
   await page.getByRole('button', { name: 'Meins' }).click();
-  await expect(page.locator('.stat-label')).toHaveText('Meine Punkte');
+  await expect(page.locator('.stat-label').first()).toHaveText('Meine Punkte');
 
   await login(page, 'mitglied2', NEW);
   await page.getByRole('button', { name: 'Konto' }).click();
@@ -651,35 +1138,28 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
-test('Nach dem Neustart: zuletzt geladene Daten sofort, ohne sie das Gerüst der Seite statt „Lädt …“', async ({ page }) => {
+test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/news');
   await expect(page.locator('.news-card').first()).toBeVisible();
   await page.getByRole('button', { name: 'Termine' }).click();
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
-  /** Schlüssel im Speicher der Ansichten auf dem Gerät (Daten bzw. Gerüste) */
-  const stored = (name: string) =>
-    page.evaluate(async (name) => (await (await caches.open(name)).keys()).map((r) => decodeURIComponent(r.url)), name);
-  await expect.poll(async () => (await stored('kompanie-ansicht-daten-v1')).some((u) => u.includes('termine|'))).toBe(true);
-  await expect.poll(async () => (await stored('kompanie-ansicht-geruest-v1')).some((u) => u.includes('/news|'))).toBe(true);
-  // Kein Text im Gerüst, nur der Aufbau
-  const layouts = await page.evaluate(async () => {
-    const cache = await caches.open('kompanie-ansicht-geruest-v1');
-    return Promise.all((await cache.keys()).map(async (k) => (await cache.match(k))!.text()));
-  });
-  expect(layouts.join('')).not.toContain('Tag der offenen Tür');
+  const layouts = () =>
+    page.evaluate(async () => {
+      const cache = await caches.open('kompanie-ansicht-geruest-v1');
+      return Promise.all((await cache.keys()).map(async (k) => decodeURIComponent(k.url) + (await (await cache.match(k))!.text())));
+    });
+  await expect.poll(async () => (await layouts()).some((l) => l.includes('/news|'))).toBe(true);
+  // Nur der Aufbau, kein Text
+  expect((await layouts()).join('')).not.toContain('Tag der offenen Tür');
 
-  // Ab jetzt antworten Termine und News sehr langsam.
-  await page.context().route(/events|news/, async (route) => {
+  // Keine gespeicherten Daten (auch nicht beim Service Worker), News antworten sehr langsam.
+  await page.evaluate(() => caches.delete('kompanie-data-v2'));
+  await page.context().route(/news/, async (route) => {
     await new Promise((r) => setTimeout(r, 8000));
     await route.continue().catch(() => undefined);
   });
   try {
-    // Termine: Die Daten vom letzten Mal sind nach dem Neustart sofort da.
-    await page.reload();
-    await expect(page.getByText('Tag der offenen Tür')).toBeVisible({ timeout: 1500 });
-    // News ohne gespeicherte Daten: sofort das Gerüst (Karten wie beim letzten Mal), kein „Lädt …“.
-    await page.evaluate(() => caches.delete('kompanie-ansicht-daten-v1'));
     await page.goto('/app/#/news');
     await page.reload();
     await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
@@ -708,6 +1188,7 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: 'Filter und Sortierung' }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberMenu(page, 'Konto und Rolle');
@@ -828,6 +1309,7 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   // Liste zeigt keine Rollen, Filter findet die Person über die Zusatzrolle.
   await page.getByRole('button', { name: '‹ Alle Mitglieder' }).click();
   await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-role')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filter und Sortierung' }).click();
   await page.getByLabel('Nach Rolle filtern').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(page.locator('.card-list .row', { hasText: 'Mitglied1' })).toHaveCount(0);
@@ -1173,6 +1655,32 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await page.goto('/app/#/einstellungen/zustand');
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
+});
+
+test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
+  // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
+  const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
+    versionen: { version: string }[];
+    unveroeffentlicht: string | null;
+  };
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Was ist neu', { exact: true }) })
+    .click();
+  await expect(page).toHaveURL(/#\/einstellungen\/neuerungen$/);
+  for (const v of changelog.versionen) {
+    await expect(page.getByRole('heading', { name: new RegExp(`^Version ${v.version.replace(/\./g, '\\.')}\\b`) })).toBeVisible();
+  }
+  await expect(page.getByRole('heading', { name: /^Vorabversion/ })).toHaveCount(changelog.unveroeffentlicht ? 1 : 0);
+  await expect(page.locator('.changelog-text h4').first()).toBeVisible();
+  await shot(page, '19-was-ist-neu');
+
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/einstellungen/neuerungen');
+  await expect(page.locator('.changelog-text')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /^Version / })).toHaveCount(0);
 });
 
 test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async ({ page }) => {
@@ -1887,6 +2395,7 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await expect(page.locator('.my-titles')).toContainText(title);
+  await shot(page, 'meins-titel');
 });
 
 test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach dem Neuladen', async ({ page }) => {
@@ -2043,17 +2552,11 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await card.getByLabel('Text').fill(`${first} – fällt aus, Halle gesperrt`);
   await card.getByRole('button', { name: 'Speichern' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
-  // Erst weiter, wenn das Mitglied die geänderte Fassung geladen hat (Issue #68): Kommt die Antwort auf /board nach dem
-  // Neuladen veraltet an (z. B. aus einem Speicher), schlägt der Test hier mit einer klaren Meldung fehl statt später am
-  // fehlenden „+1 weitere“.
+  // Nach dem Neuladen kommt zuerst der gespeicherte Stand (Issue #108), die geänderte Fassung folgt, sobald das Netz
+  // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');
-  const boardAfterReload = page.waitForResponse((r) => r.request().method() === 'GET' && /\/board(\?|$|&)/.test(r.url()));
   await page.reload();
-  const loaded = await boardAfterReload;
-  const texts = ((await loaded.json()) as { items: { text: string }[] }).items.map((i) => i.text);
-  expect(texts, `Brett nach dem Neuladen${loaded.fromServiceWorker() ? ' (über den Service Worker)' : ''}`).toContain(
-    `${first} – fällt aus, Halle gesperrt`,
-  );
+  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible();
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await banner.getByRole('button', { name: '+1 weitere' }).click();
   await expect(banner).toContainText(`${first} – fällt aus, Halle gesperrt`);
@@ -2220,6 +2723,80 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   // Aufräumen
   await card.getByRole('button', { name: 'Entfernen' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag entfernt');
+  await member.close();
+});
+
+test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mitglied sie zeigt', async ({ page, browser }) => {
+  // Die Verwaltung trägt den Eintritt mit Datum ein; die Anzeige wählt nur die Person, auf der Seite steht nur das Jahr.
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberMenu(page, 'Eintritt');
+  const adminCard = page.locator('.member-join-year');
+  await adminCard.getByLabel('Datum oder Jahr').fill('1.4.2005');
+  await adminCard.getByRole('button', { name: 'Eintritt speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
+  await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
+  await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
+  await expect(adminCard).toContainText('Nicht anzeigen (wählt nur die Person selbst)');
+  await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
+
+  // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
+  const member = await browser.newPage();
+  member.on('dialog', (d) => d.accept());
+  await login(member, 'mitglied2');
+  await member.getByRole('button', { name: 'Konto' }).click();
+  const birthday = member.locator('.birthday-card');
+  await birthday.getByLabel('Tag').selectOption('12');
+  await birthday.getByLabel('Monat').selectOption('3');
+  await birthday.getByLabel('Jahr', { exact: true }).fill('1988');
+  await birthday.getByLabel(/Alter anzeigen/).check();
+  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('none');
+  await birthday.getByLabel(/Auf meiner Seite/).selectOption('public');
+  await expect(birthday).toContainText('Dort steht das ganze Datum mit deinem Alter.');
+  await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  const joined = member.locator('.join-year-card');
+  await expect(joined.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
+  await joined.getByLabel(/Auf meiner Seite/).selectOption('members');
+  await joined.getByRole('button', { name: 'Eintritt speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Eintritt gespeichert');
+  await joined.scrollIntoViewIfNeeded();
+  await shot(member, '36b-eintritt-konto');
+
+  // Ein anderes Mitglied sieht beides auf der Seite.
+  const today = new Date();
+  const age = today.getFullYear() - 1988 - (today.getMonth() < 2 || (today.getMonth() === 2 && today.getDate() < 12) ? 1 : 0);
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/mitglieder/liste');
+  await page.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
+  const facts = page.locator('.member-page .member-page-facts');
+  await expect(facts).toHaveText(new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 2005$`));
+  await shot(page, '1d-mitglied-seite');
+
+  // Ohne Anmeldung nur der Geburtstag.
+  await page.context().clearCookies();
+  await page.reload();
+  await expect(facts).toHaveText(/^Geburtstag 12\. März 1988 \(\d+ Jahre\)$/);
+
+  // Ohne „Alter anzeigen“ nur Tag und Monat; „Nicht anzeigen“ blendet ihn aus.
+  await birthday.getByLabel(/Alter anzeigen/).uncheck();
+  await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  await page.reload();
+  await expect(facts).toHaveText('Geburtstag 12. März');
+  await birthday.getByLabel(/Auf meiner Seite/).selectOption('none');
+  await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
+  await page.reload();
+  await expect(page.locator('.member-page').getByRole('heading', { name: 'Mitglied2' })).toBeVisible();
+  await expect(facts).toHaveCount(0);
+
+  // Aufräumen (WordPress behält die Daten zwischen den Läufen)
+  await birthday.getByRole('button', { name: 'Entfernen' }).click();
+  await expect(member.locator('.toast')).toHaveText('Geburtstag entfernt');
+  await joined.getByRole('button', { name: 'Entfernen' }).click();
+  await expect(member.locator('.toast')).toHaveText('Eintritt entfernt');
   await member.close();
 });
 

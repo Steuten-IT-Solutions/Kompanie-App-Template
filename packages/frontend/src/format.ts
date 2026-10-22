@@ -14,6 +14,12 @@ export function parseLocalDate(ymd: string): Date {
 
 export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
 
+/** Datum vom Server, das auch nur das Jahr sein kann (JJJJ-MM-TT oder JJJJ, z. B. Eintritt), zum Anzeigen. */
+export const formatYearOrDate = (value: string): string => (value.length === 4 ? value : formatDate(value));
+
+/** Dasselbe zum Bearbeiten: TT.MM.JJJJ oder das Jahr. */
+export const editYearOrDate = (value: string): string => (value.length === 10 ? value.split('-').reverse().join('.') : value);
+
 /** Zeitpunkt des Servers ('YYYY-MM-DD HH:MM:SS', UTC) als lokales Datum. */
 export const formatUtcDate = (utc: string) => dateFmt.format(new Date(utc.replace(' ', 'T') + 'Z'));
 
@@ -25,6 +31,26 @@ export function todayYmd(): string {
 
 export function formatPoints(points: number): string {
   return (points > 0 ? '+' : '') + points.toLocaleString('de-DE');
+}
+
+/**
+ * Pluralformen der Standardbezeichnungen für Rollen. Eigene Bezeichnungen lassen sich nicht sicher beugen und
+ * bleiben unverändert; Wörter auf -er oder -el (Anwärter, Verwalter, Jungmariner) heißen im Plural ohnehin gleich.
+ */
+const ROLE_PLURALS: Record<string, string> = { Mitglied: 'Mitglieder', Gast: 'Gäste', Admin: 'Admins' };
+
+/** Rollenbezeichnung mit Anzahl, ab 2 (und bei 0) im Plural: „Mitglied 1“, „Mitglieder 45“. */
+export const roleCount = (label: string, count: number): string => `${count === 1 ? label : (ROLE_PLURALS[label] ?? label)} ${count}`;
+
+/**
+ * Zähler je Gruppe über Mitgliederlisten in umgekehrter Reihenfolge der Rollen (Einstellungen → Rollen, von unten nach
+ * oben): Bei Gast, Anwärter, Mitglied stehen die Mitglieder vor den Anwärtern. Gruppen ohne Personen fehlen.
+ */
+export function groupCounts(roles: { key: string; label: string }[], counts: Map<string, number>): string[] {
+  return roles
+    .filter((r) => (counts.get(r.key) ?? 0) > 0)
+    .reverse()
+    .map((r) => roleCount(r.label, counts.get(r.key) ?? 0));
 }
 
 /** "2,50" / "2.50" / "2" → 250 Cent; null bei ungültiger Eingabe. */

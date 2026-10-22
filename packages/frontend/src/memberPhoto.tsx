@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, type EncodedFile } from './api';
 import { badgeSrc } from './RankBadge';
 
 /**
  * Fotos der Mitglieder. Hochladen, ersetzen und entfernen nur, wer Mitglieder anlegen darf; sehen die Person selbst
- * (Konto) und wer die Mitglieder in der Verwaltung sieht. Der Server speichert 128 und 480 Pixel.
+ * (Konto) und wer die Mitglieder in der Verwaltung sieht. Der Server speichert 128, 480 und 1024 Pixel.
  */
 
 /** Längere Kante beim Hochladen: genug für die große Fassung, und die Anfrage bleibt klein (Server-Grenzen). */
 const UPLOAD_EDGE = 1024;
+/** Fassung für die vergrößerte Ansicht (so groß wie hochgeladen); ältere Fotos haben sie nicht, dann die große. */
+const ZOOM_PIXELS = 1024;
 const UPLOAD_QUALITY = 0.9;
 
 /** Darstellungsgrößen; geladen wird die passende Fassung (128 oder 480 Pixel, für hochauflösende Displays reichlich). */
-export type AvatarSize = 'small' | 'large';
-const PIXELS: Record<AvatarSize, number> = { small: 128, large: 480 };
+export type AvatarSize = 'small' | 'medium' | 'large';
+const PIXELS: Record<AvatarSize, number> = { small: 128, medium: 128, large: 480 };
 
 /** Ein gewähltes, schon verkleinertes Foto: für die API und als Vorschau. */
 export type PreparedPhoto = { file: EncodedFile; preview: string };
@@ -82,6 +85,80 @@ export function MemberAvatar({ url, name, size = 'small' }: { url?: string | nul
   );
 }
 
+/**
+ * Foto vergrößert über der Seite (1024-Pixel-Fassung, scharf auch bei hoher Pixeldichte; ganzes Bild statt runder
+ * Ausschnitt), damit sich neue Mitglieder die Gesichter einprägen können. Schließen mit ✕, Escape oder Tippen neben
+ * das Bild. Im body, damit es nicht im Absatz der Dienstgrad-Zeile steht und deren Farbe erbt.
+ */
+function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  // Vor Datenbankversion 18 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
+  const [fallback, setFallback] = useState(false);
+  // Bis das Bild da ist, dreht sich die Ladeschnecke (die 1024er-Fassung braucht im Mobilnetz einen Moment).
+  const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  const src = url.startsWith('data:') ? url : badgeSrc(url, fallback ? PIXELS.large : ZOOM_PIXELS);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div
+      className="lightbox member-photo-zoom"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Foto von ${name}`}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <figure onClick={(e) => e.target === e.currentTarget && onClose()}>
+        {state === 'loading' && (
+          <span className="member-photo-zoom-loading" role="status" aria-label="Foto lädt">
+            <span className="spinner" aria-hidden="true" />
+          </span>
+        )}
+        {state === 'failed' ? (
+          <p className="member-photo-zoom-error">Das Foto lässt sich gerade nicht laden.</p>
+        ) : (
+          <img
+            src={src}
+            alt={`Foto von ${name}`}
+            decoding="async"
+            hidden={state === 'loading'}
+            onLoad={() => setState('loaded')}
+            onError={() => (fallback || url.startsWith('data:') ? setState('failed') : setFallback(true))}
+          />
+        )}
+        <figcaption>{name}</figcaption>
+      </figure>
+      <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
+        ✕
+      </button>
+    </div>,
+    document.body,
+  );
+}
+
+/** Foto in den Mitgliedsdetails und der Mitgliederliste: Antippen vergrößert es; ohne Foto nur die Anfangsbuchstaben. */
+export function ZoomableAvatar({ url, name, size = 'large' }: { url?: string | null; name: string; size?: AvatarSize }) {
+  const [zoomed, setZoomed] = useState(false);
+  const close = useCallback(() => setZoomed(false), []);
+  if (!url) return <MemberAvatar url={url} name={name} size={size} />;
+  return (
+    <>
+      <button type="button" className="member-photo-open" onClick={() => setZoomed(true)} aria-label={`Foto von ${name} vergrößern`}>
+        <MemberAvatar url={url} name={name} size={size} />
+      </button>
+      {zoomed && <PhotoZoom url={url} name={name} onClose={close} />}
+    </>
+  );
+}
+
 /** Foto auswählen (Anlegen eines Mitglieds): Vorschau, Ändern und Entfernen; gespeichert wird erst mit dem Formular. */
 export function PhotoPicker({
   name,
@@ -136,12 +213,16 @@ export function PhotoPicker({
   );
 }
 
-/** Foto in den Mitgliedsdetails: groß anzeigen; mit Recht hochladen, ersetzen und entfernen (sofort gespeichert). */
+/**
+ * Foto in den Mitgliedsdetails: groß anzeigen; mit Recht hochladen, ersetzen und entfernen (sofort gespeichert).
+ * Mit showAvatar={false} nur die Knöpfe, wenn das Foto schon an anderer Stelle steht.
+ */
 export function MemberPhotoPanel({
   id,
   name,
   url,
   editable,
+  showAvatar = true,
   onChanged,
   onToast,
 }: {
@@ -149,6 +230,7 @@ export function MemberPhotoPanel({
   name: string;
   url: string | null;
   editable: boolean;
+  showAvatar?: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -185,10 +267,10 @@ export function MemberPhotoPanel({
     }
   }
 
-  if (!url && !editable) return null;
+  if (!editable && (!url || !showAvatar)) return null;
   return (
     <div className="member-photo">
-      <MemberAvatar url={url} name={name} size="large" />
+      {showAvatar && <MemberAvatar url={url} name={name} size="large" />}
       {editable && (
         <>
           <div className="button-row">

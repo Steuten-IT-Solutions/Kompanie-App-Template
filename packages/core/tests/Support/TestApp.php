@@ -35,7 +35,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -81,5 +81,19 @@ final class TestApp
             $app->features()->update($features ?? array_fill_keys(Features::keys(), true));
         }
         return $app;
+    }
+
+    /**
+     * Eigene Rolle „Anwärter“, wie ein Admin sie einrichtet (Issue #23): nur der interne Kalender, beim Anlegen von Konten
+     * wählbar, zum Mitglied zu machen. Gibt ihren Schlüssel zurück (beim zweiten Aufruf denselben).
+     */
+    public static function candidateRole(App $app): string
+    {
+        foreach ($app->roles()->all() as $key => $r) {
+            if ($r['label'] === 'Anwärter') {
+                return $key;
+            }
+        }
+        return $app->roles()->create(['label' => 'Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key'];
     }
 }

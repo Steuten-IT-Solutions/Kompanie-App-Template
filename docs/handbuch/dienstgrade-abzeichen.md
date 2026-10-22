@@ -4,7 +4,7 @@ reihenfolge: 58
 rechte: [manage_ranks]
 bereiche: [ranks]
 ---
-Zu jedem {begriff.rank} kannst du ein Abzeichen hinterlegen. Es erscheint überall, wo der {begriff.rank} steht: bei den Mitgliedern unter **Meins → {begriff.rank}** (groß über dem eigenen {begriff.rank}, dazu beim nächsten {begriff.rank}, in der Liste aller {bereich.ranks} und im Verlauf), in der Verwaltung in der Mitgliederliste, beim {begriff.rank} eines Mitglieds und in der Beförderungsübersicht. Ohne Abzeichen steht wie bisher nur die Bezeichnung.
+Zu jedem {begriff.rank} kannst du ein Abzeichen hinterlegen. Es erscheint überall, wo der {begriff.rank} steht: bei den Mitgliedern unter **Meins → {begriff.rank}** (groß über dem eigenen {begriff.rank}, dazu beim nächsten {begriff.rank}, in der Liste aller {bereich.ranks} und im Verlauf), in der Verwaltung in der Mitgliederliste und unter dem Namen in den Details eines Mitglieds (für alle, die die Mitgliederliste öffnen dürfen, auch ohne das Recht, {bereich.ranks} zu verwalten), beim {begriff.rank} eines Mitglieds und in der Beförderungsübersicht. Ohne Abzeichen steht wie bisher nur die Bezeichnung.
 
 Abzeichen pflegst du in derselben Liste, in der du die {bereich.ranks} anlegst; wie das geht, steht unter [{bereich.ranks} verwalten](seite:dienstgrade-verwalten).
 

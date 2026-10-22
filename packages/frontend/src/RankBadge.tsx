@@ -42,3 +42,13 @@ export function RankLabel({ url, title, size = 'small' }: { url?: string | null;
     </span>
   );
 }
+
+/** Abzeichen und darunter die Bezeichnung (Mitgliederliste); ohne Abzeichen nur die Bezeichnung. */
+export function RankStack({ url, title }: { url?: string | null; title: string }) {
+  return (
+    <span className="rank-stack">
+      <RankBadge url={url} title={title} size="medium" />
+      <span>{title}</span>
+    </span>
+  );
+}
