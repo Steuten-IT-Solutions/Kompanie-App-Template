@@ -44,7 +44,6 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           strafen: 'meine-strafen',
           dienstgrad: 'mein-dienstgrad',
           anwesenheit: 'meine-anwesenheit',
-          aemter: 'aemter',
           konto: 'anmelden-und-konto',
         }[sub ?? (ctx.can('member') ? 'uebersicht' : 'konto')] ?? 'meins-uebersicht'
       );

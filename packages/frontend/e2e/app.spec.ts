@@ -1200,7 +1200,7 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
 
   // Sitzung bleibt gültig: Daten laden weiterhin (neues Token wurde geholt).
   await page.getByRole('button', { name: 'Meins' }).click();
-  await expect(page.locator('.stat-label').first()).toHaveText('Meine Punkte');
+  await expect(page.locator('.stat-label').first()).toHaveText('Punkte');
 
   await login(page, 'mitglied2', NEW);
   await openKonto(page);
