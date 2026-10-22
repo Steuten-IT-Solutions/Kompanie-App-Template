@@ -45,6 +45,7 @@ import { MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, MemberPhotoPanel, PhotoPicker, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FormerImport, FormerList, FormerPanel, formerSummary } from './Ehemalige';
+import { MemberImport } from './MitgliederImport';
 
 type Sub =
   | 'mitglieder'
@@ -67,7 +68,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'import' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -93,6 +94,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <NewMember />
       ) : sub === 'neu-mehrere' && can('create_users') ? (
         <BulkNewMembers canPoints={canPoints()} />
+      ) : sub === 'import' && can('create_users') ? (
+        <ImportPage />
       ) : active === 'ehemalige' && arg === 'import' ? (
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (
@@ -125,6 +128,19 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 }
 
 /* ------------------------------------------------------------------ */
+
+/** Verwaltung → Mitglied anlegen → Aus Datei importieren (auch Anwärter und Ehemalige). */
+function ImportPage() {
+  return (
+    <div>
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
+        ‹ Einzeln anlegen
+      </button>
+      <h2 className="member-name">Mitglieder importieren</h2>
+      <MemberImport onDone={() => navigate('verwaltung/mitglieder')} />
+    </div>
+  );
+}
 
 /** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
 type MembersState = {
@@ -901,6 +917,9 @@ function NewMember() {
       </button>
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
         Mehrere auf einmal anlegen
+      </button>
+      <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/import')}>
+        Aus Datei importieren (Excel oder CSV)
       </button>
       <NameFields value={name} onChange={setName} />
       <label className="field">

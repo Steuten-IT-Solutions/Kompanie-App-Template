@@ -31,6 +31,31 @@ Die App prüft zuerst alle Einträge: Ist einer ungültig (z. B. ein vergebener 
 
 Andere Rollen vergibt danach, wer Rollen vergeben darf.
 
+## Aus Datei importieren (Excel oder CSV)
+Gibt es schon eine Mitgliederliste, z. B. in Excel, übernimmst du alle auf einmal, auf Wunsch auch die Ehemaligen. Im Formular **+ Mitglied anlegen** auf **Aus Datei importieren (Excel oder CSV)** tippen; derselbe Schritt kommt auch in der Ersteinrichtung. **Vorlage herunterladen** liefert eine Tabelle mit allen Spalten und Beispielen.
+
+Eine Zeile je Person; die **erste Zeile enthält die Spaltennamen**. Die Reihenfolge der Spalten ist egal, ebenso Groß- und Kleinschreibung. Nötig ist nur **Vorname**; die App kennt außerdem:
+
+| Spalte | Inhalt |
+|---|---|
+| Nachname (auch „Name“) | |
+| Status (auch „Rolle“) | leer oder {rolle.member}, eine andere Rolle, die sich beim Anlegen wählen lässt (z. B. Anwärter), oder **ehemalig** |
+| Benutzername, E-Mail | freiwillig; ohne Benutzernamen bildet die App ihn aus dem Namen |
+| Geburtstag | TT.MM.JJJJ oder ohne Jahr TT.MM. (nur mit dem Bereich {bereich.birthdays}) |
+| Eintritt | TT.MM.JJJJ oder nur das Jahr; bei Ehemaligen auch „Gründer“ |
+| Punkte, Dienstgrad, Titel | Anfangsbestand an {bereich.points}, {begriff.rank} und {bereich.titles} mit ihrer Bezeichnung (mehrere {bereich.titles} mit Komma getrennt); nur für Rollen mit Mitgliederbereich und nur, wenn du sie vergeben darfst |
+| Ausgeschieden, Grund | nur bei Ehemaligen, wie unter [Ehemalige importieren](seite:ehemalige-mitglieder) |
+
+Andere Spalten (z. B. Telefon) übergeht die App und sagt das in der Vorschau, ebenso Spalten zu ausgeschalteten Bereichen. {begriff.rank} und {bereich.titles} müssen in der App schon angelegt sein.
+
+**Datei wählen** nimmt Excel-Dateien (.xlsx, das erste Tabellenblatt) und CSV-Dateien; ältere Excel-Dateien (.xls) speicherst du vorher als .xlsx. Du kannst die Zellen auch kopieren und ins Feld einfügen. **Vorschau** zeigt jede Zeile mit dem, was die App verstanden hat, und Fehler je Zeile (z. B. ein Datum, das es nicht gibt, oder eine E-Mail-Adresse, die schon vergeben ist). Erst wenn keine Zeile einen Fehler hat, legt **Übernehmen** die Personen an.
+
+Danach stehen die Zugangsdaten aller neuen aktiven Konten auf einer Seite, zum Ausdrucken als Zettel je Person oder zum Kopieren. Die Startpasswörter stehen **nur dieses eine Mal** da. Ehemalige bekommen ein Konto ohne Anmeldung, wie unter [Ehemalige Mitglieder](seite:ehemalige-mitglieder) beschrieben.
+
+Wer schon ein Konto mit genau diesem Vor- und Nachnamen hat, wird übersprungen; ein zweiter Import derselben Datei legt also niemanden doppelt an. Zwei Personen mit gleichem Namen in der Datei sind ein Fehler: Mach sie unterscheidbar, z. B. mit „I“ und „II“ am Nachnamen. Höchstens 500 Personen auf einmal. Fotos trägst du danach einzeln nach.
+
+Die Datei enthält persönliche Daten: Lösche sie nach dem Import, wenn du sie nicht mehr brauchst.
+
 ## Foto eines Mitglieds
 Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mitglieder anlegen darf, und zwar bei allen Konten, die er auch sonst verwalten darf (siehe den Hinweis unten). Die Person selbst sieht ihr Foto unter **Konto**, ändert es aber nicht.
 

@@ -486,6 +486,48 @@ export interface FormerImportResult {
   applied: boolean;
 }
 
+/** Zeile der Vorschau beim Import der Mitglieder (POST /members/import) */
+export interface MemberImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  status?: 'active' | 'former';
+  /** Rolle des neuen Kontos (null bei Ehemaligen) */
+  level?: Level | null;
+  /** leer bei Ehemaligen (sie melden sich nicht an) */
+  username?: string;
+  email?: string;
+  /** JJJJ-MM-TT oder MM-TT */
+  birthday?: string;
+  /** JJJJ-MM-TT oder JJJJ */
+  joined_on?: string;
+  points?: number;
+  rank?: string;
+  titles?: string[];
+  /** nur Ehemalige */
+  reason?: FormerReason;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface MemberImportResult {
+  columns: { used: string[]; ignored: { column: string; reason: string }[] };
+  rows: MemberImportRow[];
+  /** Vorschau: was angelegt würde; nach dem Übernehmen: was angelegt wurde */
+  new: { active: number; former: number };
+  existing: number;
+  offices_linked: number;
+  applied: boolean;
+  /** Zugangsdaten der neuen Mitglieder und Anwärter (nur nach dem Übernehmen) */
+  created: CreatedUser[];
+  /** Abbruch mittendrin: die schon angelegten stehen in created */
+  error?: string;
+}
+
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
 export interface MemberRights {
   /** Rechte der Rolle (mit dem im Mitgliederbereich enthaltenen Kalender) */
@@ -1260,6 +1302,7 @@ export const api = {
   updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
   reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
   importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
+  importMembers: (csv: string, apply: boolean) => request<MemberImportResult>('POST', '/members/import', { csv, apply }),
   createUser: (
     data: PersonName & {
       username?: string;

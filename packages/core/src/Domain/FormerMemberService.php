@@ -241,18 +241,7 @@ final class FormerMemberService
      */
     public function import(User $actor, mixed $csv, bool $apply): array
     {
-        if (!is_string($csv) || trim($csv) === '') {
-            throw ApiError::invalid('Bitte die Tabelle einfügen oder eine Datei wählen.');
-        }
-        if (strlen($csv) > self::IMPORT_MAX_BYTES) {
-            throw ApiError::invalid('Die Tabelle ist zu groß (höchstens 200 KB).');
-        }
-        if (!mb_check_encoding($csv, 'UTF-8')) {
-            // Excel speichert „CSV (Trennzeichen-getrennt)“ unter Windows als Windows-1252.
-            $csv = (string) mb_convert_encoding($csv, 'UTF-8', 'Windows-1252');
-        }
-        $csv = (string) preg_replace('/^\xEF\xBB\xBF/', '', $csv);
-        $lines = preg_split('/\r\n|\r|\n/', $csv) ?: [];
+        $lines = CsvTable::lines($csv, self::IMPORT_MAX_BYTES);
         $accounts = [];
         foreach ($this->app->users->list(true) as $u) {
             $accounts[mb_strtolower($u->name)][] = $u;
@@ -270,7 +259,7 @@ final class FormerMemberService
             if (trim(str_replace([';', "\t"], '', $line)) === '') {
                 continue;
             }
-            $cells = array_map('trim', str_getcsv($line, str_contains($line, ';') ? ';' : "\t", '"', ''));
+            $cells = CsvTable::cells($line, str_contains($line, ';') ? ';' : "\t");
             if ($count === 0 && mb_strtolower($cells[0] ?? '') === 'vorname') {
                 continue; // Kopfzeile
             }
@@ -322,10 +311,7 @@ final class FormerMemberService
         $done = 0;
         foreach ($planned as [$prepared, $data]) {
             try {
-                $created = $members->insert($prepared);
-                $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.');
-                $this->deactivate($actor, $target, $data);
-                $names[mb_strtolower($prepared['name'])] = $target->id;
+                $names[mb_strtolower($prepared['name'])] = $this->createImported($actor, $prepared, $data);
             } catch (ApiError $e) {
                 $this->app->offices()->linkNames(array_filter($names), true);
                 throw ApiError::invalid(sprintf('Nach %d von %d Personen abgebrochen bei „%s“: %s Ein neuer Import legt nur die übrigen an.', $done, count($planned), $prepared['name'], $e->getMessage()));
@@ -335,6 +321,21 @@ final class FormerMemberService
         $result['offices_linked'] = $this->app->offices()->linkNames($names, true);
         $result['applied'] = true;
         return $result;
+    }
+
+    /**
+     * Neues Konto (aus MemberService::prepare) gleich als ehemalig eintragen, wie beim Import der Ehemaligen.
+     *
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string} $prepared
+     * @param array{reason: string, joined_on: string, founder: bool, left_on: string} $data aus importData()
+     * @return int ID des Kontos
+     */
+    public function createImported(User $actor, array $prepared, array $data): int
+    {
+        $created = $this->app->members()->insert($prepared);
+        $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.');
+        $this->deactivate($actor, $target, $data);
+        return $target->id;
     }
 
     /**
@@ -431,17 +432,33 @@ final class FormerMemberService
         if (($cells[0] ?? '') === '') {
             throw ApiError::invalid('Der Vorname fehlt (1. Spalte).');
         }
-        $joinedRaw = $cells[2] ?? '';
-        $founder = in_array(mb_strtolower($joinedRaw), ['gründer', 'gründungsmitglied'], true);
-        $reasonRaw = mb_strtolower($cells[4] ?? '');
+        return self::importData($cells[2] ?? '', $cells[3] ?? '', $cells[4] ?? '', $today, ' (5. Spalte)');
+    }
+
+    /**
+     * Eintritt, Ausscheiden und Grund aus einer Tabelle (auch MemberImportService): Eintritt „Gründer“ bzw.
+     * „Gründungsmitglied“ ist ein Gründungsmitglied ohne Datum, Grund leer heißt ausgetreten.
+     *
+     * @return array{reason: string, joined_on: string, founder: bool, left_on: string}
+     */
+    public static function importData(string $joinedRaw, string $leftRaw, string $reasonRaw, \DateTimeImmutable $today, string $where = ''): array
+    {
+        $founder = self::isFounder($joinedRaw);
+        $reasonRaw = mb_strtolower($reasonRaw);
         $reason = $reasonRaw === '' ? self::REASON_LEFT : array_search($reasonRaw, self::REASONS, true);
         if ($reason === false) {
-            $reason = isset(self::REASONS[$reasonRaw]) ? $reasonRaw : throw ApiError::invalid('Grund „ausgetreten“, „verstorben“ oder „sonstiges“ erwartet (5. Spalte).');
+            $reason = isset(self::REASONS[$reasonRaw]) ? $reasonRaw : throw ApiError::invalid('Grund „ausgetreten“, „verstorben“ oder „sonstiges“ erwartet' . $where . '.');
         }
         $joined = $founder ? '' : self::date($joinedRaw, 'Eintritt', $today);
-        $left = self::date($cells[3] ?? '', $reason === self::REASON_DECEASED ? 'Todestag' : 'Ausgeschieden', $today);
+        $left = self::date($leftRaw, $reason === self::REASON_DECEASED ? 'Todestag' : 'Ausgeschieden', $today);
         self::checkOrder($joined, $left);
         return ['reason' => (string) $reason, 'joined_on' => $joined, 'founder' => $founder, 'left_on' => $left];
+    }
+
+    /** Eintritt „Gründer“ bzw. „Gründungsmitglied“ in einer Tabelle. */
+    public static function isFounder(string $joinedRaw): bool
+    {
+        return in_array(mb_strtolower(trim($joinedRaw)), ['gründer', 'gründungsmitglied'], true);
     }
 
     /**

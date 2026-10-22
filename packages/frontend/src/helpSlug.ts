@@ -98,7 +98,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     listen: 'listen',
   };
   if (sub && tabs[sub]) return tabs[sub];
-  if (sub === 'neu' || sub === 'neu-mehrere') return 'mitglieder-anlegen';
+  if (sub === 'neu' || sub === 'neu-mehrere' || sub === 'import') return 'mitglieder-anlegen';
   // Liste der Ehemaligen und Import (die Seiten einer ehemaligen Person wie bei Mitgliedern, unten)
   if (sub === 'ehemalige' && (!arg || arg === 'import')) return 'ehemalige-mitglieder';
   if (sub === 'mitglied' || (sub === 'ehemalige' && /^\d+$/.test(arg ?? ''))) {

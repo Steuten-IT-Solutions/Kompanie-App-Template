@@ -90,6 +90,7 @@ const PATHS = [
   ['verwaltung', 'listen', '3'],
   ['verwaltung', 'neu'],
   ['verwaltung', 'neu-mehrere'],
+  ['verwaltung', 'import'],
   ['verwaltung', 'ehemalige'],
   ['verwaltung', 'ehemalige', 'import'],
   ...['mitglied', 'ehemalige'].flatMap((base) =>
