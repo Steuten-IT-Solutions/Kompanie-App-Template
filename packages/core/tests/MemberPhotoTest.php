@@ -149,8 +149,12 @@ final class MemberPhotoTest extends TestCase
         $photos = $this->app->memberPhotos();
         $deliver = fn (?int $viewer, mixed $v = null, mixed $s = '480'): array => $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $this->m, $v ?? $info['version'], $s);
 
-        $this->assertSame(401, $deliver(null)['status']);
+        // Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung, dann öffentlich zwischenzuspeichern.
+        $public = $deliver(null);
+        $this->assertSame([200, 'public, max-age=86400'], [$public['status'], $public['headers']['Cache-Control']]);
+        $this->assertSame('public, no-cache', $deliver(null, 'alt')['headers']['Cache-Control']);
         $this->app->features()->update(['directory' => false]);
+        $this->assertSame(401, $deliver(null)['status'], 'ohne Mitgliederliste nur mit Anmeldung');
         $this->assertSame(403, $deliver($other)['status'], 'ohne Mitgliederliste sehen andere Mitglieder das Foto nicht');
         $own = $deliver($this->m);
         $this->assertSame([200, 'image/jpeg', 'private, max-age=86400'], [$own['status'], $own['headers']['Content-Type'], $own['headers']['Cache-Control']]);
@@ -165,13 +169,13 @@ final class MemberPhotoTest extends TestCase
         $this->assertNotFalse($size);
         $this->assertSame(600, $size[0], '1024: so groß wie hochgeladen, nie vergrößert');
 
-        // Vor Datenbankversion 17 hochgeladen: ohne 1024er (die App nimmt dann die 480er), die anderen Größen wie bisher.
+        // Vor Datenbankversion 18 hochgeladen: ohne 1024er (die App nimmt dann die 480er), die anderen Größen wie bisher.
         $this->app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$this->m]);
         $this->assertSame(404, $deliver($manager, null, '1024')['status']);
         $this->assertSame(200, $deliver($manager, null, '480')['status']);
     }
 
-    public function testDirectoryShowsPhotosOfMembersAndCandidatesOnly(): void
+    public function testDirectoryShowsPhotosOfMembersAndCandidatesToEveryone(): void
     {
         $candidate = $this->users->add('anwaerter', Roles::CANDIDATE);
         $guest = $this->users->add('gast', Roles::GUEST);
@@ -179,16 +183,19 @@ final class MemberPhotoTest extends TestCase
             $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);
         }
         $photos = $this->app->memberPhotos();
-        $deliver = function (int $viewer, int $owner) use ($photos): int {
+        $deliver = function (?int $viewer, int $owner) use ($photos): int {
             $version = $photos->repository()->find($owner)['version'] ?? '';
-            return $photos->forDelivery($this->users->find($viewer), $owner, $version, '128')['status'];
+            return $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $owner, $version, '128')['status'];
         };
 
         $this->assertSame(200, $deliver($candidate, $this->m), 'Anwärter sieht das Foto eines Mitglieds');
+        $this->assertSame(200, $deliver($guest, $this->m), 'Gäste sehen die Liste (Issue #112)');
+        $this->assertSame(200, $deliver(null, $this->m), 'ohne Anmeldung ebenso');
         $this->assertSame(403, $deliver($candidate, $guest), 'Gäste stehen nicht in der Liste: Foto bleibt verborgen');
-        $this->assertSame(403, $deliver($guest, $this->m), 'Gäste sehen die Liste nicht');
+        $this->assertSame(401, $deliver(null, $guest));
         $this->app->features()->update(['directory' => false]);
         $this->assertSame(403, $deliver($candidate, $this->m), 'Bereich aus');
+        $this->assertSame(401, $deliver(null, $this->m), 'Bereich aus');
     }
 
     public function testPhotoWhenCreatingAccounts(): void

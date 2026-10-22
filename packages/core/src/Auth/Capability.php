@@ -34,6 +34,8 @@ enum Capability: string
     case ManagePolls = 'manage_polls';
     /** Inventar pflegen: Einträge anlegen, ändern, umlagern, löschen, Verlauf sehen (Bereich Inventar, Issue #6). */
     case ManageInventory = 'manage_inventory';
+    /** Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere (Bereich Ämter, Issue #112). */
+    case ManageOffices = 'manage_offices';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */

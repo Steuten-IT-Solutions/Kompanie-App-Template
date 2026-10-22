@@ -92,7 +92,7 @@ export function MemberAvatar({ url, name, size = 'small' }: { url?: string | nul
  */
 function PhotoZoom({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  // Vor Datenbankversion 17 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
+  // Vor Datenbankversion 18 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
   const [fallback, setFallback] = useState(false);
   const src = url.startsWith('data:') ? url : badgeSrc(url, fallback ? PIXELS.large : ZOOM_PIXELS);
   useEffect(() => {

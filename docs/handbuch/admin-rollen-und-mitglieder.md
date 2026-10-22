@@ -28,6 +28,7 @@ Schaltest du unter **Bereiche** einen Bereich mit eigenen Aufgaben ein, kommt se
 - „{bereich.board} verwalten“
 - „{bereich.polls} verwalten“
 - „{bereich.inventory} verwalten“
+- „{bereich.offices} verwalten“
 
 Gibt es schon eine Rolle mit diesem Namen, legt die App keine zweite an. Schaltest du den Bereich aus und niemand hat die Rolle, verschwindet sie wieder. {bereich.calendar}, {bereich.news}, {bereich.gallery} und {bereich.birthdays} bringen keine eigene Rolle mit; die Geburtstage anderer pflegt, wer Mitglieder anlegen darf.
 

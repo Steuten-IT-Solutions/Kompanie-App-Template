@@ -790,9 +790,85 @@ final class Migrations
 )',
                 ],
             ],
+            // Ämter (Issue #112): Gruppen, Ämter, Amtszeiten (Jahre) und ihre Inhaber. Ein Inhaber ist ein Konto (user_id) oder
+            // ein freier Name; name ist bei Konten die Momentaufnahme und bleibt stehen, wenn das Konto gelöscht wird
+            // (user_id wird dann NULL). kind: period (Zeitraum, end_year NULL = bis heute) oder point (ein Jahr, z. B. eine
+            // Ehrung). offices.title_id verknüpft ein Amt mit einem Titel, der mit laufenden Amtszeiten vergeben wird.
+            17 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {office_groups} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(60) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {offices} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  group_id bigint(20) unsigned DEFAULT NULL,
+  title varchar(60) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  title_id bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY group_id (group_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {office_terms} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  office_id bigint(20) unsigned NOT NULL,
+  kind varchar(10) NOT NULL DEFAULT \'period\',
+  start_year int(11) NOT NULL,
+  end_year int(11) DEFAULT NULL,
+  note varchar(100) NOT NULL DEFAULT \'\',
+  PRIMARY KEY (id),
+  KEY office_id (office_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {office_holders} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  term_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned DEFAULT NULL,
+  name varchar(191) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY term_id (term_id),
+  KEY user_id (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {office_groups} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE TABLE IF NOT EXISTS {offices} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER DEFAULT NULL,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  title_id INTEGER DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {offices}_group_id ON {offices} (group_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_terms} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  office_id INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT \'period\',
+  start_year INTEGER NOT NULL,
+  end_year INTEGER DEFAULT NULL,
+  note TEXT NOT NULL DEFAULT \'\'
+)',
+                    'CREATE INDEX IF NOT EXISTS {office_terms}_office_id ON {office_terms} (office_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_holders} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  term_id INTEGER NOT NULL,
+  user_id INTEGER DEFAULT NULL,
+  name TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE INDEX IF NOT EXISTS {office_holders}_term_id ON {office_holders} (term_id)',
+                    'CREATE INDEX IF NOT EXISTS {office_holders}_user_id ON {office_holders} (user_id)',
+                ],
+            ],
             // Fotos der Mitglieder zusätzlich in 1024 Pixeln (xlarge) für die vergrößerte Ansicht. Ohne Vorgabe (NULL):
             // Fotos von vorher haben diese Fassung erst nach erneutem Hochladen; die App nimmt bis dahin die 480er.
-            17 => [
+            18 => [
                 'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge mediumtext DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge TEXT DEFAULT NULL'],
             ],

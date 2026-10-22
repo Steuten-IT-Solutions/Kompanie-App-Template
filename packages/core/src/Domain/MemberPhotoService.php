@@ -19,9 +19,9 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert), in der
  *   Datenbank (MemberPhotoRepository).
  * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
- *   directory alle Mitglieder und Anwärter die Fotos der Personen in der Mitgliederliste (canSeeInDirectory). Ausgeliefert
- *   über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide Adapter gleich
- *   antworten.
+ *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste (Issue #112, inDirectory).
+ *   Ausgeliefert über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide
+ *   Adapter gleich antworten.
  */
 final class MemberPhotoService
 {
@@ -176,12 +176,12 @@ final class MemberPhotoService
     }
 
     /**
-     * Mitgliederliste für Mitglieder und Anwärter (Bereich directory): Wer sie sieht, sieht die Fotos der Personen darin,
-     * nicht die von Gästen.
+     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): Die Fotos der Personen darin sieht jeder, auch ohne
+     * Anmeldung; die von Gästen nicht.
      */
-    private function canSeeInDirectory(User $viewer, int $userId): bool
+    private function inDirectory(int $userId): bool
     {
-        if (!$this->app->features()->enabled('directory') || !($viewer->can(Capability::Member) || $viewer->can(Capability::Calendar))) {
+        if (!$this->app->features()->enabled('directory')) {
             return false;
         }
         $target = $this->app->users->find($userId);
@@ -217,10 +217,11 @@ final class MemberPhotoService
         if ($this->app->maintenance()->blocks($viewer)) {
             return $deny(503);
         }
-        if ($viewer === null) {
+        $public = $this->inDirectory($userId);
+        if ($viewer === null && !$public) {
             return $deny(401);
         }
-        if ($viewer->id !== $userId && !self::canSeeOthers($viewer) && !$this->canSeeInDirectory($viewer, $userId)) {
+        if ($viewer !== null && $viewer->id !== $userId && !self::canSeeOthers($viewer) && !$public) {
             return $deny(403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;
@@ -233,10 +234,10 @@ final class MemberPhotoService
         return ['status' => 200, 'headers' => [
             'Content-Type' => 'image/jpeg',
             'X-Content-Type-Options' => 'nosniff',
-            // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag und nur im Browser speichern: Ein entferntes Foto
-            // oder entzogene Rechte gelten so bald auch auf Geräten, die es schon geladen haben. In der Vorschau (Issue #63)
-            // nie speichern.
-            'Cache-Control' => $this->app->preview()->cacheControl($current ? 'private, max-age=86400' : 'private, no-cache'),
+            // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag speichern, nur im Browser, solange das Foto nicht
+            // öffentlich in der Mitgliederliste steht: Ein entferntes Foto oder entzogene Rechte gelten so bald auch auf
+            // Geräten, die es schon geladen haben. In der Vorschau (Issue #63) nie speichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(($public ? 'public' : 'private') . ($current ? ', max-age=86400' : ', no-cache')),
             'X-Robots-Tag' => 'noindex',
             'ETag' => '"' . $photo['version'] . '-' . $size . '"',
         ], 'body' => $body];

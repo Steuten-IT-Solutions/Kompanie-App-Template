@@ -3127,3 +3127,492 @@ fieldset.feature-list legend {
   border-top: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
+
+/* Ämter (Issue #112): Tab Mitglieder mit Umschalter, je Amt eine aufklappbare Karte („Ehrentafel“) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.members-switch {
+  margin-bottom: 14px;
+}
+.offices-tools {
+  justify-content: flex-end;
+  margin: 0 0 4px;
+}
+.office-group .section-title {
+  margin-top: 18px;
+}
+.office-card {
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.office-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+/* Siegel: Monogramm in der Kompaniefarbe mit Ring in der Akzentfarbe */
+.office-mono {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
+  color: var(--accent-on-primary);
+  box-shadow:
+    inset 0 0 0 2px var(--primary-deep),
+    inset 0 0 0 4px var(--accent);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+.office-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.office-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 1.08rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+.office-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.office-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.office-summary-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Fotos der aktuellen Inhaber, leicht übereinander */
+.office-faces {
+  display: flex;
+  flex: none;
+}
+.office-faces .member-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.62rem;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.office-faces > * + * {
+  margin-left: -5px;
+}
+.office-faces-more {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-text);
+  color: var(--card);
+  box-shadow: 0 0 0 2px var(--card);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.office-arrow {
+  flex: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--accent-dark);
+  transition: transform 0.15s ease;
+}
+.office-head[aria-expanded='true'] .office-arrow {
+  transform: rotate(90deg);
+}
+.office-body {
+  padding: 0 0 16px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card));
+}
+
+/* „Im Amt“: die aktuellen Inhaber auf der Kompaniefarbe, wie die Kopfleiste */
+.spotlight {
+  position: relative;
+  padding: 14px 14px 16px;
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
+    linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
+  color: var(--on-primary);
+  border-bottom: 3px solid var(--accent);
+}
+.spotlight-label {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-on-primary);
+  margin-bottom: 10px;
+}
+.spotlight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.spotlight-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--on-primary) 18%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--on-primary) 8%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+button.spotlight-person {
+  cursor: pointer;
+}
+button.spotlight-person:hover,
+button.spotlight-person:focus-visible {
+  background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+}
+.spotlight-avatar {
+  flex: none;
+  display: flex;
+}
+.spotlight-person .member-avatar {
+  flex: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.spotlight-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.spotlight-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.spotlight-since {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.spotlight-note {
+  font-size: 0.8rem;
+  font-style: italic;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.tl-heading {
+  margin: 16px 14px 4px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Chronik: Jahre | Linie | Karte; ab 720 px Linie in der Mitte, Karte und Jahr gegenüber */
+.tl {
+  --tl-years: 58px;
+  --tl-gap: 26px;
+  position: relative;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0 14px;
+}
+.tl::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: calc(14px + var(--tl-years) + var(--tl-gap) / 2 - 1px);
+  width: 2px;
+  background: linear-gradient(180deg, var(--primary-text), var(--line-strong) 40%, color-mix(in srgb, var(--line-strong) 30%, transparent));
+}
+.tl-item,
+.tl-decade {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--tl-years) var(--tl-gap) minmax(0, 1fr);
+  align-items: start;
+}
+.tl-item {
+  padding-bottom: 12px;
+}
+.tl-item:last-child {
+  padding-bottom: 0;
+}
+.tl-when {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-top: 8px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tl-when-year {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--primary-text);
+}
+.tl-when-small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.tl-dot {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-top: 12px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 3px solid var(--primary-text);
+  font-size: 0.7rem;
+  line-height: 1;
+  z-index: 1;
+}
+.tl-item.current .tl-dot {
+  background: var(--primary-text);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.tl-item.point .tl-dot {
+  width: 22px;
+  height: 22px;
+  margin-top: 8px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.85rem;
+}
+.tl-card {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  padding: 9px 12px 10px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+.tl-item.current .tl-card {
+  border-color: color-mix(in srgb, var(--primary-text) 45%, var(--line));
+  background: color-mix(in srgb, var(--primary-text) 7%, var(--card));
+}
+.tl-item.point .tl-card {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+}
+.tl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+}
+.tl-office {
+  font-weight: 600;
+}
+.tl-duration {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+/* Jahrzehnt-Marke auf der Linie */
+.tl-decade {
+  margin: 4px 0 10px;
+}
+.tl-decade-label {
+  grid-column: 1 / span 3;
+  grid-row: 1;
+  justify-self: start;
+  margin-left: calc(var(--tl-years) + var(--tl-gap) / 2);
+  transform: translateX(-50%);
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  z-index: 1;
+}
+.timeline-now {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.timeline-honor {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent-text);
+}
+.timeline-holders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.timeline-holders li {
+  min-width: 0;
+}
+.holder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 10px 2px 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.holder-chip .member-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.66rem;
+}
+.holder-chip-link {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--line));
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.holder-chip-link:hover,
+.holder-chip-link:focus-visible {
+  background: color-mix(in srgb, var(--primary-text) 12%, transparent);
+}
+.timeline-note {
+  margin-top: 6px;
+  font-size: 0.86rem;
+  font-style: italic;
+  color: var(--muted);
+}
+@media (min-width: 720px) {
+  .tl {
+    --tl-years: minmax(0, 1fr);
+  }
+  .tl::before {
+    left: calc(50% - 1px);
+  }
+  .tl-item,
+  .tl-decade {
+    grid-template-columns: minmax(0, 1fr) var(--tl-gap) minmax(0, 1fr);
+  }
+  .tl-decade-label {
+    grid-column: 2;
+    justify-self: center;
+    margin-left: 0;
+    transform: none;
+    white-space: nowrap;
+  }
+  /* Karte links, Jahr rechts der Linie */
+  .tl-left .tl-card {
+    grid-column: 1;
+    text-align: right;
+  }
+  .tl-left .tl-meta,
+  .tl-left .timeline-holders {
+    justify-content: flex-end;
+  }
+  .tl-left .tl-when {
+    grid-column: 3;
+    align-items: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-arrow {
+    transition: none;
+  }
+}
+
+/* Mitgliederliste: Knopf „Ämter“ je Person; Pflege der Ämter */
+.member-row-offices {
+  flex: none;
+}
+.office-admin-group {
+  margin-bottom: 18px;
+}
+.office-admin-terms {
+  margin: 8px 0 0;
+}
+.office-term-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.office-term-row .row-actions {
+  margin-left: auto;
+}
+.office-holder-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+.office-holder-row .field {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.office-import textarea {
+  width: 100%;
+  min-height: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+.office-import-rows {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.office-import-rows li {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.office-import-rows .form-error {
+  margin: 2px 0 0;
+}

@@ -12,7 +12,7 @@ use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\TestCase;
 
-/** Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): wer sie sieht, wer darin steht, welche Angaben. */
+/** Mitgliederliste (Bereich directory, Issue #112: öffentlich): wer sie sieht, wer darin steht, welche Angaben. */
 final class DirectoryTest extends TestCase
 {
     private FakeUsers $users;
@@ -44,17 +44,16 @@ final class DirectoryTest extends TestCase
         return $this->call('GET', '/directory');
     }
 
-    public function testMembersAndCandidatesSeeEachOtherButNoGuests(): void
+    public function testEveryoneSeesMembersAndCandidatesButNoGuests(): void
     {
-        foreach ([$this->m, $this->candidate, $this->admin] as $viewer) {
+        // Öffentlich: auch Gäste und ohne Anmeldung; darin stehen nur Mitglieder, Anwärter und Admins.
+        foreach ([$this->m, $this->candidate, $this->admin, $this->guest, null] as $viewer) {
             $res = $this->as($viewer);
             $this->assertSame(200, $res->status, (string) json_encode($res->data));
             $ids = array_column($res->data, 'id');
             sort($ids);
             $this->assertSame([$this->admin, $this->m, $this->candidate], $ids, 'Mitglieder, Anwärter und Admins, keine Gäste');
         }
-        $this->assertSame(403, $this->as($this->guest)->status, 'Gäste sehen die Liste nicht');
-        $this->assertSame(401, $this->as(null)->status);
     }
 
     public function testOnlyNamePhotoRankAndTitles(): void
@@ -65,8 +64,8 @@ final class DirectoryTest extends TestCase
         $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$title]]);
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
 
-        $entry = array_column($this->as($this->candidate)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'rank_title', 'rank_badge_url', 'titles'], array_keys($entry));
+        $entry = array_column($this->as(null)->data, null, 'id')[$this->m];
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'rank_title', 'rank_badge_url', 'titles'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
         $this->assertSame('Gefreiter', $entry['rank_title']);
         $this->assertSame([['id' => $title, 'title' => 'Ehrenmitglied']], $entry['titles']);
 
@@ -88,8 +87,9 @@ final class DirectoryTest extends TestCase
         $this->assertEquals([Roles::MEMBER => 2, $young => 1, Roles::CANDIDATE => 1], $counts($this->m));
         $this->assertSame(['group', 'count'], array_keys($this->countsAs($this->m)->data[0]), 'nur Summen');
 
-        $this->assertSame(403, $this->countsAs($this->guest)->status);
-        $this->assertSame(401, $this->countsAs(null)->status);
+        // Öffentlich wie die Liste (Issue #112)
+        $this->assertEquals([Roles::MEMBER => 2, $young => 1, Roles::CANDIDATE => 1], $counts($this->guest));
+        $this->assertSame(200, $this->countsAs(null)->status);
         $this->users->current = $this->admin;
         $this->app->features()->update(['directory' => false]);
         $this->assertSame(403, $this->countsAs($this->m)->status);
@@ -104,8 +104,10 @@ final class DirectoryTest extends TestCase
     public function testFeatureSwitch(): void
     {
         $this->app->features()->update(['directory' => false]);
-        $res = $this->as($this->m);
-        $this->assertSame(403, $res->status);
-        $this->assertSame('feature_disabled', $res->data['code'] ?? null);
+        foreach ([$this->m, null] as $viewer) {
+            $res = $this->as($viewer);
+            $this->assertSame(403, $res->status);
+            $this->assertSame('feature_disabled', $res->data['code'] ?? null);
+        }
     }
 }

@@ -15,7 +15,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  */
 final class MemberPhotoRepository
 {
-    /** Größen (längere Kante in Pixeln) => Spalte; xlarge ist NULL bei Fotos, die vor Datenbankversion 17 hochgeladen wurden. */
+    /** Größen (längere Kante in Pixeln) => Spalte; xlarge ist NULL bei Fotos, die vor Datenbankversion 18 hochgeladen wurden. */
     public const COLUMNS = [128 => 'small', 480 => 'large', 1024 => 'xlarge'];
 
     public function __construct(private readonly Connection $db)

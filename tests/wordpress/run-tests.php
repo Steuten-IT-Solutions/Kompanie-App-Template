@@ -714,6 +714,10 @@ parse_str((string) wp_parse_url((string) $badge['badge_url'], PHP_URL_QUERY), $q
 $_GET['v'] = (string) ($q['v'] ?? '');
 $_GET['s'] = '128';
 wp_set_current_user(0);
+// Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen, sonst nur mit Anmeldung.
+$res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
+$c->ok($res['status'] === 200 && str_starts_with($res['headers']['Cache-Control'], 'public'), 'Mit Mitgliederliste: Abzeichen ohne Anmeldung, öffentlich zu speichern');
+$app->features()->update(['directory' => false]);
 $res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
 $c->ok($res['status'] === 401 && ($res['headers']['X-Content-Type-Options'] ?? '') === 'nosniff' && !isset($res['path']), 'Abzeichen ohne Anmeldung → 401');
 wp_set_current_user($member);
@@ -721,6 +725,7 @@ $res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
 $c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/svg+xml' && $res['headers']['X-Content-Type-Options'] === 'nosniff'
     && ($res['headers']['Content-Security-Policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Mitglied: SVG mit strenger CSP und nosniff');
 $c->ok(str_starts_with($res['headers']['Cache-Control'], 'private') && !str_contains((string) file_get_contents((string) ($res['path'] ?? '')), 'script'), 'Privat gespeichert, ausgeliefert wird das bereinigte SVG');
+$app->features()->update(['directory' => true]);
 wp_set_current_user($admin);
 $im = imagecreatetruecolor(300, 300);
 ob_start();
@@ -745,8 +750,13 @@ parse_str((string) wp_parse_url((string) $photo['photo_url'], PHP_URL_QUERY), $q
 $_GET['v'] = (string) ($q['v'] ?? '');
 $_GET['s'] = '480';
 wp_set_current_user(0);
+// Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung.
+$res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
+$c->ok($res['status'] === 200 && $res['headers']['Cache-Control'] === 'public, max-age=86400', 'Mit Mitgliederliste: Foto ohne Anmeldung, öffentlich');
+$app->features()->update(['directory' => false]);
 $res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
 $c->ok($res['status'] === 401 && !isset($res['body']), 'Foto ohne Anmeldung → 401');
+$app->features()->update(['directory' => true]);
 wp_set_current_user($member);
 $res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
 $size = getimagesizefromstring((string) ($res['body'] ?? ''));

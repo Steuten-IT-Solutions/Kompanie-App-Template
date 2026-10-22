@@ -193,8 +193,12 @@ final class PreviewTest extends TestCase
             }
         };
         $this->assertSame([200, 'no-store'], [$badge('candidate')['status'], $badge('candidate')['headers']['Cache-Control']]);
+        $this->assertNotSame('no-store', $badge(null)['headers']['Cache-Control']);
+        // Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen, sonst nur Mitglieder und Anwärter.
+        $this->assertSame(200, $badge('guest')['status']);
+        $this->assertSame(200, $badge(Preview::PUBLIC)['status']);
+        $this->app->features()->update(['directory' => false]);
         $this->assertSame(403, $badge('guest')['status']);
         $this->assertSame(401, $badge(Preview::PUBLIC)['status']);
-        $this->assertNotSame('no-store', $badge(null)['headers']['Cache-Control']);
     }
 }

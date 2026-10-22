@@ -27,7 +27,7 @@ final class QueryCountTest extends TestCase
     private const LISTS = [
         'GET /members', 'GET /members?all=1', 'GET /members/{m}', 'GET /promotions', 'GET /ranks?all=1', 'GET /titles',
         'GET /attendance', 'GET /attendance/{list}', 'GET /birthdays', 'GET /inventory', 'GET /inventory/log',
-        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
+        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /offices', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
     ];
 
     public function testListsDoNotGrowWithMembers(): void
@@ -83,6 +83,9 @@ final class QueryCountTest extends TestCase
             $ranks[] = $call('POST', '/ranks', ['title' => $title, 'min_points' => $min])['id'];
         }
         $titles = [$call('POST', '/titles', ['title' => 'Ehrenmitglied'])['id'], $call('POST', '/titles', ['title' => 'Vorsitz'])['id']];
+        // Ämter (Issue #112): eine Amtszeit je Mitglied, mit einem Konto und einem freien Namen
+        $group = $call('POST', '/office-groups', ['title' => 'Verein'])['id'];
+        $office = $call('POST', '/offices', ['title' => 'Kassenprüfer', 'group_id' => $group])['id'];
         $members = [];
         for ($i = 0; $i < $n; $i++) {
             $members[] = $users->add('m' . $i, Roles::MEMBER);
@@ -99,6 +102,7 @@ final class QueryCountTest extends TestCase
             $call('PUT', "/members/$id/birthday", ['month' => 1 + $i % 12, 'day' => 1 + $i % 28]);
             $call('POST', '/inventory', ['title' => "Gegenstand $i", 'quantity' => 2, 'location' => 'Lager']);
             $call('POST', '/board', ['text' => "Hallo $i"]);
+            $call('POST', "/offices/$office/terms", ['start_year' => 1950 + $i, 'end_year' => 1951 + $i, 'holders' => [['user_id' => $id], ['name' => "Früher $i"]]]);
             $users->current = $id;
             $call('PUT', "/polls/{$poll['id']}/vote", ['option_ids' => [$poll['options'][0]['id']]]);
             $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);

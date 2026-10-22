@@ -243,8 +243,9 @@ final class RankService
 
     /**
      * Für die Auslieferung über badgeUrl(): sehen darf jede angemeldete Person mit Mitgliederbereich oder internem
-     * Kalender (auch Anwärter) und jede, die die Mitgliederliste sieht (dort stehen die Abzeichen auch). Die Header
-     * setzt der Kern, damit beide Adapter gleich antworten.
+     * Kalender (auch Anwärter) und jede, die die Mitgliederliste sieht (dort stehen die Abzeichen auch). Mit dem Bereich
+     * directory steht die Mitgliederliste mit den Abzeichen öffentlich (Issue #112): dann alle, auch ohne Anmeldung.
+     * Die Header setzt der Kern, damit beide Adapter gleich antworten.
      *
      * @return array{status: int, headers: array<string, string>, path?: string}
      */
@@ -257,11 +258,12 @@ final class RankService
         if ($this->app->maintenance()->blocks($user)) {
             return $deny(503);
         }
-        if ($user === null) {
+        $public = $this->app->features()->enabled('directory');
+        if (!$public && $user === null) {
             return $deny(401);
         }
         $viewers = [Capability::Member, Capability::Calendar, ...Capability::memberList()];
-        if (array_filter($viewers, static fn (Capability $c): bool => $user->can($c)) === []) {
+        if (!$public && array_filter($viewers, static fn (Capability $c): bool => $user?->can($c) ?? false) === []) {
             return $deny(403);
         }
         $rank = $this->repository()->find($rankId);
@@ -272,9 +274,9 @@ final class RankService
         $headers = [
             'Content-Type' => $svg ? 'image/svg+xml' : 'image/png',
             'X-Content-Type-Options' => 'nosniff',
-            // Die Adresse wechselt mit jeder Fassung: lange speichern, aber nur im Browser. Eine veraltete Fassung
-            // (alte Adresse) jedes Mal neu prüfen lassen; in der Vorschau (Issue #63) nie speichern.
-            'Cache-Control' => $this->app->preview()->cacheControl(is_string($version) && hash_equals($rank['badge_version'], $version) ? 'private, max-age=31536000, immutable' : 'private, no-cache'),
+            // Die Adresse wechselt mit jeder Fassung: lange speichern, ohne öffentliche Mitgliederliste nur im Browser. Eine
+            // veraltete Fassung (alte Adresse) jedes Mal neu prüfen lassen; in der Vorschau (Issue #63) nie speichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(($public ? 'public' : 'private') . (is_string($version) && hash_equals($rank['badge_version'], $version) ? ', max-age=31536000, immutable' : ', no-cache')),
             'X-Robots-Tag' => 'noindex',
         ];
         if ($svg) {

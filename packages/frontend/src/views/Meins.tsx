@@ -11,11 +11,12 @@ import { TitleBadges } from '../TitleBadges';
 import { MenuNav } from '../adminNav';
 import { MemberAvatar } from '../memberPhoto';
 import { RankLabel } from '../RankBadge';
+import { PersonOffices } from './Aemter';
 
 const sec = brand.labels.sections;
 
 /**
- * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad und Anwesenheit, umschaltbar. Die Summen
+ * „Meins“: Übersicht (mit den eigenen Titeln), Punkte, Strafen, Dienstgrad, Anwesenheit und Ämter, umschaltbar. Die Summen
  * (/me) lädt Meins einmal für alle.
  */
 export default function Meins({ sub }: { sub?: string }) {
@@ -27,6 +28,7 @@ export default function Meins({ sub }: { sub?: string }) {
       ['strafen', sec.penalties, config?.features.penalties],
       ['dienstgrad', brand.labels.rank, config?.features.ranks],
       ['anwesenheit', sec.attendance, config?.features.attendance],
+      ['aemter', sec.offices, config?.features.offices],
     ] as const
   ).filter(([, , on]) => on);
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
@@ -54,6 +56,8 @@ export default function Meins({ sub }: { sub?: string }) {
         <Dienstgrad />
       ) : active === 'anwesenheit' ? (
         <MeineAnwesenheit />
+      ) : active === 'aemter' && config?.user ? (
+        <PersonOffices userId={config.user.id} empty={`Du hast keine ${brand.labels.sections.offices} eingetragen.`} />
       ) : null}
     </div>
   );

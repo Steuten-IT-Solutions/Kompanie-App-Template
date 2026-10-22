@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api, config } from '../api';
+import brand from '../generated/brand';
 import { groupCounts } from '../format';
 import { ZoomableAvatar } from '../memberPhoto';
 import { RankStack } from '../RankBadge';
@@ -17,16 +18,71 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
+import { navigate } from '../router';
+import { holderIds, OfficesView, PersonOfficesPage, useOffices } from './Aemter';
 
 /** Nach Namen; Punkte stehen in dieser Liste nicht. */
 const SORTS: MemberSort[] = ['last-name', 'first-name'];
 
+const sec = brand.labels.sections;
+const SECTION_KEY = 'kompanie-members-section';
+
+function storedSection(): string | null {
+  try {
+    return localStorage.getItem(SECTION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeSection(section: 'liste' | 'aemter'): void {
+  try {
+    localStorage.setItem(SECTION_KEY, section);
+  } catch {
+    // ohne Speicher: beim nächsten Öffnen wieder die Liste
+  }
+}
+
 /**
- * Mitgliederliste für alle Mitglieder und Anwärter (Bereich directory): Namen, Fotos, Dienstgrade und Titel, mit Suche
- * und Sortierung wie in der Verwaltung. Keine Rollen, Punkte oder Strafen und keine Seite je Person.
+ * Tab „Mitglieder“ (öffentlich, Issue #112): Mitgliederliste (Bereich directory) und Zeitstrahl der Ämter (Bereich
+ * offices), umschaltbar; der zuletzt gewählte Abschnitt bleibt auf dem Gerät gemerkt. Ist nur ein Bereich an, steht nur
+ * dieser da. mitglieder/aemter/<id>: „Ämter von …“.
  */
-export default function Mitglieder() {
+export default function Mitglieder({ path = [] }: { path?: string[] }) {
+  const directory = !!config?.features.directory;
+  const offices = !!config?.features.offices;
+  const wanted = path[0] === 'aemter' ? 'aemter' : path[0] === 'liste' ? 'liste' : storedSection();
+  const section: 'liste' | 'aemter' = !directory || (offices && wanted === 'aemter') ? 'aemter' : 'liste';
+  const person = section === 'aemter' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : null;
+  const open = (next: 'liste' | 'aemter') => {
+    storeSection(next);
+    navigate(`mitglieder/${next}`);
+  };
+  return (
+    <div>
+      {directory && offices && (
+        <nav className="segmented members-switch" aria-label="Abschnitt">
+          <button className={section === 'liste' ? 'active' : ''} aria-pressed={section === 'liste'} onClick={() => open('liste')}>
+            {sec.directory}
+          </button>
+          <button className={section === 'aemter' ? 'active' : ''} aria-pressed={section === 'aemter'} onClick={() => open('aemter')}>
+            {sec.offices}
+          </button>
+        </nav>
+      )}
+      {section === 'liste' ? <MemberList offices={offices} /> : person !== null ? <PersonOfficesPage userId={person} /> : <OfficesView />}
+    </div>
+  );
+}
+
+/**
+ * Mitgliederliste (Bereich directory): Namen, Fotos, Dienstgrade und Titel, mit Suche und Sortierung wie in der
+ * Verwaltung. Keine Rollen, Punkte oder Strafen. Mit dem Bereich Ämter führt „Ämter“ zu den Ämtern einer Person.
+ */
+function MemberList({ offices }: { offices: boolean }) {
   const { data, error, loading, reload } = useAsync(() => api.directory(), [], 'directory');
+  const officeData = useOffices(offices);
+  const holders = useMemo(() => holderIds(officeData.data), [officeData.data]);
   // Zähler je Gruppe wie in der Verwaltung; ohne (ältere Server, Fehler) bleibt die Gesamtzahl.
   const counts = useAsync(() => api.directoryCounts(), [], 'directory-counts');
   const [query, setQuery] = useState('');
@@ -109,6 +165,16 @@ export default function Mitglieder() {
             {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
             {m.rank_title !== undefined && (
               <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
+            )}
+            {holders.has(m.id) && (
+              <button
+                type="button"
+                className="btn btn-small btn-secondary member-row-offices"
+                aria-label={`${sec.offices} von ${m.name}`}
+                onClick={() => navigate(`mitglieder/aemter/${m.id}`)}
+              >
+                {sec.offices}
+              </button>
             )}
           </li>
         ))}

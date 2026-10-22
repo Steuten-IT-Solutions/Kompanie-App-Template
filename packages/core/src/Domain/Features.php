@@ -50,8 +50,10 @@ final class Features
         'birthdays' => ['label' => 'Geburtstage', 'description' => 'Geburtstage der Mitglieder: anstehende bei den Terminen, Benachrichtigung am Tag selbst; jedes Mitglied entscheidet, ob andere ihn sehen.', 'requires' => [], 'setup' => null, 'role' => null],
         // Inventar (Issue #6): nur für alle mit manage_inventory, Mitglieder ohne das Recht sehen es nicht.
         'inventory' => ['label' => 'Inventar', 'description' => 'Was die Kompanie besitzt, wie viel und wo, mit Umlagern und Verlauf; nur für alle, die es verwalten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_inventory']],
-        // Mitgliederliste für alle: Namen, Fotos, Dienstgrade und Titel der Mitglieder und Anwärter; kein eigenes Recht.
-        'directory' => ['label' => 'Mitglieder', 'description' => 'Liste der Mitglieder und Anwärter mit Foto, Dienstgrad und Titeln, für alle Mitglieder und Anwärter.', 'requires' => [], 'setup' => null, 'role' => null],
+        // Mitgliederliste (Issue #112: öffentlich): Namen, Fotos, Dienstgrade und Titel der Mitglieder und Anwärter; kein eigenes Recht.
+        'directory' => ['label' => 'Mitglieder', 'description' => 'Liste der Mitglieder und Anwärter mit Foto, Dienstgrad und Titeln, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => null],
+        // Ämter (Issue #112): Zeitstrahl aller Ämter mit früheren Inhabern, öffentlich; im Tab der Mitgliederliste.
+        'offices' => ['label' => 'Ämter', 'description' => 'Wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl für alle sichtbar; laufende Ämter können Titel vergeben.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_offices']],
     ];
 
     /** @var array<string, bool>|null */
@@ -211,9 +213,9 @@ final class Features
         }
         $state = [];
         foreach (self::keys() as $key) {
-            // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar und die
-            // Mitgliederliste gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory'], true) && $this->app->config->legacyFeature($key);
+            // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
+            // Mitgliederliste und Ämter gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

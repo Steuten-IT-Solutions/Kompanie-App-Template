@@ -23,6 +23,7 @@ const ALL_FEATURES = [
   'birthdays',
   'inventory',
   'directory',
+  'offices',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -63,12 +64,16 @@ const PATHS = [
   ['dokumente', '5'],
   ['dokumente', 'verwalten'],
   ['mitglieder'],
+  ['mitglieder', 'liste'],
+  ['mitglieder', 'aemter'],
+  ['mitglieder', 'aemter', '7'],
   ['meins'],
   ['meins', 'uebersicht'],
   ['meins', 'punkte'],
   ['meins', 'strafen'],
   ['meins', 'dienstgrad'],
   ['meins', 'anwesenheit'],
+  ['meins', 'aemter'],
   ['verwaltung'],
   ['verwaltung', 'mitglieder'],
   ['verwaltung', 'punkte'],
@@ -77,10 +82,17 @@ const PATHS = [
   ['verwaltung', 'dienstgrade'],
   ['verwaltung', 'befoerderungen'],
   ['verwaltung', 'titel'],
+  ['verwaltung', 'aemter'],
+  ['verwaltung', 'aemter', 'import'],
   ['verwaltung', 'anwesenheit'],
   ['verwaltung', 'neu'],
   ['verwaltung', 'neu-mehrere'],
-  ...['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'geburtstag'].map((s) => ['verwaltung', 'mitglied', '7', s]),
+  ...['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag'].map((s) => [
+    'verwaltung',
+    'mitglied',
+    '7',
+    s,
+  ]),
   ['brett'],
   ['umfragen'],
   ['umfragen', '4'],
@@ -130,6 +142,7 @@ test('Verwaltung: Seite zur eigenen Aufgabe, die die Person auch sehen darf', ()
     [['manage_ranks'], ['ranks'], 'dienstgrade-verwalten'],
     [['manage_titles'], ['titles'], 'titel-verwalten'],
     [['manage_attendance'], ['attendance'], 'anwesenheit-erfassen'],
+    [['manage_offices'], ['offices'], 'aemter-verwalten'],
   ];
   for (const [rights, features, expected] of cases) {
     const ctx = withRights(['member', ...rights], features);

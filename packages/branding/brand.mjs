@@ -66,6 +66,7 @@ const DEFAULTS = {
     birthdays: 'Geburtstage',
     inventory: 'Inventar',
     directory: 'Mitglieder',
+    offices: 'Ämter',
   },
   rank: 'Dienstgrad',
 };
