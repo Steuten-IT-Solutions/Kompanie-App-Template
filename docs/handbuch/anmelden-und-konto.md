@@ -14,11 +14,15 @@ Ohne Anmeldung siehst du alles, was öffentlich ist, z. B. die öffentlichen {be
 Bist du angemeldet, steht oben rechts **Konto**. Dort findest du:
 - deinen Namen und deine Rolle, z. B. {rolle.member} oder {rolle.candidate}, und dein Foto, wenn jemand eines hochgeladen hat (ändern kann es, wer Mitglieder anlegt),
 - als {rolle.member} die Karte **Geburtstag**, wenn die Kompanie {bereich.birthdays} nutzt,
+- **Darstellung**: **Hell**, **Dunkel** oder **Wie Gerät** (Grundeinstellung: folgt dem hellen oder dunklen Modus deines Handys), siehe unten,
 - **Benachrichtigungen einstellen**, siehe [Benachrichtigungen](seite:benachrichtigungen),
 - **App installieren**, solange du die App im Browser benutzt, siehe [Die App aufs Handy holen](seite:app-installieren),
 - **Passwort ändern** und **Abmelden**.
 
 Die Einstellungen der App finden {rolle.admin}s nicht hier, sondern in der **Verwaltung**.
+
+## Hell oder dunkel
+Unter **Konto → Darstellung** wählst du, ob die App hell oder dunkel aussieht. Mit **Wie Gerät** richtet sie sich nach der Einstellung deines Handys oder Computers und wechselt mit ihr. Die Wahl gilt nur auf diesem Gerät und bleibt auch nach dem Abmelden erhalten.
 
 ## Passwort ändern
 Unter **Konto → Passwort ändern** das aktuelle Passwort und zweimal das neue eingeben (mindestens 8 Zeichen, anders als das bisherige) und **Passwort ändern** tippen. Du bleibst auf diesem Gerät angemeldet, alle anderen Geräte werden abgemeldet.

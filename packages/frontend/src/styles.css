@@ -1474,6 +1474,9 @@ code {
 .install-konto {
   margin-top: 12px;
 }
+.theme-choice {
+  margin: 12px 0 0;
+}
 
 @media (prefers-color-scheme: dark) {
   .install-warn {

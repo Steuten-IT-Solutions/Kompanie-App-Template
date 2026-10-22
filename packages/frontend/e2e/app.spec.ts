@@ -448,6 +448,41 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
   await expect(page.locator('.toast')).toContainText('Passwort geändert');
 });
 
+test('Mitglied wählt die Darstellung hell oder dunkel unabhängig vom Gerät', async ({ page }) => {
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await login(page, 'mitglied2');
+  await page.getByRole('button', { name: 'Konto' }).click();
+  const choice = page.getByRole('navigation', { name: 'Darstellung' });
+  await expect(choice.getByRole('button', { name: 'Wie Gerät' })).toHaveAttribute('aria-pressed', 'true');
+  const light = await bg();
+
+  await choice.getByRole('button', { name: 'Dunkel' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const dark = await bg();
+  expect(dark).not.toBe(light);
+  // Wie der Dunkelmodus des Geräts
+  await choice.getByRole('button', { name: 'Wie Gerät' }).click();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await bg()).toBe(dark);
+
+  // Hell gewinnt gegen den Dunkelmodus des Geräts und bleibt nach dem Neuladen.
+  await choice.getByRole('button', { name: 'Hell' }).click();
+  expect(await bg()).toBe(light);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  expect(await bg()).toBe(light);
+  await expect(page.getByRole('navigation', { name: 'Darstellung' }).getByRole('button', { name: 'Hell' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.getByRole('navigation', { name: 'Darstellung' }).getByRole('button', { name: 'Wie Gerät' }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+  expect(await bg()).toBe(dark);
+  await page.emulateMedia({ colorScheme: 'light' });
+});
+
 test('Admin pflegt öffentliche Termine', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
