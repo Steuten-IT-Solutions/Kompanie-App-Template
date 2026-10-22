@@ -5,6 +5,7 @@ import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
+import { rememberRoute } from './share';
 
 /** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -768,6 +769,8 @@ let csrfToken = config?.csrf.token ?? '';
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
+  // Nach der Anmeldung zurück auf diese Seite (z. B. aus einem geteilten Link), siehe main.tsx.
+  rememberRoute(window.location.hash);
   if (config?.auth.mode === 'redirect' && config.auth.loginUrl) {
     window.location.href = config.auth.loginUrl;
   } else {

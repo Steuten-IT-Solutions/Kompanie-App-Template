@@ -8,6 +8,7 @@ import App from './App';
 import { config, preparePreview } from './api';
 import { previewRole } from './preview';
 import { checkPushOnStart } from './push';
+import { takeRememberedRoute } from './share';
 import { watchRuntimeErrors } from './lastError';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
@@ -24,6 +25,11 @@ function sharedInstallLink(): boolean {
 }
 if (config && sharedInstallLink()) {
   history.replaceState(null, '', config.appUrl + '#/installieren');
+}
+// Gerade angemeldet: zurück auf die Seite, von der aus es zur Anmeldung ging (z. B. ein geteilter Link).
+if (config?.user) {
+  const route = takeRememberedRoute();
+  if (route) history.replaceState(null, '', config.appUrl + route);
 }
 // Vom Home-Bildschirm gestartet: nicht auf der Anleitung landen, sondern bei den Terminen.
 if (isStandalone() && window.location.hash.startsWith('#/installieren')) {

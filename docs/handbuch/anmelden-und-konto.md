@@ -10,6 +10,12 @@ Ohne Anmeldung siehst du alles, was öffentlich ist, z. B. die öffentlichen {be
 2. Benutzernamen (oder E-Mail-Adresse) und Passwort eingeben. Beides bekommst du von der Kompanie.
 3. **Angemeldet bleiben** ist vorausgewählt: Dann bleibst du auf diesem Gerät rund ein Jahr angemeldet (400 Tage); wenn du die App zwischendurch nutzt, verlängert sich das von selbst. Ohne den Haken endet die Anmeldung, wenn du den Browser schließt, spätestens nach zwei Tagen.
 
+## Seite als Link verschicken
+Oben neben **?** steht das Teilen-Symbol. Darauf tippen, und das Handy bietet das Verschicken an, z. B. per WhatsApp oder E-Mail; am Computer wird der Link kopiert. Wer den Link öffnet, landet direkt auf dieser Seite.
+- Ist die Seite nur für Angemeldete, bittet die App erst um die Anmeldung und öffnet sie danach.
+- Jede Person sieht dabei nur, was sie sehen darf. Fehlt ihr das Recht, öffnet die App ihre Startseite.
+- Verlinkt wird die Seite selbst: Einen einzelnen aufgeklappten Termin oder eine gewählte Sortierung enthält der Link nicht.
+
 ## Dein Konto
 Bist du angemeldet, steht oben rechts **Konto**. Dort findest du:
 - deinen Namen und deine Rolle, z. B. {rolle.member} oder {rolle.candidate}, und dein Foto, wenn jemand eines hochgeladen hat (ändern kann es, wer Mitglieder anlegt),

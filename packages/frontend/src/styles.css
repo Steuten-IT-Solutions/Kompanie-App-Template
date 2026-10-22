@@ -132,7 +132,8 @@ select {
   color: var(--on-accent);
   border-color: var(--accent);
 }
-.topbar .topbar-help {
+.topbar .topbar-help,
+.topbar .topbar-share {
   color: var(--on-primary);
   font-weight: 700;
   font-size: 1rem;
@@ -145,6 +146,10 @@ select {
   flex: none;
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
+}
+/* Teilen steht direkt neben „?“: Abstand kommt aus gap. */
+.topbar .topbar-share {
+  margin-right: 0;
 }
 .topbar .topbar-help.active {
   background: var(--accent);
