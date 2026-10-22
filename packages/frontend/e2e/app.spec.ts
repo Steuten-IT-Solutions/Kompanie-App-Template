@@ -2864,7 +2864,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
   await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
   await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
-  await expect(adminCard).toContainText('Nicht anzeigen (wählt nur die Person selbst)');
+  await expect(adminCard).toContainText('Mitgliedern anzeigen (wählt nur die Person selbst)');
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
@@ -2877,7 +2877,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await birthday.getByLabel('Monat').selectOption('3');
   await birthday.getByLabel('Jahr', { exact: true }).fill('1988');
   await birthday.getByLabel(/Alter anzeigen/).check();
-  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('none');
+  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('members');
   await birthday.getByLabel(/Auf meiner Seite/).selectOption('public');
   await expect(birthday).toContainText('Dort steht das ganze Datum mit deinem Alter.');
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();

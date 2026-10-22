@@ -218,8 +218,8 @@ paths:
       description: |
         Tag und Monat, das Jahr ist freiwillig. Gültiges Datum (29.02. nur im Schaltjahr oder ohne Jahr), Jahr ab 1900,
         nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Nicht mitgeschickte Schalter bleiben; ein neuer Eintrag
-        ist sichtbar (`visible: true`), ohne Alter (`show_age: false`) und nicht auf der Seite in der Mitgliederliste
-        (`profile: none`).
+        ist sichtbar (`visible: true`), ohne Alter (`show_age: false`) und auf der Seite in der Mitgliederliste nur für
+        Mitglieder (`profile: members`).
       x-capability: member
       requestBody:
         required: true
@@ -276,7 +276,7 @@ paths:
       description: |
         `date` als TT.MM.JJJJ, JJJJ-MM-TT oder nur das Jahr JJJJ; ohne `date` gilt `year` (ältere Apps, nur das Jahr). Ab
         1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein neuer
-        Eintrag steht nicht auf der Seite (`profile: none`). Auf der Seite steht immer nur das Jahr.
+        Eintrag steht nur für Mitglieder auf der Seite (`profile: members`). Auf der Seite steht immer nur das Jahr.
       x-capability: member
       requestBody:
         required: true

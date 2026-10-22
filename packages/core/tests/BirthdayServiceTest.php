@@ -95,11 +95,11 @@ final class BirthdayServiceTest extends TestCase
         $this->setUpApp();
         $this->assertSame(['birthday' => null], $this->as($this->m)->call('GET', '/me/birthday')->data);
         $saved = $this->setOwn($this->m, ['month' => 3, 'day' => 14, 'year' => 1990]);
-        $this->assertSame(['birthday' => ['month' => 3, 'day' => 14, 'year' => 1990, 'visible' => true, 'show_age' => false, 'profile' => 'none']], $saved, 'neu: sichtbar, ohne Alter');
+        $this->assertSame(['birthday' => ['month' => 3, 'day' => 14, 'year' => 1990, 'visible' => true, 'show_age' => false, 'profile' => 'members']], $saved, 'neu: sichtbar, ohne Alter');
         $saved = $this->setOwn($this->m, ['month' => '3', 'day' => '15', 'year' => null, 'show_age' => true]);
-        $this->assertSame(['month' => 3, 'day' => 15, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'none'], $saved['birthday'], 'ohne Jahr; nicht genannte Schalter bleiben');
+        $this->assertSame(['month' => 3, 'day' => 15, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'members'], $saved['birthday'], 'ohne Jahr; nicht genannte Schalter bleiben');
         $this->setOwn($this->m, ['month' => 3, 'day' => 15, 'visible' => false]);
-        $this->assertSame(['month' => 3, 'day' => 15, 'year' => null, 'visible' => false, 'show_age' => true, 'profile' => 'none'], $this->call('GET', '/me/birthday')->data['birthday']);
+        $this->assertSame(['month' => 3, 'day' => 15, 'year' => null, 'visible' => false, 'show_age' => true, 'profile' => 'members'], $this->call('GET', '/me/birthday')->data['birthday']);
         $this->setOwn($this->m, ['month' => 3, 'day' => 15, 'visible' => 'nein'], 400);
         // 29.02. ohne Jahr ist erlaubt
         $this->assertSame(29, $this->setOwn($this->m2, ['month' => 2, 'day' => 29])['birthday']['day']);
@@ -172,17 +172,17 @@ final class BirthdayServiceTest extends TestCase
         $this->setOwn($this->m, ['month' => 5, 'day' => 6, 'year' => 1980, 'visible' => false, 'show_age' => true]);
         $res = $this->as($this->creator)->call('PUT', "/members/{$this->m}/birthday", ['month' => 7, 'day' => 8, 'year' => 1981, 'visible' => true, 'show_age' => false]);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['month' => 7, 'day' => 8, 'year' => 1981, 'visible' => false, 'show_age' => true, 'profile' => 'none'], $res->data['birthday'], 'Schalter bleiben, wie die Person sie gesetzt hat');
+        $this->assertSame(['month' => 7, 'day' => 8, 'year' => 1981, 'visible' => false, 'show_age' => true, 'profile' => 'members'], $res->data['birthday'], 'Schalter bleiben, wie die Person sie gesetzt hat');
         $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/birthday", ['month' => 2, 'day' => 31])->status);
         $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/birthday", ['month' => 1, 'day' => 1, 'year' => 2030])->status);
         // Neu durch die Verwaltung: sichtbar, ohne Alter
         $res = $this->call('PUT', "/members/{$this->m2}/birthday", ['month' => 1, 'day' => 2]);
-        $this->assertSame(['month' => 1, 'day' => 2, 'year' => null, 'visible' => true, 'show_age' => false, 'profile' => 'none'], $res->data['birthday']);
+        $this->assertSame(['month' => 1, 'day' => 2, 'year' => null, 'visible' => true, 'show_age' => false, 'profile' => 'members'], $res->data['birthday']);
         $this->assertSame($this->creator, (int) $this->app->db->scalar('SELECT updated_by FROM {birthdays} WHERE user_id = ?', [$this->m2]));
 
         // Mitgliedsdetails: mit Jahr und Schaltern
         $detail = $this->call('GET', "/members/{$this->m}")->data;
-        $this->assertSame(['month' => 7, 'day' => 8, 'year' => 1981, 'visible' => false, 'show_age' => true, 'profile' => 'none'], $detail['birthday']);
+        $this->assertSame(['month' => 7, 'day' => 8, 'year' => 1981, 'visible' => false, 'show_age' => true, 'profile' => 'members'], $detail['birthday']);
         $this->assertNull($this->call('GET', "/members/{$this->m3}")->data['birthday']);
 
         // Wer Mitgliedsdetails nur wegen anderer Rechte sieht (hier Punkte), bekommt kein Geburtsdatum
@@ -202,14 +202,14 @@ final class BirthdayServiceTest extends TestCase
         $this->setUpApp();
         $res = $this->as($this->creator)->call('POST', '/users', ['name' => 'Max Mustermann', 'birthday' => '1981-10-22']);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['month' => 10, 'day' => 22, 'year' => 1981, 'visible' => true, 'show_age' => false, 'profile' => 'none'], $this->app->birthdays()->of((int) $res->data['id']));
+        $this->assertSame(['month' => 10, 'day' => 22, 'year' => 1981, 'visible' => true, 'show_age' => false, 'profile' => 'members'], $this->app->birthdays()->of((int) $res->data['id']));
         $this->assertSame(400, $this->call('POST', '/users', ['name' => 'Falsch', 'birthday' => '1990-02-31'])->status);
         $this->assertSame(400, $this->call('POST', '/users', ['name' => 'Falsch', 'birthday' => '22.10.1981'])->status);
         $this->assertFalse($this->users->loginExists('falsch'), 'ungültiger Geburtstag: kein Konto');
 
         $res = $this->call('POST', '/users/bulk', ['people' => [['name' => 'Erika Muster', 'birthday' => '02-29'], ['name' => 'Ohne Geburtstag']]]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['month' => 2, 'day' => 29, 'year' => null, 'visible' => true, 'show_age' => false, 'profile' => 'none'], $this->app->birthdays()->of((int) $res->data[0]['id']));
+        $this->assertSame(['month' => 2, 'day' => 29, 'year' => null, 'visible' => true, 'show_age' => false, 'profile' => 'members'], $this->app->birthdays()->of((int) $res->data[0]['id']));
         $this->assertNull($this->app->birthdays()->of((int) $res->data[1]['id']));
         $res = $this->call('POST', '/users/bulk', ['people' => [['name' => 'Gut'], ['name' => 'Schlecht', 'birthday' => '2030-01-01']]]);
         $this->assertSame(400, $res->status);
@@ -517,9 +517,9 @@ final class BirthdayServiceTest extends TestCase
             $this->assertSame('2026-10-20', $repo->find(5)['last_notified'] ?? null);
             $this->assertTrue($repo->claim(5, '2027-10-20'), 'im nächsten Jahr wieder');
             $repo->save(5, 10, 21, 1990, false, true, 2, '2026-10-20 11:00:00');
-            $this->assertSame(['month' => 10, 'day' => 21, 'year' => 1990, 'visible' => false, 'show_age' => true, 'profile' => 'none'], $app->birthdays()->of(5));
+            $this->assertSame(['month' => 10, 'day' => 21, 'year' => 1990, 'visible' => false, 'show_age' => true, 'profile' => 'members'], $app->birthdays()->of(5));
             $repo->save(5, 10, 22, null, null, null, 2, '2026-10-20 11:00:00');
-            $this->assertSame(['month' => 10, 'day' => 22, 'year' => null, 'visible' => false, 'show_age' => true, 'profile' => 'none'], $app->birthdays()->of(5), 'Schalter bleiben');
+            $this->assertSame(['month' => 10, 'day' => 22, 'year' => null, 'visible' => false, 'show_age' => true, 'profile' => 'members'], $app->birthdays()->of(5), 'Schalter bleiben');
         } finally {
             TestApp::dropTables($db);
         }

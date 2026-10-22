@@ -101,7 +101,7 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const current = data?.join_year ?? null;
   const v = value ?? editValue(current);
-  const p = profile ?? current?.profile ?? 'none';
+  const p = profile ?? current?.profile ?? 'members';
 
   const done = (joinYear: JoinYear | null, msg: string) => {
     setData({ join_year: joinYear });

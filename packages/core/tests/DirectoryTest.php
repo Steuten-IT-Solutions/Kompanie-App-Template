@@ -149,9 +149,18 @@ final class DirectoryTest extends TestCase
         $this->users->current = $this->m;
         $this->assertSame(200, $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'show_age' => true])->status);
         $this->assertSame(200, $this->call('PUT', '/me/join-year', ['year' => 2005])->status);
+        $this->assertSame(2005, $entry($this->m)['join_year'], 'Standard: nur Mitgliedern');
+        $this->assertSame([3, 12], [$entry($this->m)['birthday']['month'], $entry($this->m)['birthday']['day']], 'Standard: nur Mitgliedern');
+        $this->assertNull($entry(null)['birthday'], 'Standard: nicht öffentlich');
+        $this->assertNull($entry(null)['join_year'], 'Standard: nicht öffentlich');
+
+        // Nicht anzeigen: niemand sieht es auf der Seite.
+        $this->users->current = $this->m;
+        $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'none']);
+        $this->call('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'none']);
         foreach ([$this->m, null] as $viewer) {
-            $this->assertNull($entry($viewer)['birthday'], 'Standard: nicht auf der Seite');
-            $this->assertNull($entry($viewer)['join_year'], 'Standard: nicht auf der Seite');
+            $this->assertNull($entry($viewer)['birthday']);
+            $this->assertNull($entry($viewer)['join_year']);
         }
 
         // Nur Mitgliedern: angemeldete Mitglieder (Recht member) sehen es, Anwärter, Gäste und Besucher nicht.
@@ -209,7 +218,7 @@ final class DirectoryTest extends TestCase
             $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => $year])->status, (string) json_encode($year));
         }
         $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => 2000, 'profile' => 'alle'])->status);
-        $this->assertSame(['year' => 1800, 'date' => '1800', 'profile' => 'none'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
+        $this->assertSame(['year' => 1800, 'date' => '1800', 'profile' => 'members'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
         $this->assertSame(403, $this->call('PUT', "/members/{$this->admin}/join-year", ['year' => 2000])->status, 'fremdes nur mit create_users');
         $this->users->current = $this->candidate;
         $this->assertSame(403, $this->call('PUT', '/me/join-year', ['year' => 2000])->status, 'nur Mitglieder');

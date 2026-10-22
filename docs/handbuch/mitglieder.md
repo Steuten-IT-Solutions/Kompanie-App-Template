@@ -12,7 +12,7 @@ Jede Zeile zeigt den Namen und vorn ein kleines rundes Foto; wer keines hat, bek
 Ein Tipp auf eine Person öffnet ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, und nutzt die Kompanie **{bereich.offices}**, darunter alle ihre Ämter als Zeitstrahl. **‹ Zurück** führt wieder zur Liste. Mehr zeigt die Liste nicht: keine Rollen, keine {bereich.points} oder {bereich.penalties}, keine E-Mail-Adressen oder Benutzernamen.
 
 ## Geburtstag und Eintritt
-Auf seiner Seite kann jedes {rolle.member} auch seinen Geburtstag und das Jahr seines Eintritts zeigen, z. B. „Geburtstag 12. März 1988 (38 Jahre) · Eintritt 2005“. Das entscheidet nur die Person selbst unter **Konto**, je Angabe: **Nicht anzeigen** (von Anfang an), **Mitgliedern anzeigen** (nur angemeldete {rolle.member} sehen es) oder **Öffentlich anzeigen** (jeder, auch ohne Anmeldung). Beim Geburtstag stehen Jahr und Alter nur, wenn die Person **Alter anzeigen** eingeschaltet und ein Jahr eingetragen hat, sonst nur Tag und Monat.
+Auf seiner Seite kann jedes {rolle.member} auch seinen Geburtstag und das Jahr seines Eintritts zeigen, z. B. „Geburtstag 12. März 1988 (38 Jahre) · Eintritt 2005“. Das entscheidet nur die Person selbst unter **Konto**, je Angabe: **Nicht anzeigen**, **Mitgliedern anzeigen** (von Anfang an; nur angemeldete {rolle.member} sehen es) oder **Öffentlich anzeigen** (jeder, auch ohne Anmeldung). Beim Geburtstag stehen Jahr und Alter nur, wenn die Person **Alter anzeigen** eingeschaltet und ein Jahr eingetragen hat, sonst nur Tag und Monat.
 
 So stellst du es für dich ein:
 - **Geburtstag:** unter **Konto** in der Karte **Geburtstag** bei **Auf meiner Seite unter „{bereich.directory}“** (nur wenn die Kompanie {bereich.birthdays} nutzt).

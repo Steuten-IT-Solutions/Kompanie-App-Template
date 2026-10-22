@@ -56,7 +56,7 @@ final class JoinYearRepository
 
     /**
      * Anlegen oder ändern. $date: JJJJ-MM-TT im Jahr $year oder leer (nur das Jahr). Ohne $profile bleibt die Anzeige, wie
-     * sie ist (neu: nicht zeigen).
+     * sie ist (neu: nur Mitgliedern zeigen).
      */
     public function save(int $userId, int $year, string $date, ?string $profile, int $by, string $now): void
     {
@@ -69,7 +69,7 @@ final class JoinYearRepository
             return;
         }
         try {
-            $this->db->insert('join_years', ['user_id' => $userId] + $values + ['profile' => ProfileVisibility::NONE]);
+            $this->db->insert('join_years', ['user_id' => $userId] + $values + ['profile' => ProfileVisibility::MEMBERS]);
         } catch (\RuntimeException $e) {
             // Gleichzeitig angelegt: dann eben ändern.
             if ($this->find($userId) === null) {
