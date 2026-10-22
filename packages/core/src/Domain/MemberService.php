@@ -376,7 +376,7 @@ final class MemberService
     public function resetPassword(User $actor, int $id): array
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Das eigene Passwort änderst du unter Konto → Passwort ändern.');
+            throw ApiError::invalid('Das eigene Passwort änderst du unter Meins → Konto → Passwort ändern.');
         }
         $target = $this->users->find($id);
         if (!$target) {

@@ -30,7 +30,7 @@ Die App prüft zuerst alle Einträge: Ist einer ungültig (z. B. ein vergebener 
 Andere Rollen vergibt danach, wer Rollen vergeben darf.
 
 ## Foto eines Mitglieds
-Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mitglieder anlegen darf, und zwar bei allen Konten, die er auch sonst verwalten darf (siehe den Hinweis unten). Die Person selbst sieht ihr Foto unter **Konto**, ändert es aber nicht.
+Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mitglieder anlegen darf, und zwar bei allen Konten, die er auch sonst verwalten darf (siehe den Hinweis unten). Die Person selbst sieht ihr Foto unter **Meins → Konto**, ändert es aber nicht.
 
 - Beim Anlegen: im Formular unter **Foto (optional)** (einzeln oder bei **Mehrere auf einmal**).
 - Später: im Mitglied unter **Übersicht** **Foto hochladen**, **Foto ersetzen** oder **Foto entfernen**. Das gilt sofort.

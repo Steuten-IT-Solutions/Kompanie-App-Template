@@ -14,6 +14,7 @@ import { navigate, useRoute } from './router';
 import { AdminNav, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
+import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine from './views/Termine';
 
@@ -28,7 +29,6 @@ const MaintenanceBanner = lazyView(() => import('./maintenance').then((m) => ({ 
 const Einrichtung = lazyView(() => import('./views/Einrichtung'));
 const Einstellungen = lazyView(() => import('./views/Einstellungen'));
 const Installieren = lazyView(() => import('./views/Installieren'));
-const Konto = lazyView(() => import('./views/Konto'));
 const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
 const Hilfe = lazyView(() => import('./views/Hilfe'));
@@ -45,7 +45,6 @@ type View =
   | 'brett'
   | 'umfragen'
   | 'inventar'
-  | 'konto'
   | 'benachrichtigungen'
   | 'installieren'
   | 'anmelden'
@@ -63,7 +62,6 @@ const VIEWS: View[] = [
   'brett',
   'umfragen',
   'inventar',
-  'konto',
   'benachrichtigungen',
   'installieren',
   'anmelden',
@@ -77,6 +75,8 @@ const ALIASES: Record<string, string[]> = {
   punkte: ['meins', 'punkte'],
   strafen: ['meins', 'strafen'],
   spiess: ['verwaltung'],
+  // Das Konto steht unter „Meins“.
+  konto: ['meins', 'konto'],
 };
 
 const features = config?.features;
@@ -97,7 +97,6 @@ const titles = (): Record<View, string> => ({
   brett: sec.board,
   umfragen: sec.polls,
   inventar: sec.inventory,
-  konto: 'Mein Konto',
   benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
   anmelden: 'Anmelden',
@@ -109,7 +108,28 @@ const titles = (): Record<View, string> => ({
 /** Erste Unterseite von „Meins“ (wie in Meins.tsx), für die Hilfe zu #/meins ohne Unterseite. */
 function meinsFirst(): string | undefined {
   const f = config?.features;
+  if (!isMember()) return 'konto';
   return f?.points ? 'punkte' : f?.penalties ? 'strafen' : f?.ranks ? 'dienstgrad' : f?.attendance ? 'anwesenheit' : undefined;
+}
+
+/** Kopfzeile: zwischen hell und dunkel wechseln (feste Wahl und „Wie Gerät“ unter Meins → Konto). */
+function ThemeButton() {
+  const dark = useTheme().shown === 'dark';
+  const label = dark ? 'Helle Darstellung' : 'Dunkle Darstellung';
+  return (
+    <button className="btn btn-link topbar-theme" onClick={toggleTheme} aria-label={label} title={label}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        {dark ? (
+          <path
+            fill="currentColor"
+            d="M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-1-6h2v3h-2V1zm0 19h2v3h-2v-3zM1 11h3v2H1v-2zm19 0h3v2h-3v-2zM4.22 5.64l1.42-1.42 2.12 2.12-1.42 1.42-2.12-2.12zm12.02 12.02 1.42-1.42 2.12 2.12-1.42 1.42-2.12-2.12zM4.22 18.36l2.12-2.12 1.42 1.42-2.12 2.12-1.42-1.42zM16.24 6.34l2.12-2.12 1.42 1.42-2.12 2.12-1.42-1.42z"
+          />
+        ) : (
+          <path fill="currentColor" d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z" />
+        )}
+      </svg>
+    </button>
+  );
 }
 
 function Icon({ name }: { name: Tab }) {
@@ -252,7 +272,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     news: !!features?.news,
     galerie: !!features?.gallery,
     dokumente: isMember() && !!features?.documents,
-    meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
+    // Eigene Daten (Mitglieder) und das Konto (alle Angemeldeten)
+    meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
     verwaltung: adminTabs().length > 0,
     // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
@@ -261,7 +282,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
     umfragen: pollsVisible() || canManagePolls(),
     // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('manage_inventory'),
-    konto: !!user,
     benachrichtigungen: true,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
@@ -359,20 +379,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
       >
         ?
       </button>
-      {user ? (
-        <button
-          className={`btn btn-link topbar-account ${tab === 'konto' ? 'active' : ''}`}
-          onClick={() => navigate('konto')}
-          aria-current={tab === 'konto' ? 'page' : undefined}
-        >
-          Konto
+      <ThemeButton />
+      {!user && tab !== 'anmelden' && (
+        <button className="btn btn-link topbar-account" onClick={toLogin}>
+          Anmelden
         </button>
-      ) : (
-        tab !== 'anmelden' && (
-          <button className="btn btn-link topbar-account" onClick={toLogin}>
-            Anmelden
-          </button>
-        )
       )}
     </header>
   );
@@ -431,13 +442,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Dokumente docId={docId} onToast={showToast} />
               ))}
-            {tab === 'meins' && <Meins sub={path[1]} />}
+            {tab === 'meins' && <Meins sub={path[1]} onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {adminView && <AdminNav active={adminView} />}
             {tab === 'brett' && <Brett onToast={showToast} />}
             {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
             {tab === 'inventar' && <Inventar path={path.slice(1)} onToast={showToast} />}
-            {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}
             {tab === 'anmelden' && <Anmelden />}

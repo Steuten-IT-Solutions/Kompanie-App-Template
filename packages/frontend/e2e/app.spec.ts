@@ -27,6 +27,16 @@ async function meinsMenu(page: Page, name: string) {
   await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
 }
 
+/** Konto öffnen: „Meins“ und dort „Konto“ (ohne eigene Daten unter „Meins“ steht das Konto gleich da). */
+async function openKonto(page: Page) {
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  const menu = page.locator('.meins-menu');
+  await expect(menu.or(page.locator('.account-card').first())).toBeVisible();
+  if (await menu.count()) await meinsMenu(page, 'Konto');
+  await expect(page.locator('.account-name')).toBeVisible();
+}
+
 /** Seite eines Mitglieds in der Verwaltung wählen (zweites Menü unter dem Namen). */
 async function memberMenu(page: Page, name: string) {
   const nav = page.locator('.member-menu');
@@ -72,7 +82,7 @@ async function login(page: Page, user: string, password = PASSWORD) {
   await page.locator('.topbar').getByRole('button', { name: 'Anmelden' }).click();
   await fillLogin(page, user, password);
   await expect(page).toHaveURL(/\/app\/?(#.*)?$/);
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 }
 
 async function shot(page: Page, name: string) {
@@ -313,7 +323,7 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
 
   // Das Mitglied sieht sein Foto unter „Konto“, kann es dort aber nicht ändern.
   await login(page, username, password);
-  await page.locator('.topbar-account').click();
+  await openKonto(page);
   await expect(page.locator('.account-card .member-avatar-large img')).toBeVisible();
   await expect(page.getByRole('button', { name: /Foto/ })).toHaveCount(0);
 });
@@ -334,8 +344,10 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 
   await login(page, username, password);
   await expect(page.getByText('Vereinsabend')).toBeVisible(); // interner Kalender
-  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toHaveCount(0);
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+  // Unter „Meins“ nur das Konto, keine Daten aus dem Mitgliederbereich
+  await openKonto(page);
+  await expect(page.locator('.meins-menu')).toHaveCount(0);
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
@@ -348,7 +360,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.getByRole('button', { name: 'Als Mitglied aufnehmen' })).toHaveCount(0);
 
   await login(page, username, password);
-  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
@@ -421,8 +434,7 @@ test('Abgelaufenes Token wird erneuert, ohne dass die App auffällt', async ({ p
 test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) => {
   const NEW = 'Neues-Testpasswort-1';
   await login(page, 'mitglied2');
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await expect(page.locator('.topbar-title')).toHaveText('Mein Konto');
+  await openKonto(page);
 
   await page.getByLabel('Aktuelles Passwort').fill('falsch');
   await page.getByLabel(/^Neues Passwort \(/).fill(NEW);
@@ -440,7 +452,7 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
   await expect(page.locator('.stat-label')).toHaveText('Meine Punkte');
 
   await login(page, 'mitglied2', NEW);
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await page.getByLabel('Aktuelles Passwort').fill(NEW);
   await page.getByLabel(/^Neues Passwort \(/).fill(PASSWORD);
   await page.getByLabel('Neues Passwort wiederholen').fill(PASSWORD);
@@ -452,7 +464,7 @@ test('Mitglied wählt die Darstellung hell oder dunkel unabhängig vom Gerät', 
   const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await page.emulateMedia({ colorScheme: 'light' });
   await login(page, 'mitglied2');
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   const choice = page.getByRole('navigation', { name: 'Darstellung' });
   await expect(choice.getByRole('button', { name: 'Wie Gerät' })).toHaveAttribute('aria-pressed', 'true');
   const light = await bg();
@@ -481,6 +493,42 @@ test('Mitglied wählt die Darstellung hell oder dunkel unabhängig vom Gerät', 
   await expect(page.locator('html')).not.toHaveAttribute('data-theme');
   expect(await bg()).toBe(dark);
   await page.emulateMedia({ colorScheme: 'light' });
+});
+
+test('Knopf in der Kopfzeile wechselt hell und dunkel, auch ohne Anmeldung', async ({ page }) => {
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/app/');
+  const light = await bg();
+  // Ohne Anmeldung: Kopfzeile mit Hilfe, Darstellung und „Anmelden“
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await page.locator('.topbar').getByRole('button', { name: 'Dunkle Darstellung' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const dark = await bg();
+  expect(dark).not.toBe(light);
+  // Zurück zur Darstellung des Geräts: folgt wieder dem Gerät.
+  await page.locator('.topbar').getByRole('button', { name: 'Helle Darstellung' }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+  expect(await bg()).toBe(light);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Helle Darstellung' })).toBeVisible();
+  expect(await bg()).toBe(dark);
+
+  // Angemeldet: kein „Konto“ mehr oben; Knopf und Auswahl unter Meins → Konto zeigen dasselbe.
+  await login(page, 'mitglied2');
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Konto' })).toHaveCount(0);
+  await openKonto(page);
+  const choice = page.getByRole('navigation', { name: 'Darstellung' });
+  await page.locator('.topbar').getByRole('button', { name: 'Helle Darstellung' }).click();
+  await expect(choice.getByRole('button', { name: 'Hell' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await bg()).toBe(light);
+  await page.locator('.topbar').getByRole('button', { name: 'Dunkle Darstellung' }).click();
+  await expect(choice.getByRole('button', { name: 'Wie Gerät' })).toHaveAttribute('aria-pressed', 'true');
+  await page.emulateMedia({ colorScheme: 'light' });
+  // Alte Adresse #/konto führt zum Konto unter „Meins“.
+  await page.goto('/app/#/konto');
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  await expect(page.locator('.account-name')).toBeVisible();
 });
 
 test('Admin pflegt öffentliche Termine', async ({ page }) => {
@@ -629,7 +677,7 @@ test.describe('Android', () => {
 
     // Mitglied: eigene Punkte und Kasse, Schalter für Beträge
     await login(page, 'mitglied1');
-    await page.getByRole('button', { name: 'Konto' }).click();
+    await openKonto(page);
     await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
     await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
     await expect(page.getByLabel('Kasse: neue Einträge')).toBeChecked();
@@ -658,7 +706,7 @@ test.describe('Android', () => {
     });
 
     // Abmelden meldet das Gerät beim Server ab.
-    await page.getByRole('button', { name: 'Konto' }).click();
+    await openKonto(page);
     await page.getByRole('button', { name: 'Abmelden' }).click();
     await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('fake-push-sub'))).toBeNull();
@@ -697,8 +745,9 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await shot(page, '13-rolle');
 
   await login(page, 'mitglied2');
-  await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Konto' })).toBeVisible();
+  // Als Gast keine eigenen Daten: „Meins“ zeigt nur das Konto, ohne Menü.
+  await openKonto(page);
+  await expect(page.locator('.meins-menu')).toHaveCount(0);
 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
@@ -831,7 +880,7 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
   await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
   await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await expect(page.locator('.account-card').first()).toContainText('Rollen: Mitglied, Termine verwalten');
 
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -881,7 +930,7 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
   await other.close();
 
   // Nur ansehen: Der Server lehnt Änderungen ab, die App zeigt die Meldung.
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await page.getByLabel('Aktuelles Passwort').fill(ADMIN_PASSWORD);
   await page.getByLabel(/^Neues Passwort \(/).fill('Vorschau-Passwort-1');
   await page.getByLabel('Neues Passwort wiederholen').fill('Vorschau-Passwort-1');
@@ -904,7 +953,7 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
   await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
   await banner.getByRole('button', { name: 'Beenden' }).click();
   await expect(rollen).toBeVisible();
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 });
 
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {
@@ -1011,7 +1060,7 @@ test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ pa
   await expect(page.locator('.install-hint')).toHaveCount(0);
 
   await login(page, 'mitglied1');
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await page.getByRole('button', { name: 'App installieren' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('App installieren');
 });
@@ -1051,7 +1100,7 @@ test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ p
   await page.locator('.topbar').getByRole('button', { name: 'Anmelden' }).click();
   await expect(STANDALONE ? page.getByLabel('Angemeldet bleiben') : page.locator('#rememberme')).toBeChecked();
   await fillLogin(page, 'mitglied1', PASSWORD);
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
   const cookie = (await page.context().cookies()).find((c) =>
     STANDALONE ? c.name === 'kompanie_session' : c.name.startsWith('wordpress_logged_in_'),
   );
@@ -1082,7 +1131,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' });
   await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
   await page.reload();
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
   await expect(hint).toHaveCount(0);
   await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
   // Ausgeschaltet heißt auch auf dem Server gesperrt.
@@ -1973,7 +2022,7 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   const admin = await browser.newPage();
   admin.on('dialog', (d) => d.accept());
   await login(admin, 'admin', ADMIN_PASSWORD);
-  await admin.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(admin);
   await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
   await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(admin, 'Schwarzes Brett');
@@ -2003,7 +2052,7 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
     await tabs.nth(i).click();
     await expect(banner).toContainText(first);
   }
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await expect(banner).toContainText(first);
   await expect(page.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
   await shot(page, '33-schwarzes-brett');
@@ -2175,7 +2224,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   const member = await browser.newPage();
   member.on('dialog', (d) => d.accept());
   await login(member, 'mitglied1');
-  await member.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(member);
   const card = member.locator('.birthday-card');
   await card.getByLabel('Tag').selectOption(String(in3.getDate()));
   await card.getByLabel('Monat').selectOption(String(in3.getMonth() + 1));

@@ -146,6 +146,19 @@ select {
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
 }
+.topbar .topbar-theme {
+  color: var(--on-primary);
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--on-primary-soft);
+  border-radius: 50%;
+}
 .topbar .topbar-help.active {
   background: var(--accent);
   color: var(--on-accent);

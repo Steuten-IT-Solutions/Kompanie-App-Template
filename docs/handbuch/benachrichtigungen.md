@@ -6,7 +6,7 @@ rechte: []
 Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas Neues gibt – auch wenn sie gerade geschlossen ist. Du wählst selbst, worüber.
 
 ## Einschalten
-1. Mit Konto: oben rechts auf **Konto** und dann auf **Benachrichtigungen einstellen** tippen. Ohne Konto: unter **{bereich.events}** auf **Bei neuen Terminen benachrichtigen** oder unter **{bereich.news}** auf **Bei neuen Beiträgen benachrichtigen** tippen.
+1. Mit Konto: auf **Meins**, im Menü auf **Konto** und dann auf **Benachrichtigungen einstellen** tippen. Ohne Konto: unter **{bereich.events}** auf **Bei neuen Terminen benachrichtigen** oder unter **{bereich.news}** auf **Bei neuen Beiträgen benachrichtigen** tippen.
 2. Es sind alle Arten angekreuzt, die es für dich gibt. Nimm die Haken weg, die du nicht möchtest.
 3. **Benachrichtigungen einschalten** tippen und die Nachfrage des Browsers mit **Erlauben** bestätigen.
 

@@ -36,9 +36,13 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return sub === 'verwalten' ? 'dokumente-pflegen' : 'dokumente';
     case 'meins':
       return (
-        { punkte: 'meine-punkte', strafen: 'meine-strafen', dienstgrad: 'mein-dienstgrad', anwesenheit: 'meine-anwesenheit' }[
-          sub ?? ctx.meinsFirst ?? ''
-        ] ?? (on('titles') ? 'meine-titel' : null)
+        {
+          punkte: 'meine-punkte',
+          strafen: 'meine-strafen',
+          dienstgrad: 'mein-dienstgrad',
+          anwesenheit: 'meine-anwesenheit',
+          konto: 'anmelden-und-konto',
+        }[sub ?? ctx.meinsFirst ?? ''] ?? (on('titles') ? 'meine-titel' : 'anmelden-und-konto')
       );
     case 'verwaltung':
       return adminSlug(path.slice(1), ctx);
