@@ -258,6 +258,16 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Ehemalige');
+  // Filter und Sortierung sind wie in der Mitgliederliste zunächst eingeklappt; ein gesetzter Filter zeigt „aktiv“.
+  const filters = page.getByRole('button', { name: 'Filter und Sortierung' });
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Nach Grund filtern')).toBeHidden();
+  await filters.click();
+  await expect(filters).toHaveAttribute('aria-expanded', 'true');
+  await page.getByLabel('Nach Grund filtern').selectOption('left');
+  await filters.click();
+  await expect(page.getByLabel('Nach Grund filtern')).toBeHidden();
+  await expect(filters).toContainText('aktiv');
   await page.getByLabel('Ehemalige suchen').fill(last);
   await page.locator('.row', { hasText: 'Anton' }).click();
   await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
