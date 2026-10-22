@@ -2068,8 +2068,15 @@ fieldset.feature-list legend {
 .member-row .row-main {
   text-align: center;
 }
+/* Titel in eigener Zeile unter dem Namen, mittig; auch Titel mit Umbruch (Text in der Plakette mittig). */
 .member-row .title-badges {
+  display: flex;
   justify-content: center;
+  margin: 4px 0 0;
+}
+.member-row .badge-title {
+  text-align: center;
+  border-radius: 1em;
 }
 .member-row-rank {
   flex: none;
@@ -3606,7 +3613,7 @@ button.spotlight-person:focus-visible {
   background: none;
   color: inherit;
   font: inherit;
-  text-align: left;
+  text-align: inherit;
   cursor: pointer;
 }
 .member-row-open::after {
