@@ -53,7 +53,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          REPOS="$(gh search repos --owner Steuten-IT-Solutions --topic kompanie-app --visibility public --archived=false --limit 500 --json fullName --jq '.[].fullName')"
+          REPOS="$(gh api --paginate 'orgs/Steuten-IT-Solutions/repos?type=public&per_page=100' --jq '.[] | select(.archived | not) | select((.topics // []) | index("kompanie-app")) | .full_name')"
           JSON="$(printf '%s\n' "$REPOS" | { grep -E '^Steuten-IT-Solutions/[A-Za-z0-9._-]+$' || true; } | jq -R . | jq -cs .)"
           [ "$JSON" != '[]' ] || { echo "::error::Keine Kompanie gefunden."; exit 1; }
           echo "Kompanien: $JSON"
