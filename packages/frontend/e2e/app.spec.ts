@@ -27,11 +27,15 @@ async function meinsMenu(page: Page, name: string) {
   await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
 }
 
-/** Seite eines Mitglieds in der Verwaltung wählen (zweites Menü unter dem Namen). */
-async function memberMenu(page: Page, name: string) {
-  const nav = page.locator('.member-menu');
-  await nav.locator('.admin-menu-toggle').click();
-  await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
+/** Auf der Seite eines Mitglieds in der Verwaltung „Konto und Rolle“ aufklappen (ganz unten). */
+async function memberAccount(page: Page) {
+  const account = page.locator('.member-account');
+  if ((await account.getAttribute('open')) === null) await account.locator('summary').click();
+}
+/** Auf der Seite eines Mitglieds die Kachel „Offen“ antippen: Fenster mit Formular und Einträgen der Kasse. */
+async function memberPenalties(page: Page) {
+  await page.locator('.member-stats .stat-button', { hasText: 'Offen' }).click();
+  await expect(page.getByRole('dialog', { name: 'Kasse' })).toBeVisible();
 }
 /** Zählt beantwortete Aufrufe zum Speichern einer Reihenfolge (PUT …/order), um vor dem Neuladen darauf zu warten. */
 function countOrderSaves(page: Page, path: string) {
@@ -155,12 +159,47 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await expect(page.locator('.stat', { hasText: 'Offen gesamt' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
-  await memberMenu(page, 'Kasse');
-  await page.locator('.row', { hasText: 'Handy klingelt <10 min' }).getByRole('button', { name: 'Bezahlt' }).click();
+  // Antippen der Kachel: Formular nur für diese Person und ihre Einträge
+  await memberPenalties(page);
+  const sheet = page.getByRole('dialog', { name: 'Kasse' });
+  await expect(sheet.getByLabel('Mitglied1')).toHaveCount(0);
+  await sheet.locator('.row', { hasText: 'Handy klingelt <10 min' }).getByRole('button', { name: 'Bezahlt' }).click();
   await expect(page.locator('.toast')).toHaveText('Als bezahlt markiert');
-  await memberMenu(page, 'Übersicht');
-  await expect(page.locator('.stat', { hasText: 'Offen' }).locator('.stat-value')).toContainText('2,50');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(page).toHaveURL(/\/mitglied\/\d+$/);
+  await expect(page.locator('.member-stats .stat', { hasText: 'Offen' }).locator('.stat-value')).toContainText('2,50');
   await shot(page, '7-verwaltung-mitglied');
+});
+
+test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im selben Fenster', async ({ page }) => {
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  // Keine Knöpfe mehr unter den Kacheln und kein Menü unter dem Namen
+  await expect(page.getByRole('button', { name: 'Punkte vergeben' })).toHaveCount(0);
+  await expect(page.locator('.member-menu')).toHaveCount(0);
+  const before = Number(
+    (await page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value').textContent())!.replace(/\D/g, ''),
+  );
+  await page.locator('.member-stats .stat-button', { hasText: 'Punkte' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Punkte' });
+  await expect(page).toHaveURL(/\/mitglied\/\d+\/punkte$/);
+  await expect(sheet.getByLabel('Mitglied2')).toHaveCount(0);
+  await sheet.getByLabel('Punkte', { exact: true }).fill('3');
+  await sheet.getByLabel('Grund').fill('E2E Kachel');
+  await sheet.getByRole('button', { name: 'Punkte vergeben' }).click();
+  await expect(page.locator('.toast')).toHaveText('+3 Punkte an 1 Mitglied vergeben');
+  await expect(sheet.locator('.row', { hasText: 'E2E Kachel' })).toBeVisible();
+  await expect(sheet.getByLabel('Grund')).toHaveValue('');
+  await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before + 3));
+  // Wieder stornieren, damit die Summen anderer Tests stimmen
+  page.once('dialog', (d) => d.accept());
+  await sheet.locator('.row', { hasText: 'E2E Kachel' }).getByRole('button', { name: 'Stornieren' }).click();
+  await expect(page.locator('.toast')).toHaveText('Storniert');
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before));
 });
 
 test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stelle', async ({ page }) => {
@@ -204,7 +243,7 @@ async function swipe(page: Page, dx: number) {
   await cdp.detach();
 }
 
-test('Mitglied: Wischen blättert in der Liste und bleibt auf derselben Unterseite', async ({ page }) => {
+test('Mitglied: Wischen blättert in der Liste, nicht aber in einem offenen Fenster', async ({ page }) => {
   await login(page, 'verwalter');
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.getByLabel('Mitglied suchen').fill('Mitglied');
@@ -212,13 +251,10 @@ test('Mitglied: Wischen blättert in der Liste und bleibt auf derselben Untersei
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
   await expect(page.locator('.member-step')).toContainText('1 / 2');
   await expect(page.getByRole('button', { name: 'Vorheriges Mitglied' })).toBeDisabled();
-  await memberMenu(page, 'Kasse');
 
-  // Nach links: nächstes Mitglied, weiter auf „Kasse“.
+  // Nach links: nächstes Mitglied.
   await swipe(page, -200);
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
-  await expect(page).toHaveURL(/\/strafen$/);
-  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
   await expect(page.locator('.member-step')).toContainText('2 / 2');
   // Am Ende der Liste geht es nicht weiter.
   await swipe(page, -200);
@@ -229,10 +265,15 @@ test('Mitglied: Wischen blättert in der Liste und bleibt auf derselben Untersei
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
   await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
-  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
 
-  // Wischen legt keine Einträge im Verlauf an: „Zurück“ nimmt die Wahl der Unterseite zurück, dann geht es zur Liste.
+  // Im offenen Fenster blättert Wischen nicht; „Zurück“ schließt erst das Fenster, dann geht es zur Liste (Wischen legt
+  // keine Einträge im Verlauf an).
+  await memberPenalties(page);
+  await expect(page).toHaveURL(/\/strafen$/);
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
   await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/\/mitglied\/\d+$/);
   await page.goBack();
   await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
@@ -272,16 +313,26 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await page.getByRole('button', { name: 'Vorheriges Mitglied' }).click();
   await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
 
-  // Ebenso bei Mitgliedern, die Unterseite bleibt
+  // Eintritt und Austritt unten auf der Seite; Antippen öffnet gleich das Formular zum Ändern.
+  const dates = page.locator('.member-dates');
+  await expect(dates.getByRole('button', { name: /^Eintritt/ })).toContainText('1970');
+  await expect(dates.getByRole('button', { name: /^Austritt/ })).toContainText('Ausgetreten 2000');
+  await dates.getByRole('button', { name: /^Austritt/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Austritt' });
+  await sheet.getByLabel('Ausgeschieden am (optional)').fill('2001');
+  await sheet.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(dates.getByRole('button', { name: /^Austritt/ })).toContainText('Ausgetreten 2001');
+
+  // Ebenso bei Mitgliedern
   await page.goto('/app/#/verwaltung/mitglieder');
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
-  await memberMenu(page, 'Kasse');
   await page.reload();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
   await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
   await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
-  await expect(page.locator('.member-menu .admin-menu-current')).toHaveText('Kasse');
 });
 
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
@@ -301,7 +352,7 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   // Standard-Sortierung nach Nachname: „Nachname, Vorname“.
   await page.locator('.row', { hasText: 'Testperson, Neue' }).first().click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Neues Startpasswort erzeugen/ }).click();
   const fresh = (await page.getByTestId('reset-password').textContent())!.trim();
@@ -332,7 +383,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   await page.locator('.row', { hasText: `${id}, Ida` }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.getByRole('button', { name: 'Angaben ändern' }).click();
   await expect(page.locator('.account-edit').getByLabel('Vorname')).toHaveValue('Ida');
   await expect(page.locator('.account-edit').getByLabel('Nachname')).toHaveValue(id);
@@ -344,7 +395,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
   await page.locator('.row', { hasText: `${id}, Jan` }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page
     .locator('.account-panel')
     .getByRole('button', { name: /Konto löschen|Aus der App entfernen/ })
@@ -423,11 +474,22 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await page.getByRole('button', { name: /vergrößern/ }).click();
   await zoom.getByRole('button', { name: 'Schließen' }).click();
   await expect(zoom).toHaveCount(0);
+  // Ersetzen und entfernen nur in der vergrößerten Ansicht, nicht mehr auf der Seite
+  await expect(page.getByRole('button', { name: 'Foto entfernen' })).toHaveCount(0);
+  await page.getByRole('button', { name: /vergrößern/ }).click();
+  await expect(zoom.getByRole('button', { name: 'Foto ersetzen' })).toBeVisible();
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Foto entfernen' }).click();
+  await zoom.getByRole('button', { name: 'Foto entfernen' }).click();
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
-  await expect(page.getByRole('button', { name: 'Foto hochladen' })).toBeVisible();
+  await expect(zoom).toHaveCount(0);
   await expect(page.locator('.member-rank-line .member-avatar-initials')).toBeVisible();
+  // Ohne Foto öffnen die Anfangsbuchstaben ein Fenster zum Hochladen.
+  await page.getByRole('button', { name: /hochladen$/ }).click();
+  const upload = page.getByRole('dialog', { name: 'Foto' });
+  await upload.getByLabel('Foto-Datei').setInputFiles(PNG);
+  await expect(page.locator('.toast')).toContainText('Foto gespeichert');
+  await expect(upload).toHaveCount(0);
+  await expect(page.locator('.member-rank-line .member-avatar img')).toBeVisible();
 
   // Das Mitglied sieht sein Foto unter „Konto“, kann es dort aber nicht ändern.
   await login(page, username, password);
@@ -518,7 +580,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.getByRole('button', { name: 'Filter und Sortierung' })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByLabel('Sortierung')).toBeHidden();
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();
   await expect(page.locator('.toast')).toHaveText(`${name} ist jetzt Mitglied`);
@@ -834,7 +896,7 @@ test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async 
   await expect(page.locator('.row', { hasText: 'Mitglied1' })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Mitglied anlegen' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await expect(page.getByRole('button', { name: /Neues Startpasswort/ })).toHaveCount(0);
 });
 
@@ -1142,7 +1204,7 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   if (!STANDALONE) await expect(page.locator('.role-control option', { hasText: 'Admin' })).toHaveCount(0); // WordPress: Admins im Backend
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Gast' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Gast');
@@ -1157,7 +1219,7 @@ test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => 
   await page.getByRole('button', { name: 'Filter und Sortierung' }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
@@ -1166,7 +1228,7 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Termine verwalten');
 
@@ -1180,7 +1242,7 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
@@ -1189,7 +1251,7 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   const rechte = page.locator('.member-rights');
   await expect(rechte.getByLabel(/^Mitgliederbereich/)).toBeChecked();
   await rechte.getByLabel('Öffentliche Termine pflegen').check();
@@ -1206,7 +1268,7 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await expect(page.locator('.member-level')).toContainText('mit Ausnahmen bei den Rechten');
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   page.once('dialog', (d) => d.accept());
   await rechte.getByRole('button', { name: 'Wie die Rolle' }).click();
   await expect(page.locator('.toast')).toHaveText('Rechte wie die Rolle');
@@ -1237,7 +1299,7 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
 
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Kassenwart' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Kassenwart');
 
@@ -1263,7 +1325,7 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   const extra = page.locator('.extra-roles');
   // Feste Rollen sind nur Grundrolle.
   await expect(extra.getByLabel('Mitglied', { exact: true })).toHaveCount(0);
@@ -1291,7 +1353,7 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.extra-roles').getByLabel('Termine verwalten').uncheck();
   await expect(page.locator('.toast')).toHaveText('Zusatzrolle entfernt: Termine verwalten');
 });
@@ -2063,6 +2125,11 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
   await expect(page.getByText('Beförderung: kein Dienstgrad → Gefreiter')).toBeVisible();
   await expect(page.locator('.member-rank strong')).toHaveText('Gefreiter');
+  // Über einen Link geöffnet: Schließen bleibt auf der Seite des Mitglieds; das Abzeichen öffnet das Fenster wieder.
+  await page.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/verwaltung/mitglied/${id}$`));
+  await page.locator('.member-rank-open').click();
+  await expect(page.getByRole('dialog', { name: 'Dienstgrad' }).locator('.member-rank strong')).toHaveText('Gefreiter');
 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
@@ -2345,10 +2412,12 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
 
   await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Titel');
+  await page.locator('.member-titles-tile').click();
   await page.locator('.member-titles').getByLabel(title).check();
   await page.getByRole('button', { name: 'Titel speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Titel gespeichert');
+  await page.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page.locator('.member-titles-tile .badge-title')).toContainText(title);
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
   await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-title')).toContainText(title);
 
@@ -2697,7 +2766,10 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Eintritt');
+  await page
+    .locator('.member-dates')
+    .getByRole('button', { name: /^Eintritt/ })
+    .click();
   const adminCard = page.locator('.member-join-year');
   await adminCard.getByLabel('Datum oder Jahr').fill('1.4.2005');
   await adminCard.getByRole('button', { name: 'Eintritt speichern' }).click();

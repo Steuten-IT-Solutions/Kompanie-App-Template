@@ -19,11 +19,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
-  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung, und die gewählte
-  Unterseite (z. B. Punkte) bleibt.
+  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung.
 
 ### Geändert
 
+- **Seite eines Mitglieds in der Verwaltung ohne Menü**: Alles steht auf einer Seite, geändert wird durch Antippen.
+  Das Abzeichen öffnet Befördern und Degradieren, das Foto die große Ansicht mit „Foto ersetzen“ und „Foto
+  entfernen“, die Kacheln Punkte und Offen ein Fenster mit dem Formular nur für diese Person und ihren Einträgen,
+  die neue Kachel Titel die Auswahl der Titel. Darunter stehen die Ämter, ganz unten Geburtstag, Eintritt und
+  Austritt (Austritt trägt als ehemalig ein bzw. ändert die Angaben) und zum Aufklappen „Konto und Rolle“. Die
+  Knöpfe unter dem Foto und unter den Kacheln entfallen. Gilt auch für Ehemalige.
 - **Punkte in der Mitgliederliste der Verwaltung** stehen nur noch, wenn die Liste nach Punkten sortiert ist, wie
   schon der Eintritt bei der Sortierung nach Eintritt. Offene Strafen stehen weiter immer da.
 - **Shortcodes auf der Webseite**: `[kompanie_mitglieder]` sieht aus wie eine Bildergalerie: Fotos im Hochformat
