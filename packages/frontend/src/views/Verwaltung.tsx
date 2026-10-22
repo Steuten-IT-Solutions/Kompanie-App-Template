@@ -162,11 +162,20 @@ type MembersState = {
 };
 let savedMembers: MembersState | null = null;
 
-/** Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt (create_users). */
+/**
+ * Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt
+ * (create_users); nach Austritt nur bei den Ehemaligen.
+ */
 const memberSorts = (): MemberSort[] =>
   (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
-    (s) => (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+    (s) => s !== 'left' && (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
   );
+
+/** Rolle als Titel in der Liste, solange die Person noch als Mitglied aufzunehmen ist (Häkchen an der Rolle, z. B. Anwärter). */
+const admitRole = (level: Level) => {
+  const r = roleInfo(level);
+  return r?.promotable ? r.label : undefined;
+};
 
 function Members() {
   const canPromote = can('promote_users');
@@ -357,7 +366,7 @@ function Members() {
             {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">
-                {listName(m, order.sort)} <TitleBadges titles={m.titles} />
+                {listName(m, order.sort)} <TitleBadges titles={m.titles} role={admitRole(m.level)} />
               </div>
               <div className="row-sub">
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}

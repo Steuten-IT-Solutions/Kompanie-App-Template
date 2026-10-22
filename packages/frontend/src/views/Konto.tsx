@@ -5,6 +5,7 @@ import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate } from '../router';
 import { MemberAvatar } from '../memberPhoto';
+import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 
 const MIN_LENGTH = 8;
 
@@ -14,6 +15,7 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
   const [repeat, setRepeat] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const theme = useTheme().choice;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -56,6 +58,25 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         <button className="btn btn-secondary btn-block push-konto" onClick={() => navigate('benachrichtigungen')}>
           Benachrichtigungen einstellen
         </button>
+      </div>
+
+      <div className="card account-card">
+        <h3>Darstellung</h3>
+        <p className="muted small">
+          Hell, dunkel oder wie auf dem Gerät eingestellt. Gilt nur auf diesem Gerät; umschalten geht auch oben mit dem Knopf neben „?“.
+        </p>
+        <nav className="segmented theme-choice" aria-label="Darstellung">
+          {(Object.keys(THEME_LABELS) as ThemeChoice[]).map((choice) => (
+            <button
+              key={choice}
+              className={theme === choice ? 'active' : ''}
+              onClick={() => saveTheme(choice)}
+              aria-pressed={theme === choice}
+            >
+              {THEME_LABELS[choice]}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {!isStandalone() && (

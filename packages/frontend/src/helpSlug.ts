@@ -44,7 +44,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           strafen: 'meine-strafen',
           dienstgrad: 'mein-dienstgrad',
           anwesenheit: 'meine-anwesenheit',
-        }[sub ?? 'uebersicht'] ?? 'meins-uebersicht'
+          konto: 'anmelden-und-konto',
+        }[sub ?? (ctx.can('member') ? 'uebersicht' : 'konto')] ?? 'meins-uebersicht'
       );
     case 'verwaltung':
       return adminSlug(path.slice(1), ctx);

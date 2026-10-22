@@ -11,4 +11,4 @@ Unter **Meins → Übersicht** stehen deine eigenen Angaben auf einen Blick, auf
 - dein Geburtstag (wenn es bei euch Geburtstage gibt) und dein Eintritt,
 - deine {bereich.offices} als Zeitstrahl, wenn es bei euch {bereich.offices} gibt.
 
-Die Übersicht ist nur zum Ansehen. Ein Tipp auf die Kacheln oder das Abzeichen öffnet die passende Seite im Menü darüber, ein Tipp auf das Foto vergrößert es. Geburtstag und Eintritt änderst du unter **Konto** (den Eintritt dort, wenn es bei euch die {bereich.directory} gibt). Foto, Name und Rolle pflegen die Verantwortlichen in der Verwaltung.
+Die Übersicht ist nur zum Ansehen. Ein Tipp auf die Kacheln oder das Abzeichen öffnet die passende Seite im Menü darüber, ein Tipp auf das Foto vergrößert es. Geburtstag und Eintritt änderst du unter **Meins → Konto** (den Eintritt dort, wenn es bei euch die {bereich.directory} gibt). Foto, Name und Rolle pflegen die Verantwortlichen in der Verwaltung.

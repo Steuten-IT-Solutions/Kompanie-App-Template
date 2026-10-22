@@ -7,7 +7,7 @@ Die App der {kompanie.name} läuft im Browser und lässt sich wie jede andere Ap
 
 ## Wo die Anleitung in der App steht
 - Oben in der App erscheint der Hinweis **Die App aufs Handy holen**. Bietet dein Browser die Installation direkt an, tippst du dort auf **Installieren**, sonst auf **So geht's**. Mit **✕** blendest du den Hinweis aus.
-- Mit Konto findest du die Anleitung auch unter **Konto → App installieren**.
+- Mit Konto findest du die Anleitung auch unter **Meins → Konto → App installieren**.
 
 Die Anleitung zeigt die Schritte für dein Gerät mit Bildern; oben wählst du zwischen **iPhone / iPad** und **Android**. Ist die App schon installiert und du benutzt sie gerade, steht dort „Alles erledigt“.
 

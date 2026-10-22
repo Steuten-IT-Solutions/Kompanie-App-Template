@@ -4,7 +4,7 @@ reihenfolge: 72
 rechte: [create_users]
 bereiche: [birthdays]
 ---
-Jedes Mitglied trägt seinen Geburtstag selbst unter **Konto** (oben rechts) ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
+Jedes Mitglied trägt seinen Geburtstag selbst unter **Meins → Konto** ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
 
 ## In den Mitgliedsdetails
 **Verwaltung → Mitglieder →** Mitglied antippen und auf seiner Seite unter den Kacheln **Geburtstag** antippen (wie die Mitgliederliste aufgebaut ist, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen)). Dort steht das eingetragene Datum oder „Nicht eingetragen.“. Wähle **Tag**, **Monat** und, wenn bekannt, das **Jahr** und tippe **Geburtstag speichern**; **Entfernen** löscht ihn nach einer Rückfrage.

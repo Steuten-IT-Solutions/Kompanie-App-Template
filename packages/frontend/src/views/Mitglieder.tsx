@@ -23,6 +23,8 @@ import { OfficesView, PersonOffices, useOffices } from './Aemter';
 
 /** Nach Namen oder Eintritt; Punkte stehen in dieser Liste nicht. */
 const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
+/** Ehemalige zusätzlich nach Austritt (wie unter dem Namen: Datum oder nur das Jahr). */
+const FORMER_SORTS: MemberSort[] = [...SORTS, 'left'];
 
 const sec = brand.labels.sections;
 const SECTION_KEY = 'kompanie-members-section';
@@ -232,7 +234,8 @@ function MemberList({ former = false }: { former?: boolean }) {
   const [query, setQuery] = useState('');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Gemerkt ist vielleicht die Sortierung nach Punkten aus der Verwaltung: hier dann nach Nachname.
-  const order: MemberOrder = SORTS.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const sorts = former ? FORMER_SORTS : SORTS;
+  const order: MemberOrder = sorts.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
   const changeOrder = (next: MemberOrder) => {
     setStored(next);
     saveMemberOrder(next);
@@ -281,7 +284,7 @@ function MemberList({ former = false }: { former?: boolean }) {
               changeOrder({ sort, dir: defaultDir(sort) });
             }}
           >
-            {SORTS.map((s) => (
+            {sorts.map((s) => (
               <option key={s} value={s}>
                 {MEMBER_SORT_LABELS[s]}
               </option>

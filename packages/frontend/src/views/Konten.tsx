@@ -15,7 +15,7 @@ export function credentialsText(c: { name: string; username: string; password: s
     `App installieren: ${installUrl()}`,
     `Benutzername: ${c.username}`,
     `Passwort: ${c.password}`,
-    'Bitte nach der ersten Anmeldung unter „Konto“ ein eigenes Passwort setzen.',
+    'Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.',
   ].join('\n');
 }
 
@@ -70,7 +70,7 @@ export function Credentials({
               <dt>Passwort</dt>
               <dd data-testid="new-password">{c.password}</dd>
             </dl>
-            <p className="small print-only">Bitte nach der ersten Anmeldung unter „Konto“ ein eigenes Passwort setzen.</p>
+            <p className="small print-only">Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.</p>
           </section>
         ))}
       </div>
