@@ -37,7 +37,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ehemalige importieren** nimmt jetzt auch Excel-Dateien (.xlsx).
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
-  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung.
+  mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
+  dabei dem Finger, daneben ist die nächste Person schon zu sehen, und weil die App die Nachbarn vorlädt, steht deren
+  Seite nach dem Wechsel sofort da, ohne Laden.
 
 ### Geändert
 
