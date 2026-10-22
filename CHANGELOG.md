@@ -15,6 +15,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Shortcodes auf der Webseite**: `[kompanie_mitglieder]` sieht aus wie eine Bildergalerie: Fotos im Hochformat
+  (scharf, auch auf Handys), Name als Balken im Bild, ohne Dienstgrad, nach Namen sortiert, groß beim Antippen. In
+  `[kompanie_aemter]` sind die Fotos schärfer und oben ausgerichtet, damit der runde Ausschnitt keine Gesichter
+  abschneidet. Schrift steht in der Textfarbe der Webseite, damit sie auch mit dunklem Hintergrund lesbar ist.
+
 ## [0.2.0] – 2026-10-22
 
 ### Neu
