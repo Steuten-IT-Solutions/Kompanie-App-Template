@@ -866,6 +866,12 @@ final class Migrations
                     'CREATE INDEX IF NOT EXISTS {office_holders}_user_id ON {office_holders} (user_id)',
                 ],
             ],
+            // Fotos der Mitglieder zusätzlich in 1024 Pixeln (xlarge) für die vergrößerte Ansicht. Ohne Vorgabe (NULL):
+            // Fotos von vorher haben diese Fassung erst nach erneutem Hochladen; die App nimmt bis dahin die 480er.
+            18 => [
+                'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge mediumtext DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

@@ -16,8 +16,8 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  * - Hochladen, ersetzen und entfernen nur, wer Konten anlegen darf (create_users), und nur bei Konten, die er verwalten
  *   darf (MemberService::guardAccount); optional schon beim Anlegen (auch mehrere auf einmal).
  * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
- *   gedreht, ohne Metadaten wie GPS) in 128 und 480 Pixeln an der längeren Kante, in der Datenbank
- *   (MemberPhotoRepository).
+ *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert), in der
+ *   Datenbank (MemberPhotoRepository).
  * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
  *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste (Issue #112, inDirectory).
  *   Ausgeliefert über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide
@@ -28,7 +28,8 @@ final class MemberPhotoService
     public const MAX_BYTES = 5 * 1024 * 1024;
     /** Größte Kantenlänge eines hochgeladenen Bilds (schützt den Arbeitsspeicher beim Verkleinern). */
     public const MAX_EDGE = 4096;
-    public const SIZES = [128, 480];
+    /** 1024: vergrößerte Ansicht in der App, scharf auch auf Handys mit hoher Pixeldichte. */
+    public const SIZES = [128, 480, 1024];
     /** photo_url zeigt auf diese Größe; die App ändert s bei Bedarf. */
     public const DEFAULT_SIZE = 128;
     public const QUALITY = 82;
@@ -142,7 +143,7 @@ final class MemberPhotoService
             @unlink($target);
             @unlink($tmp);
         }
-        $version = substr(hash('sha256', $images[self::SIZES[0]] . $images[self::SIZES[1]] . random_bytes(8)), 0, 16);
+        $version = substr(hash('sha256', implode('', $images) . random_bytes(8)), 0, 16);
         $this->repository()->save($userId, $images, $version, $actor->id, $this->app->time()->nowUtc());
     }
 

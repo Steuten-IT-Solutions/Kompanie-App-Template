@@ -370,6 +370,8 @@ try {
     $c->ok($d->send('GET', $monaUrl, $monaCookie + ['If-None-Match' => (string) ($own[2]['etag'] ?? '-')], null)[0] === 304, 'Foto: passender ETag → 304');
     $large = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=480', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
     $c->ok(($large[0] ?? 0) === 480 && ($large[1] ?? 0) === 320 && ($large['mime'] ?? '') === 'image/jpeg', 'Wer Mitglieder verwaltet, sieht das Foto; s=480 liefert 480 Pixel');
+    $xlarge = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=1024', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
+    $c->ok(($xlarge[0] ?? 0) === 900 && ($xlarge[1] ?? 0) === 600, 's=1024 liefert das Foto so groß wie hochgeladen (nie vergrößert)');
     // Mitgliederliste für alle (Bereich directory): an sehen andere Mitglieder das Foto, aus nicht.
     $ottoCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)];
     $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 200, 'Mit Mitgliederliste sehen andere Mitglieder das Foto');

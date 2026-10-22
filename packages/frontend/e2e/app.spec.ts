@@ -309,6 +309,8 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await page.getByRole('button', { name: /vergrößern/ }).click();
   const zoom = page.getByRole('dialog', { name: /^Foto von / });
   await expect(zoom.locator('img')).toBeVisible();
+  // Vergrößert die 1024-Pixel-Fassung (scharf auch bei hoher Pixeldichte)
+  await expect(zoom.locator('img')).toHaveAttribute('src', /[?&]s=1024(&|$)/);
   await page.keyboard.press('Escape');
   await expect(zoom).toHaveCount(0);
   await page.getByRole('button', { name: /vergrößern/ }).click();

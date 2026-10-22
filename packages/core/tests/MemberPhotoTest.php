@@ -63,13 +63,13 @@ final class MemberPhotoTest extends TestCase
         return (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')[$label];
     }
 
-    public function testUploadStoresTwoJpegSizesAndReplaces(): void
+    public function testUploadStoresThreeJpegSizesAndReplaces(): void
     {
         $res = $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('Max.PNG', self::image(2000, 1000, 'png'))]);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $url = (string) $res->data['photo_url'];
         $this->assertMatchesRegularExpression('#^https://example\.org/app/mitgliedsfoto/' . $this->m . '\?v=[0-9a-f]{16}&s=128$#', $url);
-        foreach ([128 => [128, 64], 480 => [480, 240]] as $size => $dims) {
+        foreach ([128 => [128, 64], 480 => [480, 240], 1024 => [1024, 512]] as $size => $dims) {
             $bytes = $this->app->memberPhotos()->repository()->image($this->m, $size);
             $this->assertNotNull($bytes);
             $info = getimagesizefromstring($bytes);
@@ -165,6 +165,14 @@ final class MemberPhotoTest extends TestCase
         $this->assertSame('private, no-cache', $deliver($manager, 'alt')['headers']['Cache-Control'], 'veraltete Fassung jedes Mal prüfen');
         $this->assertSame(404, $deliver($manager, null, '64')['status'], 'unbekannte Größe');
         $this->assertSame(404, $photos->forDelivery($this->users->find($manager), $other, 'x', '128')['status'], 'ohne Foto');
+        $size = getimagesizefromstring($deliver($manager, null, '1024')['body'] ?? '');
+        $this->assertNotFalse($size);
+        $this->assertSame(600, $size[0], '1024: so groß wie hochgeladen, nie vergrößert');
+
+        // Vor Datenbankversion 18 hochgeladen: ohne 1024er (die App nimmt dann die 480er), die anderen Größen wie bisher.
+        $this->app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$this->m]);
+        $this->assertSame(404, $deliver($manager, null, '1024')['status']);
+        $this->assertSame(200, $deliver($manager, null, '480')['status']);
     }
 
     public function testDirectoryShowsPhotosOfMembersAndCandidatesToEveryone(): void
