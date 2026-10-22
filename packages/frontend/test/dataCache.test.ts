@@ -2,7 +2,7 @@
 // einer Änderung begonnen hat, legt ihre (möglicherweise veralteten) Daten nicht mehr ab.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dataCache, MAX_ENTRIES } from '../src/dataCache.ts';
+import { cacheKey, dataCache, MAX_ENTRIES, prefetch } from '../src/dataCache.ts';
 
 test('Daten sind beim nächsten Öffnen da, eine eigene Änderung verwirft sie', () => {
   dataCache.set('termine|[]', ['a']);
@@ -31,4 +31,31 @@ test('Höchstens MAX_ENTRIES Einträge: der am längsten nicht gespeicherte fäl
   assert.equal(dataCache.has('member|[1]'), false);
   assert.equal(dataCache.has(`member|[${MAX_ENTRIES - 1}]`), true);
   assert.equal(dataCache.has('documents|[]'), true);
+});
+
+test('Vorladen legt die Daten unter dem Schlüssel von useAsync ab, nur einmal', async () => {
+  dataCache.clear();
+  let calls = 0;
+  const load = () => {
+    calls++;
+    return Promise.resolve({ id: 7 });
+  };
+  await Promise.all([prefetch('member', [7], load), prefetch('member', [7], load)]);
+  assert.equal(calls, 1);
+  assert.equal(cacheKey('member', [7]), 'member|[7]');
+  assert.deepEqual(dataCache.get('member|[7]'), { id: 7 });
+  await prefetch('member', [7], load);
+  assert.equal(calls, 1);
+});
+
+test('Vorladen: nach einer eigenen Änderung nichts Veraltetes ablegen, Fehler bleiben still', async () => {
+  dataCache.clear();
+  let resolve!: (d: unknown) => void;
+  const done = prefetch('member', [8], () => new Promise((r) => (resolve = r)));
+  dataCache.clear();
+  resolve({ id: 8 });
+  await done;
+  assert.equal(dataCache.has('member|[8]'), false);
+  await prefetch('member', [9], () => Promise.reject(new Error('offline')));
+  assert.equal(dataCache.has('member|[9]'), false);
 });

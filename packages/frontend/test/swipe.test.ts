@@ -1,17 +1,39 @@
-// Wischen in der Mitgliederansicht (src/swipe.ts): nur deutlich waagerechte Bewegungen blättern, am Ende der Liste ist Schluss.
+// Wischen in der Mitgliederansicht (src/swipe.ts): weit oder schnell genug gezogen blättert, am Ende der Liste ist Schluss.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { neighbors, swipeStep } from '../src/swipe.ts';
+import { dragOffset, neighbors, releaseStep } from '../src/swipe.ts';
 
-test('nach links wischen blättert weiter, nach rechts zurück', () => {
-  assert.equal(swipeStep(-80, 5), 1);
-  assert.equal(swipeStep(80, -5), -1);
+test('weit genug gezogen: nach links weiter, nach rechts zurück', () => {
+  // Breite 400: ab einem Viertel (100 px)
+  assert.equal(releaseStep(-120, 0, 400, true, true), 1);
+  assert.equal(releaseStep(120, 0, 400, true, true), -1);
+  // Schmale Karte: mindestens 60 px
+  assert.equal(releaseStep(-50, 0, 160, true, true), 0);
+  assert.equal(releaseStep(-60, 0, 160, true, true), 1);
 });
 
-test('kurze oder schräge Bewegungen zählen nicht', () => {
-  assert.equal(swipeStep(-40, 0), 0);
-  assert.equal(swipeStep(-100, 60), 0);
-  assert.equal(swipeStep(0, 300), 0);
+test('zu kurz gezogen: Die Karte schnappt zurück', () => {
+  assert.equal(releaseStep(-80, 0, 400, true, true), 0);
+  assert.equal(releaseStep(0, 0, 400, true, true), 0);
+});
+
+test('schnell gewischt blättert auch mit kürzerem Weg, aber nicht gegen die Richtung', () => {
+  assert.equal(releaseStep(-50, -0.8, 400, true, true), 1);
+  assert.equal(releaseStep(50, 0.8, 400, true, true), -1);
+  assert.equal(releaseStep(-50, 0.8, 400, true, true), 0);
+  assert.equal(releaseStep(-30, -2, 400, true, true), 0);
+});
+
+test('am Anfang und Ende der Liste geht es nicht weiter', () => {
+  assert.equal(releaseStep(-300, -1, 400, true, false), 0);
+  assert.equal(releaseStep(300, 1, 400, false, true), 0);
+});
+
+test('ohne Nachbarn folgt die Karte dem Finger nur gebremst', () => {
+  assert.equal(dragOffset(-100, true, true), -100);
+  assert.equal(dragOffset(-100, true, false), -30);
+  assert.equal(dragOffset(100, false, true), 30);
+  assert.equal(dragOffset(100, true, false), 100);
 });
 
 test('Nachbarn in der Reihenfolge der Liste', () => {
