@@ -90,7 +90,7 @@ export function FormerList() {
       </select>
       <ul className="card-list">
         {list.map((f) => (
-          <li key={f.id} className="card row clickable member-row" onClick={() => navigate(`verwaltung/mitglied/${f.id}`)}>
+          <li key={f.id} className="card row clickable member-row" onClick={() => navigate(`verwaltung/ehemalige/${f.id}`)}>
             {withPhotos && <MemberAvatar url={f.photo_url} name={f.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">{listName(f, order.sort)}</div>
