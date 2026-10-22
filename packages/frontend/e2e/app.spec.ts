@@ -286,6 +286,8 @@ test('Mitglied: Beim Wischen steht der Nachbar schon daneben, gewechselt wird oh
   await page.getByLabel('Mitglied suchen').fill('Mitglied');
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  // Erst die eigene Seite fertig laden lassen (z. B. die Ämter), sonst zählt deren „Lädt …“ als Laden beim Wechsel.
+  await expect(page.locator('[data-loading]')).toHaveCount(0);
   // Merken, ob irgendwann „Lädt …“ bzw. das Gerüst erscheint.
   await page.evaluate(() => {
     const w = window as unknown as { sawLoading: boolean };
@@ -306,7 +308,8 @@ test('Mitglied: Beim Wischen steht der Nachbar schon daneben, gewechselt wird oh
   }
   await expect(page.locator('.member-peek-next .member-peek-name')).toHaveText('Mitglied2');
   await expect(page.locator('.member-peek-next .member-step')).toContainText('2 / 2');
-  expect(await page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('translateX(-120px)');
+  // Touch-Bewegungen kommen erst mit dem nächsten Bild an, daher warten statt sofort lesen.
+  await expect.poll(() => page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('translateX(-120px)');
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
@@ -339,6 +342,16 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Ehemalige');
+  // Filter und Sortierung sind wie in der Mitgliederliste zunächst eingeklappt; ein gesetzter Filter zeigt „aktiv“.
+  const filters = page.getByRole('button', { name: 'Filter und Sortierung' });
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Nach Grund filtern')).toBeHidden();
+  await filters.click();
+  await expect(filters).toHaveAttribute('aria-expanded', 'true');
+  await page.getByLabel('Nach Grund filtern').selectOption('left');
+  await filters.click();
+  await expect(page.getByLabel('Nach Grund filtern')).toBeHidden();
+  await expect(filters).toContainText('aktiv');
   await page.getByLabel('Ehemalige suchen').fill(last);
   await page.locator('.row', { hasText: 'Anton' }).click();
   await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
