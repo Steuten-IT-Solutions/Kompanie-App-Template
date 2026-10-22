@@ -331,11 +331,11 @@ function Members() {
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </div>
               <div className="row-sub">
-                {/* Nach Eintritt sortiert: das Jahr vorn, damit die Reihenfolge nachvollziehbar ist. */}
+                {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
                 {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
-                {order.sort === 'joined' && m.joined_on && (canPoints() || (m.open_cents ?? 0) > 0) && ' · '}
-                {canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
-                {canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
+                {order.sort === 'joined' && m.joined_on && (m.open_cents ?? 0) > 0 && ' · '}
+                {order.sort === 'points' && canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
+                {order.sort === 'points' && canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
