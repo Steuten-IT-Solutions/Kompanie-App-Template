@@ -3860,16 +3860,18 @@ button.spotlight-person:focus-visible {
   padding: 5px 6px;
 }
 /*
- * Gedrehte Überschrift wie in Tabellenkalkulationen: Die Zelle selbst bleibt weiß und ohne Rahmen; darin ein um 45°
- * gekipptes Feld (Parallelogramm, unten so breit wie die Spalte) in der Farbe der Kompanie mit schrägen Linien, und der
- * Text läuft mittig darin. So kreuzt keine Linie den Text. Positioniert ist nur das innere div, nicht die Zelle: So
- * liegen die Felder über den Hintergründen der Nachbarzellen.
+ * Gedrehte Überschrift wie in Tabellenkalkulationen: In der Zelle liegt ein um 45° gekipptes Feld (Parallelogramm,
+ * unten so breit wie die Spalte) in der Farbe der Kompanie mit schrägen Linien, und der Text läuft mittig darin. So
+ * kreuzt keine Linie den Text. Positioniert ist nur das innere div, nicht die Zelle: So liegen die Felder über den
+ * Hintergründen der Nachbarzellen. Die Zelle selbst ist ebenfalls farbig (oben und unten mit Rahmen): Sie füllt das
+ * Dreieck zwischen einer geraden Spalte und dem ersten gekippten Feld; sonst liegt sie ganz unter den Feldern.
  */
 .list-table th.list-th-rotated {
   padding: 0;
-  border-width: 0 0 1px;
-  background: none;
+  border-width: 1px 0;
   vertical-align: bottom;
+  /* 1 px über den rechten Rand, gegen eine helle Naht zur Nachbarzelle (liegt unter den gekippten Feldern) */
+  box-shadow: 1px 0 0 var(--list-color);
 }
 .list-th-rotated > div {
   position: relative;
@@ -3893,11 +3895,14 @@ button.spotlight-person:focus-visible {
   white-space: nowrap;
   line-height: 1;
 }
-/* Platz für das gekippte Feld der letzten Spalte, ohne Rahmen */
+/*
+ * Platz für das gekippte Feld der letzten Spalte (so breit wie der Kopf hoch, also quadratisch): oben links bis zur
+ * Kante dieses Felds farbig, darunter weiß und ohne Rahmen
+ */
 .list-table th.list-spare-head {
-  border-width: 0;
+  border-width: 1px 0 0;
   padding: 0;
-  background: none;
+  background: linear-gradient(to bottom right, var(--list-color) 50%, #fff 50%);
 }
 .list-table thead {
   display: table-header-group;
@@ -3912,6 +3917,13 @@ button.spotlight-person:focus-visible {
 .list-table .list-spare {
   border: 0;
   background: none;
+}
+/*
+ * Zeilen abwechselnd leicht in der Farbe der Kompanie (wie die Tabellenformatvorlage der Kompanie-Tabellen: erste Zeile
+ * gefärbt, Farbe um 80 % aufgehellt); Spalten zum Ausfüllen bleiben weiß
+ */
+.list-table tbody tr:nth-child(odd) td:not(.list-blank, .list-spare) {
+  background: color-mix(in srgb, var(--list-color) 20%, #fff);
 }
 .list-table .list-blank {
   text-align: center;
