@@ -40,6 +40,8 @@ In `[kompanie_mitglieder]` stehen bei Personen ohne Foto ihre Anfangsbuchstaben.
 
 > **Für Fortgeschrittene: Server mit nginx.** Auf den Webservern Apache und LiteSpeed sorgt das Plugin selbst dafür, dass die Dateien der App lange im Browser bleiben und komprimiert ankommen (über `.htaccess`). Läuft die Webseite mit **nginx**, bitte den Hoster, die Dateien unter `wp-content/plugins/kompanie-app/app/assets/` ein Jahr zwischenspeichern zu lassen (`Cache-Control: public, max-age=31536000, immutable`; ihr Name ändert sich mit jeder Version) und Textdateien komprimiert (gzip) auszuliefern. Die App läuft auch ohne, lädt beim ersten Öffnen aber langsamer.
 
+> **Für Fortgeschrittene: Hintergrundaufgaben (WP-Cron).** Die Abgleiche von {bereich.calendar} und {bereich.gallery}, Benachrichtigungen und die tägliche Suche nach Updates erledigt die App über WP-Cron. WP-Cron läuft nur, wenn jemand die Webseite oder die App aufruft; auf wenig besuchten Webseiten kommen diese Aufgaben deshalb verspätet, Updates z. B. erst nach dem nächsten Besuch. Zuverlässiger ist ein Cronjob beim Hoster: Lege im Kundenmenü des Hosters zuerst einen Cronjob an, der alle 15 Minuten `https://eure-webseite.de/wp-cron.php` aufruft. Trage erst danach in der `wp-config.php` `define('DISABLE_WP_CRON', true);` ein; ohne den Cronjob laufen die Aufgaben sonst gar nicht mehr. Manche Hoster haben dafür eine eigene Einstellung im Kundenmenü.
+
 ## Siehe auch
 - [Einrichtungsassistent](seite:admin-einrichtung)
 - [Einstellungen](seite:admin-einstellungen)
