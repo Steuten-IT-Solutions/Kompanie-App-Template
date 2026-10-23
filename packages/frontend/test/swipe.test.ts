@@ -1,4 +1,5 @@
-// Wischen in der Mitgliederansicht (src/swipe.ts): weit oder schnell genug gezogen blättert, am Ende der Liste ist Schluss.
+// Wischen in der Mitgliederansicht (src/swipe.ts): weit oder schnell genug gezogen blättert; ohne Nachbarn ist Schluss,
+// als Karussell (wrap) geht es nach dem Ende wieder von vorn los.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { dragOffset, neighbors, prefetchOrder, releaseStep } from '../src/swipe.ts';
@@ -50,4 +51,23 @@ test('Vorladen von der aktuellen Stelle nach außen, abwechselnd, bis die ganze 
   assert.deepEqual(prefetchOrder([1, 2, 3, 4], 3), [3, 2, 1]);
   assert.deepEqual(prefetchOrder([1], 0), []);
   assert.deepEqual(prefetchOrder([1, 2], -1), []);
+});
+
+test('Karussell: Nach dem letzten kommt der erste, vor dem ersten der letzte', () => {
+  assert.deepEqual(neighbors([7, 3, 9], 3, true), { prev: 7, next: 9, index: 1 });
+  assert.deepEqual(neighbors([7, 3, 9], 7, true), { prev: 9, next: 3, index: 0 });
+  assert.deepEqual(neighbors([7, 3, 9], 9, true), { prev: 3, next: 7, index: 2 });
+  // Zwei Einträge: Der andere ist Vorgänger und Nachfolger zugleich.
+  assert.deepEqual(neighbors([7, 3], 7, true), { prev: 3, next: 3, index: 0 });
+  // Allein oder nicht in der Liste: keine Nachbarn.
+  assert.deepEqual(neighbors([7], 7, true), { prev: null, next: null, index: 0 });
+  assert.deepEqual(neighbors([7, 3, 9], 5, true), { prev: null, next: null, index: -1 });
+});
+
+test('Karussell: Vorladen nach außen über das Ende hinaus, jeder Eintrag einmal', () => {
+  assert.deepEqual(prefetchOrder([1, 2, 3, 4, 5, 6], 0, true), [2, 6, 3, 5, 4]);
+  assert.deepEqual(prefetchOrder([1, 2, 3, 4, 5], 4, true), [1, 4, 2, 3]);
+  assert.deepEqual(prefetchOrder([1, 2], 1, true), [1]);
+  assert.deepEqual(prefetchOrder([1], 0, true), []);
+  assert.deepEqual(prefetchOrder([1, 2], -1, true), []);
 });

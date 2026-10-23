@@ -30,7 +30,7 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 
 ### Eine ehemalige Person öffnen
 1. Tippe in der Liste auf die Person. Es öffnet sich ihre Seite wie bei aktiven Mitgliedern.
-2. **‹ Ehemalige** führt zurück. Mit Wischen (oder **‹** und **›** oben rechts) blätterst du zur nächsten bzw. vorherigen Person.
+2. **‹ Ehemalige** führt zurück. Mit Wischen (oder **‹** und **›** oben rechts) blätterst du zur nächsten bzw. vorherigen Person; nach der letzten kommt wieder die erste.
 
 ### Angaben ändern oder wieder aufnehmen
 1. Tippe auf der Seite der Person auf **Eintritt** oder **Austritt**, ändere Grund, Daten oder **Gründungsmitglied** und tippe auf **Speichern**.

@@ -1062,6 +1062,10 @@ button.member-date {
   padding: 0 16px;
   overflow-x: clip;
 }
+/* Gewischt wird auch auf der leeren Fläche um die Seite (swipe.ts), etwa unter dem kurzen Gerüst beim Laden. */
+.app:has(.member-detail, .member-page) {
+  touch-action: pan-y pinch-zoom;
+}
 /* Spur mit der Karte; beim Ziehen setzt swipe.ts den Versatz, beim Loslassen gleitet sie. */
 .member-track {
   position: relative;

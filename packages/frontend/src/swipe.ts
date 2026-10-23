@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject, type TouchEvent } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 /** Mindestweg in Pixeln, ab dem eine Wischbewegung blättert. */
 const MIN_DISTANCE = 60;
@@ -31,13 +31,20 @@ export function releaseStep(dx: number, velocity: number, width: number, canPrev
   return far || flick ? step : 0;
 }
 
-/** Vorheriger und nächster Eintrag in einer Reihenfolge; am Anfang bzw. Ende keiner. */
-export function neighbors<T>(order: readonly T[], current: T): { prev: T | null; next: T | null; index: number } {
+/**
+ * Vorheriger und nächster Eintrag in einer Reihenfolge; am Anfang bzw. Ende keiner. wrap: Die Reihenfolge ist ein Ring
+ * (Karussell), vor dem ersten steht der letzte, nach dem letzten der erste; nur mit einem Eintrag gibt es keine Nachbarn.
+ */
+export function neighbors<T>(order: readonly T[], current: T, wrap = false): { prev: T | null; next: T | null; index: number } {
   const index = order.indexOf(current);
   if (index < 0) return { prev: null, next: null, index };
+  const n = order.length;
+  if (wrap) {
+    return n < 2 ? { prev: null, next: null, index } : { prev: order[(index - 1 + n) % n], next: order[(index + 1) % n], index };
+  }
   return {
     prev: index > 0 ? order[index - 1] : null,
-    next: index < order.length - 1 ? order[index + 1] : null,
+    next: index < n - 1 ? order[index + 1] : null,
     index,
   };
 }
@@ -45,12 +52,22 @@ export function neighbors<T>(order: readonly T[], current: T): { prev: T | null;
 /**
  * Reihenfolge zum Vorladen von der Stelle `index` aus nach außen, abwechselnd: nächster, vorheriger, übernächster,
  * vorvorheriger … bis die ganze Liste dran war (die Person selbst nicht). Steht sie nicht in der Liste, nichts.
+ * wrap: als Ring (wie neighbors), über das Ende hinaus wieder von vorn, jeder Eintrag einmal.
  */
-export function prefetchOrder<T>(order: readonly T[], index: number): T[] {
-  if (index < 0 || index >= order.length) return [];
+export function prefetchOrder<T>(order: readonly T[], index: number, wrap = false): T[] {
+  const n = order.length;
+  if (index < 0 || index >= n) return [];
   const out: T[] = [];
-  for (let d = 1; index + d < order.length || index - d >= 0; d++) {
-    if (index + d < order.length) out.push(order[index + d]);
+  if (wrap) {
+    for (let d = 1; 2 * d <= n; d++) {
+      out.push(order[(index + d) % n]);
+      // Bei gerader Länge ist der gegenüberliegende Eintrag von beiden Seiten gleich weit weg: nur einmal.
+      if (2 * d < n) out.push(order[(index - d + n) % n]);
+    }
+    return out;
+  }
+  for (let d = 1; index + d < n || index - d >= 0; d++) {
+    if (index + d < n) out.push(order[index + d]);
     if (index - d >= 0) out.push(order[index - d]);
   }
   return out;
@@ -62,10 +79,16 @@ export function prefetchOrder<T>(order: readonly T[], index: number): T[] {
  * die Stelle oder `restart` (z. B. nach dem Laden der eigenen Daten, denn eigene Änderungen leeren den Speicher),
  * beginnt die Kette dort neu; schon Geladenes überspringt `load` selbst (prefetch). Fehler halten die Kette nicht auf.
  */
-export function usePrefetchChain<T>(order: readonly T[], index: number, load: (item: T) => Promise<unknown>, restart: unknown): void {
+export function usePrefetchChain<T>(
+  order: readonly T[],
+  index: number,
+  load: (item: T) => Promise<unknown>,
+  restart: unknown,
+  wrap = false,
+): void {
   const latest = useRef(load);
   latest.current = load;
-  const queue = prefetchOrder(order, index);
+  const queue = prefetchOrder(order, index, wrap);
   const signature = JSON.stringify(queue);
   useEffect(() => {
     if (restart === null || restart === undefined) return;
@@ -87,11 +110,14 @@ export function usePrefetchChain<T>(order: readonly T[], index: number, load: (i
 const EDGE = 24;
 
 /**
- * Beginnt die Geste in einem Feld, in etwas, das selbst waagerecht scrollt oder gezogen wird, oder in einem Portal
- * (z. B. vergrößertes Foto): React reicht dessen Ereignisse an die Ansicht weiter, obwohl es über ihr liegt.
+ * Beginnt die Geste in einem Feld, in etwas, das selbst waagerecht scrollt oder gezogen wird, oder außerhalb der Ansicht
+ * (Kopf- und Tab-Leiste, Fenster und vergrößertes Foto über ihr): Dann wischt die Ansicht nicht. Die leere Fläche um
+ * sie herum (ihre Eltern, z. B. unter der noch kurzen Seite, solange die Daten laden) gehört dagegen zu ihr.
  */
 function ownsGesture(target: EventTarget | null, root: Element): boolean {
-  if (!(target instanceof Node) || !root.contains(target)) return true;
+  if (!(target instanceof Node)) return true;
+  if (target !== root && target.contains(root)) return false;
+  if (!root.contains(target)) return true;
   for (let el = target instanceof Element ? target : null; el && el !== root; el = el.parentElement) {
     if (el.matches('input, textarea, select, [contenteditable], .drag-handle')) return true;
     const overflow = getComputedStyle(el).overflowX;
@@ -104,12 +130,14 @@ function ownsGesture(target: EventTarget | null, root: Element): boolean {
 const SLIDE_TIMEOUT = 400;
 
 /**
- * Karussell zum Blättern mit einem Finger: Die Spur (track) folgt dem Finger, daneben zeigt die Ansicht die Nachbarn,
- * solange `peeking` gilt. Beim Loslassen gleitet die Spur zum Nachbarn und ruft dann onCommit auf (die Ansicht wechselt
+ * Karussell zum Blättern mit einem Finger, auf der Ansicht (root) und der leeren Fläche um sie herum (siehe
+ * ownsGesture; daher am document, nicht an der Ansicht). Die Spur (track) folgt dem Finger, daneben zeigt die Ansicht
+ * die Nachbarn, solange `peeking` gilt. Beim Loslassen gleitet die Spur zum Nachbarn und ruft dann onCommit auf (die Ansicht wechselt
  * zum Nachbarn, der genau an dieser Stelle erscheint), oder schnappt zurück. slide() macht dasselbe für die Pfeile.
  * Der Versatz wird direkt am Element gesetzt, nicht über React, damit das Ziehen nicht bei jeder Bewegung neu rendert.
  */
 export function useSwipeDrag(
+  root: RefObject<HTMLElement>,
   track: RefObject<HTMLElement>,
   { canPrev, canNext, onCommit }: { canPrev: boolean; canNext: boolean; onCommit: (step: -1 | 1) => void },
 ) {
@@ -199,18 +227,20 @@ export function useSwipeDrag(
   }
 
   const handlers = {
-    onTouchStart(e: TouchEvent<HTMLElement>) {
+    onTouchStart(e: TouchEvent) {
       const t = e.touches[0];
+      const el = root.current;
       gesture.current =
+        el &&
         !busy.current &&
         e.touches.length === 1 &&
         t.clientX > EDGE &&
         t.clientX < window.innerWidth - EDGE &&
-        !ownsGesture(e.target, e.currentTarget)
+        !ownsGesture(e.target, el)
           ? { x: t.clientX, y: t.clientY, lock: null, dx: 0, lastX: t.clientX, lastT: e.timeStamp, v: 0 }
           : null;
     },
-    onTouchMove(e: TouchEvent<HTMLElement>) {
+    onTouchMove(e: TouchEvent) {
       const g = gesture.current;
       if (!g) return;
       if (e.touches.length !== 1) {
@@ -239,7 +269,7 @@ export function useSwipeDrag(
       g.dx = dx;
       setOffset(dragOffset(dx, latest.current.canPrev, latest.current.canNext), false);
     },
-    onTouchEnd(e: TouchEvent<HTMLElement>) {
+    onTouchEnd(e: TouchEvent) {
       const g = gesture.current;
       if (!g || e.touches.length > 0) return;
       gesture.current = null;
@@ -253,6 +283,21 @@ export function useSwipeDrag(
       if (g?.lock) settle(0);
     },
   };
+  const latestHandlers = useRef(handlers);
+  latestHandlers.current = handlers;
 
-  return { handlers, peeking, slide };
+  useEffect(() => {
+    const on = {
+      touchstart: (e: TouchEvent) => latestHandlers.current.onTouchStart(e),
+      touchmove: (e: TouchEvent) => latestHandlers.current.onTouchMove(e),
+      touchend: (e: TouchEvent) => latestHandlers.current.onTouchEnd(e),
+      touchcancel: () => latestHandlers.current.onTouchCancel(),
+    };
+    for (const [type, fn] of Object.entries(on)) document.addEventListener(type, fn as EventListener, { passive: true });
+    return () => {
+      for (const [type, fn] of Object.entries(on)) document.removeEventListener(type, fn as EventListener);
+    };
+  }, []);
+
+  return { peeking, slide };
 }

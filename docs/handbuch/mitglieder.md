@@ -26,7 +26,7 @@ Tippe unten in der Leiste auf **{bereich.directory}**.
 ### Zur nächsten Person blättern
 1. Wische auf der Seite einer Person nach links oder rechts. Die Seite folgt deinem Finger, daneben siehst du schon die nächste Person.
 2. Am Computer tippst du stattdessen auf **‹** oder **›** oben rechts; daneben steht die Position in der Liste (z. B. „3 / 25“).
-3. Du blätterst in der Reihenfolge, in der die Liste gerade sortiert und durchsucht ist, bei den **Ehemaligen** in deren Liste. Geöffnet über einen Link oder die {bereich.offices}, blätterst du in der ganzen Liste. **‹ Zurück** führt danach gleich zur Liste.
+3. Du blätterst in der Reihenfolge, in der die Liste gerade sortiert und durchsucht ist, bei den **Ehemaligen** in deren Liste. Geöffnet über einen Link oder die {bereich.offices}, blätterst du in der ganzen Liste. Nach der letzten Person kommt wieder die erste und umgekehrt. **‹ Zurück** führt danach gleich zur Liste.
 
 ![Seite einer Person](bild:mitglieder-person)
 

@@ -53,7 +53,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
   dabei dem Finger, daneben ist die nächste Person schon zu sehen, und weil die App die Nachbarn vorlädt, steht deren
-  Seite nach dem Wechsel sofort da, ohne Laden.
+  Seite nach dem Wechsel sofort da, ohne Laden. Die Liste ist ein Karussell: Nach der letzten Person kommt wieder die
+  erste und umgekehrt (auch im Tab „Mitglieder“). Gewischt werden kann überall auf der Seite, auch während sie noch lädt.
 - **Ehemalige nach Austritt sortieren**: Die Liste der Ehemaligen (in der Verwaltung und in der Mitgliederliste) lässt
   sich jetzt auch nach dem Datum des Ausscheidens sortieren, früheste oder neueste zuerst; wer keines hat, steht am Ende.
 - **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
