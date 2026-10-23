@@ -42,6 +42,47 @@ export function neighbors<T>(order: readonly T[], current: T): { prev: T | null;
   };
 }
 
+/**
+ * Reihenfolge zum Vorladen von der Stelle `index` aus nach außen, abwechselnd: nächster, vorheriger, übernächster,
+ * vorvorheriger … bis die ganze Liste dran war (die Person selbst nicht). Steht sie nicht in der Liste, nichts.
+ */
+export function prefetchOrder<T>(order: readonly T[], index: number): T[] {
+  if (index < 0 || index >= order.length) return [];
+  const out: T[] = [];
+  for (let d = 1; index + d < order.length || index - d >= 0; d++) {
+    if (index + d < order.length) out.push(order[index + d]);
+    if (index - d >= 0) out.push(order[index - d]);
+  }
+  return out;
+}
+
+/**
+ * Alle Einträge der Reihenfolge nacheinander vorladen, von der aktuellen Stelle nach außen (prefetchOrder): Erst wenn
+ * einer fertig ist, kommt der nächste, damit immer nur eine Anfrage läuft und die Nachbarn zuerst da sind. Wechselt
+ * die Stelle oder `restart` (z. B. nach dem Laden der eigenen Daten, denn eigene Änderungen leeren den Speicher),
+ * beginnt die Kette dort neu; schon Geladenes überspringt `load` selbst (prefetch). Fehler halten die Kette nicht auf.
+ */
+export function usePrefetchChain<T>(order: readonly T[], index: number, load: (item: T) => Promise<unknown>, restart: unknown): void {
+  const latest = useRef(load);
+  latest.current = load;
+  const queue = prefetchOrder(order, index);
+  const signature = JSON.stringify(queue);
+  useEffect(() => {
+    if (restart === null || restart === undefined) return;
+    let alive = true;
+    void (async () => {
+      for (const item of queue) {
+        if (!alive) return;
+        await latest.current(item).catch(() => {});
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, restart]);
+}
+
 /** Rand, an dem iOS und Android selbst „Zurück“ wischen: dort beginnende Gesten bleiben dem System. */
 const EDGE = 24;
 

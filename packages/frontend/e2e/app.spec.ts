@@ -398,6 +398,138 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
 });
 
+/** Anfragen nach den Daten einer Person (members/<id>), nicht nach Unterseiten wie members/<id>/points. */
+const MEMBER_DETAIL = /members\/(\d+)(?![\w/])/;
+
+test('Mitglied: Alle der Liste werden nacheinander vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
+  await login(page, 'verwalter');
+  const requested = new Set<string>();
+  page.on('request', (r) => {
+    const m = MEMBER_DETAIL.exec(r.url());
+    if (m && r.method() === 'GET') requested.add(m[1]);
+  });
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.member-row').first().click();
+  const step = (await page.locator('.member-step .muted').textContent()) ?? '';
+  const total = Number(/\/ (\d+)/.exec(step)?.[1]);
+  expect(total).toBeGreaterThan(2);
+  // Die Person selbst und alle anderen der Liste, eine nach der anderen
+  await expect.poll(() => requested.size, { timeout: 20_000 }).toBe(total);
+});
+
+test.describe('ohne Service Worker, Daten zurückgehalten', () => {
+  // page.route sieht Anfragen des Service Workers nicht
+  test.use({ serviceWorkers: 'block' });
+
+  test('Mitglied: Lädt die Seite noch, steht schon der Name da, und Wischen geht weiter', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    // Daten der Personen zurückhalten, bis der Test sie freigibt
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+    await expect(page.locator('.member-step')).toContainText('1 / 2');
+    await swipe(page, -200);
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await expect(page.locator('.member-step')).toContainText('2 / 2');
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await expect(page.locator('.member-level').first()).toContainText('Rolle');
+  });
+
+  test('Mitglied: Kommen die Daten mitten im Wischen an, blättert die Geste trotzdem', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    // Finger auf den Namen im Gerüst, ein Stück ziehen; dann kommen die Daten, die Seite baut sich auf.
+    const box = (await page.locator('.member-name').boundingBox())!;
+    const x = page.viewportSize()!.width / 2 + 60;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 40, y }] });
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+    for (const dx of [-120, -200]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  });
+});
+
+test('Mitglieder (für alle): Wischen und Pfeile blättern in der Liste, „Zurück“ führt zur Liste', async ({ page }) => {
+  await login(page, 'mitglied1');
+  await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page
+    .locator('.directory .member-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /Mitglied1/ })
+    .click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await expect(page.getByRole('button', { name: 'Vorherige Person' })).toBeDisabled();
+
+  // Nach links: nächste Person; am Ende der Liste geht es nicht weiter.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  await expect(page).toHaveURL(/#\/mitglieder\/\d+$/);
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Beim Ziehen steht die Nachbarin daneben, mit Namen aus der Liste.
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 - 60;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [20, 60, 120]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  }
+  await expect(page.locator('.member-peek-prev .member-peek-name')).toHaveText('Mitglied1');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await page.getByRole('button', { name: 'Nächste Person' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Blättern legt keine Einträge im Verlauf an: „Zurück“ führt gleich zur Liste.
+  await page.getByRole('button', { name: '‹ Zurück' }).click();
+  await expect(page.locator('.directory .card-list')).toBeVisible();
+
+  // Neu geladen (wie ein Link): die ganze Liste in der gemerkten Sortierung
+  await page.goto('/app/#/mitglieder/liste');
+  await page
+    .locator('.directory .member-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /Mitglied1/ })
+    .click();
+  await page.reload();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
+});
+
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Mitglieder');

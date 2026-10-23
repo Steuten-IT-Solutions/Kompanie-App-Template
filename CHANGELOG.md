@@ -39,6 +39,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Die Vorschau zeigt Fehler je Zeile, danach stehen die Zugangsdaten zum Ausdrucken bereit; Ehemalige bekommen ein Konto
   ohne Anmeldung. Wer schon ein Konto mit demselben Namen hat, wird übersprungen.
 - **Ehemalige importieren** nimmt jetzt auch Excel-Dateien (.xlsx).
+- **Wischen auch im Tab „Mitglieder“**: Auf der Seite einer Person blättert Wischen wie in der Verwaltung zur nächsten
+  bzw. vorherigen Person der Liste (mit Suche und Sortierung), auch bei den Ehemaligen; am Computer mit den Pfeilen oben
+  rechts. **‹ Zurück** führt weiter direkt zur Liste.
+- **Ganze Liste vorgeladen**: Auf der Seite einer Person lädt die App jetzt nacheinander alle Personen der Liste vor,
+  zuerst die direkten Nachbarn, dann immer weiter nach außen. Ist eine Seite beim Wischen doch noch nicht geladen,
+  steht ihr Name schon da, darunter das Gerüst, und man kann gleich weiterwischen.
 - **Ehemalige einzeln anlegen**: Unter *Verwaltung → Ehemalige* steht jetzt **+ Ehemalige Person anlegen**, aufgebaut wie
   **+ Mitglied anlegen**: Name, Grund, Eintritt, Ausscheiden, Gründungsmitglied und auf Wunsch Geburtstag und Foto. Es
   entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. **Tabelle importieren (z. B. Chronik)**

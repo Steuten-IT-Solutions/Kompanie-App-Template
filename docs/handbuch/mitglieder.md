@@ -23,6 +23,11 @@ Tippe unten in der Leiste auf **{bereich.directory}**.
 1. Tippe auf den Namen. Es öffnet sich ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, Geburtstag und Eintritt (soweit die Person sie zeigt) und darunter ihre {bereich.offices} als Zeitstrahl.
 2. **‹ Zurück** führt wieder zur Liste.
 
+### Zur nächsten Person blättern
+1. Wische auf der Seite einer Person nach links oder rechts. Die Seite folgt deinem Finger, daneben siehst du schon die nächste Person.
+2. Am Computer tippst du stattdessen auf **‹** oder **›** oben rechts; daneben steht die Position in der Liste (z. B. „3 / 25“).
+3. Du blätterst in der Reihenfolge, in der die Liste gerade sortiert und durchsucht ist, bei den **Ehemaligen** in deren Liste. Geöffnet über einen Link oder die {bereich.offices}, blätterst du in der ganzen Liste. **‹ Zurück** führt danach gleich zur Liste.
+
 ![Seite einer Person](bild:mitglieder-person)
 
 ### Ein Foto groß ansehen

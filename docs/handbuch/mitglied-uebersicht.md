@@ -48,6 +48,7 @@ Tippe auf **✕**, neben das Fenster oder auf die Zurück-Taste des Geräts.
 
 ## Gut zu wissen
 - Du blätterst in der Reihenfolge, in der die Liste gerade sortiert und gefiltert ist. In einem offenen Fenster blättert Wischen nicht. Öffnest du die Seite nicht über die Liste (z. B. über einen Link), blätterst du in der ganzen Liste ohne Suche und Filter.
+- Die App lädt nach und nach alle Personen der Liste vor, zuerst die direkten Nachbarn. Wischst du schneller, steht auf einer noch nicht geladenen Seite schon der Name, und du kannst gleich weiterwischen.
 - Erlaubt sind Fotos als JPG, PNG oder WebP. Die App zeigt sie rund und schneidet sie dafür zu; am besten wirkt ein Porträt mit dem Kopf mittig im oberen Teil des Bildes. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
 - Nutzt die Kompanie die öffentliche Liste **{bereich.directory}**, sind die Fotos von {rolle.member}n und Anwärtern dort für jeden sichtbar, auch ohne Anmeldung. Die Person selbst sieht ihr Foto unter **Meins**, ändert es aber nicht.
 - Der Eintritt geht ab dem Jahr 1800 und nicht in der Zukunft. Ob er auf der Seite der Person unter **{bereich.directory}** steht, wählt nur sie selbst unter **Meins → Konto**; im Fenster siehst du ihre Wahl nur zur Information.

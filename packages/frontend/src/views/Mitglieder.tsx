@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { api, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import brand from '../generated/brand';
 import { formatYearOrDate, groupCounts } from '../format';
-import { ZoomableAvatar } from '../memberPhoto';
-import { RankStack } from '../RankBadge';
+import { MemberAvatar, preloadAvatar, ZoomableAvatar } from '../memberPhoto';
+import { preloadBadge, RankStack } from '../RankBadge';
 import { TitleBadges } from '../TitleBadges';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import {
@@ -11,14 +11,20 @@ import {
   defaultDir,
   dirLabel,
   listName,
+  browseOrder,
   loadMemberOrder,
   MEMBER_SORT_LABELS,
+  orderFor,
   saveMemberOrder,
+  setBrowseOrder,
   sortMembers,
+  type BrowseEntry,
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
-import { navigate } from '../router';
+import { navigate, redirect } from '../router';
+import { PersonName } from '../skeleton';
+import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { OfficesView, PersonOffices, useOffices } from './Aemter';
 
 /** Nach Namen oder Eintritt; Punkte stehen in dieser Liste nicht. */
@@ -156,10 +162,125 @@ function back(): void {
   else navigate('mitglieder/liste');
 }
 
+/** Eintrag der Liste bzw. der Ehemaligen, wie ihn die Seite einer Person zeigt. */
+type Person = DirectoryEntry & Partial<DirectoryFormerEntry>;
+
+/**
+ * Reihenfolge zum Blättern auf der Seite einer Person: die der Liste, aus der sie geöffnet wurde (mit Suche und
+ * Sortierung). Sonst (Link, Neustart, aus den Ämtern) die ganze Liste bzw. die Ehemaligen ohne Suche in der gemerkten
+ * Sortierung, wie sie beim Öffnen erscheint. Steht die Person in keiner Liste, gibt es nichts zu blättern.
+ */
+function useDirectoryOrder(userId: number, list: DirectoryEntry[] | null, former: DirectoryFormerEntry[] | null): BrowseEntry[] {
+  const stored = browseOrder('directory', userId) ?? browseOrder('directory-former', userId);
+  return useMemo(() => {
+    if (stored) return stored;
+    const isFormer = !!former?.some((e) => e.id === userId);
+    const source: Person[] = isFormer ? (former ?? []) : list?.some((e) => e.id === userId) ? list : [];
+    return sortMembers(source, orderFor(loadMemberOrder(), isFormer ? FORMER_SORTS : SORTS)).map(({ id, name }) => ({ id, name }));
+  }, [stored, list, former, userId]);
+}
+
+/**
+ * Kopf der Seite einer Person: Foto, Name, bei Ehemaligen Eintritt und Ausscheiden, sonst Geburtstag und Eintritt
+ * (soweit sie sie zeigt), Titel und Dienstgrad. Solange die Liste lädt (waiting), der Name aus der Reihenfolge und ein
+ * Platzhalter fürs Foto; dasselbe Element mit derselben Überschrift, damit eine schon begonnene Geste weiterläuft.
+ * peek: als Nachbar beim Wischen (nur zum Ansehen, eigene Klasse für den Namen, Foto ohne Vergrößern).
+ */
+function PersonHead({
+  name,
+  m,
+  f,
+  waiting = false,
+  peek = false,
+}: {
+  name?: string;
+  m?: DirectoryEntry;
+  f?: DirectoryFormerEntry;
+  waiting?: boolean;
+  peek?: boolean;
+}) {
+  return (
+    <div className="member-page-head">
+      {m ? (
+        peek ? (
+          <MemberAvatar url={m.photo_url} name={m.name} size="large" />
+        ) : (
+          <ZoomableAvatar url={m.photo_url} name={m.name} size="large" />
+        )
+      ) : (
+        waiting && <span className="skeleton-box" style={{ width: 128, height: 128, borderRadius: '50%' }} />
+      )}
+      <h2 className={`${peek ? 'member-peek-name' : 'member-name'} member-name-centered`}>
+        <PersonName name={name} />
+      </h2>
+      {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
+      {m && !f && personFacts(m) && <p className="small muted member-page-facts">{personFacts(m)}</p>}
+      {m?.titles && m.titles.length > 0 && (
+        <p className="member-page-titles">
+          <TitleBadges titles={m.titles} />
+        </p>
+      )}
+      {m?.rank_title && (
+        <div className="member-page-rank">
+          <RankStack url={m.rank_badge_url} title={m.rank_title} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Zurück und die Pfeile mit der Position („3 / 25“), auf der Seite und beim Nachbarn daneben. */
+function PageNav({
+  position,
+  total,
+  onStep,
+}: {
+  position: number;
+  total: number;
+  /** Ohne: beim Nachbarn daneben (nur zum Ansehen) */
+  onStep?: (step: -1 | 1) => void;
+}) {
+  return (
+    <div className="member-nav">
+      <button type="button" className="btn btn-link back" onClick={onStep ? back : undefined}>
+        ‹ Zurück
+      </button>
+      {position >= 1 && total > 1 && (
+        <span className="member-step">
+          <button
+            type="button"
+            className="btn btn-link"
+            disabled={position === 1}
+            onClick={onStep && (() => onStep(-1))}
+            aria-label={onStep && 'Vorherige Person'}
+          >
+            ‹
+          </button>
+          <span className="muted small">
+            {position} / {total}
+          </span>
+          <button
+            type="button"
+            className="btn btn-link"
+            disabled={position === total}
+            onClick={onStep && (() => onStep(1))}
+            aria-label={onStep && 'Nächste Person'}
+          >
+            ›
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
 /**
  * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu Eintritt und Ausscheiden,
  * bei Mitgliedern Geburtstag und Eintritt, soweit sie sie zeigen), darunter direkt ihre Ämter als Zeitstrahl. Ohne
  * Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
+ * Wischen (oder die Pfeile) blättert wie in der Verwaltung durch die Liste, aus der die Person geöffnet wurde, ohne
+ * Verlaufseintrag: „‹ Zurück“ führt weiter zur Liste. Die App lädt dabei Fotos und Abzeichen aller Personen der Liste
+ * nacheinander vor; die Angaben selbst stehen schon in der Liste.
  */
 function MemberPage({
   userId,
@@ -174,46 +295,81 @@ function MemberPage({
   former: ReturnType<typeof useAsync<DirectoryFormerEntry[] | null>>;
 }) {
   const list = useAsync(() => (directory ? api.directory() : Promise.resolve(null)), [], directory ? 'directory' : undefined);
-  const officeData = useOffices(offices);
-  const f = former.data?.find((e) => e.id === userId);
-  const m: DirectoryEntry | undefined = list.data?.find((e) => e.id === userId) ?? f;
+  // Nur für den Namen ohne Mitgliederliste; die Ämter darunter laden selbst.
+  const officeData = useOffices(offices && !directory);
+  const findPerson = (id: number | null) => {
+    const f = former.data?.find((e) => e.id === id);
+    return { f, m: list.data?.find((e) => e.id === id) ?? f };
+  };
+  const { f, m } = findPerson(userId);
   const name =
     m?.name ?? officeData.data?.offices.flatMap((o) => o.terms.flatMap((t) => t.holders)).find((h) => h.user_id === userId)?.name;
-  if ((list.loading && !list.data) || (former.loading && !former.data) || (officeData.loading && !officeData.data)) return <Loading />;
-  if (list.error && !list.data) return <ErrorBox message={list.error} onRetry={list.reload} />;
+
+  const order = useDirectoryOrder(userId, list.data, former.data);
+  const ids = useMemo(() => order.map((e) => e.id), [order]);
+  const nameOf = (id: number | null) => findPerson(id).m?.name ?? order.find((e) => e.id === id)?.name;
+  const { prev, next, index } = neighbors(ids, userId);
+  const track = useRef<HTMLDivElement>(null);
+  const swipe = useSwipeDrag(track, {
+    canPrev: prev !== null,
+    canNext: next !== null,
+    onCommit: (step) => {
+      const other = step === 1 ? next : prev;
+      if (other !== null) redirect(`mitglieder/${other}`);
+    },
+  });
+  usePrefetchChain(
+    ids,
+    index,
+    (id: number) => {
+      const p = findPerson(id).m;
+      return Promise.all([preloadAvatar(p?.photo_url), preloadBadge(p?.rank_badge_url, 'medium')]);
+    },
+    list.data ?? former.data,
+  );
+
+  const peek = (id: number | null, side: 'prev' | 'next', position: number) => {
+    if (!swipe.peeking || id === null) return null;
+    const other = findPerson(id);
+    const otherName = nameOf(id);
+    return (
+      <div className={`member-peek member-peek-${side}`} aria-hidden="true" ref={(el) => el?.setAttribute('inert', '')}>
+        <PageNav position={position} total={order.length} />
+        <PersonHead name={otherName} m={other.m} f={other.f} waiting={!other.m} peek />
+      </div>
+    );
+  };
+
+  const waiting = (list.loading && !list.data) || (former.loading && !former.data) || (officeData.loading && !officeData.data);
   return (
-    <div className="member-page">
-      <button type="button" className="btn btn-link back" onClick={back}>
-        ‹ Zurück
-      </button>
-      {name === undefined ? (
-        <Empty>Diese Person steht nicht (mehr) in der Liste.</Empty>
-      ) : (
-        <>
-          <div className="member-page-head">
-            {m && <ZoomableAvatar url={m.photo_url} name={m.name} size="large" />}
-            <h2 className="member-name member-name-centered">{name}</h2>
-            {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
-            {m && !f && personFacts(m) && <p className="small muted member-page-facts">{personFacts(m)}</p>}
-            {m?.titles && m.titles.length > 0 && (
-              <p className="member-page-titles">
-                <TitleBadges titles={m.titles} />
-              </p>
+    <div className="member-page" {...swipe.handlers}>
+      <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
+        {peek(prev, 'prev', index)}
+        {peek(next, 'next', index + 2)}
+        <PageNav position={index + 1} total={order.length} onStep={swipe.slide} />
+        {name === undefined && waiting ? (
+          <>
+            <PersonHead name={nameOf(userId)} waiting />
+            <div role="status" data-loading="">
+              <span className="visually-hidden">Lädt …</span>
+            </div>
+          </>
+        ) : list.error && !list.data ? (
+          <ErrorBox message={list.error} onRetry={list.reload} />
+        ) : name === undefined ? (
+          <Empty>Diese Person steht nicht (mehr) in der Liste.</Empty>
+        ) : (
+          <>
+            <PersonHead name={name} m={m} f={f} />
+            {offices && (
+              <section>
+                <h3 className="section-title">{sec.offices}</h3>
+                <PersonOffices userId={userId} empty={`Keine ${sec.offices} eingetragen.`} />
+              </section>
             )}
-            {m?.rank_title && (
-              <div className="member-page-rank">
-                <RankStack url={m.rank_badge_url} title={m.rank_title} />
-              </div>
-            )}
-          </div>
-          {offices && (
-            <section>
-              <h3 className="section-title">{sec.offices}</h3>
-              <PersonOffices userId={userId} empty={`Keine ${sec.offices} eingetragen.`} />
-            </section>
-          )}
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -249,6 +405,12 @@ function MemberList({ former = false }: { former?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, query, order.sort, order.dir],
   );
+
+  // Auf der Seite der Person blättert man in dieser Reihenfolge (mit Suche und Sortierung) weiter.
+  function open(id: number) {
+    setBrowseOrder(former ? 'directory-former' : 'directory', list);
+    navigate(`mitglieder/${id}`);
+  }
 
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
@@ -310,7 +472,7 @@ function MemberList({ former = false }: { former?: boolean }) {
             <ZoomableAvatar url={m.photo_url} name={m.name} size="medium" />
             <div className="row-main">
               {/* Die ganze Zeile öffnet die Seite der Person; das Foto vergrößert weiterhin (liegt darüber). */}
-              <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
+              <button type="button" className="row-title member-row-open" onClick={() => open(m.id)}>
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} />
               </button>
               {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}

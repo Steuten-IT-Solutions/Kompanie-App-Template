@@ -3,10 +3,10 @@
  * Stale-while-revalidate: Beim nächsten Öffnen erscheinen sie sofort, frische Daten kommen im Hintergrund.
  * Jede eigene Änderung (Anfrage mit anderer Methode als GET) leert den Speicher, damit danach nichts Veraltetes
  * aufblitzt. Beim Abmelden lädt die App neu; damit ist auch der Speicher leer.
- * Höchstens MAX_ENTRIES Einträge (Detailansichten legen je Mitglied, Liste usw. einen an): Der am längsten nicht
- * gespeicherte fällt zuerst heraus.
+ * Höchstens MAX_ENTRIES Einträge (Detailansichten legen je Mitglied, Liste usw. einen an; beim Blättern lädt die App
+ * alle Mitglieder der Liste vor): Der am längsten nicht gespeicherte fällt zuerst heraus.
  */
-export const MAX_ENTRIES = 200;
+export const MAX_ENTRIES = 1000;
 const entries = new Map<string, unknown>();
 let generation = 0;
 

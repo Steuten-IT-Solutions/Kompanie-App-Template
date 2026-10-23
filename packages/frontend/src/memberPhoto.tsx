@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api, type EncodedFile } from './api';
-import { badgeSrc } from './RankBadge';
+import { badgeSrc, preloadImage } from './RankBadge';
 import { Sheet } from './ui';
 
 /**
@@ -72,8 +72,8 @@ export function initials(name: string): string {
 
 /** Rundes Foto; ohne Foto (oder wenn es nicht lädt) die Anfangsbuchstaben. */
 /** Foto schon laden (z. B. des nächsten Mitglieds beim Wischen), damit es ohne Verzögerung erscheint. */
-export function preloadAvatar(url: string | null | undefined, size: AvatarSize = 'large'): void {
-  if (url && !url.startsWith('data:')) new Image().src = badgeSrc(url, PIXELS[size]);
+export function preloadAvatar(url: string | null | undefined, size: AvatarSize = 'large'): Promise<void> {
+  return url && !url.startsWith('data:') ? preloadImage(badgeSrc(url, PIXELS[size])) : Promise.resolve();
 }
 
 export function MemberAvatar({ url, name, size = 'small' }: { url?: string | null; name: string; size?: AvatarSize }) {

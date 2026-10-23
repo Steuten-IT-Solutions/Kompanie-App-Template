@@ -71,19 +71,28 @@ export function orderFor(stored: MemberOrder, options: readonly MemberSort[]): M
   return options.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
 }
 
-/** Liste, aus der eine Person geöffnet wird: aktive Mitglieder oder Ehemalige (wie in der Adresse). */
-export type BrowseList = 'mitglied' | 'ehemalige';
+/**
+ * Liste, aus der eine Person geöffnet wird: in der Verwaltung aktive Mitglieder oder Ehemalige (wie in der Adresse),
+ * im Tab „Mitglieder“ die Mitgliederliste oder die Ehemaligen.
+ */
+export type BrowseList = 'mitglied' | 'ehemalige' | 'directory' | 'directory-former';
+
+/** Eintrag der Reihenfolge: mit dem Namen, damit die Seite einer Person ihn schon vor dem Laden zeigt. */
+export interface BrowseEntry {
+  id: number;
+  name: string;
+}
 
 /** Reihenfolge der Liste beim Öffnen einer Person (gefiltert und sortiert): Auf ihrer Seite blättert man darin weiter. */
-let browse: { list: BrowseList; ids: number[] } | null = null;
+let browse: { list: BrowseList; entries: BrowseEntry[] } | null = null;
 
-export function setBrowseOrder(list: BrowseList, ids: number[]): void {
-  browse = { list, ids };
+export function setBrowseOrder(list: BrowseList, entries: BrowseEntry[]): void {
+  browse = { list, entries: entries.map(({ id, name }) => ({ id, name })) };
 }
 
 /** Gemerkte Reihenfolge, wenn die Person darin steht; sonst null. */
-export function browseOrder(list: BrowseList, id: number): number[] | null {
-  return browse && browse.list === list && browse.ids.includes(id) ? browse.ids : null;
+export function browseOrder(list: BrowseList, id: number): BrowseEntry[] | null {
+  return browse && browse.list === list && browse.entries.some((e) => e.id === id) ? browse.entries : null;
 }
 
 export function saveMemberOrder(order: MemberOrder): void {

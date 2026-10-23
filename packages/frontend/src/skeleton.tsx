@@ -136,3 +136,36 @@ export function Loading() {
     </div>
   );
 }
+
+/**
+ * Seite einer Person, solange ihre Daten laden (z. B. schneller gewischt, als die App vorlädt): unter dem Namen, den
+ * die Seite schon aus der Liste zeigt (PersonName), Platzhalter für Abzeichen bzw. Foto und eine Zeile. Der Nachbar
+ * daneben zeigt kein „Lädt …“ (status).
+ */
+export function PersonSkeleton({ status = true }: { status?: boolean }) {
+  const placeholders = (
+    <>
+      <div className="member-rank-line">
+        <span className="skeleton-box" style={{ width: 96, height: 96, borderRadius: '50%' }} />
+      </div>
+      <p className="small member-level">
+        <span className="skeleton-text" style={{ width: '16ch' }} />
+      </p>
+    </>
+  );
+  return status ? (
+    <div className="skeleton" role="status" data-loading="">
+      <span className="visually-hidden">Lädt …</span>
+      <div className="skeleton-parts" aria-hidden="true">
+        {placeholders}
+      </div>
+    </div>
+  ) : (
+    <div className="skeleton-parts">{placeholders}</div>
+  );
+}
+
+/** Name einer Person; ohne bekannten Namen (Daten und Liste laden noch) ein Platzhalter. */
+export function PersonName({ name }: { name?: string }) {
+  return <>{name ?? <span className="skeleton-text" style={{ width: '12ch' }} />}</>;
+}

@@ -1050,8 +1050,10 @@ button.member-date {
 .back {
   margin-bottom: 4px;
 }
-/* Mitglied in der Verwaltung: zurück zur Liste, daneben vorheriges und nächstes (auch per Wischen). */
-.member-detail {
+/* Mitglied in der Verwaltung bzw. Seite einer Person im Tab „Mitglieder“: zurück zur Liste, daneben vorheriges und
+   nächstes (auch per Wischen). */
+.member-detail,
+.member-page {
   /* Waagerecht wischt die App selbst; sonst blättert der Browser zusätzlich im Verlauf zurück oder vor. */
   touch-action: pan-y pinch-zoom;
   /* Karussell: Die Nachbarn stehen neben der Karte im Seitenrand und darüber hinaus; abgeschnitten wird erst am Rand
@@ -3964,7 +3966,8 @@ button.spotlight-person:focus-visible {
   margin: 4px 0 8px;
   text-align: center;
 }
-.member-page-head .member-name {
+.member-page-head .member-name,
+.member-page-head .member-peek-name {
   margin: 6px 0 0;
 }
 .member-page-titles {
