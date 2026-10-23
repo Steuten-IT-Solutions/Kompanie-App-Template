@@ -19,9 +19,12 @@ export function memberListAllowed(): boolean {
   return canPoints() || canPenalties() || canRanks() || canTitles() || canAttendance() || can('create_users') || can('promote_users');
 }
 
-type AdminTab = { id: string; label: string; on: boolean; route?: string };
+type AdminTab = { id: string; label: string; on: boolean; route?: string; group?: string };
 
-/** Bereiche der Verwaltung (Knöpfe auf ihrer Startseite); Schwarzes Brett, Umfragen, Inventar und Einstellungen sind eigene Seiten (route), stehen aber hier mit. */
+/** Sammelknopf „Einrichtungen“ auf der Startseite der Verwaltung: was eine Kompanie einmal anlegt und selten ändert. */
+const SETUP = 'einrichtungen';
+
+/** Bereiche der Verwaltung (Knöpfe auf ihrer Startseite, die mit group unter „Einrichtungen“); Schwarzes Brett, Umfragen, Inventar und Einstellungen sind eigene Seiten (route), stehen aber hier mit. */
 export function adminTabs(): AdminTab[] {
   const points = canPoints();
   return (
@@ -30,19 +33,36 @@ export function adminTabs(): AdminTab[] {
       { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
-      { id: 'katalog', label: `${sec.points}katalog`, on: points },
-      { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
+      { id: 'katalog', label: `${sec.points}katalog`, on: points, group: SETUP },
+      { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
-      { id: 'titel', label: sec.titles, on: canTitles() },
-      { id: 'aemter', label: sec.offices, on: canOffices() },
+      { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
+      { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
-      { id: 'listen', label: sec.lists, on: canLists() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
+      { id: 'listen', label: sec.lists, on: canLists() },
       { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
+}
+
+/** Bereiche unter „Einrichtungen“; der Sammelknopf erscheint erst ab zweien, ein einzelner steht direkt auf der Startseite. */
+export function setupTabs(): AdminTab[] {
+  const tabs = adminTabs().filter((t) => t.group === SETUP);
+  return tabs.length > 1 ? tabs : [];
+}
+
+/** Knöpfe der Startseite der Verwaltung: „Einrichtungen“ statt ihrer Bereiche, ganz unten vor den Einstellungen. */
+function startTabs(): AdminTab[] {
+  const setup = setupTabs();
+  const tabs = adminTabs().filter((t) => !setup.some((s) => s.id === t.id));
+  // Nur Bereiche der Einrichtungen: keine Seite mit einem einzigen Knopf, sie stehen gleich auf der Startseite.
+  if (setup.length === 0 || tabs.length === 0) return adminTabs();
+  const at = tabs.findIndex((t) => t.id === 'einstellungen');
+  const entry: AdminTab = { id: SETUP, label: 'Einrichtungen', on: true, route: `verwaltung/${SETUP}` };
+  return at < 0 ? [...tabs, entry] : [...tabs.slice(0, at), entry, ...tabs.slice(at)];
 }
 
 export type MenuItem = { id: string; label: string; onSelect: () => void };
@@ -174,6 +194,7 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M7 9h10M7 13h6M12 4V2" />
     </>
   ),
+  einrichtungen: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5a2.1 2.1 0 0 0 3 3l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,
   umfragen: <path d="M5 20v-9M12 20V5M19 20v-6M3 20h18" />,
   inventar: <path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9" />,
   einstellungen: (
@@ -204,12 +225,12 @@ function AdminIcon({ id }: { id: string }) {
   );
 }
 
-/** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol. */
-export function AdminMenu() {
+/** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
+export function AdminMenu({ group }: { group?: string }) {
   return (
-    <nav aria-label="Verwaltung">
+    <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
       <ul className="admin-tiles">
-        {adminTabs().map((t) => (
+        {(group ? setupTabs() : startTabs()).map((t) => (
           <li key={t.id}>
             <button type="button" className="card admin-tile" onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}>
               <AdminIcon id={t.id} />
@@ -222,9 +243,16 @@ export function AdminMenu() {
   );
 }
 
-/** Zurück zur Startseite der Verwaltung; nur, wenn es dort mehr als einen Bereich gibt. */
-export function AdminBack() {
+/** Zurück zur Startseite der Verwaltung (aus einem Bereich unter „Einrichtungen“ dorthin); nur, wenn es dort mehr als einen
+ * Bereich gibt. */
+export function AdminBack({ from }: { from?: string } = {}) {
   if (adminTabs().length < 2) return null;
+  if (from && setupTabs().some((t) => t.id === from) && startTabs().some((t) => t.id === SETUP))
+    return (
+      <button type="button" className="btn btn-link back" onClick={() => navigate(`verwaltung/${SETUP}`)}>
+        ‹ Einrichtungen
+      </button>
+    );
   return (
     <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung')}>
       ‹ Verwaltung

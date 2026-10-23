@@ -64,6 +64,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Verwaltung aufgeräumt: Knopf „Einrichtungen“**: Punktekatalog, Dienstgrade, Titel und Ämter – was man einmal
+  anlegt und selten ändert – liegen jetzt hinter dem neuen Knopf „Einrichtungen“ ganz unten vor „Einstellungen“.
+  „Listen“ steht jetzt nach „Inventar“. Darf jemand nur einen der vier Bereiche pflegen, steht sein Knopf wie bisher
+  direkt auf der Startseite.
 - **„Meins → Übersicht“ wie die Seite eines Mitglieds in der Verwaltung**: Name, darunter Dienstgradabzeichen und Foto,
   Rolle, die Kacheln Punkte und Offen, die Titel, Geburtstag und Eintritt sowie die Ämter als Zeitstrahl. Antippen
   führt zur passenden Seite (Kacheln, Abzeichen) bzw. zu „Konto“ (Geburtstag, Eintritt); das Foto vergrößert sich.

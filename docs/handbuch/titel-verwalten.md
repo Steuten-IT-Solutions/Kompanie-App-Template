@@ -9,7 +9,7 @@ Hier legst du die {bereich.titles} an, die Mitglieder tragen können, z. B. Ehre
 ![Die Liste der {bereich.titles} mit Griff zum Verschieben und den Knöpfen](bild:titel-verwalten)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.titles}**. Mit **‹ Verwaltung** kommst du zurück.
+Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{bereich.titles}**. Mit **‹ Einrichtungen** kommst du zurück.
 
 ## Was du hier siehst
 - Alle {bereich.titles} in der Reihenfolge, in der sie überall angezeigt werden, jeweils mit „… × vergeben“ oder „nicht vergeben“. Deaktivierte tragen das Schild „inaktiv“.

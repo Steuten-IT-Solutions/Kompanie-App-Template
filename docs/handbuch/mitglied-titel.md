@@ -19,7 +19,7 @@ Mit **✕** oder der Zurück-Taste schließt du es wieder.
 - Alle {bereich.titles} zum Ankreuzen. Was das Mitglied schon hat, ist angekreuzt.
 - Ein deaktivierter Titel steht nur da, wenn das Mitglied ihn hat, mit dem Zusatz „(deaktiviert – nach dem Abwählen nicht mehr vergebbar)“.
 - **Titel speichern**: lässt sich erst tippen, wenn du etwas geändert hast.
-- Gibt es noch keine {bereich.titles}, steht dort „Noch keine {bereich.titles} angelegt (Verwaltung → {bereich.titles}).“
+- Gibt es noch keine {bereich.titles}, steht dort „Noch keine {bereich.titles} angelegt (Verwaltung → Einrichtungen → {bereich.titles}).“
 
 ## So gehst du vor
 ### Titel verleihen oder wegnehmen
