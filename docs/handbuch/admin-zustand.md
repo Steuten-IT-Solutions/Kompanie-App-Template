@@ -66,7 +66,7 @@ Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein
 3. Ist das Problem behoben, kannst du mit **Leeren** das Protokoll löschen.
 
 ## Gut zu wissen
-- **Automatische Updates:** Solange **Updates automatisch einspielen (empfohlen)** an ist, spielt die App neue Versionen derselben Hauptversion selbst ein. Mit WordPress kann die Webseite automatische Updates sperren; dann steht das hier, und du spielst neue Versionen von Hand ein.
+- **Automatische Updates:** Solange **Updates automatisch einspielen (empfohlen)** an ist, spielt die App neue Versionen derselben Hauptversion selbst ein. Sie sucht dafür einmal am Tag und spielt eine passende Version dabei gleich ein; eine feste Uhrzeit gibt es nicht. Ohne Cronjob beim Hoster passiert das nur, wenn jemand die App (mit WordPress: die Webseite) aufruft; wird sie selten aufgerufen, kommen Updates entsprechend später (siehe **Für Fortgeschrittene** unten). Mit WordPress kann die Webseite automatische Updates sperren; dann steht das hier, und du spielst neue Versionen von Hand ein.
 - **Vorsorge:** Vor Updates mit Änderungen an der Datenbank und vor einer neuen Hauptversion sichert die App die Daten automatisch auf dem Server; die letzten fünf dieser Sicherungen bleiben. Schlägt ein Update fehl, läuft die bisherige Version weiter und der Grund steht hier.
 - **Zurückgezogene Version:** Wird eine fehlerhafte Version zurückgezogen, wechselt die App von selbst auf eine geprüfte Version (außer automatische Updates sind gesperrt); mit **Jetzt auf … wechseln** geht das sofort. Gibt es noch keine geprüfte Version, meldest du dich bei den Betreuern der App.
 - **Vorabversionen:** Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist, noch bevor sie für alle freigegeben wird. Das ist für eine Testseite gedacht. Schaltest du es aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
@@ -74,7 +74,7 @@ Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein
 - **Fehlerprotokoll:** Es bleibt auf eurem Server und wird nicht gesendet, auch ohne Zustimmung zu den Statusmeldungen. Gleiche Fehler direkt hintereinander stehen nur einmal da, mit Anzahl und Zeitraum. Adressen sind auf den Server gekürzt; so bleibt z. B. eine geheime Kalender-Adresse geheim.
 - Bekommt eure Installation keine Updates über die App, steht im Abschnitt **Updates** nur die installierte Version.
 
-> **Für Fortgeschrittene:** Ein *Cronjob* ist ein Auftrag im Kundenmenü eures Hosters, der eine Adresse regelmäßig aufruft. Ohne ihn erledigt die App ihre Hintergrundaufgaben (Abgleich von {bereich.gallery} und Kalender, Updates) nach Seitenaufrufen. Zuverlässiger ist ein Cronjob, der alle 15 Minuten die Adresse aufruft, die bei **Hintergrundaufgaben** steht.
+> **Für Fortgeschrittene:** Ein *Cronjob* ist ein Auftrag im Kundenmenü eures Hosters, der eine Adresse regelmäßig aufruft. Ohne ihn erledigt die App ihre Hintergrundaufgaben (Abgleich von {bereich.gallery} und Kalender, Updates) nach Seitenaufrufen. Zuverlässiger ist ein Cronjob, der alle 15 Minuten die Adresse aufruft, die bei **Hintergrundaufgaben** steht. Mit WordPress gibt es diese Zeile nicht; dort ersetzt der Cronjob WP-Cron, wie in der Anleitung zur Installation mit WordPress beschrieben.
 
 Was du bei typischen Meldungen tun kannst, steht unter [Häufige Probleme](seite:haeufige-probleme).
 
