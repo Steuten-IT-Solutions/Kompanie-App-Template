@@ -29,6 +29,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 1. Wische auf der Seite nach links oder rechts. Die Seite folgt deinem Finger, daneben siehst du schon die nächste Person.
 2. Lass los: Die nächste Person gleitet herüber. Ziehst du nur ein kleines Stück, bleibt alles, wie es war.
 3. Am Computer tippst du stattdessen auf **‹** oder **›** oben rechts.
+4. Nach dem letzten Mitglied kommt wieder das erste, und vom ersten geht es zurück zum letzten. Wischen geht auch, während eine Seite noch lädt.
 
 ### Das Foto ändern
 Das dürfen alle, die Mitglieder anlegen dürfen.
