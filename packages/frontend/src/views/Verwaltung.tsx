@@ -580,16 +580,17 @@ function MemberDetailView({
   useEffect(() => {
     if (target !== base) redirectTo(`verwaltung/${target}/${id}${page ? `/${page}` : ''}`);
   }, [target, base, id, page]);
-  // Wischen blättert durch die Liste, aus der das Mitglied geöffnet wurde. Ohne Verlaufseintrag, damit „Zurück“ nicht
-  // durch jedes Mitglied führt.
+  // Wischen blättert durch die Liste, aus der das Mitglied geöffnet wurde, im Kreis (nach dem letzten das erste). Ohne
+  // Verlaufseintrag, damit „Zurück“ nicht durch jedes Mitglied führt.
   const order = useBrowseOrder(base, id);
   const ids = useMemo(() => order.map((e) => e.id), [order]);
   const nameOf = (other: number | null) => order.find((e) => e.id === other)?.name;
-  const { prev, next, index } = neighbors(ids, id);
+  const { prev, next, index } = neighbors(ids, id, true);
   const show = (other: number | null) => other !== null && redirectTo(`verwaltung/${base}/${other}`);
   // Karussell: Die Karte folgt dem Finger, daneben stehen die Nachbarn; beim Loslassen gleitet sie hinüber.
+  const root = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const swipe = useSwipeDrag(track, {
+  const swipe = useSwipeDrag(root, track, {
     canPrev: prev !== null,
     canNext: next !== null,
     onCommit: (step) => show(step === 1 ? next : prev),
@@ -610,6 +611,7 @@ function MemberDetailView({
       await Promise.all([preloadAvatar(other.photo_url), preloadBadge(other.rank_badge_url)]);
     },
     data,
+    true,
   );
   const here = `verwaltung/${base}/${id}`;
   const sheet = MEMBER_SHEETS.find((s) => s === page) ?? null;
@@ -661,13 +663,27 @@ function MemberDetailView({
   // Liste). Die Überschrift bleibt dabei dasselbe Element: Beginnt eine Geste darauf, bevor die Daten da sind, liefe sie
   // sonst ins Leere (der Browser schickt die weiteren Touch-Ereignisse an das entfernte Element).
   const frame = (former: boolean, heading: ReactNode, body: ReactNode) => (
-    <div className="member-detail" {...swipe.handlers}>
+    <div className="member-detail" ref={root}>
       <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
         {swipe.peeking && prev !== null && (
-          <MemberPeek id={prev} name={nameOf(prev)} former={base === 'ehemalige'} side="prev" position={index} total={order.length} />
+          <MemberPeek
+            id={prev}
+            name={nameOf(prev)}
+            former={base === 'ehemalige'}
+            side="prev"
+            position={index === 0 ? order.length : index}
+            total={order.length}
+          />
         )}
         {swipe.peeking && next !== null && (
-          <MemberPeek id={next} name={nameOf(next)} former={base === 'ehemalige'} side="next" position={index + 2} total={order.length} />
+          <MemberPeek
+            id={next}
+            name={nameOf(next)}
+            former={base === 'ehemalige'}
+            side="next"
+            position={index + 2 > order.length ? 1 : index + 2}
+            total={order.length}
+          />
         )}
         <div className="member-nav">
           {former ? (

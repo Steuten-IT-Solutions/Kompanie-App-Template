@@ -247,25 +247,13 @@ function PageNav({
       </button>
       {position >= 1 && total > 1 && (
         <span className="member-step">
-          <button
-            type="button"
-            className="btn btn-link"
-            disabled={position === 1}
-            onClick={onStep && (() => onStep(-1))}
-            aria-label={onStep && 'Vorherige Person'}
-          >
+          <button type="button" className="btn btn-link" onClick={onStep && (() => onStep(-1))} aria-label={onStep && 'Vorherige Person'}>
             ‹
           </button>
           <span className="muted small">
             {position} / {total}
           </span>
-          <button
-            type="button"
-            className="btn btn-link"
-            disabled={position === total}
-            onClick={onStep && (() => onStep(1))}
-            aria-label={onStep && 'Nächste Person'}
-          >
+          <button type="button" className="btn btn-link" onClick={onStep && (() => onStep(1))} aria-label={onStep && 'Nächste Person'}>
             ›
           </button>
         </span>
@@ -278,8 +266,8 @@ function PageNav({
  * Seite einer Person (Issue #112): Foto, Name, Dienstgrad und Titel wie in der Liste (bei Ehemaligen dazu Eintritt und Ausscheiden,
  * bei Mitgliedern Geburtstag und Eintritt, soweit sie sie zeigen), darunter direkt ihre Ämter als Zeitstrahl. Ohne
  * Mitgliederliste (nur Ämter) kommt der Name aus den Ämtern.
- * Wischen (oder die Pfeile) blättert wie in der Verwaltung durch die Liste, aus der die Person geöffnet wurde, ohne
- * Verlaufseintrag: „‹ Zurück“ führt weiter zur Liste. Die App lädt dabei Fotos und Abzeichen aller Personen der Liste
+ * Wischen (oder die Pfeile) blättert wie in der Verwaltung im Kreis durch die Liste, aus der die Person geöffnet wurde,
+ * ohne Verlaufseintrag: „‹ Zurück“ führt weiter zur Liste. Die App lädt dabei Fotos und Abzeichen aller Personen der Liste
  * nacheinander vor; die Angaben selbst stehen schon in der Liste.
  */
 function MemberPage({
@@ -308,9 +296,10 @@ function MemberPage({
   const order = useDirectoryOrder(userId, list.data, former.data);
   const ids = useMemo(() => order.map((e) => e.id), [order]);
   const nameOf = (id: number | null) => findPerson(id).m?.name ?? order.find((e) => e.id === id)?.name;
-  const { prev, next, index } = neighbors(ids, userId);
+  const { prev, next, index } = neighbors(ids, userId, true);
+  const root = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const swipe = useSwipeDrag(track, {
+  const swipe = useSwipeDrag(root, track, {
     canPrev: prev !== null,
     canNext: next !== null,
     onCommit: (step) => {
@@ -326,6 +315,7 @@ function MemberPage({
       return Promise.all([preloadAvatar(p?.photo_url), preloadBadge(p?.rank_badge_url, 'medium')]);
     },
     list.data ?? former.data,
+    true,
   );
 
   const peek = (id: number | null, side: 'prev' | 'next', position: number) => {
@@ -342,10 +332,10 @@ function MemberPage({
 
   const waiting = (list.loading && !list.data) || (former.loading && !former.data) || (officeData.loading && !officeData.data);
   return (
-    <div className="member-page" {...swipe.handlers}>
+    <div className="member-page" ref={root}>
       <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
-        {peek(prev, 'prev', index)}
-        {peek(next, 'next', index + 2)}
+        {peek(prev, 'prev', index === 0 ? order.length : index)}
+        {peek(next, 'next', index + 2 > order.length ? 1 : index + 2)}
         <PageNav position={index + 1} total={order.length} onStep={swipe.slide} />
         {name === undefined && waiting ? (
           <>

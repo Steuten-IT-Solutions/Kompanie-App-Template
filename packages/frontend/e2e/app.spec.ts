@@ -261,20 +261,23 @@ test('Mitglied: Wischen blättert in der Liste, nicht aber in einem offenen Fens
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
   await expect(page.locator('.member-step')).toContainText('1 / 2');
-  await expect(page.getByRole('button', { name: 'Vorheriges Mitglied' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Vorheriges Mitglied' })).toBeEnabled();
 
   // Nach links: nächstes Mitglied.
   await swipe(page, -200);
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
   await expect(page.locator('.member-step')).toContainText('2 / 2');
-  // Am Ende der Liste geht es nicht weiter.
+  // Karussell: Nach dem letzten kommt wieder das erste.
   await swipe(page, -200);
-  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
-
-  // Nach rechts bzw. mit dem Pfeil wieder zurück und vor.
-  await swipe(page, 200);
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+
+  // Nach rechts vom ersten zum letzten; mit den Pfeilen ebenso im Kreis.
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
   await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await page.getByRole('button', { name: 'Vorheriges Mitglied' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
 
   // Im offenen Fenster blättert Wischen nicht; „Zurück“ schließt erst das Fenster, dann geht es zur Liste (Wischen legt
@@ -447,6 +450,38 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('.member-level').first()).toContainText('Rolle');
   });
 
+  test('Mitglied: Lädt die Seite noch, wischt auch die leere Fläche unter dem Gerüst', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    // Unten über der Tab-Leiste: dort steht beim Laden nichts mehr von der Seite, nur die leere Fläche darunter.
+    const { width, height } = page.viewportSize()!;
+    const y = height - 120;
+    const card = (await page.locator('.member-detail').boundingBox())!;
+    expect(card.y + card.height).toBeLessThan(y);
+    const cdp = await page.context().newCDPSession(page);
+    const x = width / 2 + 100;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (const dx of [-50, -100, -150, -200]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+  });
+
   test('Mitglied: Kommen die Daten mitten im Wischen an, blättert die Geste trotzdem', async ({ page }) => {
     await login(page, 'verwalter');
     await adminMenu(page, 'Mitglieder');
@@ -489,14 +524,17 @@ test('Mitglieder (für alle): Wischen und Pfeile blättern in der Liste, „Zur�
     .click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
   await expect(page.locator('.member-step')).toContainText('1 / 2');
-  await expect(page.getByRole('button', { name: 'Vorherige Person' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Vorherige Person' })).toBeEnabled();
 
-  // Nach links: nächste Person; am Ende der Liste geht es nicht weiter.
+  // Nach links: nächste Person; nach der letzten wieder die erste (Karussell), nach rechts zurück zur letzten.
   await swipe(page, -200);
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
   await expect(page.locator('.member-step')).toContainText('2 / 2');
   await expect(page).toHaveURL(/#\/mitglieder\/\d+$/);
   await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await swipe(page, 200);
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
 
   // Beim Ziehen steht die Nachbarin daneben, mit Namen aus der Liste.
