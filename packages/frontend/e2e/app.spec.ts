@@ -883,6 +883,12 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await openKonto(page);
   await expect(page.locator('.meins-menu')).toHaveCount(0);
 
+  // Öffentliche Liste (ohne Anmeldung): Die Rolle steht wie ein Titel neben dem Namen.
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(page.locator('.directory .member-row', { hasText: last }).locator('.badge-candidate')).toHaveText('Anwärter');
+
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Mitglieder');
   // Zähler über „Mitglied anlegen“: Gruppen wie in der Anwesenheit
@@ -891,7 +897,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.getByRole('button', { name: 'Filter und Sortierung' })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByLabel('Sortierung')).toBeHidden();
   // Die Rolle steht wie ein Titel neben dem Namen, solange die Person noch aufzunehmen ist.
-  await expect(page.locator('.row', { hasText: `${last}, Anna` }).locator('.badge-role')).toHaveText('Anwärter');
+  await expect(page.locator('.row', { hasText: `${last}, Anna` }).locator('.badge-candidate')).toHaveText('Anwärter');
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberAccount(page);
   page.once('dialog', (d) => d.accept());

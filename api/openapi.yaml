@@ -4949,6 +4949,11 @@ components:
         name: { type: string, description: 'Anzeigename „Vorname Nachname“' }
         first_name: { type: string }
         last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
+        candidate_role:
+          description: |
+            Name der Rolle, solange die Person noch als Mitglied aufzunehmen ist (Rolle mit `promotable`, z. B. Anwärter),
+            sonst null. Die App zeigt ihn wie einen Titel. Fehlt bei Ehemaligen und bei älteren Servern.
+          type: [string, 'null']
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade)' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }

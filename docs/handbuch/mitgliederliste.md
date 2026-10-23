@@ -34,7 +34,7 @@ Tippe unten auf **Verwaltung** und dann auf **Mitglieder**. Ist die Mitgliederli
 ## Gut zu wissen
 - Nach Eintritt sortiert steht der Eintritt in der Zeile, nach {bereich.points} sortiert die {bereich.points}. Wer keinen Eintritt hat, steht am Ende. Eine neu gewählte Sortierung beginnt mit A → Z, mit dem frühesten Eintritt bzw. mit den meisten {bereich.points}.
 - Dein Gerät merkt sich die Sortierung. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
-- In der Liste stehen auch Personen nur mit dem internen Kalender (z. B. Anwärter). Kann man ihre Rolle als {rolle.member} aufnehmen, steht der Name der Rolle neben dem Namen.
+- In der Liste stehen auch Personen nur mit dem internen Kalender (z. B. Anwärter). Kann man ihre Rolle als {rolle.member} aufnehmen, steht der Name der Rolle neben dem Namen wie ein Titel, ebenso in der Liste unter **{bereich.directory}**.
 - Ausgetretene und verstorbene Mitglieder stehen nicht hier, sondern unter **Ehemalige**.
 - Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Wer Rollen vergeben darf, findet unter **Filter und Sortierung** das Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)**; {rolle.guest} lässt sich bei **Alle Rollen** auch ohne das Häkchen wählen.
 

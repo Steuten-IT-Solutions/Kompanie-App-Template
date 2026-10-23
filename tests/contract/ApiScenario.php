@@ -1016,6 +1016,8 @@ final class ApiScenario
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
         $c->ok(is_string($entry['name'] ?? null) && array_key_exists('photo_url', $entry) && array_key_exists('rank_title', $entry) && is_array($entry['titles'] ?? null), 'Name, Foto, Dienstgrad und Titel');
         $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
+        $byId = array_column((array) $d, null, 'id');
+        $c->ok(array_key_exists('candidate_role', $entry) && $entry['candidate_role'] === null && is_string($byId[$cand]['candidate_role'] ?? null), 'Rollenname nur bei Anwärtern');
         $c->ok(array_key_exists('birthday', $entry) && $entry['birthday'] === null && array_key_exists('join_year', $entry) && $entry['join_year'] === null, 'Geburtstag und Eintrittsjahr: ohne Freigabe null');
 
         // Geburtstag und Eintrittsjahr auf der Seite der Person: wählt nur sie selbst

@@ -295,9 +295,9 @@ final class Api
 
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
-     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich
-     * Geburtstage) und Eintritt (join_year, join_date) nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility),
-     * sonst null. Mit $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintritt: Sie haben
+     * Dienstgrad (mit Abzeichen) und Titel, bei Anwärtern der Name ihrer Rolle (candidate_role). Sonst keine Rollen,
+     * Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich Geburtstage) und Eintritt (join_year, join_date) nur,
+     * soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintritt: Sie haben
      * ihre eigenen Daten).
      * Öffentlich, damit der Shortcode [kompanie_mitglieder] dieselbe Liste zeigt.
      *

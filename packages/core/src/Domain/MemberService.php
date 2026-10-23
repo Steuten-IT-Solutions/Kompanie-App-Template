@@ -102,17 +102,26 @@ final class MemberService
 
     /**
      * Mitgliederliste für Mitglieder und Anwärter (Bereich directory): alle mit Mitgliederbereich oder internem
-     * Kalender, ohne Gäste und ohne Punkte, Strafen oder Rollen. Foto, Dienstgrad und Titel ergänzt die API.
+     * Kalender, ohne Gäste und ohne Punkte oder Strafen. Von der Rolle nur ihr Name, solange die Person noch als Mitglied
+     * aufzunehmen ist (candidate_role, Rolle mit „Als Mitglied aufnehmen“, z. B. Anwärter), sonst null.
+     * Foto, Dienstgrad und Titel ergänzt die API.
      * Mit $membersOnly nur Mitglieder, ohne Anwärter (Shortcode [kompanie_mitglieder] der Webseite).
      *
-     * @return list<array{id: int, name: string, first_name: string, last_name: string}>
+     * @return list<array{id: int, name: string, first_name: string, last_name: string, candidate_role: string|null}>
      */
     public function directory(bool $membersOnly = false): array
     {
         $out = [];
         foreach ($this->users->list(false) as $u) {
             if ($membersOnly ? $u->isMember() : self::inDirectory($u)) {
-                $out[] = ['id' => $u->id, 'name' => $u->name, 'first_name' => $u->firstName, 'last_name' => $u->lastName];
+                $role = $this->roles?->find($u->role);
+                $out[] = [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'first_name' => $u->firstName,
+                    'last_name' => $u->lastName,
+                    'candidate_role' => ($role['promotable'] ?? false) ? $role['label'] : null,
+                ];
             }
         }
         return $out;

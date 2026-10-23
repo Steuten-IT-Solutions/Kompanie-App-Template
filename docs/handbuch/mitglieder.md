@@ -16,7 +16,7 @@ Tippe unten in der Leiste auf **{bereich.directory}**.
 - **Zähler**: wie viele Personen es je Gruppe gibt, z. B. {rolle.member} und Anwärter.
 - **Mitglied suchen …**: filtert die Liste nach dem Namen; ein Teil des Namens genügt.
 - **Sortierung** und **Reihenfolge**: **Nachname** oder **Vorname** (**A → Z** bzw. **Z → A**) oder **Eintritt** (**Früheste zuerst** bzw. **Neueste zuerst**).
-- **Die Liste**: vorn ein rundes Foto oder die Anfangsbuchstaben, dann der Name mit {bereich.titles}. Nutzt die Kompanie {bereich.ranks}, steht rechts das Abzeichen mit dem {begriff.rank}.
+- **Die Liste**: vorn ein rundes Foto oder die Anfangsbuchstaben, dann der Name mit {bereich.titles}. Bei Anwärtern (Personen, die noch als {rolle.member} aufzunehmen sind) steht davor wie ein Titel der Name ihrer Rolle, z. B. „Anwärter“. Nutzt die Kompanie {bereich.ranks}, steht rechts das Abzeichen mit dem {begriff.rank}.
 
 ## So gehst du vor
 ### Die Seite einer Person öffnen
@@ -41,10 +41,10 @@ Tippe unten in der Leiste auf **{bereich.directory}**.
 ![Ehemalige unter {bereich.directory}](bild:mitglieder-ehemalige)
 
 ## Gut zu wissen
-- Gäste stehen nicht in der Liste. Rollen, {bereich.points}, {bereich.penalties}, E-Mail-Adressen und Benutzernamen zeigt die Liste nicht. Bei Ehemaligen steht kein Grund des Ausscheidens.
+- Gäste stehen nicht in der Liste. Rollen (außer der Rolle von Anwärtern), {bereich.points}, {bereich.penalties}, E-Mail-Adressen und Benutzernamen zeigt die Liste nicht. Bei Ehemaligen steht kein Grund des Ausscheidens.
 - Geburtstag und Eintritt stehen nur da, wenn die Person das selbst unter **Meins → Konto** gewählt hat: **Nicht anzeigen**, **Mitgliedern anzeigen** (nur angemeldete {rolle.member} sehen es) oder **Öffentlich anzeigen** (jeder). Jahr und Alter beim Geburtstag nur, wenn sie **Alter anzeigen** eingeschaltet und ein Jahr eingetragen hat.
 - Nach **Eintritt** sortiert zählt der Eintritt, den die Person auf ihrer Seite zeigt; wer keinen zeigt, steht am Ende. Die Sortierung merkt sich die App auf diesem Gerät.
 - Die Fotos laden die zuständigen Personen in der Verwaltung hoch. Möchtest du ein anderes Foto oder keines, sprich sie an.
-- Solange die Kompanie die Liste nutzt, sind Namen, Fotos, {bereich.titles} und {begriff.rank} der {rolle.member}, Anwärter und Ehemaligen für jeden sichtbar, der die Adresse der App kennt.
+- Solange die Kompanie die Liste nutzt, sind Namen, Fotos, {bereich.titles} und {begriff.rank} der {rolle.member}, Anwärter und Ehemaligen für jeden sichtbar, der die Adresse der App kennt, ebenso, wer Anwärter ist.
 
 > **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_mitglieder]` die {rolle.member} (ohne Anwärter) als Bildergalerie auch auf der Webseite.
