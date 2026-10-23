@@ -103,14 +103,15 @@ final class MemberService
     /**
      * Mitgliederliste für Mitglieder und Anwärter (Bereich directory): alle mit Mitgliederbereich oder internem
      * Kalender, ohne Gäste und ohne Punkte, Strafen oder Rollen. Foto, Dienstgrad und Titel ergänzt die API.
+     * Mit $membersOnly nur Mitglieder, ohne Anwärter (Shortcode [kompanie_mitglieder] der Webseite).
      *
      * @return list<array{id: int, name: string, first_name: string, last_name: string}>
      */
-    public function directory(): array
+    public function directory(bool $membersOnly = false): array
     {
         $out = [];
         foreach ($this->users->list(false) as $u) {
-            if (self::inDirectory($u)) {
+            if ($membersOnly ? $u->isMember() : self::inDirectory($u)) {
                 $out[] = ['id' => $u->id, 'name' => $u->name, 'first_name' => $u->firstName, 'last_name' => $u->lastName];
             }
         }

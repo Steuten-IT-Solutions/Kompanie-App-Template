@@ -1,22 +1,37 @@
 ---
 titel: "{bereich.offices}"
-reihenfolge: 39
+reihenfolge: 40
 rechte: []
 bereiche: [offices]
 ---
-Unter **{bereich.directory}** (unten in der Leiste) steht neben der Mitgliederliste der Abschnitt **{bereich.offices}**: wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl. Sehen kann ihn jeder, auch ohne Anmeldung. Oben wechselst du zwischen **{bereich.directory}** und **{bereich.offices}**; die App merkt sich auf diesem Gerät, was du zuletzt gewählt hast. Nutzt die Kompanie keine Mitgliederliste, heißt der Tab **{bereich.offices}**. Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe.
+Unter **{bereich.offices}** siehst du, wer welches Amt gerade hat und wer es früher hatte – als Zeitstrahl, der weit zurückreichen kann. Sehen kann ihn jeder, auch ohne Anmeldung.
 
-## Ämter und Chronik
-Die Ämter stehen nach Gruppen geordnet. Jede Karte zeigt zugeklappt ein Siegel mit den Anfangsbuchstaben des Amts, wer es gerade hat (mit Fotos), sonst die letzte Amtszeit, und seit wann die Chronik reicht. Ein Tipp auf die Karte klappt sie auf, **Alle aufklappen** öffnet alle Karten auf einmal.
+![{bereich.offices} nach Gruppen](bild:aemter)
 
-Aufgeklappt stehen oben unter **Im Amt** alle, die das Amt gerade haben, mit Foto und wie lange schon. Darunter folgt unter **Frühere** die Chronik: links das Jahr, in dem die Amtszeit begann (darunter „bis …“), rechts eine Karte mit den Personen, der Dauer und einem kurzen Zusatz, falls es einen gibt (z. B. „Unter …“). Die neueste Amtszeit steht oben; bei langen Listen gliedern Marken wie **2000er** die Jahrzehnte. Ein einzelnes Jahr, z. B. eine Ehrung, trägt einen Stern und den Hinweis **Ehrung**.
+## So öffnest du die Seite
+Tippe unten in der Leiste auf **{bereich.directory}** und oben auf **{bereich.offices}**. Nutzt die Kompanie keine Mitgliederliste, heißt der Knopf unten gleich **{bereich.offices}**.
 
-Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
+## Was du hier siehst
+- **Alle aufklappen** (bzw. **Alle zuklappen**): öffnet oder schließt alle Karten auf einmal.
+- **Gruppen**, z. B. Vorstand: Darunter stehen ihre Ämter.
+- **Je Amt eine Karte**: ein Siegel mit den Anfangsbuchstaben des Amts, wer es gerade hat (mit Fotos) – sonst „zuletzt“ und die letzte Amtszeit – und seit wann die Chronik reicht.
 
-## Ämter einer Person
-Steht eine Person auch in der Mitgliederliste, siehst du ihr Foto, und ein Tipp auf ihren Namen (unter **Im Amt** oder in der Chronik) öffnet ihre Seite mit allen ihren Ämtern als Zeitstrahl. Dorthin kommst du auch, wenn du in der Mitgliederliste auf die Person tippst. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
+## So gehst du vor
+### Die Chronik eines Amts ansehen
+1. Tippe auf die Karte des Amts. Sie klappt auf.
+2. Oben unter **Im Amt** stehen alle, die das Amt gerade haben, mit Foto und wie lange schon.
+3. Darunter folgt unter **Frühere** die Chronik: links das Jahr, in dem die Amtszeit begann (darunter „bis …“), rechts die Personen, die Dauer und ein kurzer Zusatz, falls es einen gibt.
 
-Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins → Übersicht** ganz unten.
+![Aufgeklappte Chronik eines Amts](bild:aemter-chronik)
 
-## Für Admins
-Die Ämter sind ein eigener Bereich: **Einstellungen → Bereiche → {bereich.offices}**. Gepflegt werden sie unter **Verwaltung → {bereich.offices}** (siehe **{bereich.offices} verwalten** im Handbuch).
+### Die Ämter einer Person sehen
+1. Tippe in der Chronik oder unter **Im Amt** auf ihren Namen.
+2. Es öffnet sich ihre Seite mit allen ihren Ämtern als Zeitstrahl.
+
+## Gut zu wissen
+- Die neueste Amtszeit steht oben. Bei langen Listen gliedern Marken wie **2000er** die Jahrzehnte. Ein einzelnes Jahr, z. B. eine Ehrung, trägt einen Stern und den Hinweis **Ehrung**.
+- Antippen lassen sich nur Personen, die in der Mitgliederliste stehen. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
+- Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
+- Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins**.
+
+> **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe.

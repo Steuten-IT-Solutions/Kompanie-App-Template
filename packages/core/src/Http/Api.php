@@ -787,6 +787,15 @@ final class Api
                 $photos = $a->memberPhotos()->urls();
                 return array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $a->formerMembers()->list($this->user()));
             }, null, $denyUsers),
+            // Eine ehemalige Person neu anlegen (Konto ohne Anmeldung), wie beim Mitglied mit Geburtstag und Foto
+            new Route('POST', '/members/former', Cap::CreateUsers, function (Request $r) use ($a) {
+                $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
+                $photo = $this->photoInput($r->body['photo'] ?? null);
+                $created = $a->formerMembers()->create($this->user(), $r->body);
+                $this->storeBirthday($created['id'], $birthday, $created);
+                $this->storePhoto($created['id'], $photo, $created);
+                return Response::created($created);
+            }, null, $denyUsers),
             // Import (Ersterfassung, z. B. aus einer Chronik): ohne apply nur die Vorschau
             new Route('POST', '/members/former/import', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
             // Mitglieder aus einer Tabelle (CSV, in der App auch aus Excel gelesen), mit Anwärtern und Ehemaligen: ohne apply

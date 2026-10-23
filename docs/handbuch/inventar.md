@@ -1,34 +1,67 @@
 ---
-titel: "{bereich.inventory} pflegen"
+titel: "{bereich.inventory}"
 reihenfolge: 66
 rechte: [manage_inventory]
 bereiche: [inventory]
 ---
-Im {bereich.inventory} steht, was die Kompanie besitzt, wie viel davon da ist und wo es liegt. Es sehen und pflegen nur alle mit der Rolle „{bereich.inventory} verwalten“ oder einer Rolle mit diesem Recht (und die Admins); andere {rolle.member} sehen es nicht. Du findest es unter **Verwaltung** → **{bereich.inventory}** (Knopf auf der Startseite der Verwaltung).
+Im {bereich.inventory} hältst du fest, was die Kompanie besitzt, wie viel davon da ist und wo es liegt. Hier legst du Material an, änderst Mengen und lagerst es an einen anderen Ort um.
 
-## Die Liste
-Die Liste ist **nach Material sortiert**, nicht nach Ort: Jede Zeile zeigt ein Material mit der **Summe über alle Orte**, z. B. „12 Stück“. Gleiche Bezeichnungen gehören zusammen, auch in anderer Groß- und Kleinschreibung. Verschiedene Einheiten werden nicht zusammengezählt, sondern nebeneinander angezeigt, z. B. „12 Stück · 3 kg“.
+![Das {bereich.inventory} mit aufgeklapptem Material und seinen Orten](bild:inventar)
 
-Tippe auf ein Material, um zu sehen, wo wie viel davon liegt. Über das Suchfeld findest du Material, Orte, Kategorien und Notizen.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.inventory}**. Gibt es in der Verwaltung nur diesen einen Knopf, öffnet sich das {bereich.inventory} gleich.
 
-## Anlegen
-Mit **+ Eintrag anlegen**:
-- **Bezeichnung** und **Ort** sind Pflicht. Ein Eintrag hat genau einen Ort. Liegt dasselbe Material an zwei Orten, sind das zwei Einträge.
-- **Menge**: 0 oder mehr, auch mit Komma (z. B. 2,5; höchstens drei Nachkommastellen). Leer gelassen gilt 0.
-- Optional: **Einheit** (z. B. Stück, kg, m), **Kategorie**, **Notiz** und ein **Grund**, der im Verlauf steht.
+## Was du hier siehst
+- **+ Eintrag anlegen**: öffnet das Formular für neues Material.
+- **Gesamter Verlauf**: zeigt alle Änderungen im {bereich.inventory} (siehe [Verlauf im {bereich.inventory}](seite:inventar-verlauf)).
+- **{bereich.inventory} durchsuchen …**: findet Material nach Bezeichnung, Ort, Kategorie oder Notiz. Bei einer Suche sind alle Treffer aufgeklappt.
+- **Die Liste**: Jede Zeile ist ein Material mit der Summe über alle Orte, z. B. „18 Stück“. Darunter steht der Ort oder „an 2 Orten“. Gleiche Bezeichnungen gehören zusammen, auch in anderer Groß- und Kleinschreibung. Verschiedene Einheiten zählt die App nicht zusammen, sondern zeigt sie nebeneinander, z. B. „12 Stück · 3 kg“.
+- **Ein Material antippen**: klappt es auf. Du siehst je Ort die Menge, die Kategorie und die Notiz.
+- **−** und **+**: ändern die Menge an diesem Ort um 1.
+- **Umlagern**, **Bearbeiten**, **Verlauf**, **Löschen**: Knöpfe für den Eintrag an diesem Ort.
 
-Beim Ort, bei Einheit und Kategorie schlägt die App vor, was es schon gibt. Schreibst du einen bekannten Ort (oder eine bekannte Einheit oder Kategorie) nur anders groß oder klein, übernimmt die App die bekannte Schreibweise.
+## So gehst du vor
+### Material anlegen
+1. Tippe auf **+ Eintrag anlegen**.
+2. Trage die **Bezeichnung** und den **Ort** ein. Beides ist Pflicht.
+3. Trage die **Menge** ein. Leer gelassen gilt 0. Kommazahlen gehen auch, z. B. 2,5.
+4. Trage bei Bedarf **Einheit** (z. B. Stück, kg, m), **Kategorie (optional)** und **Notiz (optional)** ein.
+5. Schreibe bei Bedarf einen **Grund** dazu, z. B. „Spende“. Er steht im Verlauf.
+6. Tippe auf **Anlegen**.
 
-## Ändern
-- **−** und **+** ändern die Menge um 1. Unter 0 geht es nicht.
-- **Bearbeiten** ändert alle Angaben. Ein **Grund** (optional) steht danach im Verlauf, z. B. „Inventur“ oder „Sturmschaden“.
-- **Löschen** nimmt den Eintrag aus der Liste. Die App fragt nach einem Grund (optional). Der Verlauf bleibt erhalten.
+![Das Formular für einen neuen Eintrag, ausgefüllt](bild:inventar-anlegen)
 
-## Umlagern
-Mit **Umlagern** bringst du einen Teil oder alles an einen anderen Ort:
-- Gibt es am Zielort schon dasselbe Material mit derselben Einheit, kommt die Menge dort dazu. Sonst entsteht am Zielort ein neuer Eintrag.
-- Lagerst du alles um, verschwindet der Eintrag am alten Ort (oder es ändert sich nur sein Ort, wenn es am Ziel noch nichts davon gibt).
-- Mehr als vorhanden geht nicht, und der Zielort muss ein anderer sein; dann ändert sich nichts. Ein **Grund** (optional) steht im Verlauf.
+Bei Ort, Einheit und Kategorie schlägt die App vor, was es schon gibt. Schreibst du einen bekannten Ort, eine Einheit oder eine Kategorie nur anders groß oder klein, übernimmt die App die bekannte Schreibweise.
 
-## Verlauf
-Jede Änderung steht im Verlauf: wann, wer, was sich geändert hat und der Grund. **Verlauf** bei einem Eintrag zeigt seine Änderungen, **Gesamter Verlauf** oben alle (mit **Ältere Einträge laden** unten kommen weitere). Beim Umlagern bekommen der alte und der neue Eintrag je einen Verlaufseintrag. Auch gelöschte Einträge behalten ihren Verlauf.
+### Die Menge ändern
+1. Tippe auf das Material, um es aufzuklappen.
+2. Tippe beim richtigen Ort auf **−** oder **+**.
+
+Für größere Änderungen tippst du auf **Bearbeiten**, trägst die neue **Menge** ein, schreibst bei Bedarf einen Grund dazu (z. B. „Inventur“) und tippst auf **Speichern**.
+
+### Material umlagern
+1. Klappe das Material auf und tippe beim Ort, von dem es weggeht, auf **Umlagern**.
+2. Trage die **Menge** ein. Vorgegeben ist alles, was dort liegt.
+3. Trage den **Zielort** ein.
+4. Schreibe bei Bedarf einen **Grund (optional)** dazu.
+5. Tippe auf **Umlagern**.
+
+![Das Formular zum Umlagern, ausgefüllt](bild:inventar-umlagern)
+
+### Einen Eintrag löschen
+1. Klappe das Material auf und tippe beim Ort auf **Löschen**.
+2. Die App fragt nach einem Grund. Du kannst ihn leer lassen.
+3. Bestätige mit **OK**.
+
+## Gut zu wissen
+- Ein Eintrag hat genau einen Ort. Liegt dasselbe Material an zwei Orten, sind das zwei Einträge.
+- Die Menge ist 0 oder mehr, mit höchstens drei Nachkommastellen. Unter 0 geht es nicht; ist weniger als 1 da, ist **−** gesperrt.
+- Beim Umlagern: Gibt es am Zielort schon dasselbe Material mit derselben Einheit, kommt die Menge dort dazu. Sonst entsteht am Zielort ein neuer Eintrag.
+- Lagerst du alles um, verschwindet der Eintrag am alten Ort. Gibt es am Ziel noch nichts davon, ändert sich nur sein Ort.
+- Mehr umlagern, als da ist, geht nicht. Der Zielort muss ein anderer sein. Die App meldet das, und nichts ändert sich.
+- Änderst du unter **Bearbeiten** den Ort, berichtigst du nur die Angabe. Mit gleichem Material am neuen Ort wird dabei nichts zusammengelegt; dafür nimmst du **Umlagern**.
+- Jede Änderung steht im Verlauf, auch bei gelöschten Einträgen.
+- Das {bereich.inventory} sehen nur Personen, die es pflegen dürfen. Andere {rolle.member} sehen es nicht.
+
+## Siehe auch
+- [Verlauf im {bereich.inventory}](seite:inventar-verlauf)

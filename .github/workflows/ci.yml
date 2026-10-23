@@ -244,6 +244,17 @@ jobs:
       - name: Bildschirmfotos
         run: scripts/screenshots.sh screenshots-standalone
 
+      # Jede Anleitung im Handbuch bekommt ihre Bildschirmfotos (fehlt eines, wird der Schritt rot).
+      - name: Bilder für das Handbuch
+        run: scripts/handbuch-bilder.sh handbuch-bilder
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: handbuch-bilder
+          path: handbuch-bilder
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:

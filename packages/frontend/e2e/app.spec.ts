@@ -40,8 +40,8 @@ async function openKonto(page: Page) {
 
 /** Auf der Seite eines Mitglieds in der Verwaltung „Konto und Rolle“ aufklappen (ganz unten). */
 async function memberAccount(page: Page) {
-  const account = page.locator('.member-account');
-  if ((await account.getAttribute('open')) === null) await account.locator('summary').click();
+  const toggle = page.locator('.member-account .fold-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
 }
 /** Auf der Seite eines Mitglieds die Kachel „Offen“ antippen: Fenster mit Formular und Einträgen der Kasse. */
 async function memberPenalties(page: Page) {
@@ -2257,12 +2257,12 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await expect(item(STANDALONE ? 'Installation ohne WordPress' : 'Installation mit WordPress')).toBeVisible();
   await expect(item(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('Startpasswort');
-  await expect(item('Mitglieder anlegen')).toBeVisible();
+  await expect(item('Mitglied anlegen')).toBeVisible();
   await expect(item('Wartungsmodus')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('');
-  await item('Rollen und Mitglieder').click();
-  await page.locator('.hilfe-text a', { hasText: 'Rollen vergeben' }).click(); // Verweis auf eine andere Seite
-  await expect(page.locator('.news-headline')).toHaveText('Rollen vergeben');
+  await page.locator('.row-title', { hasText: /^Rollen$/ }).click();
+  await page.locator('.hilfe-text a', { hasText: 'Konto und Rolle' }).first().click(); // Verweis auf eine andere Seite
+  await expect(page.locator('.news-headline')).toHaveText('Konto und Rolle');
   await shot(page, '21-hilfe');
 
   // Offline: Hilfe kommt aus dem Speicher des Service Workers
@@ -2758,7 +2758,7 @@ test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({
 
   const doc = page.locator('.doc-card', { hasText: `Langes Dokument ${id}` });
   await expect(doc).toBeAttached();
-  const toggle = page.locator('.doc-group', { has: doc }).locator('.doc-group-toggle');
+  const toggle = page.locator('.doc-group', { has: doc }).locator('.fold-toggle');
   if ((await toggle.count()) > 0 && (await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
   await doc.getByRole('button', { name: 'Öffnen' }).click();
   const first = page.getByAltText(`Langes Dokument ${id}, Seite 1 von 10`);

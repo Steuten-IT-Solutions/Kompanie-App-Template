@@ -1,7 +1,7 @@
 <?php
 /**
  * Erzeugt die Download-Seite einer Kompanie (statisch, für GitHub Pages):
- *   php scripts/download-page.php --updates=updates.json --out=site [--screenshots=ordner] [--brand=ordner]
+ *   php scripts/download-page.php --updates=updates.json --out=site [--screenshots=ordner] [--brand=ordner] [--bilder=ordner]
  *
  * Branding (brand.json, theme.css, logo.png, favicon.png) aus --brand, sonst aus dem zuletzt
  * gebauten Stand (packages/frontend/src/generated) bzw. aus site/brand/ einer früheren Seite.
@@ -21,7 +21,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['updates::', 'out:', 'screenshots::', 'brand::']);
+$opt = getopt('', ['updates::', 'out:', 'screenshots::', 'brand::', 'bilder::']);
 $out = rtrim((string) ($opt['out'] ?? ''), '/');
 if ($out === '') {
     fwrite(STDERR, "Aufruf: php scripts/download-page.php --updates=updates.json --out=ordner\n");
@@ -177,7 +177,9 @@ footer { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
 HTML;
 file_put_contents($out . '/index.html', $html);
 // Handbuch mit dem eben geprüften Branding (site/brand/).
-$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($root . '/scripts/handbuch.php') . ' --site=' . escapeshellarg($out . '/handbuch') . ' --brand=' . escapeshellarg($out . '/brand');
+$cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($root . '/scripts/handbuch.php') . ' --site=' . escapeshellarg($out . '/handbuch') . ' --brand=' . escapeshellarg($out . '/brand')
+    // Bildschirmfotos für das Handbuch (scripts/handbuch-bilder.sh, in der gebauten Oberfläche unter handbuch/bilder/)
+    . (!empty($opt['bilder']) ? ' --bilder=' . escapeshellarg((string) $opt['bilder']) : '');
 passthru($cmd, $code);
 if ($code !== 0) {
     fwrite(STDERR, "Fehler: Handbuch nicht erzeugt.\n");

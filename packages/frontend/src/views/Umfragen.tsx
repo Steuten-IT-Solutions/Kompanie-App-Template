@@ -324,7 +324,7 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
       <h3>{poll ? 'Umfrage bearbeiten' : 'Neue Umfrage'}</h3>
       <label className="field">
         <span>Frage</span>
-        <input value={title} maxLength={TITLE_MAX} onChange={(e) => setTitle(e.target.value)} />
+        <input type="text" value={title} maxLength={TITLE_MAX} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label className="field">
         <span>Beschreibung (optional)</span>
@@ -348,6 +348,7 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
             {options.map((o, i) => (
               <div className="poll-option-edit" key={i}>
                 <input
+                  type="text"
                   aria-label={`Möglichkeit ${i + 1}`}
                   value={o}
                   maxLength={OPTION_MAX}

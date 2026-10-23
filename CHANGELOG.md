@@ -17,6 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Hilfe als Bedienungsanleitung zu jedem Bildschirm**: Das „?“ oben öffnet jetzt die Anleitung genau zu der Seite,
+  auf der man gerade ist – mit Bildschirmfotos aus der eigenen App (in euren Farben und mit euren Bezeichnungen) und
+  Schritt für Schritt erklärt: wozu die Seite da ist, wie man sie öffnet, was man dort sieht und wie man vorgeht. Die
+  Texte sind neu geschrieben, verständlich und ohne Technik. Dasselbe Handbuch mit Fotos steht auf der Download-Seite.
 - **Konten in der Datensicherung** (WordPress): Die Sicherung enthält jetzt auch die Benutzer der Webseite mit
   Benutzername, E-Mail, Namen, Passwort (als Prüfwert) und Rollen. Ist die Webseite verloren, legt das Wiederherstellen
   auf einer neu installierten WordPress-Seite unter derselben Adresse die Konten mit ihrer bisherigen Nummer wieder an;
@@ -41,6 +45,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ganze Liste vorgeladen**: Auf der Seite einer Person lädt die App jetzt nacheinander alle Personen der Liste vor,
   zuerst die direkten Nachbarn, dann immer weiter nach außen. Ist eine Seite beim Wischen doch noch nicht geladen,
   steht ihr Name schon da, darunter das Gerüst, und man kann gleich weiterwischen.
+- **Ehemalige einzeln anlegen**: Unter *Verwaltung → Ehemalige* steht jetzt **+ Ehemalige Person anlegen**, aufgebaut wie
+  **+ Mitglied anlegen**: Name, Grund, Eintritt, Ausscheiden, Gründungsmitglied und auf Wunsch Geburtstag und Foto. Es
+  entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. **Tabelle importieren (z. B. Chronik)**
+  steht jetzt oben in diesem Formular.
 - **Zwischen Mitgliedern wischen**: Auf der Seite einer Person in der Verwaltung blättert Wischen nach links bzw.
   rechts zur nächsten bzw. vorherigen Person, auch bei den Ehemaligen; am Computer gibt es dafür Pfeile oben rechts
   mit der Position („3 / 25“). Die Reihenfolge ist die der Liste mit Suche, Filtern und Sortierung. Die Seite folgt
@@ -90,6 +98,20 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (scharf, auch auf Handys), Name als Balken im Bild, ohne Dienstgrad, nach Namen sortiert, groß beim Antippen. In
   `[kompanie_aemter]` sind die Fotos schärfer und oben ausgerichtet, damit der runde Ausschnitt keine Gesichter
   abschneidet. Schrift steht in der Textfarbe der Webseite, damit sie auch mit dunklem Hintergrund lesbar ist.
+- **„Konto und Rolle“ in den Mitgliedsdetails** sieht beim Auf- und Zuklappen aus wie die Kategorien unter
+  Dokumente: Überschrift mit Linien links und rechts und einem Pfeil, der beim Aufklappen nach unten zeigt.
+- **`[kompanie_mitglieder]` ohne Anwärter**: Die Galerie auf der Webseite zeigt nur noch Mitglieder. Anwärter und
+  andere Personen nur mit dem internen Kalender stehen weiter in der Mitgliederliste der App.
+
+### Behoben
+
+- **Shortcodes mittig**: Manche Themes (z. B. Astra) rückten `[kompanie_mitglieder]`, `[kompanie_termine]` und die
+  Inhaber in `[kompanie_aemter]` nach rechts ein; links war mehr Platz als rechts. Die Listen stehen jetzt bündig.
+
+### Behoben
+
+- **Eingabefelder in Umfragen**: Die Felder *Frage* und *Antwortmöglichkeiten* sowie *Ende* beim Anlegen oder
+  Bearbeiten einer Umfrage sehen jetzt aus wie alle anderen Eingabefelder der App (bisher graue, eckige Kästen).
 
 ## [0.2.0] – 2026-10-22
 

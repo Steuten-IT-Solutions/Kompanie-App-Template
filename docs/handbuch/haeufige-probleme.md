@@ -3,46 +3,81 @@ titel: Häufige Probleme
 reihenfolge: 150
 rechte: [manage_settings]
 ---
-Ein erster Blick lohnt sich immer unter **Verwaltung → Einstellungen → Zustand und Updates**: Die Ampel zeigt, wo etwas hakt, und der Text daneben sagt meist schon, was zu tun ist (siehe [Zustand und Statusmeldungen](seite:admin-zustand)). Wo welche Einstellung liegt, zeigt [Einstellungen im Überblick](seite:admin-einstellungen).
+Hier findest du als {rolle.admin} Lösungen für Probleme, die häufig vorkommen: Zu jedem Problem steht, woran es meist liegt und was du tun kannst. Einen eigenen Bildschirm gibt es dafür nicht.
+
+## Zuerst: die Ampel ansehen
+1. Tippe unten auf **Verwaltung** und dann auf **Einstellungen**.
+2. Wähle **Zustand und Updates**.
+3. Sieh nach, welche Zeile gelb oder rot ist. Der Text daneben sagt meist schon, was zu tun ist.
+
+Mehr dazu unter [Zustand und Updates](seite:admin-zustand). Wo welche Einstellung liegt, zeigt [Einstellungen](seite:admin-einstellungen).
 
 ## Ein Bereich fehlt in der App
-Unter **Einstellungen → Bereiche** prüfen, ob er eingeschaltet ist. {bereich.calendar}, {bereich.gallery} und {bereich.news} erscheinen erst, wenn sie auch eingerichtet sind; dann steht dort „Noch nicht eingerichtet“ mit **Jetzt einrichten**. {bereich.polls} lassen sich nur zusammen mit dem {bereich.board} einschalten.
+1. Öffne **Verwaltung** → **Einstellungen** → **Bereiche**.
+2. Prüfe, ob der Bereich eingeschaltet ist, und schalte ihn bei Bedarf ein.
+3. Steht beim Bereich „Noch nicht eingerichtet“, tippe auf **Jetzt einrichten**. {bereich.calendar}, {bereich.gallery} und {bereich.news} erscheinen erst, wenn sie auch eingerichtet sind.
+
+{bereich.polls} lassen sich nur zusammen mit dem {bereich.board} einschalten.
 
 ## Jemand sieht etwas nicht, das er sehen sollte
-Unter **Verwaltung → Mitglieder** die Person öffnen, ganz unten **Konto und Rolle** aufklappen und ihre Rolle prüfen, dann unter **Einstellungen → Rollen**, welche Rechte diese Rolle hat. Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen und Mitglieder](seite:admin-rollen-und-mitglieder).
+1. Öffne unter **Verwaltung** → **Mitglieder** die Person.
+2. Klappe ganz unten **Konto und Rolle** auf und prüfe ihre Rolle.
+3. Prüfe unter **Einstellungen** → **Rollen**, welche Rechte diese Rolle hat.
+
+Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen](seite:admin-rollen-und-mitglieder).
 
 ## Jemand hat sein Passwort vergessen
-Im Mitglied **Konto und Rolle** aufklappen und ein neues Startpasswort erzeugen, siehe [Mitglieder anlegen](seite:mitglieder-anlegen).
+1. Öffne unter **Verwaltung** → **Mitglieder** die Person.
+2. Klappe **Konto und Rolle** auf und erzeuge ein neues Startpasswort.
+3. Gib es der Person weiter; sie ändert es danach unter **Meins** → **Konto**.
 
-## Fotos erscheinen grau
-Neue Bilder bereitet die App beim ersten Abruf und im Hintergrund auf. Bei vielen neuen Bildern zeigt sie für einige kurz einen grauen Platzhalter und lädt sie dann von selbst nach. Ohne WordPress geht das zügiger mit einem Cronjob beim Hoster (die Adresse steht in der Zeile **Hintergrundaufgaben** der Ampel); mit WordPress hilft es, wenn die Webseite regelmäßig aufgerufen wird.
+Siehe auch [Mitglied anlegen](seite:mitglieder-anlegen).
+
+## Bilder der {bereich.gallery} erscheinen grau
+Neue Bilder bereitet die App beim ersten Abruf und im Hintergrund auf. Bei vielen neuen Bildern zeigt sie für einige kurz einen grauen Platzhalter und lädt sie dann von selbst nach. Meist genügt es zu warten.
+
+> **Für Fortgeschrittene:** Ohne WordPress geht das zügiger mit einem Cronjob beim Hoster; die Adresse steht in der Zeile **Hintergrundaufgaben** der Ampel. Mit WordPress hilft es, wenn die Webseite regelmäßig aufgerufen wird.
 
 ## Die {bereich.gallery} gleicht nicht mehr ab
-Unter **Verwaltung → Einstellungen → {bereich.gallery}** steht der Fehler des letzten Abgleichs; mit **Jetzt abgleichen** versuchst du es sofort. Häufige Ursachen:
-- Der Ordner in Google Drive ist für das verbundene Google-Konto bzw. das Dienstkonto nicht mehr sichtbar, z. B. weil die Freigabe entfernt wurde.
-- Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Dann unter **Einstellungen → Google-Zugang** auf **Verbindung trennen** tippen und neu mit Google verbinden. Läuft sie immer wieder nach 7 Tagen ab, ist das Google-Projekt noch im Status „Testen“, siehe [Google einrichten](seite:admin-google).
+1. Öffne **Verwaltung** → **Einstellungen** → **{bereich.gallery}**. Dort steht der Fehler des letzten Abgleichs.
+2. Tippe auf **Jetzt abgleichen**, um es sofort noch einmal zu versuchen.
 
-## Der {bereich.calendar} zeigt nichts an
-Unter **Einstellungen → Kalender** mit **Kalender testen** prüfen, ob er erreichbar ist. Meldet die Ampel, dass die Verbindung mit Google den Kalender nicht lesen darf: unter **Einstellungen → Google-Zugang** die Verbindung trennen und neu verbinden, dabei auch das Häkchen für den Kalender setzen.
+Klappt es weiter nicht, liegt es meist an einem dieser Gründe:
+- Der Ordner in Google Drive ist für das verbundene Google-Konto bzw. das Dienstkonto nicht mehr sichtbar, z. B. weil die Freigabe entfernt wurde. Gib ihn dort wieder frei.
+- Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Tippe unter **Einstellungen** → **Google-Zugang** auf **Verbindung trennen** und verbinde neu mit Google.
+
+Läuft die Verbindung immer wieder nach 7 Tagen ab, ist das Google-Projekt noch im Status „Testen“, siehe [Google-Zugang](seite:admin-google).
+
+## Der Kalender zeigt nichts an
+1. Öffne **Verwaltung** → **Einstellungen** → **Kalender**.
+2. Tippe auf **Kalender testen**. Die App prüft, ob der Kalender erreichbar ist.
+3. Meldet die Ampel, dass die Verbindung mit Google den Kalender nicht lesen darf: Trenne unter **Einstellungen** → **Google-Zugang** die Verbindung und verbinde neu. Setze dabei auch das Häkchen für den Kalender.
 
 ## Benachrichtigungen kommen nicht an
-Die Zeile **Push-Benachrichtigungen** der Ampel zeigt, ob der Server Benachrichtigungen senden kann. Fehlt etwas, kann das nur der Hoster nachrüsten. Liegt es am Gerät (abgelehnte Nachfrage, iPhone ohne installierte App), hilft [Benachrichtigungen](seite:benachrichtigungen).
+- Die Zeile **Push-Benachrichtigungen** der Ampel zeigt, ob der Server Benachrichtigungen senden kann. Fehlt dort etwas, kann das nur der Hoster nachrüsten.
+- Liegt es am Gerät (abgelehnte Nachfrage des Browsers, iPhone ohne installierte App), hilft [Benachrichtigungen](seite:benachrichtigungen).
 
 ## Updates kommen nicht an
-Unter **Verwaltung → Einstellungen → Zustand und Updates** steht unter **Updates**, was zuletzt passiert ist und warum eine neue Version nicht eingespielt werden kann. Häufig:
-- **Automatische Updates sind gesperrt** (mit WordPress z. B. in den Einstellungen der Webseite): Neue Versionen hier von Hand einspielen.
-- **WordPress fragt nach FTP-Zugangsdaten**: WordPress darf die Plugin-Dateien nicht selbst schreiben. Der Hoster muss die Dateirechte anpassen, oder du lädst das Update von Hand hoch.
+Unter **Verwaltung** → **Einstellungen** → **Zustand und Updates** steht unter **Updates**, was zuletzt passiert ist und warum eine neue Version nicht eingespielt werden kann. Häufige Gründe:
+- **Automatische Updates sind gesperrt** (mit WordPress z. B. in den Einstellungen der Webseite): Spiel neue Versionen dort von Hand ein.
+- **Zu wenig Speicherplatz**: Die Zeile **Server** wird gelb, wenn weniger als 200 MB frei sind. Schaffe Platz oder erweitere das Paket beim Hoster.
 - **Zu alte PHP- oder WordPress-Version**: PHP lässt sich meist im Kundenmenü des Hosters umstellen; WordPress zuerst aktualisieren.
-- **Ohne WordPress darf PHP die Programmdateien nicht ändern**: beim Hoster die Dateirechte prüfen oder `install.php` erneut hochladen und **Aktualisieren / Reparieren** wählen.
-- **Zu wenig Speicherplatz**: Die Zeile **Server** wird gelb, wenn weniger als 200 MB frei sind. Platz schaffen oder das Paket beim Hoster erweitern.
 
-Mehr dazu unter [Updates und Datensicherung](seite:admin-updates-und-sicherung).
+> **Für Fortgeschrittene:** Fragt WordPress nach FTP-Zugangsdaten, darf es die Plugin-Dateien nicht selbst schreiben; der Hoster muss die Dateirechte anpassen, oder du lädst das Update von Hand hoch. Ohne WordPress: Darf PHP die Programmdateien nicht ändern, prüfe beim Hoster die Dateirechte oder lade `install.php` erneut hoch und wähle **Aktualisieren / Reparieren**.
 
-## Hintergrundaufgaben laufen nicht (ohne WordPress)
-Ohne Cronjob laufen Abgleiche und Updates nur, wenn jemand die App aufruft. Ist die Zeile **Hintergrundaufgaben** gelb oder rot, richte beim Hoster einen Cronjob ein, der alle 15 Minuten die dort genannte Adresse aufruft.
+Mehr dazu unter [Datensicherung](seite:admin-updates-und-sicherung).
+
+## Die Zeile „Hintergrundaufgaben“ ist gelb oder rot (ohne WordPress)
+Abgleiche und Updates laufen dann nur, wenn jemand die App aufruft.
+
+> **Für Fortgeschrittene:** Richte beim Hoster einen Cronjob ein, der alle 15 Minuten die Adresse aufruft, die in der Zeile **Hintergrundaufgaben** steht.
 
 ## Die Zeile „Schutz der Daten“ ist rot (ohne WordPress)
-Dann sind Dateien mit Daten aus dem Internet abrufbar, weil der Webserver die Sperre nicht auswertet. Lass sofort beim Hoster das Verzeichnis `data` sperren oder lege die Daten außerhalb des Web-Verzeichnisses ab.
+Dann sind Dateien mit Daten aus dem Internet abrufbar. Handle sofort.
+
+> **Für Fortgeschrittene:** Der Webserver wertet die Sperre des Datenverzeichnisses nicht aus. Lass beim Hoster das Verzeichnis `data` sperren oder lege die Daten außerhalb des Web-Verzeichnisses ab.
 
 ## Nichts davon hilft
-Ist unter der Ampel bei **Hilfe** eine Kontaktadresse hinterlegt, melde dich dort. Haben die Statusmeldungen eure Zustimmung, sehen die Betreuer schwere Fehler oft schon von selbst.
+- Ist unter der Ampel bei **Hilfe** eine Kontaktadresse hinterlegt, melde dich dort.
+- Oder melde den Fehler direkt aus der App, siehe [Fehler melden](seite:fehler-melden).
+- Haben die Statusmeldungen eure Zustimmung, sehen die Betreuer schwere Fehler oft schon von selbst.

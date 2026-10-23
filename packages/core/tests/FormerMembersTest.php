@@ -201,6 +201,33 @@ final class FormerMembersTest extends TestCase
         $this->assertTrue($res->data['rows'][1]['existing']['former']);
     }
 
+    public function testCreateSingle(): void
+    {
+        $office = $this->call('POST', '/offices', ['title' => 'Vorsitz'])->data['id'];
+        $this->call('POST', "/offices/$office/terms", ['kind' => 'period', 'start_year' => 1975, 'end_year' => 1980, 'holders' => [['name' => 'max beispiel']]]);
+        $count = count($this->users->users);
+
+        $this->assertSame(400, $this->call('POST', '/members/former', ['first_name' => '', 'reason' => 'left'])->status, 'ohne Vornamen');
+        $this->assertSame(400, $this->call('POST', '/members/former', ['first_name' => 'Max', 'reason' => 'weg'])->status, 'ohne gültigen Grund');
+        $this->assertSame(400, $this->call('POST', '/members/former', ['first_name' => 'Max', 'reason' => 'left', 'joined_on' => '1990', 'left_on' => '1980'])->status, 'Eintritt nach Ausscheiden');
+        $this->assertCount($count, $this->users->users, 'nichts angelegt');
+
+        $res = $this->call('POST', '/members/former', ['first_name' => ' Max ', 'last_name' => 'Beispiel', 'reason' => 'deceased', 'joined_on' => '1974', 'founder' => true, 'left_on' => '14.11.1991']);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $id = $res->data['id'];
+        $this->assertSame(['Max Beispiel', 'deceased', '1974', true, '1991-11-14', 1], [$res->data['name'], $res->data['reason'], $res->data['joined_on'], $res->data['founder'], $res->data['left_on'], $res->data['offices_linked']]);
+        $this->assertSame(Roles::GUEST, $this->users->find($id)?->role, 'ohne Anmeldung');
+        $this->assertNotContains($id, $this->memberIds());
+        $this->assertSame([$id], array_column($this->call('GET', '/members/former')->data, 'id'));
+        $this->assertSame($id, (int) $this->app->db->select('SELECT user_id FROM {office_holders}')[0]['user_id'], 'Amtszeit verknüpft');
+
+        $again = $this->call('POST', '/members/former', ['first_name' => 'max', 'last_name' => 'beispiel', 'reason' => 'left']);
+        $this->assertSame(400, $again->status, 'nicht doppelt');
+        $this->assertStringContainsString('ehemalige Person', (string) json_encode($again->data, JSON_UNESCAPED_UNICODE));
+        $this->users->users[$this->m]['name'] = 'Erika Muster';
+        $this->assertSame(400, $this->call('POST', '/members/former', ['first_name' => 'Erika', 'last_name' => 'Muster', 'reason' => 'left'])->status, 'Name eines aktiven Kontos');
+    }
+
     public function testImportLinksFreeNamesInOffices(): void
     {
         $office = $this->call('POST', '/offices', ['title' => 'Vorsitz'])->data['id'];

@@ -469,6 +469,17 @@ export interface FormerInput {
   left_on: string;
 }
 
+/** Neu angelegte ehemalige Person (POST /members/former) */
+export interface CreatedFormer extends FormerInfo {
+  id: number;
+  name: string;
+  /** Einträge in Amtszeiten (nur freier Name), die mit dem Konto verknüpft wurden */
+  offices_linked: number;
+  /** Person angelegt, aber Geburtstag bzw. Foto nicht übernommen */
+  warning?: string;
+  photo_url?: string | null;
+}
+
 /** Zeile der Vorschau beim Import der Ehemaligen */
 export interface FormerImportRow {
   line: number;
@@ -1312,6 +1323,8 @@ export const api = {
   markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
   updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
   reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
+  createFormer: (data: PersonName & FormerInput & { birthday?: string; photo?: EncodedFile }) =>
+    request<CreatedFormer>('POST', '/members/former', data),
   importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
   importMembers: (csv: string, apply: boolean) => request<MemberImportResult>('POST', '/members/import', { csv, apply }),
   createUser: (
