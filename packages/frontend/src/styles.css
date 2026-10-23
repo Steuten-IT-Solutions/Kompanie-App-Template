@@ -96,17 +96,26 @@ select {
 }
 @media (max-width: 430px) {
   .topbar {
-    gap: 10px;
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .topbar .logo {
+    height: 42px;
   }
   .topbar-title {
     letter-spacing: 0.03em;
   }
-  .topbar .topbar-help {
-    margin-right: 0;
+  /* Teilen, Hilfe, Darstellung und „Login“ nebeneinander: Platz für den Titel lassen */
+  .topbar .topbar-help,
+  .topbar .topbar-share,
+  .topbar .topbar-theme {
+    width: 30px;
+    height: 30px;
   }
   .topbar .topbar-account {
-    padding: 6px 11px;
-    letter-spacing: 0.06em;
+    padding: 6px 9px;
+    letter-spacing: 0.04em;
   }
 }
 .topbar-sub {
@@ -132,7 +141,9 @@ select {
   color: var(--on-accent);
   border-color: var(--accent);
 }
-.topbar .topbar-help {
+.topbar .topbar-help,
+.topbar .topbar-share,
+.topbar .topbar-theme {
   color: var(--on-primary);
   font-weight: 700;
   font-size: 1rem;
@@ -141,7 +152,6 @@ select {
   height: 32px;
   min-height: 0;
   padding: 0;
-  margin-right: 8px;
   flex: none;
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
@@ -604,6 +614,52 @@ select {
     transform: rotate(360deg);
   }
 }
+/* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
+ * steht wie der echte Inhalt; Text als graue Balken, alles entfärbt und nicht bedienbar. */
+.skeleton,
+.skeleton-parts {
+  display: contents;
+}
+.skeleton-parts > * {
+  filter: grayscale(1);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-parts > * {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.skeleton-text {
+  display: inline-block;
+  max-width: 100%;
+  height: 0.7em;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.2;
+  vertical-align: middle;
+}
+.skeleton-box {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 6px;
+  background: var(--line);
+  vertical-align: middle;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .error {
   background: #f6dcd3;
   color: #6b1d0d;
@@ -631,7 +687,7 @@ select {
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
-  z-index: 20;
+  z-index: 60; /* auch über Fenstern (Sheet) und der Foto-Ansicht */
   background: #1d1f24;
   color: #fff;
   padding: 11px 16px 11px 14px;
@@ -794,14 +850,16 @@ select {
   width: 100%;
   margin: 14px 0;
 }
-.member-name {
+.member-name,
+.member-peek-name {
   margin: 4px 0 14px;
   font-family: var(--font-head);
   font-weight: 700;
   font-size: 1.6rem;
   letter-spacing: 0.02em;
 }
-.member-name.with-rank {
+.member-name.with-rank,
+.member-peek-name.with-rank {
   margin-bottom: 4px;
 }
 /* Mitgliedsdetails: Name mittig */
@@ -835,8 +893,221 @@ select {
   height: 96px;
   font-size: 1.8rem;
 }
+/* Abzeichen antippen: befördern oder degradieren (Fenster); ohne Dienstgrad ein Kreis mit „+“ in Größe des Abzeichens */
+.member-rank-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.rank-badge-none {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px dashed var(--line-strong);
+  color: var(--accent-text);
+  font-size: 2rem;
+}
+/* Mitgliedsdetails: Kacheln antippbar, darunter Titel, Ämter, Daten und „Konto und Rolle“ */
+.member-stats {
+  margin-bottom: 12px;
+}
+.stat-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.stat-button > span {
+  display: block;
+}
+.member-tile,
+.member-date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px 13px 16px;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+button.member-tile,
+button.member-date {
+  cursor: pointer;
+}
+.member-tile {
+  margin-bottom: 12px;
+}
+.member-tile-label,
+.member-date-label {
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.member-tile-value,
+.member-date-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+.member-offices .section-title {
+  margin-top: 18px;
+}
+.member-dates {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+.member-dates li + li {
+  border-top: 1px solid var(--line);
+}
+.member-date {
+  border: 0;
+  background: none;
+}
+/* Fenster über der Seite (ui.tsx, Sheet): auf dem Handy von unten, ab 560 px mittig */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+.sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(92vh / var(--kompanie-zoom, 1));
+  border-radius: 18px 18px 0 0;
+  border-top: 2px solid var(--accent);
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 -8px 30px rgb(0 0 0 / 35%);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 10px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sheet-close {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px calc(20px + env(safe-area-inset-bottom));
+}
+/* Die Überschrift des Inhalts steht schon oben im Fenster. */
+.sheet-body > :first-child > h3.section-title:first-child {
+  display: none;
+}
+@media (min-width: 560px) {
+  .sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+  .sheet {
+    border-radius: 18px;
+    border: 2px solid var(--accent);
+  }
+}
+/* Foto ersetzen und entfernen in der vergrößerten Ansicht, unter dem Bild */
+.member-photo-zoom .member-photo {
+  justify-content: center;
+  margin: 0;
+}
 .back {
   margin-bottom: 4px;
+}
+/* Mitglied in der Verwaltung bzw. Seite einer Person im Tab „Mitglieder“: zurück zur Liste, daneben vorheriges und
+   nächstes (auch per Wischen). */
+.member-detail,
+.member-page {
+  /* Waagerecht wischt die App selbst; sonst blättert der Browser zusätzlich im Verlauf zurück oder vor. */
+  touch-action: pan-y pinch-zoom;
+  /* Karussell: Die Nachbarn stehen neben der Karte im Seitenrand und darüber hinaus; abgeschnitten wird erst am Rand
+     von .content, ohne dass die Seite seitlich scrollt. */
+  margin: 0 -16px;
+  padding: 0 16px;
+  overflow-x: clip;
+}
+/* Gewischt wird auch auf der leeren Fläche um die Seite (swipe.ts), etwa unter dem kurzen Gerüst beim Laden. */
+.app:has(.member-detail, .member-page) {
+  touch-action: pan-y pinch-zoom;
+}
+/* Spur mit der Karte; beim Ziehen setzt swipe.ts den Versatz, beim Loslassen gleitet sie. */
+.member-track {
+  position: relative;
+  transition: transform 0.22s ease-out;
+}
+.member-track.peeking {
+  will-change: transform;
+}
+/* Nachbarn links und rechts, Abstand wie PEEK_GAP in swipe.ts */
+.member-peek {
+  position: absolute;
+  top: var(--peek-top, 0);
+  width: 100%;
+  pointer-events: none;
+}
+.member-peek-prev {
+  right: calc(100% + 32px);
+}
+.member-peek-next {
+  left: calc(100% + 32px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-track {
+    transition: none;
+  }
+}
+.member-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.member-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.member-step .btn-link {
+  min-width: 40px;
+  font-size: 1.3rem;
+  line-height: 1;
 }
 .add-member {
   margin-top: 14px;
@@ -916,6 +1187,7 @@ select {
 input[type='text'],
 input[type='number'],
 input[type='date'],
+input[type='datetime-local'],
 input[type='search'],
 input[type='email'],
 input[type='password'],
@@ -1539,6 +1811,9 @@ code {
 .install-konto {
   margin-top: 12px;
 }
+.theme-choice {
+  margin: 12px 0 0;
+}
 
 @media (prefers-color-scheme: dark) {
   .install-warn {
@@ -1626,7 +1901,8 @@ code {
   flex: none;
   color: var(--accent-text);
 }
-.admin-menu-current {
+.admin-menu-current,
+.member-peek-menu-current {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1667,6 +1943,51 @@ code {
   background: var(--primary);
   color: var(--accent-on-primary);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 560px) {
+  .admin-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.admin-tiles li {
+  display: flex;
+}
+.admin-tile {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 112px;
+  padding: 16px 10px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  transition: transform 0.08s ease;
+}
+.admin-tile:active {
+  transform: scale(0.98);
+}
+.admin-tile svg {
+  flex: none;
+  color: var(--accent-text);
 }
 
 /* Übersicht der Einstellungen: je Seite eine Zeile */
@@ -1785,6 +2106,24 @@ fieldset.feature-list legend {
   border-left: 4px solid var(--accent);
   padding: 10px 14px;
   border-radius: 6px;
+}
+.hilfe-text .hilfe-bild {
+  margin: 14px 0 18px;
+  text-align: center;
+}
+.hilfe-text .hilfe-bild img {
+  display: block;
+  margin: 0 auto;
+  max-width: min(100%, 320px);
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow, 0 2px 10px rgba(0, 0, 0, 0.12));
+}
+.hilfe-text .hilfe-bild figcaption {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 6px;
 }
 .hilfe-web {
   margin-top: 18px;
@@ -2037,9 +2376,6 @@ fieldset.feature-list legend {
 .account-card .member-avatar-large {
   margin-bottom: 8px;
 }
-.my-overview-rank {
-  margin: 8px 0 0;
-}
 
 /* Abzeichen der Dienstgrade (Issue #17): ohne eigenen Hintergrund, Rahmen oder Farbfilter, damit transparente
  * Abzeichen direkt auf der Fläche dahinter stehen (hell wie dunkel). Höhe fest, Breite nach Seitenverhältnis. */
@@ -2175,16 +2511,6 @@ fieldset.feature-list legend {
 .badge-title,
 .badge-name {
   text-transform: none;
-}
-.my-overview .stats {
-  margin-bottom: 16px;
-}
-.my-titles .title-badges {
-  margin: 6px 0 0;
-}
-.my-titles .badge-title {
-  font-size: 0.85rem;
-  padding: 2px 11px;
 }
 .member-titles .toggle {
   display: flex;
@@ -2374,7 +2700,7 @@ fieldset.feature-list legend {
   gap: 10px;
 }
 
-/* Dokumente (Issue #2): Kategorien einklappbar, Kopf in der Optik von .section-title. */
+/* Dokumente (Issue #2): Kategorien einklappbar (FoldSection, siehe unten). */
 .doc-card {
   padding: 14px 16px 2px;
 }
@@ -2417,10 +2743,11 @@ fieldset.feature-list legend {
 .doc-group + .doc-group {
   margin-top: 6px;
 }
-.doc-group-title {
+/* Einklappbarer Abschnitt (ui.tsx, FoldSection): Dokument-Kategorien und „Konto und Rolle“ in den Mitgliedsdetails */
+.doc-group .fold-title {
   margin: 10px 2px;
 }
-.doc-group-toggle {
+.fold-toggle {
   flex: 0 1 auto;
   min-width: 0;
   min-height: 44px;
@@ -2438,21 +2765,21 @@ fieldset.feature-list legend {
   color: inherit;
   text-align: center;
 }
-.doc-group-arrow {
+.fold-arrow {
   flex: none;
   display: inline-block;
   font-size: 1.3rem;
   line-height: 1;
   transition: transform 0.15s ease;
 }
-.doc-group-toggle[aria-expanded='true'] .doc-group-arrow {
+.fold-toggle[aria-expanded='true'] .fold-arrow {
   transform: rotate(90deg);
 }
-.doc-group-body {
+.fold-body {
   margin-bottom: 18px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .doc-group-arrow {
+  .fold-arrow {
     transition: none;
   }
 }
@@ -3643,7 +3970,8 @@ button.spotlight-person:focus-visible {
   margin: 4px 0 8px;
   text-align: center;
 }
-.member-page-head .member-name {
+.member-page-head .member-name,
+.member-page-head .member-peek-name {
   margin: 6px 0 0;
 }
 .member-page-titles {

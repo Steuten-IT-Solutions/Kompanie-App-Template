@@ -1014,10 +1014,22 @@ final class Migrations
                 'mysql' => ["ALTER TABLE {join_years} ADD COLUMN joined_on varchar(10) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {join_years} ADD COLUMN joined_on TEXT NOT NULL DEFAULT ''"],
             ],
+            // Seite in der Mitgliederliste: Standard ist jetzt „Mitgliedern anzeigen“ (members). Auch bestehende Geburtstage
+            // und Eintritte mit none stellen auf members um (neue Einträge setzt das Programm selbst auf members).
+            23 => [
+                'mysql' => [
+                    "UPDATE {birthdays} SET profile = 'members' WHERE profile = 'none'",
+                    "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
+                ],
+                'sqlite' => [
+                    "UPDATE {birthdays} SET profile = 'members' WHERE profile = 'none'",
+                    "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
+                ],
+            ],
             // Fotos der Mitglieder zusätzlich in Originalauflösung (höchstens MemberPhotoService::MAX_EDGE) für die
             // Großansicht, die sie nach der 1024er nachlädt. Ohne Vorgabe (NULL): Fotos von vorher haben sie erst nach
             // erneutem Hochladen, ebenso wenn die Datenbank das große Foto nicht annimmt (max_allowed_packet).
-            23 => [
+            24 => [
                 'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN original mediumtext DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN original TEXT DEFAULT NULL'],
             ],

@@ -67,7 +67,8 @@ final class DirectoryTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
 
         $entry = array_column($this->as(null)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'birthday', 'join_year'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'candidate_role', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'birthday', 'join_year', 'join_date'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertNull($entry['candidate_role'], 'Mitglieder ohne Rollenname');
         $this->assertNull($entry['birthday'], 'ohne Freigabe kein Geburtstag');
         $this->assertNull($entry['join_year'], 'ohne Freigabe kein Eintrittsjahr');
         $this->assertSame('Gefreiter', $entry['rank_title']);
@@ -76,7 +77,22 @@ final class DirectoryTest extends TestCase
         $this->users->current = $this->admin;
         $this->app->features()->update(['ranks' => false, 'titles' => false, 'birthdays' => false]);
         $entry = array_column($this->as($this->m)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'join_year'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad, keine Titel und kein Geburtstag');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'candidate_role', 'photo_url', 'join_year', 'join_date'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad, keine Titel und kein Geburtstag');
+    }
+
+    public function testCandidatesShowTheirRoleName(): void
+    {
+        // Rolle mit „Als Mitglied aufnehmen“ (z. B. Anwärter): ihr Name steht in der Liste, auch ohne Anmeldung.
+        $label = $this->app->roles()->find(TestApp::candidateRole($this->app))['label'] ?? null;
+        $byId = array_column($this->as(null)->data, null, 'id');
+        $this->assertIsString($label);
+        $this->assertSame($label, $byId[$this->candidate]['candidate_role']);
+        $this->assertNull($byId[$this->admin]['candidate_role']);
+
+        // Ohne das Häkchen kein Rollenname mehr
+        $this->users->current = $this->admin;
+        $this->app->roles()->update(TestApp::candidateRole($this->app), ['promotable' => false]);
+        $this->assertNull(array_column($this->as(null)->data, null, 'id')[$this->candidate]['candidate_role']);
     }
 
     public function testCountsPerGroupWithoutRolesPerPerson(): void
@@ -105,7 +121,7 @@ final class DirectoryTest extends TestCase
         return $this->call('GET', '/directory/counts');
     }
 
-    public function testFormerMembersPublicWithYearsOnly(): void
+    public function testFormerMembersPublicWithDatesButNoReason(): void
     {
         $title = $this->call('POST', '/titles', ['title' => 'Ehrenmitglied'])->data['id'];
         $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$title]]);
@@ -121,8 +137,8 @@ final class DirectoryTest extends TestCase
             $this->assertSame([$this->m], array_column($res->data, 'id'));
         }
         $entry = $res->data[0];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'founder', 'joined_year', 'left_year', 'photo_url', 'rank_title', 'rank_badge_url', 'titles'], array_keys($entry), 'kein Grund, keine genauen Daten');
-        $this->assertSame([true, '1993', '2016'], [$entry['founder'], $entry['joined_year'], $entry['left_year']]);
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'founder', 'joined_year', 'left_year', 'joined_on', 'left_on', 'photo_url', 'rank_title', 'rank_badge_url', 'titles'], array_keys($entry), 'kein Grund');
+        $this->assertSame([true, '1993', '2016', '1993-05-03', '2016-06-30'], [$entry['founder'], $entry['joined_year'], $entry['left_year'], $entry['joined_on'], $entry['left_on']], 'Daten wie eingetragen, dazu die Jahre');
         $this->assertSame([['id' => $title, 'title' => 'Ehrenmitglied']], $entry['titles']);
 
         // In den Ämtern öffnet der Name die Seite der Person, auch ohne Anmeldung (wie bei Personen der Liste).
@@ -136,7 +152,8 @@ final class DirectoryTest extends TestCase
         // Ohne Daten bleiben die Jahre leer; wieder aufgenommen steht die Person nicht mehr bei den Ehemaligen.
         $this->users->current = $this->admin;
         $this->call('PATCH', "/members/{$this->m}/former", ['joined_on' => '', 'left_on' => '']);
-        $this->assertSame(['', ''], [$this->call('GET', '/directory/former')->data[0]['joined_year'], $this->call('GET', '/directory/former')->data[0]['left_year']]);
+        $f = $this->call('GET', '/directory/former')->data[0];
+        $this->assertSame(['', '', '', ''], [$f['joined_year'], $f['left_year'], $f['joined_on'], $f['left_on']]);
         $this->call('DELETE', "/members/{$this->m}/former");
         $this->assertSame([], $this->call('GET', '/directory/former')->data);
     }
@@ -149,9 +166,18 @@ final class DirectoryTest extends TestCase
         $this->users->current = $this->m;
         $this->assertSame(200, $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'year' => 1988, 'show_age' => true])->status);
         $this->assertSame(200, $this->call('PUT', '/me/join-year', ['year' => 2005])->status);
+        $this->assertSame(2005, $entry($this->m)['join_year'], 'Standard: nur Mitgliedern');
+        $this->assertSame([3, 12], [$entry($this->m)['birthday']['month'], $entry($this->m)['birthday']['day']], 'Standard: nur Mitgliedern');
+        $this->assertNull($entry(null)['birthday'], 'Standard: nicht öffentlich');
+        $this->assertNull($entry(null)['join_year'], 'Standard: nicht öffentlich');
+
+        // Nicht anzeigen: niemand sieht es auf der Seite.
+        $this->users->current = $this->m;
+        $this->call('PUT', '/me/birthday', ['month' => 3, 'day' => 12, 'profile' => 'none']);
+        $this->call('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'none']);
         foreach ([$this->m, null] as $viewer) {
-            $this->assertNull($entry($viewer)['birthday'], 'Standard: nicht auf der Seite');
-            $this->assertNull($entry($viewer)['join_year'], 'Standard: nicht auf der Seite');
+            $this->assertNull($entry($viewer)['birthday']);
+            $this->assertNull($entry($viewer)['join_year']);
         }
 
         // Nur Mitgliedern: angemeldete Mitglieder (Recht member) sehen es, Anwärter, Gäste und Besucher nicht.
@@ -196,6 +222,7 @@ final class DirectoryTest extends TestCase
         $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left']);
         $this->users->current = null;
         $this->assertArrayNotHasKey('join_year', $this->call('GET', '/directory/former')->data[0]);
+        $this->assertArrayNotHasKey('join_date', $this->call('GET', '/directory/former')->data[0]);
         $this->users->current = $this->admin;
         $this->assertSame(200, $this->call('DELETE', "/members/{$this->m}")->status);
         $this->assertNull($this->app->joinYears()->of($this->m));
@@ -209,7 +236,7 @@ final class DirectoryTest extends TestCase
             $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => $year])->status, (string) json_encode($year));
         }
         $this->assertSame(400, $this->call('PUT', '/me/join-year', ['year' => 2000, 'profile' => 'alle'])->status);
-        $this->assertSame(['year' => 1800, 'date' => '1800', 'profile' => 'none'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
+        $this->assertSame(['year' => 1800, 'date' => '1800', 'profile' => 'members'], $this->call('PUT', '/me/join-year', ['year' => '1800'])->data['join_year']);
         $this->assertSame(403, $this->call('PUT', "/members/{$this->admin}/join-year", ['year' => 2000])->status, 'fremdes nur mit create_users');
         $this->users->current = $this->candidate;
         $this->assertSame(403, $this->call('PUT', '/me/join-year', ['year' => 2000])->status, 'nur Mitglieder');
@@ -223,9 +250,16 @@ final class DirectoryTest extends TestCase
         $put = fn (array $body): Response => $this->call('PUT', '/me/join-year', $body);
         $this->assertSame(['year' => 2005, 'date' => '2005-03-12', 'profile' => 'public'], $put(['date' => '12.3.2005', 'profile' => 'public'])->data['join_year']);
         $this->assertSame('2005-03-12', $put(['date' => '2005-03-12'])->data['join_year']['date'], 'auch JJJJ-MM-TT');
-        // Auf der Seite in der Mitgliederliste nur das Jahr, wie bei den Ehemaligen
-        $this->assertSame(2005, array_column($this->as(null)->data, null, 'id')[$this->m]['join_year']);
-        $this->assertStringNotContainsString('03-12', (string) json_encode($this->as(null)->data));
+        // Auf der Seite in der Mitgliederliste das ganze Datum, wie eingetragen (dazu das Jahr für ältere Apps)
+        $public = array_column($this->as(null)->data, null, 'id')[$this->m];
+        $this->assertSame([2005, '2005-03-12'], [$public['join_year'], $public['join_date']]);
+        $this->users->current = $this->m;
+        $put(['date' => '2005', 'profile' => 'members']);
+        $own = array_column($this->as($this->m)->data, null, 'id')[$this->m];
+        $this->assertSame([2005, '2005'], [$own['join_year'], $own['join_date']], 'nur das Jahr eingetragen: nur das Jahr');
+        $this->assertSame([null, null], [array_column($this->as(null)->data, null, 'id')[$this->m]['join_year'], array_column($this->as(null)->data, null, 'id')[$this->m]['join_date']], 'nicht freigegeben: weder Jahr noch Datum');
+        $this->users->current = $this->m;
+        $put(['date' => '2005-03-12', 'profile' => 'public']);
         // Verwaltung: ganzes Datum in Liste und Details
         $this->users->current = $this->admin;
         $this->assertSame('2005-03-12', array_column($this->call('GET', '/members')->data, null, 'id')[$this->m]['joined_on']);

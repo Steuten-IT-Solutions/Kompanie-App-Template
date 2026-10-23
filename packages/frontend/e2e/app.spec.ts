@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { devices, expect, test, type Page } from '@playwright/test';
+import { strToU8, zipSync } from 'fflate';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -13,11 +14,17 @@ const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 /** Tab für Punkte und Strafen */
 const MANAGER = 'Verwaltung';
 
-/** Menü der Verwaltung (Burger-Menü) aufklappen und einen Bereich wählen. */
+/** Bereiche, die unter „Einrichtungen“ stehen, sobald es davon mindestens zwei gibt. */
+const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter'];
+
+/** Startseite der Verwaltung (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (ggf. über „Einrichtungen“). */
 async function adminMenu(page: Page, name: string) {
-  const nav = page.getByRole('navigation', { name: 'Verwaltung' });
-  await nav.locator('.admin-menu-toggle').click();
-  await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  const tiles = page.locator('.admin-tiles');
+  const setup = tiles.getByRole('button', { name: 'Einrichtungen', exact: true });
+  await tiles.waitFor();
+  if (SETUP.includes(name) && (await setup.count()) > 0) await setup.click();
+  await tiles.getByRole('button', { name, exact: true }).click();
 }
 
 /** Bereich unter „Meins“ wählen (Burger-Menü). */
@@ -27,11 +34,26 @@ async function meinsMenu(page: Page, name: string) {
   await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
 }
 
-/** Seite eines Mitglieds in der Verwaltung wählen (zweites Menü unter dem Namen). */
-async function memberMenu(page: Page, name: string) {
-  const nav = page.locator('.member-menu');
-  await nav.locator('.admin-menu-toggle').click();
-  await nav.locator('.admin-menu-list').getByRole('button', { name, exact: true }).click();
+/** Konto öffnen: „Meins“ und dort „Konto“ (ohne eigene Daten unter „Meins“ steht das Konto gleich da). */
+async function openKonto(page: Page) {
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  const menu = page.locator('.meins-menu');
+  const logout = page.getByRole('button', { name: 'Abmelden' });
+  await expect(menu.or(logout)).toBeVisible();
+  if (await menu.count()) await meinsMenu(page, 'Konto');
+  await expect(logout).toBeVisible();
+}
+
+/** Auf der Seite eines Mitglieds in der Verwaltung „Konto und Rolle“ aufklappen (ganz unten). */
+async function memberAccount(page: Page) {
+  const toggle = page.locator('.member-account .fold-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+}
+/** Auf der Seite eines Mitglieds die Kachel „Offen“ antippen: Fenster mit Formular und Einträgen der Kasse. */
+async function memberPenalties(page: Page) {
+  await page.locator('.member-stats .stat-button', { hasText: 'Offen' }).click();
+  await expect(page.getByRole('dialog', { name: 'Kasse' })).toBeVisible();
 }
 /** Zählt beantwortete Aufrufe zum Speichern einer Reihenfolge (PUT …/order), um vor dem Neuladen darauf zu warten. */
 function countOrderSaves(page: Page, path: string) {
@@ -69,10 +91,10 @@ async function login(page: Page, user: string, password = PASSWORD) {
   await page.context().clearCookies();
   await page.goto('/app/');
   // Gäste sehen die öffentliche Ansicht; angemeldet wird über den Knopf in der Kopfleiste.
-  await page.locator('.topbar').getByRole('button', { name: 'Anmelden' }).click();
+  await page.locator('.topbar').getByRole('button', { name: 'Login' }).click();
   await fillLogin(page, user, password);
   await expect(page).toHaveURL(/\/app\/?(#.*)?$/);
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 }
 
 async function shot(page: Page, name: string) {
@@ -118,7 +140,7 @@ test('Mitglied sieht Termine, aber keine Verwaltung', async ({ page }) => {
 
 test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ page }) => {
   await login(page, 'verwalter');
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await shot(page, '5-verwaltung-mitglieder');
 
   await adminMenu(page, 'Punktekatalog');
@@ -155,19 +177,54 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await expect(page.locator('.stat', { hasText: 'Offen gesamt' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
   await expect(page.locator('.member-name')).toHaveText('Mitglied1');
-  await memberMenu(page, 'Kasse');
-  await page.locator('.row', { hasText: 'Handy klingelt <10 min' }).getByRole('button', { name: 'Bezahlt' }).click();
+  // Antippen der Kachel: Formular nur für diese Person und ihre Einträge
+  await memberPenalties(page);
+  const sheet = page.getByRole('dialog', { name: 'Kasse' });
+  await expect(sheet.getByLabel('Mitglied1')).toHaveCount(0);
+  await sheet.locator('.row', { hasText: 'Handy klingelt <10 min' }).getByRole('button', { name: 'Bezahlt' }).click();
   await expect(page.locator('.toast')).toHaveText('Als bezahlt markiert');
-  await memberMenu(page, 'Übersicht');
-  await expect(page.locator('.stat', { hasText: 'Offen' }).locator('.stat-value')).toContainText('2,50');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(page).toHaveURL(/\/mitglied\/\d+$/);
+  await expect(page.locator('.member-stats .stat', { hasText: 'Offen' }).locator('.stat-value')).toContainText('2,50');
   await shot(page, '7-verwaltung-mitglied');
+});
+
+test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im selben Fenster', async ({ page }) => {
+  await login(page, 'verwalter');
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  // Keine Knöpfe mehr unter den Kacheln und kein Menü unter dem Namen
+  await expect(page.getByRole('button', { name: 'Punkte vergeben' })).toHaveCount(0);
+  await expect(page.locator('.member-menu')).toHaveCount(0);
+  const before = Number(
+    (await page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value').textContent())!.replace(/\D/g, ''),
+  );
+  await page.locator('.member-stats .stat-button', { hasText: 'Punkte' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Punkte' });
+  await expect(page).toHaveURL(/\/mitglied\/\d+\/punkte$/);
+  await expect(sheet.getByLabel('Mitglied2')).toHaveCount(0);
+  await sheet.getByLabel('Punkte', { exact: true }).fill('3');
+  await sheet.getByLabel('Grund').fill('E2E Kachel');
+  await sheet.getByRole('button', { name: 'Punkte vergeben' }).click();
+  await expect(page.locator('.toast')).toHaveText('+3 Punkte an 1 Mitglied vergeben');
+  await expect(sheet.locator('.row', { hasText: 'E2E Kachel' })).toBeVisible();
+  await expect(sheet.getByLabel('Grund')).toHaveValue('');
+  await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before + 3));
+  // Wieder stornieren, damit die Summen anderer Tests stimmen
+  page.once('dialog', (d) => d.accept());
+  await sheet.locator('.row', { hasText: 'E2E Kachel' }).getByRole('button', { name: 'Stornieren' }).click();
+  await expect(page.locator('.toast')).toHaveText('Storniert');
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before));
 });
 
 test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stelle', async ({ page }) => {
   await login(page, 'verwalter');
   // Niedriges Fenster, damit die wenigen Testmitglieder schon scrollen.
   await page.setViewportSize({ width: 390, height: 360 });
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.getByLabel('Mitglied suchen').fill('Mitglied');
   const row = page.locator('.row', { hasText: 'Mitglied2' });
   await row.scrollIntoViewIfNeeded();
@@ -184,14 +241,374 @@ test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stel
 
   // Neu geöffnet beginnt die Liste wieder oben.
   await page.locator('.tabbar').getByRole('button', { name: 'Termine' }).click();
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await expect(page.getByLabel('Mitglied suchen')).toHaveValue('');
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+/** Waagerecht über den Namen auf der Seite eines Mitglieds wischen (Touch-Ereignisse über CDP, wie ein Finger). */
+async function swipe(page: Page, dx: number) {
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const cdp = await page.context().newCDPSession(page);
+  const { width } = page.viewportSize()!;
+  const x = width / 2 - dx / 2;
+  const y = box.y + box.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * f, y }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+test('Mitglied: Wischen blättert in der Liste, nicht aber in einem offenen Fenster', async ({ page }) => {
+  await login(page, 'verwalter');
+  await adminMenu(page, 'Mitglieder');
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await expect(page.getByRole('button', { name: 'Vorheriges Mitglied' })).toBeEnabled();
+
+  // Nach links: nächstes Mitglied.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  // Karussell: Nach dem letzten kommt wieder das erste.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+
+  // Nach rechts vom ersten zum letzten; mit den Pfeilen ebenso im Kreis.
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await page.getByRole('button', { name: 'Vorheriges Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Im offenen Fenster blättert Wischen nicht; „Zurück“ schließt erst das Fenster, dann geht es zur Liste (Wischen legt
+  // keine Einträge im Verlauf an).
+  await memberPenalties(page);
+  await expect(page).toHaveURL(/\/strafen$/);
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/mitglied\/\d+$/);
+  await page.goBack();
+  await expect(page.getByLabel('Mitglied suchen')).toHaveValue('Mitglied');
+});
+
+test('Mitglied: Beim Wischen steht der Nachbar schon daneben, gewechselt wird ohne Laden', async ({ page }) => {
+  await login(page, 'verwalter');
+  await adminMenu(page, 'Mitglieder');
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  // Erst die eigene Seite fertig laden lassen (z. B. die Ämter), sonst zählt deren „Lädt …“ als Laden beim Wechsel.
+  await expect(page.locator('[data-loading]')).toHaveCount(0);
+  // Merken, ob irgendwann „Lädt …“ bzw. das Gerüst erscheint.
+  await page.evaluate(() => {
+    const w = window as unknown as { sawLoading: boolean };
+    w.sawLoading = false;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-loading]')) w.sawLoading = true;
+    }).observe(document.body, { subtree: true, childList: true });
+  });
+
+  // Finger noch auf dem Bildschirm: Die Karte ist verschoben, rechts daneben steht schon das nächste Mitglied.
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 + 60;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [-20, -60, -120]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  }
+  await expect(page.locator('.member-peek-next .member-peek-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-peek-next .member-step')).toContainText('2 / 2');
+  // Touch-Bewegungen kommen erst mit dem nächsten Bild an, daher warten statt sofort lesen.
+  await expect.poll(() => page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('translateX(-120px)');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-peek')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { sawLoading: boolean }).sawLoading)).toBe(false);
+
+  // Nur kurz gezogen: Die Karte schnappt zurück, es bleibt beim selben Mitglied.
+  await swipe(page, 30);
+  await expect(page.locator('.member-peek')).toHaveCount(0);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  expect(await page.locator('.member-track').evaluate((el) => el.style.transform)).toBe('');
+});
+
+test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neustart)', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const last = `Altwisch${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.evaluate(async (last) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const headers = { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' };
+    const csv = `vorname;nachname;eintritt;ausgeschieden;grund\nAnton;${last};1970;2000;ausgetreten\nBerta;${last};1980;2010;ausgetreten`;
+    await fetch(cfg.apiBase + 'members/former/import', {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ csv, apply: true }),
+    });
+  }, last);
+  // Gemerkte Sortierung aus anderen Tests weg: nach Nachname, dann Vorname
+  await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
+  await adminMenu(page, 'Ehemalige');
+  // Filter und Sortierung sind wie in der Mitgliederliste zunächst eingeklappt; ein gesetzter Filter zeigt „aktiv“.
+  const filters = page.getByRole('button', { name: 'Filter und Sortierung' });
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Nach Grund filtern')).toBeHidden();
+  await filters.click();
+  await expect(filters).toHaveAttribute('aria-expanded', 'true');
+  await page.getByLabel('Nach Grund filtern').selectOption('left');
+  await filters.click();
+  await expect(page.getByLabel('Nach Grund filtern')).toBeHidden();
+  await expect(filters).toContainText('aktiv');
+  await page.getByLabel('Ehemalige suchen').fill(last);
+  await page.locator('.row', { hasText: 'Anton' }).click();
+  await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText(`Berta ${last}`);
+  await expect(page).toHaveURL(/#\/verwaltung\/ehemalige\/\d+$/);
+
+  // Neu geladen (wie ein Link): ganze Liste der Ehemaligen in der gemerkten Sortierung
+  await page.reload();
+  await expect(page.locator('.member-name')).toHaveText(`Berta ${last}`);
+  await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
+  await page.getByRole('button', { name: 'Vorheriges Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText(`Anton ${last}`);
+
+  // Eintritt und Austritt unten auf der Seite; Antippen öffnet gleich das Formular zum Ändern.
+  const dates = page.locator('.member-dates');
+  await expect(dates.getByRole('button', { name: /^Eintritt/ })).toContainText('1970');
+  await expect(dates.getByRole('button', { name: /^Austritt/ })).toContainText('Ausgetreten 2000');
+  await dates.getByRole('button', { name: /^Austritt/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Austritt' });
+  await sheet.getByLabel('Ausgeschieden am (optional)').fill('2001');
+  await sheet.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(dates.getByRole('button', { name: /^Austritt/ })).toContainText('Ausgetreten 2001');
+
+  // Ebenso bei Mitgliedern
+  await page.goto('/app/#/verwaltung/mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await page.reload();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
+  await page.getByRole('button', { name: 'Nächstes Mitglied' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+});
+
+/** Anfragen nach den Daten einer Person (members/<id>), nicht nach Unterseiten wie members/<id>/points. */
+const MEMBER_DETAIL = /members\/(\d+)(?![\w/])/;
+
+test('Mitglied: Alle der Liste werden nacheinander vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
+  await login(page, 'verwalter');
+  const requested = new Set<string>();
+  page.on('request', (r) => {
+    const m = MEMBER_DETAIL.exec(r.url());
+    if (m && r.method() === 'GET') requested.add(m[1]);
+  });
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.member-row').first().click();
+  const step = (await page.locator('.member-step .muted').textContent()) ?? '';
+  const total = Number(/\/ (\d+)/.exec(step)?.[1]);
+  expect(total).toBeGreaterThan(2);
+  // Die Person selbst und alle anderen der Liste, eine nach der anderen
+  await expect.poll(() => requested.size, { timeout: 20_000 }).toBe(total);
+});
+
+test.describe('ohne Service Worker, Daten zurückgehalten', () => {
+  // page.route sieht Anfragen des Service Workers nicht
+  test.use({ serviceWorkers: 'block' });
+
+  test('Mitglied: Lädt die Seite noch, steht schon der Name da, und Wischen geht weiter', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    // Daten der Personen zurückhalten, bis der Test sie freigibt
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+    await expect(page.locator('.member-step')).toContainText('1 / 2');
+    await swipe(page, -200);
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await expect(page.locator('.member-step')).toContainText('2 / 2');
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await expect(page.locator('.member-level').first()).toContainText('Rolle');
+  });
+
+  test('Mitglied: Lädt die Seite noch, wischt auch die leere Fläche unter dem Gerüst', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    // Unten über der Tab-Leiste: dort steht beim Laden nichts mehr von der Seite, nur die leere Fläche darunter.
+    const { width, height } = page.viewportSize()!;
+    const y = height - 120;
+    const card = (await page.locator('.member-detail').boundingBox())!;
+    expect(card.y + card.height).toBeLessThan(y);
+    const cdp = await page.context().newCDPSession(page);
+    const x = width / 2 + 100;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (const dx of [-50, -100, -150, -200]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+  });
+
+  test('Mitglied: Kommen die Daten mitten im Wischen an, blättert die Geste trotzdem', async ({ page }) => {
+    await login(page, 'verwalter');
+    await adminMenu(page, 'Mitglieder');
+    await page.getByLabel('Mitglied suchen').fill('Mitglied');
+    await expect(page.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(MEMBER_DETAIL, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.row', { hasText: 'Mitglied1' }).click();
+    await expect(page.locator('[data-loading]')).not.toHaveCount(0);
+    // Finger auf den Namen im Gerüst, ein Stück ziehen; dann kommen die Daten, die Seite baut sich auf.
+    const box = (await page.locator('.member-name').boundingBox())!;
+    const x = page.viewportSize()!.width / 2 + 60;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - 40, y }] });
+    release();
+    await expect(page.locator('[data-loading]')).toHaveCount(0);
+    for (const dx of [-120, -200]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+    await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  });
+});
+
+test('Mitglieder (für alle): Liegt der Finger schon auf, während die Karte noch gleitet, blättert er danach weiter', async ({ page }) => {
+  await login(page, 'mitglied1');
+  await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page
+    .locator('.directory .member-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /Mitglied1/ })
+    .click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 + 80;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  const move = async (dx: number) => cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  // Erster Wisch: Die Karte gleitet zur nächsten Person.
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [-50, -100, -160]) await move(dx);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  // Gleich wieder aufsetzen, noch während sie gleitet; die Seite der nächsten Person ersetzt die Ansicht unter dem Finger.
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  // Derselbe Finger zieht weiter: Die Karte folgt ihm und blättert (im Kreis) wieder zur ersten.
+  for (const dx of [-20, -60, -120, -180]) await move(dx);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+});
+
+test('Mitglieder (für alle): Wischen und Pfeile blättern in der Liste, „Zurück“ führt zur Liste', async ({ page }) => {
+  await login(page, 'mitglied1');
+  await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page
+    .locator('.directory .member-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /Mitglied1/ })
+    .click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await expect(page.getByRole('button', { name: 'Vorherige Person' })).toBeEnabled();
+
+  // Nach links: nächste Person; nach der letzten wieder die erste (Karussell), nach rechts zurück zur letzten.
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  await expect(page).toHaveURL(/#\/mitglieder\/\d+$/);
+  await swipe(page, -200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+  await swipe(page, 200);
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Beim Ziehen steht die Nachbarin daneben, mit Namen aus der Liste.
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 - 60;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [20, 60, 120]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  }
+  await expect(page.locator('.member-peek-prev .member-peek-name')).toHaveText('Mitglied1');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await page.getByRole('button', { name: 'Nächste Person' }).click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+
+  // Blättern legt keine Einträge im Verlauf an: „Zurück“ führt gleich zur Liste.
+  await page.getByRole('button', { name: '‹ Zurück' }).click();
+  await expect(page.locator('.directory .card-list')).toBeVisible();
+
+  // Neu geladen (wie ein Link): die ganze Liste in der gemerkten Sortierung
+  await page.goto('/app/#/mitglieder/liste');
+  await page
+    .locator('.directory .member-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /Mitglied1/ })
+    .click();
+  await page.reload();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText(/\d+ \/ \d+/);
+});
+
 test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByLabel('Vorname').fill('Neue');
   await page.getByLabel('Nachname').fill('Testperson');
@@ -206,7 +623,7 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   // Standard-Sortierung nach Nachname: „Nachname, Vorname“.
   await page.locator('.row', { hasText: 'Testperson, Neue' }).first().click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Neues Startpasswort erzeugen/ }).click();
   const fresh = (await page.getByTestId('reset-password').textContent())!.trim();
@@ -218,10 +635,56 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
 });
 
+test('Konten: aus einer Excel-Datei importieren, mit Ehemaligen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  // Kleinste .xlsx-Datei wie aus Excel: Texte inline, Geburtstag als Datumszahl mit Datumsformat.
+  const cell = (ref: string, v: string) => `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`;
+  const rows = [
+    ['Vorname', 'Nachname', 'Status', 'Geburtstag', 'Ausgeschieden', 'Grund'],
+    ['Karla', id, 'Mitglied', '', '', ''],
+    ['Lutz', id, 'ehemalig', '', '2001', 'verstorben'],
+  ];
+  const sheet =
+    '<worksheet><sheetData>' +
+    rows
+      .map(
+        (r, i) =>
+          `<row r="${i + 1}">${r.map((v, j) => (v ? cell(`${'ABCDEF'[j]}${i + 1}`, v) : '')).join('')}${i === 1 ? '<c r="D2" s="1"><v>29254</v></c>' : ''}</row>`,
+      )
+      .join('') +
+    '</sheetData></worksheet>';
+  const xlsx = zipSync({
+    'xl/workbook.xml': strToU8('<workbook><sheets><sheet name="A" sheetId="1"/></sheets></workbook>'),
+    'xl/styles.xml': strToU8('<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>'),
+    'xl/worksheets/sheet1.xml': strToU8(sheet),
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Mitglieder');
+  await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
+  await page.getByRole('button', { name: 'Aus Datei importieren (Excel oder CSV)' }).click();
+  await page.getByLabel('Datei wählen (Excel .xlsx oder CSV)').setInputFiles({
+    name: 'mitglieder.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from(xlsx),
+  });
+  await expect(page.getByLabel('Inhalt von mitglieder.xlsx')).toHaveValue(new RegExp(`Karla\t${id}\tMitglied\t03\.02\.1980`));
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.getByRole('status')).toContainText('Neu: 1 Konto mit Anmeldung · 1 ehemalig');
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.getByRole('heading', { name: 'Import übernommen' })).toBeVisible();
+  await expect(page.locator('.print-sheet')).toHaveCount(1);
+  await expect(page.locator('.print-sheet')).toContainText(`Karla ${id}`);
+  await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
+  await expect(page.locator('.row', { hasText: `${id}, Karla` })).toBeVisible();
+  await expect(page.locator('.row', { hasText: `${id}, Lutz` })).toHaveCount(0);
+  await adminMenu(page, 'Ehemalige');
+  await expect(page.locator('.row', { hasText: `${id}, Lutz` })).toBeVisible();
+});
+
 test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen', async ({ page }) => {
   const id = Date.now().toString(36);
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByRole('button', { name: 'Mehrere auf einmal anlegen' }).click();
   const rows = page.locator('.bulk-row');
@@ -237,7 +700,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: '‹ Zur Mitgliederliste' }).click();
   await page.locator('.row', { hasText: `${id}, Ida` }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.getByRole('button', { name: 'Angaben ändern' }).click();
   await expect(page.locator('.account-edit').getByLabel('Vorname')).toHaveValue('Ida');
   await expect(page.locator('.account-edit').getByLabel('Nachname')).toHaveValue(id);
@@ -249,7 +712,7 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
 
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
   await page.locator('.row', { hasText: `${id}, Jan` }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page
     .locator('.account-panel')
     .getByRole('button', { name: /Konto löschen|Aus der App entfernen/ })
@@ -272,7 +735,7 @@ const PNG = {
 test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, entfernen; Mitglied sieht sein Foto', async ({ page }) => {
   const id = Date.now().toString(36);
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByLabel('Vorname').fill('Fiona');
   await page.getByLabel('Nachname').fill(id);
@@ -341,15 +804,26 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await page.getByRole('button', { name: /vergrößern/ }).click();
   await zoom.getByRole('button', { name: 'Schließen' }).click();
   await expect(zoom).toHaveCount(0);
+  // Ersetzen und entfernen nur in der vergrößerten Ansicht, nicht mehr auf der Seite
+  await expect(page.getByRole('button', { name: 'Foto entfernen' })).toHaveCount(0);
+  await page.getByRole('button', { name: /vergrößern/ }).click();
+  await expect(zoom.getByRole('button', { name: 'Foto ersetzen' })).toBeVisible();
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Foto entfernen' }).click();
+  await zoom.getByRole('button', { name: 'Foto entfernen' }).click();
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
-  await expect(page.getByRole('button', { name: 'Foto hochladen' })).toBeVisible();
+  await expect(zoom).toHaveCount(0);
   await expect(page.locator('.member-rank-line .member-avatar-initials')).toBeVisible();
+  // Ohne Foto öffnen die Anfangsbuchstaben ein Fenster zum Hochladen.
+  await page.getByRole('button', { name: /hochladen$/ }).click();
+  const upload = page.getByRole('dialog', { name: 'Foto' });
+  await upload.getByLabel('Foto-Datei').setInputFiles(PNG);
+  await expect(page.locator('.toast')).toContainText('Foto gespeichert');
+  await expect(upload).toHaveCount(0);
+  await expect(page.locator('.member-rank-line .member-avatar img')).toBeVisible();
 
   // Das Mitglied sieht sein Foto unter „Konto“, kann es dort aber nicht ändern.
   await login(page, username, password);
-  await page.locator('.topbar-account').click();
+  await openKonto(page);
   await expect(page.locator('.account-card .member-avatar-large img')).toBeVisible();
   await expect(page.getByRole('button', { name: /Foto/ })).toHaveCount(0);
 
@@ -372,7 +846,6 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   const last = `Anwärterin ${Date.now() % 1000000}`;
   const name = `Anna ${last}`;
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   // Anwärter sind eine eigene Rolle: nur Kalender, für neue Konten, als Mitglied aufzunehmen (bei WordPress ggf. schon da).
   await adminMenu(page, 'Einstellungen');
   await page
@@ -414,7 +887,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await page.reload();
   await expect.poll(titles).toEqual(['Gast', 'Anwärter', 'Mitglied']);
 
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.getByRole('button', { name: '+ Mitglied anlegen' }).click();
   await page.getByLabel('Vorname').fill('Anna');
   await page.getByLabel('Nachname').fill(last);
@@ -425,25 +898,36 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
 
   await login(page, username, password);
   await expect(page.getByText('Vereinsabend')).toBeVisible(); // interner Kalender
-  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toHaveCount(0);
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+  // Unter „Meins“ nur das Konto, keine Daten aus dem Mitgliederbereich
+  await openKonto(page);
+  await expect(page.locator('.meins-menu')).toHaveCount(0);
+
+  // Öffentliche Liste (ohne Anmeldung): Die Rolle steht wie ein Titel neben dem Namen.
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(page.locator('.directory .member-row', { hasText: last }).locator('.badge-candidate')).toHaveText('Anwärter');
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   // Zähler über „Mitglied anlegen“: Gruppen wie in der Anwesenheit
   await expect(page.locator('.member-counts')).toContainText(/Anwärter \d+/);
   // Filter und Sortierung sind zunächst eingeklappt.
   await expect(page.getByRole('button', { name: 'Filter und Sortierung' })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByLabel('Sortierung')).toBeHidden();
+  // Die Rolle steht wie ein Titel neben dem Namen, solange die Person noch aufzunehmen ist.
+  await expect(page.locator('.row', { hasText: `${last}, Anna` }).locator('.badge-candidate')).toHaveText('Anwärter');
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();
   await expect(page.locator('.toast')).toHaveText(`${name} ist jetzt Mitglied`);
   await expect(page.getByRole('button', { name: 'Als Mitglied aufnehmen' })).toHaveCount(0);
 
   await login(page, username, password);
-  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
 test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte oder Rollen', async ({ page }) => {
@@ -463,7 +947,7 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   // Öffentlich (Issue #112): auch ohne Anmeldung, ebenfalls ohne Punkte
   await page.context().clearCookies();
   await page.goto('/app/');
-  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
   await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
   await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(list).not.toContainText(/Punkte|offen/);
@@ -487,6 +971,8 @@ test.describe('ohne Service Worker', () => {
             founder: true,
             joined_year: '1985',
             left_year: '2010',
+            joined_on: '1985-04-01',
+            left_on: '2010',
           },
         ],
       }),
@@ -496,7 +982,7 @@ test.describe('ohne Service Worker', () => {
     const list = page.locator('.directory .card-list');
     await list.locator('.member-row', { hasText: 'Ehemalig, Erwin' }).locator('.member-row-open').click();
     await expect(page).toHaveURL(/#\/mitglieder\/987654$/);
-    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 1985–2010');
+    await expect(page.locator('.member-page')).toContainText('Ehemalig · Gründungsmitglied · 01.04.1985 – 2010');
     await expect(switcher.getByRole('button', { name: 'Ehemalige' })).toHaveAttribute('aria-pressed', 'true');
     await expect(switcher.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-pressed', 'false');
 
@@ -532,7 +1018,6 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
     return list.find((m) => m.name === name)?.id;
   }, former);
   expect(formerId).toBeTruthy();
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Ämter');
   await page.getByLabel('Neue Gruppe').fill(group);
   await page.getByRole('button', { name: 'Gruppe anlegen' }).click();
@@ -644,7 +1129,6 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
 test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
   const title = `Unterschriften ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Listen');
   const create = page.locator('form', { hasText: 'Neue Liste' });
   await create.getByLabel('Titel').fill(title);
@@ -748,11 +1232,11 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
 
 test('Verwalter ohne Admin-Rechte kann weder anlegen noch zurücksetzen', async ({ page }) => {
   await login(page, 'verwalter');
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await expect(page.locator('.row', { hasText: 'Mitglied1' })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ Mitglied anlegen' })).toHaveCount(0);
   await page.locator('.row', { hasText: 'Mitglied1' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await expect(page.getByRole('button', { name: /Neues Startpasswort/ })).toHaveCount(0);
 });
 
@@ -826,8 +1310,7 @@ test('Abgelaufenes Token wird erneuert, ohne dass die App auffällt', async ({ p
 test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) => {
   const NEW = 'Neues-Testpasswort-1';
   await login(page, 'mitglied2');
-  await page.getByRole('button', { name: 'Konto' }).click();
-  await expect(page.locator('.topbar-title')).toHaveText('Mein Konto');
+  await openKonto(page);
 
   await page.getByLabel('Aktuelles Passwort').fill('falsch');
   await page.getByLabel(/^Neues Passwort \(/).fill(NEW);
@@ -842,15 +1325,86 @@ test('Mitglied ändert sein Passwort und bleibt angemeldet', async ({ page }) =>
 
   // Sitzung bleibt gültig: Daten laden weiterhin (neues Token wurde geholt).
   await page.getByRole('button', { name: 'Meins' }).click();
-  await expect(page.locator('.stat-label').first()).toHaveText('Meine Punkte');
+  await expect(page.locator('.stat-label').first()).toHaveText('Punkte');
 
   await login(page, 'mitglied2', NEW);
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await page.getByLabel('Aktuelles Passwort').fill(NEW);
   await page.getByLabel(/^Neues Passwort \(/).fill(PASSWORD);
   await page.getByLabel('Neues Passwort wiederholen').fill(PASSWORD);
   await page.getByRole('button', { name: 'Passwort ändern' }).click();
   await expect(page.locator('.toast')).toContainText('Passwort geändert');
+});
+
+test('Mitglied wählt die Darstellung hell oder dunkel unabhängig vom Gerät', async ({ page }) => {
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await login(page, 'mitglied2');
+  await openKonto(page);
+  const choice = page.getByRole('navigation', { name: 'Darstellung' });
+  await expect(choice.getByRole('button', { name: 'Wie Gerät' })).toHaveAttribute('aria-pressed', 'true');
+  const light = await bg();
+
+  await choice.getByRole('button', { name: 'Dunkel' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const dark = await bg();
+  expect(dark).not.toBe(light);
+  // Wie der Dunkelmodus des Geräts
+  await choice.getByRole('button', { name: 'Wie Gerät' }).click();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  expect(await bg()).toBe(dark);
+
+  // Hell gewinnt gegen den Dunkelmodus des Geräts und bleibt nach dem Neuladen.
+  await choice.getByRole('button', { name: 'Hell' }).click();
+  expect(await bg()).toBe(light);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  expect(await bg()).toBe(light);
+  await expect(page.getByRole('navigation', { name: 'Darstellung' }).getByRole('button', { name: 'Hell' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.getByRole('navigation', { name: 'Darstellung' }).getByRole('button', { name: 'Wie Gerät' }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+  expect(await bg()).toBe(dark);
+  await page.emulateMedia({ colorScheme: 'light' });
+});
+
+test('Knopf in der Kopfzeile wechselt hell und dunkel, auch ohne Anmeldung', async ({ page }) => {
+  const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/app/');
+  const light = await bg();
+  // Ohne Anmeldung: Kopfzeile mit Hilfe, Darstellung und „Login“
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+  await page.locator('.topbar').getByRole('button', { name: 'Dunkle Darstellung' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const dark = await bg();
+  expect(dark).not.toBe(light);
+  // Zurück zur Darstellung des Geräts: folgt wieder dem Gerät.
+  await page.locator('.topbar').getByRole('button', { name: 'Helle Darstellung' }).click();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+  expect(await bg()).toBe(light);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Helle Darstellung' })).toBeVisible();
+  expect(await bg()).toBe(dark);
+
+  // Angemeldet: kein „Konto“ mehr oben; Knopf und Auswahl unter Meins → Konto zeigen dasselbe.
+  await login(page, 'mitglied2');
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Konto' })).toHaveCount(0);
+  await openKonto(page);
+  const choice = page.getByRole('navigation', { name: 'Darstellung' });
+  await page.locator('.topbar').getByRole('button', { name: 'Helle Darstellung' }).click();
+  await expect(choice.getByRole('button', { name: 'Hell' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await bg()).toBe(light);
+  await page.locator('.topbar').getByRole('button', { name: 'Dunkle Darstellung' }).click();
+  await expect(choice.getByRole('button', { name: 'Wie Gerät' })).toHaveAttribute('aria-pressed', 'true');
+  await page.emulateMedia({ colorScheme: 'light' });
+  // Alte Adresse #/konto führt zum Konto unter „Meins“.
+  await page.goto('/app/#/konto');
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  await expect(page.getByRole('button', { name: 'Abmelden' })).toBeVisible();
 });
 
 test('Admin pflegt öffentliche Termine', async ({ page }) => {
@@ -872,7 +1426,7 @@ test('Admin pflegt öffentliche Termine', async ({ page }) => {
 test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
-  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await expect(page.getByText('Vereinsabend')).toHaveCount(0); // nur im Kalender für Mitglieder
   await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
@@ -889,6 +1443,31 @@ test('Gast ohne Anmeldung sieht öffentliche Termine und News', async ({ page })
     async () => (await fetch(window.KOMPANIE_CONFIG!.apiBase + 'me/points', { credentials: 'same-origin' })).status,
   );
   expect(status).toBe(401);
+});
+
+test('Geteilter Link: Gast meldet sich an und landet auf der Seite; Teilen-Knopf liefert die Adresse', async ({ page }) => {
+  await page.context().clearCookies();
+  // Teilen-Menü des Geräts nachbilden: Die App gibt ihm die Adresse der Seite.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', {
+      value: async (data: ShareData) => {
+        (window as unknown as { shared: ShareData }).shared = data;
+      },
+    });
+  });
+  await page.goto('/app/#/meins/punkte');
+  const hint = page.locator('.login-first');
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Anmelden' }).click();
+  await fillLogin(page, 'mitglied1', PASSWORD);
+  await expect(page).toHaveURL(/\/app\/#\/meins\/punkte$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Meins');
+  await expect(page.locator('.login-first')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Link zu dieser Seite teilen' }).click();
+  const shared = await page.evaluate(() => (window as unknown as { shared?: ShareData }).shared);
+  expect(shared?.url).toMatch(/\/app\/#\/meins\/punkte$/);
+  expect(shared?.title).toContain('Meins');
 });
 
 /**
@@ -999,7 +1578,7 @@ test.describe('Android', () => {
 
     // Mitglied: eigene Punkte und Kasse, Schalter für Beträge
     await login(page, 'mitglied1');
-    await page.getByRole('button', { name: 'Konto' }).click();
+    await openKonto(page);
     await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
     await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
     await expect(page.getByLabel('Kasse: neue Einträge')).toBeChecked();
@@ -1028,9 +1607,9 @@ test.describe('Android', () => {
     });
 
     // Abmelden meldet das Gerät beim Server ab.
-    await page.getByRole('button', { name: 'Konto' }).click();
+    await openKonto(page);
     await page.getByRole('button', { name: 'Abmelden' }).click();
-    await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('fake-push-sub'))).toBeNull();
     await login(page, 'mitglied1');
     expect(await status()).toBeNull();
@@ -1056,35 +1635,74 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
+  await page.context().clearCookies();
+  const layouts = () =>
+    page.evaluate(async () => {
+      const cache = await caches.open('kompanie-ansicht-geruest-v1');
+      return Promise.all((await cache.keys()).map(async (k) => decodeURIComponent(k.url) + (await (await cache.match(k))!.text())));
+    });
+  // Erst über die Navigation zu den News, später direkt: Das Gerüst muss trotzdem passen.
+  await page.goto('/app/');
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await page.getByRole('button', { name: 'News' }).click();
+  await expect(page.locator('.news-card').first()).toBeVisible();
+  // Sofort weiter (wie in WordPress, wo die Daten schnell da sind): Das Gerüst ist trotzdem gemerkt.
+  await page.getByRole('button', { name: 'Termine' }).click();
+  await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
+  await expect.poll(async () => (await layouts()).some((l) => l.includes('/news|'))).toBe(true);
+  // Nur der Aufbau, kein Text
+  expect((await layouts()).join('')).not.toContain('Tag der offenen Tür');
+
+  // Keine gespeicherten Daten (auch nicht beim Service Worker), News antworten sehr langsam.
+  await page.evaluate(() => caches.delete('kompanie-data-v2'));
+  await page.context().route(/news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.goto('/app/#/news');
+    await page.reload();
+    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.loading')).toHaveCount(0);
+    await shot(page, 'geruest-news');
+    await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.skeleton')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   if (!STANDALONE) await expect(page.locator('.role-control option', { hasText: 'Admin' })).toHaveCount(0); // WordPress: Admins im Backend
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Gast' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Gast');
   await shot(page, '13-rolle');
 
   await login(page, 'mitglied2');
-  await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Konto' })).toBeVisible();
+  // Als Gast keine eigenen Daten: „Meins“ zeigt nur das Konto, ohne Menü.
+  await openKonto(page);
+  await expect(page.locator('.meins-menu')).toHaveCount(0);
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.getByRole('button', { name: 'Filter und Sortierung' }).click();
   await page.getByLabel('Auch Gast-Konten anzeigen').check();
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
 
 test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Strafen nein', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Termine verwalten' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Termine verwalten');
 
@@ -1096,18 +1714,18 @@ test('Standardrolle „Termine verwalten“: Termine pflegen ja, Punkte und Stra
   // Die Rechte auf dem Server prüft das API-Szenario (tests/contract) für beide Varianten.
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Mitglied' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Mitglied');
 });
 
 test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   const rechte = page.locator('.member-rights');
   await expect(rechte.getByLabel(/^Mitgliederbereich/)).toBeChecked();
   await rechte.getByLabel('Öffentliche Termine pflegen').check();
@@ -1121,10 +1739,10 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await expect(page.locator('.member-level')).toContainText('mit Ausnahmen bei den Rechten');
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   page.once('dialog', (d) => d.accept());
   await rechte.getByRole('button', { name: 'Wie die Rolle' }).click();
   await expect(page.locator('.toast')).toHaveText('Rechte wie die Rolle');
@@ -1136,7 +1754,6 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
 
 test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Einstellungen');
   await page
     .locator('.settings-link')
@@ -1153,9 +1770,9 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toContainText('0 Personen');
   await shot(page, '20-rollen');
 
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.role-control').getByLabel('Grundrolle').selectOption({ label: 'Kassenwart' });
   await expect(page.locator('.toast')).toHaveText('Grundrolle geändert: Kassenwart');
 
@@ -1164,7 +1781,6 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toHaveCount(0);
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Einstellungen');
   await page
     .locator('.settings-link')
@@ -1179,9 +1795,9 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
 
 test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Filter findet sie', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   const extra = page.locator('.extra-roles');
   // Feste Rollen sind nur Grundrolle.
   await expect(extra.getByLabel('Mitglied', { exact: true })).toHaveCount(0);
@@ -1203,13 +1819,13 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
   await page.getByRole('button', { name: 'Öffentliche Termine verwalten' }).click();
   await expect(page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' })).toBeVisible();
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await expect(page.locator('.account-card').first()).toContainText('Rollen: Mitglied, Termine verwalten');
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Konto und Rolle');
+  await memberAccount(page);
   await page.locator('.extra-roles').getByLabel('Termine verwalten').uncheck();
   await expect(page.locator('.toast')).toHaveText('Zusatzrolle entfernt: Termine verwalten');
 });
@@ -1217,7 +1833,6 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
 test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ansehen, danach wieder als Admin', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   const openRoles = async () => {
-    await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
     await adminMenu(page, 'Einstellungen');
     await page
       .locator('.settings-link')
@@ -1253,7 +1868,7 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
   await other.close();
 
   // Nur ansehen: Der Server lehnt Änderungen ab, die App zeigt die Meldung.
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await page.getByLabel('Aktuelles Passwort').fill(ADMIN_PASSWORD);
   await page.getByLabel(/^Neues Passwort \(/).fill('Vorschau-Passwort-1');
   await page.getByLabel('Neues Passwort wiederholen').fill('Vorschau-Passwort-1');
@@ -1267,16 +1882,16 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
   await expect(banner).toHaveCount(0);
   await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toBeVisible();
 
-  // Ohne Anmeldung: nur Öffentliches, mit „Anmelden“ statt Konto.
+  // Ohne Anmeldung: nur Öffentliches, mit „Login“ oben.
   await rollen.getByRole('button', { name: 'App ohne Anmeldung ansehen' }).click();
   await expect(banner).toHaveText(/Vorschau ohne Anmeldung – nur ansehen/);
-  await expect(page.locator('.topbar').getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await expect(page.getByText('Vereinsabend')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Meins' })).toHaveCount(0);
   await banner.getByRole('button', { name: 'Beenden' }).click();
   await expect(rollen).toBeVisible();
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 });
 
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {
@@ -1383,7 +1998,7 @@ test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ pa
   await expect(page.locator('.install-hint')).toHaveCount(0);
 
   await login(page, 'mitglied1');
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await page.getByRole('button', { name: 'App installieren' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('App installieren');
 });
@@ -1420,10 +2035,10 @@ test.describe('Android', () => {
 test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
-  await page.locator('.topbar').getByRole('button', { name: 'Anmelden' }).click();
+  await page.locator('.topbar').getByRole('button', { name: 'Login' }).click();
   await expect(STANDALONE ? page.getByLabel('Angemeldet bleiben') : page.locator('#rememberme')).toBeChecked();
   await fillLogin(page, 'mitglied1', PASSWORD);
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
   const cookie = (await page.context().cookies()).find((c) =>
     STANDALONE ? c.name === 'kompanie_session' : c.name.startsWith('wordpress_logged_in_'),
   );
@@ -1444,17 +2059,20 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Kalender für Mitglieder' })).toBeVisible();
   // Kalender (und bei der eigenständigen Version Neuigkeiten) lassen sich überspringen.
+  let importStep = false;
   while ((await page.getByRole('heading', { name: 'Fast fertig' }).count()) === 0) {
+    importStep ||= (await page.getByRole('heading', { name: 'Mitglieder übernehmen' }).count()) > 0;
     await expect(page.getByRole('heading', { name: 'Galerie aus Google Drive' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   }
+  expect(importStep).toBe(true);
   await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
   await expect(page).toHaveURL(/#\/verwaltung$/);
   await expect(hint).toHaveCount(0);
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' });
   await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
   await page.reload();
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
   await expect(hint).toHaveCount(0);
   await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
   // Ausgeschaltet heißt auch auf dem Server gesperrt.
@@ -1491,7 +2109,6 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
 
 test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Einstellungen');
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
   await page
@@ -1735,12 +2352,12 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await expect(item(STANDALONE ? 'Installation ohne WordPress' : 'Installation mit WordPress')).toBeVisible();
   await expect(item(STANDALONE ? 'Installation mit WordPress' : 'Installation ohne WordPress')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('Startpasswort');
-  await expect(item('Mitglieder anlegen')).toBeVisible();
+  await expect(item('Mitglied anlegen')).toBeVisible();
   await expect(item('Wartungsmodus')).toHaveCount(0);
   await page.getByLabel('Hilfe durchsuchen').fill('');
-  await item('Rollen und Mitglieder').click();
-  await page.locator('.hilfe-text a', { hasText: 'Rollen vergeben' }).click(); // Verweis auf eine andere Seite
-  await expect(page.locator('.news-headline')).toHaveText('Rollen vergeben');
+  await page.locator('.row-title', { hasText: /^Rollen$/ }).click();
+  await page.locator('.hilfe-text a', { hasText: 'Konto und Rolle' }).first().click(); // Verweis auf eine andere Seite
+  await expect(page.locator('.news-headline')).toHaveText('Konto und Rolle');
   await shot(page, '21-hilfe');
 
   // Offline: Hilfe kommt aus dem Speicher des Service Workers
@@ -1838,7 +2455,6 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
 
 test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Einstellungen');
   await expect(page.locator('.topbar-title')).toHaveText('Einstellungen');
   const open = async (title: string) => {
@@ -1942,7 +2558,6 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
 
 test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht Stand und Verlauf', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Dienstgrade');
   for (const [title, min] of [
     ['Gefreiter', '10'],
@@ -1953,9 +2568,18 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
     await page.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.row', { hasText: title })).toBeVisible();
   }
-  await page.getByRole('navigation', { name: 'Verwaltung' }).locator('.admin-menu-toggle').click();
-  await expect(page.locator('.admin-menu-list').getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
+  // „‹ Einrichtungen“ und „‹ Verwaltung“ führen zurück zur Startseite; mit Punkten gibt es dort auch „Beförderungen“,
+  // die Dienstgrade stehen dort nur unter „Einrichtungen“ (vor „Einstellungen“).
+  await page.getByRole('button', { name: '‹ Einrichtungen' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+  await expect(page.locator('.admin-tiles').getByRole('button', { name: 'Punktekatalog', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '‹ Verwaltung' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung$/);
+  const tiles = page.locator('.admin-tiles');
+  await expect(tiles.getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
+  await expect(tiles.getByRole('button', { name: 'Dienstgrade', exact: true })).toHaveCount(0);
+  await expect(tiles.locator('li').nth(-2)).toHaveText('Einrichtungen');
+  await expect(tiles.locator('li').last()).toHaveText('Einstellungen');
 
   // Punkte für mitglied2 buchen, dann befördern.
   await adminMenu(page, 'Mitglieder');
@@ -1981,6 +2605,11 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
   await expect(page.getByText('Beförderung: kein Dienstgrad → Gefreiter')).toBeVisible();
   await expect(page.locator('.member-rank strong')).toHaveText('Gefreiter');
+  // Über einen Link geöffnet: Schließen bleibt auf der Seite des Mitglieds; das Abzeichen öffnet das Fenster wieder.
+  await page.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/verwaltung/mitglied/${id}$`));
+  await page.locator('.member-rank-open').click();
+  await expect(page.getByRole('dialog', { name: 'Dienstgrad' }).locator('.member-rank strong')).toHaveText('Gefreiter');
 
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
@@ -2003,7 +2632,6 @@ test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in �
       '<path d="M2 18 L20 2 L38 18 Z" fill="#c8a400" stroke="#fff" stroke-width="2"/></svg>',
   );
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Dienstgrade');
   for (const [title, file] of [
     ['Gefreiter', { name: 'gefreiter.png', mimeType: 'image/png', buffer: png }],
@@ -2091,7 +2719,6 @@ test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in �
 test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht seine Anwesenheit', async ({ page }) => {
   const title = `Übung ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Anwesenheit');
   await page.locator('.free-event').getByLabel('Titel').fill(title);
   await page.getByRole('button', { name: 'Liste anlegen' }).click();
@@ -2234,7 +2861,7 @@ test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({
 
   const doc = page.locator('.doc-card', { hasText: `Langes Dokument ${id}` });
   await expect(doc).toBeAttached();
-  const toggle = page.locator('.doc-group', { has: doc }).locator('.doc-group-toggle');
+  const toggle = page.locator('.doc-group', { has: doc }).locator('.fold-toggle');
   if ((await toggle.count()) > 0 && (await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
   await doc.getByRole('button', { name: 'Öffnen' }).click();
   const first = page.getByAltText(`Langes Dokument ${id}, Seite 1 von 10`);
@@ -2255,7 +2882,6 @@ test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({
 test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ page }) => {
   const title = `Ehrenmitglied ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Titel');
   await page.getByLabel('Bezeichnung').fill(title);
   await page.getByRole('button', { name: 'Anlegen' }).click();
@@ -2263,10 +2889,12 @@ test('Titel: anlegen und vergeben, Mitglied sieht ihn in „Meins“', async ({ 
 
   await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Titel');
+  await page.locator('.member-titles-tile').click();
   await page.locator('.member-titles').getByLabel(title).check();
   await page.getByRole('button', { name: 'Titel speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Titel gespeichert');
+  await page.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page.locator('.member-titles-tile .badge-title')).toContainText(title);
   await page.getByRole('button', { name: 'Alle Mitglieder' }).click();
   await expect(page.locator('.row', { hasText: 'Mitglied2' }).locator('.badge-title')).toContainText(title);
 
@@ -2286,7 +2914,6 @@ test('Titel: Reihenfolge per Ziehen am Griff und mit Pfeiltasten, bleibt nach de
   const id = Date.now().toString(36);
   const names = ['A', 'B', 'C'].map((n) => `Reihe ${n} ${id}`);
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Titel');
   for (const name of names) {
     await page.getByLabel('Bezeichnung').fill(name);
@@ -2326,7 +2953,6 @@ test('Titel: beim Ziehen an den unteren Rand scrollt die Seite mit', async ({ pa
   const id = Date.now().toString(36);
   const names = Array.from({ length: 8 }, (_, i) => `Lang ${i + 1} ${id}`);
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Titel');
   for (const name of names) {
     await page.getByLabel('Bezeichnung').fill(name);
@@ -2372,9 +2998,8 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   const admin = await browser.newPage();
   admin.on('dialog', (d) => d.accept());
   await login(admin, 'admin', ADMIN_PASSWORD);
-  await admin.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(admin);
   await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
-  await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(admin, 'Schwarzes Brett');
   await expect(admin.locator('.tabbar button.active')).toHaveText(MANAGER);
   await expect(admin.locator('.topbar-title')).toHaveText('Schwarzes Brett');
@@ -2402,7 +3027,7 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
     await tabs.nth(i).click();
     await expect(banner).toContainText(first);
   }
-  await page.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(page);
   await expect(banner).toContainText(first);
   await expect(page.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
   await shot(page, '33-schwarzes-brett');
@@ -2483,7 +3108,6 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
   const admin = await browser.newPage();
   admin.on('dialog', (d) => d.accept());
   await login(admin, 'admin', ADMIN_PASSWORD);
-  await admin.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(admin, 'Umfragen');
   await expect(admin.locator('.topbar-title')).toHaveText('Umfragen');
   const form = admin.locator('.poll-form');
@@ -2568,7 +3192,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   const member = await browser.newPage();
   member.on('dialog', (d) => d.accept());
   await login(member, 'mitglied1');
-  await member.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(member);
   const card = member.locator('.birthday-card');
   await card.getByLabel('Tag').selectOption(String(in3.getDate()));
   await card.getByLabel('Monat').selectOption(String(in3.getMonth() + 1));
@@ -2613,29 +3237,32 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
 test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mitglied sie zeigt', async ({ page, browser }) => {
   // Die Verwaltung trägt den Eintritt mit Datum ein; die Anzeige wählt nur die Person, auf der Seite steht nur das Jahr.
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
-  await memberMenu(page, 'Eintritt');
+  await page
+    .locator('.member-dates')
+    .getByRole('button', { name: /^Eintritt/ })
+    .click();
   const adminCard = page.locator('.member-join-year');
   await adminCard.getByLabel('Datum oder Jahr').fill('1.4.2005');
   await adminCard.getByRole('button', { name: 'Eintritt speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
   await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
   await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
-  await expect(adminCard).toContainText('Nicht anzeigen (wählt nur die Person selbst)');
+  await expect(adminCard).toContainText('Mitgliedern anzeigen (wählt nur die Person selbst)');
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
   const member = await browser.newPage();
   member.on('dialog', (d) => d.accept());
   await login(member, 'mitglied2');
-  await member.getByRole('button', { name: 'Konto' }).click();
+  await openKonto(member);
   const birthday = member.locator('.birthday-card');
   await birthday.getByLabel('Tag').selectOption('12');
   await birthday.getByLabel('Monat').selectOption('3');
   await birthday.getByLabel('Jahr', { exact: true }).fill('1988');
   await birthday.getByLabel(/Alter anzeigen/).check();
-  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('none');
+  await expect(birthday.getByLabel(/Auf meiner Seite/)).toHaveValue('members');
   await birthday.getByLabel(/Auf meiner Seite/).selectOption('public');
   await expect(birthday).toContainText('Dort steht das ganze Datum mit deinem Alter.');
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
@@ -2655,7 +3282,9 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await page.goto('/app/#/mitglieder/liste');
   await page.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
   const facts = page.locator('.member-page .member-page-facts');
-  await expect(facts).toHaveText(new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 2005$`));
+  await expect(facts).toHaveText(
+    new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 01\\.04\\.2005$`),
+  );
   await shot(page, '1d-mitglied-seite');
 
   // Ohne Anmeldung nur der Geburtstag.
@@ -2694,7 +3323,6 @@ test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle S
 
   // Admin (hat manage_inventory) öffnet es über „Verwaltung“.
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Inventar');
   await expect(page.locator('.topbar-title')).toHaveText('Inventar');
   await page.getByRole('button', { name: '+ Eintrag anlegen' }).click();
@@ -2787,7 +3415,6 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   const before = await storedApi();
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await adminMenu(page, 'Einstellungen');
   await page
     .locator('.settings-link')

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { can, config } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
@@ -19,9 +19,12 @@ export function memberListAllowed(): boolean {
   return canPoints() || canPenalties() || canRanks() || canTitles() || canAttendance() || can('create_users') || can('promote_users');
 }
 
-type AdminTab = { id: string; label: string; on: boolean; route?: string };
+type AdminTab = { id: string; label: string; on: boolean; route?: string; group?: string };
 
-/** Reiter der Verwaltung; Schwarzes Brett, Umfragen, Inventar und Einstellungen sind eigene Seiten (route), stehen aber hier mit. */
+/** Sammelknopf „Einrichtungen“ auf der Startseite der Verwaltung: was eine Kompanie einmal anlegt und selten ändert. */
+const SETUP = 'einrichtungen';
+
+/** Bereiche der Verwaltung (Knöpfe auf ihrer Startseite, die mit group unter „Einrichtungen“); Schwarzes Brett, Umfragen, Inventar und Einstellungen sind eigene Seiten (route), stehen aber hier mit. */
 export function adminTabs(): AdminTab[] {
   const points = canPoints();
   return (
@@ -30,26 +33,43 @@ export function adminTabs(): AdminTab[] {
       { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
-      { id: 'katalog', label: `${sec.points}katalog`, on: points },
-      { id: 'dienstgrade', label: sec.ranks, on: canRanks() },
+      { id: 'katalog', label: `${sec.points}katalog`, on: points, group: SETUP },
+      { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
-      { id: 'titel', label: sec.titles, on: canTitles() },
-      { id: 'aemter', label: sec.offices, on: canOffices() },
+      { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
+      { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
-      { id: 'listen', label: sec.lists, on: canLists() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
+      { id: 'listen', label: sec.lists, on: canLists() },
       { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
+}
+
+/** Bereiche unter „Einrichtungen“; der Sammelknopf erscheint erst ab zweien, ein einzelner steht direkt auf der Startseite. */
+export function setupTabs(): AdminTab[] {
+  const tabs = adminTabs().filter((t) => t.group === SETUP);
+  return tabs.length > 1 ? tabs : [];
+}
+
+/** Knöpfe der Startseite der Verwaltung: „Einrichtungen“ statt ihrer Bereiche, ganz unten vor den Einstellungen. */
+function startTabs(): AdminTab[] {
+  const setup = setupTabs();
+  const tabs = adminTabs().filter((t) => !setup.some((s) => s.id === t.id));
+  // Nur Bereiche der Einrichtungen: keine Seite mit einem einzigen Knopf, sie stehen gleich auf der Startseite.
+  if (setup.length === 0 || tabs.length === 0) return adminTabs();
+  const at = tabs.findIndex((t) => t.id === 'einstellungen');
+  const entry: AdminTab = { id: SETUP, label: 'Einrichtungen', on: true, route: `verwaltung/${SETUP}` };
+  return at < 0 ? [...tabs, entry] : [...tabs.slice(0, at), entry, ...tabs.slice(at)];
 }
 
 export type MenuItem = { id: string; label: string; onSelect: () => void };
 
 /**
  * Aufklappmenü (Burger-Menü): Der Knopf zeigt den aktuellen Eintrag, ein Tipp klappt die Liste aller Einträge auf.
- * Schließt bei Auswahl, Escape oder Tipp daneben. Für die Verwaltung und für die Seiten eines Mitglieds.
+ * Schließt bei Auswahl, Escape oder Tipp daneben. Für „Meins“ und für die Seiten eines Mitglieds.
  */
 export function MenuNav({
   label,
@@ -112,8 +132,130 @@ export function MenuNav({
   );
 }
 
-/** Menü der Verwaltung, auch über Schwarzem Brett, Umfragen und Inventar. */
-export function AdminNav({ active }: { active: string }) {
-  const items = adminTabs().map((t) => ({ id: t.id, label: t.label, onSelect: () => navigate(t.route ?? `verwaltung/${t.id}`) }));
-  return <MenuNav label="Verwaltung" items={items} active={active} />;
+/** Symbole der Verwaltung (24 × 24, Linien in Textfarbe). */
+const ADMIN_ICONS: Record<string, ReactNode> = {
+  mitglieder: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M16.5 14.1c2.9.3 5 2.4 5 5.4" />
+    </>
+  ),
+  ehemalige: (
+    <>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
+      <path d="M18 3.5a3 3 0 0 1 0 4" />
+    </>
+  ),
+  punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,
+  strafe: (
+    <>
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18M16 14.5h2" />
+    </>
+  ),
+  katalog: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
+  dienstgrade: <path d="M5 11l7-5 7 5M5 17l7-5 7 5" />,
+  befoerderungen: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 16.5v-9M8 11l4-4 4 4" />
+    </>
+  ),
+  titel: (
+    <>
+      <circle cx="12" cy="15" r="5" />
+      <path d="M8 3l2.5 7.5M16 3l-2.5 7.5M8 3h8" />
+    </>
+  ),
+  aemter: (
+    <>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18" />
+    </>
+  ),
+  anwesenheit: (
+    <>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1M9 13l2 2 4-4" />
+    </>
+  ),
+  listen: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
+    </>
+  ),
+  brett: (
+    <>
+      <rect x="3" y="4" width="18" height="15" rx="2" />
+      <path d="M7 9h10M7 13h6M12 4V2" />
+    </>
+  ),
+  einrichtungen: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5a2.1 2.1 0 0 0 3 3l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,
+  umfragen: <path d="M5 20v-9M12 20V5M19 20v-6M3 20h18" />,
+  inventar: <path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9" />,
+  einstellungen: (
+    <>
+      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="18" cy="18" r="2" />
+    </>
+  ),
+};
+
+function AdminIcon({ id }: { id: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="30"
+      height="30"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {ADMIN_ICONS[id]}
+    </svg>
+  );
+}
+
+/** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
+export function AdminMenu({ group }: { group?: string }) {
+  return (
+    <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
+      <ul className="admin-tiles">
+        {(group ? setupTabs() : startTabs()).map((t) => (
+          <li key={t.id}>
+            <button type="button" className="card admin-tile" onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}>
+              <AdminIcon id={t.id} />
+              <span>{t.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** Zurück zur Startseite der Verwaltung (aus einem Bereich unter „Einrichtungen“ dorthin); nur, wenn es dort mehr als einen
+ * Bereich gibt. */
+export function AdminBack({ from }: { from?: string } = {}) {
+  if (adminTabs().length < 2) return null;
+  if (from && setupTabs().some((t) => t.id === from) && startTabs().some((t) => t.id === SETUP))
+    return (
+      <button type="button" className="btn btn-link back" onClick={() => navigate(`verwaltung/${SETUP}`)}>
+        ‹ Einrichtungen
+      </button>
+    );
+  return (
+    <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung')}>
+      ‹ Verwaltung
+    </button>
+  );
 }

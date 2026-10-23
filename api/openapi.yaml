@@ -218,8 +218,8 @@ paths:
       description: |
         Tag und Monat, das Jahr ist freiwillig. Gültiges Datum (29.02. nur im Schaltjahr oder ohne Jahr), Jahr ab 1900,
         nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Nicht mitgeschickte Schalter bleiben; ein neuer Eintrag
-        ist sichtbar (`visible: true`), ohne Alter (`show_age: false`) und nicht auf der Seite in der Mitgliederliste
-        (`profile: none`).
+        ist sichtbar (`visible: true`), ohne Alter (`show_age: false`) und auf der Seite in der Mitgliederliste nur für
+        Mitglieder (`profile: members`).
       x-capability: member
       requestBody:
         required: true
@@ -276,7 +276,7 @@ paths:
       description: |
         `date` als TT.MM.JJJJ, JJJJ-MM-TT oder nur das Jahr JJJJ; ohne `date` gilt `year` (ältere Apps, nur das Jahr). Ab
         1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein neuer
-        Eintrag steht nicht auf der Seite (`profile: none`). Auf der Seite steht immer nur das Jahr.
+        Eintrag steht nur für Mitglieder auf der Seite (`profile: members`). Auf der Seite steht der Eintritt, wie er eingetragen ist.
       x-capability: member
       requestBody:
         required: true
@@ -2189,7 +2189,7 @@ paths:
         Für alle, auch Gäste und ohne Anmeldung (Issue #112). Enthält alle Mitglieder und Anwärter (auch Personen mit
         eigenen Rollen nur mit dem internen Kalender), keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch
         den Dienstgrad, mit Bereich Titel die Titel; nie Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit Bereich
-        Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (`ProfileVisibility`), sonst null.
+        Geburtstage) und Eintritt nur, soweit die Person sie dem Betrachter zeigt (`ProfileVisibility`), sonst null.
         Sortiert nach Anzeigename. Bereich aus → 403 `feature_disabled`.
       security: []
       responses:
@@ -2233,8 +2233,9 @@ paths:
       summary: Ehemalige in der Mitgliederliste (Tab „Ehemalige“), öffentlich
       description: |
         Gleiche Rechte wie `GET /directory` (öffentlich, mit dem Bereich directory). Alle als ehemalig eingetragenen
-        Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied und
-        die Jahre von Eintritt und Ausscheiden; nie der Grund, genaue Daten, Punkte oder Strafen. Ohne feste Reihenfolge.
+        Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied,
+        Eintritt und Ausscheiden (wie eingetragen: ganzes Datum oder nur das Jahr); nie der Grund, Punkte oder Strafen.
+        Ohne feste Reihenfolge.
         Bereich aus → 403 `feature_disabled`.
       security: []
       responses:
@@ -2737,6 +2738,53 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/FormerMember' }
         '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Eine ehemalige Person neu anlegen (Konto ohne Anmeldung, gleich als ehemalig eingetragen)
+      description: |
+        Wie eine Zeile von `/members/former/import`, mit den Feldern von `PUT /members/{id}/former` (Daten als TT.MM.JJJJ,
+        JJJJ-MM-TT, nur das Jahr oder leer). Erst wird alles geprüft, dann angelegt. Wer genau so heißt wie ein vorhandenes
+        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage) und
+        Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
+        Namen in Amtszeiten, die genau passen, werden mit dem Konto verknüpft (`offices_linked`).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, reason]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                reason: { $ref: '#/components/schemas/FormerReason' }
+                joined_on: { type: string }
+                founder: { type: boolean, default: false }
+                left_on: { type: string }
+                birthday: { $ref: '#/components/schemas/BirthdayString' }
+                photo:
+                  description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
+                  allOf:
+                    - $ref: '#/components/schemas/PhotoFile'
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/FormerInfo' }
+                  - type: object
+                    required: [id, name, offices_linked]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      offices_linked: { type: integer }
+                      warning: { type: string }
+                      photo_url: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
 
   /members/former/import:
     post:
@@ -2767,6 +2815,44 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FormerImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/import:
+    post:
+      tags: [Verwaltung]
+      summary: Mitglieder aus einer Tabelle übernehmen, auch Ehemalige (Ersterfassung); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
+        Windows-1252, höchstens 200 KB und 500 Personen. Die erste Zeile enthält die Spaltennamen (Reihenfolge und Groß- und
+        Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
+        geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden, grund. Unbekannte Spalten und
+        Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
+        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
+        Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
+        „Gründer“, ausgeschieden und grund nur dann). Punkte, Dienstgrad (Bezeichnung) und Titel (Bezeichnungen) nur für
+        Rollen mit Mitgliederbereich. Geburtstag als TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT; Eintritt als TT.MM.JJJJ oder Jahr.
+        Wer genau so heißt wie ein vorhandenes Konto, wird übersprungen (`existing`); gleiche Namen in der Tabelle sind ein
+        Fehler. Mit `apply` und einem Fehler in einer Zeile → 400 (nichts angelegt). Sonst stehen die Zugangsdaten der neuen
+        aktiven Konten (mit Startpasswort, nur in dieser Antwort) in `created`; bricht das Anlegen mittendrin ab, steht der
+        Grund in `error` und die schon angelegten in `created`.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberImportResult' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -3871,8 +3957,10 @@ paths:
       tags: [Wartung]
       summary: Datensicherung herunterladen
       description: |
-        Gemeinsames Format `kompanie-app-backup` (Tabellen und Einstellungen; eigenständige Version
-        auch Konten mit Passwort-Hashes). Enthält Zugangsschlüssel – sicher aufbewahren.
+        Gemeinsames Format `kompanie-app-backup` (Tabellen, Einstellungen und Konten mit Passwort-Hashes:
+        eigenständige Version in `tables.users`, WordPress als `accounts` mit den Benutzern der Website;
+        dazu unter `files` die Dateien der Dokumente und Abzeichen als Base64 sowie die Push-Abos).
+        Enthält Zugangsschlüssel – sicher aufbewahren.
       x-capability: manage_settings
       responses:
         '200':
@@ -3888,7 +3976,9 @@ paths:
       summary: Sicherung wiederherstellen (ersetzt alle Daten)
       description: |
         Eigenständige Version: nur Sicherungen der eigenständigen Version mit mindestens einem Admin;
-        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website.
+        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website; fehlende Konten werden mit
+        ihrer ID angelegt (nur mit den WP-Rechten create_users und promote_users), vorhandene behalten
+        Anmeldedaten. Passt eine ID nicht zum Benutzernamen, wird nichts geändert (400).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -3913,6 +4003,50 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/drive:
+    get:
+      tags: [Wartung]
+      summary: Sicherungen in Google Drive – Stand
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Sicherungen in Google Drive ein- oder ausschalten
+      description: |
+        Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
+        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen
+        eigenen Ordner im verbundenen Google-Konto und behält die letzten acht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/drive/upload:
+    post:
+      tags: [Wartung]
+      summary: Sicherung jetzt in Google Drive hochladen
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
 
   /admin/setup/done:
     post:
@@ -3975,6 +4109,24 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    BackupDriveStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, access, enabled, email, folder_url, last_ok, last_try, error, every_days, keep]
+            properties:
+              available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
+              access: { type: boolean, description: Google hat drive.file erlaubt }
+              enabled: { type: boolean }
+              email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
+              folder_url: { type: [string, 'null'] }
+              last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
+              last_try: { type: [integer, 'null'] }
+              error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
+              every_days: { type: integer }
+              keep: { type: integer }
     PushStatus:
       description: OK
       content:
@@ -4805,6 +4957,11 @@ components:
         name: { type: string, description: 'Anzeigename „Vorname Nachname“' }
         first_name: { type: string }
         last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
+        candidate_role:
+          description: |
+            Name der Rolle, solange die Person noch als Mitglied aufzunehmen ist (Rolle mit `promotable`, z. B. Anwärter),
+            sonst null. Die App zeigt ihn wie einen Titel. Fehlt bei Ehemaligen und bei älteren Servern.
+          type: [string, 'null']
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade)' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
@@ -4822,6 +4979,11 @@ components:
         join_year:
           description: Eintrittsjahr, soweit die Person es dem Betrachter zeigt, sonst null. Fehlt bei Ehemaligen (`joined_year`).
           type: [integer, 'null']
+        join_date:
+          description: |
+            Eintritt wie eingetragen (JJJJ-MM-TT oder nur das Jahr JJJJ), soweit die Person ihn dem Betrachter zeigt, sonst
+            null. Fehlt bei Ehemaligen (`joined_on`) und bei älteren Servern (dann nur `join_year`).
+          type: [string, 'null']
 
     DirectoryBirthday:
       type: object
@@ -4859,11 +5021,13 @@ components:
       allOf:
         - $ref: '#/components/schemas/DirectoryEntry'
         - type: object
-          required: [founder, joined_year, left_year]
+          required: [founder, joined_year, left_year, joined_on, left_on]
           properties:
             founder: { type: boolean, description: Gründungsmitglied }
             joined_year: { type: string, description: 'Jahr des Eintritts (JJJJ), leer ohne Angabe' }
             left_year: { type: string, description: 'Jahr des Ausscheidens (JJJJ), leer ohne Angabe' }
+            joined_on: { type: string, description: 'Eintritt wie eingetragen (JJJJ-MM-TT oder JJJJ), leer ohne Angabe' }
+            left_on: { type: string, description: 'Ausscheiden wie eingetragen (JJJJ-MM-TT oder JJJJ), leer ohne Angabe' }
 
     MemberDetail:
       allOf:
@@ -4981,6 +5145,68 @@ components:
         existing: { type: integer }
         offices_linked: { type: integer, description: 'Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden' }
         applied: { type: boolean }
+
+    MemberImportResult:
+      type: object
+      required: [columns, rows, new, existing, offices_linked, applied, created]
+      properties:
+        columns:
+          type: object
+          required: [used, ignored]
+          properties:
+            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason)' }
+            ignored:
+              type: array
+              items:
+                type: object
+                required: [column, reason]
+                properties:
+                  column: { type: string }
+                  reason: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              status: { type: string, enum: [active, former] }
+              level: { type: [string, 'null'], description: 'Rolle des neuen Kontos; null bei Ehemaligen' }
+              username: { type: string, description: 'leer bei Ehemaligen' }
+              email: { type: string }
+              birthday: { type: string, description: 'JJJJ-MM-TT oder MM-TT; leer ohne' }
+              joined_on: { $ref: '#/components/schemas/FormerDate' }
+              points: { type: integer }
+              rank: { type: string }
+              titles: { type: array, items: { type: string } }
+              reason: { $ref: '#/components/schemas/FormerReason' }
+              founder: { type: boolean }
+              left_on: { $ref: '#/components/schemas/FormerDate' }
+              existing:
+                description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  former: { type: boolean }
+              error: { type: string }
+        new:
+          type: object
+          description: Vorschau, was angelegt würde; mit apply, was angelegt wurde
+          required: [active, former]
+          properties:
+            active: { type: integer }
+            former: { type: integer }
+        existing: { type: integer }
+        offices_linked: { type: integer }
+        applied: { type: boolean }
+        created:
+          type: array
+          items: { $ref: '#/components/schemas/CreatedUser' }
+        error: { type: string, description: 'Anlegen mittendrin abgebrochen (nur mit apply)' }
 
     GrantableCapability:
       type: string
@@ -5258,6 +5484,9 @@ components:
             terms:
               type: array
               items: { $ref: '#/components/schemas/OfficeTerm' }
+            holder_title:
+              type: [string, 'null']
+              description: Einzahl für den Zeitstrahl einer Person („Kompaniekönig“ statt „Kompaniekönige“) = Name des verknüpften Titels; null ohne Verknüpfung oder ohne Bereich `titles`
             linked_title: { type: [string, 'null'], description: Nur mit manage_offices }
 
     OfficesOverview:

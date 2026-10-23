@@ -1016,6 +1016,8 @@ final class ApiScenario
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['id'] ?? 0) === $m))[0] ?? [];
         $c->ok(is_string($entry['name'] ?? null) && array_key_exists('photo_url', $entry) && array_key_exists('rank_title', $entry) && is_array($entry['titles'] ?? null), 'Name, Foto, Dienstgrad und Titel');
         $c->ok(array_intersect(['level', 'extra_roles', 'member', 'points', 'open_cents', 'email', 'login'], array_keys($entry)) === [], 'Keine Rollen, Punkte, Strafen oder Kontodaten');
+        $byId = array_column((array) $d, null, 'id');
+        $c->ok(array_key_exists('candidate_role', $entry) && $entry['candidate_role'] === null && is_string($byId[$cand]['candidate_role'] ?? null), 'Rollenname nur bei Anwärtern');
         $c->ok(array_key_exists('birthday', $entry) && $entry['birthday'] === null && array_key_exists('join_year', $entry) && $entry['join_year'] === null, 'Geburtstag und Eintrittsjahr: ohne Freigabe null');
 
         // Geburtstag und Eintrittsjahr auf der Seite der Person: wählt nur sie selbst
@@ -1026,7 +1028,7 @@ final class ApiScenario
         $c->ok($this->req('PUT', '/me/join-year', ['year' => (int) gmdate('Y') + 1])[0] === 400, 'Eintrittsjahr in der Zukunft → 400');
         $c->ok($this->req('PUT', '/me/join-year', ['year' => 1799])[0] === 400, 'Eintrittsjahr vor 1800 → 400');
         [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005]);
-        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2005, 'date' => '2005', 'profile' => 'none'], 'Eigenes Eintrittsjahr, Standard: nicht zeigen');
+        $c->ok($s === 200 && ($d['join_year'] ?? null) === ['year' => 2005, 'date' => '2005', 'profile' => 'members'], 'Eigenes Eintrittsjahr, Standard: nur Mitgliedern zeigen');
         [$s, $d] = $this->req('PUT', '/me/join-year', ['year' => 2005, 'profile' => 'members']);
         $c->ok($s === 200 && ($d['join_year']['profile'] ?? null) === 'members', 'Eintrittsjahr nur Mitgliedern zeigen');
         $this->d->actAs($admin);
@@ -1243,7 +1245,7 @@ final class ApiScenario
             $year = 1996;
         }
         [$s, $d] = $this->req('PUT', '/me/birthday', ['month' => $month, 'day' => $day, 'year' => $year, 'show_age' => true]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Eigenen Geburtstag mit Jahr eintragen');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => $year, 'visible' => true, 'show_age' => true, 'profile' => 'members'], 'Eigenen Geburtstag mit Jahr eintragen');
         $this->d->actAs($m2);
         [$s, $d] = $this->req('GET', '/birthdays', [], ['days' => '7']);
         $entry = array_values(array_filter((array) $d, static fn (mixed $e): bool => is_array($e) && ($e['user_id'] ?? 0) === $m))[0] ?? null;
@@ -1253,7 +1255,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [$s, $d] = $this->req('PUT', "/members/$m/birthday", ['month' => $month, 'day' => $day, 'visible' => false, 'show_age' => false]);
-        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'none'], 'Verwaltung ändert das Datum, die Schalter bleiben');
+        $c->ok($s === 200 && ($d['birthday'] ?? null) === ['month' => $month, 'day' => $day, 'year' => null, 'visible' => true, 'show_age' => true, 'profile' => 'members'], 'Verwaltung ändert das Datum, die Schalter bleiben');
         [$s, $d] = $this->req('GET', "/members/$m");
         $c->ok($s === 200 && ($d['birthday']['month'] ?? null) === $month, 'Mitgliedsdetails mit Geburtstag');
 
@@ -1270,7 +1272,7 @@ final class ApiScenario
             $this->users[] = $newId;
         }
         [, $detail] = $this->req('GET', "/members/$newId");
-        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false, 'profile' => 'none'], 'Mitglied mit Geburtstag anlegen');
+        $c->ok($s === 201 && ($detail['birthday'] ?? null) === ['month' => 6, 'day' => 15, 'year' => 1985, 'visible' => true, 'show_age' => false, 'profile' => 'members'], 'Mitglied mit Geburtstag anlegen');
         $c->ok($this->req('DELETE', "/members/$newId")[0] === 200, 'Konto mit Geburtstag entfernen');
         $this->d->actAs($m2);
         [, $d] = $this->req('GET', '/birthdays');
@@ -1420,6 +1422,23 @@ final class ApiScenario
         $c->ok($s === 200 && ($d['applied'] ?? false) === true && count($imported) === 2, 'Import: Konten angelegt und als ehemalig eingetragen');
         [$s, $d] = $this->req('POST', '/members/former/import', ['csv' => $csv, 'apply' => true]);
         $c->ok($s === 200 && ($d['new'] ?? -1) === 0 && ($d['existing'] ?? 0) === 2, 'Import: zweiter Lauf legt nichts doppelt an');
+
+        // Mitglieder aus einer Tabelle, mit Ehemaligen (POST /members/import)
+        $csv = "Nachname;Vorname;Status;E-Mail;Eintritt;Ausgeschieden;Telefon\nImport$sfx;Kptest;;kptest$sfx@example.org;1999;;0\nAlt$sfx;Kptest;ehemalig;;Gründer;2001;\n";
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv]);
+        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
+        $created = (array) ($d['created'] ?? []);
+        foreach ($created as $u) {
+            $this->users[] = (int) $u['id'];
+        }
+        $former = array_values(array_filter((array) $this->req('GET', '/members/former')[1], static fn (array $f): bool => ($f['name'] ?? '') === "Kptest Alt$sfx"));
+        foreach ($former as $f) {
+            $this->users[] = (int) $f['id'];
+        }
+        $c->ok($s === 200 && count($created) === 1 && ($created[0]['password'] ?? '') !== '' && count($former) === 1 && ($former[0]['founder'] ?? false) === true, 'Mitglieder-Import: Mitglied mit Startpasswort, Ehemaliger ohne');
+        [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
+        $c->ok($s === 200 && ($d['existing'] ?? 0) === 2 && ($d['created'] ?? null) === [], 'Mitglieder-Import: zweiter Lauf legt nichts doppelt an');
     }
 
     private function events(): void

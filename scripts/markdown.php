@@ -7,9 +7,10 @@ declare(strict_types=1);
 
 /**
  * Markdown (kleine Auswahl) → HTML. Alles wird maskiert; Platzhalter bleiben als Text stehen.
- * $link bildet seite:name auf eine Adresse ab.
+ * $link bildet seite:name auf eine Adresse ab, $image bild:name auf die Adresse eines Bildes. Ein Bild steht als eigene
+ * Zeile: ![Beschreibung](bild:name). Ohne $image (oder wenn es null liefert) entfällt das Bild.
  */
-function kompanie_markdown(string $md, callable $link): string
+function kompanie_markdown(string $md, callable $link, ?callable $image = null): string
 {
     $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $inline = static function (string $s) use ($h, $link): string {
@@ -52,7 +53,15 @@ function kompanie_markdown(string $md, callable $link): string
             $flushList();
             continue;
         }
-        if (preg_match('/^(#{2,3})\s+(.+)$/', $t, $m)) {
+        if (preg_match('/^!\[([^\]]+)\]\(bild:([a-z0-9-]+)\)$/', trim($t), $m)) {
+            $flushPara();
+            $flushList();
+            $src = $image === null ? null : $image($m[2]);
+            if ($src !== null) {
+                $alt = $h($m[1]);
+                $out[] = '<figure class="hilfe-bild"><img src="' . $h($src) . '" alt="' . $alt . '" loading="lazy"><figcaption>' . $alt . '</figcaption></figure>';
+            }
+        } elseif (preg_match('/^(#{2,3})\s+(.+)$/', $t, $m)) {
             $flushPara();
             $flushList();
             $level = strlen($m[1]);

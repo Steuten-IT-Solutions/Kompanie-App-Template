@@ -295,9 +295,10 @@ final class Api
 
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
-     * Dienstgrad (mit Abzeichen) und Titel. Keine Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich
-     * Geburtstage) und Eintrittsjahr nur, soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit
-     * $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintrittsjahr: Sie haben ihre Jahre).
+     * Dienstgrad (mit Abzeichen) und Titel, bei Anwärtern der Name ihrer Rolle (candidate_role). Sonst keine Rollen,
+     * Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich Geburtstage) und Eintritt (join_year, join_date) nur,
+     * soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintritt: Sie haben
+     * ihre eigenen Daten).
      * Öffentlich, damit der Shortcode [kompanie_mitglieder] dieselbe Liste zeigt.
      *
      * @param list<array<string, mixed>>|null $entries
@@ -317,7 +318,7 @@ final class Api
             + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
             + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
             + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
-            + ($joined !== null ? ['join_year' => $joined[$m['id']] ?? null] : []), $entries ?? $a->members()->directory());
+            + ($joined !== null ? ['join_year' => $joined[$m['id']]['year'] ?? null, 'join_date' => $joined[$m['id']]['date'] ?? null] : []), $entries ?? $a->members()->directory());
     }
 
     /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -729,10 +730,10 @@ final class Api
             }, 'attendance', $denyRights),
 
             // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und
-            // Titel, dazu Geburtstag und Eintrittsjahr, soweit die Person sie dem Betrachter zeigt
+            // Titel, dazu Geburtstag und Eintritt, soweit die Person sie dem Betrachter zeigt
             new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
             new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
-            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied und die Jahre, kein Grund
+            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied, Eintritt und Ausscheiden, kein Grund
             new Route('GET', '/directory/former', $P, fn () => $this->directory($a->formerMembers()->directory()), 'directory'),
 
             // Mitglieder
@@ -786,8 +787,20 @@ final class Api
                 $photos = $a->memberPhotos()->urls();
                 return array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $a->formerMembers()->list($this->user()));
             }, null, $denyUsers),
+            // Eine ehemalige Person neu anlegen (Konto ohne Anmeldung), wie beim Mitglied mit Geburtstag und Foto
+            new Route('POST', '/members/former', Cap::CreateUsers, function (Request $r) use ($a) {
+                $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
+                $photo = $this->photoInput($r->body['photo'] ?? null);
+                $created = $a->formerMembers()->create($this->user(), $r->body);
+                $this->storeBirthday($created['id'], $birthday, $created);
+                $this->storePhoto($created['id'], $photo, $created);
+                return Response::created($created);
+            }, null, $denyUsers),
             // Import (Ersterfassung, z. B. aus einer Chronik): ohne apply nur die Vorschau
             new Route('POST', '/members/former/import', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            // Mitglieder aus einer Tabelle (CSV, in der App auch aus Excel gelesen), mit Anwärtern und Ehemaligen: ohne apply
+            // nur die Vorschau; mit apply stehen die Startpasswörter der neuen aktiven Konten in der Antwort
+            new Route('POST', '/members/import', Cap::CreateUsers, fn (Request $r) => $a->memberImport()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
             new Route('PUT', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('PATCH', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('DELETE', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyUsers),
@@ -947,6 +960,19 @@ final class Api
                     throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
                 }
                 return ['restored' => true];
+            }, null, $denySettings),
+            new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
+                $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));
+                $a->scheduleTasks();
+                return $status;
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/drive/upload', Cap::ManageSettings, function () use ($a) {
+                try {
+                    return $a->backupUpload()->upload();
+                } catch (\RuntimeException $e) {
+                    throw $e instanceof ApiError ? $e : new ApiError(502, 'upload_failed', $e->getMessage());
+                }
             }, null, $denySettings),
             new Route('POST', '/admin/setup/done', Cap::ManageSettings, function () use ($a) {
                 $a->settings->set(self::SETUP_SETTING, true);

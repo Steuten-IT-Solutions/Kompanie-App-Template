@@ -100,10 +100,11 @@ final class FormerMemberService
     }
 
     /**
-     * Ehemalige für die öffentliche Mitgliederliste (Tab „Ehemalige“, Bereich directory): nur Name, Gründungsmitglied und
-     * die Jahre von Eintritt und Ausscheiden. Kein Grund, keine genauen Daten, keine Punkte.
+     * Ehemalige für die öffentliche Mitgliederliste (Tab „Ehemalige“, Bereich directory): nur Name, Gründungsmitglied,
+     * Eintritt und Ausscheiden (joined_on, left_on wie eingetragen: JJJJ-MM-TT, JJJJ oder leer; dazu die Jahre für ältere
+     * Apps). Kein Grund, keine Punkte.
      *
-     * @return list<array{id: int, name: string, first_name: string, last_name: string, founder: bool, joined_year: string, left_year: string}>
+     * @return list<array{id: int, name: string, first_name: string, last_name: string, founder: bool, joined_year: string, left_year: string, joined_on: string, left_on: string}>
      */
     public function directory(): array
     {
@@ -123,6 +124,8 @@ final class FormerMemberService
                 'founder' => $row['founder'],
                 'joined_year' => substr($row['joined_on'], 0, 4),
                 'left_year' => substr($row['left_on'], 0, 4),
+                'joined_on' => $row['joined_on'],
+                'left_on' => $row['left_on'],
             ];
         }
         return $out;
@@ -228,6 +231,35 @@ final class FormerMemberService
     }
 
     /**
+     * Eine ehemalige Person neu anlegen (Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“): Konto ohne Anmeldung, gleich als
+     * ehemalig eingetragen, wie eine Zeile des Imports. Erst alles prüfen, dann anlegen. Wer genau so heißt wie ein
+     * vorhandenes Konto, wird nicht angelegt (wie beim Import, damit niemand doppelt entsteht). Steht die Person in
+     * Amtszeiten nur als freier Name, wird der Eintrag mit ihrem Konto verknüpft.
+     *
+     * @param array<string, mixed> $in first_name, last_name, reason, joined_on, founder, left_on
+     * @return array{id: int, name: string, offices_linked: int, reason: string, joined_on: string, founder: bool, left_on: string, previous_level: string}
+     */
+    public function create(User $actor, array $in): array
+    {
+        $data = self::valid($in, $this->app->time()->today());
+        $taken = [];
+        $prepared = $this->app->members()->prepare(['first_name' => $in['first_name'] ?? '', 'last_name' => $in['last_name'] ?? ''], $taken);
+        $key = mb_strtolower($prepared['name']);
+        foreach ($this->app->users->list(true) as $u) {
+            if (mb_strtolower($u->name) === $key) {
+                throw ApiError::invalid(sprintf(
+                    'Es gibt schon %s „%s“. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).',
+                    $this->previousRole($u) !== null ? 'eine ehemalige Person' : 'ein Konto',
+                    $u->name,
+                ));
+            }
+        }
+        $id = $this->createImported($actor, $prepared, $data);
+        $linked = $this->app->offices()->linkNames([$key => $id], true);
+        return ['id' => $id, 'name' => $prepared['name'], 'offices_linked' => $linked] + ($this->of($id) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.'));
+    }
+
+    /**
      * Ehemalige aus einer Tabelle anlegen (CSV mit Semikolon oder Tabulator): vorname;nachname;eintritt;ausgeschieden;grund.
      * - eintritt und ausgeschieden: TT.MM.JJJJ, JJJJ-MM-TT, nur das Jahr oder leer; eintritt „Gründer“ bzw.
      *   „Gründungsmitglied“ trägt ein Gründungsmitglied ohne Datum ein.
@@ -241,18 +273,7 @@ final class FormerMemberService
      */
     public function import(User $actor, mixed $csv, bool $apply): array
     {
-        if (!is_string($csv) || trim($csv) === '') {
-            throw ApiError::invalid('Bitte die Tabelle einfügen oder eine Datei wählen.');
-        }
-        if (strlen($csv) > self::IMPORT_MAX_BYTES) {
-            throw ApiError::invalid('Die Tabelle ist zu groß (höchstens 200 KB).');
-        }
-        if (!mb_check_encoding($csv, 'UTF-8')) {
-            // Excel speichert „CSV (Trennzeichen-getrennt)“ unter Windows als Windows-1252.
-            $csv = (string) mb_convert_encoding($csv, 'UTF-8', 'Windows-1252');
-        }
-        $csv = (string) preg_replace('/^\xEF\xBB\xBF/', '', $csv);
-        $lines = preg_split('/\r\n|\r|\n/', $csv) ?: [];
+        $lines = CsvTable::lines($csv, self::IMPORT_MAX_BYTES);
         $accounts = [];
         foreach ($this->app->users->list(true) as $u) {
             $accounts[mb_strtolower($u->name)][] = $u;
@@ -270,7 +291,7 @@ final class FormerMemberService
             if (trim(str_replace([';', "\t"], '', $line)) === '') {
                 continue;
             }
-            $cells = array_map('trim', str_getcsv($line, str_contains($line, ';') ? ';' : "\t", '"', ''));
+            $cells = CsvTable::cells($line, str_contains($line, ';') ? ';' : "\t");
             if ($count === 0 && mb_strtolower($cells[0] ?? '') === 'vorname') {
                 continue; // Kopfzeile
             }
@@ -322,10 +343,7 @@ final class FormerMemberService
         $done = 0;
         foreach ($planned as [$prepared, $data]) {
             try {
-                $created = $members->insert($prepared);
-                $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.');
-                $this->deactivate($actor, $target, $data);
-                $names[mb_strtolower($prepared['name'])] = $target->id;
+                $names[mb_strtolower($prepared['name'])] = $this->createImported($actor, $prepared, $data);
             } catch (ApiError $e) {
                 $this->app->offices()->linkNames(array_filter($names), true);
                 throw ApiError::invalid(sprintf('Nach %d von %d Personen abgebrochen bei „%s“: %s Ein neuer Import legt nur die übrigen an.', $done, count($planned), $prepared['name'], $e->getMessage()));
@@ -335,6 +353,21 @@ final class FormerMemberService
         $result['offices_linked'] = $this->app->offices()->linkNames($names, true);
         $result['applied'] = true;
         return $result;
+    }
+
+    /**
+     * Neues Konto (aus MemberService::prepare) gleich als ehemalig eintragen, wie beim Import der Ehemaligen.
+     *
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string} $prepared
+     * @param array{reason: string, joined_on: string, founder: bool, left_on: string} $data aus importData()
+     * @return int ID des Kontos
+     */
+    public function createImported(User $actor, array $prepared, array $data): int
+    {
+        $created = $this->app->members()->insert($prepared);
+        $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.');
+        $this->deactivate($actor, $target, $data);
+        return $target->id;
     }
 
     /**
@@ -431,17 +464,33 @@ final class FormerMemberService
         if (($cells[0] ?? '') === '') {
             throw ApiError::invalid('Der Vorname fehlt (1. Spalte).');
         }
-        $joinedRaw = $cells[2] ?? '';
-        $founder = in_array(mb_strtolower($joinedRaw), ['gründer', 'gründungsmitglied'], true);
-        $reasonRaw = mb_strtolower($cells[4] ?? '');
+        return self::importData($cells[2] ?? '', $cells[3] ?? '', $cells[4] ?? '', $today, ' (5. Spalte)');
+    }
+
+    /**
+     * Eintritt, Ausscheiden und Grund aus einer Tabelle (auch MemberImportService): Eintritt „Gründer“ bzw.
+     * „Gründungsmitglied“ ist ein Gründungsmitglied ohne Datum, Grund leer heißt ausgetreten.
+     *
+     * @return array{reason: string, joined_on: string, founder: bool, left_on: string}
+     */
+    public static function importData(string $joinedRaw, string $leftRaw, string $reasonRaw, \DateTimeImmutable $today, string $where = ''): array
+    {
+        $founder = self::isFounder($joinedRaw);
+        $reasonRaw = mb_strtolower($reasonRaw);
         $reason = $reasonRaw === '' ? self::REASON_LEFT : array_search($reasonRaw, self::REASONS, true);
         if ($reason === false) {
-            $reason = isset(self::REASONS[$reasonRaw]) ? $reasonRaw : throw ApiError::invalid('Grund „ausgetreten“, „verstorben“ oder „sonstiges“ erwartet (5. Spalte).');
+            $reason = isset(self::REASONS[$reasonRaw]) ? $reasonRaw : throw ApiError::invalid('Grund „ausgetreten“, „verstorben“ oder „sonstiges“ erwartet' . $where . '.');
         }
         $joined = $founder ? '' : self::date($joinedRaw, 'Eintritt', $today);
-        $left = self::date($cells[3] ?? '', $reason === self::REASON_DECEASED ? 'Todestag' : 'Ausgeschieden', $today);
+        $left = self::date($leftRaw, $reason === self::REASON_DECEASED ? 'Todestag' : 'Ausgeschieden', $today);
         self::checkOrder($joined, $left);
         return ['reason' => (string) $reason, 'joined_on' => $joined, 'founder' => $founder, 'left_on' => $left];
+    }
+
+    /** Eintritt „Gründer“ bzw. „Gründungsmitglied“ in einer Tabelle. */
+    public static function isFounder(string $joinedRaw): bool
+    {
+        return in_array(mb_strtolower(trim($joinedRaw)), ['gründer', 'gründungsmitglied'], true);
     }
 
     /**

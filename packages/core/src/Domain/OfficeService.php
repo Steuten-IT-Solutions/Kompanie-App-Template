@@ -74,8 +74,10 @@ final class OfficeService
         $directory = $this->app->features()->enabled('directory');
         $photos = $directory && $users !== [] ? $this->app->memberPhotos()->urls() : [];
         $former = $this->app->formerMembers();
+        // Titelnamen für die Pflege (Verknüpfung) und, mit Bereich Titel, als Bezeichnung für eine Person (holder_title)
         $titles = [];
-        if ($manager) {
+        $titlesShown = $this->app->features()->enabled('titles');
+        if ($manager || $titlesShown) {
             foreach ($this->app->titles()->repository()->all(false) as $t) {
                 $titles[$t['id']] = $t['title'];
             }
@@ -92,6 +94,8 @@ final class OfficeService
                 'id' => $o['id'],
                 'group_id' => $o['group_id'],
                 'title' => $o['title'],
+                // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“, null ohne verknüpften Titel
+                'holder_title' => $titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null,
                 'terms' => array_map(function (array $t) use ($holders, $users, $photos, $directory, $former, $manager, $viewer): array {
                     return self::termOut($t) + ['holders' => array_map(function (array $h) use ($users, $photos, $directory, $former, $manager, $viewer): array {
                         $user = $h['user_id'] !== null ? ($users[$h['user_id']] ?? null) : null;

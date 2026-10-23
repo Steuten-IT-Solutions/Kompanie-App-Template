@@ -4,16 +4,40 @@ reihenfolge: 38
 rechte: [member]
 bereiche: [documents]
 ---
-Unter **{bereich.documents}** findest du Dateien wie Satzung, Protokolle oder Formulare.
+Unter **{bereich.documents}** findest du Dateien der {kompanie.name} wie Satzung, Protokolle oder Formulare. Hier suchst du ein Dokument, öffnest es oder lädst es auf dein Gerät.
 
-## Finden
-Die {bereich.documents} sind nach Kategorien geordnet; was keiner Kategorie angehört, steht zuletzt unter „Weitere {bereich.documents}“. Beim Öffnen sind alle Kategorien eingeklappt; ein Tipp auf den Namen klappt sie auf oder zu. In Klammern steht, wie viele {bereich.documents} darin liegen. Bei jedem Dokument stehen der Stand (Datum), die Art der Datei und ihre Größe.
+![Die Liste der {bereich.documents}, nach Kategorien geordnet](bild:dokumente)
 
-Oben wählst du die **Sortierung** innerhalb der Kategorien: **Stand neu → alt** (vorgewählt), **Stand alt → neu**, **Name A–Z** oder **Name Z–A**. Dein Gerät merkt sich die Wahl.
+## So öffnest du die Seite
+Tippe unten auf **{bereich.documents}**.
 
-## Öffnen und herunterladen
-- **Öffnen** zeigt PDFs und Bilder direkt in der App. Mit **‹ Alle {bereich.documents}** kommst du zurück; die Kategorie bleibt aufgeklappt.
-- **Herunterladen** speichert die Datei. Andere Dateien, z. B. Word, Excel oder PowerPoint, gibt es nur zum Herunterladen. Auf dem iPhone öffnet sich dafür das Teilen-Menü („In Dateien sichern“).
+## Was du hier siehst
+- **Sortierung**: legt fest, in welcher Reihenfolge die {bereich.documents} innerhalb einer Kategorie stehen.
+- **Kategorien**: je eine Zeile mit dem Namen und in Klammern der Zahl der {bereich.documents}, z. B. „Protokolle (2)“. Was keiner Kategorie angehört, steht zuletzt unter **Weitere {bereich.documents}**. Gibt es gar keine Kategorien, stehen alle {bereich.documents} in einer Liste.
+- **Dokument**: Titel, **Stand** (das Datum des Dokuments), die Art der Datei (z. B. PDF, Bild, Word) und ihre Größe.
+- **Auch offline verfügbar**: steht bei {bereich.documents}, die schon auf deinem Gerät gespeichert sind.
+- **Eingeschränkt**: steht bei {bereich.documents}, die nur sieht, wer {bereich.documents} pflegt. Andere {rolle.member} sehen sie gar nicht.
+- **{bereich.documents} verwalten**: nur, wenn du {bereich.documents} pflegen darfst. Dort lädst du {bereich.documents} hoch und änderst sie.
 
-## Offline
-Was du einmal geöffnet oder heruntergeladen hast, ist auch ohne Netz verfügbar; dann steht „Auch offline verfügbar“ dabei. Gibt es eine neue Fassung, lädt die App beim nächsten Öffnen die neue. Beim Abmelden werden die gespeicherten {bereich.documents} vom Gerät gelöscht.
+## So gehst du vor
+### Ein Dokument finden
+1. Wähle bei **Sortierung**, wie die {bereich.documents} geordnet sein sollen: **Stand neu → alt** (vorgewählt), **Stand alt → neu**, **Name A–Z** oder **Name Z–A**.
+2. Tippe auf den Namen einer Kategorie. Sie klappt auf und zeigt ihre {bereich.documents}. Ein zweiter Tipp klappt sie wieder zu.
+
+![Eine aufgeklappte Kategorie mit den Knöpfen Öffnen und Herunterladen](bild:dokumente-kategorie)
+
+### Ein Dokument öffnen oder herunterladen
+1. Tippe beim Dokument auf **Öffnen**. PDFs und Bilder zeigt die App direkt an (siehe [Dokument ansehen](seite:dokument-ansehen)).
+2. Oder tippe auf **Herunterladen**, um die Datei auf deinem Gerät zu speichern. Auf dem iPhone öffnet sich dafür das Teilen-Menü; dort wählst du z. B. „In Dateien sichern“.
+
+Word-, Excel-, PowerPoint- und OpenDocument-Dateien haben nur den Knopf **Herunterladen**.
+
+## Gut zu wissen
+- Beim Öffnen der Seite sind alle Kategorien zugeklappt. Kommst du von einem geöffneten Dokument zurück, ist seine Kategorie aufgeklappt.
+- Dein Gerät merkt sich die gewählte Sortierung. Sie gilt auch auf der Seite **{bereich.documents} verwalten**.
+- Was du einmal geöffnet oder heruntergeladen hast, kannst du auch ohne Netz öffnen. Gibt es eine neue Fassung, lädt die App beim nächsten Öffnen die neue.
+- Wenn du dich abmeldest, löscht die App die gespeicherten {bereich.documents} von deinem Gerät.
+- Für neue {bereich.documents} gibt es keine Benachrichtigung.
+
+## Siehe auch
+- [Dokument ansehen](seite:dokument-ansehen)

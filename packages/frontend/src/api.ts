@@ -5,6 +5,7 @@ import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
+import { rememberRoute } from './share';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -373,6 +374,8 @@ export interface DirectoryEntry {
   name: string;
   first_name: string;
   last_name: string;
+  /** Rolle, solange die Person noch als Mitglied aufzunehmen ist (z. B. Anwärter); fehlt bei Ehemaligen und älteren Servern */
+  candidate_role?: string | null;
   /** Foto (128 Pixel), null ohne */
   photo_url: string | null;
   /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */
@@ -384,6 +387,8 @@ export interface DirectoryEntry {
   birthday?: DirectoryBirthday | null;
   /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
   join_year?: number | null;
+  /** Eintritt wie eingetragen (JJJJ-MM-TT oder JJJJ), soweit gezeigt; fehlt bei Ehemaligen und älteren Servern */
+  join_date?: string | null;
 }
 
 /** Geburtstag auf der Seite einer Person: Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr. */
@@ -398,7 +403,7 @@ export interface DirectoryBirthday {
 /** Wem eine Angabe auf der eigenen Seite in der Mitgliederliste erscheint: nicht, nur Mitgliedern, allen. */
 export type ProfileVisibility = 'none' | 'members' | 'public';
 
-/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht nur das Jahr). */
+/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht er, wie er eingetragen ist). */
 export interface JoinYear {
   year: number;
   /** JJJJ-MM-TT oder nur das Jahr JJJJ; fehlt bei älteren Servern (nur year) */
@@ -406,11 +411,15 @@ export interface JoinYear {
   profile: ProfileVisibility;
 }
 
-/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied und Jahre (JJJJ oder leer). */
+/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied, Eintritt und Ausscheiden. */
 export interface DirectoryFormerEntry extends DirectoryEntry {
   founder: boolean;
+  /** Jahre (JJJJ oder leer) */
   joined_year: string;
   left_year: string;
+  /** wie eingetragen (JJJJ-MM-TT, JJJJ oder leer); fehlen bei älteren Servern */
+  joined_on?: string;
+  left_on?: string;
 }
 
 export interface MemberDetail extends MemberSummary {
@@ -464,6 +473,17 @@ export interface FormerInput {
   left_on: string;
 }
 
+/** Neu angelegte ehemalige Person (POST /members/former) */
+export interface CreatedFormer extends FormerInfo {
+  id: number;
+  name: string;
+  /** Einträge in Amtszeiten (nur freier Name), die mit dem Konto verknüpft wurden */
+  offices_linked: number;
+  /** Person angelegt, aber Geburtstag bzw. Foto nicht übernommen */
+  warning?: string;
+  photo_url?: string | null;
+}
+
 /** Zeile der Vorschau beim Import der Ehemaligen */
 export interface FormerImportRow {
   line: number;
@@ -486,6 +506,48 @@ export interface FormerImportResult {
   /** Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden */
   offices_linked?: number;
   applied: boolean;
+}
+
+/** Zeile der Vorschau beim Import der Mitglieder (POST /members/import) */
+export interface MemberImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  status?: 'active' | 'former';
+  /** Rolle des neuen Kontos (null bei Ehemaligen) */
+  level?: Level | null;
+  /** leer bei Ehemaligen (sie melden sich nicht an) */
+  username?: string;
+  email?: string;
+  /** JJJJ-MM-TT oder MM-TT */
+  birthday?: string;
+  /** JJJJ-MM-TT oder JJJJ */
+  joined_on?: string;
+  points?: number;
+  rank?: string;
+  titles?: string[];
+  /** nur Ehemalige */
+  reason?: FormerReason;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface MemberImportResult {
+  columns: { used: string[]; ignored: { column: string; reason: string }[] };
+  rows: MemberImportRow[];
+  /** Vorschau: was angelegt würde; nach dem Übernehmen: was angelegt wurde */
+  new: { active: number; former: number };
+  existing: number;
+  offices_linked: number;
+  applied: boolean;
+  /** Zugangsdaten der neuen Mitglieder und Anwärter (nur nach dem Übernehmen) */
+  created: CreatedUser[];
+  /** Abbruch mittendrin: die schon angelegten stehen in created */
+  error?: string;
 }
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
@@ -847,6 +909,8 @@ export interface Office {
   id: number;
   group_id: number | null;
   title: string;
+  /** Einzahl für den Zeitstrahl einer Person: Name des verknüpften Titels (nur mit Bereich Titel, nur in GET /offices) */
+  holder_title?: string | null;
   /** Laufende zuerst, dann nach Beginn absteigend */
   terms: OfficeTerm[];
   /** Nur für die Pflege: verknüpfter Titel */
@@ -1062,6 +1126,8 @@ let csrfToken = config?.csrf.token ?? '';
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
+  // Nach der Anmeldung zurück auf diese Seite (z. B. aus einem geteilten Link), siehe main.tsx.
+  rememberRoute(window.location.hash);
   if (config?.auth.mode === 'redirect' && config.auth.loginUrl) {
     window.location.href = config.auth.loginUrl;
   } else {
@@ -1261,7 +1327,10 @@ export const api = {
   markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
   updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
   reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
+  createFormer: (data: PersonName & FormerInput & { birthday?: string; photo?: EncodedFile }) =>
+    request<CreatedFormer>('POST', '/members/former', data),
   importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
+  importMembers: (csv: string, apply: boolean) => request<MemberImportResult>('POST', '/members/import', { csv, apply }),
   createUser: (
     data: PersonName & {
       username?: string;
@@ -1460,6 +1529,9 @@ export const api = {
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
+  setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
+  uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
   clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
@@ -1559,6 +1631,22 @@ const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push
 const guestAuth = (device: PushDevice): string | undefined => (config?.user ? undefined : device.keys.auth);
 
 export type StatusLevel = 'ok' | 'warn' | 'error' | 'off';
+
+/** Sicherungen in Google Drive (Einstellungen → Datensicherung). */
+export interface BackupDriveStatus {
+  /** Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden */
+  available: boolean;
+  /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
+  access: boolean;
+  enabled: boolean;
+  email: string;
+  folder_url: string | null;
+  last_ok: number | null;
+  last_try: number | null;
+  error: string | null;
+  every_days: number;
+  keep: number;
+}
 
 export interface UpdateStatus {
   configured: boolean;

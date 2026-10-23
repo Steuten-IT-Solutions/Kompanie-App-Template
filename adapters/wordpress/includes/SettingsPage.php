@@ -10,7 +10,7 @@ use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Http\ApiError;
 
-/** Einstellungen → <Name der Kompanie>: Wartung, Bereiche, Google-Zugang, Kalender und Galerie. */
+/** Einstellungen → <Name der Kompanie>: Wartung, Bereiche, Google-Zugang, Kalender, Galerie und Platzhalterbild der Webseite. */
 final class SettingsPage
 {
     public const PAGE = 'kompanie-app';
@@ -30,6 +30,13 @@ final class SettingsPage
         add_action('admin_notices', [self::class, 'permalinkNotice']);
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
         add_action('admin_post_kompanie_app_gallery_sync', static fn () => self::syncGallery(Plugin::app()));
+        add_action('admin_post_kompanie_app_members_placeholder', static fn () => self::saveMembersPlaceholder(Plugin::app()));
+        // Auswahl des Platzhalterbilds aus der Mediathek.
+        add_action('admin_enqueue_scripts', static function (string $hook): void {
+            if ($hook === 'settings_page_' . self::PAGE) {
+                wp_enqueue_media();
+            }
+        });
         add_action('admin_post_kompanie_app_google_connect', static fn () => self::googleConnect(Plugin::app()));
         add_action('admin_post_kompanie_app_google_disconnect', static fn () => self::googleDisconnect(Plugin::app()));
         add_action('admin_post_kompanie_app_service_account', static fn () => self::saveServiceAccount(Plugin::app()));
@@ -235,8 +242,76 @@ final class SettingsPage
                 <p><em>Bereite weitere Bilder auf …</em></p>
                 <script>setTimeout(function(){document.getElementById('kompanie-gallery-sync').submit();},800);</script>
             <?php endif; ?>
+
+            <hr />
+            <?php self::renderMembersPlaceholder($app); ?>
         </div>
         <?php
+    }
+
+    /** Platzhalterbild für [kompanie_mitglieder]: aus der Mediathek wählen (wird gleich gespeichert) oder entfernen. */
+    private static function renderMembersPlaceholder(App $app): void
+    {
+        $id = (int) $app->settings->get(Shortcodes::MEMBERS_PLACEHOLDER, 0);
+        $preview = $id > 0 ? wp_get_attachment_image_url($id, 'medium') : false;
+        ?>
+        <h2 id="webseite">Webseite: Mitglieder ohne Foto</h2>
+        <p>Die Mitgliederliste auf der Webseite (<code>[kompanie_mitglieder]</code>) zeigt bei Personen ohne Foto dieses Bild
+           statt der Anfangsbuchstaben, z. B. eine Silhouette oder das Logo. Am besten im Hochformat 2 : 3; andere Formate
+           werden mittig zugeschnitten. Ohne Platzhalterbild stehen dort die Anfangsbuchstaben. Die App selbst zeigt weiter die Anfangsbuchstaben.</p>
+        <?php if ($id > 0 && $preview === false) : ?>
+            <div class="notice notice-warning inline"><p>Das gewählte Bild ist nicht mehr in der Mediathek. Bis du ein neues wählst, stehen dort die Anfangsbuchstaben.</p></div>
+        <?php endif; ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" id="kompanie-members-placeholder">
+            <input type="hidden" name="action" value="kompanie_app_members_placeholder" />
+            <?php wp_nonce_field('kompanie_app_members_placeholder'); ?>
+            <input type="hidden" name="placeholder_id" id="kompanie-placeholder-id" value="<?php echo esc_attr($id > 0 ? (string) $id : ''); ?>" />
+            <?php if ($preview !== false) : ?>
+                <p><img src="<?php echo esc_url($preview); ?>" alt="Aktuelles Platzhalterbild" style="width:120px;aspect-ratio:2/3;object-fit:cover;display:block" /></p>
+            <?php endif; ?>
+            <p>
+                <button type="button" class="button" id="kompanie-placeholder-choose"><?php echo $preview !== false ? 'Anderes Bild wählen' : 'Bild aus der Mediathek wählen'; ?></button>
+                <?php if ($id > 0) : ?>
+                    <?php submit_button('Platzhalterbild entfernen', 'delete', 'remove', false); ?>
+                <?php endif; ?>
+            </p>
+        </form>
+        <script>
+        (function(){var b=document.getElementById('kompanie-placeholder-choose');if(!b)return;
+        b.addEventListener('click',function(){if(!window.wp||!wp.media)return;
+        var f=wp.media({title:'Platzhalterbild für Mitglieder ohne Foto',library:{type:'image'},multiple:false,button:{text:'Übernehmen'}});
+        f.on('select',function(){var a=f.state().get('selection').first();if(!a)return;
+        document.getElementById('kompanie-placeholder-id').value=a.id;document.getElementById('kompanie-members-placeholder').submit();});
+        f.open();});})();
+        </script>
+        <?php
+    }
+
+    private static function saveMembersPlaceholder(App $app): never
+    {
+        self::guard('kompanie_app_members_placeholder');
+        [$message, $error] = self::applyMembersPlaceholder($app, wp_unslash($_POST));
+        self::back($message, $error, 'webseite');
+    }
+
+    /**
+     * Platzhalterbild aus dem Formular speichern bzw. entfernen (ohne Weiterleitung, damit testbar).
+     *
+     * @param array<string, mixed> $post
+     * @return array{0: string, 1: bool} Meldung und ob sie ein Fehler ist
+     */
+    public static function applyMembersPlaceholder(App $app, array $post): array
+    {
+        if (isset($post['remove'])) {
+            $app->settings->delete(Shortcodes::MEMBERS_PLACEHOLDER);
+            return ['Platzhalterbild entfernt. Personen ohne Foto zeigen wieder die Anfangsbuchstaben.', false];
+        }
+        $id = isset($post['placeholder_id']) && is_scalar($post['placeholder_id']) ? absint($post['placeholder_id']) : 0;
+        if ($id === 0 || !wp_attachment_is_image($id)) {
+            return ['Bitte ein Bild aus der Mediathek wählen.', true];
+        }
+        $app->settings->set(Shortcodes::MEMBERS_PLACEHOLDER, $id);
+        return ['Platzhalterbild gespeichert.', false];
     }
 
     /** Google-Zugang für Galerie und Kalender: „Mit Google verbinden“, darunter als Alternative das Dienstkonto. */

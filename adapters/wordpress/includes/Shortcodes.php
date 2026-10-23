@@ -13,10 +13,13 @@ use KompanieApp\Core\Domain\MemberPhotoService;
  * [kompanie_termine anzahl="10"]  Kommende öffentliche Termine aus der App.
  * [kompanie_galerie]              Galerie (Jahre → Alben → Bilder).
  * [kompanie_aemter gruppe="…"]    Ämter mit Inhabern und Chronik (optional nur eine Gruppe).
- * [kompanie_mitglieder]           Mitglieder als Bildergalerie (Foto mit Namen, Großansicht beim Antippen).
+ * [kompanie_mitglieder]           Mitglieder (ohne Anwärter) als Bildergalerie (Foto mit Namen, Großansicht beim Antippen).
  */
 final class Shortcodes
 {
+    /** Einstellung: Bild aus der Mediathek (ID) für Personen ohne Foto in [kompanie_mitglieder]; leer = Anfangsbuchstaben. */
+    public const MEMBERS_PLACEHOLDER = 'members_placeholder';
+
     public static function init(App $app): void
     {
         add_shortcode('kompanie_termine', static fn ($atts) => self::events($app, is_array($atts) ? $atts : []));
@@ -30,6 +33,8 @@ final class Shortcodes
      * und verwerfen sie; eine „nur einmal“-Ausgabe ginge dann verloren. Doppelt schadet nicht.
      * Schrift in der Textfarbe der Webseite (hell und dunkel lesbar, auch mit dunklem Modus des Themes);
      * die Kompaniefarbe nur für Flächen und Leisten, Linien aus currentColor.
+     * Abstände der Listen mit !important: Themes rücken Listen im Inhalt mit spezifischeren Regeln ein (Astra:
+     * .entry-content ul{padding-left:20px}); die Galerie stünde sonst nicht mittig.
      */
     private static function styles(App $app): string
     {
@@ -37,7 +42,7 @@ final class Shortcodes
         $accent = $app->config->accentColor();
         return '<style id="kompanie-app-css">
 .ka{--ka-primary:' . esc_attr($primary) . ';--ka-accent:' . esc_attr($accent) . ';--ka-line:color-mix(in srgb,currentColor 15%,transparent)}
-.ka-termine{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.ka-termine{list-style:none;margin:0!important;padding:0!important;display:flex;flex-direction:column;gap:12px}
 .ka-termin{display:flex;gap:16px;align-items:flex-start;padding:14px 16px;border:1px solid var(--ka-line);border-left:4px solid var(--ka-primary);border-radius:10px}
 .ka-datum{flex:none;width:56px;border-radius:8px;overflow:hidden;text-align:center;background:var(--ka-primary);color:#fff;display:flex;flex-direction:column}
 .ka-monat{background:rgba(0,0,0,.18);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 0}
@@ -64,17 +69,17 @@ final class Shortcodes
 .ka-aemter{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;align-items:start}
 .ka-amt{border:1px solid var(--ka-line);border-top:4px solid var(--ka-primary);border-radius:10px;padding:14px 16px}
 .ka-amt-titel{margin:0 0 10px;font-size:1.1rem}
-.ka-inhaber{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ka-inhaber{list-style:none;margin:0!important;padding:0!important;display:flex;flex-direction:column;gap:8px}
 .ka-person{display:flex;gap:10px;align-items:center}
 .ka-bild{flex:none;width:56px;height:56px;border-radius:50%;object-fit:cover;object-position:50% 0;background:var(--ka-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95rem}
 .ka-name{font-weight:700}.ka-klein{display:block;font-size:.85rem;opacity:.75}
 .ka-chronik{margin-top:10px}.ka-chronik summary{cursor:pointer;font-size:.92rem}
 .ka-chronik ol{list-style:none;margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--ka-accent);display:flex;flex-direction:column;gap:6px;font-size:.92rem}
 .ka-jahre{font-weight:700;margin-right:6px}
-.ka-mitglieder{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
+.ka-mitglieder{list-style:none;margin:0!important;padding:0!important;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}
 @media(max-width:976px){.ka-mitglieder{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:767px){.ka-mitglieder{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.ka-mitglied{position:relative;margin:0;overflow:hidden;box-shadow:0 18px 40px -10px rgba(0,0,0,.2);transition:box-shadow .2s}
+.ka-mitglied{position:relative;margin:0!important;overflow:hidden;box-shadow:0 18px 40px -10px rgba(0,0,0,.2);transition:box-shadow .2s}
 .ka-mitglied:hover,.ka-mitglied:focus-within{box-shadow:none}
 .ka-mitglied a{display:block;color:inherit}
 .ka-mitglied img,.ka-mitglied-leer{display:block;width:100%;height:auto;aspect-ratio:2/3;object-fit:cover}
@@ -311,7 +316,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         if (!$app->features()->enabled('directory')) {
             return '';
         }
-        $members = $app->api()->directory();
+        // Nur Mitglieder: Anwärter (nur interner Kalender) stehen in der App, aber nicht auf der Webseite.
+        $members = $app->members()->directory(true);
         $collator = class_exists(\Collator::class) ? new \Collator('de_DE') : null;
         usort($members, static fn (array $a, array $b): int => $collator !== null ? (int) $collator->compare($a['name'], $b['name']) : strcasecmp($a['name'], $b['name']));
         $html = self::styles($app);
@@ -322,6 +328,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         $medium = $app->memberPhotos()->urls(480);
         $large = $app->memberPhotos()->urls(1024);
         $original = $app->memberPhotos()->urls(MemberPhotoService::MAX_EDGE); // nachgeladen; fehlt bei älteren Fotos (404)
+        $placeholder = self::membersPlaceholder($app);
         $html .= self::lightbox() . '<ul class="ka ka-mitglieder">';
         foreach ($members as $m) {
             $name = esc_html($m['name']);
@@ -335,11 +342,32 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                     $caption,
                     esc_url($original[$m['id']] ?? $large[$m['id']]),
                 );
+            } elseif ($placeholder !== '') {
+                // Ohne Großansicht: Das Platzhalterbild zeigt nicht die Person.
+                $html .= '<li class="ka-mitglied">' . $placeholder . $caption . '</li>';
             } else {
                 $html .= '<li class="ka-mitglied"><span class="ka-mitglied-leer" aria-hidden="true">' . esc_html(self::initials($m['name'])) . '</span>' . $caption . '</li>';
             }
         }
         return $html . '</ul>';
+    }
+
+    /**
+     * Platzhalterbild aus den Einstellungen als <img> (mit srcset der Mediathek), leer ohne Einstellung oder wenn das Bild
+     * nicht mehr in der Mediathek ist; dann bleiben die Anfangsbuchstaben.
+     */
+    private static function membersPlaceholder(App $app): string
+    {
+        $id = (int) $app->settings->get(self::MEMBERS_PLACEHOLDER, 0);
+        if ($id <= 0 || !wp_attachment_is_image($id)) {
+            return '';
+        }
+        return wp_get_attachment_image($id, 'medium_large', false, [
+            'class' => 'ka-mitglied-platzhalter',
+            'alt' => '',
+            'loading' => 'lazy',
+            'sizes' => '(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw',
+        ]);
     }
 
     /** Foto rund (Hochformat oben ausgerichtet), ohne Foto die Initialen auf der Kompaniefarbe. */

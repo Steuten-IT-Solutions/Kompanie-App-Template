@@ -206,4 +206,19 @@ final class CoreTest extends TestCase
         $this->assertContains('attempts', \KompanieApp\Core\Storage\Sql\Schema::columns($db, 'photos'), 'Spalte aus Migration 2 genau einmal');
         TestApp::dropTables($db);
     }
+
+    public function testMigrationShowsExistingBirthdaysAndJoinYearsToMembers(): void
+    {
+        $db = TestApp::connection();
+        $settings = new MemorySettings();
+        $all = Migrations::all();
+        (new Migrator($db, $settings, array_filter($all, static fn (int $v): bool => $v < 23, ARRAY_FILTER_USE_KEY)))->migrate();
+        $db->insert('birthdays', ['user_id' => 1, 'month' => 3, 'day' => 12, 'year' => null, 'visible' => 1, 'show_age' => 0, 'profile' => 'none', 'updated_by' => 1, 'updated_at' => '2026-01-01 00:00:00']);
+        $db->insert('birthdays', ['user_id' => 2, 'month' => 4, 'day' => 1, 'year' => null, 'visible' => 1, 'show_age' => 0, 'profile' => 'public', 'updated_by' => 1, 'updated_at' => '2026-01-01 00:00:00']);
+        $db->insert('join_years', ['user_id' => 1, 'year' => 2005, 'joined_on' => '', 'profile' => 'none', 'updated_by' => 1, 'updated_at' => '2026-01-01 00:00:00']);
+        (new Migrator($db, $settings, $all))->migrate();
+        $this->assertSame(['members', 'public'], array_column($db->select('SELECT profile FROM {birthdays} ORDER BY user_id'), 'profile'));
+        $this->assertSame('members', $db->scalar('SELECT profile FROM {join_years} WHERE user_id = 1'));
+        TestApp::dropTables($db);
+    }
 }

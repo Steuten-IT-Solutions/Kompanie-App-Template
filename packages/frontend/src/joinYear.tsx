@@ -1,6 +1,6 @@
 // Seite einer Person in der Mitgliederliste: wem Geburtstag und Eintrittsjahr dort erscheinen (wählt nur die Person
 // selbst), dazu der Eintritt (Datum oder nur das Jahr) unter „Mein Konto“ und in den Mitgliedsdetails (wer Mitglieder
-// anlegen darf). Auf der Seite steht immer nur das Jahr.
+// anlegen darf). Auf der Seite steht er, wie er eingetragen ist (Datum oder nur das Jahr).
 
 import { useState, type FormEvent } from 'react';
 import { api, can, config, type JoinYear, type ProfileVisibility } from './api';
@@ -58,7 +58,7 @@ export function profileHint(v: ProfileVisibility): string {
 const editValue = (j: JoinYear | null): string => (j ? editYearOrDate(j.date ?? String(j.year)) : '');
 
 /** Eintritt zum Anzeigen: „am 12.03.2005“ bzw. „2005“. */
-const joinText = (j: JoinYear): string => {
+export const joinText = (j: JoinYear): string => {
   const d = j.date ?? String(j.year);
   return d.length === 4 ? d : `am ${formatYearOrDate(d)}`;
 };
@@ -101,7 +101,7 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const current = data?.join_year ?? null;
   const v = value ?? editValue(current);
-  const p = profile ?? current?.profile ?? 'none';
+  const p = profile ?? current?.profile ?? 'members';
 
   const done = (joinYear: JoinYear | null, msg: string) => {
     setData({ join_year: joinYear });
@@ -142,7 +142,7 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
   return (
     <form className="form card account-card join-year-card" onSubmit={save}>
       <h3>Eintritt</h3>
-      <p className="muted small">Wann du eingetreten bist: das Datum oder nur das Jahr. Auf deiner Seite steht nur das Jahr.</p>
+      <p className="muted small">Wann du eingetreten bist: das Datum oder nur das Jahr. So steht es auch auf deiner Seite.</p>
       <DateField value={v} onChange={setValue} disabled={busy || pending} />
       <ProfileSelect value={p} onChange={setProfile} disabled={busy || pending} />
       <p className="muted small">{profileHint(p)}</p>

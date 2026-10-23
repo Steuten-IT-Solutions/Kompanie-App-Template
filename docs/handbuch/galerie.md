@@ -1,20 +1,30 @@
 ---
 titel: "{bereich.gallery}"
-reihenfolge: 37
+reihenfolge: 38
 rechte: []
 bereiche: [gallery]
 ---
-Die **{bereich.gallery}** zeigt die Fotoalben der {kompanie.name}, nach Jahren geordnet, das neueste Jahr oben. Unter jedem Album steht, wie viele Bilder es hat.
+Die **{bereich.gallery}** zeigt die Fotoalben der {kompanie.name}, nach Jahren geordnet, das neueste Jahr oben. Von hier öffnest du ein Album und siehst dir die Bilder an.
 
-## Bilder ansehen
-1. Ein Album antippen; die Bilder erscheinen als kleine Vorschau.
-2. Ein Bild antippen: Es öffnet sich groß, nach einem Moment in voller Auflösung. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf die Pfeile, am Computer gehen auch die Pfeiltasten.
-3. Vergrößern: zwei Finger auseinanderziehen (bis zu vierfach) oder doppelt tippen. Vergrößert verschiebst du das Bild mit einem Finger; doppelt tippen stellt es wieder zurück.
-4. **✕** (oder die Escape-Taste) schließt das Bild, **‹ Alle Alben** führt zurück zur Übersicht.
+![Übersicht der Alben eines Jahres mit Titel und Anzahl der Bilder](bild:galerie)
 
-## Interne Bilder
-Manche Bilder sind nur für {rolle.member} bestimmt. Du siehst sie nur, wenn du als {rolle.member} angemeldet bist; sie tragen ein Schloss 🔒, und unter dem Album steht, wie viele davon intern sind. Ohne Anmeldung fehlen sie einfach. Wie du dich anmeldest: [Anmelden und Konto](seite:anmelden-und-konto).
+## So öffnest du die Seite
+Tippe unten auf **{bereich.gallery}**.
+
+## Was du hier siehst
+- **Jahr**: Überschrift über den Alben dieses Jahres.
+- **Album**: ein Vorschaubild, der Titel und die Anzahl der Bilder, z. B. „3 Bilder · 1 intern“. „intern“ zählt die Bilder, die nur {rolle.member} sehen.
+
+## So gehst du vor
+### Ein Album öffnen
+1. Tippe auf das Album.
+2. Die Bilder erscheinen als kleine Vorschau. Wie es weitergeht, steht unter [Ein Album ansehen](seite:galerie-album).
 
 ## Gut zu wissen
-- Die Bilder kommen aus einem Ordner, den die Kompanie pflegt; die App gleicht ihn regelmäßig ab. Neue Bilder brauchen beim ersten Öffnen manchmal einen Moment, bis sie aufbereitet sind. Die App lädt sie dann von selbst nach.
-- Fehlt ein Album oder ein Bild, wende dich an die Verantwortlichen eurer Kompanie.
+- Manche Bilder sind nur für {rolle.member} bestimmt. Du siehst sie nur, wenn du als {rolle.member} angemeldet bist. Ohne Anmeldung fehlen sie einfach, ebenso Alben, die nur solche Bilder enthalten. Wie du dich anmeldest: [Anmelden](seite:anmelden).
+- Die Bilder kommen aus einem Ordner, den die {kompanie.name} pflegt; die App gleicht ihn regelmäßig ab. Neue Alben erscheinen deshalb nicht sofort.
+- Gibt es noch keine Bilder, steht dort „Noch keine Bilder in der Galerie.“
+- Fehlt ein Album oder ein Bild, wende dich an die Verantwortlichen der {kompanie.name}.
+
+## Siehe auch
+- [Ein Album ansehen](seite:galerie-album)

@@ -10,11 +10,25 @@ export function badgeSrc(url: string, px: number): string {
   return /([?&])s=\d+/.test(url) ? url.replace(/([?&])s=\d+/, `$1s=${px}`) : `${url}${url.includes('?') ? '&' : '?'}s=${px}`;
 }
 
+/** Bild in den Speicher des Browsers laden; fertig, wenn es da ist oder nicht lädt (zum Vorladen nacheinander). */
+export function preloadImage(src: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
 /**
  * Abzeichen eines Dienstgrads (Issue #17). Ohne eigenen Hintergrund, Rahmen oder Farbfilter: Transparente Abzeichen
  * stehen direkt auf der Fläche dahinter (hell wie dunkel). Ohne Abzeichen (oder wenn es nicht lädt) nichts; die
  * Bezeichnung zeigt der Aufrufer wie bisher.
  */
+/** Abzeichen schon laden (z. B. des nächsten Mitglieds beim Wischen), damit es ohne Verzögerung erscheint. */
+export function preloadBadge(url: string | null | undefined, size: RankBadgeSize = 'large'): Promise<void> {
+  return url ? preloadImage(badgeSrc(url, PIXELS[size])) : Promise.resolve();
+}
+
 export function RankBadge({ url, title, size = 'small' }: { url?: string | null; title: string; size?: RankBadgeSize }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);

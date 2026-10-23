@@ -14,7 +14,7 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  *
  * - Jedes Mitglied pflegt seinen eigenen Geburtstag (Tag und Monat, Jahr freiwillig) mit zwei Schaltern: „Anderen
  *   Mitgliedern zeigen“ (visible, Standard an) und „Alter anzeigen“ (show_age, Standard aus). Dazu wählt es, wem der
- *   Geburtstag auf seiner Seite in der Mitgliederliste erscheint (profile: none, members, public; Standard none,
+ *   Geburtstag auf seiner Seite in der Mitgliederliste erscheint (profile: none, members, public; Standard members,
  *   unabhängig von visible): mit show_age und Jahr das ganze Datum und das Alter, sonst nur Tag und Monat.
  * - Wer Mitglieder anlegen darf (create_users), trägt das Datum anderer ein oder entfernt es; die beiden Schalter
  *   bleiben dabei, wie die Person sie gesetzt hat.
@@ -130,7 +130,7 @@ final class BirthdayService
 
     /**
      * Eigener Geburtstag mit Jahr und Schaltern (PUT /me/birthday); fehlende Schalter bleiben (neu: sichtbar, ohne Alter,
-     * nicht auf der eigenen Seite in der Mitgliederliste).
+     * auf der eigenen Seite in der Mitgliederliste nur für Mitglieder).
      *
      * @param array<string, mixed> $in month, day, year, visible, show_age, profile
      * @return array{month: int, day: int, year: int|null, visible: bool, show_age: bool, profile: string}|null

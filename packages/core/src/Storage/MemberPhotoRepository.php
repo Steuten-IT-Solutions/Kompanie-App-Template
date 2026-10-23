@@ -17,7 +17,7 @@ final class MemberPhotoRepository
 {
     /** Größen (längere Kante in Pixeln) => Spalte; xlarge ist NULL bei Fotos, die vor Datenbankversion 18 hochgeladen wurden. */
     public const COLUMNS = [128 => 'small', 480 => 'large', 1024 => 'xlarge'];
-    /** Originalauflösung (Datenbankversion 23): eigene Spalte, eigenes UPDATE; NULL, wenn es sie nicht gibt. */
+    /** Originalauflösung (Datenbankversion 24): eigene Spalte, eigenes UPDATE; NULL, wenn es sie nicht gibt. */
     public const ORIGINAL_COLUMN = 'original';
 
     public function __construct(private readonly Connection $db)

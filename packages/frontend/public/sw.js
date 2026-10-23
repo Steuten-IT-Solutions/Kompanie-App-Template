@@ -24,6 +24,9 @@
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
  * - Abzeichen der Dienstgrade (<App>/abzeichen/<id>?v=<Fassung>&s=<Größe>, Issue #17) → zuerst aus dem Speicher,
  *   ebenso versioniert; je Dienstgrad und Größe nur die aktuelle Fassung. Einmal geladen, sind sie offline da.
+ * - Bildschirmfotos des Handbuchs (<Programmdateien>/handbuch/bilder/<name>.jpg?v=<Version>) → zuerst aus dem Speicher;
+ *   je Foto nur die Fassung der aktuellen Version. Vorab geladen wird nichts (die App bliebe sonst nicht klein); was
+ *   einmal in der Hilfe angesehen wurde, ist offline da.
  * - Rückkehr von Google („Mit Google verbinden“, <App>/google/callback bzw. ?r=/google/callback) → durchreichen: Der
  *   Server tauscht dort den Code ein und leitet weiter; eine gespeicherte App-Seite nach dem Zeitlimit wäre falsch.
  * - Vorschau „App als Rolle ansehen“ (Issue #63): Anfragen mit dem Header X-Kompanie-Preview (API) oder dem Parameter
@@ -43,6 +46,9 @@ const STATIC_CACHE = 'kompanie-static-' + BUILD;
 const DATA_CACHE = 'kompanie-data-v2';
 const DOCS_CACHE = 'kompanie-docs-v1';
 const BADGES_CACHE = 'kompanie-badges-v1';
+const HELP_IMAGES_CACHE = 'kompanie-hilfebilder-v1';
+// Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
+const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
@@ -115,7 +121,13 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE].includes(k)).map((k) => caches.delete(k))),
+        Promise.all(
+          keys
+            .filter(
+              (k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE].includes(k) && !k.startsWith(VIEWS_CACHE),
+            )
+            .map((k) => caches.delete(k)),
+        ),
       )
       .then(() => trimData())
       .then(() => self.clients.claim()),
@@ -212,6 +224,25 @@ async function badgeFirst(request, key) {
   if (cacheable(res)) {
     const keys = await cache.keys();
     await Promise.all(keys.filter((k) => badgeKey(new URL(k.url)) === key).map((k) => cache.delete(k)));
+    await cache.put(request, res.clone());
+  }
+  return res;
+}
+
+function isHelpImage(url) {
+  return ASSETS !== '' && url.href.startsWith(ASSETS + 'handbuch/bilder/') && url.pathname.endsWith('.jpg');
+}
+
+/** Bildschirmfotos der Hilfe: gespeicherte Fassung, sonst laden und die Fassung einer früheren Version ersetzen. */
+async function helpImageFirst(request) {
+  const cache = await caches.open(HELP_IMAGES_CACHE);
+  const cached = await cache.match(request, MATCH);
+  if (cached) return cached;
+  const res = await fetch(request);
+  if (cacheable(res)) {
+    const path = new URL(request.url).pathname;
+    const keys = await cache.keys();
+    await Promise.all(keys.filter((k) => new URL(k.url).pathname === path).map((k) => cache.delete(k)));
     await cache.put(request, res.clone());
   }
   return res;
@@ -361,6 +392,8 @@ self.addEventListener('fetch', (event) => {
   } else if (doc !== null) {
     // Direkt aufgerufen (neuer Tab, Download-Link): durchreichen, nicht als App-Seite speichern.
     if (request.mode !== 'navigate') event.respondWith(documentFirst(request, doc));
+  } else if (isHelpImage(url)) {
+    if (request.mode !== 'navigate') event.respondWith(helpImageFirst(request));
   } else if (isStatic(url)) {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === 'navigate' && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {

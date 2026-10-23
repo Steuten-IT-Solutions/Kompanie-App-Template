@@ -1,6 +1,7 @@
-import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { Component, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
-import { DATA_UPDATED, dataCache } from './dataCache';
+import { cacheKey as keyOf, DATA_UPDATED, dataCache } from './dataCache';
 import { noteError } from './lastError';
 
 /**
@@ -13,7 +14,7 @@ import { noteError } from './lastError';
  * Stand (setData): Dann einmal neu laden.
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
-  const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
+  const cacheKey = key === undefined ? null : keyOf(key, deps);
   const cached = () => (cacheKey !== null && dataCache.has(cacheKey) ? dataCache.get<T>(cacheKey) : null);
   const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
@@ -72,13 +73,8 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   return { data, error, loading, reload, setData, revision };
 }
 
-export function Loading() {
-  return (
-    <div className="loading" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" /> Lädt …
-    </div>
-  );
-}
+// Lädt …, mit dem Gerüst der Seite, sobald die App es kennt (skeleton.tsx)
+export { Loading } from './skeleton';
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
@@ -97,12 +93,133 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
-export function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'neutral' }) {
+/** Zeile mit einem Datum der Person; mit onOpen antippbar (öffnet, wo es sich ändern lässt). */
+export function DateRow({ label, onOpen, children }: { label: string; onOpen?: () => void; children: ReactNode }) {
+  const content = (
+    <>
+      <span className="member-date-label">{label}</span>
+      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? 'Nicht eingetragen'}</span>
+      {onOpen && (
+        <span className="chevron" aria-hidden="true">
+          ›
+        </span>
+      )}
+    </>
+  );
   return (
-    <div className={`stat stat-${tone ?? 'neutral'}`}>
+    <li>
+      {onOpen ? (
+        <button type="button" className="member-date" onClick={onOpen}>
+          {content}
+        </button>
+      ) : (
+        <div className="member-date">{content}</div>
+      )}
+    </li>
+  );
+}
+
+/** Kennzahl als Kachel; mit onClick ein Knopf (z. B. öffnet er ein Fenster zum Bearbeiten). */
+export function StatCard({
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  tone?: 'good' | 'warn' | 'neutral';
+  onClick?: () => void;
+}) {
+  const className = `stat stat-${tone ?? 'neutral'}`;
+  if (onClick) {
+    return (
+      <button type="button" className={`${className} stat-button`} onClick={onClick}>
+        <span className="stat-value">{value}</span>
+        <span className="stat-label">{label}</span>
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
       <div className="stat-value">{value}</div>
       <div className="stat-label">{label}</div>
     </div>
+  );
+}
+
+/**
+ * Einklappbarer Abschnitt: Kopf in der Optik von .section-title mit Pfeil „›“, der beim Aufklappen nach unten zeigt.
+ * Für Dokument-Kategorien und „Konto und Rolle“ in den Mitgliedsdetails, damit alle gleich aussehen.
+ */
+export function FoldSection({
+  id,
+  title,
+  open,
+  onToggle,
+  className,
+  children,
+}: {
+  id: string;
+  title: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const bodyId = `${id}-body`;
+  return (
+    <section id={id} className={className ? `fold ${className}` : 'fold'}>
+      <h3 className="section-title fold-title">
+        <button type="button" className="fold-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+          {title}
+          <span className="fold-arrow" aria-hidden="true">
+            ›
+          </span>
+        </button>
+      </h3>
+      <div id={bodyId} className="fold-body" hidden={!open}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Fenster über der Seite (auf dem Handy von unten, am Computer mittig) mit Überschrift und ✕. Schließen mit ✕, Escape
+ * oder Tippen daneben. Im body, damit Wischen auf der Seite darunter nicht greift (swipe.ts) und nichts die Optik erbt.
+ */
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    // Waagerecht wischen im Fenster ist keine Zurück-Geste des Browsers (die schlösse es und blätterte im Verlauf).
+    const root = document.documentElement.style;
+    const overscroll = root.overscrollBehaviorX;
+    root.overscrollBehaviorX = 'none';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      root.overscrollBehaviorX = overscroll;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="sheet-head">
+          <h2 className="sheet-title">{title}</h2>
+          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label="Schließen">
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

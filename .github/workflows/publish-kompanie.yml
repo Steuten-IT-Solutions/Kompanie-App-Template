@@ -1,6 +1,6 @@
 # Baut, signiert und veröffentlicht die App einer Kompanie. Läuft nur im Kern-Repo, von Hand oder aus
 # „Kompanien abgleichen“ (kompanien-abgleichen.yml, z. B. nach einer Änderung im Kompanie-Repo):
-# - Job „build“ ohne Geheimnisse: npm, Branding aus kompanie.json und Logo, Bildschirmfotos.
+# - Job „build“ ohne Geheimnisse: npm, Branding aus kompanie.json und Logo, Bildschirmfotos (auch fürs Handbuch).
 #   Sein Ergebnis gilt als nicht vertrauenswürdig (hier laufen fremde Pakete und Daten der Kompanie).
 # - Job „publish“ hinter der Environment „veroeffentlichen“ (Secrets KOMPANIE_SIGNING_KEY und
 #   KOMPANIE_APP_KEY, Variable KOMPANIE_APP_ID; nur Branches main und develop), ohne npm: übernimmt aus „build“ nur
@@ -100,6 +100,12 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           scripts/screenshots.sh "$OUT/screenshots"
+
+      # Bildschirmfotos für die Anleitungen im Handbuch (in Farben und mit Bezeichnungen der Kompanie). Sie liegen in der
+      # gebauten Oberfläche (App: Hilfe, Download-Seite: Handbuch), damit die App sie nicht bündeln muss.
+      - name: Bilder für das Handbuch
+        working-directory: core
+        run: scripts/handbuch-bilder.sh packages/frontend/dist/handbuch/bilder
 
       - name: Ergebnis zusammenstellen
         working-directory: core

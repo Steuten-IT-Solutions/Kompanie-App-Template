@@ -1,37 +1,62 @@
 ---
-titel: Rollen vergeben
-reihenfolge: 75
-rechte: [promote_users]
+titel: Konto und Rolle
+reihenfolge: 53
+rechte: []
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, promote_users]
 ---
-Wer Rollen vergeben darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort öffnet sich zuerst die **Mitgliederliste**.
+Unter **Konto und Rolle** auf der Seite eines Mitglieds legst du fest, welche Rolle und welche Rechte die Person hat, erzeugst ein neues Startpasswort, trägst sie als ehemalig ein oder änderst und löschst ihr Konto. Wer nur {bereich.points}, {bereich.penalties} oder Ähnliches pflegt, sieht hier nur die Rolle.
 
-## Die Mitgliederliste
-Das Suchfeld **Mitglied suchen …** filtert die Liste nach dem Namen. Ein Tipp auf eine Person öffnet ihre Seite; unter dem Namen wählst du im Menü die Unterseite (**Übersicht**, **Konto und Rolle** und je nach deinen Rechten weitere). **‹ Alle Mitglieder** führt zurück.
+![Konto und Rolle, aufgeklappt](bild:rollen-vergeben)
 
-## Rolle ändern
-Unter **Verwaltung → Mitglieder** die Person öffnen, im Menü unter dem Namen **Konto und Rolle** wählen und unter **Grundrolle** die Rolle auswählen. Die Änderung gilt sofort. Welche Rollen es gibt und was sie dürfen, legen die Admins unter **Verwaltung → Einstellungen → Rollen** fest.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe auf die Person. Tippe ganz unten auf ihrer Seite auf **Konto und Rolle**; der Bereich klappt auf.
 
-## Zusatzrollen
-Darunter kreuzt du unter **Zusatzrollen** weitere Rollen an, z. B. „{bereich.points} verwalten“ für ein {rolle.member}. Die Person hat dann die Rechte aller ihrer Rollen zusammen; bei {bereich.points} zählt der kleinste Punktefaktor ihrer Rollen. Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich, und die festen Rollen ({rolle.guest}, {rolle.member}, {rolle.admin}) sind nur Grundrolle.
+## Was du hier siehst
+Du siehst nur die Teile, für die du das Recht hast:
+- **Grundrolle** und **Zusatzrollen**: für alle, die Rollen vergeben dürfen. Sonst steht hier nur die Rolle zum Lesen.
+- **Rechte**: alle Rechte der Person, mit **Rechte speichern** (wer Rollen vergeben darf).
+- **Als {rolle.member} aufnehmen**: nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat, z. B. Anwärter (wer Mitglieder anlegen darf).
+- **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf).
+- **Ehemalig** mit **Als ehemalig eintragen …** (wer Mitglieder anlegen darf).
+- **Konto** mit Benutzername und E-Mail, **Angaben ändern** und **Konto löschen** (wer Mitglieder anlegen darf).
 
-Die Mitgliederliste zeigt die Rollen nicht an; unter **Filter und Sortierung** filterst du über **Alle Rollen** die Liste nach einer Rolle, egal ob Grund- oder Zusatzrolle. {rolle.guest} kannst du dort auch wählen, ohne vorher das Häkchen darunter zu setzen.
+## So gehst du vor
+### Die Rolle ändern
+1. Wähle unter **Grundrolle** die neue Rolle. Die Änderung gilt sofort.
+2. Machst du jemanden zum {rolle.admin}, fragt die App vorher nach: {rolle.admin}s dürfen alles, auch Einstellungen ändern.
 
-- Die eigene Rolle ändert niemand selbst.
-- Der letzte {rolle.admin} kann nicht herabgestuft werden.
-- Wer jemanden zum {rolle.admin} macht, muss das bestätigen: {rolle.admin}s dürfen alles, auch Einstellungen ändern.
-- Mit WordPress wird {rolle.admin} nicht in der App vergeben oder entzogen, sondern im WordPress-Backend.
-- Wer kein {rolle.admin} ist, vergibt und entfernt (auch als Zusatzrolle) nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
+### Eine Zusatzrolle vergeben
+1. Setze unter **Zusatzrollen** einen Haken bei der Rolle, z. B. „{bereich.points} verwalten“. Die Änderung gilt sofort.
+2. Entferne den Haken, um die Zusatzrolle wieder wegzunehmen.
 
-## Einzelne Rechte geben oder entziehen
-Soll eine Person ein Recht bekommen, das keine ihrer Rollen hat, oder ein Recht ihrer Rollen nicht haben, brauchst du dafür keine eigene Rolle. Unter **Konto und Rolle** stehen unter **Rechte** alle Rechte der Person. Setze oder entferne die Haken und tippe auf **Rechte speichern**. Was von ihren Rollen (Grundrolle und Zusatzrollen) abweicht, ist mit „zusätzlich“ oder „entzogen“ markiert; in der Übersicht der Person steht dann „mit Ausnahmen bei den Rechten“. **Wie die Rolle** entfernt alle Ausnahmen.
+### Ein einzelnes Recht geben oder entziehen
+1. Setze oder entferne unter **Rechte** den Haken beim Recht.
+2. Tippe auf **Rechte speichern**. Was von den Rollen abweicht, ist mit „zusätzlich“ oder „entzogen“ markiert.
+3. **Wie die Rolle** entfernt alle Ausnahmen wieder.
 
-- Die Ausnahmen bleiben bestehen, wenn sich die Grundrolle oder die Zusatzrollen ändern. Was die Rollen dann ohnehin regeln, fällt weg: ein zusätzlich gegebenes Recht, das die Rollen jetzt schon haben, und ein entzogenes Recht, das sie nicht mehr haben.
-- Rechte zum Verwalten brauchen den Mitgliederbereich. Der interne Kalender gehört zum Mitgliederbereich und lässt sich nur mit ihm entziehen.
-- Die Rolle {rolle.admin} hat immer alle Rechte, die Rolle {rolle.guest} keine: Für sie gibt es keine Ausnahmen. Bekommt jemand eine dieser beiden Rollen als Grundrolle, verfallen seine Ausnahmen.
-- Einstellungen, Updates und Datensicherung bleiben der Rolle {rolle.admin} vorbehalten.
-- Wer kein {rolle.admin} ist, ändert nur Rechte, die er selbst hat, nie „Mitglieder anlegen“ oder „Rollen vergeben“, und nur bei Personen, die er auch sonst verwalten darf. Die eigenen Rechte ändert niemand selbst.
+![Rechte einer Person](bild:rollen-vergeben-rechte)
 
-## Gäste und Anwärter
-Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Mit dem Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** erscheinen sie, und du kannst ihnen eine Rolle geben. Personen mit Rollen nur für den internen Kalender (z. B. Anwärter) stehen immer in der Liste.
+### Ein neues Startpasswort erzeugen
+1. Tippe auf **Passwort vergessen? Neues Startpasswort erzeugen** und bestätige die Rückfrage.
+2. Gib das neue Startpasswort persönlich weiter. Es steht nur jetzt da; darunter steht der Link zur Installationsanleitung.
 
-Neue Konten anlegen, Passwörter zurücksetzen und Personen mit **Als {rolle.member} aufnehmen** aufnehmen (nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat, z. B. Anwärter) darf nur, wer Mitglieder anlegen darf.
+### Angaben ändern oder das Konto löschen
+1. Tippe unter **Konto** auf **Angaben ändern**, ändere Vorname, Nachname, Benutzername oder E-Mail und tippe auf **Speichern**.
+2. Zum Löschen tippe auf **Konto löschen**, tippe zur Bestätigung den Namen ein und dann **Endgültig löschen**.
+
+![Passwort, Ehemalig und Konto](bild:rollen-vergeben-konto)
+
+## Gut zu wissen
+- Die Person hat die Rechte aller ihrer Rollen zusammen; bei {bereich.points} zählt der kleinste Punktefaktor ihrer Rollen. Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich; {rolle.guest}, {rolle.member} und {rolle.admin} sind nur Grundrolle.
+- Die eigene Rolle und die eigenen Rechte ändert niemand selbst. Der letzte {rolle.admin} kann nicht herabgestuft werden.
+- Wer kein {rolle.admin} ist, vergibt und entfernt nur Rollen und Rechte, die er selbst hat – nie {rolle.admin} und nie „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
+- Ausnahmen bei den Rechten bleiben, wenn sich die Rollen ändern; was die Rollen dann ohnehin regeln, fällt weg. {rolle.admin}s haben immer alle Rechte, {rolle.guest}s keine: Für sie gibt es keine Ausnahmen. Einstellungen, Updates und Datensicherung bleiben {rolle.admin}s vorbehalten.
+- Nach einem neuen Startpasswort gilt das alte nicht mehr, und die Person ist auf allen Geräten abgemeldet. Ein neuer Benutzername meldet sie ebenfalls überall ab.
+- **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank}, {bereich.titles}, Geburtstag, Eintritt, Foto, Antworten bei Umfragen und Benachrichtigungen. Was sie für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen. Wer nur ausgetreten oder verstorben ist, trägst du besser als ehemalig ein: Dann bleiben alle Daten erhalten.
+- Wer kein {rolle.admin} ist, setzt Passwörter nur bei Personen zurück (und ändert bzw. löscht nur deren Konten und Fotos), die keine weiteren Rechte als er selbst haben und weder Mitglieder anlegen noch Rollen vergeben dürfen.
+- Bei einer ehemaligen Person lassen sich Rolle, Rechte und Passwort erst nach **Wieder aufnehmen** ändern.
+
+> **Für Fortgeschrittene:** In der WordPress-Version wird die Rolle {rolle.admin} im WordPress-Backend vergeben und entzogen, nicht in der App. Der Knopf zum Löschen heißt dort **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Den Benutzernamen von Benutzern der Webseite (z. B. Redakteure) ändert nur, wer sie in WordPress bearbeiten darf.
+
+## Siehe auch
+- [Seite eines Mitglieds](seite:mitglied-uebersicht)

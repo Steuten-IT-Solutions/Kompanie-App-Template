@@ -185,7 +185,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       <p className="small muted">
-        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
+        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).
       </p>
     </section>
   );

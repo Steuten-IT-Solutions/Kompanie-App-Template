@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Schema;
 
@@ -11,17 +12,20 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Datensicherung im gemeinsamen Export-Format (JSON), für beide Datenbanken und beide Adapter.
  *
  *   {format: "kompanie-app-backup", formatVersion: 1, created, variant, version,
- *    schema: {name: version}, tables: {tabelle: [zeilen]}, settings: {name: wert}}
+ *    schema: {name: version}, tables: {tabelle: [zeilen]}, files: {pfad: base64}, settings: {name: wert}}
+ *
+ * Konten: in der eigenständigen Version als Tabelle users, im WordPress-Plugin als accounts (WordPress-Benutzer, s. WpBackup).
  *
  * Wiederherstellen ersetzt den Inhalt der Tabellen. Spalten, die die Datenbank nicht kennt
  * (Sicherung einer neueren Version), werden ausgelassen; fehlende bekommen ihren Standardwert.
  * Galeriebilder sind nicht enthalten; sie werden nach dem Wiederherstellen neu aus Drive erzeugt.
- * Dateien der Dokumente und Abzeichen der Dienstgrade sind ebenfalls nicht enthalten, nur ihre Zeilen (mit dem Namen
- * der Datei); die Dateien bleiben in der geschützten Dateiablage. Fehlt ein Abzeichen nach dem Einspielen auf einem
- * anderen Server, liefert die API badge_url = null. Die Fotos der Mitglieder liegen in der Datenbank (member_photos) und
- * sind deshalb enthalten.
- * Nicht enthalten sind außerdem Push-Abos samt Warteschlange und wartende Fehlermeldungen (bug_reports, Issue #64): Sie
- * gehören zur Installation, und Meldungen mit Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
+ * Die Dateien der Dokumente und die Abzeichen der Dienstgrade stehen unter files (Pfad in der geschützten Dateiablage,
+ * Inhalt als Base64; nur Dateien, auf die eine Zeile verweist). Die Fotos der Mitglieder liegen in der Datenbank
+ * (member_photos) und sind deshalb enthalten.
+ * Die Push-Abos (push_subscriptions) und der Schlüssel dazu (Einstellung push_vapid) sind enthalten, damit Benachrichtigungen
+ * nach einem Umzug weiter ankommen; die Warteschlange (push_queue) nicht.
+ * Nicht enthalten sind wartende Fehlermeldungen (bug_reports, Issue #64): Sie gehören zur Installation, und Meldungen mit
+ * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  */
 final class Backup
 {
@@ -39,11 +43,20 @@ final class Backup
         'telemetry_errors', 'telemetry_details', 'telemetry_pending', 'telemetry_events', 'error_log',
         // Fehlermeldungen (Issue #64): Bestätigung durch den Empfänger. Die Warteschlange (bug_reports) ist keine Kerntabelle der Sicherung.
         'bug_reports_registered',
-        // Web Push: Schlüssel und Stand der Abgleiche gehören zu dieser Installation (Abos sind nicht in Sicherungen).
-        'push_vapid', 'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
+        // Zustand der Sicherungen in Google Drive (BackupUploadService::STATE_SETTING): letzter Lauf, Fehler.
+        'backup_drive_state',
+        // Web Push: Stand der Abgleiche gehört zu dieser Installation (Schlüssel und Abos sind in der Sicherung).
+        'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'push_subscriptions'];
+    /**
+     * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
+     * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
+     */
+    public const KEEP_IF_MISSING = ['push_subscriptions'];
+    /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente und Abzeichen der Dienstgrade. */
+    public const FILE_DIRS = ['dokumente', 'abzeichen'];
 
     public function __construct(private readonly Connection $db)
     {
@@ -75,7 +88,13 @@ final class Backup
             // alle Daten durch den Stand der Sicherung. In der eigenständigen Version gehörten die Zeilen sonst womöglich
             // anderen Personen (gleiche IDs, andere Konten).
             foreach (array_reverse($allowed) as $t) {
-                $this->db->execute('DELETE FROM {' . $t . '}');
+                if (!in_array($t, self::KEEP_IF_MISSING, true) || isset($tables[$t])) {
+                    $this->db->execute('DELETE FROM {' . $t . '}');
+                }
+            }
+            // Die Warteschlange verweist auf die IDs der Abos.
+            if (isset($tables['push_subscriptions']) && in_array('push_subscriptions', $allowed, true)) {
+                $this->db->execute('DELETE FROM {push_queue}');
             }
             foreach ($allowed as $t) {
                 if (!isset($tables[$t]) || !is_array($tables[$t])) {
@@ -98,6 +117,92 @@ final class Backup
                 }
             }
         });
+    }
+
+    /**
+     * Dateien der Dokumente und Abzeichen, auf die eine Zeile der Sicherung verweist.
+     *
+     * @param array<string, array<int, array<string, mixed>>> $tables aus dump()
+     * @return array<string, string> Pfad => Inhalt als Base64
+     */
+    public static function dumpFiles(FileStorage $files, array $tables): array
+    {
+        $wanted = [
+            'dokumente' => array_map('strval', array_column($tables['documents'] ?? [], 'file')),
+            'abzeichen' => array_values(array_filter(array_map('strval', array_column($tables['ranks'] ?? [], 'badge_file')))),
+        ];
+        $out = [];
+        foreach (self::FILE_DIRS as $dir) {
+            $base = dirname($files->path($dir . '/x', false));
+            foreach (glob($base . '/*') ?: [] as $file) {
+                $name = basename($file);
+                $referenced = $dir === 'dokumente'
+                    ? in_array($name, $wanted['dokumente'], true)
+                    : array_filter($wanted['abzeichen'], static fn (string $b): bool => str_starts_with($name, $b . '-') || str_starts_with($name, $b . '.')) !== [];
+                if (!$referenced || !is_file($file) || !self::validFileName($name)) {
+                    continue;
+                }
+                $data = file_get_contents($file);
+                if ($data === false) {
+                    throw new \RuntimeException('Die Datei ' . $dir . '/' . $name . ' ließ sich nicht lesen.');
+                }
+                $out[$dir . '/' . $name] = base64_encode($data);
+            }
+        }
+        ksort($out);
+        return $out;
+    }
+
+    /**
+     * Prüft die Dateien einer Sicherung (vor dem Wiederherstellen der Tabellen, damit eine beschädigte Sicherung nichts ändert).
+     *
+     * @return array<string, string> Pfad => Inhalt
+     */
+    public static function parseFiles(mixed $files): array
+    {
+        if ($files === null) {
+            return [];
+        }
+        $broken = new \RuntimeException('Die Sicherung ist beschädigt (Dateien).');
+        if (!is_array($files)) {
+            throw $broken;
+        }
+        $out = [];
+        foreach ($files as $path => $data) {
+            $parts = explode('/', (string) $path);
+            if (count($parts) !== 2 || !in_array($parts[0], self::FILE_DIRS, true) || !self::validFileName($parts[1]) || !is_string($data)) {
+                throw $broken;
+            }
+            $bytes = base64_decode($data, true);
+            if ($bytes === false) {
+                throw $broken;
+            }
+            $out[$parts[0] . '/' . $parts[1]] = $bytes;
+        }
+        return $out;
+    }
+
+    /**
+     * Schreibt die Dateien aus parseFiles() in die geschützte Dateiablage (vorhandene gleichen Namens werden ersetzt).
+     *
+     * @param array<string, string> $files
+     */
+    public static function restoreFiles(FileStorage $storage, array $files): void
+    {
+        foreach ($files as $path => $bytes) {
+            $target = $storage->path($path, false);
+            $tmp = $target . '.' . bin2hex(random_bytes(4)) . '.tmp';
+            if (@file_put_contents($tmp, $bytes) !== strlen($bytes) || !@rename($tmp, $target)) {
+                @unlink($tmp);
+                throw new \RuntimeException('Die Daten sind wiederhergestellt, aber die Datei ' . $path . ' ließ sich nicht speichern (Speicherplatz, Schreibrechte?). Bitte die Sicherung erneut einspielen.');
+            }
+        }
+    }
+
+    /** Dateiname ohne Pfad, wie ihn die App vergibt (keine versteckten Dateien, kein index.php des Ordnerschutzes). */
+    private static function validFileName(string $name): bool
+    {
+        return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,150}$/', $name) === 1 && !str_starts_with($name, 'index.') && !str_ends_with($name, '.tmp');
     }
 
     /** @return string[] Spaltennamen einer Tabelle */

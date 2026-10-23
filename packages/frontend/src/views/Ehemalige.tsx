@@ -1,18 +1,21 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, levelLabel, type FormerImportResult, type FormerInfo, type FormerInput, type FormerReason } from '../api';
+import { api, levelLabel, type CreatedFormer, type FormerImportResult, type FormerInfo, type FormerInput, type FormerReason } from '../api';
+import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-import { MemberAvatar } from '../memberPhoto';
+import { readSheet } from '../sheet';
+import { Empty, emptyName, ErrorBox, Loading, NameFields, trimName, useAsync } from '../ui';
+import { MemberAvatar, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import {
-  DEFAULT_MEMBER_SORT,
   MEMBER_SORT_LABELS,
   defaultDir,
   dirLabel,
   listName,
   loadMemberOrder,
+  orderFor,
   saveMemberOrder,
+  setBrowseOrder,
   sortMembers,
   type MemberOrder,
   type MemberSort,
@@ -20,8 +23,8 @@ import {
 
 const sec = brand.labels.sections;
 
-/** Nach Namen oder Eintritt; Punkte gibt es in dieser Liste nicht. */
-const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
+/** Nach Namen, Eintritt oder Austritt; Punkte gibt es in dieser Liste nicht. */
+export const FORMER_SORTS: MemberSort[] = ['last-name', 'first-name', 'joined', 'left'];
 
 /** Auswahl beim Eintragen */
 export const REASON_OPTIONS: Record<FormerReason, string> = { left: 'Ausgetreten', deceased: 'Verstorben', other: 'Sonstiges' };
@@ -46,9 +49,11 @@ export function FormerList() {
   const { data, error, loading, reload } = useAsync(() => api.formerMembers(), [], 'former-members');
   const [query, setQuery] = useState('');
   const [reason, setReason] = useState<FormerReason | ''>('');
+  // Filter und Sortierung zunächst eingeklappt, wie in der Mitgliederliste.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Wie die Mitgliederliste (gemerkt je Gerät); gemerkt nach Punkten gilt hier der Nachname.
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
-  const order: MemberOrder = SORTS.includes(stored.sort) ? stored : { sort: DEFAULT_MEMBER_SORT, dir: defaultDir(DEFAULT_MEMBER_SORT) };
+  const order = orderFor(stored, FORMER_SORTS);
   const changeOrder = (next: MemberOrder) => {
     setStored(next);
     saveMemberOrder(next);
@@ -64,6 +69,11 @@ export function FormerList() {
   );
   const withPhotos = (data ?? []).some((f) => f.photo_url);
 
+  function open(id: number) {
+    setBrowseOrder('ehemalige', list);
+    navigate(`verwaltung/ehemalige/${id}`);
+  }
+
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const count = (r: FormerReason) => (data ?? []).filter((f) => f.reason === r).length;
@@ -76,9 +86,11 @@ export function FormerList() {
           .map((r) => `${count(r)} ${REASON_TEXT[r]}`)
           .join(' · ') || 'Noch niemand eingetragen.'}
       </p>
-      <button className="btn btn-block btn-secondary" onClick={() => navigate('verwaltung/ehemalige/import')}>
-        Tabelle importieren (z. B. Chronik)
-      </button>
+      <div className="button-row add-member">
+        <button className="btn" onClick={() => navigate('verwaltung/ehemalige/neu')}>
+          + Ehemalige Person anlegen
+        </button>
+      </div>
       <input
         className="search"
         type="search"
@@ -87,54 +99,70 @@ export function FormerList() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Ehemalige suchen"
       />
-      <select
-        className="role-filter"
-        value={reason}
-        onChange={(e) => setReason(e.target.value as FormerReason | '')}
-        aria-label="Nach Grund filtern"
+      <button
+        type="button"
+        className="member-filters-toggle"
+        aria-expanded={filtersOpen}
+        aria-controls="former-filters"
+        onClick={() => setFiltersOpen(!filtersOpen)}
       >
-        <option value="">Alle Gründe</option>
-        {(Object.keys(REASON_OPTIONS) as FormerReason[]).map((r) => (
-          <option key={r} value={r}>
-            {REASON_OPTIONS[r]}
-          </option>
-        ))}
-      </select>
-      <div className="field-row member-sort">
-        {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
-        <div className="field">
-          <span id="former-sort-label">Sortierung</span>
-          <select
-            aria-labelledby="former-sort-label"
-            value={order.sort}
-            onChange={(e) => {
-              const sort = e.target.value as MemberSort;
-              changeOrder({ sort, dir: defaultDir(sort) });
-            }}
-          >
-            {SORTS.map((s) => (
-              <option key={s} value={s}>
-                {MEMBER_SORT_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field member-sort-dir">
-          <span id="former-sort-dir-label">Reihenfolge</span>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            aria-labelledby="former-sort-dir-label former-sort-dir-value"
-            title="Reihenfolge umkehren"
-            onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
-          >
-            <span id="former-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
-          </button>
+        Filter und Sortierung
+        {/* Hinweis am eingeklappten Bereich, damit ein gesetzter Filter nicht übersehen wird (die Sortierung zählt nicht). */}
+        {reason !== '' && <span className="badge badge-role">aktiv</span>}
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      <div id="former-filters" className="member-filters" hidden={!filtersOpen}>
+        <select
+          className="role-filter"
+          value={reason}
+          onChange={(e) => setReason(e.target.value as FormerReason | '')}
+          aria-label="Nach Grund filtern"
+        >
+          <option value="">Alle Gründe</option>
+          {(Object.keys(REASON_OPTIONS) as FormerReason[]).map((r) => (
+            <option key={r} value={r}>
+              {REASON_OPTIONS[r]}
+            </option>
+          ))}
+        </select>
+        <div className="field-row member-sort">
+          {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+          <div className="field">
+            <span id="former-sort-label">Sortierung</span>
+            <select
+              aria-labelledby="former-sort-label"
+              value={order.sort}
+              onChange={(e) => {
+                const sort = e.target.value as MemberSort;
+                changeOrder({ sort, dir: defaultDir(sort) });
+              }}
+            >
+              {FORMER_SORTS.map((s) => (
+                <option key={s} value={s}>
+                  {MEMBER_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field member-sort-dir">
+            <span id="former-sort-dir-label">Reihenfolge</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-labelledby="former-sort-dir-label former-sort-dir-value"
+              title="Reihenfolge umkehren"
+              onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+            >
+              <span id="former-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
+            </button>
+          </div>
         </div>
       </div>
       <ul className="card-list">
         {list.map((f) => (
-          <li key={f.id} className="card row clickable member-row" onClick={() => navigate(`verwaltung/ehemalige/${f.id}`)}>
+          <li key={f.id} className="card row clickable member-row" onClick={() => open(f.id)}>
             {withPhotos && <MemberAvatar url={f.photo_url} name={f.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">{listName(f, order.sort)}</div>
@@ -203,9 +231,124 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
   );
 }
 
+/** Leeres Formular: ausgetreten, ohne Daten */
+const emptyFormer = (): FormerInput => ({ reason: 'left', joined_on: '', founder: false, left_on: '' });
+
 /**
- * Im Mitglied unter „Konto und Rolle“ (create_users): als ehemalig eintragen bzw. die Angaben ändern und wieder
- * aufnehmen. Offene Beträge werden vor dem Eintragen genannt, damit sie nicht in Vergessenheit geraten.
+ * Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“ (create_users), aufgebaut wie „+ Mitglied anlegen“: Name, Angaben zum
+ * Ausscheiden, Geburtstag und Foto. Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Darüber
+ * führt „Tabelle importieren“ zum Import vieler auf einmal.
+ */
+export function NewFormer() {
+  const [name, setName] = useState(emptyName());
+  const [former, setFormer] = useState<FormerInput>(emptyFormer);
+  const [birthday, setBirthday] = useState(emptyBirthday());
+  const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedFormer | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
+    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    if (typeof bday === 'string') return setFormError(bday);
+    setBusy(true);
+    try {
+      setCreated(
+        await api.createFormer({
+          ...trimName(name),
+          ...former,
+          joined_on: former.joined_on.trim(),
+          left_on: former.left_on.trim(),
+          ...(bday ? { birthday: birthdayString(bday) } : {}),
+          ...(photo ? { photo: photo.file } : {}),
+        }),
+      );
+    } catch (err) {
+      setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (created) {
+    return (
+      <div>
+        <h2 className="member-name">{created.name} ist als ehemalig angelegt</h2>
+        <p className="small">{formerSummary(created)}</p>
+        {created.offices_linked > 0 && (
+          <p className="small">
+            {created.offices_linked === 1 ? '1 Eintrag' : `${created.offices_linked} Einträge`} in den {sec.offices} mit dem Konto
+            verknüpft.
+          </p>
+        )}
+        {created.warning && (
+          <p className="form-error" role="alert">
+            {created.warning}
+          </p>
+        )}
+        <button className="btn btn-block" onClick={() => navigate('verwaltung/ehemalige')}>
+          Fertig
+        </button>
+        <button
+          className="btn btn-secondary btn-block"
+          onClick={() => {
+            setCreated(null);
+            setName(emptyName());
+            setFormer(emptyFormer());
+            setBirthday(emptyBirthday());
+            setPhoto(null);
+          }}
+        >
+          Weitere Person
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form className="form" onSubmit={submit}>
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+        ‹ Ehemalige
+      </button>
+      <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/ehemalige/import')}>
+        Tabelle importieren (z. B. Chronik)
+      </button>
+      <NameFields value={name} onChange={setName} />
+      <FormerFields value={former} onChange={setFormer} />
+      {canSetBirthdays() && (
+        <fieldset className="fieldset new-member-birthday">
+          <legend>Geburtstag (optional)</legend>
+          <BirthdayFields value={birthday} onChange={setBirthday} />
+        </fieldset>
+      )}
+      <fieldset className="fieldset new-member-photo">
+        <legend>Foto (optional)</legend>
+        <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
+      </fieldset>
+      <p className="muted small">
+        Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Wer schon ein Konto mit genau diesem Namen hat, wird
+        nicht noch einmal angelegt. Steht die Person in den {sec.offices} bisher nur mit ihrem Namen, wird der Eintrag mit ihrem Konto
+        verknüpft.
+      </p>
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
+      <button className="btn btn-block" type="submit" disabled={busy}>
+        {busy ? 'Legt an …' : 'Ehemalige Person anlegen'}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * Im Mitglied unter „Konto und Rolle“ und hinter „Austritt“ (create_users): als ehemalig eintragen bzw. die Angaben
+ * ändern und wieder aufnehmen. Offene Beträge werden vor dem Eintragen genannt, damit sie nicht in Vergessenheit geraten.
+ * Mit `editing` steht gleich das Formular da; „Abbrechen“ ruft dann `onCancel` (z. B. schließt das Fenster).
  */
 export function FormerPanel({
   id,
@@ -213,7 +356,9 @@ export function FormerPanel({
   former,
   joinedOn,
   openCents,
+  editing = false,
   onChanged,
+  onCancel,
   onToast,
 }: {
   id: number;
@@ -223,10 +368,21 @@ export function FormerPanel({
   joinedOn?: string | null;
   /** offene Beträge; null, wenn man sie nicht sieht */
   openCents: number | null;
+  editing?: boolean;
   onChanged: () => void;
+  onCancel?: () => void;
   onToast: (msg: string) => void;
 }) {
-  const [form, setForm] = useState<FormerInput | null>(null);
+  const startForm = (): FormerInput =>
+    former
+      ? {
+          reason: former.reason,
+          joined_on: editYearOrDate(former.joined_on),
+          founder: former.founder,
+          left_on: editYearOrDate(former.left_on),
+        }
+      : { reason: 'left', joined_on: joinedOn ? editYearOrDate(joinedOn) : '', founder: false, left_on: '' };
+  const [form, setForm] = useState<FormerInput | null>(() => (editing ? startForm() : null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -294,7 +450,14 @@ export function FormerPanel({
             <button className="btn" type="submit" disabled={busy}>
               {former ? 'Speichern' : 'Als ehemalig eintragen'}
             </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setForm(null)}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setForm(null);
+                onCancel?.();
+              }}
+            >
               Abbrechen
             </button>
           </div>
@@ -303,18 +466,7 @@ export function FormerPanel({
         <>
           <p className="small">{formerSummary(former)}</p>
           <div className="button-row">
-            <button
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={() =>
-                setForm({
-                  reason: former.reason,
-                  joined_on: editYearOrDate(former.joined_on),
-                  founder: former.founder,
-                  left_on: editYearOrDate(former.left_on),
-                })
-              }
-            >
+            <button className="btn btn-secondary" disabled={busy} onClick={() => setForm(startForm())}>
               Angaben ändern
             </button>
             <button className="btn" disabled={busy} onClick={reactivate}>
@@ -327,11 +479,7 @@ export function FormerPanel({
           <p className="muted small">
             Ausgetreten oder verstorben? Dann hier eintragen statt das Konto zu löschen: Die Daten bleiben erhalten.
           </p>
-          <button
-            className="btn btn-secondary"
-            disabled={busy}
-            onClick={() => setForm({ reason: 'left', joined_on: joinedOn ? editYearOrDate(joinedOn) : '', founder: false, left_on: '' })}
-          >
+          <button className="btn btn-secondary" disabled={busy} onClick={() => setForm(startForm())}>
             Als ehemalig eintragen …
           </button>
         </>
@@ -342,16 +490,6 @@ export function FormerPanel({
 
 const IMPORT_EXAMPLE =
   'vorname;nachname;eintritt;ausgeschieden;grund\nErika;Muster;Gründer;31.12.1990;ausgetreten\nMax;Beispiel;1975;2003;verstorben';
-
-/** Datei lesen: UTF-8, sonst Windows-1252 (so speichert Excel unter Windows „CSV (Trennzeichen-getrennt)“). */
-async function readText(file: File): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return new TextDecoder('windows-1252').decode(bytes);
-  }
-}
 
 /**
  * Ehemalige aus einer Tabelle anlegen (Ersterfassung, z. B. aus einer Chronik): einfügen oder Datei wählen, Vorschau mit
@@ -388,8 +526,8 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
   return (
     <div className="office-import">
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
-        ‹ Ehemalige
+      <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige/neu')}>
+        ‹ Einzeln anlegen
       </button>
       <h2 className="member-name">Ehemalige importieren</h2>
       <p className="muted small">
@@ -414,15 +552,18 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
         />
       </label>
       <label className="field">
-        <span>Oder Datei wählen (CSV)</span>
+        <span>Oder Datei wählen (Excel .xlsx oder CSV)</span>
         <input
           type="file"
-          accept=".csv,.txt,text/csv,text/plain"
+          accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={async (e) => {
             const file = e.target.files?.[0];
-            if (file) {
-              setCsv(await readText(file));
-              setResult(null);
+            if (!file) return;
+            setResult(null);
+            try {
+              setCsv(await readSheet(file));
+            } catch (err) {
+              setError((err as Error).message);
             }
           }}
         />

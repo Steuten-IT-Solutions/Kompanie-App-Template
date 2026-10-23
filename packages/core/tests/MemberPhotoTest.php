@@ -198,7 +198,7 @@ final class MemberPhotoTest extends TestCase
         $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('klein.png', self::image(300, 200, 'png'))]);
         $this->assertSame([300, 200], array_slice((array) getimagesizefromstring((string) $repo->original($this->m)), 0, 2));
 
-        // Ohne Original (vor Datenbankversion 23 hochgeladen): 404, die Großansicht bleibt bei der 1024er.
+        // Ohne Original (vor Datenbankversion 24 hochgeladen): 404, die Großansicht bleibt bei der 1024er.
         $this->app->db->execute('UPDATE {member_photos} SET original = NULL WHERE user_id = ?', [$this->m]);
         $version = (string) $repo->find($this->m)['version'];
         $this->assertSame(404, $photos->forDelivery(null, $this->m, $version, '4096')['status']);
