@@ -20,7 +20,7 @@ import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
-import { AdminBack, AdminMenu, adminTabs } from '../adminNav';
+import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
   DateRow,
   emptyName,
@@ -91,7 +91,7 @@ const canPenalties = (): boolean => !!config?.features.penalties && can('manage_
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
-  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'import' | undefined, path[1]];
+  const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'import' | 'einrichtungen' | undefined, path[1]];
   const preselect = arg && /^\d+$/.test(arg) ? [Number(arg)] : [];
   // Vorschlag aus einer Anwesenheitsliste: verwaltung/punkte/anwesenheit-<id> bzw. verwaltung/strafe/anwesenheit-<id>
   const fromList = arg && /^anwesenheit-\d+$/.test(arg) ? Number(arg.slice(12)) : null;
@@ -108,11 +108,15 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   if (redirect) return null;
   // „‹ Verwaltung“ auf der ersten Seite eines Bereichs; Unterseiten (Mitglied, Liste, Amt …) haben ihren eigenen Rückweg.
   const showBack = !!active && (!arg || ((active === 'punkte' || active === 'strafe') && fromList === null));
+  // „Einrichtungen“: Sammelseite für Katalog, Dienstgrade, Titel und Ämter (adminNav.tsx)
+  const setup = !active && sub === 'einrichtungen' && setupTabs().length > 0;
 
   return (
     <div>
-      {showBack && <AdminBack />}
-      {sub === 'mitglied' && arg ? (
+      {(showBack || setup) && <AdminBack from={active ?? undefined} />}
+      {setup ? (
+        <AdminMenu group="einrichtungen" />
+      ) : sub === 'mitglied' && arg ? (
         <MemberDetailView base="mitglied" id={Number(arg)} page={path[2]} onToast={onToast} />
       ) : active === 'ehemalige' && arg && /^\d+$/.test(arg) ? (
         <MemberDetailView base="ehemalige" id={Number(arg)} page={path[2]} onToast={onToast} />

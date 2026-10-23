@@ -14,10 +14,17 @@ const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 /** Tab für Punkte und Strafen */
 const MANAGER = 'Verwaltung';
 
-/** Startseite der Verwaltung (Tab unten) öffnen und dort den Knopf eines Bereichs wählen. */
+/** Bereiche, die unter „Einrichtungen“ stehen, sobald es davon mindestens zwei gibt. */
+const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter'];
+
+/** Startseite der Verwaltung (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (ggf. über „Einrichtungen“). */
 async function adminMenu(page: Page, name: string) {
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page.locator('.admin-tiles').getByRole('button', { name, exact: true }).click();
+  const tiles = page.locator('.admin-tiles');
+  const setup = tiles.getByRole('button', { name: 'Einrichtungen', exact: true });
+  await tiles.waitFor();
+  if (SETUP.includes(name) && (await setup.count()) > 0) await setup.click();
+  await tiles.getByRole('button', { name, exact: true }).click();
 }
 
 /** Bereich unter „Meins“ wählen (Burger-Menü). */
@@ -2548,10 +2555,18 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
     await page.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.row', { hasText: title })).toBeVisible();
   }
-  // „‹ Verwaltung“ führt zurück zur Startseite; mit Punkten gibt es dort auch „Beförderungen“.
+  // „‹ Einrichtungen“ und „‹ Verwaltung“ führen zurück zur Startseite; mit Punkten gibt es dort auch „Beförderungen“,
+  // die Dienstgrade stehen dort nur unter „Einrichtungen“ (vor „Einstellungen“).
+  await page.getByRole('button', { name: '‹ Einrichtungen' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+  await expect(page.locator('.admin-tiles').getByRole('button', { name: 'Punktekatalog', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '‹ Verwaltung' }).click();
   await expect(page).toHaveURL(/#\/verwaltung$/);
-  await expect(page.locator('.admin-tiles').getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
+  const tiles = page.locator('.admin-tiles');
+  await expect(tiles.getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
+  await expect(tiles.getByRole('button', { name: 'Dienstgrade', exact: true })).toHaveCount(0);
+  await expect(tiles.locator('li').nth(-2)).toHaveText('Einrichtungen');
+  await expect(tiles.locator('li').last()).toHaveText('Einstellungen');
 
   // Punkte für mitglied2 buchen, dann befördern.
   await adminMenu(page, 'Mitglieder');

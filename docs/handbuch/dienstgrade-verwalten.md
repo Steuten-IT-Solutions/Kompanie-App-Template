@@ -9,7 +9,7 @@ Hier legst du fest, welche {bereich.ranks} es bei euch gibt, in welcher Reihenfo
 ![Die Liste der {bereich.ranks} mit Schwellen und Abzeichen](bild:dienstgrade-verwalten)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.ranks}**. Mit **‹ Verwaltung** kommst du zurück.
+Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{bereich.ranks}**. Mit **‹ Einrichtungen** kommst du zurück.
 
 ## Was du hier siehst
 - Die {bereich.ranks} vom niedrigsten (oben) zum höchsten (unten), jeweils mit Abzeichen, Bezeichnung, Schwelle („ab … {bereich.points}“ oder „ohne Schwelle“) und wie oft er vergeben ist. Deaktivierte tragen das Schild „inaktiv“.

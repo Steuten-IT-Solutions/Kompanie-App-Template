@@ -9,7 +9,7 @@ Im {bereich.points}katalog legst du häufige Anlässe mit ihrer Punktzahl als Vo
 ![Der {bereich.points}katalog mit aktiven und deaktivierten Vorlagen](bild:punktekatalog)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.points}katalog**. Mit **‹ Verwaltung** kommst du zurück.
+Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{bereich.points}katalog**. Mit **‹ Einrichtungen** kommst du zurück.
 
 ## Was du hier siehst
 - **Neue Vorlage** und **{bereich.points}**: das Formular für eine neue Vorlage, mit dem Knopf **Hinzufügen**.

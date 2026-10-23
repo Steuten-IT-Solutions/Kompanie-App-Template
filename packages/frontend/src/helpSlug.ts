@@ -105,7 +105,8 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
     import: 'mitglieder-import',
   };
-  if (!sub) return 'verwaltung';
+  // „Einrichtungen“ sammelt nur Knöpfe der Startseite; ihre Anleitung steht dort.
+  if (!sub || sub === 'einrichtungen') return 'verwaltung';
   if (tabs[sub]) return tabs[sub];
   if (sub === 'anwesenheit') return arg ? 'anwesenheitsliste' : 'anwesenheit-erfassen';
   if (sub === 'listen') return arg ? 'liste-bearbeiten' : 'listen';

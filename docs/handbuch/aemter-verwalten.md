@@ -9,7 +9,7 @@ Hier pflegst du, wer welches Amt wann hatte – auch frühere Inhaber ohne Konto
 ![{bereich.offices} in der Verwaltung](bild:aemter-verwalten)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf **{bereich.offices}**.
+Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.offices}**. Mit **‹ Einrichtungen** kommst du zurück.
 
 ## Was du hier siehst
 - **Tabelle importieren**: viele Amtszeiten auf einmal übernehmen.
