@@ -62,7 +62,7 @@ Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbe
 - Insgesamt gibt es höchstens 30 Rollen.
 - Mit WordPress sind die Administratoren der Webseite die {rolle.admin}s der App. Diese Rolle vergibst du im WordPress-Backend, nicht in der App.
 
-> **Beispiel Anwärter:** Lege eine Rolle „Anwärter“ an, nur mit **Interner Kalender**, ohne Mitgliederbereich, mit **Beim Anlegen neuer Konten wählbar** und dem Häkchen zum Aufnehmen als {rolle.member}. Anwärter sehen dann den internen Kalender und das {bereich.board} und stehen in der Mitgliederliste und der {bereich.attendance}, bekommen aber keine {bereich.points} oder {bereich.penalties}. Später nimmt sie auf, wer Mitglieder anlegen darf.
+> **Beispiel Anwärter:** Lege eine Rolle „Anwärter“ an, nur mit **Interner Kalender**, ohne Mitgliederbereich, mit **Beim Anlegen neuer Konten wählbar** und dem Häkchen zum Aufnehmen als {rolle.member}. Anwärter sehen dann den internen Kalender und das {bereich.board} und stehen in der Mitgliederliste und der {bereich.attendance}, bekommen aber keine {bereich.points} oder {bereich.penalties}. Der Name der Rolle steht in beiden Mitgliederlisten wie ein Titel neben dem Namen, auch in der öffentlichen unter **{bereich.directory}**. Später nimmt sie auf, wer Mitglieder anlegen darf.
 
 ## Siehe auch
 - [App als Rolle ansehen](seite:admin-vorschau)

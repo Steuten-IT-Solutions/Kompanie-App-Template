@@ -215,9 +215,9 @@ function PersonHead({
       </h2>
       {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
       {m && !f && personFacts(m) && <p className="small muted member-page-facts">{personFacts(m)}</p>}
-      {m?.titles && m.titles.length > 0 && (
+      {((m?.titles && m.titles.length > 0) || m?.candidate_role) && (
         <p className="member-page-titles">
-          <TitleBadges titles={m.titles} />
+          <TitleBadges titles={m.titles} role={m.candidate_role ?? undefined} />
         </p>
       )}
       {m?.rank_title && (
@@ -463,7 +463,7 @@ function MemberList({ former = false }: { former?: boolean }) {
             <div className="row-main">
               {/* Die ganze Zeile öffnet die Seite der Person; das Foto vergrößert weiterhin (liegt darüber). */}
               <button type="button" className="row-title member-row-open" onClick={() => open(m.id)}>
-                {listName(m, order.sort)} <TitleBadges titles={m.titles} />
+                {listName(m, order.sort)} <TitleBadges titles={m.titles} role={m.candidate_role ?? undefined} />
               </button>
               {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
               {/* Nach Eintritt sortiert: das Jahr, soweit die Person es zeigt (Ehemalige haben ihre Jahre oben). */}

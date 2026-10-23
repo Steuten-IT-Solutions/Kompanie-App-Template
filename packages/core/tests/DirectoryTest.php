@@ -67,7 +67,8 @@ final class DirectoryTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
 
         $entry = array_column($this->as(null)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'birthday', 'join_year', 'join_date'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'candidate_role', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'birthday', 'join_year', 'join_date'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertNull($entry['candidate_role'], 'Mitglieder ohne Rollenname');
         $this->assertNull($entry['birthday'], 'ohne Freigabe kein Geburtstag');
         $this->assertNull($entry['join_year'], 'ohne Freigabe kein Eintrittsjahr');
         $this->assertSame('Gefreiter', $entry['rank_title']);
@@ -76,7 +77,22 @@ final class DirectoryTest extends TestCase
         $this->users->current = $this->admin;
         $this->app->features()->update(['ranks' => false, 'titles' => false, 'birthdays' => false]);
         $entry = array_column($this->as($this->m)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'photo_url', 'join_year', 'join_date'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad, keine Titel und kein Geburtstag');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'candidate_role', 'photo_url', 'join_year', 'join_date'], array_keys($entry), 'ohne die Bereiche kein Dienstgrad, keine Titel und kein Geburtstag');
+    }
+
+    public function testCandidatesShowTheirRoleName(): void
+    {
+        // Rolle mit „Als Mitglied aufnehmen“ (z. B. Anwärter): ihr Name steht in der Liste, auch ohne Anmeldung.
+        $label = $this->app->roles()->find(TestApp::candidateRole($this->app))['label'] ?? null;
+        $byId = array_column($this->as(null)->data, null, 'id');
+        $this->assertIsString($label);
+        $this->assertSame($label, $byId[$this->candidate]['candidate_role']);
+        $this->assertNull($byId[$this->admin]['candidate_role']);
+
+        // Ohne das Häkchen kein Rollenname mehr
+        $this->users->current = $this->admin;
+        $this->app->roles()->update(TestApp::candidateRole($this->app), ['promotable' => false]);
+        $this->assertNull(array_column($this->as(null)->data, null, 'id')[$this->candidate]['candidate_role']);
     }
 
     public function testCountsPerGroupWithoutRolesPerPerson(): void

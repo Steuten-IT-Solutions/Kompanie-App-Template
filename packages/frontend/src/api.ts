@@ -372,6 +372,8 @@ export interface DirectoryEntry {
   name: string;
   first_name: string;
   last_name: string;
+  /** Rolle, solange die Person noch als Mitglied aufzunehmen ist (z. B. Anwärter); fehlt bei Ehemaligen und älteren Servern */
+  candidate_role?: string | null;
   /** Foto (128 Pixel), null ohne */
   photo_url: string | null;
   /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */

@@ -8,7 +8,7 @@ export function TitleBadges({ titles, role }: { titles?: TitleRef[]; role?: stri
   if (!role && (!titles || titles.length === 0)) return null;
   return (
     <span className="title-badges">
-      {role && <span className="badge badge-title badge-role">{role}</span>}
+      {role && <span className="badge badge-title badge-candidate">{role}</span>}
       {(titles ?? []).map((t) => (
         <span key={t.id} className="badge badge-title">
           {t.title}
