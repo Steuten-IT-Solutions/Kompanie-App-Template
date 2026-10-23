@@ -129,12 +129,53 @@ function ownsGesture(target: EventTarget | null, root: Element): boolean {
 /** Längste Dauer der Animation (CSS .member-track), falls transitionend ausbleibt. */
 const SLIDE_TIMEOUT = 400;
 
+/** Ansicht, auf der gerade gewischt werden kann (es gibt höchstens eine). */
+let activeRoot: HTMLElement | null = null;
+/** Finger auf dem Bildschirm: ob er wischen darf, entschieden beim Aufsetzen. Mehr als ein Finger: keiner wischt. */
+const fingers = new Set<number>();
+let finger: { id: number; eligible: boolean } | null = null;
+let tracking = false;
+
+/**
+ * Aufsetzen und Abheben jedes Fingers merken, unabhängig von der Ansicht: Wechselt sie zum Nachbarn, während der Finger
+ * noch aufliegt (z. B. gleich wieder aufgesetzt, während die Karte noch gleitet), übernimmt die neue Ansicht ihn.
+ * Pointer- statt Touch-Ereignisse: Verschwindet das Element unter dem Finger, kommen Touch-Ereignisse nirgends mehr an,
+ * Pointer-Ereignisse dagegen weiter am document.
+ */
+function trackFingers(): void {
+  if (tracking) return;
+  tracking = true;
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType !== 'touch') return;
+      fingers.add(e.pointerId);
+      finger =
+        fingers.size === 1
+          ? {
+              id: e.pointerId,
+              eligible: !!activeRoot && e.clientX > EDGE && e.clientX < window.innerWidth - EDGE && !ownsGesture(e.target, activeRoot),
+            }
+          : null;
+    },
+    { capture: true, passive: true },
+  );
+  const up = (e: PointerEvent) => {
+    fingers.delete(e.pointerId);
+    if (finger?.id === e.pointerId) finger = null;
+  };
+  // Am window, also nach den Ansichten (sie hören am document): Sie ordnen das Abheben noch dem Finger zu.
+  window.addEventListener('pointerup', up, { passive: true });
+  window.addEventListener('pointercancel', up, { passive: true });
+}
+
 /**
  * Karussell zum Blättern mit einem Finger, auf der Ansicht (root) und der leeren Fläche um sie herum (siehe
- * ownsGesture; daher am document, nicht an der Ansicht). Die Spur (track) folgt dem Finger, daneben zeigt die Ansicht
- * die Nachbarn, solange `peeking` gilt. Beim Loslassen gleitet die Spur zum Nachbarn und ruft dann onCommit auf (die Ansicht wechselt
- * zum Nachbarn, der genau an dieser Stelle erscheint), oder schnappt zurück. slide() macht dasselbe für die Pfeile.
- * Der Versatz wird direkt am Element gesetzt, nicht über React, damit das Ziehen nicht bei jeder Bewegung neu rendert.
+ * ownsGesture; daher am document, nicht an der Ansicht), auch mit einem Finger, der schon vor der Ansicht auflag
+ * (trackFingers). Die Spur (track) folgt dem Finger, daneben zeigt die Ansicht die Nachbarn, solange `peeking` gilt.
+ * Beim Loslassen gleitet die Spur zum Nachbarn und ruft dann onCommit auf (die Ansicht wechselt zum Nachbarn, der
+ * genau an dieser Stelle erscheint), oder schnappt zurück. slide() macht dasselbe für die Pfeile. Der Versatz wird
+ * direkt am Element gesetzt, nicht über React, damit das Ziehen nicht bei jeder Bewegung neu rendert.
  */
 export function useSwipeDrag(
   root: RefObject<HTMLElement>,
@@ -226,36 +267,41 @@ export function useSwipeDrag(
     else showPeeks();
   }
 
+  // Geste des aufliegenden Fingers ab dieser Stelle; während die Spur gleitet, keine (der Finger wartet auf die nächste
+  // Ansicht, die ihn dann übernimmt).
+  function grab(e: PointerEvent) {
+    gesture.current =
+      finger?.id === e.pointerId && finger.eligible && !busy.current && root.current
+        ? { x: e.clientX, y: e.clientY, lock: null, dx: 0, lastX: e.clientX, lastT: e.timeStamp, v: 0 }
+        : null;
+  }
+
   const handlers = {
-    onTouchStart(e: TouchEvent) {
-      const t = e.touches[0];
-      const el = root.current;
-      gesture.current =
-        el &&
-        !busy.current &&
-        e.touches.length === 1 &&
-        t.clientX > EDGE &&
-        t.clientX < window.innerWidth - EDGE &&
-        !ownsGesture(e.target, el)
-          ? { x: t.clientX, y: t.clientY, lock: null, dx: 0, lastX: t.clientX, lastT: e.timeStamp, v: 0 }
-          : null;
+    onPointerDown(e: PointerEvent) {
+      if (e.pointerType === 'touch') grab(e);
     },
-    onTouchMove(e: TouchEvent) {
+    onPointerMove(e: PointerEvent) {
+      if (e.pointerType !== 'touch') return;
+      if (!gesture.current) {
+        // Aufgesetzt, bevor diese Ansicht stand oder während die Spur glitt: jetzt übernehmen.
+        if (finger?.id === e.pointerId) grab(e);
+        return;
+      }
       const g = gesture.current;
-      if (!g) return;
-      if (e.touches.length !== 1) {
+      if (finger?.id !== e.pointerId) {
+        // Zweiter Finger (z. B. zum Zoomen): keine Geste.
         gesture.current = null;
         if (g.lock) settle(0);
         return;
       }
-      const t = e.touches[0];
-      const dx = t.clientX - g.x;
-      const dy = t.clientY - g.y;
+      const dx = e.clientX - g.x;
+      const dy = e.clientY - g.y;
       if (!g.lock) {
         if (Math.hypot(dx, dy) < LOCK_DISTANCE) return;
         // Senkrecht: Scrollen. Markierter Text: Der Finger wählt aus, statt zu wischen.
         if (Math.abs(dx) < 2 * Math.abs(dy) || !window.getSelection()?.isCollapsed) {
           gesture.current = null;
+          if (finger) finger.eligible = false;
           return;
         }
         g.lock = 'x';
@@ -263,21 +309,21 @@ export function useSwipeDrag(
         showPeeks();
       }
       const dt = e.timeStamp - g.lastT;
-      if (dt > 0) g.v = (t.clientX - g.lastX) / dt;
-      g.lastX = t.clientX;
+      if (dt > 0) g.v = (e.clientX - g.lastX) / dt;
+      g.lastX = e.clientX;
       g.lastT = e.timeStamp;
       g.dx = dx;
       setOffset(dragOffset(dx, latest.current.canPrev, latest.current.canNext), false);
     },
-    onTouchEnd(e: TouchEvent) {
+    onPointerUp(e: PointerEvent) {
       const g = gesture.current;
-      if (!g || e.touches.length > 0) return;
+      if (!g || finger?.id !== e.pointerId) return;
       gesture.current = null;
       if (!g.lock) return;
       const width = track.current?.offsetWidth ?? window.innerWidth;
       settle(releaseStep(g.dx, g.v, width, latest.current.canPrev, latest.current.canNext));
     },
-    onTouchCancel() {
+    onPointerCancel() {
       const g = gesture.current;
       gesture.current = null;
       if (g?.lock) settle(0);
@@ -287,14 +333,18 @@ export function useSwipeDrag(
   latestHandlers.current = handlers;
 
   useEffect(() => {
+    trackFingers();
+    const el = root.current;
+    activeRoot = el;
     const on = {
-      touchstart: (e: TouchEvent) => latestHandlers.current.onTouchStart(e),
-      touchmove: (e: TouchEvent) => latestHandlers.current.onTouchMove(e),
-      touchend: (e: TouchEvent) => latestHandlers.current.onTouchEnd(e),
-      touchcancel: () => latestHandlers.current.onTouchCancel(),
+      pointerdown: (e: PointerEvent) => latestHandlers.current.onPointerDown(e),
+      pointermove: (e: PointerEvent) => latestHandlers.current.onPointerMove(e),
+      pointerup: (e: PointerEvent) => latestHandlers.current.onPointerUp(e),
+      pointercancel: () => latestHandlers.current.onPointerCancel(),
     };
     for (const [type, fn] of Object.entries(on)) document.addEventListener(type, fn as EventListener, { passive: true });
     return () => {
+      if (activeRoot === el) activeRoot = null;
       for (const [type, fn] of Object.entries(on)) document.removeEventListener(type, fn as EventListener);
     };
   }, []);

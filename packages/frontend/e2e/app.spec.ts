@@ -513,6 +513,37 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
   });
 });
 
+test('Mitglieder (für alle): Liegt der Finger schon auf, während die Karte noch gleitet, blättert er danach weiter', async ({ page }) => {
+  await login(page, 'mitglied1');
+  await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await page.getByLabel('Mitglied suchen').fill('Mitglied');
+  await page
+    .locator('.directory .member-row', { hasText: 'Mitglied1' })
+    .getByRole('button', { name: /Mitglied1/ })
+    .click();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  const box = (await page.locator('.member-name').boundingBox())!;
+  const x = page.viewportSize()!.width / 2 + 80;
+  const y = box.y + box.height / 2;
+  const cdp = await page.context().newCDPSession(page);
+  const move = async (dx: number) => cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y }] });
+  // Erster Wisch: Die Karte gleitet zur nächsten Person.
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const dx of [-50, -100, -160]) await move(dx);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  // Gleich wieder aufsetzen, noch während sie gleitet; die Seite der nächsten Person ersetzt die Ansicht unter dem Finger.
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await expect(page.locator('.member-name')).toHaveText('Mitglied2');
+  await expect(page.locator('.member-step')).toContainText('2 / 2');
+  // Derselbe Finger zieht weiter: Die Karte folgt ihm und blättert (im Kreis) wieder zur ersten.
+  for (const dx of [-20, -60, -120, -180]) await move(dx);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await expect(page.locator('.member-name')).toHaveText('Mitglied1');
+  await expect(page.locator('.member-step')).toContainText('1 / 2');
+});
+
 test('Mitglieder (für alle): Wischen und Pfeile blättern in der Liste, „Zurück“ führt zur Liste', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
