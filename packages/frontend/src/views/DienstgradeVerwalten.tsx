@@ -4,6 +4,7 @@ import brand from '../generated/brand';
 import { formatDate } from '../format';
 import { navigate } from '../router';
 import { RankBadge, RankLabel } from '../RankBadge';
+import { useDragSort, useSaveQueue } from '../dragSort';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
 
@@ -76,7 +77,8 @@ function BadgePreview({ rank: r }: { rank: Rank }) {
 }
 
 /**
- * Verwaltung → Dienstgrade: anlegen, umbenennen, Schwelle (nur mit Punkten), Reihenfolge, deaktivieren, löschen.
+ * Verwaltung → Dienstgrade: anlegen, umbenennen, Schwelle (nur mit Punkten), Reihenfolge (Ziehen am Griff), deaktivieren,
+ * löschen.
  * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad.
  */
 export function RankList({ onToast }: { onToast: (msg: string) => void }) {
@@ -139,19 +141,23 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
     }
   }
 
-  async function move(list: Rank[], index: number, dir: -1 | 1) {
-    const ids = list.map((r) => r.id);
-    [ids[index], ids[index + dir]] = [ids[index + dir], ids[index]];
-    setBusy(true);
+  // Reihenfolge per Ziehen am Griff (Issue #176), gesperrt, solange ein Dienstgrad bearbeitet wird. Steigen die Schwellen
+  // dann nicht mehr mit der Reihenfolge, lehnt der Server ab: Meldung zeigen und die gespeicherte Reihenfolge laden.
+  const saveOrder = useSaveQueue();
+  function reorder(next: Rank[]) {
+    // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
+    setData(next);
     setFormError(null);
-    try {
-      setData(await api.reorderRanks(ids));
-    } catch (e) {
-      setFormError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    saveOrder(
+      () => api.reorderRanks(next.map((r) => r.id)),
+      setData,
+      (e) => {
+        setFormError(e.message);
+        reload();
+      },
+    );
   }
+  const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -165,6 +171,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         {points
           ? `Mit ${sec.points}schwelle: befördern erst ab der Schwelle, degradieren jederzeit. Ohne Schwelle frei.`
           : `Befördern und degradieren geht frei; mit dem Bereich ${sec.points} kommen ${sec.points}schwellen dazu.`}
+        {list.length > 1 && ` Zum Umsortieren einen ${rank} am Griff links ziehen; die Schwellen müssen mit der Reihenfolge steigen.`}
       </p>
       {missing && (
         <p className="small">
@@ -182,7 +189,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         <ul className="card-list">
           {list.map((r, i) =>
             editing === r.id ? (
-              <li key={r.id} className="card">
+              <li key={r.id} {...sort.itemProps(i, 'card')}>
                 <RankForm
                   rank={r}
                   thresholdLabel={thresholdLabel}
@@ -194,7 +201,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                 />
               </li>
             ) : (
-              <li key={r.id} className={`card row ${r.active ? '' : 'inactive'}`}>
+              <li key={r.id} {...sort.itemProps(i, `card row ${r.active ? '' : 'inactive'}`)}>
+                {list.length > 1 && sort.handle(i, r.title)}
                 <div className="row-main">
                   <div className="row-title">
                     <RankLabel url={r.badge_url} title={r.title} />
@@ -206,22 +214,6 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                     {r.assigned ? `${r.assigned}× vergeben` : 'nicht vergeben'}
                   </div>
                   <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy || i === 0}
-                      onClick={() => move(list, i, -1)}
-                      aria-label={`${r.title} eine Stufe niedriger`}
-                    >
-                      niedriger
-                    </button>
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy || i === list.length - 1}
-                      onClick={() => move(list, i, 1)}
-                      aria-label={`${r.title} eine Stufe höher`}
-                    >
-                      höher
-                    </button>
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(r.id)}>
                       Ändern
                     </button>
@@ -308,7 +300,9 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         <button className="btn btn-block" type="submit" disabled={busy}>
           Anlegen
         </button>
-        <p className="muted small">Neue {sec.ranks} kommen ans obere Ende; mit „niedriger“ und „höher“ änderst du die Reihenfolge.</p>
+        <p className="muted small">
+          Neue {sec.ranks} kommen ans Ende der Liste, also als höchster {rank}; den Platz änderst du per Ziehen am Griff.
+        </p>
       </form>
     </div>
   );

@@ -64,6 +64,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Kalender: Aktualisierung einstellbar**: Unter *Einstellungen → Kalender* (und mit WordPress auch im Backend) legt
   ihr fest, nach wie vielen Minuten die App neue Termine bei Google holt (1 bis 1440, Standard 15). Kürzere Zeiten
   zeigen Änderungen wie gelöschte Termine schneller; Speichern und „Kalender testen“ laden sofort neu.
+- **Punktekatalog und Dienstgrade per Ziehen sortieren**: Wie bei Titeln hat jeder Eintrag links einen Griff. Mit
+  Maus, Finger oder Pfeiltasten ändert ihr die Reihenfolge; sie gilt auch für die Vorlagen beim Punkte vergeben. Neue
+  Vorlagen kommen ans Ende. Bei Dienstgraden ersetzt das die Knöpfe „niedriger“ und „höher“; passt ein Zug nicht zu den
+  Punkteschwellen, springt der Dienstgrad zurück und die App sagt, welche nicht passen.
 
 ### Geändert
 

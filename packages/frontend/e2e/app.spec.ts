@@ -2737,6 +2737,99 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
 });
 
+test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen werden geprüft', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+
+  /** Griff von „from“ mit der Maus auf die Zeile „onto“ ziehen. */
+  const drag = async (from: string, onto: Locator) => {
+    const handle = page.getByRole('button', { name: `${from} verschieben (ziehen oder Pfeiltasten)` });
+    await handle.scrollIntoViewIfNeeded();
+    const a = (await handle.boundingBox())!;
+    const b = (await onto.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2, b.y + 5, { steps: 10 });
+    await page.mouse.up();
+  };
+  const saved = (path: string) => page.waitForResponse((r) => r.request().method() === 'PUT' && r.url().includes(path));
+
+  // Punktekatalog (Issue #176): ziehen und Pfeiltasten, gilt auch für die Vorlagen beim Vergeben
+  const items = ['A', 'B', 'C'].map((n) => `Vorlage ${n} ${id}`);
+  await adminMenu(page, 'Punktekatalog');
+  for (const title of items) {
+    // Das Formular leert sich erst nach der Meldung
+    await expect(page.getByPlaceholder('z. B. Teilnahme am Sommerfest')).toHaveValue('');
+    await page.getByPlaceholder('z. B. Teilnahme am Sommerfest').fill(title);
+    await page.locator('.field.narrow input').fill('2');
+    await page.getByRole('button', { name: 'Hinzufügen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Vorlage angelegt');
+  }
+  const catalogOrder = async () => (await page.locator('.card-list .row-title').allTextContents()).filter((t) => t.includes(id));
+  await expect.poll(catalogOrder).toEqual(items); // neue Einträge ans Ende
+  let done = saved('catalog');
+  await drag(items[2], page.locator('.card-list .row', { hasText: items[0] }));
+  expect((await done).status()).toBe(200);
+  expect(await catalogOrder()).toEqual([items[2], items[0], items[1]]);
+  done = saved('catalog');
+  await page.getByRole('button', { name: `${items[1]} verschieben (ziehen oder Pfeiltasten)` }).press('ArrowUp');
+  expect((await done).status()).toBe(200);
+  await page.reload();
+  await expect.poll(catalogOrder).toEqual([items[2], items[1], items[0]]);
+  await adminMenu(page, 'Punkte +');
+  const options = async () =>
+    (await page.getByLabel('Vorlage aus dem Katalog').locator('option').allTextContents()).filter((t) => t.includes(id));
+  await expect.poll(options).toEqual([items[2], items[1], items[0]].map((t) => `${t} (+2)`));
+  // Aufräumen: deaktivieren (Katalogeinträge lassen sich nicht löschen)
+  await adminMenu(page, 'Punktekatalog');
+  for (const title of items) {
+    await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Deaktivieren' }).click();
+    await expect(page.locator('.toast')).toHaveText('Deaktiviert');
+  }
+
+  // Dienstgrade: keine Knöpfe „niedriger“/„höher“ mehr; ein Zug gegen die Schwellen springt mit Meldung zurück
+  const ranks = [`Rang A ${id}`, `Rang B ${id}`, `Rang C ${id}`];
+  await adminMenu(page, 'Dienstgrade');
+  for (const [title, min] of [
+    [ranks[0], '5000'],
+    [ranks[1], '6000'],
+    [ranks[2], ''],
+  ]) {
+    await expect(page.getByLabel('Bezeichnung')).toHaveValue('');
+    await page.getByLabel('Bezeichnung').fill(title);
+    await page.getByLabel('Punkteschwelle (optional)').fill(min);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.row', { hasText: title })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: /niedriger|höher/ })).toHaveCount(0);
+  const rankOrder = async () => (await page.locator('.card-list .row-title').allTextContents()).filter((t) => t.includes(id));
+  await expect.poll(rankOrder).toEqual(ranks);
+  // C (ohne Schwelle) per Pfeiltaste vor B: erlaubt
+  done = saved('ranks');
+  await page.getByRole('button', { name: `${ranks[2]} verschieben (ziehen oder Pfeiltasten)` }).press('ArrowUp');
+  expect((await done).status()).toBe(200);
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  // B (6000) vor A (5000): Die Schwellen fallen, der Server lehnt ab, B springt zurück
+  done = saved('ranks');
+  await drag(ranks[1], page.locator('.card-list .row', { hasText: ranks[0] }));
+  expect((await done).status()).toBe(400);
+  await expect(page.locator('.form-error')).toBeVisible();
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  await page.reload();
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  // Während ein Dienstgrad bearbeitet wird, ist Ziehen gesperrt
+  await page.locator('.card-list .row', { hasText: ranks[0] }).getByRole('button', { name: 'Ändern' }).click();
+  await page.getByRole('button', { name: `${ranks[1]} verschieben (ziehen oder Pfeiltasten)` }).press('ArrowUp');
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  // Aufräumen
+  for (const title of ranks) {
+    page.once('dialog', (d) => void d.accept());
+    await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
   page,
 }) => {

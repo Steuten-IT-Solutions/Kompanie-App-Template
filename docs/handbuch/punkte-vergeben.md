@@ -12,7 +12,7 @@ Hier trägst du {bereich.points} für ein oder mehrere Mitglieder auf einmal ein
 Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.points} +**. Mit **‹ Verwaltung** kommst du zurück zur Startseite der Verwaltung.
 
 ## Was du hier siehst
-- **Vorlage aus dem Katalog**: häufige Anlässe mit fester Punktzahl. „– freie Eingabe –“ heißt: ohne Vorlage.
+- **Vorlage aus dem Katalog**: häufige Anlässe mit fester Punktzahl, in der Reihenfolge aus dem [{bereich.points}katalog](seite:punktekatalog). „– freie Eingabe –“ heißt: ohne Vorlage.
 - **{bereich.points}**: die Punktzahl, eine ganze Zahl. Für einen Abzug schreibst du ein Minus davor.
 - **Datum**: heute ist vorausgewählt.
 - **Grund**: steht später beim Mitglied im Verlauf.

@@ -41,6 +41,7 @@ import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
+import { useDragSort, useSaveQueue } from '../dragSort';
 import { PenaltyRow } from './Strafen';
 import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
 import { TitleBadges } from '../TitleBadges';
@@ -1647,10 +1648,26 @@ function GivePenalty({
 /* ------------------------------------------------------------------ */
 
 function Catalog({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.catalog(true), [], 'catalog-all');
+  const { data, error, loading, reload, setData } = useAsync(() => api.catalog(true), [], 'catalog-all');
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Reihenfolge per Ziehen am Griff (Issue #176), wie bei den Titeln; gilt auch für die Vorlagen beim Punkte vergeben.
+  const saveOrder = useSaveQueue();
+  function reorder(next: CatalogItem[]) {
+    // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
+    setData(next);
+    saveOrder(
+      () => api.reorderCatalog(next.map((c) => c.id)),
+      setData,
+      (e) => {
+        onToast(e.message);
+        reload();
+      },
+    );
+  }
+  const sort = useDragSort(data ?? [], reorder);
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -1700,9 +1717,13 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
           Hinzufügen
         </button>
       </form>
+      {(data ?? []).length > 1 && (
+        <p className="muted small">Die Reihenfolge gilt auch für die Vorlagen beim Vergeben; zum Ändern am Griff links ziehen.</p>
+      )}
       <ul className="card-list">
-        {(data ?? []).map((c) => (
-          <li key={c.id} className={`card row ${c.active ? '' : 'inactive'}`}>
+        {(data ?? []).map((c, i, list) => (
+          <li key={c.id} {...sort.itemProps(i, `card row ${c.active ? '' : 'inactive'}`)}>
+            {list.length > 1 && sort.handle(i, c.title)}
             <div className="row-main">
               <div className="row-title">{c.title}</div>
               <div className="row-sub">{c.active ? 'aktiv' : 'deaktiviert'}</div>

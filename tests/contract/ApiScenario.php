@@ -140,6 +140,7 @@ final class ApiScenario
         $c->ok($this->req('POST', '/points', ['user_ids' => [$m1], 'points' => 100, 'reason' => 'Selbstbedienung'])[0] === 403, 'POST /points als Mitglied → 403');
         $c->ok($this->req('POST', '/penalties', ['user_ids' => [$m2], 'amount_cents' => 500, 'reason' => 'x'])[0] === 403, 'POST /penalties als Mitglied → 403');
         $c->ok($this->req('POST', '/catalog', ['title' => 'x', 'points' => 1])[0] === 403, 'POST /catalog als Mitglied → 403');
+        $c->ok($this->req('PUT', '/catalog/order', ['ids' => []])[0] === 403, 'PUT /catalog/order als Mitglied → 403');
         [$s, $d] = $this->req('GET', '/me');
         $c->ok($s === 200 && $d['level'] === 'member', 'GET /me als Mitglied → level member');
 
@@ -156,6 +157,13 @@ final class ApiScenario
         [, $list] = $this->req('GET', '/catalog');
         [, $all] = $this->req('GET', '/catalog', [], ['all' => '1']);
         $c->ok(!in_array($this->catalogId, array_column($list, 'id'), true) && in_array($this->catalogId, array_column($all, 'id'), true), 'Inaktive Einträge nur mit all=1');
+        // Reihenfolge per Ziehen (Issue #176): alle IDs, auch inaktive; danach wie vorher.
+        $before = array_column($all, 'id');
+        $moved = array_merge([$this->catalogId], array_values(array_diff($before, [$this->catalogId])));
+        [$s, $d] = $this->req('PUT', '/catalog/order', ['ids' => $moved]);
+        $c->ok($s === 200 && array_column($d, 'id') === $moved, 'Katalog umsortieren (mit inaktiven)');
+        $c->ok($this->req('PUT', '/catalog/order', ['ids' => array_slice($moved, 1)])[0] === 400, 'Unvollständige Reihenfolge → 400');
+        $this->req('PUT', '/catalog/order', ['ids' => $before]);
         $this->req('PATCH', '/catalog/' . $this->catalogId, ['active' => true]);
 
         [$s, $d] = $this->req('POST', '/points', ['user_ids' => [$m1, $m2], 'catalog_id' => $this->catalogId, 'date' => '2026-06-27']);
