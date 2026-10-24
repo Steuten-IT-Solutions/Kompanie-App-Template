@@ -1026,6 +1026,13 @@ final class Migrations
                     "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
                 ],
             ],
+            // Fotos der Mitglieder zusätzlich in Originalauflösung (höchstens MemberPhotoService::MAX_EDGE) für die
+            // Großansicht, die sie nach der 1024er nachlädt. Ohne Vorgabe (NULL): Fotos von vorher haben sie erst nach
+            // erneutem Hochladen, ebenso wenn die Datenbank das große Foto nicht annimmt (max_allowed_packet).
+            24 => [
+                'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN original mediumtext DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN original TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

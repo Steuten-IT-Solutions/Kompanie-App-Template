@@ -61,6 +61,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
   Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Logo. `[kompanie_mitglieder]`
   zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
+- **Großansicht in voller Auflösung**: Galerie und Mitgliedsfotos erscheinen beim Antippen erst wie bisher und werden
+  nach einem Moment durch die Originalauflösung ersetzt (App und Webseite). In der Galerie entsteht sie aus dem
+  Original in Google Drive, wenn jemand das Bild zum ersten Mal öffnet. Mitgliedsfotos lädt die App jetzt bis
+  4096 Pixel hoch; vorhandene Fotos haben die volle Auflösung erst, wenn sie neu hochgeladen werden.
 
 ### Geändert
 
@@ -120,6 +124,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Eingabefelder in Umfragen**: Die Felder *Frage* und *Antwortmöglichkeiten* sowie *Ende* beim Anlegen oder
   Bearbeiten einer Umfrage sehen jetzt aus wie alle anderen Eingabefelder der App (bisher graue, eckige Kästen).
+
+### Sicherheit
+
+- **Keine Metadaten in Bildern**: Gespeicherte Bilder enthalten keine EXIF-Daten mehr, auch keinen GPS-Ort, auch
+  wenn der Server sie nicht verkleinern musste.
 
 ## [0.2.0] – 2026-10-22
 

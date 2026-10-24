@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Infra;
 
+use KompanieApp\Core\Domain\JpegMetadata;
 use KompanieApp\Core\Port\ImageResizer;
 
 /** Bildverkleinerung mit der PHP-Erweiterung GD. */
@@ -25,17 +26,24 @@ final class GdImageResizer implements ImageResizer
         $scale = min(1.0, $maxEdge / max($w, $h));
         $nw = max(1, (int) round($w * $scale));
         $nh = max(1, (int) round($h * $scale));
-        $dst = imagecreatetruecolor($nw, $nh);
-        // Transparente Flächen (PNG) weiß statt schwarz.
-        imagefill($dst, 0, 0, (int) imagecolorallocate($dst, 255, 255, 255));
-        imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        if ($scale >= 1.0 && str_starts_with($data, "\xFF\xD8")) {
+            // Originalauflösung aus einem JPEG (keine Transparenz): ohne zweite Kopie im Speicher (bei 4096 Pixeln rund 50 MB).
+            $dst = $src;
+        } else {
+            $dst = imagecreatetruecolor($nw, $nh);
+            // Transparente Flächen (PNG) weiß statt schwarz.
+            imagefill($dst, 0, 0, (int) imagecolorallocate($dst, 255, 255, 255));
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($src);
+        }
+        unset($data);
         imageinterlace($dst, true);
         $ok = imagejpeg($dst, $targetFile, $quality);
-        imagedestroy($src);
         imagedestroy($dst);
         if (!$ok) {
             throw new \RuntimeException('Das Bild kann nicht gespeichert werden.');
         }
+        JpegMetadata::stripFile($targetFile); // GD schreibt keine Metadaten; zur Sicherheit wie im WordPress-Adapter
         return ['width' => $nw, 'height' => $nh];
     }
 

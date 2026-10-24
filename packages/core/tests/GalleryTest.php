@@ -423,6 +423,50 @@ final class GalleryTest extends TestCase
         $this->assertSame(7, $this->drive->downloads);
     }
 
+    public function testOriginalResolutionIsGeneratedWhenOpened(): void
+    {
+        $gallery = $this->app->gallery();
+        $gallery->waitSeconds = 0;
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $this->drive->contents['IMG1'] = JpegMetadataTest::jpegWithMetadata(3000, 2000);
+        $gallery->sync();
+        $gallery->processPending(60);
+        $downloads = $this->drive->downloads;
+        $id = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE drive_file_id = 'IMG1'");
+        $album = (int) $this->app->db->scalar("SELECT album_id FROM {photos} WHERE id = ?", [$id]);
+        $photo = fn (): array => array_values(array_filter($gallery->album($album, false)['photos'], static fn (array $p): bool => $p['id'] === $id))[0];
+
+        // Noch nicht erzeugt: Adresse über die App, die Großansicht zeigt bis dahin large.
+        $this->assertSame('https://example.org/app/foto/' . $id . '/original', $photo()['original']);
+        $res = $gallery->photoForDelivery($id, 'original', false, false);
+        $this->assertSame(200, $res['status']);
+        $this->assertSame([3000, 2000], array_slice((array) getimagesize((string) $res['file']), 0, 2), 'volle Auflösung, nicht 1600');
+        $this->assertStringNotContainsString('GPSLatitude', (string) file_get_contents((string) $res['file']), 'ohne Metadaten');
+        $this->assertSame($downloads + 1, $this->drive->downloads, 'Original einmal aus Drive geladen');
+        $this->assertSame(200, $gallery->photoForDelivery($id, 'original', false, false)['status']);
+        $this->assertSame($downloads + 1, $this->drive->downloads, 'danach aus der Datei');
+        $this->assertStringEndsWith('-original.jpg', $photo()['original'], 'öffentlich: jetzt direkt als Datei');
+
+        // Interne Bilder: Rechte wie bei den anderen Größen.
+        $intern = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE drive_file_id = 'IMG3'");
+        $this->assertSame(401, $gallery->photoForDelivery($intern, 'original', false, false)['status']);
+
+        // Scheitert das Original (z. B. Störung bei Google): 404, und nicht bei jedem Klick erneut aus Drive laden.
+        $this->drive->downloadFails = true;
+        $before = $this->drive->downloads;
+        $this->assertSame(404, $gallery->photoForDelivery($intern, 'original', true, true)['status']);
+        $this->assertSame(404, $gallery->photoForDelivery($intern, 'original', true, true)['status']);
+        $this->assertSame($before + 1, $this->drive->downloads, 'Merker verhindert weitere Downloads');
+        $this->drive->downloadFails = false;
+
+        // Neuer Inhalt in Drive: alle Fassungen samt Original verschwinden.
+        $file = (string) $res['file'];
+        $row = (array) $this->app->db->selectOne('SELECT * FROM {photos} WHERE id = ?', [$id]);
+        $gallery->deleteFiles($row);
+        $this->assertFileDoesNotExist($file);
+    }
+
     public function testBackgroundTaskContinuesWhilePhotosArePending(): void
     {
         $gallery = $this->app->gallery();
