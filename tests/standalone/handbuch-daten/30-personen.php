@@ -69,7 +69,7 @@ $offices->createTerm($chair, ['kind' => 'period', 'start_year' => $year - 6, 'ho
 $offices->createTerm($chair, ['kind' => 'period', 'start_year' => $year - 18, 'end_year' => $year - 6, 'holders' => $who('Gerd Fischer')]);
 $offices->createTerm($chair, ['kind' => 'period', 'start_year' => $year - 31, 'end_year' => $year - 18, 'holders' => $who('Heinrich Albers')]);
 $offices->createTerm($chair, ['kind' => 'period', 'start_year' => $year - 44, 'end_year' => $year - 31, 'holders' => $who('Josef Hermes')]);
-$offices->createTerm($chair, ['kind' => 'point', 'start_year' => $year - 6, 'note' => 'Ehrenvorsitz', 'holders' => $who('Gerd Fischer')]);
+$offices->createTerm($chair, ['kind' => 'point', 'start_year' => $year - 6, 'note' => 'Ehrenvorsitz', 'honor' => true, 'holders' => $who('Gerd Fischer')]);
 
 $cash = $office('Kassierer', $board);
 $offices->createTerm($cash, ['kind' => 'period', 'start_year' => $year - 9, 'holders' => $who('Sabine Wolf')]);

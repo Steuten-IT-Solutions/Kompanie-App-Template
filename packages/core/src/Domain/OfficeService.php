@@ -14,8 +14,9 @@ use KompanieApp\Core\Storage\OfficeRepository;
  * Ämter (Issue #112): wer welches Amt wann hatte, auch frühere Inhaber ohne Konto, für den Zeitstrahl.
  *
  * - Gruppen (z. B. Verein und Dachverband) ordnen die Ämter; ein Amt kann auch ohne Gruppe sein.
- * - Eine Amtszeit ist ein Zeitraum in Jahren (ohne Ende: läuft bis heute) oder ein einzelnes Jahr (z. B. eine Ehrung),
- *   mit einem oder mehreren Inhabern und einem kurzen Zusatz. Inhaber sind Konten oder freie Namen.
+ * - Eine Amtszeit ist ein Zeitraum in Jahren (ohne Ende: läuft bis heute) oder ein einzelnes Jahr, mit einem oder mehreren
+ *   Inhabern und einem kurzen Zusatz. Inhaber sind Konten oder freie Namen. Der Haken „Ehrung“ (honor, Issue #180) ist
+ *   bei beiden Arten möglich und ändert nur die Darstellung; einen Titel vergibt nur eine laufende Amtszeit.
  * - Lesen ist öffentlich. Konto und Foto eines Inhabers stehen nur dabei, wenn er in der Mitgliederliste steht (Bereich
  *   directory); wer Ämter verwaltet, sieht die Konten immer.
  * - Ein Amt kann mit einem Titel verknüpft sein: Wer eine laufende Amtszeit hat (Konto, Mitglied), bekommt ihn, wer keine
@@ -260,7 +261,7 @@ final class OfficeService
     // ---- Amtszeiten ----
 
     /**
-     * @param array<string, mixed> $in kind, start_year, end_year, note, holders [{user_id} | {name}]
+     * @param array<string, mixed> $in kind, start_year, end_year, note, honor, holders [{user_id} | {name}]
      * @return array<string, mixed>
      */
     public function createTerm(int $officeId, array $in): array
@@ -287,6 +288,7 @@ final class OfficeService
             'start_year' => $current['start_year'],
             'end_year' => $current['end_year'],
             'note' => $current['note'],
+            'honor' => $current['honor'],
             'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name']], $repo->holdersOf($id)),
         ];
         [$term, $holders] = $this->validTerm($merged);
@@ -369,7 +371,8 @@ final class OfficeService
     // ---- Import ----
 
     /**
-     * Ersterfassung aus einer Tabelle (CSV, Semikolon oder Tabulator): gruppe;amt;beginn;ende;art;personen;zusatz.
+     * Ersterfassung aus einer Tabelle (CSV, Semikolon oder Tabulator): gruppe;amt;beginn;ende;art;personen;zusatz;ehrung.
+     * Die Spalte ehrung ist optional (ja, nein oder leer); nur sie macht eine Zeile zur Ehrung.
      * - ende leer und art leer: ein Jahr (Zeitpunkt); „heute“: laufend; art „zeitraum“ oder „zeitpunkt“ erzwingt die Art.
      * - personen mit „&“ getrennt; wer genau so heißt wie genau ein Konto, wird damit verknüpft (link).
      * - Gruppen und Ämter werden nach Namen gefunden oder angelegt; eine Amtszeit, die es genau so schon gibt, wird
@@ -434,6 +437,7 @@ final class OfficeService
                     'start_year' => $term['start_year'],
                     'end_year' => $term['end_year'],
                     'note' => $term['note'],
+                    'honor' => $term['honor'],
                     'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']], $holders),
                 ];
                 $groupKey = mb_strtolower($groupTitle);
@@ -536,7 +540,7 @@ final class OfficeService
     /**
      * @param list<string> $cells
      * @param array<string, list<User>> $accounts Name (klein) => Konten
-     * @return array{0: string, 1: string, 2: array{kind: string, start_year: int, end_year: int|null, note: string}, 3: list<array{user_id: int|null, name: string}>}
+     * @return array{0: string, 1: string, 2: array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool}, 3: list<array{user_id: int|null, name: string}>}
      */
     private function importRow(array $cells, array $accounts): array
     {
@@ -555,6 +559,12 @@ final class OfficeService
             'zeitpunkt' => self::KIND_POINT,
             default => throw ApiError::invalid('Art „zeitraum“ oder „zeitpunkt“ (oder leer) erwartet.'),
         };
+        // Ehrung nur mit der 8. Spalte; ältere Tabellen mit 7 Spalten ergeben keine Ehrungen (auch nicht bei zeitpunkt).
+        $honor = match (mb_strtolower(trim($cells[7] ?? ''))) {
+            '', 'nein' => false,
+            'ja' => true,
+            default => throw ApiError::invalid('Spalte „ehrung“: „ja“, „nein“ oder leer erwartet.'),
+        };
         $names = array_values(array_filter(array_map('trim', explode('&', $cells[5] ?? '')), static fn (string $n): bool => $n !== ''));
         $holders = [];
         foreach ($names as $name) {
@@ -566,6 +576,7 @@ final class OfficeService
             'start_year' => trim($cells[2] ?? ''),
             'end_year' => in_array($end, ['', 'heute'], true) ? null : $end,
             'note' => $cells[6] ?? '',
+            'honor' => $honor,
             'holders' => $holders,
         ]);
         return [$groupTitle, $officeTitle, $term, $holders];
@@ -581,7 +592,7 @@ final class OfficeService
      * Prüft Angaben und Inhaber einer Amtszeit. Konten werden mit ihrem aktuellen Namen gespeichert.
      *
      * @param array<string, mixed> $in
-     * @return array{0: array{kind: string, start_year: int, end_year: int|null, note: string}, 1: list<array{user_id: int|null, name: string}>}
+     * @return array{0: array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool}, 1: list<array{user_id: int|null, name: string}>}
      */
     private function validTerm(array $in): array
     {
@@ -651,7 +662,7 @@ final class OfficeService
             $seen[$key] = true;
             $holders[] = $holder;
         }
-        return [['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note], $holders];
+        return [['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note, 'honor' => Input::bool($in['honor'] ?? false)], $holders];
     }
 
     /**
@@ -767,11 +778,11 @@ final class OfficeService
 
     /**
      * @param Term $t
-     * @return array{id: int, kind: string, start_year: int, end_year: int|null, note: string, current: bool}
+     * @return array{id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, current: bool}
      */
     private static function termOut(array $t): array
     {
-        return ['id' => $t['id'], 'kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => $t['note'], 'current' => self::current($t)];
+        return ['id' => $t['id'], 'kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => $t['note'], 'honor' => $t['honor'], 'current' => self::current($t)];
     }
 
     /**

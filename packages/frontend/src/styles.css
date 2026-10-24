@@ -3784,7 +3784,7 @@ button.spotlight-person:focus-visible {
   background: var(--primary-text);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.tl-item.point .tl-dot {
+.tl-item.honor .tl-dot {
   width: 22px;
   height: 22px;
   margin-top: 8px;
@@ -3808,7 +3808,7 @@ button.spotlight-person:focus-visible {
   border-color: color-mix(in srgb, var(--primary-text) 45%, var(--line));
   background: color-mix(in srgb, var(--primary-text) 7%, var(--card));
 }
-.tl-item.point .tl-card {
+.tl-item.honor .tl-card {
   background: color-mix(in srgb, var(--accent) 10%, var(--card));
 }
 .tl-meta {

@@ -75,6 +75,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Ämter: Haken „Ehrung“ an der Amtszeit**: Ob eine Amtszeit eine Ehrung ist (Stern und Hinweis „Ehrung“ im
+  Zeitstrahl), entscheidet jetzt ein eigener Haken, bei einem einzelnen Jahr wie bei einem Zeitraum. Ein einzelnes Jahr
+  ohne Haken, etwa ein Königsjahr, erscheint als gewöhnliches Jahr. Bisherige einzelne Jahre behalten ihren Stern. Der
+  Import kennt dafür die 8. Spalte `ehrung` (`ja`, `nein` oder leer); ältere Tabellen mit 7 Spalten ergeben keine
+  Ehrungen mehr.
 - **Verwaltung aufgeräumt: Knopf „Einrichtungen“**: Punktekatalog, Dienstgrade, Titel und Ämter – was man einmal
   anlegt und selten ändert – liegen jetzt hinter dem neuen Knopf „Einrichtungen“ ganz unten vor „Einstellungen“.
   „Listen“ steht jetzt nach „Inventar“. Darf jemand nur einen der vier Bereiche pflegen, steht sein Knopf wie bisher

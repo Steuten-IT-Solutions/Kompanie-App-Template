@@ -1033,6 +1033,18 @@ final class Migrations
                 'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN original mediumtext DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN original TEXT DEFAULT NULL'],
             ],
+            // Ämter (Issue #180): Haken „Ehrung“ an der Amtszeit, bei jeder Art. Bisher galt jedes einzelne Jahr (point) als
+            // Ehrung; diese Einträge bekommen den Haken, damit der Zeitstrahl aussieht wie vorher.
+            25 => [
+                'mysql' => [
+                    'ALTER TABLE {office_terms} ADD COLUMN honor tinyint(1) NOT NULL DEFAULT 0',
+                    "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {office_terms} ADD COLUMN honor INTEGER NOT NULL DEFAULT 0',
+                    "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
+                ],
+            ],
         ];
     }
 

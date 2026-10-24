@@ -1126,7 +1126,12 @@ final class ApiScenario
         [$s, $title] = $this->req('POST', '/titles', ['title' => 'Kptest Vorsitz']);
         $tid = (int) ($title['id'] ?? 0);
         [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kptest Früher']]]);
-        $c->ok($s === 201 && ($d['current'] ?? null) === false, 'Amtszeit mit freiem Namen');
+        $c->ok($s === 201 && ($d['current'] ?? null) === false && ($d['honor'] ?? null) === false, 'Amtszeit mit freiem Namen (ohne Ehrung)');
+        [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['kind' => 'point', 'start_year' => 1985, 'honor' => true, 'holders' => [['name' => 'Kptest Geehrt']]]);
+        $c->ok($s === 201 && ($d['honor'] ?? null) === true && ($d['kind'] ?? '') === 'point', 'Einzelnes Jahr mit Haken „Ehrung“ (Issue #180)');
+        $honorId = (int) ($d['id'] ?? 0);
+        [$s, $d] = $this->req('PATCH', "/office-terms/$honorId", ['honor' => false]);
+        $c->ok($s === 200 && ($d['honor'] ?? null) === false && $this->req('DELETE', "/office-terms/$honorId")[0] === 200, 'Ehrung abwählen, Amtszeit löschen');
         [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 2020, 'holders' => [['user_id' => $m], ['user_id' => $gone]]]);
         $termId = (int) ($d['id'] ?? 0);
         $c->ok($s === 201 && ($d['current'] ?? null) === true && array_column($d['holders'] ?? [], 'user_id') === [$m, $gone], 'Laufende Amtszeit mit zwei Konten');

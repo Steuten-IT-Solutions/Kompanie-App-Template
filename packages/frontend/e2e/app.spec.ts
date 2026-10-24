@@ -1161,6 +1161,67 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   expect(deleted).toBeLessThan(300);
 });
 
+test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Issue #180)', async ({ page }) => {
+  const office = `Ehrentest ${Date.now() % 1000000}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  await newOffice.getByLabel('Bezeichnung').fill(office);
+  await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.getByRole('button', { name: office, exact: true }).click();
+
+  const add = async (kind: 'period' | 'point', from: string, to: string, name: string, honor: boolean) => {
+    await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+    const form = page.locator('form', { hasText: 'Neue Amtszeit' });
+    await form.getByRole('combobox', { name: /^Art/ }).selectOption(kind);
+    await form.getByLabel(kind === 'point' ? 'Jahr' : 'Von (Jahr)', { exact: true }).fill(from);
+    if (to) await form.getByLabel('Bis (leer: bis heute)').fill(to);
+    await form.getByLabel('Name', { exact: true }).fill(name);
+    if (honor) await form.getByLabel(/^Ehrung/).check();
+    await form.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+  };
+  await expect(page.getByRole('button', { name: 'Amtszeit eintragen' })).toBeVisible();
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  await expect(page.locator('form', { hasText: 'Neue Amtszeit' }).getByRole('combobox', { name: /^Art/ }).locator('option')).toHaveText([
+    'Zeitraum (von–bis oder bis heute)',
+    'Einzelnes Jahr',
+  ]);
+  await page.locator('form', { hasText: 'Neue Amtszeit' }).getByRole('button', { name: 'Abbrechen' }).click();
+  await add('point', '2019', '', 'Karl König', false);
+  await add('point', '2008', '', 'Gustav Gans', true);
+  await add('period', '2000', '2004', 'Ida Igel', true);
+  // Der Haken steht beim Bearbeiten wieder da
+  await page.locator('.office-term-row', { hasText: '2008' }).getByRole('button', { name: 'Bearbeiten' }).click();
+  const edit = page.locator('form', { hasText: 'Amtszeit bearbeiten' });
+  await expect(edit.getByLabel(/^Ehrung/)).toBeChecked();
+  await edit.getByRole('button', { name: 'Abbrechen' }).click();
+  await page.locator('.office-term-row', { hasText: '2019' }).getByRole('button', { name: 'Bearbeiten' }).click();
+  await expect(page.locator('form', { hasText: 'Amtszeit bearbeiten' }).getByLabel(/^Ehrung/)).not.toBeChecked();
+  await page.locator('form', { hasText: 'Amtszeit bearbeiten' }).getByRole('button', { name: 'Abbrechen' }).click();
+
+  // Öffentlicher Zeitstrahl: Stern und Abzeichen nur mit dem Haken, bei jeder Art
+  await page.goto('/app/#/mitglieder/aemter');
+  const card = page.locator('.office-card', { hasText: office });
+  await card.locator('.office-head').click();
+  const item = (text: string) => card.locator('.tl-item', { hasText: text });
+  await expect(item('Karl König')).not.toHaveClass(/\bhonor\b/);
+  await expect(item('Karl König').locator('.timeline-honor')).toHaveCount(0);
+  await expect(item('Karl König').locator('.tl-dot')).toHaveText('');
+  await expect(item('Gustav Gans')).toHaveClass(/\bhonor\b/);
+  await expect(item('Gustav Gans').locator('.timeline-honor')).toHaveText('Ehrung');
+  await expect(item('Gustav Gans').locator('.tl-dot')).toHaveText('★');
+  await expect(item('Ida Igel').locator('.timeline-honor')).toHaveText('Ehrung');
+  await expect(item('Ida Igel')).toContainText('4 Jahre');
+
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
 test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
   const title = `Unterschriften ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);
