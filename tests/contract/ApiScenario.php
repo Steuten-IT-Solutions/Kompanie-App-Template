@@ -1399,8 +1399,20 @@ final class ApiScenario
         $this->d->setPassword($m, 'kptest-passwort-1');
         $this->d->actAs($admin);
         $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 3, 'reason' => 'Kptest Ehemalig']);
+        // Laufendes Amt (Issue #181): Vorschau, dann endet es mit dem Ausscheiden
+        [, $office] = $this->req('POST', '/offices', ['title' => 'Kptest Ehemalig Amt ' . bin2hex(random_bytes(3))]);
+        $officeId = (int) ($office['id'] ?? 0);
+        [, $term] = $this->req('POST', "/offices/$officeId/terms", ['start_year' => 2020, 'holders' => [['user_id' => $m]]]);
+        [$s, $d] = $this->req('GET', "/members/$m/former/offices", [], ['left_on' => '14.03.2024']);
+        $c->ok($s === 200 && ($d['end_year'] ?? 0) === 2024 && ($d['terms'][0]['end_year'] ?? 0) === 2024 && ($d['terms'][0]['clamped'] ?? null) === false, 'Vorschau: laufendes Amt endet 2024');
+        $c->ok($this->req('GET', "/members/$m/former/offices", [], ['left_on' => 'gestern'])[0] === 400, 'Vorschau mit ungültigem Datum → 400');
         [$s, $d] = $this->req('PUT', "/members/$m/former", ['reason' => 'deceased', 'joined_on' => '1980', 'left_on' => '14.03.2024']);
         $c->ok($s === 200 && ($d['reason'] ?? '') === 'deceased' && ($d['left_on'] ?? '') === '2024-03-14' && ($d['previous_level'] ?? '') === 'member', 'Als verstorben eintragen');
+        $c->ok(($d['offices_ended'] ?? null) === 1, 'Ein laufendes Amt beendet');
+        [, $all] = $this->req('GET', '/offices');
+        $ended = array_values(array_filter((array) ($all['offices'] ?? []), static fn (mixed $o): bool => is_array($o) && ($o['id'] ?? 0) === $officeId))[0]['terms'][0] ?? [];
+        $c->ok(($ended['id'] ?? 0) === ($term['id'] ?? -1) && ($ended['end_year'] ?? null) === 2024 && ($ended['current'] ?? null) === false, 'Amtszeit endet mit dem Austrittsjahr');
+        $this->req('DELETE', "/offices/$officeId");
         $c->ok(!in_array($m, array_column((array) $this->req('GET', '/members')[1], 'id'), true), 'Nicht mehr in der Mitgliederliste');
         $former = array_column((array) $this->req('GET', '/members/former')[1], null, 'id');
         $c->ok((float) ($former[$m]['points'] ?? 0) === 3.0, 'In der Liste der Ehemaligen, Punkte bleiben');

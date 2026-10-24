@@ -22,6 +22,8 @@ use KompanieApp\Core\Storage\OfficeRepository;
  * - Ein Amt kann mit einem Titel verknüpft sein: Wer eine laufende Amtszeit hat (Konto, Mitglied), bekommt ihn, wer keine
  *   mehr hat, verliert ihn (syncTitles). Diese Titel lassen sich nicht mehr von Hand vergeben (TitleService::assign).
  * - Wird ein Konto gelöscht, bleiben seine Amtszeiten mit dem gespeicherten Namen stehen (UserData::purge).
+ * - Scheidet jemand aus (FormerMemberService::mark), enden seine laufenden Amtszeiten mit dem Austrittsjahr (endFor,
+ *   Issue #181). Teilt er die Amtszeit mit anderen, bekommt er eine eigene, beendete; die anderen laufen weiter.
  *
  * @phpstan-import-type Office from OfficeRepository
  * @phpstan-import-type Term from OfficeRepository
@@ -293,6 +295,9 @@ final class OfficeService
         ];
         [$term, $holders] = $this->validTerm($merged);
         $repo->saveTerm($id, $current['office_id'], $term, $holders);
+        if ($current['ended_for'] !== null) {
+            $repo->releaseEnd($id); // von Hand geändert: Ein neues Austrittsdatum zieht das Ende nicht mehr nach
+        }
         $office = $repo->findOffice($current['office_id']);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
         return $this->term($id);
@@ -305,6 +310,100 @@ final class OfficeService
         $repo->deleteTerm($id);
         $office = $repo->findOffice($term['office_id']);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
+    }
+
+    // ---- Ausscheiden (Issue #181) ----
+
+    /**
+     * Laufende Amtszeiten eines Kontos (Zeitraum ohne Ende, auch mit Haken „Ehrung“) beenden, wenn es als ehemalig
+     * eingetragen wird; einzelne Jahre und beendete Amtszeiten bleiben. Ende ist $year, aber nie vor dem Beginn
+     * (clamped). Allein: Die Amtszeit bekommt das Ende. Gemeinsam mit anderen: Für das Konto entsteht eine eigene,
+     * beendete Amtszeit (gleiches Amt, gleicher Beginn, Zusatz und Haken), die anderen laufen unverändert weiter. Danach
+     * gleicht syncTitles die verknüpften Titel ab. Ohne $apply nur die Vorschau.
+     *
+     * @return list<array{term_id: int, office_id: int, office: string, start_year: int, end_year: int, clamped: bool, shared: bool}>
+     */
+    public function endFor(int $userId, int $year, bool $apply): array
+    {
+        $repo = $this->repository();
+        $offices = [];
+        foreach ($this->ordered($repo->groups(), $repo->offices()) as $i => $o) {
+            $offices[$o['id']] = $o + ['pos' => $i];
+        }
+        $holders = $repo->holders();
+        $ending = [];
+        foreach ($repo->terms() as $t) {
+            if (!self::current($t) || !in_array($userId, array_column($holders[$t['id']] ?? [], 'user_id'), true)) {
+                continue;
+            }
+            $ending[] = [$t, $holders[$t['id']]];
+        }
+        usort($ending, static fn (array $a, array $b): int => [$offices[$a[0]['office_id']]['pos'] ?? PHP_INT_MAX, $b[0]['start_year']] <=> [$offices[$b[0]['office_id']]['pos'] ?? PHP_INT_MAX, $a[0]['start_year']]);
+        $out = array_map(static fn (array $e): array => [
+            'term_id' => $e[0]['id'],
+            'office_id' => $e[0]['office_id'],
+            'office' => $offices[$e[0]['office_id']]['title'] ?? '',
+            'start_year' => $e[0]['start_year'],
+            'end_year' => max($e[0]['start_year'], $year),
+            'clamped' => $year < $e[0]['start_year'],
+            'shared' => count($e[1]) > 1,
+        ], $ending);
+        if (!$apply || $ending === []) {
+            return $out;
+        }
+        $this->app->db->transaction(function () use ($repo, $ending, $userId, $year): void {
+            foreach ($ending as [$t, $termHolders]) {
+                $end = max($t['start_year'], $year);
+                if (count($termHolders) === 1) {
+                    $repo->setEnd($t['id'], $end, $userId);
+                    continue;
+                }
+                $mine = [];
+                $others = [];
+                foreach ($termHolders as $h) {
+                    if ($h['user_id'] === $userId) {
+                        $mine[] = $h;
+                    } else {
+                        $others[] = $h;
+                    }
+                }
+                $data = ['kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => null, 'note' => $t['note'], 'honor' => $t['honor']];
+                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name']], $list);
+                $repo->saveTerm($t['id'], $t['office_id'], $data, $keep($others));
+                $repo->setEnd($repo->saveTerm(null, $t['office_id'], $data, $keep($mine)), $end, $userId);
+            }
+        });
+        $titles = [];
+        foreach ($ending as [$t]) {
+            $titles[] = $offices[$t['office_id']]['title_id'] ?? null;
+        }
+        $this->syncTitles(array_values(array_filter(array_unique($titles), static fn (?int $id): bool => $id !== null)));
+        return $out;
+    }
+
+    /**
+     * Austrittsjahr nachträglich geändert: Amtszeiten, die die App für das Konto beendet hat und die seither niemand von
+     * Hand geändert hat (ended_for), enden mit dem neuen Jahr, nie vor ihrem Beginn.
+     *
+     * @return int Zahl der geänderten Amtszeiten
+     */
+    public function moveEndFor(int $userId, int $year): int
+    {
+        $repo = $this->repository();
+        $n = 0;
+        foreach ($repo->terms() as $t) {
+            if ($t['ended_for'] === $userId && $t['end_year'] !== max($t['start_year'], $year)) {
+                $repo->setEnd($t['id'], max($t['start_year'], $year), $userId);
+                $n++;
+            }
+        }
+        return $n;
+    }
+
+    /** Wieder aufgenommen: Die beendeten Amtszeiten bleiben beendet und gehören wieder der Pflege von Hand. */
+    public function releaseEndsFor(int $userId): void
+    {
+        $this->repository()->releaseEndsFor($userId);
     }
 
     // ---- Titel ----

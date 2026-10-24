@@ -801,6 +801,8 @@ final class Api
             // Mitglieder aus einer Tabelle (CSV, in der App auch aus Excel gelesen), mit Anwärtern und Ehemaligen: ohne apply
             // nur die Vorschau; mit apply stehen die Startpasswörter der neuen aktiven Konten in der Antwort
             new Route('POST', '/members/import', Cap::CreateUsers, fn (Request $r) => $a->memberImport()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            // Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181)
+            new Route('GET', '/members/{id}/former/offices', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->officesPreview($this->user(), $r->id(), $r->query['left_on'] ?? ''), null, $denyUsers),
             new Route('PUT', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('PATCH', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('DELETE', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyUsers),

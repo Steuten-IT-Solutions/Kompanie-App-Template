@@ -11,7 +11,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  *
  * @phpstan-type Group array{id: int, title: string, sort: int}
  * @phpstan-type Office array{id: int, group_id: int|null, title: string, sort: int, title_id: int|null}
- * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool}
+ * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null}
  * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int}
  */
 final class OfficeRepository
@@ -147,6 +147,27 @@ final class OfficeRepository
         });
     }
 
+    /**
+     * Ende einer Amtszeit setzen, die die App für ein Konto beendet (Ausscheiden); $endedFor merkt sich das Konto, null
+     * gibt die Amtszeit an die Pflege von Hand zurück.
+     */
+    public function setEnd(int $id, int $endYear, ?int $endedFor): void
+    {
+        $this->db->update('office_terms', ['end_year' => $endYear, 'ended_for' => $endedFor], ['id' => $id]);
+    }
+
+    /** Amtszeit gehört nicht mehr zu den automatisch beendeten (z. B. nach einer Änderung von Hand). */
+    public function releaseEnd(int $termId): void
+    {
+        $this->db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE id = ?', [$termId]);
+    }
+
+    /** Alle Amtszeiten, die die App für dieses Konto beendet hat, gehören wieder der Pflege von Hand. */
+    public function releaseEndsFor(int $userId): void
+    {
+        $this->db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+    }
+
     public function deleteTerm(int $id): void
     {
         $this->db->transaction(function () use ($id): void {
@@ -210,6 +231,7 @@ final class OfficeRepository
             'end_year' => $r['end_year'] === null ? null : (int) $r['end_year'],
             'note' => (string) $r['note'],
             'honor' => (bool) ($r['honor'] ?? false),
+            'ended_for' => ($r['ended_for'] ?? null) === null ? null : (int) $r['ended_for'],
         ];
     }
 

@@ -1,5 +1,14 @@
-import { useMemo, useState, type FormEvent } from 'react';
-import { api, levelLabel, type CreatedFormer, type FormerImportResult, type FormerInfo, type FormerInput, type FormerReason } from '../api';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  api,
+  levelLabel,
+  type CreatedFormer,
+  type FormerImportResult,
+  type FormerInfo,
+  type FormerInput,
+  type FormerOfficesPreview,
+  type FormerReason,
+} from '../api';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
@@ -397,8 +406,10 @@ export function FormerPanel({
         await api.updateFormer(id, data);
         onToast('Gespeichert');
       } else {
-        await api.markFormer(id, data);
-        onToast(`${name} ist jetzt als ehemalig eingetragen`);
+        const res = await api.markFormer(id, data);
+        onToast(
+          `${name} ist jetzt als ehemalig eingetragen` + (res.offices_ended > 0 ? `. ${sec.offices} beendet: ${res.offices_ended}` : ''),
+        );
       }
       setForm(null);
       onChanged();
@@ -441,6 +452,7 @@ export function FormerPanel({
             </p>
           )}
           <FormerFields value={form} onChange={setForm} />
+          {!former && <EndingOffices id={id} leftOn={form.left_on} />}
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -485,6 +497,37 @@ export function FormerPanel({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Vorschau beim Eintragen als ehemalig (Issue #181): welche laufenden Ämter mit dem Ausscheiden enden. Folgt dem Feld
+ * „Ausgeschieden“; ohne laufende Ämter (oder solange das Datum ungültig ist) steht nichts da.
+ */
+function EndingOffices({ id, leftOn }: { id: number; leftOn: string }) {
+  const [preview, setPreview] = useState<FormerOfficesPreview | null>(null);
+  useEffect(() => {
+    let current = true;
+    const timer = window.setTimeout(() => {
+      api.formerOfficesPreview(id, leftOn.trim()).then(
+        (p) => current && setPreview(p),
+        () => current && setPreview(null),
+      );
+    }, 300);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [id, leftOn]);
+  if (!preview || preview.terms.length === 0) return null;
+  const clamped = preview.terms.filter((t) => t.clamped);
+  return (
+    <p className="small ending-offices" role="status">
+      Mit dem Ausscheiden enden: {preview.terms.map((t) => `${t.office} (seit ${t.start_year})`).join(', ')} – Ende {preview.end_year}.
+      {clamped.length > 0 &&
+        ` Der Austritt liegt vor dem Beginn von ${clamped.map((t) => t.office).join(', ')}; dort ist das Ende deshalb das Jahr des Beginns.`}
+      {preview.terms.some((t) => t.shared) && ' Wer ein Amt gemeinsam innehat, bleibt darin; nur dieser Eintrag endet.'}
+    </p>
   );
 }
 

@@ -45,6 +45,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ### Eine Amtszeit ändern oder beenden
 1. Tippe im Amt bei der Amtszeit auf **Bearbeiten** (oder **Löschen**).
 2. Endet ein Amt, trage bei der Amtszeit das Jahr unter **Bis** ein und tippe auf **Speichern**.
+3. Wird jemand als ehemalig eingetragen, enden seine laufenden Amtszeiten von selbst mit dem Jahr des Ausscheidens (siehe *Ehemalige*). Eine solche Amtszeit kannst du hier wie jede andere ändern; danach zieht eine Änderung des Austrittsdatums sie nicht mehr nach.
 
 ### Ein Amt umbenennen oder löschen
 1. Öffne das Amt und ändere unter **Amt bearbeiten** **Bezeichnung** oder **Gruppe**; tippe auf **Speichern**.

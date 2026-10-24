@@ -68,6 +68,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Ämter enden mit dem Ausscheiden**: Wer unter *Austritt* als ehemalig eingetragen wird, hat danach keine laufenden
+  Ämter mehr. Sie enden mit dem Jahr des Ausscheidens (ohne Datum mit dem aktuellen Jahr, nie vor ihrem Beginn); teilt
+  die Person ein Amt mit anderen, bleiben die anderen im Amt. Verknüpfte Titel entfallen damit. Das Fenster zeigt vorher,
+  welche Ämter enden. Ein später geändertes Austrittsdatum zieht das Ende nach; „Wieder aufnehmen“ öffnet nichts wieder.
 - **Ämter: Haken „Ehrung“ an der Amtszeit**: Ob eine Amtszeit eine Ehrung ist (Stern und Hinweis „Ehrung“ im
   Zeitstrahl), entscheidet jetzt ein eigener Haken, bei einem einzelnen Jahr wie bei einem Zeitraum. Ein einzelnes Jahr
   ohne Haken, etwa ein Königsjahr, erscheint als gewöhnliches Jahr. Bisherige einzelne Jahre behalten ihren Stern. Der
