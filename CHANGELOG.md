@@ -120,6 +120,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Eingabefelder in Umfragen**: Die Felder *Frage* und *Antwortmöglichkeiten* sowie *Ende* beim Anlegen oder
   Bearbeiten einer Umfrage sehen jetzt aus wie alle anderen Eingabefelder der App (bisher graue, eckige Kästen).
+- **Großansicht älterer Mitgliedsfotos auf der Webseite**: In `[kompanie_mitglieder]` öffnete sich bei Fotos, die vor
+  der Fassung in 1024 Pixeln hochgeladen wurden, beim Antippen kein Bild. Jetzt zeigt die Großansicht dann das größte
+  vorhandene Foto (480 Pixel). Wer volle Auflösung will, lädt das Foto neu hoch.
 
 ## [0.2.0] – 2026-10-22
 

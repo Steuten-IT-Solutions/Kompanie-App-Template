@@ -175,6 +175,28 @@ final class MemberPhotoTest extends TestCase
         $this->assertSame(200, $deliver($manager, null, '480')['status']);
     }
 
+    public function testUrlsFallBackToLargestStoredSize(): void
+    {
+        $other = $this->users->add('anderes', Roles::MEMBER);
+        foreach ([$this->m, $other] as $id) {
+            $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(1200, 800))]);
+        }
+        $photos = $this->app->memberPhotos();
+        $size = static fn (string $url): string => (string) preg_replace('/^.*[?&]s=(\d+).*$/', '$1', $url);
+        $this->assertSame(['1024', '1024'], [$size($photos->urls(1024)[$this->m]), $size($photos->urls(1024)[$other])]);
+
+        // Vor Datenbankversion 18 hochgeladen (Issue #109): Für die Großansicht die 480er statt einer Adresse mit 404.
+        $this->app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$this->m]);
+        $urls = $photos->urls(1024);
+        $this->assertSame($photos->urls(480)[$this->m], $urls[$this->m]);
+        $this->assertSame('1024', $size($urls[$other]), 'andere Fotos bleiben bei 1024');
+        $this->assertSame('128', $size($photos->urls()[$this->m]));
+        $version = $photos->repository()->find($this->m)['version'] ?? '';
+        $res = $photos->forDelivery($this->users->find($this->admin), $this->m, $version, $size($urls[$this->m]));
+        $this->assertSame(200, $res['status']);
+        $this->assertSame(480, getimagesizefromstring($res['body'] ?? '')[0] ?? null);
+    }
+
     public function testDirectoryShowsPhotosOfMembersAndCandidatesToEveryone(): void
     {
         $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
