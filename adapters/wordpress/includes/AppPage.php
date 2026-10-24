@@ -80,7 +80,7 @@ final class AppPage
             self::sendServiceWorker($app);
         } elseif ($path === 'csrf') {
             self::sendCsrf($app);
-        } elseif (preg_match('#^foto/(\d+)/(thumb|large)$#', $path, $m)) {
+        } elseif (preg_match('#^foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
             self::sendPhoto($app, (int) $m[1], $m[2]);
         } elseif (preg_match('#^dokument/(\d+)/?$#', $path, $m)) {
             self::sendDocument($app, (int) $m[1]);

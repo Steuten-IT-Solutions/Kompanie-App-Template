@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\MemberPhotoService;
 
 /**
  * Shortcodes für die Webseite, in den Farben der Kompanie.
@@ -87,7 +88,10 @@ final class Shortcodes
 </style>';
     }
 
-    /** Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). */
+    /**
+     * Großansicht. Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). Erst erscheint das Bild
+     * hinter href, data-ka-original (Originalauflösung) wird nachgeladen und ersetzt es, sobald es ganz da ist.
+     */
     private static function lightbox(): string
     {
         return '<script>
@@ -97,7 +101,8 @@ var g=a.getAttribute("data-ka-lightbox"),links=[].slice.call(document.querySelec
 var box=document.createElement("div");box.className="ka-lb";box.setAttribute("role","dialog");box.setAttribute("aria-modal","true");
 box.innerHTML="<img alt=\"\"><button class=\"ka-lb-close\" aria-label=\"Schließen\">✕</button><button class=\"ka-lb-prev\" aria-label=\"Vorheriges Bild\">‹</button><button class=\"ka-lb-next\" aria-label=\"Nächstes Bild\">›</button><div class=\"ka-lb-count\"></div>";
 var img=box.querySelector("img"),cnt=box.querySelector(".ka-lb-count");
-function show(n){i=(n+links.length)%links.length;img.src=links[i].href;var t=links[i].getAttribute("data-ka-titel");img.alt=t||"";cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;}
+function show(n){i=(n+links.length)%links.length;var l=links[i],o=l.getAttribute("data-ka-original");img.src=l.href;var t=l.getAttribute("data-ka-titel");img.alt=t||"";cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;
+if(o){var big=new Image();big.onload=function(){if(links[i]===l)img.src=o;};big.src=o;}}
 function close(){document.removeEventListener("keydown",key);box.remove();a.focus();}
 function key(ev){if(ev.key==="Escape")close();if(ev.key==="ArrowLeft")show(i-1);if(ev.key==="ArrowRight")show(i+1);}
 box.addEventListener("click",function(ev){if(ev.target===box||ev.target.classList.contains("ka-lb-close"))close();});
@@ -182,8 +187,9 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '<h2>' . esc_html($album['title']) . ' <small>' . esc_html($album['year']) . '</small></h2><div class="ka-grid">';
             foreach ($album['photos'] as $ph) {
                 $html .= sprintf(
-                    '<a class="ka-foto" href="%s" data-ka-lightbox><img src="%s" alt="%s" loading="lazy" width="400" height="400" /></a>',
+                    '<a class="ka-foto" href="%s" data-ka-lightbox data-ka-original="%s"><img src="%s" alt="%s" loading="lazy" width="400" height="400" /></a>',
                     esc_url($ph['large']),
+                    esc_url($ph['original']),
                     esc_url($ph['thumb']),
                     esc_attr($album['title']),
                 );
@@ -322,6 +328,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         // ohne 1024er (Issue #109): Großansicht mit der 480er, dann ohne srcset (dieselbe Datei, keine falsche Breite).
         $medium = $app->memberPhotos()->urls(480);
         $large = $app->memberPhotos()->urls(1024);
+        $original = $app->memberPhotos()->urls(MemberPhotoService::MAX_EDGE); // nachgeladen; fehlt bei älteren Fotos (404)
         $placeholder = self::membersPlaceholder($app);
         $html .= self::lightbox() . '<ul class="ka ka-mitglieder">';
         foreach ($members as $m) {
@@ -332,11 +339,12 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                     ? sprintf(' srcset="%1$s 320w, %2$s 683w" sizes="(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw"', esc_url($medium[$m['id']]), esc_url($large[$m['id']]))
                     : '';
                 $html .= sprintf(
-                    '<li class="ka-mitglied"><a href="%1$s" data-ka-lightbox="mitglieder" data-ka-titel="%2$s"><img src="%3$s"%5$s alt="%2$s" loading="lazy" width="320" height="480" />%4$s</a></li>',
+                    '<li class="ka-mitglied"><a href="%1$s" data-ka-lightbox="mitglieder" data-ka-original="%5$s" data-ka-titel="%2$s"><img src="%3$s"%6$s alt="%2$s" loading="lazy" width="320" height="480" />%4$s</a></li>',
                     esc_url($large[$m['id']]),
                     esc_attr($m['name']),
                     esc_url($medium[$m['id']]),
                     $caption,
+                    esc_url($original[$m['id']] ?? $large[$m['id']]),
                     $srcset,
                 );
             } elseif ($placeholder !== '') {

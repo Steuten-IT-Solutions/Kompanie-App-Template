@@ -321,6 +321,8 @@ export interface GalleryPhoto {
   id: number;
   thumb: string;
   large: string;
+  /** Originalauflösung für die Großansicht: wird nach large nachgeladen; 404, wenn es sie nicht gibt (large bleibt) */
+  original?: string;
   width: number;
   height: number;
   intern: boolean;

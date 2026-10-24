@@ -326,7 +326,7 @@ final class Kernel
             $this->sendManifest();
         } elseif ($path === '/sw.js') {
             $this->sendServiceWorker();
-        } elseif (preg_match('#^/foto/(\d+)/(thumb|large)$#', $path, $m)) {
+        } elseif (preg_match('#^/foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendPhoto((int) $m[1], $m[2]);
         } elseif (preg_match('#^/dokument/(\d+)$#', $path, $m)) {

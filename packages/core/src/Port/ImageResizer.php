@@ -9,7 +9,8 @@ interface ImageResizer
 {
     /**
      * Verkleinert ein Bild auf höchstens $maxEdge Pixel an der längeren Kante
-     * (nie vergrößern), dreht es nach EXIF und speichert es als JPEG.
+     * (nie vergrößern), dreht es nach EXIF und speichert es als JPEG ohne Metadaten (JpegMetadata::strip):
+     * auch dann, wenn nicht verkleinert werden musste.
      *
      * @return array{width: int, height: int}
      * @throws \RuntimeException wenn das Bild nicht gelesen oder gespeichert werden kann

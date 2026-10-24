@@ -312,6 +312,22 @@ $c->ok(str_contains($html, 'Kpwp Fest') && str_contains($html, 'href="https://ex
 $c->ok(!str_contains($html, '⚓'), 'Keine Motive einer bestimmten Kompanie');
 $d->request('DELETE', '/events/' . $ev['id']);
 
+$c->section('Bilder ohne Metadaten');
+// Der Bildeditor von WordPress (Imagick) behält EXIF, wenn er nicht verkleinern muss: auch dann kein GPS-Ort.
+$im = imagecreatetruecolor(60, 40);
+ob_start();
+imagejpeg($im, null, 90);
+$jpeg = (string) ob_get_clean();
+$exif = "Exif\0\0GPSLatitude 51.29";
+$jpeg = substr($jpeg, 0, 2) . "\xFF\xE1" . pack('n', strlen($exif) + 2) . $exif . substr($jpeg, 2);
+$src = wp_tempnam('kpwp') . '.jpg';
+$dst = $src . '-out.jpg';
+file_put_contents($src, $jpeg);
+$size = $app->images->resizeToJpeg($src, $dst, 8192, 90);
+$c->ok($size === ['width' => 60, 'height' => 40] && !str_contains((string) file_get_contents($dst), 'GPSLatitude'), 'Ohne Verkleinerung: JPEG ohne EXIF (' . get_class(wp_get_image_editor($src)) . ')');
+@unlink($src);
+@unlink($dst);
+
 $c->section('Galerie');
 $gallery = $app->gallery();
 $c->ok($gallery->isConfigured(), 'Beispiel-Galerie der Test-Instanz eingerichtet');
@@ -466,7 +482,10 @@ $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);
 $html = do_shortcode('[kompanie_galerie]');
 unset($_GET['album']);
-$c->ok(substr_count($html, 'class="ka-foto"') === 2 && !str_contains($html, '/app/foto/'), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
+// Interne Bilder kämen nur über die App (…/foto/<id>/thumb|large); die Originalauflösung öffentlicher Bilder läuft
+// über die App, bis sie erzeugt ist.
+$c->ok(substr_count($html, 'class="ka-foto"') === 2 && !preg_match('#/app/foto/\d+/(thumb|large)#', $html), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
+$c->ok(substr_count($html, 'data-ka-original="') === 2, '[kompanie_galerie] lädt in der Großansicht die Originalauflösung nach');
 
 $c->section('Laufzeit-Konfiguration und App-Seite');
 wp_set_current_user($member);

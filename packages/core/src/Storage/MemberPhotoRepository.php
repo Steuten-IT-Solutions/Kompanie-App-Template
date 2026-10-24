@@ -7,7 +7,7 @@ namespace KompanieApp\Core\Storage;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
- * Fotos der Mitglieder: eines je Konto, als JPEG in drei Größen (Base64) in der Datenbank. So löscht UserData::purge sie
+ * Fotos der Mitglieder: eines je Konto, als JPEG in drei Größen und optional in Originalauflösung (Base64) in der Datenbank. So löscht UserData::purge sie
  * mit dem Konto (auch auf allen Seiten eines WordPress-Netzwerks), und die Sicherung enthält sie. version wechselt mit
  * jedem Hochladen (Adresse des Fotos); updated_at in UTC ('Y-m-d H:i:s').
  *
@@ -17,6 +17,8 @@ final class MemberPhotoRepository
 {
     /** Größen (längere Kante in Pixeln) => Spalte; xlarge ist NULL bei Fotos, die vor Datenbankversion 18 hochgeladen wurden. */
     public const COLUMNS = [128 => 'small', 480 => 'large', 1024 => 'xlarge'];
+    /** Originalauflösung (Datenbankversion 24): eigene Spalte, eigenes UPDATE; NULL, wenn es sie nicht gibt. */
+    public const ORIGINAL_COLUMN = 'original';
 
     public function __construct(private readonly Connection $db)
     {
@@ -60,6 +62,17 @@ final class MemberPhotoRepository
         if ($column === null) {
             return null;
         }
+        return $this->column($userId, $column);
+    }
+
+    /** Das Foto in Originalauflösung (JPEG-Bytes) oder null. */
+    public function original(int $userId): ?string
+    {
+        return $this->column($userId, self::ORIGINAL_COLUMN);
+    }
+
+    private function column(int $userId, string $column): ?string
+    {
         $data = $this->db->scalar('SELECT ' . $column . ' FROM {member_photos} WHERE user_id = ?', [$userId]);
         $bytes = is_string($data) && $data !== '' ? base64_decode($data, true) : false;
         return $bytes === false || $bytes === '' ? null : $bytes;
@@ -89,6 +102,15 @@ final class MemberPhotoRepository
             }
             $this->db->update('member_photos', $values, ['user_id' => $userId]);
         }
+    }
+
+    /**
+     * Originalauflösung setzen (null entfernt sie). Eigenes UPDATE nach save(): Die Anweisung mit dem großen Foto bleibt
+     * so für sich, und scheitert sie (z. B. max_allowed_packet), sind die übrigen Größen schon gespeichert.
+     */
+    public function saveOriginal(int $userId, ?string $jpeg): void
+    {
+        $this->db->update('member_photos', [self::ORIGINAL_COLUMN => $jpeg === null ? null : base64_encode($jpeg)], ['user_id' => $userId]);
     }
 
     public function delete(int $userId): bool
