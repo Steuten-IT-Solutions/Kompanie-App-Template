@@ -1045,6 +1045,13 @@ final class Migrations
                     "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
                 ],
             ],
+            // Ämter enden beim Ausscheiden (Issue #181): ended_for ist das Konto, für das die App das Ende beim Eintragen als
+            // ehemalig gesetzt hat. Solange niemand die Amtszeit von Hand ändert, zieht eine Änderung des Austrittsdatums das
+            // Ende nach.
+            26 => [
+                'mysql' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for bigint(20) unsigned DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for INTEGER DEFAULT NULL'],
+            ],
         ];
     }
 

@@ -2884,6 +2884,48 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/former/offices:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Verwaltung]
+      summary: Vorschau zu „Als ehemalig eintragen“ – laufende Ämter, die mit dem Ausscheiden enden
+      description: |
+        Laufende Amtszeiten (Zeitraum ohne Ende, auch mit Haken „Ehrung“) der Person mit dem Jahr, mit dem sie enden würden:
+        Jahr aus `left_on`, leer dieses Jahr, nie vor dem Beginn (`clamped`). Prüfung und Grenzen wie bei
+        `PUT /members/{id}/former`; ungültiges Datum → 400. Ändert nichts.
+      x-capability: create_users
+      parameters:
+        - name: left_on
+          in: query
+          required: false
+          schema: { type: string }
+          description: Ausgeschieden wie im Formular (TT.MM.JJJJ, JJJJ-MM-TT, nur das Jahr oder leer)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [end_year, terms]
+                properties:
+                  end_year: { type: integer }
+                  terms:
+                    type: array
+                    items:
+                      type: object
+                      required: [office, start_year, end_year, clamped, shared]
+                      properties:
+                        office: { type: string }
+                        start_year: { type: integer }
+                        end_year: { type: integer }
+                        clamped: { type: boolean, description: Austritt vor dem Beginn; das Ende ist der Beginn }
+                        shared: { type: boolean, description: Gemeinsam mit anderen; nur der Ehemalige bekommt eine beendete Amtszeit }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/former:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -2893,7 +2935,9 @@ paths:
       description: |
         Grundrolle Gast, Zusatzrollen und Ausnahmen fallen weg (werden für „Wieder aufnehmen“ gemerkt), alle Sitzungen und
         Push-Abos enden; die eigenständige Version sperrt die Anmeldung. Grenzen wie beim Löschen; nicht das eigene Konto,
-        nicht den letzten Admin, keine Gäste.
+        nicht den letzten Admin, keine Gäste. Im selben Vorgang enden die laufenden Ämter der Person (siehe
+        `GET /members/{id}/former/offices`); gemeinsame Amtszeiten werden geteilt, die anderen laufen weiter. Verknüpfte
+        Titel entfallen damit, andere Titel bleiben.
       x-capability: create_users
       requestBody:
         required: true
@@ -2905,13 +2949,22 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FormerInfo' }
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/FormerInfo' }
+                  - type: object
+                    required: [offices_ended]
+                    properties:
+                      offices_ended: { type: integer, description: Zahl der beendeten Amtszeiten }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Verwaltung]
       summary: Angaben einer ehemaligen Person ändern (fehlende bleiben)
+      description: |
+        Ändert sich das Austrittsdatum, enden die beim Eintragen automatisch beendeten Amtszeiten mit dem neuen Jahr (nie vor
+        ihrem Beginn), solange niemand sie seither von Hand geändert hat.
       x-capability: create_users
       requestBody:
         required: true
@@ -2933,7 +2986,7 @@ paths:
       description: |
         Grundrolle von vorher (Mitglied, wenn es sie nicht mehr gibt), Zusatzrollen, soweit es sie gibt und der Handelnde
         sie vergeben darf; Ausnahmen bei den Rechten nur durch Admins. Ein Startpasswort danach über
-        `POST /members/{id}/password`.
+        `POST /members/{id}/password`. Beendete Ämter bleiben beendet.
       x-capability: create_users
       responses:
         '200':

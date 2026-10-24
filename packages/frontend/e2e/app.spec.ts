@@ -1222,6 +1222,74 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
+test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem Austrittsjahr (Issue #181)', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const flag = `Fahne ${id}`;
+  const ministers = `Minister ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const ids = await page.evaluate(
+    async ({ id, flag, ministers }) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const post = async (path: string, body: unknown) =>
+        (
+          await fetch(cfg.apiBase + path, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+            body: JSON.stringify(body),
+          })
+        ).json();
+      const user = await post('users', { first_name: 'Erna', last_name: `Austritt${id}` });
+      const a = await post('offices', { title: flag });
+      const b = await post('offices', { title: ministers });
+      await post(`offices/${a.id}/terms`, { start_year: 2006, holders: [{ user_id: user.id }] });
+      await post(`offices/${b.id}/terms`, { start_year: 2020, holders: [{ user_id: user.id }, { name: `Paul Partner ${id}` }] });
+      return { user: user.id as number, offices: [a.id as number, b.id as number] };
+    },
+    { id, flag, ministers },
+  );
+  expect(ids.user).toBeTruthy();
+
+  await page.goto(`/app/#/verwaltung/mitglied/${ids.user}`);
+  await page.getByRole('button', { name: /^Austritt/ }).click();
+  // Das Fenster „Austritt“ zeigt gleich das Formular
+  const sheet = page.getByRole('dialog');
+  const hint = sheet.locator('.ending-offices');
+  const year = new Date().getFullYear();
+  // Ohne Datum: dieses Jahr; mit Datum: dessen Jahr
+  await expect(hint).toContainText(`Mit dem Ausscheiden enden: ${flag} (seit 2006), ${ministers} (seit 2020) – Ende ${year}.`);
+  await expect(hint).toContainText('nur dieser Eintrag endet');
+  await sheet.getByLabel(/^Ausgeschieden am/).fill('15.03.2024');
+  await expect(hint).toContainText(`– Ende 2024.`);
+  await sheet.getByLabel(/^Ausgeschieden am/).fill('2010');
+  await expect(hint).toContainText(`Der Austritt liegt vor dem Beginn von ${ministers}`);
+  await sheet.getByLabel(/^Ausgeschieden am/).fill('15.03.2024');
+  await expect(hint).toContainText(`– Ende 2024.`);
+  await sheet.getByRole('button', { name: 'Als ehemalig eintragen', exact: true }).click();
+  await expect(page.locator('.toast')).toContainText('ist jetzt als ehemalig eingetragen');
+  await expect(page.locator('.toast')).toContainText('beendet: 2');
+
+  // Öffentlicher Zeitstrahl: beendet statt „seit“; der Partner bleibt im Amt
+  await page.goto('/app/#/mitglieder/aemter');
+  const flagCard = page.locator('.office-card', { hasText: flag });
+  await expect(flagCard.locator('.office-summary-text')).not.toContainText('seit');
+  await flagCard.locator('.office-head').click();
+  await expect(flagCard.locator('.tl-item').first()).toContainText('2006–2024');
+  const ministerCard = page.locator('.office-card', { hasText: ministers });
+  await expect(ministerCard.locator('.office-summary-text')).toHaveText(`Paul Partner ${id} · seit 2020`);
+
+  // Aufräumen (WordPress behält die Daten zwischen den Läufen)
+  const status = await page.evaluate(async (ids) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const del = (path: string) =>
+      fetch(cfg.apiBase + path, { method: 'DELETE', credentials: 'same-origin', headers: { [cfg.csrf.header]: cfg.csrf.token } }).then(
+        (r) => r.status,
+      );
+    return [await del(`offices/${ids.offices[0]}`), await del(`offices/${ids.offices[1]}`), await del(`members/${ids.user}`)];
+  }, ids);
+  expect(status.every((s) => s < 300)).toBe(true);
+});
+
 test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
   const title = `Unterschriften ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);

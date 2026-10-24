@@ -58,6 +58,7 @@ final class UserData
         }
         try {
             $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
+            $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
         } catch (\RuntimeException) {
             $ok = false;
         }

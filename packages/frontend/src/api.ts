@@ -454,6 +454,20 @@ export interface FormerInfo {
   previous_level: Level;
 }
 
+/** Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181). */
+export interface FormerOfficesPreview {
+  end_year: number;
+  terms: {
+    office: string;
+    start_year: number;
+    end_year: number;
+    /** Austritt vor dem Beginn: Das Ende ist der Beginn */
+    clamped: boolean;
+    /** Gemeinsam mit anderen, die weiterlaufen */
+    shared: boolean;
+  }[];
+}
+
 /** Eintrag der Liste „Ehemalige“ (create_users). */
 export interface FormerMember extends FormerInfo {
   id: number;
@@ -1330,7 +1344,9 @@ export const api = {
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
-  markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
+  markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
+  formerOfficesPreview: (id: number, leftOn: string) =>
+    request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),
   updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
   reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
   createFormer: (data: PersonName & FormerInput & { birthday?: string; photo?: EncodedFile }) =>
