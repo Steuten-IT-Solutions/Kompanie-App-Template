@@ -3235,6 +3235,8 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await adminCard.getByRole('button', { name: 'Eintritt speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
   await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
+  // Neben der Beschriftung „Eintritt“ nur das Datum, ohne „am“ (Issue #174)
+  await expect(page.locator('.member-dates .member-date', { hasText: 'Eintritt' }).locator('.member-date-value')).toHaveText('01.04.2005');
   await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
   await expect(adminCard).toContainText('Mitgliedern anzeigen (wählt nur die Person selbst)');
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
@@ -3261,6 +3263,11 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await expect(member.locator('.toast')).toHaveText('Eintritt gespeichert');
   await joined.scrollIntoViewIfNeeded();
   await shot(member, '36b-eintritt-konto');
+  await member.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(member.locator('.member-dates .member-date', { hasText: 'Eintritt' }).locator('.member-date-value')).toHaveText(
+    '01.04.2005',
+  );
+  await openKonto(member);
 
   // Ein anderes Mitglied sieht beides auf der Seite.
   const today = new Date();

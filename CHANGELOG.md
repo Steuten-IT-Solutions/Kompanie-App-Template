@@ -110,6 +110,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Dokumente: Überschrift mit Linien links und rechts und einem Pfeil, der beim Aufklappen nach unten zeigt.
 - **`[kompanie_mitglieder]` ohne Anwärter**: Die Galerie auf der Webseite zeigt nur noch Mitglieder. Anwärter und
   andere Personen nur mit dem internen Kalender stehen weiter in der Mitgliederliste der App.
+- **Eintritt ohne „am“**: Unter *Meins* und in den Mitgliedsdetails steht neben „Eintritt“ nur noch das Datum
+  („17.04.2023“) bzw. das Jahr. Der Satz beim Bearbeiten lautet weiter „Eingetreten am …“.
 
 ### Behoben
 
