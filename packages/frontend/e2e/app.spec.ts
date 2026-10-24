@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { devices, expect, test, type Page } from '@playwright/test';
+import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
@@ -99,6 +99,30 @@ async function login(page: Page, user: string, password = PASSWORD) {
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
+}
+
+/** Senkrechter Abstand zwischen der Unterkante von a und der Oberkante von b (Pixel). */
+async function gapBetween(a: Locator, b: Locator): Promise<number> {
+  const [ra, rb] = [await a.boundingBox(), await b.boundingBox()];
+  return Math.round(rb!.y - (ra!.y + ra!.height));
+}
+
+/** Bildschirmfotos schmal (360 px) und breit, hell und dunkel; danach wieder wie vorher. */
+async function shotsNarrowAndWide(page: Page, name: string) {
+  if (!SHOTS) return;
+  const before = page.viewportSize()!;
+  for (const [width, suffix] of [
+    [360, 'schmal'],
+    [1000, 'breit'],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.screenshot({ path: `${SHOTS}/${name}-${suffix}${scheme === 'dark' ? '-dunkel' : ''}.png`, fullPage: true });
+    }
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.setViewportSize(before);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -1061,6 +1085,17 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await form.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
   await expect(page.locator('.office-term-row').first()).toContainText('seit 2020');
+  // Abstände um „Amtszeit eintragen“ wie zwischen Karten, auch mit offenem Formular (Issue #179)
+  const addTerm = page.getByRole('button', { name: 'Amtszeit eintragen' });
+  expect(await gapBetween(page.locator('.office-term-row').last(), addTerm)).toBe(16);
+  expect(await gapBetween(addTerm, page.locator('.btn-block + .card'))).toBe(16);
+  await shotsNarrowAndWide(page, '1a-amt-bearbeiten');
+  await addTerm.click();
+  form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  expect(await gapBetween(page.locator('.office-term-row').last(), form)).toBe(16);
+  expect(await gapBetween(form, page.locator('form.card:has-text("Neue Amtszeit") + .card'))).toBe(16);
+  await shotsNarrowAndWide(page, '1a-amt-bearbeiten-neue-amtszeit');
+  await form.getByRole('button', { name: 'Abbrechen' }).click();
 
   // Ohne Anmeldung: Zeitstrahl im Tab Mitglieder, laufende Amtszeit oben
   await page.context().clearCookies();
@@ -1342,12 +1377,47 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await page.setViewportSize({ width: 360, height: 740 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen)
+  // Auch im dunklen Modus schwarz auf weiß; Zeilen werden nicht geteilt, der Kopf steht auf jeder Seite (Issue #121).
+  // Mit vielen Zeilen über mehrere Seiten (nicht gespeichert, die Druckansicht zeigt den Entwurf).
+  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: '+ 5 leere Zeilen' }).click();
+  await page.emulateMedia({ media: 'print', colorScheme: 'dark' });
+  const printed = await page.evaluate(() => {
+    const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
+    const rows = [...document.querySelectorAll('.list-print-root .list-table tbody tr')];
+    return {
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      body: css('body').backgroundColor,
+      sheet: [css('.list-print-root .list-sheet').color, css('.list-print-root .list-sheet').backgroundColor],
+      cell: css('.list-print-root .list-table tbody td').color,
+      title: css('.list-print-root .list-sheet-title').color,
+      head: css('.list-print-root .list-table thead').display,
+      rows: rows.length,
+      avoid: rows.every((r) => getComputedStyle(r).breakInside === 'avoid'),
+    };
+  });
+  expect(printed).toEqual({
+    html: 'rgb(255, 255, 255)',
+    body: 'rgb(255, 255, 255)',
+    sheet: ['rgb(0, 0, 0)', 'rgb(255, 255, 255)'],
+    cell: 'rgb(0, 0, 0)',
+    title: 'rgb(255, 255, 255)',
+    head: 'table-header-group',
+    rows: members + 42,
+    avoid: true,
+  });
+  if (SHOTS) await page.pdf({ path: `${SHOTS}/40e-liste-dunkel-mehrseitig.pdf`, format: 'A4', preferCSSPageSize: true });
+  await page.emulateMedia({ media: 'screen', colorScheme: 'light' });
+
+  // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen); die leeren Zeilen von eben verwerfen
+  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Alle Listen/ }).click();
   await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
   await expect(page.locator('.toast')).toHaveText('Liste kopiert');
+  // Abstand zwischen der letzten Liste und „Neue Liste“ (Issue #179)
+  expect(await gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
+  await shotsNarrowAndWide(page, '40d-listen-uebersicht');
   for (const t of [`${title} (Kopie)`, title]) {
     page.once('dialog', (d) => d.accept());
     await page
@@ -2593,12 +2663,34 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
       .filter({ has: page.getByText(title, { exact: true }) })
       .click();
   };
+  // Zwischenspeicher-Dauer (Issue #177): 1441 lehnt schon das Feld ab; eine reine Änderung der Minuten wird gespeichert.
+  const cacheMinutes = async () => {
+    const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
+    const field = cal.getByLabel('Aktualisieren alle … Minuten');
+    await expect(field).toHaveValue('15');
+    await field.fill('1441');
+    await cal.getByRole('button', { name: 'Speichern' }).click();
+    expect(await field.evaluate((el: HTMLInputElement) => el.validity.rangeOverflow && el.validationMessage !== '')).toBe(true);
+    await expect(page.locator('.toast')).toHaveCount(0);
+    await field.fill('30');
+    await cal.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.reload();
+    await expect(
+      page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' }).getByLabel('Aktualisieren alle … Minuten'),
+    ).toHaveValue('30');
+    await page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' }).getByLabel('Aktualisieren alle … Minuten').fill('15');
+    await page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' }).getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.locator('.toast').waitFor({ state: 'detached' });
+  };
   if (!STANDALONE) {
     // WordPress: Neuigkeiten kommen aus den Beiträgen (keine Seite); Kalender und Galerie sind einstellbar.
     // Die Test-Instanz hat keine Attrappen für Google, deshalb nur Speichern und Prüfen der Eingabe.
     await expect(page.locator('.settings-link').filter({ has: page.getByText('Galerie', { exact: true }) })).toBeVisible();
     await expect(page.locator('.settings-link').filter({ has: page.getByText('Neuigkeiten', { exact: true }) })).toHaveCount(0);
     await open('Kalender');
+    await cacheMinutes();
     const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
     await cal.locator('input[type=url]').fill('ftp://falsch');
     await cal.getByRole('button', { name: 'Speichern' }).click();
@@ -2611,6 +2703,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
 
   await page.getByRole('button', { name: 'Kalender testen' }).click();
   await expect(page.getByText(/3 Termine gefunden/)).toBeVisible();
+  await cacheMinutes();
 
   const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
   // Speichern ohne Änderung ist kein Fehler.
@@ -2740,12 +2833,143 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await page.locator('.member-rank-open').click();
   await expect(page.getByRole('dialog', { name: 'Dienstgrad' }).locator('.member-rank strong')).toHaveText('Gefreiter');
 
+  // Unter die Schwelle des eigenen Dienstgrads (Issue #178): eigener Abschnitt ganz oben, ohne Schalter.
+  const book = (points: number) =>
+    page.evaluate(
+      async ([userId, n]) => {
+        const c = window.KOMPANIE_CONFIG!;
+        const r = await fetch(c.apiBase + 'points', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [c.csrf.header]: c.csrf.token },
+          body: JSON.stringify({ user_ids: [userId], points: n, reason: 'E2E Schwelle' }),
+        });
+        return r.status;
+      },
+      [id, points],
+    );
+  // Auf 9 Punkte, eins unter der Schwelle des Gefreiten (andere Tests haben schon Punkte vergeben)
+  const current = await page.evaluate(async (userId) => {
+    const c = window.KOMPANIE_CONFIG!;
+    const list = await (
+      await fetch(c.apiBase + 'promotions', { credentials: 'same-origin', headers: { [c.csrf.header]: c.csrf.token } })
+    ).json();
+    return (list as { user_id: number; points: number }[]).find((p) => p.user_id === userId)!.points;
+  }, id);
+  const minus = 9 - current;
+  expect(await book(minus)).toBeLessThan(300);
+  await page.goto('/app/#/verwaltung/befoerderungen');
+  const promotions = page.locator('.promotions');
+  await expect(promotions.locator('li').first()).toHaveText('Unter der Schwelle');
+  await expect(promotions.locator('li').nth(1)).toContainText('Mitglied2');
+  await expect(promotions.locator('li').nth(1)).toHaveClass(/\bbelow\b/);
+  await expect(promotions.locator('.row', { hasText: 'Mitglied2' })).toHaveCount(1);
+  await expect(page.locator('label.toggle')).toHaveCount(0);
+  await shot(page, '24c-befoerderungen-unter-der-schwelle');
+  expect(await book(-minus)).toBeLessThan(300);
+  await page.reload();
+  await expect(promotions.locator('.list-divider', { hasText: 'Unter der Schwelle' })).toHaveCount(0);
+  await expect(promotions.locator('.list-divider').first()).toHaveText(/Schwelle erreicht|Noch nicht erreicht/);
+
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Dienstgrad');
   await expect(page.locator('.rank-card-title')).toHaveText('Gefreiter');
   await expect(page.locator('.rank-progress')).toContainText('bis „Unteroffizier“');
   await expect(page.getByText('Gute Arbeit')).toBeVisible();
+});
+
+test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen werden geprüft', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+
+  /** Griff von „from“ mit der Maus auf die Zeile „onto“ ziehen. */
+  const drag = async (from: string, onto: Locator) => {
+    const handle = page.getByRole('button', { name: `${from} verschieben (ziehen oder Pfeiltasten)` });
+    await handle.scrollIntoViewIfNeeded();
+    const a = (await handle.boundingBox())!;
+    const b = (await onto.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2, b.y + 5, { steps: 10 });
+    await page.mouse.up();
+  };
+  const saved = (path: string) => page.waitForResponse((r) => r.request().method() === 'PUT' && r.url().includes(path));
+
+  // Punktekatalog (Issue #176): ziehen und Pfeiltasten, gilt auch für die Vorlagen beim Vergeben
+  const items = ['A', 'B', 'C'].map((n) => `Vorlage ${n} ${id}`);
+  await adminMenu(page, 'Punktekatalog');
+  for (const title of items) {
+    // Das Formular leert sich erst nach der Meldung
+    await expect(page.getByPlaceholder('z. B. Teilnahme am Sommerfest')).toHaveValue('');
+    await page.getByPlaceholder('z. B. Teilnahme am Sommerfest').fill(title);
+    await page.locator('.field.narrow input').fill('2');
+    await page.getByRole('button', { name: 'Hinzufügen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Vorlage angelegt');
+  }
+  const catalogOrder = async () => (await page.locator('.card-list .row-title').allTextContents()).filter((t) => t.includes(id));
+  await expect.poll(catalogOrder).toEqual(items); // neue Einträge ans Ende
+  let done = saved('catalog');
+  await drag(items[2], page.locator('.card-list .row', { hasText: items[0] }));
+  expect((await done).status()).toBe(200);
+  expect(await catalogOrder()).toEqual([items[2], items[0], items[1]]);
+  done = saved('catalog');
+  await page.getByRole('button', { name: `${items[1]} verschieben (ziehen oder Pfeiltasten)` }).press('ArrowUp');
+  expect((await done).status()).toBe(200);
+  await page.reload();
+  await expect.poll(catalogOrder).toEqual([items[2], items[1], items[0]]);
+  await adminMenu(page, 'Punkte +');
+  const options = async () =>
+    (await page.getByLabel('Vorlage aus dem Katalog').locator('option').allTextContents()).filter((t) => t.includes(id));
+  await expect.poll(options).toEqual([items[2], items[1], items[0]].map((t) => `${t} (+2)`));
+  // Aufräumen: deaktivieren (Katalogeinträge lassen sich nicht löschen)
+  await adminMenu(page, 'Punktekatalog');
+  for (const title of items) {
+    await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Deaktivieren' }).click();
+    await expect(page.locator('.toast')).toHaveText('Deaktiviert');
+  }
+
+  // Dienstgrade: keine Knöpfe „niedriger“/„höher“ mehr; ein Zug gegen die Schwellen springt mit Meldung zurück
+  const ranks = [`Rang A ${id}`, `Rang B ${id}`, `Rang C ${id}`];
+  await adminMenu(page, 'Dienstgrade');
+  for (const [title, min] of [
+    [ranks[0], '5000'],
+    [ranks[1], '6000'],
+    [ranks[2], ''],
+  ]) {
+    await expect(page.getByLabel('Bezeichnung')).toHaveValue('');
+    await page.getByLabel('Bezeichnung').fill(title);
+    await page.getByLabel('Punkteschwelle (optional)').fill(min);
+    await page.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.row', { hasText: title })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: /niedriger|höher/ })).toHaveCount(0);
+  const rankOrder = async () => (await page.locator('.card-list .row-title').allTextContents()).filter((t) => t.includes(id));
+  await expect.poll(rankOrder).toEqual(ranks);
+  // C (ohne Schwelle) per Pfeiltaste vor B: erlaubt
+  done = saved('ranks');
+  await page.getByRole('button', { name: `${ranks[2]} verschieben (ziehen oder Pfeiltasten)` }).press('ArrowUp');
+  expect((await done).status()).toBe(200);
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  // B (6000) vor A (5000): Die Schwellen fallen, der Server lehnt ab, B springt zurück
+  done = saved('ranks');
+  await drag(ranks[1], page.locator('.card-list .row', { hasText: ranks[0] }));
+  expect((await done).status()).toBe(400);
+  await expect(page.locator('.form-error')).toBeVisible();
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  await page.reload();
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  // Während ein Dienstgrad bearbeitet wird, ist Ziehen gesperrt
+  await page.locator('.card-list .row', { hasText: ranks[0] }).getByRole('button', { name: 'Ändern' }).click();
+  await page.getByRole('button', { name: `${ranks[1]} verschieben (ziehen oder Pfeiltasten)` }).press('ArrowUp');
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
+  // Aufräumen
+  for (const title of ranks) {
+    page.once('dialog', (d) => void d.accept());
+    await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
 });
 
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
@@ -3377,6 +3601,8 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await adminCard.getByRole('button', { name: 'Eintritt speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Eintritt gespeichert');
   await expect(adminCard).toContainText('Eingetreten am 01.04.2005');
+  // Neben der Beschriftung „Eintritt“ nur das Datum, ohne „am“ (Issue #174)
+  await expect(page.locator('.member-dates .member-date', { hasText: 'Eintritt' }).locator('.member-date-value')).toHaveText('01.04.2005');
   await expect(adminCard.getByLabel('Datum oder Jahr')).toHaveValue('01.04.2005');
   await expect(adminCard).toContainText('Mitgliedern anzeigen (wählt nur die Person selbst)');
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
@@ -3403,6 +3629,11 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await expect(member.locator('.toast')).toHaveText('Eintritt gespeichert');
   await joined.scrollIntoViewIfNeeded();
   await shot(member, '36b-eintritt-konto');
+  await member.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(member.locator('.member-dates .member-date', { hasText: 'Eintritt' }).locator('.member-date-value')).toHaveText(
+    '01.04.2005',
+  );
+  await openKonto(member);
 
   // Ein anderes Mitglied sieht beides auf der Seite.
   const today = new Date();

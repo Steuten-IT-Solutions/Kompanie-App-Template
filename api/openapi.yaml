@@ -2143,13 +2143,39 @@ paths:
               properties:
                 title: { type: string }
                 points: { type: integer }
-                sort: { type: integer }
+                sort: { type: integer, description: Ohne Angabe ans Ende }
       responses:
         '201':
           description: Angelegt
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CatalogItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /catalog/order:
+    put:
+      tags: [Verwaltung]
+      summary: Reihenfolge des Punktekatalogs
+      description: Gilt überall, wo der Katalog erscheint (auch für die Vorlagen beim Punkte vergeben). Neue Einträge kommen ans Ende.
+      x-capability: manage_points
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs (auch inaktive) in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Der ganze Katalog in der neuen Reihenfolge (mit inaktiven)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CatalogItem' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 

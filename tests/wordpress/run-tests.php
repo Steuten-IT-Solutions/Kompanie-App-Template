@@ -542,6 +542,17 @@ $app->settings->delete('drive_oauth');
 $app->settings->set('calendar_ids', '');
 $app->calendar()->clearCache();
 
+// Zwischenspeicher-Dauer (Issue #177) auch im WP-Admin: geprüft wie in der App, ungültig ändert nichts.
+$calendarBefore = ['calendar_ics_url' => (string) $app->settings->get('calendar_ics_url', ''), 'calendar_ids' => '', 'google_api_key' => (string) $app->settings->get('google_api_key', '')];
+$c->ok(str_contains($renderSettings(), 'id="calendar_cache_minutes" name="calendar_cache_minutes" value="15"'), 'Einstellungsseite: Feld „Aktualisieren alle … Minuten“ mit 15');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, $calendarBefore + ['calendar_cache_minutes' => '1441', 'calendar_ics_url' => 'https://anders.example/k.ics'])
+    === ['Der Zwischenspeicher muss zwischen 1 und 1440 Minuten liegen.', true]
+    && $app->settings->get('calendar_ics_url') === $calendarBefore['calendar_ics_url'], '1441 Minuten abgelehnt, nichts geändert');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => 'x'] + $calendarBefore)[1], 'Keine Zahl abgelehnt');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '30'] + $calendarBefore) === ['Gespeichert.', false]
+    && $app->settingsService()->get()['calendar']['cache_minutes'] === 30 && str_contains($renderSettings(), 'name="calendar_cache_minutes" value="30"'), '30 Minuten gespeichert');
+KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '15'] + $calendarBefore);
+
 $c->section('Mit Google verbinden');
 $page = $renderSettings();
 $redirect = admin_url('admin-post.php');
@@ -819,6 +830,17 @@ $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp K
 $html = do_shortcode('[kompanie_mitglieder]');
 $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
     && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+// Foto von vor Datenbankversion 18 ohne 1024er (Issue #109): Großansicht mit der 480er statt einer Adresse mit 404, ohne srcset.
+$app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$member]);
+$medium480 = esc_url((string) $app->memberPhotos()->urls(480)[$member]);
+$oldHtml = do_shortcode('[kompanie_mitglieder]');
+$c->ok(str_contains($oldHtml, 'href="' . $medium480 . '" data-ka-lightbox="mitglieder"') && str_contains($oldHtml, '<img src="' . $medium480 . '" alt=')
+    && !str_contains($oldHtml, 's=1024'), 'Altes Foto ohne 1024er: Großansicht mit der 480er, ohne srcset');
+$_GET['v'] = (string) ($q['v'] ?? '');
+parse_str((string) wp_parse_url(html_entity_decode($medium480), PHP_URL_QUERY), $oldQuery);
+$_GET['s'] = (string) ($oldQuery['s'] ?? '');
+$c->ok(KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member)['status'] === 200, 'Adresse der Großansicht liefert das Foto');
+unset($_GET['v'], $_GET['s']);
 $body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
 $c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
 $c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');

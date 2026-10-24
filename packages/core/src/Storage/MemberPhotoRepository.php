@@ -41,6 +41,20 @@ final class MemberPhotoRepository
         return $out;
     }
 
+    /** @return array<int, true> Benutzer-IDs, deren Foto diese Größe nicht hat (xlarge bei alten Fotos) */
+    public function withoutImage(int $size): array
+    {
+        $column = self::COLUMNS[$size] ?? null;
+        if ($column === null) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->db->select("SELECT user_id FROM {member_photos} WHERE $column IS NULL OR $column = ''") as $r) {
+            $out[(int) $r['user_id']] = true;
+        }
+        return $out;
+    }
+
     /** Das Bild in einer Größe (JPEG-Bytes) oder null. */
     public function image(int $userId, int $size): ?string
     {
