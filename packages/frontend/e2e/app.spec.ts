@@ -1139,8 +1139,8 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   const add = async (kind: 'period' | 'point', from: string, to: string, name: string, honor: boolean) => {
     await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
     const form = page.locator('form', { hasText: 'Neue Amtszeit' });
-    await form.getByLabel('Art').selectOption(kind);
-    await form.getByLabel(kind === 'point' ? 'Jahr' : 'Von (Jahr)').fill(from);
+    await form.getByRole('combobox', { name: /^Art/ }).selectOption(kind);
+    await form.getByLabel(kind === 'point' ? 'Jahr' : 'Von (Jahr)', { exact: true }).fill(from);
     if (to) await form.getByLabel('Bis (leer: bis heute)').fill(to);
     await form.getByLabel('Name', { exact: true }).fill(name);
     if (honor) await form.getByLabel(/^Ehrung/).check();
@@ -1149,7 +1149,7 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   };
   await expect(page.getByRole('button', { name: 'Amtszeit eintragen' })).toBeVisible();
   await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
-  await expect(page.locator('form', { hasText: 'Neue Amtszeit' }).getByLabel('Art').locator('option')).toHaveText([
+  await expect(page.locator('form', { hasText: 'Neue Amtszeit' }).getByRole('combobox', { name: /^Art/ }).locator('option')).toHaveText([
     'Zeitraum (von–bis oder bis heute)',
     'Einzelnes Jahr',
   ]);
