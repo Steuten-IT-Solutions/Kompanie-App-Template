@@ -10,9 +10,11 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Alle eigenen Daten einer Person löschen (Issue #24, Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit
  * Verlauf, Titel, Zusatzrollen (Issue #66), Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen
- * (namentliche über user_id, anonyme über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag, Foto, wartende
- * Fehlermeldungen mit ihrem Namen (Issue #64). Was sie für andere eingetragen hat (created_by, updated_by), bleibt; ebenso
- * Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“). Ohne App: WordPress-Multisite löscht
+ * (namentliche über user_id, anonyme über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag,
+ * Eintrittsjahr, Foto, Eintrag als ehemaliges Mitglied, wartende Fehlermeldungen mit ihrem Namen (Issue #64). Was sie für andere eingetragen
+ * hat (created_by, updated_by), bleibt; ebenso Inventar und Inventar-Verlauf (Issue #6: user_id dort ist nur „geändert von“). Amtszeiten (Issue #112) bleiben als Chronik
+ * mit dem gespeicherten Namen stehen; nur die Verknüpfung mit dem Konto wird gelöst. Zeilen in Listen (Issue #121) bleiben
+ * ohne Verknüpfung und ohne Namen stehen, bis die Liste aktualisiert wird. Ohne App: WordPress-Multisite löscht
  * damit auch in den Tabellen anderer Seiten des Netzwerks.
  */
 final class UserData
@@ -29,7 +31,10 @@ final class UserData
         'poll_votes' => 'user_id',
         'poll_answers' => 'user_id',
         'birthdays' => 'user_id',
+        'join_years' => 'user_id',
         'member_photos' => 'user_id',
+        // Eintrag als ehemaliges Mitglied (Grund, Eintritt, Ausscheiden)
+        'former_members' => 'user_id',
         // Fehlermeldungen (Issue #64) mit Namen, die noch nicht versandt sind; ohne Namen steht dort 0.
         'bug_reports' => 'user_id',
     ];
@@ -50,6 +55,17 @@ final class UserData
             $db->execute('DELETE FROM {push_subscriptions} WHERE user_id = ?', [$userId]);
         } catch (\RuntimeException) {
             $ok = false; // Tabelle fehlt (ältere Version oder Seite ohne die App)
+        }
+        try {
+            $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
+            $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+        } catch (\RuntimeException) {
+            $ok = false;
+        }
+        try {
+            $db->execute('UPDATE {list_rows} SET user_id = NULL WHERE user_id = ?', [$userId]);
+        } catch (\RuntimeException) {
+            $ok = false;
         }
         foreach (self::TABLES as $table => $column) {
             try {

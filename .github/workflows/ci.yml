@@ -34,6 +34,9 @@ jobs:
       - name: Handbuch (Seiten, Platzhalter, Verweise, App und Webseite)
         run: tests/handbuch/run-tests.sh
 
+      - name: Changelog (Aufbau, Prüfung zum Release, Ausgabe für die App)
+        run: tests/changelog/run-tests.sh
+
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
@@ -240,6 +243,17 @@ jobs:
 
       - name: Bildschirmfotos
         run: scripts/screenshots.sh screenshots-standalone
+
+      # Jede Anleitung im Handbuch bekommt ihre Bildschirmfotos (fehlt eines, wird der Schritt rot).
+      - name: Bilder für das Handbuch
+        run: scripts/handbuch-bilder.sh handbuch-bilder
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: handbuch-bilder
+          path: handbuch-bilder
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()

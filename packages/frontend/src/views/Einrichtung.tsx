@@ -3,8 +3,9 @@ import { api, applyFeatures, config, refreshRoles, type AdminSettings, type Feat
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { Calendar, FeatureSwitches, Gallery, GoogleAccess, News } from './Einstellungen';
+import { MemberImport } from './MitgliederImport';
 
-type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'fertig';
+type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'mitglieder' | 'fertig';
 
 /**
  * Einrichtungsassistent beim ersten Öffnen durch einen Admin. Erster Schritt: die Bereiche wählen
@@ -14,9 +15,9 @@ type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'fertig';
  * Einstellungen ändern.
  */
 export default function Einrichtung({ onToast }: { onToast: (msg: string) => void }) {
-  const settings = useAsync(() => api.settings(), []);
-  const status = useAsync(() => api.status(), []);
-  const features = useAsync(() => api.features(), []);
+  const settings = useAsync(() => api.settings(), [], 'settings');
+  const status = useAsync(() => api.status(), [], 'admin/status');
+  const features = useAsync(() => api.features(), [], 'features');
   const [chosen, setChosen] = useState<Record<Feature, boolean> | null>(null);
   const [index, setIndex] = useState(0);
   // Statusmeldungen sind vorausgewählt; der Admin kann den Haken vor dem Abschluss entfernen.
@@ -42,7 +43,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
   if (value.calendar) steps.push('kalender');
   if (value.gallery) steps.push('galerie');
   if (value.news && s.news) steps.push('news');
-  steps.push('fertig');
+  steps.push('mitglieder', 'fertig');
   const step = steps[Math.min(index, steps.length - 1)];
   const next = () => setIndex(index + 1);
   const onSaved = (n: AdminSettings) => settings.setData(n);
@@ -110,10 +111,23 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
         </section>
       )}
       {/* Google-Zugang beim ersten Schritt, der ihn braucht: Galerie, sonst Kalender (für Kalender-IDs). */}
-      {(step === 'galerie' || (step === 'kalender' && !value.gallery)) && <GoogleAccess settings={s} onSaved={onSaved} onToast={onToast} />}
-      {step === 'kalender' && <Calendar settings={s} onSaved={onSaved} onToast={onToast} />}
-      {step === 'galerie' && <Gallery settings={s} onSaved={onSaved} onToast={onToast} />}
-      {step === 'news' && <News settings={s} onSaved={onSaved} onToast={onToast} />}
+      {/* key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen. */}
+      {(step === 'galerie' || (step === 'kalender' && !value.gallery)) && (
+        <GoogleAccess key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />
+      )}
+      {step === 'kalender' && <Calendar key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
+      {step === 'galerie' && <Gallery key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
+      {step === 'news' && <News key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
+      {step === 'mitglieder' && (
+        <section className="card settings-section">
+          <h3>Mitglieder übernehmen</h3>
+          <p className="small">
+            Habt ihr eine Mitgliederliste in Excel oder als CSV? Dann lassen sich alle Mitglieder auf einmal anlegen, auf Wunsch auch
+            Ehemalige. Sonst einfach weiter: Mitglieder legst du jederzeit unter Verwaltung an.
+          </p>
+          <MemberImport onDone={next} doneLabel="Weiter zum letzten Schritt" />
+        </section>
+      )}
       {step === 'fertig' && (
         <section className="card settings-section">
           <h3>Fast fertig</h3>
@@ -132,7 +146,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
               </span>
             </label>
           )}
-          <p className="small">Als Nächstes legst du die Mitglieder an; sie bekommen von dir Benutzername und Startpasswort.</p>
+          <p className="small">Weitere Mitglieder legst du unter Verwaltung an; sie bekommen von dir Benutzername und Startpasswort.</p>
           {error && (
             <p className="form-error" role="alert">
               {error}

@@ -12,6 +12,7 @@ import {
   type NewsSourceType,
 } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Neuerungen from './Neuerungen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import { MaintenanceCard } from '../maintenance';
@@ -31,6 +32,7 @@ const PAGES = [
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
   { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
+  { id: 'neuerungen', title: 'Was ist neu', text: 'Änderungen von Version zu Version.' },
 ] as const;
 
 /**
@@ -58,6 +60,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
+      {page.id === 'neuerungen' && <Neuerungen />}
       {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
@@ -93,15 +96,16 @@ function Overview() {
 
 /** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
 function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
+  const { data, error, loading, reload, setData, revision } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
+  // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
   const props = { settings: s, onSaved: setData, onToast };
-  if (page === 'google') return <GoogleAccess {...props} />;
-  if (page === 'kalender') return <Calendar {...props} />;
-  if (page === 'galerie') return <Gallery {...props} />;
-  return s.news ? <News {...props} /> : null;
+  if (page === 'google') return <GoogleAccess key={revision} {...props} />;
+  if (page === 'kalender') return <Calendar key={revision} {...props} />;
+  if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  return s.news ? <News key={revision} {...props} /> : null;
 }
 
 /**
@@ -109,7 +113,7 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
  * wann am Geburtstag benachrichtigt wird.
  */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
@@ -181,7 +185,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       <p className="small muted">
-        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
+        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).
       </p>
     </section>
   );
@@ -274,6 +278,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
         return list;
       }),
     [],
+    'features',
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -603,10 +608,14 @@ function GoogleLink() {
   );
 }
 
+/** Zwischenspeicher des Kalenders in Minuten (Grenzen wie SettingsService::update auf dem Server). */
+const CACHE_MINUTES = { min: 1, max: 1440 };
+
 export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const c = settings.calendar;
   const [url, setUrl] = useState('');
   const [ids, setIds] = useState(c.calendar_ids);
+  const [minutes, setMinutes] = useState(String(c.cache_minutes));
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -645,11 +654,16 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       onSubmit={(e) => {
         e.preventDefault();
         const idsChanged = ids.trim() !== c.calendar_ids;
+        // Die Grenzen prüfen der Browser (min/max am Feld) und genau noch einmal der Server.
+        const cacheMinutes = Number(minutes);
+        // Nur die Dauer geändert: auch ohne neue Adresse oder IDs speichern (Issue #177).
+        const cache = cacheMinutes !== c.cache_minutes ? { calendar_cache_minutes: cacheMinutes } : {};
         if (!url.trim() && !idsChanged) {
+          if ('calendar_cache_minutes' in cache) return save(cache);
           if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
           return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
         }
-        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim() }, () => setUrl(''));
+        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
       }}
     >
       <p className="muted small">
@@ -694,6 +708,25 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         <span className="small muted">
           In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Geheime Adresse im iCal-Format. Sie wird nicht wieder
           angezeigt.
+        </span>
+      </label>
+      <label className="field">
+        <span>Aktualisieren alle … Minuten</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={CACHE_MINUTES.min}
+          max={CACHE_MINUTES.max}
+          step={1}
+          required
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+        />
+        <span className="small muted">
+          So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt ({CACHE_MINUTES.min} bis{' '}
+          {CACHE_MINUTES.max} Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der
+          Termine dauert dann öfter länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und
+          Speichern laden sofort neu.
         </span>
       </label>
       {c.source !== 'none' && (
@@ -836,9 +869,9 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
     <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
       <p className="small muted">
-        Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein Bild, das für den Speicher des
-        Servers zu groß ist, oder eine beschädigte Datei. Abhilfe: das Bild als JPG in denselben Ordner in Google Drive legen (das alte
-        entfernen); der nächste Abgleich nimmt es neu auf.
+        Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das
+        Vorschaubild von Google. Hier stehen Bilder, bei denen auch das nicht ging, z. B. beschädigte Dateien. Abhilfe: das Bild als JPG in
+        denselben Ordner in Google Drive legen (das alte entfernen); der nächste Abgleich nimmt es neu auf.
       </p>
       {error && (
         <p className="form-error small" role="alert">

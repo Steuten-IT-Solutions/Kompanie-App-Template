@@ -131,12 +131,12 @@ final class AttendanceService
                 $counts[$status][$group] = ($counts[$status][$group] ?? 0) + 1;
             }
         }
-        // Gruppen in der Reihenfolge der Rollen
+        // In umgekehrter Reihenfolge der Rollen (Einstellungen → Rollen, von unten nach oben; wie die Mitgliederliste)
         $order = array_flip(array_keys($roles->all()));
         $byGroup = [];
         foreach (self::STATUSES as $s) {
             $row = $counts[$s] ?? [];
-            uksort($row, static fn (string $a, string $b): int => ($order[$a] ?? PHP_INT_MAX) <=> ($order[$b] ?? PHP_INT_MAX));
+            uksort($row, static fn (string $a, string $b): int => ($order[$b] ?? -1) <=> ($order[$a] ?? -1));
             $byGroup[$s] = array_map(static fn (string $g, int $n): array => ['group' => $g, 'label' => $roles->label($g), 'count' => $n], array_keys($row), array_values($row));
         }
         $names = new UserNames($this->app->users);

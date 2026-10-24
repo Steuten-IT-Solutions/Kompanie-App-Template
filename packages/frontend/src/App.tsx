@@ -10,10 +10,12 @@ import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
-import { navigate, useRoute } from './router';
-import { AdminNav, adminTabs } from './adminNav';
+import { navigate, useRoute, viewKey } from './router';
+import { AdminBack, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
+import { shareLink, shareUrl } from './share';
+import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine from './views/Termine';
 
@@ -28,7 +30,6 @@ const MaintenanceBanner = lazyView(() => import('./maintenance').then((m) => ({ 
 const Einrichtung = lazyView(() => import('./views/Einrichtung'));
 const Einstellungen = lazyView(() => import('./views/Einstellungen'));
 const Installieren = lazyView(() => import('./views/Installieren'));
-const Konto = lazyView(() => import('./views/Konto'));
 const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
 const Hilfe = lazyView(() => import('./views/Hilfe'));
@@ -38,14 +39,14 @@ const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
 const Brett = lazyView(() => import('./views/Brett'));
 const Umfragen = lazyView(() => import('./views/Umfragen'));
 const Inventar = lazyView(() => import('./views/Inventar'));
+const Mitglieder = lazyView(() => import('./views/Mitglieder'));
 
-type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'meins' | 'verwaltung';
+type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'mitglieder' | 'meins' | 'verwaltung';
 type View =
   | Tab
   | 'brett'
   | 'umfragen'
   | 'inventar'
-  | 'konto'
   | 'benachrichtigungen'
   | 'installieren'
   | 'anmelden'
@@ -58,12 +59,12 @@ const VIEWS: View[] = [
   'news',
   'galerie',
   'dokumente',
+  'mitglieder',
   'meins',
   'verwaltung',
   'brett',
   'umfragen',
   'inventar',
-  'konto',
   'benachrichtigungen',
   'installieren',
   'anmelden',
@@ -77,6 +78,8 @@ const ALIASES: Record<string, string[]> = {
   punkte: ['meins', 'punkte'],
   strafen: ['meins', 'strafen'],
   spiess: ['verwaltung'],
+  // Das Konto steht unter „Meins“.
+  konto: ['meins', 'konto'],
 };
 
 const features = config?.features;
@@ -87,6 +90,8 @@ const tabLabels = (): Record<Tab, string> => ({
   news: sec.news,
   galerie: sec.gallery,
   dokumente: sec.documents,
+  // Nur Ämter ohne Mitgliederliste (Issue #112): Der Tab heißt dann wie die Ämter.
+  mitglieder: features?.directory || !features?.offices ? sec.directory : sec.offices,
   meins: 'Meins',
   verwaltung: 'Verwaltung',
 });
@@ -97,7 +102,6 @@ const titles = (): Record<View, string> => ({
   brett: sec.board,
   umfragen: sec.polls,
   inventar: sec.inventory,
-  konto: 'Mein Konto',
   benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
   anmelden: 'Anmelden',
@@ -106,10 +110,24 @@ const titles = (): Record<View, string> => ({
   hilfe: 'Hilfe',
 });
 
-/** Erste Unterseite von „Meins“ (wie in Meins.tsx), für die Hilfe zu #/meins ohne Unterseite. */
-function meinsFirst(): string | undefined {
-  const f = config?.features;
-  return f?.points ? 'punkte' : f?.penalties ? 'strafen' : f?.ranks ? 'dienstgrad' : f?.attendance ? 'anwesenheit' : undefined;
+/** Kopfzeile: zwischen hell und dunkel wechseln (feste Wahl und „Wie Gerät“ unter Meins → Konto). */
+function ThemeButton() {
+  const dark = useTheme().shown === 'dark';
+  const label = dark ? 'Helle Darstellung' : 'Dunkle Darstellung';
+  return (
+    <button className="btn btn-link topbar-theme" onClick={toggleTheme} aria-label={label} title={label}>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        {dark ? (
+          <path
+            fill="currentColor"
+            d="M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-1-6h2v3h-2V1zm0 19h2v3h-2v-3zM1 11h3v2H1v-2zm19 0h3v2h-3v-2zM4.22 5.64l1.42-1.42 2.12 2.12-1.42 1.42-2.12-2.12zm12.02 12.02 1.42-1.42 2.12 2.12-1.42 1.42-2.12-2.12zM4.22 18.36l2.12-2.12 1.42 1.42-2.12 2.12-1.42-1.42zM16.24 6.34l2.12-2.12 1.42 1.42-2.12 2.12-1.42-1.42z"
+          />
+        ) : (
+          <path fill="currentColor" d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z" />
+        )}
+      </svg>
+    </button>
+  );
 }
 
 function Icon({ name }: { name: Tab }) {
@@ -120,6 +138,8 @@ function Icon({ name }: { name: Tab }) {
       'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
     dokumente:
       'M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 13v1.5h8V13H8zm0 3v1.5h8V16H8zm0-6v1.5h4V10H8z',
+    mitglieder:
+      'M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm8.5 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13c-3 0-7 1.5-7 4.5V20h14v-2.5C15 14.5 11 13 8 13zm8.5 0c-.6 0-1.3.1-2 .2 1.4 1 2.5 2.4 2.5 4.3V20h6v-2.5c0-3-3.9-4.5-6.5-4.5z',
     meins: 'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z',
     verwaltung:
       'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm-4 9.5c.8-1.6 2.3-2.5 4-2.5s3.2.9 4 2.5',
@@ -252,7 +272,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
     news: !!features?.news,
     galerie: !!features?.gallery,
     dokumente: isMember() && !!features?.documents,
-    meins: isMember() && !!(features?.points || features?.penalties || features?.ranks || features?.titles || features?.attendance),
+    // Mitgliederliste und Ämter (Issue #112): für alle, auch ohne Anmeldung.
+    mitglieder: !!(features?.directory || features?.offices),
+    // Eigene Daten (Mitglieder) und das Konto (alle Angemeldeten)
+    meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
     verwaltung: adminTabs().length > 0,
     // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
@@ -261,7 +284,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
     umfragen: pollsVisible() || canManagePolls(),
     // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('manage_inventory'),
-    konto: !!user,
     benachrichtigungen: true,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
@@ -270,14 +292,19 @@ export default function App({ notice = null }: { notice?: string | null }) {
     hilfe: true,
   };
   // „Meins“ ganz rechts, die Verwaltung davor.
-  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
+  const tabs = (['termine', 'news', 'galerie', 'dokumente', 'mitglieder', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
   const requested = path[0] as View;
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
   const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : start;
-  // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Menü oben, Tab unten).
+  // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Knopf dort, Tab unten).
   const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
+  // „‹ Verwaltung“ nur auf der Seite, zu der der Knopf führt; Unterseiten haben ihren eigenen Rückweg.
+  const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === path.join('/');
   const activeTab: View = adminView ? 'verwaltung' : tab;
+  // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
+  const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
+  const loginFirst = !user && canLogin && VIEWS.includes(requested) && requested !== 'anmelden' && !allowed[requested];
 
   const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
@@ -334,6 +361,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
+  const pageUrl = shareUrl(config.appUrl, tab, requested, path);
   const head = (
     <header className="topbar">
       <img src={logoUrl} alt="" className="logo" />
@@ -341,6 +369,21 @@ export default function App({ notice = null }: { notice?: string | null }) {
         <div className="topbar-title">{caps(titles()[tab])}</div>
         <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
       </div>
+      {!['anmelden', 'einrichtung'].includes(tab) && (
+        <button
+          className="btn btn-link topbar-share"
+          onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${caps(titles()[tab])}`, showToast)}
+          aria-label="Link zu dieser Seite teilen"
+          title="Link zu dieser Seite teilen"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7l7-4.1c.5.5 1.3.8 2.1.8 1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 .2 0 .5.1.7l-7 4.1C7.5 9.3 6.8 9 6 9c-1.7 0-3 1.3-3 3s1.3 3 3 3c.8 0 1.5-.3 2-.8l7.1 4.2c-.1.2-.1.4-.1.6 0 1.6 1.3 2.9 2.9 2.9s2.9-1.3 2.9-2.9-1.2-2.9-2.8-2.9z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      )}
       <button
         className={`btn btn-link topbar-help ${tab === 'hilfe' ? 'active' : ''}`}
         onClick={() => {
@@ -348,7 +391,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
           if (tab !== 'hilfe') setReportOrigin('#/' + [tab, ...path.slice(1)].join('/'));
           const slug = helpSlug([tab, ...path.slice(1)], {
             boardWriter: canPostBoard(),
-            meinsFirst: meinsFirst(),
             can: (c) => can(c as Capability),
             features: config?.features ?? {},
           });
@@ -359,20 +401,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
       >
         ?
       </button>
-      {user ? (
-        <button
-          className={`btn btn-link topbar-account ${tab === 'konto' ? 'active' : ''}`}
-          onClick={() => navigate('konto')}
-          aria-current={tab === 'konto' ? 'page' : undefined}
-        >
-          Konto
+      <ThemeButton />
+      {!user && tab !== 'anmelden' && (
+        <button className="btn btn-link topbar-account" onClick={toLogin}>
+          Login
         </button>
-      ) : (
-        tab !== 'anmelden' && (
-          <button className="btn btn-link topbar-account" onClick={toLogin}>
-            Anmelden
-          </button>
-        )
       )}
     </header>
   );
@@ -401,7 +434,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
       <main className="content">
-        <ErrorBoundary key={rawPath.join('/')}>
+        <ErrorBoundary key={viewKey(path)}>
           <Suspense fallback={<Loading />}>
             {config.setupPending && tab !== 'einrichtung' && (
               <div className="card setup-hint">
@@ -411,6 +444,14 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 </p>
                 <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
                   Einrichtung starten
+                </button>
+              </div>
+            )}
+            {loginFirst && (
+              <div className="card login-first" role="note">
+                <p>Diese Seite ist erst nach der Anmeldung zu sehen. Danach geht sie direkt auf.</p>
+                <button className="btn btn-block" onClick={toLogin}>
+                  Anmelden
                 </button>
               </div>
             )}
@@ -431,13 +472,13 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Dokumente docId={docId} onToast={showToast} />
               ))}
-            {tab === 'meins' && <Meins sub={path[1]} />}
+            {tab === 'mitglieder' && <Mitglieder path={path.slice(1)} />}
+            {tab === 'meins' && <Meins sub={path[1]} onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
-            {adminView && <AdminNav active={adminView} />}
+            {adminStart && <AdminBack />}
             {tab === 'brett' && <Brett onToast={showToast} />}
             {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
             {tab === 'inventar' && <Inventar path={path.slice(1)} onToast={showToast} />}
-            {tab === 'konto' && <Konto onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}
             {tab === 'anmelden' && <Anmelden />}

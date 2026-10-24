@@ -51,6 +51,9 @@ tags:
   - name: Umfragen
   - name: Geburtstage
   - name: Inventar
+  - name: Mitgliederliste
+  - name: Ämter
+  - name: Listen
   - name: Einstellungen
   - name: Wartung
   - name: Fehlermeldungen
@@ -215,7 +218,8 @@ paths:
       description: |
         Tag und Monat, das Jahr ist freiwillig. Gültiges Datum (29.02. nur im Schaltjahr oder ohne Jahr), Jahr ab 1900,
         nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Nicht mitgeschickte Schalter bleiben; ein neuer Eintrag
-        ist sichtbar (`visible: true`) und ohne Alter (`show_age: false`).
+        ist sichtbar (`visible: true`), ohne Alter (`show_age: false`) und auf der Seite in der Mitgliederliste nur für
+        Mitglieder (`profile: members`).
       x-capability: member
       requestBody:
         required: true
@@ -230,6 +234,7 @@ paths:
                 year: { type: [integer, 'null'], minimum: 1900, description: 'Geburtsjahr; null oder weglassen = ohne Jahr' }
                 visible: { type: boolean, description: Anderen Mitgliedern zeigen }
                 show_age: { type: boolean, description: 'Alter anzeigen (nur mit Jahr wirksam)' }
+                profile: { $ref: '#/components/schemas/ProfileVisibility' }
       responses:
         '200':
           description: Gespeichert
@@ -249,6 +254,59 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BirthdayResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/join-year:
+    get:
+      tags: [Mitgliederliste]
+      summary: Eigenes Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
+      x-capability: member
+      responses:
+        '200':
+          description: OK; `join_year` null, wenn keines eingetragen ist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Mitgliederliste]
+      summary: Eigenen Eintritt eintragen oder ändern
+      description: |
+        `date` als TT.MM.JJJJ, JJJJ-MM-TT oder nur das Jahr JJJJ; ohne `date` gilt `year` (ältere Apps, nur das Jahr). Ab
+        1800, nicht in der Zukunft (Zeitzone der Kompanie), sonst 400. Ohne `profile` bleibt die Anzeige; ein neuer
+        Eintrag steht nur für Mitglieder auf der Seite (`profile: members`). Auf der Seite steht der Eintritt, wie er eingetragen ist.
+      x-capability: member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date: { type: string, examples: ['12.03.2005', '2005'] }
+                year: { type: integer, minimum: 1800, description: 'Nur ohne date' }
+                profile: { $ref: '#/components/schemas/ProfileVisibility' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Mitgliederliste]
+      summary: Eigenes Eintrittsjahr entfernen
+      x-capability: member
+      responses:
+        '200':
+          description: Entfernt (`join_year` ist null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -950,6 +1008,169 @@ paths:
                         user_id: { type: integer }
                         name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
+
+  /lists:
+    get:
+      tags: [Listen]
+      summary: Alle gespeicherten Listen (Issue #121), zuletzt geänderte zuerst
+      description: Nur mit `manage_lists` (Standardrolle „Listen verwalten“, Admins). Bereich aus → 403 `feature_disabled`.
+      x-capability: manage_lists
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PrintListSummary' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Listen]
+      summary: Liste anlegen
+      description: |
+        Ohne `columns`: Name (Nachname), Vorname und eine breite leere Spalte „Unterschrift“. Ohne `rows` beginnt die Liste leer;
+        Mitglieder kommen über `POST /lists/{id}/sync-members` dazu.
+      x-capability: manage_lists
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrintListInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /lists/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Listen]
+      summary: Liste mit Spalten, Zeilen und den Werten der Datenspalten
+      description: |
+        Die Werte der Datenspalten werden beim Lesen ermittelt und nur geliefert, soweit die anfragende Person sie in der
+        App ohnehin sehen darf (`available`): Rolle nur mit Zugang zur Mitgliederliste der Verwaltung, Dienstgrad und
+        Titel mit öffentlicher Mitgliederliste (Bereich directory) oder dem Recht, sie zu pflegen, Geburtstag (Tag und
+        Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `manage_points`, offene
+        Strafen nur mit `manage_penalties`; jeweils nur bei eingeschaltetem Bereich.
+      x-capability: manage_lists
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Listen]
+      summary: Liste ganz ersetzen (Titel, Untertitel, Datum, Ausrichtung, Spalten, Zeilen)
+      description: |
+        Mitgliedszeilen nur für Konten, die schon in der Liste stehen (z. B. beim Umsortieren), oder für Mitglieder (Recht
+        `member`); jedes Konto höchstens einmal. `user_id: null` steht für ein gelöschtes Konto. Mit `updated_at` (der
+        geladene Stand) nur, wenn niemand die Liste inzwischen geändert hat, sonst 409 `conflict`.
+      x-capability: manage_lists
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PrintListInput' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Listen]
+      summary: Liste löschen
+      x-capability: manage_lists
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /lists/{id}/copy:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Listen]
+      summary: Liste kopieren (mit allen Spalten und Zeilen, Titel mit „(Kopie)“)
+      x-capability: manage_lists
+      responses:
+        '201':
+          description: Kopie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrintList' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /lists/{id}/sync-members:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Listen]
+      summary: „Mitglieder aktualisieren“
+      description: |
+        Legt Zeilen für alle Mitglieder (Recht `member`, ohne Gäste und Anwärter) an, die noch keine haben, und löscht die
+        Zeilen von Konten, die es nicht mehr gibt oder die kein Mitglied mehr sind. Freie Zeilen bleiben. Neue Zeilen
+        werden nach Nachname vor die erste Mitgliedszeile eingeordnet, die nach Namen später kommt (sonst hinter die
+        letzte; ohne Mitgliedszeilen an den Anfang). Ohne `apply` nur die Übersicht, was sich ändern würde.
+      x-capability: manage_lists
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Übersicht bzw. Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [added, removed, applied, list]
+                properties:
+                  added:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id: { type: integer }
+                        name: { type: string }
+                  removed:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user_id: { type: [integer, 'null'], description: null bei gelöschtem Konto }
+                        name: { type: [string, 'null'] }
+                  applied: { type: boolean, description: false ohne apply oder wenn es nichts zu ändern gab }
+                  list:
+                    oneOf:
+                      - $ref: '#/components/schemas/PrintList'
+                      - type: 'null'
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /documents:
     get:
@@ -1922,13 +2143,39 @@ paths:
               properties:
                 title: { type: string }
                 points: { type: integer }
-                sort: { type: integer }
+                sort: { type: integer, description: Ohne Angabe ans Ende }
       responses:
         '201':
           description: Angelegt
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CatalogItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /catalog/order:
+    put:
+      tags: [Verwaltung]
+      summary: Reihenfolge des Punktekatalogs
+      description: Gilt überall, wo der Katalog erscheint (auch für die Vorlagen beim Punkte vergeben). Neue Einträge kommen ans Ende.
+      x-capability: manage_points
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs (auch inaktive) in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Der ganze Katalog in der neuen Reihenfolge (mit inaktiven)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CatalogItem' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -1960,6 +2207,391 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /directory:
+    get:
+      tags: [Mitgliederliste]
+      summary: Mitgliederliste (Bereich directory), öffentlich
+      description: |
+        Für alle, auch Gäste und ohne Anmeldung (Issue #112). Enthält alle Mitglieder und Anwärter (auch Personen mit
+        eigenen Rollen nur mit dem internen Kalender), keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch
+        den Dienstgrad, mit Bereich Titel die Titel; nie Rollen, Punkte, Strafen oder Kontodaten. Geburtstag (mit Bereich
+        Geburtstage) und Eintritt nur, soweit die Person sie dem Betrachter zeigt (`ProfileVisibility`), sonst null.
+        Sortiert nach Anzeigename. Bereich aus → 403 `feature_disabled`.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DirectoryEntry' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /directory/counts:
+    get:
+      tags: [Mitgliederliste]
+      summary: Zähler über der Mitgliederliste (Anzahl je Gruppe)
+      description: |
+        Gleiche Rechte wie `GET /directory` (öffentlich, Issue #112). Anzahl der Personen dieser Liste je Gruppe wie im
+        Zähler der Anwesenheit (Einstellungen → Rollen, `GET /attendance/groups`), ohne Gäste. Nur die Summen, keine Rolle
+        je Person; Gruppen ohne Personen fehlen.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [group, count]
+                  properties:
+                    group: { type: string, description: Rollenschlüssel der Gruppe }
+                    count: { type: integer, minimum: 1 }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /directory/former:
+    get:
+      tags: [Mitgliederliste]
+      summary: Ehemalige in der Mitgliederliste (Tab „Ehemalige“), öffentlich
+      description: |
+        Gleiche Rechte wie `GET /directory` (öffentlich, mit dem Bereich directory). Alle als ehemalig eingetragenen
+        Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied,
+        Eintritt und Ausscheiden (wie eingetragen: ganzes Datum oder nur das Jahr); nie der Grund, Punkte oder Strafen.
+        Ohne feste Reihenfolge.
+        Bereich aus → 403 `feature_disabled`.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DirectoryFormerEntry' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices:
+    get:
+      tags: [Ämter]
+      summary: Alle Gruppen, Ämter und Amtszeiten für den Zeitstrahl (Issue #112), öffentlich
+      description: |
+        Für alle, auch ohne Anmeldung. Ämter in der Reihenfolge ihrer Gruppen (ohne Gruppe zuletzt); Amtszeiten laufende
+        zuerst, dann nach Beginn absteigend. Inhaber mit `user_id` und `photo_url` nur, wenn sie in der Mitgliederliste
+        stehen oder ehemalig sind (Bereich directory); wer `manage_offices` hat, sieht alle Konten, jede Person ihr eigenes. `title_id` und
+        `linked_title` nur mit `manage_offices`. Bereich aus → 403 `feature_disabled`.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficesOverview' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Ämter]
+      summary: Amt anlegen (kommt ans Ende)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60, description: In der Gruppe eindeutig ohne Groß-/Kleinschreibung }
+                singular: { type: string, maxLength: 60, description: Einzahl (optional) }
+                group_id: { type: [integer, 'null'] }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/order:
+    put:
+      tags: [Ämter]
+      summary: Reihenfolge der Ämter (alle IDs; angezeigt innerhalb ihrer Gruppe)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Ämter in der neuen Reihenfolge
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OfficeRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/import:
+    post:
+      tags: [Ämter]
+      summary: Tabelle importieren (Ersterfassung); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon oder Tabulator, höchstens 200 KB und 2000 Zeilen:
+        `gruppe;amt;beginn;ende;art;personen;zusatz;ehrung` (Kopfzeile erlaubt). ende: Jahr, „heute“ (laufend) oder leer
+        (ein Jahr); art leer, „zeitraum“ oder „zeitpunkt“; personen mit „&“ getrennt; ehrung „ja“, „nein“ oder leer
+        (optionale 8. Spalte; ohne sie keine Ehrung, auch nicht bei „zeitpunkt“). Der Wert der Ehrung zählt beim Erkennen
+        gleicher Amtszeiten nicht mit. Gruppen und Ämter werden nach Namen gefunden oder angelegt, gleiche Amtszeiten
+        übersprungen. Mit `link` werden Namen, die genau einem Konto entsprechen, damit verknüpft. Mit `apply` alles in
+        einer Transaktion; enthält eine Zeile einen Fehler → 400 (nichts übernommen).
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                link: { type: boolean, default: true }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Umbenennen, Einzahl ändern, Gruppe wechseln, mit einem Titel verknüpfen
+      description: |
+        `title_id` verknüpft das Amt mit einem Titel (je Titel höchstens ein Amt): Wer eine laufende Amtszeit hat (Konto,
+        Mitglied), bekommt ihn, wer keine hat, verliert ihn; von Hand ist er dann nicht mehr zu vergeben. `null` löst die
+        Verknüpfung, die vergebenen Titel bleiben.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 60 }
+                singular: { type: string, maxLength: 60, description: 'Einzahl; leer: keine eigene' }
+                group_id: { type: [integer, 'null'] }
+                title_id: { type: [integer, 'null'] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Amt mit allen Amtszeiten löschen (ein verknüpfter Titel geht den Inhabern verloren)
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /offices/{id}/title-preview:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Ämter]
+      summary: Was eine Verknüpfung mit einem Titel ändern würde (ändert nichts)
+      x-capability: manage_offices
+      parameters:
+        - { name: title_id, in: query, required: false, schema: { type: integer } }
+      responses:
+        '200':
+          description: Wer den Titel bekommt, wer ihn verliert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  add: { type: array, items: { $ref: '#/components/schemas/OfficeTitleChange' } }
+                  remove: { type: array, items: { $ref: '#/components/schemas/OfficeTitleChange' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /offices/{id}/terms:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Ämter]
+      summary: Amtszeit eintragen
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeTermInput' }
+      responses:
+        '201':
+          description: Eingetragen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /office-terms/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Amtszeit ändern (fehlende Felder bleiben; holders ersetzt alle Inhaber)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeTermInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Amtszeit löschen
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /office-groups:
+    post:
+      tags: [Ämter]
+      summary: Gruppe anlegen (kommt ans Ende)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60, description: Eindeutig ohne Groß-/Kleinschreibung }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroup' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /office-groups/order:
+    put:
+      tags: [Ämter]
+      summary: Reihenfolge der Gruppen (alle IDs)
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Gruppen in der neuen Reihenfolge
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OfficeGroup' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /office-groups/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Gruppe umbenennen
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 60 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroup' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Leere Gruppe löschen (mit Ämtern → 400)
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members:
     get:
       tags: [Verwaltung]
@@ -1973,7 +2605,7 @@ paths:
           schema: { type: string, enum: ['1'] }
         - name: candidates
           in: query
-          description: Auch Anwärter (Rolle `candidate`) und Personen mit eigenen Rollen nur mit dem internen Kalender.
+          description: Auch Personen mit Rollen nur mit dem internen Kalender (z. B. Anwärter).
           schema: { type: string, enum: ['1'] }
       responses:
         '200':
@@ -2027,7 +2659,7 @@ paths:
         Admin-Rechte nur im WP-Backend vergeben. Der letzte Admin kann nicht herabgestuft werden.
 
         `extra_roles` (Issue #66) ersetzt die Zusatzrollen (leere Liste: keine). Nur eigene Rollen
-        (`/config` → `roles[].extra`), nicht `guest`, `candidate`, `member`, `admin`; nur zu einer Grundrolle mit
+        (`/config` → `roles[].extra`), nicht `guest`, `member`, `admin`; nur zu einer Grundrolle mit
         Mitgliederbereich und nicht für Admins (sonst 400). Mit `level` zusammen wird gegen die neue Grundrolle geprüft;
         eine neue Grundrolle ohne Mitgliederbereich entfernt die Zusatzrollen. Wer kein Admin ist, vergibt und entfernt
         nur Rollen, die er auch als Grundrolle vergeben dürfte, und nur bei Personen ohne mehr Rechte als er (sonst 403).
@@ -2102,8 +2734,10 @@ paths:
       - $ref: '#/components/parameters/Id'
     post:
       tags: [Verwaltung]
-      summary: Anwärter als Mitglied aufnehmen
-      description: Nur von `candidate` zu `member`; andere Rollenwechsel gehen über `/members/{id}/role`.
+      summary: Als Mitglied aufnehmen (z. B. Anwärter)
+      description: |
+        Nur aus einer Rolle mit `promotable` (`/config` → `roles`; eigene Rollen ohne Mitgliederbereich, vom Admin
+        freigegeben) zu `member`, sonst 400; andere Rollenwechsel gehen über `/members/{id}/role`.
       x-capability: create_users
       responses:
         '200':
@@ -2116,6 +2750,259 @@ paths:
                   id: { type: integer }
                   level: { $ref: '#/components/schemas/Level' }
         '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/former:
+    get:
+      tags: [Verwaltung]
+      summary: Ehemalige Mitglieder (ausgetreten, verstorben, sonst ausgeschieden)
+      description: Nach Namen. `points` bzw. `open_cents` nur mit manage_points bzw. manage_penalties (sonst null).
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FormerMember' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Eine ehemalige Person neu anlegen (Konto ohne Anmeldung, gleich als ehemalig eingetragen)
+      description: |
+        Wie eine Zeile von `/members/former/import`, mit den Feldern von `PUT /members/{id}/former` (Daten als TT.MM.JJJJ,
+        JJJJ-MM-TT, nur das Jahr oder leer). Erst wird alles geprüft, dann angelegt. Wer genau so heißt wie ein vorhandenes
+        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage) und
+        Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
+        Namen in Amtszeiten, die genau passen, werden mit dem Konto verknüpft (`offices_linked`).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, reason]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                reason: { $ref: '#/components/schemas/FormerReason' }
+                joined_on: { type: string }
+                founder: { type: boolean, default: false }
+                left_on: { type: string }
+                birthday: { $ref: '#/components/schemas/BirthdayString' }
+                photo:
+                  description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
+                  allOf:
+                    - $ref: '#/components/schemas/PhotoFile'
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/FormerInfo' }
+                  - type: object
+                    required: [id, name, offices_linked]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      offices_linked: { type: integer }
+                      warning: { type: string }
+                      photo_url: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/former/import:
+    post:
+      tags: [Verwaltung]
+      summary: Ehemalige aus einer Tabelle anlegen (Ersterfassung, z. B. Chronik); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon oder Tabulator, UTF-8 oder Windows-1252, höchstens 200 KB und 500 Zeilen:
+        `vorname;nachname;eintritt;ausgeschieden;grund` (Kopfzeile erlaubt). Daten als TT.MM.JJJJ, JJJJ-MM-TT, nur das Jahr
+        oder leer; eintritt „Gründer“ setzt `founder`. grund: ausgetreten (auch leer), verstorben, sonstiges. Wer genau so
+        heißt wie ein vorhandenes Konto, wird übersprungen (`existing`); gleiche Namen in der Tabelle sind ein Fehler. Mit
+        `apply` entsteht je Person ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen
+        wird; enthält eine Zeile einen Fehler → 400 (nichts angelegt). Freie Namen in Amtszeiten, die genau zu einer neu
+        angelegten (oder schon früher als ehemalig importierten) Person passen, werden mit ihrem Konto verknüpft.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormerImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/import:
+    post:
+      tags: [Verwaltung]
+      summary: Mitglieder aus einer Tabelle übernehmen, auch Ehemalige (Ersterfassung); ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
+        Windows-1252, höchstens 200 KB und 500 Personen. Die erste Zeile enthält die Spaltennamen (Reihenfolge und Groß- und
+        Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
+        geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden, grund. Unbekannte Spalten und
+        Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
+        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
+        Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
+        „Gründer“, ausgeschieden und grund nur dann). Punkte, Dienstgrad (Bezeichnung) und Titel (Bezeichnungen) nur für
+        Rollen mit Mitgliederbereich. Geburtstag als TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT; Eintritt als TT.MM.JJJJ oder Jahr.
+        Wer genau so heißt wie ein vorhandenes Konto, wird übersprungen (`existing`); gleiche Namen in der Tabelle sind ein
+        Fehler. Mit `apply` und einem Fehler in einer Zeile → 400 (nichts angelegt). Sonst stehen die Zugangsdaten der neuen
+        aktiven Konten (mit Startpasswort, nur in dieser Antwort) in `created`; bricht das Anlegen mittendrin ab, steht der
+        Grund in `error` und die schon angelegten in `created`.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/former/offices:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Verwaltung]
+      summary: Vorschau zu „Als ehemalig eintragen“ – laufende Ämter, die mit dem Ausscheiden enden
+      description: |
+        Laufende Amtszeiten (Zeitraum ohne Ende, auch mit Haken „Ehrung“) der Person mit dem Jahr, mit dem sie enden würden:
+        Jahr aus `left_on`, leer dieses Jahr, nie vor dem Beginn (`clamped`). Prüfung und Grenzen wie bei
+        `PUT /members/{id}/former`; ungültiges Datum → 400. Ändert nichts.
+      x-capability: create_users
+      parameters:
+        - name: left_on
+          in: query
+          required: false
+          schema: { type: string }
+          description: Ausgeschieden wie im Formular (TT.MM.JJJJ, JJJJ-MM-TT, nur das Jahr oder leer)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [end_year, terms]
+                properties:
+                  end_year: { type: integer }
+                  terms:
+                    type: array
+                    items:
+                      type: object
+                      required: [office, start_year, end_year, clamped, shared]
+                      properties:
+                        office: { type: string }
+                        start_year: { type: integer }
+                        end_year: { type: integer }
+                        clamped: { type: boolean, description: Austritt vor dem Beginn; das Ende ist der Beginn }
+                        shared: { type: boolean, description: Gemeinsam mit anderen; nur der Ehemalige bekommt eine beendete Amtszeit }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/former:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: Als ehemalig eintragen (Konto stilllegen, alle Daten bleiben)
+      description: |
+        Grundrolle Gast, Zusatzrollen und Ausnahmen fallen weg (werden für „Wieder aufnehmen“ gemerkt), alle Sitzungen und
+        Push-Abos enden; die eigenständige Version sperrt die Anmeldung. Grenzen wie beim Löschen; nicht das eigene Konto,
+        nicht den letzten Admin, keine Gäste. Im selben Vorgang enden die laufenden Ämter der Person (siehe
+        `GET /members/{id}/former/offices`); gemeinsame Amtszeiten werden geteilt, die anderen laufen weiter. Verknüpfte
+        Titel entfallen damit, andere Titel bleiben.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormerInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/FormerInfo' }
+                  - type: object
+                    required: [offices_ended]
+                    properties:
+                      offices_ended: { type: integer, description: Zahl der beendeten Amtszeiten }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Angaben einer ehemaligen Person ändern (fehlende bleiben)
+      description: |
+        Ändert sich das Austrittsdatum, enden die beim Eintragen automatisch beendeten Amtszeiten mit dem neuen Jahr (nie vor
+        ihrem Beginn), solange niemand sie seither von Hand geändert hat.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormerInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormerInfo' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Wieder aufnehmen
+      description: |
+        Grundrolle von vorher (Mitglied, wenn es sie nicht mehr gibt), Zusatzrollen, soweit es sie gibt und der Handelnde
+        sie vergeben darf; Ausnahmen bei den Rechten nur durch Admins. Ein Startpasswort danach über
+        `POST /members/{id}/password`. Beendete Ämter bleiben beendet.
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+                  extra_roles:
+                    type: array
+                    items: { $ref: '#/components/schemas/Level' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -2188,8 +3075,9 @@ paths:
       summary: Foto eines Mitglieds hochladen oder ersetzen
       description: |
         JPG, PNG oder WebP, höchstens 5 MB und 4096 × 4096 Pixel, Base64 im JSON. Geprüft werden Endung und Signatur.
-        Gespeichert werden nur neu erzeugte JPEGs in 128 und 480 Pixeln (längere Kante, nie vergrößert, nach EXIF
-        gedreht, ohne Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
+        Gespeichert werden nur neu erzeugte JPEGs in 128, 480 und 1024 Pixeln und, soweit möglich, in
+        Originalauflösung (bis 4096, höchstens 3 MB; längere Kante, nie vergrößert, nach EXIF gedreht, ohne
+        Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
         `photo_url`) ändert sich. Wer kein Admin ist, nur bei Konten, die er verwalten darf (wie `PATCH
         /members/{id}/account`).
       x-capability: create_users
@@ -2232,6 +3120,48 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/join-year:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Mitgliederliste]
+      summary: Eintritt eines Mitglieds eintragen oder ändern
+      description: |
+        Nur der Eintritt (`date` bzw. `year`, Prüfung wie bei `PUT /me/join-year`). Die Anzeige (`profile`) entscheidet
+        allein die Person: Sie bleibt, wie sie ist (ein mitgeschickter Wert wird nicht übernommen); ein neuer Eintrag
+        steht nicht auf der Seite.
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date: { type: string, examples: ['12.03.2005', '2005'] }
+                year: { type: integer, minimum: 1800, description: 'Nur ohne date' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Mitgliederliste]
+      summary: Eintrittsjahr eines Mitglieds entfernen
+      x-capability: create_users
+      responses:
+        '200':
+          description: Entfernt (`join_year` ist null)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JoinYearResponse' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/{id}/birthday:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -2239,8 +3169,9 @@ paths:
       tags: [Geburtstage]
       summary: Geburtstag eines Mitglieds eintragen oder ändern (Issue #1)
       description: |
-        Nur das Datum (Prüfung wie bei `PUT /me/birthday`). `visible` und `show_age` entscheidet allein die Person: Sie
-        bleiben, wie sie sind (mitgeschickte Werte werden nicht übernommen); ein neuer Eintrag ist sichtbar und ohne Alter.
+        Nur das Datum (Prüfung wie bei `PUT /me/birthday`). `visible`, `show_age` und `profile` entscheidet allein die
+        Person: Sie bleiben, wie sie sind (mitgeschickte Werte werden nicht übernommen); ein neuer Eintrag ist sichtbar,
+        ohne Alter und nicht auf der Seite in der Mitgliederliste.
       x-capability: create_users
       requestBody:
         required: true
@@ -2278,8 +3209,11 @@ paths:
   /users:
     post:
       tags: [Verwaltung]
-      summary: Mitglied oder Anwärter anlegen
-      description: Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt.
+      summary: Mitglied anlegen (oder mit einer Rolle für neue Konten, z. B. Anwärter)
+      description: |
+        Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt. `level`:
+        `member` oder eine Rolle mit `new_accounts` (`/config` → `roles`), sonst 400. Wer kein Admin ist, nur Rollen mit
+        höchstens `member` bzw. `calendar` oder mit Rechten, die er selbst weitergeben darf (sonst 403).
       x-capability: create_users
       requestBody:
         required: true
@@ -2294,7 +3228,7 @@ paths:
                 name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
-                level: { type: string, enum: [member, candidate], default: member }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
                 initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
                 rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
@@ -2315,7 +3249,7 @@ paths:
   /users/bulk:
     post:
       tags: [Verwaltung]
-      summary: Mehrere Mitglieder bzw. Anwärter auf einmal anlegen (Issue #24)
+      summary: Mehrere Mitglieder (bzw. mit einer Rolle für neue Konten) auf einmal anlegen (Issue #24)
       description: |
         Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
         Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
@@ -2331,7 +3265,7 @@ paths:
               type: object
               required: [people]
               properties:
-                level: { type: string, enum: [member, candidate], default: member }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
                 people:
                   type: array
                   maxItems: 50
@@ -2486,8 +3420,11 @@ paths:
       tags: [Einstellungen]
       summary: Rollen mit Rechten, Punktefaktor und Anzahl der Personen
       description: |
-        Jede Person hat genau eine Rolle. Fest sind Gast, Mitglied (Rolle neuer Konten) und Admin (nur umbenennen;
-        Bezeichnungen bei der Ersteinrichtung aus `kompanie.json`). Schaltet der Admin einen Bereich mit eigenen Rechten ein
+        Jede Person hat genau eine Grundrolle. Fest sind Gast, Mitglied (Rolle neuer Konten) und Admin (nur umbenennen;
+        Mitglied und Admin auch mit Punktefaktor; Bezeichnungen bei der Ersteinrichtung aus `kompanie.json`), in der
+        Reihenfolge, die der Admin festlegt (`PUT /admin/roles/order`; anfangs Gast, Mitglied, eigene Rollen, Admin).
+        Anwärter (Issue #23) sind eine eigene Rolle; die frühere feste Rolle `candidate` bleibt in Installationen, die
+        sie hatten, als eigene Rolle mit `new_accounts` und `promotable` erhalten. Schaltet der Admin einen Bereich mit eigenen Rechten ein
         (Termine, Punkte, Strafen), kommt dessen Standardrolle dazu; schaltet er ihn aus, verschwindet sie, wenn niemand sie hat.
         Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten, ohne `create_users` und `promote_users`.
       x-capability: manage_settings
@@ -2517,13 +3454,42 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/roles/order:
+    put:
+      tags: [Einstellungen]
+      summary: Reihenfolge der Rollen
+      description: |
+        `keys`: alle Rollen, auch `guest`, `member` und `admin`, in der neuen Reihenfolge, jede genau einmal (sonst 400).
+        Die Reihenfolge gilt überall, wo Rollen stehen (`/config`, Zusatzrollen; `counts_by_group` der Anwesenheit umgekehrt, von unten nach oben). Neue Rollen kommen ans Ende,
+        vor `admin`, wenn der dort steht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keys]
+              properties:
+                keys: { type: array, items: { $ref: '#/components/schemas/Level' } }
+      responses:
+        '200':
+          description: Neuer Stand aller Rollen
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RoleAdmin' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/roles/{key}:
     parameters:
       - { name: key, in: path, required: true, schema: { $ref: '#/components/schemas/Level' } }
     patch:
       tags: [Einstellungen]
       summary: Rolle umbenennen, Rechte oder Punktefaktor ändern (nur mitgeschickte Felder)
-      description: Bei guest und admin nur die Bezeichnung, bei member Bezeichnung und Punktefaktor. Ein geänderter Faktor gilt für künftige Buchungen.
+      description: |
+        Bei guest nur die Bezeichnung, bei member und admin Bezeichnung und Punktefaktor; `new_accounts` und `promotable`
+        nur bei eigenen Rollen (`promotable` nur ohne `member`). Ein geänderter Faktor gilt für künftige Buchungen.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -3074,8 +4040,10 @@ paths:
       tags: [Wartung]
       summary: Datensicherung herunterladen
       description: |
-        Gemeinsames Format `kompanie-app-backup` (Tabellen und Einstellungen; eigenständige Version
-        auch Konten mit Passwort-Hashes). Enthält Zugangsschlüssel – sicher aufbewahren.
+        Gemeinsames Format `kompanie-app-backup` (Tabellen, Einstellungen und Konten mit Passwort-Hashes:
+        eigenständige Version in `tables.users`, WordPress als `accounts` mit den Benutzern der Website;
+        dazu unter `files` die Dateien der Dokumente und Abzeichen als Base64 sowie die Push-Abos).
+        Enthält Zugangsschlüssel – sicher aufbewahren.
       x-capability: manage_settings
       responses:
         '200':
@@ -3091,7 +4059,9 @@ paths:
       summary: Sicherung wiederherstellen (ersetzt alle Daten)
       description: |
         Eigenständige Version: nur Sicherungen der eigenständigen Version mit mindestens einem Admin;
-        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website.
+        alle Sitzungen enden. WordPress: nur Sicherungen derselben Website; fehlende Konten werden mit
+        ihrer ID angelegt (nur mit den WP-Rechten create_users und promote_users), vorhandene behalten
+        Anmeldedaten. Passt eine ID nicht zum Benutzernamen, wird nichts geändert (400).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -3116,6 +4086,50 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/drive:
+    get:
+      tags: [Wartung]
+      summary: Sicherungen in Google Drive – Stand
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Sicherungen in Google Drive ein- oder ausschalten
+      description: |
+        Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
+        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen
+        eigenen Ordner im verbundenen Google-Konto und behält die letzten acht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/drive/upload:
+    post:
+      tags: [Wartung]
+      summary: Sicherung jetzt in Google Drive hochladen
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupDriveStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
 
   /admin/setup/done:
     post:
@@ -3178,6 +4192,24 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    BackupDriveStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, access, enabled, email, folder_url, last_ok, last_try, error, every_days, keep]
+            properties:
+              available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
+              access: { type: boolean, description: Google hat drive.file erlaubt }
+              enabled: { type: boolean }
+              email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
+              folder_url: { type: [string, 'null'] }
+              last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
+              last_try: { type: [integer, 'null'] }
+              error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
+              every_days: { type: integer }
+              keep: { type: integer }
     PushStatus:
       description: OK
       content:
@@ -3498,7 +4530,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -3620,9 +4652,10 @@ components:
       type: string
       maxLength: 10
       description: |
-        Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `candidate` (Anwärter: nur interner Kalender), `member`
-        (Mitgliederbereich mit Kalender, Rolle neuer Konten) und `admin` (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
-        `r1`, `r2`, …; ältere Installationen haben außerdem `organizer` und `manager`. Bezeichnungen und Punktefaktor stehen in
+        Schlüssel der Rolle. Fest sind `guest` (keine Rechte), `member` (Mitgliederbereich mit Kalender, Rolle neuer
+        Konten) und `admin` (alle Rechte). Standardrollen der Bereiche heißen wie der Bereich (`events`, `points`, `penalties`), eigene Rollen
+        `r1`, `r2`, …; ältere Installationen haben außerdem `organizer` und `manager` bzw. `candidate` (die frühere feste
+        Rolle Anwärter, jetzt eine eigene Rolle). Bezeichnungen und Punktefaktor stehen in
         `/config` (`roles`), Rechte unter `/admin/roles`. `level` ist überall die Grundrolle; Zusatzrollen stehen in
         `extra_roles` (Issue #66).
 
@@ -3640,7 +4673,9 @@ components:
         key: { $ref: '#/components/schemas/Level' }
         label: { type: string }
         points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5; bei mehreren Rollen der kleinste' }
-        extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, candidate, member, admin)' }
+        extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, member, admin)' }
+        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten wählbar (POST /users): immer bei member, sonst nach Einstellung' }
+        promotable: { type: boolean, description: 'Personen mit dieser Rolle lassen sich mit create_users als Mitglied aufnehmen (POST /members/{id}/promote), z. B. Anwärter' }
 
     RoleAdmin:
       allOf:
@@ -3650,12 +4685,12 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
-            system: { type: boolean, description: 'guest, candidate, member und admin: Rechte fest, nicht löschbar' }
-            deletable: { type: boolean, description: 'false für guest, candidate, member und admin' }
+            system: { type: boolean, description: 'guest, member und admin: Rechte fest, nicht löschbar' }
+            deletable: { type: boolean, description: 'false für guest, member und admin' }
 
     RoleInput:
       type: object
@@ -3663,9 +4698,11 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users] }
           description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
+        new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
+        promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
 
     AppUser:
       type: object
@@ -3681,7 +4718,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -3800,6 +4837,9 @@ components:
             polls: { type: boolean }
             birthdays: { type: boolean }
             inventory: { type: boolean }
+            directory: { type: boolean }
+            offices: { type: boolean }
+            lists: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -3943,6 +4983,13 @@ components:
             die Aufbereitung im Hintergrund. Fertige Bilder: 200 mit JPEG. Interne Bilder ohne
             Mitgliedschaft: 401/403. Scheitert die Aufbereitung: 404.
         large: { type: string, description: Adresse der Großansicht (Verhalten wie thumb) }
+        original:
+          type: string
+          description: |
+            Originalauflösung für die Großansicht, nach `large` nachzuladen. Erst erzeugt, wenn jemand sie abruft (aus
+            dem Original in Drive, als JPEG ohne Metadaten, höchstens 8192 Pixel); bis dahin über die App
+            (`…/foto/<id>/original`), danach bei öffentlichen Bildern als statische Datei. 404, wenn es sie nicht gibt
+            (Bild noch nicht aufbereitet, gerade kein Platz frei, Erzeugung gescheitert): dann bleibt `large`.
         width: { type: integer }
         height: { type: integer }
         intern: { type: boolean }
@@ -3971,15 +5018,99 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
+        group: { type: [string, 'null'], description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen' }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
-        rank_title: { type: [string, 'null'], description: 'Dienstgrad (nur mit Bereich Dienstgrade und Recht manage_ranks)' }
+        rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
+        joined_on:
+          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
+          type: string
+
+    DirectoryEntry:
+      type: object
+      required: [id, name, first_name, last_name, photo_url]
+      properties:
+        id: { type: integer }
+        name: { type: string, description: 'Anzeigename „Vorname Nachname“' }
+        first_name: { type: string }
+        last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
+        candidate_role:
+          description: |
+            Name der Rolle, solange die Person noch als Mitglied aufzunehmen ist (Rolle mit `promotable`, z. B. Anwärter),
+            sonst null. Die App zeigt ihn wie einen Titel. Fehlt bei Ehemaligen und bei älteren Servern.
+          type: [string, 'null']
+        photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade)' }
+        rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
+        titles:
+          description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
+          type: array
+          items: { $ref: '#/components/schemas/TitleRef' }
+        birthday:
+          description: |
+            Geburtstag, soweit die Person ihn dem Betrachter zeigt (`profile` members: angemeldete Mitglieder, public: alle),
+            sonst null. Nur mit Bereich Geburtstage; fehlt bei Ehemaligen.
+          oneOf:
+            - $ref: '#/components/schemas/DirectoryBirthday'
+            - type: 'null'
+        join_year:
+          description: Eintrittsjahr, soweit die Person es dem Betrachter zeigt, sonst null. Fehlt bei Ehemaligen (`joined_year`).
+          type: [integer, 'null']
+        join_date:
+          description: |
+            Eintritt wie eingetragen (JJJJ-MM-TT oder nur das Jahr JJJJ), soweit die Person ihn dem Betrachter zeigt, sonst
+            null. Fehlt bei Ehemaligen (`joined_on`) und bei älteren Servern (dann nur `join_year`).
+          type: [string, 'null']
+
+    DirectoryBirthday:
+      type: object
+      description: Geburtstag auf der Seite einer Person; Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr.
+      required: [month, day, year, age]
+      properties:
+        month: { type: integer, minimum: 1, maximum: 12 }
+        day: { type: integer, minimum: 1, maximum: 31 }
+        year: { type: [integer, 'null'] }
+        age: { type: [integer, 'null'], description: 'Heutiges Alter (Zeitzone der Kompanie; 29.02. in Jahren ohne Schalttag ab dem 28.02.)' }
+
+    ProfileVisibility:
+      type: string
+      description: 'Anzeige auf der eigenen Seite in der Mitgliederliste: nicht, nur angemeldeten Mitgliedern, allen'
+      enum: [none, members, public]
+
+    JoinYear:
+      type: object
+      required: [year, date, profile]
+      properties:
+        year: { type: integer }
+        date: { type: string, description: 'Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ' }
+        profile: { $ref: '#/components/schemas/ProfileVisibility' }
+
+    JoinYearResponse:
+      type: object
+      required: [join_year]
+      properties:
+        join_year:
+          oneOf:
+            - $ref: '#/components/schemas/JoinYear'
+            - type: 'null'
+
+    DirectoryFormerEntry:
+      allOf:
+        - $ref: '#/components/schemas/DirectoryEntry'
+        - type: object
+          required: [founder, joined_year, left_year, joined_on, left_on]
+          properties:
+            founder: { type: boolean, description: Gründungsmitglied }
+            joined_year: { type: string, description: 'Jahr des Eintritts (JJJJ), leer ohne Angabe' }
+            left_year: { type: string, description: 'Jahr des Ausscheidens (JJJJ), leer ohne Angabe' }
+            joined_on: { type: string, description: 'Eintritt wie eingetragen (JJJJ-MM-TT oder JJJJ), leer ohne Angabe' }
+            left_on: { type: string, description: 'Ausscheiden wie eingetragen (JJJJ-MM-TT oder JJJJ), leer ohne Angabe' }
 
     MemberDetail:
       allOf:
@@ -3992,7 +5123,7 @@ components:
             penalties:
               type: array
               items: { $ref: '#/components/schemas/Penalty' }
-            rank: { $ref: '#/components/schemas/RankStatus' }
+            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht manage_ranks)' }
             rank_history:
               type: array
               items: { $ref: '#/components/schemas/RankHistoryEntry' }
@@ -4005,6 +5136,11 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/Birthday'
                 - type: 'null'
+            join_year:
+              description: Eintrittsjahr mit Anzeige (nur mit Recht create_users; null ohne Eintrag)
+              oneOf:
+                - $ref: '#/components/schemas/JoinYear'
+                - type: 'null'
             rights:
               description: |
                 Ausnahmen bei den Rechten (`PUT /members/{id}/rights`); null für Admins, Gäste, sich selbst und wenn der
@@ -4013,11 +5149,152 @@ components:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
             photo_editable: { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
+            former:
+              description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
+              oneOf:
+                - $ref: '#/components/schemas/FormerInfo'
+                - type: 'null'
+
+    FormerReason:
+      type: string
+      description: ausgetreten, verstorben, sonst ausgeschieden
+      enum: [left, deceased, other]
+
+    FormerDate:
+      type: string
+      description: JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer
+      pattern: '^(\d{4}(-\d{2}-\d{2})?)?$'
+
+    FormerInput:
+      type: object
+      description: Daten auch als TT.MM.JJJJ; nicht in der Zukunft, nicht vor 1800, Eintritt nicht nach dem Ausscheiden.
+      properties:
+        reason: { $ref: '#/components/schemas/FormerReason' }
+        joined_on: { type: string }
+        left_on: { type: string, description: 'bei Verstorbenen der Todestag' }
+        founder: { type: boolean, description: Gründungsmitglied }
+
+    FormerInfo:
+      type: object
+      required: [reason, joined_on, founder, left_on, previous_level]
+      properties:
+        reason: { $ref: '#/components/schemas/FormerReason' }
+        joined_on: { $ref: '#/components/schemas/FormerDate' }
+        founder: { type: boolean }
+        left_on: { $ref: '#/components/schemas/FormerDate' }
+        previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
+
+    FormerMember:
+      allOf:
+        - $ref: '#/components/schemas/FormerInfo'
+        - type: object
+          required: [id, name, first_name, last_name, photo_url, points, open_cents]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            first_name: { type: string }
+            last_name: { type: string }
+            photo_url: { type: [string, 'null'] }
+            points: { type: [number, 'null'] }
+            open_cents: { type: [integer, 'null'] }
+
+    FormerImportResult:
+      type: object
+      required: [rows, new, existing, offices_linked, applied]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              reason: { $ref: '#/components/schemas/FormerReason' }
+              joined_on: { $ref: '#/components/schemas/FormerDate' }
+              founder: { type: boolean }
+              left_on: { $ref: '#/components/schemas/FormerDate' }
+              existing:
+                description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  former: { type: boolean }
+              error: { type: string }
+        new: { type: integer }
+        existing: { type: integer }
+        offices_linked: { type: integer, description: 'Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden' }
+        applied: { type: boolean }
+
+    MemberImportResult:
+      type: object
+      required: [columns, rows, new, existing, offices_linked, applied, created]
+      properties:
+        columns:
+          type: object
+          required: [used, ignored]
+          properties:
+            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason)' }
+            ignored:
+              type: array
+              items:
+                type: object
+                required: [column, reason]
+                properties:
+                  column: { type: string }
+                  reason: { type: string }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              status: { type: string, enum: [active, former] }
+              level: { type: [string, 'null'], description: 'Rolle des neuen Kontos; null bei Ehemaligen' }
+              username: { type: string, description: 'leer bei Ehemaligen' }
+              email: { type: string }
+              birthday: { type: string, description: 'JJJJ-MM-TT oder MM-TT; leer ohne' }
+              joined_on: { $ref: '#/components/schemas/FormerDate' }
+              points: { type: integer }
+              rank: { type: string }
+              titles: { type: array, items: { type: string } }
+              reason: { $ref: '#/components/schemas/FormerReason' }
+              founder: { type: boolean }
+              left_on: { $ref: '#/components/schemas/FormerDate' }
+              existing:
+                description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
+                type: object
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  former: { type: boolean }
+              error: { type: string }
+        new:
+          type: object
+          description: Vorschau, was angelegt würde; mit apply, was angelegt wurde
+          required: [active, former]
+          properties:
+            active: { type: integer }
+            former: { type: integer }
+        existing: { type: integer }
+        offices_linked: { type: integer }
+        applied: { type: boolean }
+        created:
+          type: array
+          items: { $ref: '#/components/schemas/CreatedUser' }
+        error: { type: string, description: 'Anlegen mittendrin abgebrochen (nur mit apply)' }
 
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, create_users, promote_users]
+      enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users]
 
     MemberRights:
       type: object
@@ -4043,13 +5320,14 @@ components:
     Birthday:
       type: object
       description: Geburtstag mit Jahr und Schaltern – nur für die Person selbst und in den Mitgliedsdetails.
-      required: [month, day, year, visible, show_age]
+      required: [month, day, year, visible, show_age, profile]
       properties:
         month: { type: integer, minimum: 1, maximum: 12 }
         day: { type: integer, minimum: 1, maximum: 31 }
         year: { type: [integer, 'null'] }
         visible: { type: boolean, description: Anderen Mitgliedern zeigen }
         show_age: { type: boolean, description: Alter anzeigen }
+        profile: { $ref: '#/components/schemas/ProfileVisibility' }
 
     BirthdayResponse:
       type: object
@@ -4104,19 +5382,246 @@ components:
       type: [string, 'null']
       description: |
         Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
-        durch 480. Ausgeliefert als image/jpeg nur an angemeldete Personen: die Person selbst und wer die Mitglieder in
-        der Verwaltung sieht (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder
-        promote_users); sonst 401/403, im Wartungsmodus 503. `Cache-Control: private`, bei passender Fassung einen Tag.
-        Die Adresse wechselt mit jedem Foto.
+        durch 480, 1024 oder 4096 (Originalauflösung, für die Großansicht nachgeladen; 404, wenn es sie nicht gibt). Ausgeliefert als image/jpeg an die Person selbst und an alle, die die Mitglieder in der Verwaltung
+        sehen (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users); mit dem
+        Bereich directory an alle, auch ohne Anmeldung, wenn das Foto zu einem Mitglied oder Anwärter gehört (Issue #112,
+        dann `Cache-Control: public`); sonst 401/403, im Wartungsmodus 503. Sonst `Cache-Control: private`, bei passender
+        Fassung einen Tag; immer `X-Robots-Tag: noindex`. Die Adresse wechselt mit jedem Foto.
 
     BadgeUrl:
       type: [string, 'null']
       description: |
         Abzeichen des Dienstgrads (Issue #17) oder null: `<App>/abzeichen/<id>?v=<Fassung>&s=128`. Die App ersetzt
-        `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert nur an angemeldete
-        Personen mit Mitgliederbereich oder internem Kalender (sonst 401/403, im Wartungsmodus 503, Bereich aus 404);
+        `s` bei Bedarf durch 64 oder 256 (PNG-Fassungen; bei SVG dieselbe Datei). Ausgeliefert an angemeldete
+        Personen mit Mitgliederbereich oder internem Kalender und an alle mit Zugang zur Mitgliederliste der Verwaltung;
+        mit dem Bereich directory (öffentliche Mitgliederliste, Issue #112) an alle, dann `Cache-Control: public` (sonst
+        401/403, im Wartungsmodus 503, Bereich aus 404);
         SVG als image/svg+xml mit `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
         und `X-Content-Type-Options: nosniff`, sonst image/png. Die Adresse wechselt mit jeder Fassung.
+
+    PrintListSummary:
+      type: object
+      required: [id, title, subtitle, date, rows, updated_by_name, updated_at]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 120 }
+        subtitle: { type: [string, 'null'], maxLength: 200 }
+        date: { type: [string, 'null'], format: date }
+        rows: { type: integer, description: Zahl der Zeilen }
+        updated_by_name: { type: [string, 'null'] }
+        updated_at: { type: string, format: date-time }
+
+    PrintListColumn:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [field, blank], description: 'field: Wert aus der App, blank: leer zum Ausfüllen auf Papier' }
+        field:
+          type: [string, 'null']
+          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, points, penalties, null]
+          description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
+        label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
+        width: { type: string, enum: [narrow, normal, wide], default: normal }
+        checkbox: { type: boolean, description: Kästchen zum Abhaken (nur bei blank) }
+        available: { type: boolean, description: 'Nur in Antworten: ob die anfragende Person die Werte sieht (blank immer)' }
+
+    PrintListRow:
+      oneOf:
+        - type: object
+          description: Mitgliedszeile
+          required: [kind, user_id, name, deleted, values]
+          properties:
+            kind: { type: string, enum: [member] }
+            user_id: { type: [integer, 'null'], description: null bei gelöschtem Konto }
+            name: { type: string, description: Anzeigename; leer bei gelöschtem Konto }
+            first_name: { type: string }
+            last_name: { type: string }
+            deleted: { type: boolean }
+            values:
+              type: object
+              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), points (Zahl), penalties (offene Cent)'
+              additionalProperties: true
+        - type: object
+          description: Freie Zeile
+          required: [kind, name]
+          properties:
+            kind: { type: string, enum: [free] }
+            name: { type: string, maxLength: 100, description: Freier Name oder leer }
+
+    PrintList:
+      type: object
+      required: [id, title, subtitle, date, orientation, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 120 }
+        subtitle: { type: [string, 'null'], maxLength: 200 }
+        date: { type: [string, 'null'], format: date }
+        orientation: { type: string, enum: [portrait, landscape] }
+        created_by_name: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        updated_by_name: { type: [string, 'null'] }
+        updated_at: { type: string, format: date-time }
+        columns:
+          type: array
+          items: { $ref: '#/components/schemas/PrintListColumn' }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/PrintListRow' }
+        fields:
+          type: array
+          description: Alle Datenspalten mit der Angabe, ob die anfragende Person sie sieht (für die Auswahl)
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              available: { type: boolean }
+
+    PrintListInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 120 }
+        subtitle: { type: string, maxLength: 200 }
+        date: { type: [string, 'null'], format: date }
+        orientation: { type: string, enum: [portrait, landscape], default: portrait }
+        columns:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/PrintListColumn' }
+        rows:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [kind]
+            properties:
+              kind: { type: string, enum: [member, free] }
+              user_id: { type: [integer, 'null'], description: Nur bei member }
+              name: { type: string, maxLength: 100, description: Nur bei free }
+        updated_at: { type: string, format: date-time, description: 'Nur beim Ersetzen (PUT): der geladene Stand' }
+
+    OfficeGroup:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 60 }
+
+    OfficeRef:
+      type: object
+      required: [id, group_id, title, singular, title_id]
+      properties:
+        id: { type: integer }
+        group_id: { type: [integer, 'null'] }
+        title: { type: string, maxLength: 60 }
+        singular: { type: string, maxLength: 60, description: 'Eigene Einzahl („Kapitän“ zu „Kapitäne“); leer ohne' }
+        title_id: { type: [integer, 'null'], description: Verknüpfter Titel }
+
+    OfficeHolder:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: 'Anzeigename des Kontos, sonst der gespeicherte Name (auch nach dem Löschen des Kontos)' }
+        user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
+        photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+
+    OfficeTerm:
+      type: object
+      required: [id, kind, start_year, end_year, note, honor, current, holders]
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [period, point], description: 'period: Zeitraum (ohne Ende bis heute), point: ein Jahr' }
+        start_year: { type: integer }
+        end_year: { type: [integer, 'null'] }
+        note: { type: string, maxLength: 100 }
+        honor: { type: boolean, description: 'Ehrung (Stern und Abzeichen im Zeitstrahl), bei jeder Art; vergibt keinen Titel' }
+        current: { type: boolean, description: Zeitraum ohne Ende }
+        office_id: { type: integer, description: Nur in Antworten der Pflege }
+        holders:
+          type: array
+          items: { $ref: '#/components/schemas/OfficeHolder' }
+
+    OfficeTermInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [period, point], default: period }
+        start_year: { type: integer, minimum: 1800, description: Höchstens zehn Jahre in der Zukunft }
+        end_year: { type: [integer, 'null'], description: 'Nicht vor dem Beginn; null: bis heute (bei point immer null)' }
+        note: { type: string, maxLength: 100 }
+        honor: { type: boolean, default: false, description: Ehrung; beim Ändern ohne Angabe bleibt der bisherige Wert }
+        holders:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            description: Ein Konto (user_id) oder ein freier Name; jede Person nur einmal
+            properties:
+              user_id: { type: integer }
+              name: { type: string, maxLength: 100 }
+
+    Office:
+      allOf:
+        - $ref: '#/components/schemas/OfficeRef'
+        - type: object
+          required: [terms]
+          properties:
+            terms:
+              type: array
+              items: { $ref: '#/components/schemas/OfficeTerm' }
+            holder_title:
+              type: [string, 'null']
+              description: Einzahl für den Zeitstrahl einer Person („Kompaniekönig“ statt „Kompaniekönige“) = eigene Einzahl (`singular`), sonst Name des verknüpften Titels (nur mit Bereich `titles`); null ohne beides
+            linked_title: { type: [string, 'null'], description: Nur mit manage_offices }
+
+    OfficesOverview:
+      type: object
+      required: [groups, offices]
+      properties:
+        groups:
+          type: array
+          items: { $ref: '#/components/schemas/OfficeGroup' }
+        offices:
+          type: array
+          items: { $ref: '#/components/schemas/Office' }
+
+    OfficeTitleChange:
+      type: object
+      properties:
+        name: { type: string }
+        title: { type: string }
+
+    OfficeImportResult:
+      type: object
+      required: [rows, groups_new, offices_new, terms_new, applied]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            properties:
+              line: { type: integer }
+              group: { type: string }
+              office: { type: string }
+              kind: { type: string, enum: [period, point] }
+              start_year: { type: integer }
+              end_year: { type: [integer, 'null'] }
+              note: { type: string }
+              honor: { type: boolean }
+              holders:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    user_id: { type: [integer, 'null'] }
+              duplicate: { type: boolean, description: Gibt es schon; wird übersprungen }
+              error: { type: string }
+        groups_new: { type: integer }
+        offices_new: { type: integer }
+        terms_new: { type: integer }
+        applied: { type: boolean }
 
     Title:
       type: object
@@ -4127,6 +5632,14 @@ components:
         sort: { type: integer, description: Reihenfolge der Anzeige }
         active: { type: boolean, description: 'Deaktivierte werden nicht mehr neu vergeben; wer sie hat, behält sie' }
         assigned: { type: integer, description: Wie vielen Mitgliedern zugewiesen }
+        office:
+          description: 'Amt, das den Titel über die laufenden Amtszeiten vergibt (Issue #112); von Hand nicht vergebbar'
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                id: { type: integer }
+                title: { type: string }
 
     DocCategory:
       type: object
@@ -4281,7 +5794,7 @@ components:
         last_name: { type: string }
         username: { type: string }
         email: { type: string }
-        level: { type: string, enum: [member, candidate] }
+        level: { $ref: '#/components/schemas/Level' }
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort }

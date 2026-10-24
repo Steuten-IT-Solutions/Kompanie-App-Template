@@ -57,8 +57,11 @@ $c->ok($app->users->find($member)?->role === $kasseKey && in_array('manage_penal
 $app->users->setRole($member, KompanieApp\Core\Auth\Roles::MEMBER);
 $app->roles()->delete($kasseKey, null);
 
-// Anwärter (Issue #23): Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt – nur diesen Schritt.
+// Anwärter (Issue #23) als eigene Rolle: Abonnent mit der Rolle in der Benutzer-Option; aufnehmen darf, wer Konten anlegt –
+// nur diesen Schritt und nur aus Rollen, die das erlauben.
 $c->section('Anwärter');
+$candKey = (string) (array_search('Kpwp Anwärter', array_column($app->roles()->all(), 'label', 'key'), true)
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key']);
 $app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => ['member', 'create_users']]);
 $aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
 $holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
@@ -67,10 +70,10 @@ if ($existingCand) {
     wp_delete_user($existingCand->ID);
 }
 wp_set_current_user($holder);
-$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => 'candidate']);
+$created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'kpwp.anwaerter', 'level' => $candKey], $app->users->find($holder));
 $cand = (int) $created['id'];
 clean_user_cache($cand);
-$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'candidate', 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
+$c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === $candKey, 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
 $c->ok($caps($cand) === ['calendar'], 'Anwärter: nur interner Kalender');
 try {
     $app->users->setRole($cand, 'events');
@@ -82,7 +85,7 @@ $app->members()->promote($app->users->find($holder), $cand);
 clean_user_cache($cand);
 $c->ok($app->users->find($cand)?->role === 'member' && in_array(Roles::ROLE_MEMBER, get_userdata($cand)->roles, true), 'Aufgenommen: Mitglied, mit früherer WP-Rolle');
 try {
-    $app->users->setRole($cand, 'candidate');
+    $app->users->setRole($cand, $candKey);
     $c->ok(false, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
 } catch (\DomainException) {
     $c->ok(true, 'Zurück zum Anwärter nur mit „Rollen vergeben“');
@@ -91,6 +94,7 @@ wp_set_current_user(0);
 wp_delete_user($cand);
 wp_delete_user($holder);
 $app->roles()->delete($aufnahmeKey, null);
+$app->roles()->delete($candKey, null);
 
 // Update einer bestehenden Installation (vor #28): Rolle nur als WP-Rolle, ohne Meta.
 // Die früheren WP-Rollen gibt es hier nur, wenn die Installation sie hatte; für den Test anlegen.
@@ -308,6 +312,22 @@ $c->ok(str_contains($html, 'Kpwp Fest') && str_contains($html, 'href="https://ex
 $c->ok(!str_contains($html, '⚓'), 'Keine Motive einer bestimmten Kompanie');
 $d->request('DELETE', '/events/' . $ev['id']);
 
+$c->section('Bilder ohne Metadaten');
+// Der Bildeditor von WordPress (Imagick) behält EXIF, wenn er nicht verkleinern muss: auch dann kein GPS-Ort.
+$im = imagecreatetruecolor(60, 40);
+ob_start();
+imagejpeg($im, null, 90);
+$jpeg = (string) ob_get_clean();
+$exif = "Exif\0\0GPSLatitude 51.29";
+$jpeg = substr($jpeg, 0, 2) . "\xFF\xE1" . pack('n', strlen($exif) + 2) . $exif . substr($jpeg, 2);
+$src = wp_tempnam('kpwp') . '.jpg';
+$dst = $src . '-out.jpg';
+file_put_contents($src, $jpeg);
+$size = $app->images->resizeToJpeg($src, $dst, 8192, 90);
+$c->ok($size === ['width' => 60, 'height' => 40] && !str_contains((string) file_get_contents($dst), 'GPSLatitude'), 'Ohne Verkleinerung: JPEG ohne EXIF (' . get_class(wp_get_image_editor($src)) . ')');
+@unlink($src);
+@unlink($dst);
+
 $c->section('Galerie');
 $gallery = $app->gallery();
 $c->ok($gallery->isConfigured(), 'Beispiel-Galerie der Test-Instanz eingerichtet');
@@ -462,7 +482,10 @@ $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);
 $html = do_shortcode('[kompanie_galerie]');
 unset($_GET['album']);
-$c->ok(substr_count($html, 'class="ka-foto"') === 2 && !str_contains($html, '/app/foto/'), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
+// Interne Bilder kämen nur über die App (…/foto/<id>/thumb|large); die Originalauflösung öffentlicher Bilder läuft
+// über die App, bis sie erzeugt ist.
+$c->ok(substr_count($html, 'class="ka-foto"') === 2 && !preg_match('#/app/foto/\d+/(thumb|large)#', $html), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
+$c->ok(substr_count($html, 'data-ka-original="') === 2, '[kompanie_galerie] lädt in der Großansicht die Originalauflösung nach');
 
 $c->section('Laufzeit-Konfiguration und App-Seite');
 wp_set_current_user($member);
@@ -518,6 +541,17 @@ remove_filter('pre_http_request', $googleCalFilter, 10);
 $app->settings->delete('drive_oauth');
 $app->settings->set('calendar_ids', '');
 $app->calendar()->clearCache();
+
+// Zwischenspeicher-Dauer (Issue #177) auch im WP-Admin: geprüft wie in der App, ungültig ändert nichts.
+$calendarBefore = ['calendar_ics_url' => (string) $app->settings->get('calendar_ics_url', ''), 'calendar_ids' => '', 'google_api_key' => (string) $app->settings->get('google_api_key', '')];
+$c->ok(str_contains($renderSettings(), 'id="calendar_cache_minutes" name="calendar_cache_minutes" value="15"'), 'Einstellungsseite: Feld „Aktualisieren alle … Minuten“ mit 15');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, $calendarBefore + ['calendar_cache_minutes' => '1441', 'calendar_ics_url' => 'https://anders.example/k.ics'])
+    === ['Der Zwischenspeicher muss zwischen 1 und 1440 Minuten liegen.', true]
+    && $app->settings->get('calendar_ics_url') === $calendarBefore['calendar_ics_url'], '1441 Minuten abgelehnt, nichts geändert');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => 'x'] + $calendarBefore)[1], 'Keine Zahl abgelehnt');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '30'] + $calendarBefore) === ['Gespeichert.', false]
+    && $app->settingsService()->get()['calendar']['cache_minutes'] === 30 && str_contains($renderSettings(), 'name="calendar_cache_minutes" value="30"'), '30 Minuten gespeichert');
+KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '15'] + $calendarBefore);
 
 $c->section('Mit Google verbinden');
 $page = $renderSettings();
@@ -714,6 +748,10 @@ parse_str((string) wp_parse_url((string) $badge['badge_url'], PHP_URL_QUERY), $q
 $_GET['v'] = (string) ($q['v'] ?? '');
 $_GET['s'] = '128';
 wp_set_current_user(0);
+// Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen, sonst nur mit Anmeldung.
+$res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
+$c->ok($res['status'] === 200 && str_starts_with($res['headers']['Cache-Control'], 'public'), 'Mit Mitgliederliste: Abzeichen ohne Anmeldung, öffentlich zu speichern');
+$app->features()->update(['directory' => false]);
 $res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
 $c->ok($res['status'] === 401 && ($res['headers']['X-Content-Type-Options'] ?? '') === 'nosniff' && !isset($res['path']), 'Abzeichen ohne Anmeldung → 401');
 wp_set_current_user($member);
@@ -721,6 +759,7 @@ $res = KompanieApp\WordPress\AppPage::badgeResponse($app, $rank['id']);
 $c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/svg+xml' && $res['headers']['X-Content-Type-Options'] === 'nosniff'
     && ($res['headers']['Content-Security-Policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Mitglied: SVG mit strenger CSP und nosniff');
 $c->ok(str_starts_with($res['headers']['Cache-Control'], 'private') && !str_contains((string) file_get_contents((string) ($res['path'] ?? '')), 'script'), 'Privat gespeichert, ausgeliefert wird das bereinigte SVG');
+$app->features()->update(['directory' => true]);
 wp_set_current_user($admin);
 $im = imagecreatetruecolor(300, 300);
 ob_start();
@@ -745,14 +784,115 @@ parse_str((string) wp_parse_url((string) $photo['photo_url'], PHP_URL_QUERY), $q
 $_GET['v'] = (string) ($q['v'] ?? '');
 $_GET['s'] = '480';
 wp_set_current_user(0);
+// Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung.
+$res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
+$c->ok($res['status'] === 200 && $res['headers']['Cache-Control'] === 'public, max-age=86400', 'Mit Mitgliederliste: Foto ohne Anmeldung, öffentlich');
+$app->features()->update(['directory' => false]);
 $res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
 $c->ok($res['status'] === 401 && !isset($res['body']), 'Foto ohne Anmeldung → 401');
+$app->features()->update(['directory' => true]);
 wp_set_current_user($member);
 $res = KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member);
 $size = getimagesizefromstring((string) ($res['body'] ?? ''));
 $c->ok($res['status'] === 200 && $res['headers']['Content-Type'] === 'image/jpeg' && $size !== false && [$size[0], $size[1], $size['mime']] === [480, 320, 'image/jpeg'], 'Eigenes Foto: JPEG in 480 Pixeln über den Bildeditor von WordPress');
+$_GET['s'] = '1024';
+$size = getimagesizefromstring((string) (KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member)['body'] ?? ''));
+$c->ok($size !== false && $size[0] === 1024 && abs($size[1] - 683) <= 1, 'Eigenes Foto: 1024 Pixel für die vergrößerte Ansicht');
 unset($_GET['v'], $_GET['s']);
 $c->ok(($app->api()->config()['user']['photo_url'] ?? null) === $photo['photo_url'], '/config: eigenes Foto');
+
+// Shortcodes aus Ämtern und Mitgliederliste: dieselben öffentlichen Angaben wie die App, auch für Gäste.
+$c->section('Shortcodes: Ämter und Mitglieder');
+wp_set_current_user($admin);
+$app->features()->update(['offices' => true, 'directory' => true]);
+$guestHolder = $d->createUser('kpwp_gast_amt', 'guest');
+$galleryCandKey = (string) (array_search('Kpwp Anwärter Galerie', array_column($app->roles()->all(), 'label', 'key'), true)
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter Galerie', 'capabilities' => ['calendar']])['key']);
+$galleryCand = $d->createUser('kpwp_anwaerter_galerie', $galleryCandKey);
+$memberName = (string) $app->users->find($member)?->name;
+$offices = $app->offices();
+$groupA = $offices->createGroup('Kpwp Kompanie');
+$groupB = $offices->createGroup('Kpwp Bruderschaft');
+$officeA = $offices->createOffice(['title' => 'Kpwp Kapitän', 'group_id' => $groupA['id']]);
+$officeB = $offices->createOffice(['title' => 'Kpwp Brudermeister', 'group_id' => $groupB['id']]);
+$offices->createTerm($officeA['id'], ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kpwp Früher'], ['user_id' => $guestHolder]]]);
+$offices->createTerm($officeA['id'], ['start_year' => 2020, 'holders' => [['user_id' => $member]], 'note' => 'Kpwp Zusatz']);
+$offices->createTerm($officeB['id'], ['start_year' => 2018, 'holders' => [['name' => 'Kpwp Frei']]]);
+wp_set_current_user(0);
+$html = do_shortcode('[kompanie_aemter]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'class="ka-gruppe">Kpwp Kompanie<'), '[kompanie_aemter]: alle Gruppen mit Überschrift');
+$c->ok(str_contains($html, esc_html($memberName)) && str_contains($html, 'seit 2020 · Kpwp Zusatz') && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])), 'Laufende Amtszeit mit Foto (480 Pixel) aus der Mitgliederliste und Zusatz');
+$c->ok(str_contains($html, 'Chronik seit 1980') && str_contains($html, '1980–1990') && str_contains($html, 'Kpwp Früher'), 'Frühere Amtszeiten als Chronik');
+$html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
+$c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
+$html = do_shortcode('[kompanie_aemter gruppe=”Kpwp Bruderschaft”]');
+$c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän'), 'gruppe mit typografischen Anführungszeichen');
+foreach (['/kompanie-app/v1/offices', '/kompanie-app/v1/directory'] as $route) {
+    $res = rest_do_request(new WP_REST_Request('GET', $route));
+    $c->ok($res->get_status() === 200 && ($res->get_headers()['X-Robots-Tag'] ?? '') === 'noindex', "GET $route ohne Anmeldung: noindex");
+}
+$html = do_shortcode('[kompanie_aemter amt="kpwp kapitän"]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'ka-gruppe">'), 'amt="…" zeigt nur dieses Amt (ohne Überschrift)');
+$html = do_shortcode('[kompanie_aemter gruppe=„Kpwp Kompanie“ amt=„Kpwp Kapitän“]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister'), 'gruppe und amt mit typografischen Anführungszeichen');
+$html = do_shortcode('[kompanie_aemter gruppe="Kpwp Bruderschaft" amt="Kpwp Kapitän"]');
+$c->ok(!str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'Noch keine Ämter eingetragen.'), 'amt in einer anderen Gruppe: nichts');
+$html = do_shortcode('[kompanie_mitglieder]');
+$c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
+    && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+// Foto von vor Datenbankversion 18 ohne 1024er (Issue #109): Großansicht mit der 480er statt einer Adresse mit 404, ohne srcset.
+$app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$member]);
+$medium480 = esc_url((string) $app->memberPhotos()->urls(480)[$member]);
+$oldHtml = do_shortcode('[kompanie_mitglieder]');
+$c->ok(str_contains($oldHtml, 'href="' . $medium480 . '" data-ka-lightbox="mitglieder"') && str_contains($oldHtml, '<img src="' . $medium480 . '" alt=')
+    && !str_contains($oldHtml, 's=1024'), 'Altes Foto ohne 1024er: Großansicht mit der 480er, ohne srcset');
+$_GET['v'] = (string) ($q['v'] ?? '');
+parse_str((string) wp_parse_url(html_entity_decode($medium480), PHP_URL_QUERY), $oldQuery);
+$_GET['s'] = (string) ($oldQuery['s'] ?? '');
+$c->ok(KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member)['status'] === 200, 'Adresse der Großansicht liefert das Foto');
+unset($_GET['v'], $_GET['s']);
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
+$c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
+$c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');
+$c->ok(in_array($galleryCand, array_column($app->api()->directory(), 'id'), true) && !str_contains($body, 'Kpwp_anwaerter_galerie'), 'Ohne Anwärter (in der App-Liste stehen sie)');
+wp_delete_user($galleryCand);
+$app->roles()->delete($galleryCandKey, null);
+
+// Platzhalterbild aus der Mediathek statt der Anfangsbuchstaben (Einstellungen der Webseite).
+require_once ABSPATH . 'wp-admin/includes/image.php';
+$upload = wp_upload_dir();
+$file = $upload['path'] . '/kpwp-platzhalter.png';
+$im = imagecreatetruecolor(400, 600);
+imagepng($im, $file);
+imagedestroy($im);
+$attachment = wp_insert_attachment(['post_mime_type' => 'image/png', 'post_title' => 'Kpwp Platzhalter', 'post_status' => 'inherit'], $file);
+wp_update_attachment_metadata($attachment, wp_generate_attachment_metadata($attachment, $file));
+$c->ok(KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['placeholder_id' => 'x']) === ['Bitte ein Bild aus der Mediathek wählen.', true]
+    && KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['placeholder_id' => (string) $guestHolder])[1], 'Platzhalterbild: nur Bilder aus der Mediathek');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['placeholder_id' => (string) $attachment]) === ['Platzhalterbild gespeichert.', false]
+    && (int) $app->settings->get(KompanieApp\WordPress\Shortcodes::MEMBERS_PLACEHOLDER) === $attachment, 'Platzhalterbild gespeichert');
+$c->ok(str_contains($renderSettings(), 'id="kompanie-placeholder-id" value="' . $attachment . '"'), 'Einstellungsseite zeigt das Platzhalterbild');
+$html = do_shortcode('[kompanie_mitglieder]');
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html);
+$c->ok(!str_contains($body, 'class="ka-mitglied-leer"') && str_contains($body, 'class="ka-mitglied-platzhalter"') && str_contains($body, 'kpwp-platzhalter')
+    && str_contains($body, esc_url((string) $app->memberPhotos()->urls(480)[$member])), 'Ohne Foto das Platzhalterbild statt der Anfangsbuchstaben, Fotos bleiben');
+$c->ok(substr_count($body, 'data-ka-lightbox="mitglieder"') === count($app->memberPhotos()->urls(480)), 'Platzhalterbild ohne Großansicht');
+wp_delete_attachment($attachment, true);
+$body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', do_shortcode('[kompanie_mitglieder]'));
+$c->ok(str_contains($body, 'class="ka-mitglied-leer"') && !str_contains($body, 'ka-mitglied-platzhalter'), 'Bild aus der Mediathek gelöscht: wieder die Anfangsbuchstaben');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyMembersPlaceholder($app, ['remove' => '1'])[1] === false
+    && $app->settings->get(KompanieApp\WordPress\Shortcodes::MEMBERS_PLACEHOLDER) === null, 'Platzhalterbild entfernt');
+$app->features()->update(['offices' => false, 'directory' => false]);
+$c->ok(do_shortcode('[kompanie_aemter]') === '' && do_shortcode('[kompanie_mitglieder]') === '', 'Bereich aus: keine Ausgabe');
+$app->features()->update(['offices' => true, 'directory' => true]);
+wp_set_current_user($admin);
+foreach ([$officeA, $officeB] as $o) {
+    $offices->deleteOffice($o['id']);
+}
+$offices->deleteGroup($groupA['id']);
+$offices->deleteGroup($groupB['id']);
+wp_delete_user($guestHolder);
+
 wp_set_current_user($admin);
 $app->memberPhotos()->remove($app->users->find($admin), $member);
 $c->ok($app->memberPhotos()->url($member) === null, 'Foto entfernt');
@@ -780,7 +920,7 @@ $res = rest_do_request(new WP_REST_Request('POST', '/kpwp-alt/v1/push/status'));
 $c->ok($res->get_status() !== 404, 'Push-Routen im Alias erreichbar (Status ' . $res->get_status() . ')');
 
 $c->section('Datensicherung und Update');
-$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name());
+$backup = new KompanieApp\WordPress\WpBackup($app->db, KOMPANIE_APP_VERSION, $app->config->name(), $app->files);
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'vorher');
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state', ['serial' => 5]);
 $app->cache->increment('backup_test', 900);
@@ -802,6 +942,71 @@ try {
 } catch (RuntimeException $e) {
     $c->ok(str_contains($e->getMessage(), 'anderen Website'), 'Sicherung einer anderen Website wird abgelehnt');
 }
+
+// Dateien der Dokumente: in der Sicherung, nach dem Verlust wieder da.
+$docId = $app->db->insert('documents', ['title' => 'Satzung (Sicherung)', 'category_id' => null, 'doc_date' => '2026-01-01', 'visibility' => 'members', 'file' => 'dok-sicherungstest.pdf', 'ext' => 'pdf', 'size' => 9, 'version' => 'v1', 'uploaded_by' => $admin, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00']);
+$docPath = $app->files->path('dokumente/dok-sicherungstest.pdf', false);
+file_put_contents($docPath, '%PDF-test');
+$withFile = $backup->export();
+$c->ok(base64_decode((string) ($withFile['files']['dokumente/dok-sicherungstest.pdf'] ?? '')) === '%PDF-test', 'Sicherung enthält die Dateien der Dokumente');
+unlink($docPath);
+$backup->import((string) json_encode($withFile));
+$c->ok(is_file($docPath) && file_get_contents($docPath) === '%PDF-test', 'Wiederherstellen legt die Dateien der Dokumente wieder ab');
+$app->db->execute('DELETE FROM {documents} WHERE id = ?', [$docId]);
+unlink($docPath);
+
+// Konten (WordPress-Benutzer) in der Sicherung: nach dem Verlust der Website mit derselben ID wieder angelegt.
+$verloren = wp_insert_user(['user_login' => 'kpwp_verloren', 'user_pass' => 'Geheim-123', 'user_email' => 'verloren@example.com', 'display_name' => 'Vera Loren', 'first_name' => 'Vera', 'last_name' => 'Loren', 'role' => 'subscriber']);
+wp_set_current_user(0);
+$app->users->setRole($verloren, KompanieApp\Core\Auth\Roles::MEMBER);
+update_user_option($verloren, WpUsers::ACCOUNT_META, '1', false);
+$acc = $backup->export()['accounts'];
+$row = array_values(array_filter($acc, static fn (array $a): bool => $a['id'] === $verloren))[0] ?? [];
+$c->ok(($row['login'] ?? '') === 'kpwp_verloren' && ($row['app_role'] ?? '') === 'member' && ($row['app_account'] ?? false) === true
+    && ($row['first_name'] ?? '') === 'Vera' && wp_check_password('Geheim-123', (string) ($row['pass'] ?? '')), 'Sicherung enthält die Konten mit Passwort-Hash, Namen und Rolle in der App');
+$c->ok(in_array($admin, array_column($acc, 'id'), true), 'Sicherung enthält alle Benutzer der Website, auch Administratoren');
+$member2 = $d->createUser('kpwp_rolle', 'member');
+$withAccounts = $backup->export();
+wp_delete_user($verloren);
+$app->users->setRole($member2, 'points');
+$backup->import((string) json_encode($withAccounts));
+$back = get_userdata($verloren);
+$c->ok($back !== false && $back->user_login === 'kpwp_verloren' && $back->user_email === 'verloren@example.com' && $back->first_name === 'Vera'
+    && $back->display_name === 'Vera Loren', 'Fehlendes Konto mit derselben ID, Benutzername, E-Mail und Namen wieder angelegt');
+$c->ok($back !== false && wp_check_password('Geheim-123', $back->user_pass, $verloren) && $app->users->find($verloren)?->role === 'member'
+    && in_array(Roles::ROLE_MEMBER, $back->roles, true), 'Wiederhergestelltes Konto: altes Passwort und Rolle in der App gelten');
+$c->ok($app->users->find($member2)?->role === 'member', 'Vorhandenes Konto bekommt die Rolle in der App aus der Sicherung zurück');
+// Widerspruch: Die ID gehört hier einem anderen Benutzernamen → nichts ändern.
+$falsch = $withAccounts;
+foreach ($falsch['accounts'] as &$a) {
+    if ($a['id'] === $member2) {
+        $a['login'] = 'kpwp_jemand_anders';
+    }
+}
+unset($a);
+$app->users->setRole($member2, 'points');
+try {
+    $backup->import((string) json_encode($falsch));
+    $c->ok(false, 'Konto-ID mit anderem Benutzernamen wird abgelehnt');
+} catch (RuntimeException $e) {
+    $c->ok(str_contains($e->getMessage(), 'kpwp_jemand_anders') && $app->users->find($member2)?->role === 'points', 'Konto-ID mit anderem Benutzernamen wird abgelehnt, ohne etwas zu ändern');
+}
+// Konten anlegen nur mit dem WP-Recht dazu.
+wp_delete_user($verloren);
+wp_set_current_user($member2);
+try {
+    $backup->import((string) json_encode($withAccounts));
+    $c->ok(false, 'Konten anlegen ohne WP-Recht wird abgelehnt');
+} catch (RuntimeException $e) {
+    $c->ok(str_contains($e->getMessage(), 'Benutzer anlegen') && get_userdata($verloren) === false, 'Konten anlegen ohne WP-Recht wird abgelehnt');
+}
+wp_set_current_user(0);
+// Ältere Sicherung ohne Konten: wie bisher.
+$alt = $withAccounts;
+unset($alt['accounts']);
+$backup->import((string) json_encode($alt));
+$c->ok(get_userdata($verloren) === false && (int) $app->db->scalar('SELECT COUNT(*) FROM {events} WHERE title = ?', ['Aus der Sicherung']) === 1, 'Ältere Sicherung ohne Konten lässt sich weiter einspielen');
+wp_delete_user($member2);
 $app->db->execute('DELETE FROM {events} WHERE title = ?', ['Aus der Sicherung']);
 foreach ($photoStatus as $p) {
     $app->db->update('photos', ['status' => $p['status']], ['id' => $p['id']]);

@@ -318,6 +318,10 @@ try {
     [$s, $badge] = $d->request('POST', '/ranks/' . ($badgeRank['id'] ?? 0) . '/badge', ['file' => ['name' => 'abzeichen.svg', 'data' => base64_encode($svgBadge)]]);
     $badgeUrl = (string) ($badge['badge_url'] ?? '');
     $c->ok($s === 200 && str_starts_with($badgeUrl, $base . 'index.php?r=/abzeichen/' . ($badgeRank['id'] ?? 0) . '&v='), 'SVG-Abzeichen hochgeladen, Adresse im Bereich der App');
+    // Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen; ohne sie nur Mitglieder und Anwärter.
+    $anon = $d->send('GET', $badgeUrl, [], null);
+    $c->ok($anon[0] === 200 && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public'), 'Mit Mitgliederliste: Abzeichen ohne Anmeldung, öffentlich zu speichern');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
     $anon = $d->send('GET', $badgeUrl, [], null);
     $c->ok($anon[0] === 401 && ($anon[2]['x-content-type-options'] ?? '') === 'nosniff', 'Abzeichen ohne Anmeldung → 401');
     $cookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)];
@@ -343,6 +347,7 @@ try {
     $c->ok($pngRes[0] === 200 && ($pngRes[2]['content-type'] ?? '') === 'image/png' && !isset($pngRes[2]['content-security-policy']) && ($pngSize[0] ?? 0) === 64 && ($pngSize[1] ?? 0) === 32, 'PNG-Abzeichen: image/png, s=64 liefert 64 Pixel');
     $old = $d->send('GET', $badgeUrl, $cookie, null);
     $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
 
     $c->section('Fotos der Mitglieder (Auslieferung)');
     $mona = $users->add('Mona Foto', 'mona', 'mona@example.org', 'mona-passwort', Roles::MEMBER);
@@ -353,15 +358,31 @@ try {
     [$s, $monaPhoto] = $d->request('PUT', '/members/' . $mona . '/photo', ['file' => ['name' => 'mona.jpg', 'data' => base64_encode((string) ob_get_clean())]]);
     $monaUrl = (string) ($monaPhoto['photo_url'] ?? '');
     $c->ok($s === 200 && str_starts_with($monaUrl, $base . 'index.php?r=/mitgliedsfoto/' . $mona . '&v=') && str_ends_with($monaUrl, '&s=128'), 'Foto hochgeladen, Adresse im Bereich der App');
+    // Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung und privat.
+    $public = $d->send('GET', $monaUrl, [], null);
+    $c->ok($public[0] === 200 && ($public[2]['cache-control'] ?? '') === 'public, max-age=86400' && ($public[2]['x-robots-tag'] ?? '') === 'noindex', 'Mit Mitgliederliste: Foto ohne Anmeldung, einen Tag öffentlich, noindex');
+    foreach (['directory', 'offices'] as $route) {
+        $res = $d->send('GET', $base . 'index.php?r=/api/v1/' . $route, ['Accept' => 'application/json'], null);
+        $c->ok(($res[2]['x-robots-tag'] ?? '') === 'noindex', "GET /$route ohne Anmeldung: noindex (Status {$res[0]})");
+    }
+    $d->request('PUT', '/admin/features', ['directory' => false]);
     $c->ok($d->send('GET', $monaUrl, [], null)[0] === 401, 'Foto ohne Anmeldung → 401');
     $monaCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($mona)];
     $own = $d->send('GET', $monaUrl, $monaCookie, null);
     $c->ok($own[0] === 200 && ($own[2]['content-type'] ?? '') === 'image/jpeg' && ($own[2]['x-content-type-options'] ?? '') === 'nosniff' && ($own[2]['cache-control'] ?? '') === 'private, max-age=86400', 'Eigenes Foto: image/jpeg, nosniff, einen Tag privat');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
     $c->ok($d->send('GET', $monaUrl, $monaCookie + ['If-None-Match' => (string) ($own[2]['etag'] ?? '-')], null)[0] === 304, 'Foto: passender ETag → 304');
     $large = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=480', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
     $c->ok(($large[0] ?? 0) === 480 && ($large[1] ?? 0) === 320 && ($large['mime'] ?? '') === 'image/jpeg', 'Wer Mitglieder verwaltet, sieht das Foto; s=480 liefert 480 Pixel');
-    $c->ok($d->send('GET', $monaUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)], null)[0] === 403, 'Andere Mitglieder sehen das Foto nicht → 403');
+    $xlarge = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=1024', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
+    $c->ok(($xlarge[0] ?? 0) === 900 && ($xlarge[1] ?? 0) === 600, 's=1024 liefert das Foto so groß wie hochgeladen (nie vergrößert)');
+    // Mitgliederliste für alle (Bereich directory): an sehen andere Mitglieder das Foto, aus nicht.
+    $ottoCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)];
+    $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 200, 'Mit Mitgliederliste sehen andere Mitglieder das Foto');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
+    $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 403, 'Ohne Mitgliederliste sehen andere Mitglieder das Foto nicht → 403');
     $c->ok($d->send('GET', $monaUrl . '&vorschau=member', $cookie, null)[0] === 403, 'Vorschau als Mitglied: fremdes Foto → 403');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
     [$s] = $d->request('DELETE', '/members/' . $mona);
     $c->ok($s === 200 && $d->send('GET', $monaUrl, $cookie, null)[0] === 404, 'Konto gelöscht: Foto weg (404)');
 
@@ -608,11 +629,20 @@ try {
     $d->actAs($anna);
     [, $ev] = $d->request('POST', '/events', ['title' => 'Sicherungstest', 'start_date' => '2031-05-01']);
     $backup = new StandaloneBackup($kernel);
+    // Abzeichen eines Dienstgrads: Datei in der Sicherung, nach dem Umzug wieder da.
+    $rankId = $kernel->db()->insert('ranks', ['title' => 'Sicherungsrang', 'sort' => 99, 'badge_file' => 'abz-sicherung', 'badge_ext' => 'svg', 'badge_version' => 'v1']);
+    $badge = $kernel->app()->files->path('abzeichen/abz-sicherung.svg', false);
+    file_put_contents($badge, '<svg xmlns="http://www.w3.org/2000/svg"/>');
     $export = $backup->export();
+    $c->ok(isset($export['files']['abzeichen/abz-sicherung.svg']), 'Export enthält die Abzeichen der Dienstgrade');
+    unlink($badge);
     $c->ok($export['format'] === 'kompanie-app-backup' && count($export['tables']['users']) >= 2 && !isset($export['tables']['sessions']), 'Export enthält Daten und Benutzer, keine Sitzungen');
     $d->request('DELETE', '/events/' . $ev['id']);
     $backup->import((string) json_encode($export));
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Import stellt gelöschte Daten wieder her');
+    $c->ok(is_file($badge), 'Import legt die Abzeichen wieder ab');
+    $kernel->db()->execute('DELETE FROM {ranks} WHERE id = ?', [$rankId]);
+    @unlink($badge);
     $c->ok((int) $kernel->db()->scalar('SELECT COUNT(*) FROM {sessions}') === 0, 'Nach dem Import müssen sich alle neu anmelden');
     $c->ok($kernel->users()->verifyPassword($anna, 'anna-passwort'), 'Passwörter bleiben erhalten');
     $noAdmin = $export;

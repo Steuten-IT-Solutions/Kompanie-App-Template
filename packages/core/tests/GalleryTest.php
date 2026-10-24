@@ -423,6 +423,50 @@ final class GalleryTest extends TestCase
         $this->assertSame(7, $this->drive->downloads);
     }
 
+    public function testOriginalResolutionIsGeneratedWhenOpened(): void
+    {
+        $gallery = $this->app->gallery();
+        $gallery->waitSeconds = 0;
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $this->drive->contents['IMG1'] = JpegMetadataTest::jpegWithMetadata(3000, 2000);
+        $gallery->sync();
+        $gallery->processPending(60);
+        $downloads = $this->drive->downloads;
+        $id = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE drive_file_id = 'IMG1'");
+        $album = (int) $this->app->db->scalar("SELECT album_id FROM {photos} WHERE id = ?", [$id]);
+        $photo = fn (): array => array_values(array_filter($gallery->album($album, false)['photos'], static fn (array $p): bool => $p['id'] === $id))[0];
+
+        // Noch nicht erzeugt: Adresse über die App, die Großansicht zeigt bis dahin large.
+        $this->assertSame('https://example.org/app/foto/' . $id . '/original', $photo()['original']);
+        $res = $gallery->photoForDelivery($id, 'original', false, false);
+        $this->assertSame(200, $res['status']);
+        $this->assertSame([3000, 2000], array_slice((array) getimagesize((string) $res['file']), 0, 2), 'volle Auflösung, nicht 1600');
+        $this->assertStringNotContainsString('GPSLatitude', (string) file_get_contents((string) $res['file']), 'ohne Metadaten');
+        $this->assertSame($downloads + 1, $this->drive->downloads, 'Original einmal aus Drive geladen');
+        $this->assertSame(200, $gallery->photoForDelivery($id, 'original', false, false)['status']);
+        $this->assertSame($downloads + 1, $this->drive->downloads, 'danach aus der Datei');
+        $this->assertStringEndsWith('-original.jpg', $photo()['original'], 'öffentlich: jetzt direkt als Datei');
+
+        // Interne Bilder: Rechte wie bei den anderen Größen.
+        $intern = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE drive_file_id = 'IMG3'");
+        $this->assertSame(401, $gallery->photoForDelivery($intern, 'original', false, false)['status']);
+
+        // Scheitert das Original (z. B. Störung bei Google): 404, und nicht bei jedem Klick erneut aus Drive laden.
+        $this->drive->downloadFails = true;
+        $before = $this->drive->downloads;
+        $this->assertSame(404, $gallery->photoForDelivery($intern, 'original', true, true)['status']);
+        $this->assertSame(404, $gallery->photoForDelivery($intern, 'original', true, true)['status']);
+        $this->assertSame($before + 1, $this->drive->downloads, 'Merker verhindert weitere Downloads');
+        $this->drive->downloadFails = false;
+
+        // Neuer Inhalt in Drive: alle Fassungen samt Original verschwinden.
+        $file = (string) $res['file'];
+        $row = (array) $this->app->db->selectOne('SELECT * FROM {photos} WHERE id = ?', [$id]);
+        $gallery->deleteFiles($row);
+        $this->assertFileDoesNotExist($file);
+    }
+
     public function testBackgroundTaskContinuesWhilePhotosArePending(): void
     {
         $gallery = $this->app->gallery();
@@ -462,6 +506,61 @@ final class GalleryTest extends TestCase
         $this->assertSame(GalleryRepository::FAILED, $db->scalar('SELECT status FROM {photos} WHERE id = ?', [$first]));
         $this->assertSame(0, $gallery->countPending());
         $this->assertSame(0, (int) $db->scalar("SELECT COUNT(*) FROM {photos} WHERE status = 'ready' AND attempts <> 0"), 'fertige Bilder ohne offene Versuche');
+    }
+
+    /**
+     * Nachgebaute RAW-Datei (wie NEF): IFD0 mit Ausrichtung und kleinem Vorschaubild, SubIFD mit großem JPEG.
+     */
+    private static function raw(int $orientation): string
+    {
+        $small = DriveMock::jpeg(160, 120);
+        $large = DriveMock::jpeg(1200, 900);
+        $entry = static fn (int $tag, int $type, int $value): string => pack('vvV', $tag, $type, 1) . ($type === 3 ? pack('vv', $value, 0) : pack('V', $value));
+        $sub = 8 + 2 + 4 * 12 + 4;
+        $data = $sub + 2 + 2 * 12 + 4;
+        $ifd0 = pack('v', 4) . $entry(0x0112, 3, $orientation) . $entry(0x014A, 4, $sub)
+            . $entry(0x0201, 4, $data) . $entry(0x0202, 4, strlen($small)) . pack('V', 0);
+        $ifd1 = pack('v', 2) . $entry(0x0201, 4, $data + strlen($small)) . $entry(0x0202, 4, strlen($large)) . pack('V', 0);
+        return "II*\x00" . pack('V', 8) . $ifd0 . $ifd1 . $small . $large . str_repeat("\x00", 4096);
+    }
+
+    public function testUnreadableFormatsUseRawPreviewOrGoogleThumbnail(): void
+    {
+        $gallery = $this->app->gallery();
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $this->drive->contents = [
+            'IMG1' => self::raw(6), // RAW hochkant: eingebettetes JPEG, gedreht
+            'IMG2' => "II*\x00" . pack('V', 0) . str_repeat("\x00", 64), // z. B. TIFF ohne JPEG: Vorschaubild von Google
+            'IMG3' => 'kaputt', // weder noch: fehlgeschlagen
+        ];
+        $this->drive->thumbnails = ['IMG2'];
+        $gallery->sync();
+        $gallery->processPending(60);
+        $db = $this->app->db;
+        $row = static fn (string $id): array => $db->selectOne('SELECT * FROM {photos} WHERE drive_file_id = ?', [$id]);
+
+        $raw = $row('IMG1');
+        $this->assertSame(GalleryRepository::READY, $raw['status']);
+        $this->assertSame([900, 1200], [(int) $raw['width'], (int) $raw['height']], 'großes JPEG statt Daumennagel, nach der Ausrichtung der RAW-Datei gedreht');
+        $this->assertSame([300, 400], array_slice(getimagesize($gallery->path($raw, 'thumb')), 0, 2));
+
+        $tiff = $row('IMG2');
+        $this->assertSame(GalleryRepository::READY, $tiff['status']);
+        $this->assertSame([1600, 1200], [(int) $tiff['width'], (int) $tiff['height']]);
+        $this->assertSame(['https://lh3.googleusercontent.com/drive-storage/IMG2=s1600'], $this->drive->thumbnailRequests);
+
+        $broken = $row('IMG3');
+        $this->assertSame(GalleryRepository::FAILED, $broken['status']);
+        $this->assertSame('Das Bild kann nicht gelesen werden.', $broken['error'], 'Meldung des Originals, nicht der Ausweichwege');
+
+        // Stürzt PHP am Original immer wieder ab, kommt das Bild nach MAX_ATTEMPTS aus Googles Vorschaubild.
+        $this->drive->thumbnails[] = 'IMG3';
+        $db->update('photos', ['status' => GalleryRepository::PENDING, 'attempts' => GalleryService::MAX_ATTEMPTS], ['id' => (int) $broken['id']]);
+        $downloads = $this->drive->downloads;
+        $gallery->processPending(60);
+        $this->assertSame(GalleryRepository::READY, $row('IMG3')['status']);
+        $this->assertSame($downloads, $this->drive->downloads, 'das Original wird nicht noch einmal geladen');
     }
 
     public function testSameDriveFileTwiceInAlbumIsSyncedOnce(): void

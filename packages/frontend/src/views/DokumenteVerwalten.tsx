@@ -83,7 +83,7 @@ const titleFromFile = (name: string) =>
 
 /** Wer Dokumente pflegt (manage_documents), verwaltet hier alle Dokumente und ihre Kategorien. */
 export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.documents);
+  const { data, error, loading, reload, setData } = useAsync(api.documents, [], 'documents');
   const fileInput = useRef<HTMLInputElement>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);

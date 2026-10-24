@@ -31,6 +31,26 @@ final class CatalogRepository
         return $this->db->insert('point_catalog', ['title' => $title, 'points' => $points, 'active' => 1, 'sort' => $sort]);
     }
 
+    /** Größter sort-Wert (0 ohne Einträge): Neue Einträge kommen ans Ende. */
+    public function maxSort(): int
+    {
+        return (int) ($this->db->scalar('SELECT MAX(sort) FROM {point_catalog}') ?? 0);
+    }
+
+    /**
+     * Reihenfolge auf einmal setzen, in einer Transaktion (keine halbe Reihenfolge).
+     *
+     * @param array<int, int> $sortById ID => sort
+     */
+    public function reorder(array $sortById): void
+    {
+        $this->db->transaction(function () use ($sortById): void {
+            foreach ($sortById as $id => $sort) {
+                $this->db->update('point_catalog', ['sort' => $sort], ['id' => $id]);
+            }
+        });
+    }
+
     /** @param array<string, mixed> $data */
     public function update(int $id, array $data): void
     {

@@ -326,7 +326,7 @@ final class Kernel
             $this->sendManifest();
         } elseif ($path === '/sw.js') {
             $this->sendServiceWorker();
-        } elseif (preg_match('#^/foto/(\d+)/(thumb|large)$#', $path, $m)) {
+        } elseif (preg_match('#^/foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendPhoto((int) $m[1], $m[2]);
         } elseif (preg_match('#^/dokument/(\d+)$#', $path, $m)) {
@@ -378,6 +378,8 @@ final class Kernel
     {
         $method = $this->http->method();
         header('Cache-Control: no-store');
+        // Daten der App (auch öffentliche wie Mitgliederliste und Ämter) nicht in Suchmaschinen (Issue #112).
+        header('X-Robots-Tag: noindex');
         $this->securityHeaders();
         try {
             // Erst Herkunft, Inhaltstyp und CSRF-Token prüfen, dann den Inhalt lesen.

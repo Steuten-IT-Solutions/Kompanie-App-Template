@@ -20,6 +20,8 @@ export const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben` },
   { key: 'manage_polls', label: `${sec.polls}: anlegen, beenden und alle Ergebnisse sehen` },
   { key: 'manage_inventory', label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf` },
+  { key: 'manage_offices', label: `${sec.offices}: Gruppen, Ämter und Amtszeiten pflegen, auch frühere` },
+  { key: 'manage_lists', label: `${sec.lists}: zum Drucken und als CSV anlegen und bearbeiten` },
   { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
   { key: 'promote_users', label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)' },
 ];

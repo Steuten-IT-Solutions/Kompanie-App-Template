@@ -1,36 +1,83 @@
 ---
-titel: Zustand und Statusmeldungen
-reihenfolge: 140
+titel: Zustand und Updates
+reihenfolge: 130
 rechte: [manage_settings]
 ---
-Unter **Verwaltung → Einstellungen → Zustand und Updates** zeigt die Karte **Zustand der App** mit einer Ampel, ob alles läuft. Jede Zeile hat einen kurzen Text, der sagt, was los ist und was zu tun ist. Mit **Zustand neu laden** holst du den aktuellen Stand.
+Hier siehst du auf einen Blick, ob die App rund läuft, welche Version installiert ist und ob es Updates gibt. Außerdem findest du hier das Fehlerprotokoll und die Statusmeldungen an die Betreuer der App.
 
-## Die Zeilen
-- **Updates**: ob die App aktuell ist, ob ein Update ansteht oder fehlgeschlagen ist. Mehr unter [Updates und Datensicherung](seite:admin-updates-und-sicherung).
+![Die Seite Zustand und Updates mit der Ampel](bild:admin-zustand)
+
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Zustand und Updates**.
+
+## Was du hier siehst
+### Zustand der App
+Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was los ist und was zu tun ist.
+- **Updates**: ob die App aktuell ist, ob ein Update ansteht oder fehlgeschlagen ist.
 - **{bereich.gallery}**: wann der letzte Abgleich mit Google Drive war, ob er geklappt hat und ob Bilder noch aufbereitet werden oder sich nicht laden ließen.
-- **{bereich.calendar}**: ob und wie der Kalender eingerichtet ist und ob die Verbindung mit Google ihn lesen darf.
-- **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen wurde.
-- **Server**: PHP-Version und Datenbank; gelb, wenn auf dem Webspace weniger als 200 MB frei sind.
+- **Kalender**: ob und wie der Kalender eingerichtet ist und ob die Verbindung mit Google ihn lesen darf.
+- **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen bzw. in Google Drive abgelegt wurde.
+- **Server**: welche PHP-Version und Datenbank laufen; gelb, wenn auf dem Webspace weniger als 200 MB frei sind.
 - **Push-Benachrichtigungen**: wie viele Geräte angemeldet sind, oder was dem Server fehlt, um Benachrichtigungen zu senden.
+- Nur ohne WordPress: **Schutz der Daten** (ob Datenbank und Zugangsdaten aus dem Internet abrufbar wären; ist die Zeile rot, lass das sofort beim Hoster beheben) und **Hintergrundaufgaben** (ob ein Cronjob beim Hoster die Aufgaben erledigt, mit der Adresse dafür).
 
-Ohne WordPress kommen zwei Zeilen dazu:
-- **Schutz der Daten**: ob die Datenbank und die Zugangsdaten aus dem Internet abrufbar wären. Ist diese Zeile rot, lass das sofort beim Hoster beheben.
-- **Hintergrundaufgaben**: ob ein Cronjob beim Hoster die Aufgaben erledigt (Abgleich von {bereich.gallery} und {bereich.calendar}, Updates) oder ob sie nur nach Seitenaufrufen laufen. Hier steht auch die Adresse für den Cronjob.
+Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erledigt werden, z. B. eine neue Datensicherung. **Rot** heißt, etwas funktioniert nicht. **Grau** heißt ausgeschaltet, noch nicht eingerichtet oder in dieser Installation nicht verfügbar. Ist bei euch eine Kontaktadresse der Betreuer hinterlegt, steht sie darunter bei **Hilfe**.
 
-## Die Farben
-- **Grün**: alles in Ordnung.
-- **Gelb** (in der Farbe eurer App): etwas sollte erledigt werden, z. B. eine neue Datensicherung.
-- **Rot**: etwas funktioniert nicht; der Text sagt, was zu tun ist.
-- **Grau**: ausgeschaltet, noch nicht eingerichtet oder in dieser Installation nicht verfügbar.
+### Updates
+- **Installiert: …** mit dem Zeitpunkt der letzten Prüfung und dem Verweis **Was ist neu**.
+- **✓ Die App ist auf dem neuesten Stand.** oder **Neue Version: …** mit dem Knopf **Jetzt auf … aktualisieren**.
+- **Nach Updates suchen** und **Zustand neu laden**.
+- **Updates automatisch einspielen (empfohlen)** und **Vorabversionen erhalten (zum Testen)**.
+- **Auf eine ältere Version zurück**: zum Aufklappen, wenn es frühere Versionen gibt.
+- **Statusmeldungen an die Betreuer der App senden**: nur, wenn eure App Statusmeldungen vorsieht.
 
-Was du bei typischen Meldungen tun kannst, steht unter [Häufige Probleme](seite:haeufige-probleme). Ist bei euch eine Kontaktadresse der Betreuer hinterlegt, steht sie unter der Ampel bei **Hilfe**.
+### Fehlerprotokoll
+Die Fehler der letzten 14 Tage (höchstens 50) mit Zeitpunkt, Art des Fehlers und vollständigem Fehlertext, mit den Knöpfen **Kopieren** und **Leeren**. Gab es keine, steht dort **Keine Fehler in den letzten 14 Tagen.**
 
-## Statusmeldungen an die Betreuer
-Wenn du zustimmst, schickt die App den Betreuern der App stündlich ein kurzes Lebenszeichen (u. a. Version, Farbe der Ampel je Zeile, Fehlercodes der letzten 24 Stunden mit Ursache, z. B. „Kalender-Link: HTTP 404“ oder „Zeitüberschreitung“) und meldet schwere Fehler sofort, z. B. ein gescheitertes Update. Namen, Inhalte und Fehlertexte werden nie gesendet. So sehen die Betreuer Probleme früh.
+![Das Fehlerprotokoll mit zwei Einträgen](bild:admin-zustand-fehlerprotokoll)
 
-Bei der Einrichtung ist der Haken dafür schon gesetzt; du kannst ihn dort entfernen oder später unter **Zustand und Updates** den Schalter **Statusmeldungen an die Betreuer der App senden** umstellen. Dort siehst du unter **Was genau gesendet wird**, welche Angaben das Lebenszeichen enthält, und wann die letzte Meldung ging. Die Zustimmung lässt sich jederzeit zurücknehmen; dann werden auch die gezählten Fehler gelöscht. Fehlt der Schalter, sind Statusmeldungen in eurer App nicht vorgesehen.
+## So gehst du vor
+### Den aktuellen Stand holen
+1. Tippe auf **Zustand neu laden**.
 
-## Fehlerprotokoll
-Unter **Zustand und Updates** steht außerdem das **Fehlerprotokoll**: die Fehler der letzten 14 Tage (höchstens 50) mit dem vollständigen Fehlertext, auch ohne Zustimmung zu den Statusmeldungen. Es bleibt auf eurem Server und wird nicht gesendet. Gleiche Fehler direkt hintereinander stehen nur einmal da, mit Anzahl und Zeitraum. Adressen sind auf den Server gekürzt (so bleibt z. B. ein geheimer Kalender-Link geheim).
+### Eine neue Version einspielen
+1. Tippe auf **Nach Updates suchen**. Die App sucht ohnehin einmal am Tag selbst.
+2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert bis zu zwei Minuten.
+3. Danach lädt die App neu.
 
-Sollen die Betreuer bei einem Problem helfen, tippe auf **Kopieren** und schick ihnen den Text. Sieh ihn vorher kurz durch: Fehlertexte können Namen oder Inhalte enthalten, z. B. wenn ein Datenbankfehler den Wert eines Eintrags nennt. **Leeren** löscht das Protokoll, z. B. nachdem ein Problem behoben ist.
+Kann die neue Version auf eurem Server nicht laufen (z. B. zu alte PHP- oder WordPress-Version, fehlende Schreibrechte), steht der Grund darüber und der Knopf ist gesperrt. Das muss zuerst behoben werden.
+
+### Eine neue Hauptversion einspielen
+1. Lies die Hinweise zur Version (unter **Was ist neu** bzw. von den Betreuern der App).
+2. Tippe auf **Hauptversion einspielen** und bestätige die Rückfrage.
+
+Eine neue Hauptversion spielt die App nie automatisch ein. Vorher sichert sie die Daten. Zurück auf die bisherige Hauptversion geht es danach nicht per Knopf, nur mit Hilfe der Betreuer.
+
+### Auf eine ältere Version zurückgehen
+1. Tippe auf **Auf eine ältere Version zurück**.
+2. Wähle bei **Version** eine frühere Version derselben Hauptversion.
+3. Tippe auf **Zurückrollen** und bestätige die Rückfrage.
+
+Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein, erst wieder die nächste neuere.
+
+### Das Fehlerprotokoll an die Betreuer schicken
+1. Sieh das Protokoll kurz durch: Fehlertexte können Namen oder Inhalte enthalten.
+2. Tippe auf **Kopieren** und füge den Text in eine Nachricht an die Betreuer ein. Klappt das Kopieren nicht, zeigt die App den Text zum Markieren.
+3. Ist das Problem behoben, kannst du mit **Leeren** das Protokoll löschen.
+
+## Gut zu wissen
+- **Automatische Updates:** Solange **Updates automatisch einspielen (empfohlen)** an ist, spielt die App neue Versionen derselben Hauptversion selbst ein. Sie sucht dafür einmal am Tag und spielt eine passende Version dabei gleich ein; eine feste Uhrzeit gibt es nicht. Ohne Cronjob beim Hoster passiert das nur, wenn jemand die App (mit WordPress: die Webseite) aufruft; wird sie selten aufgerufen, kommen Updates entsprechend später (siehe **Für Fortgeschrittene** unten). Mit WordPress kann die Webseite automatische Updates sperren; dann steht das hier, und du spielst neue Versionen von Hand ein.
+- **Vorsorge:** Vor Updates mit Änderungen an der Datenbank und vor einer neuen Hauptversion sichert die App die Daten automatisch auf dem Server; die letzten fünf dieser Sicherungen bleiben. Schlägt ein Update fehl, läuft die bisherige Version weiter und der Grund steht hier.
+- **Zurückgezogene Version:** Wird eine fehlerhafte Version zurückgezogen, wechselt die App von selbst auf eine geprüfte Version (außer automatische Updates sind gesperrt); mit **Jetzt auf … wechseln** geht das sofort. Gibt es noch keine geprüfte Version, meldest du dich bei den Betreuern der App.
+- **Vorabversionen:** Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist, noch bevor sie für alle freigegeben wird. Das ist für eine Testseite gedacht. Schaltest du es aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
+- **Statusmeldungen:** Wenn du zustimmst, schickt die App den Betreuern stündlich ein kurzes Lebenszeichen (u. a. Version, Farbe der Ampel je Zeile, Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“) und meldet schwere Fehler sofort. Namen, Inhalte und Fehlertexte werden nie gesendet. Was genau gesendet wird, zeigt **Was genau gesendet wird (Beispiel: Lebenszeichen)**; darüber steht, wann die letzte Meldung ging. Nimmst du die Zustimmung zurück, werden auch die gezählten Fehler gelöscht.
+- **Fehlerprotokoll:** Es bleibt auf eurem Server und wird nicht gesendet, auch ohne Zustimmung zu den Statusmeldungen. Gleiche Fehler direkt hintereinander stehen nur einmal da, mit Anzahl und Zeitraum. Adressen sind auf den Server gekürzt; so bleibt z. B. eine geheime Kalender-Adresse geheim.
+- Bekommt eure Installation keine Updates über die App, steht im Abschnitt **Updates** nur die installierte Version.
+
+> **Für Fortgeschrittene:** Ein *Cronjob* ist ein Auftrag im Kundenmenü eures Hosters, der eine Adresse regelmäßig aufruft. Ohne ihn erledigt die App ihre Hintergrundaufgaben (Abgleich von {bereich.gallery} und Kalender, Updates) nach Seitenaufrufen. Zuverlässiger ist ein Cronjob, der alle 15 Minuten die Adresse aufruft, die bei **Hintergrundaufgaben** steht. Mit WordPress gibt es diese Zeile nicht; dort ersetzt der Cronjob WP-Cron, wie in der Anleitung zur Installation mit WordPress beschrieben.
+
+Was du bei typischen Meldungen tun kannst, steht unter [Häufige Probleme](seite:haeufige-probleme).
+
+## Siehe auch
+- [Was ist neu](seite:admin-neuerungen)
+- [Datensicherung](seite:admin-updates-und-sicherung)

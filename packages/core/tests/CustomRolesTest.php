@@ -43,14 +43,14 @@ final class CustomRolesTest extends TestCase
     {
         // Feste Rollen und die Standardrollen der eingeschalteten Bereiche (TestApp schaltet alle ein).
         $roles = $this->call('GET', '/admin/roles')->data;
-        $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'events', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'inventory', Roles::ADMIN], array_column($roles, 'key'));
-        $this->assertSame(['Gast', 'Anwärter', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Dokumente verwalten', 'Schwarzes Brett verwalten', 'Umfragen verwalten', 'Inventar verwalten', 'Admin'], array_column($roles, 'label'));
-        $this->assertSame(1, $roles[13]['users'], 'ein Admin');
-        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[2]['system'] && $roles[13]['system']);
-        $this->assertFalse($roles[2]['deletable'], 'Mitglied ist die Rolle neuer Konten');
-        $this->assertSame(['calendar'], $roles[1]['capabilities'], 'Anwärter: nur der interne Kalender');
-        $this->assertSame(['member'], $roles[2]['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt angezeigt');
-        $this->assertTrue($roles[4]['deletable']);
+        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'events', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'inventory', 'offices', 'lists', Roles::ADMIN], array_column($roles, 'key'));
+        $this->assertSame(['Gast', 'Kamerad', 'Termine verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Dokumente verwalten', 'Schwarzes Brett verwalten', 'Umfragen verwalten', 'Inventar verwalten', 'Ämter verwalten', 'Listen verwalten', 'Admin'], array_column($roles, 'label'));
+        $this->assertSame(1, $roles[14]['users'], 'ein Admin');
+        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[14]['system']);
+        $this->assertFalse($roles[1]['deletable'], 'Mitglied ist die Rolle neuer Konten');
+        $this->assertSame(['member'], $roles[1]['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt angezeigt');
+        $this->assertTrue($roles[3]['deletable']);
+        $this->assertSame([true, false], [$roles[1]['new_accounts'], $roles[3]['new_accounts']], 'neue Konten: Mitglied, eigene Rollen nur nach Einstellung');
         $this->assertSame('Kamerad', array_column($this->app->api()->config()['roles'], 'label', 'key')[Roles::MEMBER]);
         // kompanie.json gilt nur für die festen Rollen beim ersten Start.
         $again = TestApp::create(TestApp::connection(), settings: new MemorySettings([RoleService::SETTING => $this->app->settings->get(RoleService::SETTING)]), config: ['labels' => ['roles' => ['member' => 'Mitglied']]]);

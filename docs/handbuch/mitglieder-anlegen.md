@@ -1,55 +1,45 @@
 ---
-titel: Mitglieder anlegen
+titel: Mitglied anlegen
 reihenfolge: 70
 rechte: [create_users]
 ---
-Wer Mitglieder anlegen darf ({rolle.admin} oder eine Rolle mit diesem Recht), findet in der App den Bereich **Verwaltung** (unten in der Leiste, wenn es mehrere Bereiche gibt). Dort öffnet sich zuerst die **Mitgliederliste**. Hast du in der Verwaltung noch weitere Aufgaben, wechselst du über das Menü oben (es zeigt gerade **Mitglieder**).
+Hier legst du ein neues Konto für eine Person an. Die App erzeugt dabei ein Startpasswort, das du der Person persönlich weitergibst.
 
-## Die Mitgliederliste
-- Oben steht **+ Mitglied anlegen**, darunter das Suchfeld **Mitglied suchen …**: Es filtert die Liste nach dem Namen.
-- **Auch {rolle.candidate} anzeigen** nimmt {rolle.candidate} und Personen mit Rollen nur für den internen Kalender dazu. Wer Mitglieder anlegen darf, hat dieses Häkchen von Anfang an gesetzt.
-- **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)** gibt es nur für alle, die auch Rollen vergeben dürfen.
-- **Sortierung**: nach Nachname, nach Vorname oder (wer {bereich.points} vergeben darf) nach {bereich.points}. Der Knopf **Reihenfolge** daneben dreht sie um: bei Namen A → Z oder Z → A, bei {bereich.points} die meisten oder die wenigsten zuerst. Eine neu gewählte Sortierung beginnt mit A → Z bzw. mit den meisten {bereich.points}. Dein Gerät merkt sich die Wahl.
-- Jede Zeile zeigt den Namen, nach Nachname sortiert als „Nachname, Vorname“; wer nicht {rolle.member} ist, hat ein Schild mit der Rolle. Je nach deinen Rechten stehen dabei auch {begriff.rank}, {bereich.titles}, {bereich.points} und offene {bereich.penalties}. Sobald es Fotos gibt, steht vorn ein kleines rundes Foto; wer keines hat, bekommt dort seine Anfangsbuchstaben.
+![Formular „Mitglied anlegen“](bild:mitglieder-anlegen)
 
-Ein Tipp auf eine Person öffnet ihre Seite. Unter dem Namen wählst du im Menü die Unterseite: **Übersicht**, **Konto und Rolle**, {bereich.points}, {bereich.penalties}, {begriff.rank}, {bereich.titles} und **Geburtstag**. Du siehst nur die Unterseiten, für die du die Rechte hast und deren Bereich eingeschaltet ist. **‹ Alle Mitglieder** (oder die Zurück-Taste) führt zurück zur Liste, und zwar an dieselbe Stelle, mit demselben Suchbegriff und denselben Filtern. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf **+ Mitglied anlegen**.
 
-## Neues Mitglied
-1. In der Mitgliederliste **+ Mitglied anlegen** tippen.
-2. **Vorname** und **Nachname** eintragen. Nur der Vorname ist Pflicht; ohne Nachnamen geht es z. B. für ein Funktionskonto wie „Kassenwart“. **Benutzername** und **E-Mail** sind freiwillig; ohne Benutzernamen bildet die App ihn aus dem Namen. Ein Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten. Benutzername und E-Mail dürfen nicht schon vergeben sein.
-3. Bei **Rolle** {rolle.member} oder {rolle.candidate} wählen. Ist der Bereich {bereich.birthdays} eingeschaltet, kannst du gleich den **Geburtstag** eintragen (freiwillig, das Jahr auch). Wer auch {bereich.points} bzw. {bereich.ranks} verwalten darf, kann für {rolle.member} gleich den Anfangsbestand an {bereich.points} (mit **Stand vom**) und den {begriff.rank} eintragen – gedacht für die Übernahme bestehender Mitglieder. Unter **Foto (optional)** kannst du mit **Foto auswählen** gleich ein Foto der Person mitgeben (siehe unten unter **Foto eines Mitglieds**).
-4. **Mitglied anlegen** tippen. Die App zeigt die Zugangsdaten: den Link zur Installationsanleitung, Benutzername und Startpasswort. Das Startpasswort steht **nur dieses eine Mal** da: **Ausdrucken** (ein Zettel je Person), **Zugangsdaten kopieren** oder **Teilen …** (wenn das Gerät es kann) und persönlich weitergeben. Eine E-Mail verschickt die App nicht.
+## Was du hier siehst
+- **‹ Alle Mitglieder**: zurück zur Liste.
+- **Mehrere auf einmal anlegen**: eine Liste für mehrere Personen (siehe [Mehrere Mitglieder anlegen](seite:mitglieder-mehrere-anlegen)).
+- **Aus Datei importieren (Excel oder CSV)**: eine bestehende Mitgliederliste übernehmen (siehe [Mitglieder importieren](seite:mitglieder-import)).
+- **Vorname** und **Nachname**, **Benutzername (optional)** und **E-Mail (optional)**.
+- **Rolle**: nur, wenn ein {rolle.admin} weitere Rollen für neue Konten freigegeben hat (z. B. Anwärter). Sonst werden neue Konten {rolle.member}.
+- **{bereich.points} (Anfangsbestand, optional)** mit **Stand vom** und **{begriff.rank} (optional)**: nur für {rolle.member} und nur, wenn du auch {bereich.points} bzw. {bereich.ranks} verwalten darfst. Gedacht für die Übernahme bestehender Mitglieder.
+- **Geburtstag (optional)** mit Tag, Monat und Jahr: nur, wenn die Kompanie {bereich.birthdays} nutzt.
+- **Foto (optional)** mit **Foto auswählen**.
+- **Mitglied anlegen**: legt das Konto an.
 
-Mit **Weiteres Mitglied** legst du gleich das nächste an. Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Anmelden und Konto](seite:anmelden-und-konto).
+## So gehst du vor
+### Ein Mitglied anlegen
+1. Trage **Vorname** und **Nachname** ein.
+2. Trage, wenn gewünscht, Benutzername, E-Mail, Geburtstag und die übrigen Angaben ein, und wähle mit **Foto auswählen** ein Foto.
+3. Tippe auf **Mitglied anlegen**.
+4. Die App zeigt die Zugangsdaten: den Link zum Installieren der App, Benutzername und Passwort. Tippe auf **Ausdrucken** (ein Zettel je Person), **Zugangsdaten kopieren** oder **Teilen …** und gib sie persönlich weiter.
+5. Mit **Weiteres Mitglied** legst du gleich das nächste an; **‹ Zur Mitgliederliste** führt zurück.
 
-## Mehrere auf einmal
-Oben im Formular **+ Mitglied anlegen** führt **Mehrere auf einmal anlegen** zu einer Liste. Die **Rolle für alle** gilt für jede Person. Je Person trägst du Vor- und Nachnamen und, wenn gewünscht, Benutzername, E-Mail, Geburtstag, Foto und (bei {rolle.member}) den Anfangsbestand an {bereich.points} ein; den {begriff.rank} trägst du danach einzeln nach. **+ Weitere Person** fügt Zeilen hinzu (bis 50), leere Zeilen werden übersprungen. Dann **Alle anlegen**.
+![Zugangsdaten nach dem Anlegen](bild:mitglieder-anlegen-zugangsdaten)
 
-Die App prüft zuerst alle Einträge: Ist einer ungültig (z. B. ein vergebener Benutzername), wird niemand angelegt, und die Meldung nennt die Zeile. Die Fotos lädt die App danach einzeln hoch; klappt eines nicht, steht das bei der Person, und du trägst das Foto in ihrer **Übersicht** nach. Danach stehen die Zugangsdaten aller neuen Konten auf einer Seite, zum Ausdrucken als Zettel je Person oder zum Kopieren.
+## Gut zu wissen
+- Nur der Vorname ist Pflicht; ohne Nachnamen geht es z. B. für ein Konto wie „Kassenwart“.
+- Ohne Benutzernamen bildet die App ihn aus dem Namen. Ein Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten. Benutzername und E-Mail dürfen nicht schon vergeben sein.
+- Das Startpasswort steht **nur dieses eine Mal** da. Eine E-Mail verschickt die App nicht. **Teilen …** gibt es nur, wenn dein Gerät es kann.
+- Andere Rollen vergibt danach, wer Rollen vergeben darf (unter **Konto und Rolle** auf der Seite des Mitglieds).
+- Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Mein Konto](seite:anmelden-und-konto).
+- Bitte lade ein Foto nur mit dem Einverständnis der Person hoch. Erlaubt sind JPG, PNG und WebP.
 
-Andere Rollen vergibt danach, wer Rollen vergeben darf.
-
-## Foto eines Mitglieds
-Jedes Konto kann ein Foto haben. Hochladen, ersetzen und entfernen darf, wer Mitglieder anlegen darf, und zwar bei allen Konten, die er auch sonst verwalten darf (siehe den Hinweis unten). Die Person selbst sieht ihr Foto unter **Konto**, ändert es aber nicht.
-
-- Beim Anlegen: im Formular unter **Foto (optional)** (einzeln oder bei **Mehrere auf einmal**).
-- Später: im Mitglied unter **Übersicht** **Foto hochladen**, **Foto ersetzen** oder **Foto entfernen**. Das gilt sofort.
-
-Erlaubt sind Fotos als JPG, PNG oder WebP; Handyfotos gehen direkt aus der Fotoauswahl. Die App verkleinert das Foto schon auf dem Gerät, der Server speichert es in zwei kleinen Größen und ohne Angaben wie den Aufnahmeort. Am besten wirkt ein Porträt mit dem Gesicht in der Mitte: Die App zeigt das Foto rund und schneidet es dafür zu.
-
-Sehen kann das Foto nur, wer angemeldet ist: die Person selbst und alle, die die Mitgliederliste in der Verwaltung sehen (z. B. wer {bereich.points} oder {bereich.penalties} vergibt). Andere {rolle.member} sehen es nicht. Bitte lade ein Foto nur mit dem Einverständnis der Person hoch.
-
-## {rolle.candidate} aufnehmen
-{rolle.candidate} nehmen vor der Aufnahme schon am Kompanieleben teil: Sie sehen den internen Kalender, aber nicht den Mitgliederbereich. Ist es so weit, im Mitglied unter **Konto und Rolle** auf **Als {rolle.member} aufnehmen** tippen. Das geht nur von {rolle.candidate} zu {rolle.member}.
-
-## Angaben ändern und Konto löschen
-Im Mitglied unter **Konto und Rolle**, Abschnitt **Konto**: **Angaben ändern** für Vor- und Nachname, E-Mail und Benutzername. Mit WordPress stehen Vor- und Nachname auch im Profil des Benutzers der Webseite. Alle Daten bleiben erhalten. Nach einem neuen Benutzernamen ist die Person auf allen Geräten abgemeldet und meldet sich mit dem neuen Namen wieder an. Mit WordPress ändert den Benutzernamen von Benutzern der Webseite (z. B. Redakteure, Administratoren) nur, wer sie in WordPress bearbeiten darf.
-
-Konten aus der Zeit, als es nur ein Namensfeld gab, hat die App beim Update geteilt: Das letzte Wort ist der Nachname, der Rest der Vorname. Bei Namen wie „Maria von Berg“ stimmt das nicht; dann hier korrigieren. Mit WordPress bleiben Vor- und Nachnamen, die schon im Profil gepflegt waren.
-
-**Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, Geburtstag, Foto, Antworten bei Umfragen und Benachrichtigungen; ohne WordPress werden auch alle ihre Geräte abgemeldet. Was die Person für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“ statt des Namens. Zur Sicherheit fragt die App nach und lässt den Namen (Vor- und Nachname) eintippen. Mit WordPress heißt der Knopf **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Ein Konto ganz löschen geht dort im WordPress-Backend unter *Benutzer*; auch dann löscht die App alle seine Daten. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen.
-
-## Passwort vergessen
-Im Mitglied unter **Konto und Rolle** auf **Passwort vergessen? Neues Startpasswort erzeugen** tippen. Das bisherige Passwort gilt danach nicht mehr, und das Mitglied wird auf allen Geräten abgemeldet. Das neue Startpasswort steht nur jetzt da; darunter steht der Link zur Installationsanleitung, falls die App noch nicht auf dem Handy ist.
-
-> Wer kein {rolle.admin} ist, setzt nur Passwörter (und ändert bzw. löscht nur Konten und Fotos) von {rolle.candidate} und von Personen mit Mitgliederbereich zurück, die keine weiteren Rechte als er selbst haben und weder „Mitglieder anlegen“ noch „Rollen vergeben“ dürfen. Passwörter von Admins setzen nur Admins zurück. Mit WordPress gilt für Konten, die die Webseite bearbeiten oder Benutzer verwalten dürfen, das Recht aus WordPress.
+## Siehe auch
+- [Mitgliederliste](seite:mitgliederliste)
+- [Seite eines Mitglieds](seite:mitglied-uebersicht)
+- [Ehemalige](seite:ehemalige-mitglieder)

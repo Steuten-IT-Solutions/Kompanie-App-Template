@@ -52,6 +52,16 @@ final class GalleryService
     private const IMAGE_LOCKS = 64;
     public const INTERN_FOLDER = 'intern';
     public const SIZES = ['thumb' => 400, 'large' => 1600];
+    /**
+     * Originalauflösung für die Großansicht (die 1600er erscheint sofort, diese wird nachgeladen). Erst erzeugt, wenn
+     * jemand das Bild öffnet: aus dem Original in Drive, neu als JPEG ohne Metadaten (kein GPS-Ort), höchstens
+     * ORIGINAL_EDGE Pixel. So belegen nur angesehene Bilder Platz, und der Abgleich bleibt so schnell wie bisher.
+     */
+    public const ORIGINAL = 'original';
+    public const ORIGINAL_EDGE = 8192;
+    public const ORIGINAL_QUALITY = 90;
+    /** Merker „Original wird erzeugt oder ist gescheitert“; erst nach so vielen Sekunden wieder versuchen. */
+    public const ORIGINAL_RETRY = 86400;
     /** So oft wird ein Bild aufbereitet, bevor es als dauerhaft fehlerhaft gilt. */
     public const MAX_ATTEMPTS = 5;
     /** Höchstens so viele fehlgeschlagene Bilder zeigt Einstellungen → Galerie. */
@@ -448,7 +458,11 @@ final class GalleryService
     {
         $attempts = (int) ($photo['attempts'] ?? 0);
         if ($attempts >= self::MAX_ATTEMPTS) {
-            return $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+            // Das Original bringt PHP jedes Mal zum Abbruch (Speicher, Zeitlimit); Googles kleineres Vorschaubild geht oft noch.
+            // Vorher als fehlgeschlagen vermerken: Bricht auch das ab, wird es nicht bei jedem Lauf wieder versucht.
+            $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+            $size = $this->fromDriveThumbnail($photo);
+            return $size !== null && $this->markReady($photo, $size);
         }
         // Den Versuch vorab vermerken: Bricht PHP mittendrin ab (Speicher, Zeitlimit), kommt das Bild
         // beim nächsten Lauf nach den anderen dran (nextPending) und hält sie nicht auf.
@@ -459,16 +473,68 @@ final class GalleryService
             return $this->markFailed($photo, $e->getMessage());
         }
         try {
-            $size = null;
-            foreach (self::SIZES as $name => $max) {
-                $size = $this->images->resizeToJpeg($tmp, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
-            }
+            $size = $this->render($photo, $tmp);
         } catch (\Throwable $e) {
-            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException
-            return $this->markFailed($photo, $e->getMessage());
+            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException.
+            // Formate, die der Server nicht lesen kann (RAW, TIFF, oft auch HEIC): erst das eingebettete JPEG
+            // einer RAW-Datei, dann das Vorschaubild von Google.
+            $size = $this->fromRawPreview($photo, $tmp) ?? $this->fromDriveThumbnail($photo);
+            if ($size === null) {
+                return $this->markFailed($photo, $e->getMessage());
+            }
         } finally {
             @unlink($tmp);
         }
+        return $this->markReady($photo, $size);
+    }
+
+    /**
+     * Beide Größen aus einer Bilddatei.
+     *
+     * @return array{width: int, height: int}|null Größe der Großansicht
+     */
+    private function render(array $photo, string $file): ?array
+    {
+        $size = null;
+        foreach (self::SIZES as $name => $max) {
+            $size = $this->images->resizeToJpeg($file, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
+        }
+        return $size;
+    }
+
+    /** @return array{width: int, height: int}|null */
+    private function fromRawPreview(array $photo, string $file): ?array
+    {
+        $preview = $this->files->tempFile();
+        try {
+            return RawPreview::extract($file, $preview, self::SIZES['thumb']) ? $this->render($photo, $preview) : null;
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            @unlink($preview);
+        }
+    }
+
+    /** @return array{width: int, height: int}|null */
+    private function fromDriveThumbnail(array $photo): ?array
+    {
+        try {
+            $thumb = $this->drive->thumbnail((string) $photo['drive_file_id'], self::SIZES['large']);
+        } catch (\RuntimeException) {
+            return null;
+        }
+        try {
+            return $this->render($photo, $thumb);
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            @unlink($thumb);
+        }
+    }
+
+    /** @param array{width: int, height: int}|null $size */
+    private function markReady(array $photo, ?array $size): bool
+    {
         $this->repo->updatePhoto((int) $photo['id'], [
             'status' => GalleryRepository::READY,
             'error' => '',
@@ -503,15 +569,23 @@ final class GalleryService
 
     public function deleteFiles(array $photo): void
     {
-        foreach (array_keys(self::SIZES) as $size) {
+        foreach ([...array_keys(self::SIZES), self::ORIGINAL] as $size) {
             $this->files->delete(self::relativePath($photo, $size), !(int) $photo['is_intern']);
         }
+        $this->files->delete(self::markerPath($photo), false);
     }
 
-    /** Öffentliche fertige Bilder direkt als Datei, sonst über die App. */
+    /** Merker für die Originalauflösung, immer im geschützten Verzeichnis (nie öffentlich abrufbar). */
+    private static function markerPath(array $photo): string
+    {
+        return '.original-' . $photo['file_key'] . '.merker';
+    }
+
+    /** Öffentliche fertige Bilder direkt als Datei, sonst über die App (das Original erst, wenn es erzeugt ist). */
     public function url(array $photo, string $size): string
     {
-        if (!(int) $photo['is_intern'] && $photo['status'] === GalleryRepository::READY) {
+        if (!(int) $photo['is_intern'] && $photo['status'] === GalleryRepository::READY
+            && ($size !== self::ORIGINAL || is_file($this->path($photo, $size)))) {
             return $this->files->publicUrl(self::relativePath($photo, $size));
         }
         return $this->env->photoUrl((int) $photo['id'], $size);
@@ -542,7 +616,7 @@ final class GalleryService
      */
     public function deliverPhoto(int $id, string $size, \Closure $access): array
     {
-        if (!isset(self::SIZES[$size])) {
+        if (!isset(self::SIZES[$size]) && $size !== self::ORIGINAL) {
             return ['status' => 404];
         }
         $photo = $this->repo->photo($id);
@@ -563,6 +637,12 @@ final class GalleryService
         if ($photo['status'] === GalleryRepository::FAILED) {
             return ['status' => 404];
         }
+        if ($size === self::ORIGINAL) {
+            // Ohne Original zeigt die Großansicht einfach die 1600er weiter (404 statt Platzhalter).
+            $file = $photo['status'] === GalleryRepository::READY ? $this->original($photo) : null;
+            return $file === null ? ['status' => 404]
+                : ['status' => 200, 'file' => $file, 'etag' => FileCache::etag(self::relativePath($photo, $size), $file), 'intern' => $intern];
+        }
         if ($photo['status'] === GalleryRepository::READY && !is_file($file)) {
             // Datei fehlt (z. B. gelöscht): neu aufbereiten.
             $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::PENDING, 'attempts' => 0]);
@@ -582,6 +662,77 @@ final class GalleryService
             $file = $this->path($photo, $size);
         }
         return ['status' => 200, 'file' => $file, 'etag' => FileCache::etag(self::relativePath($photo, $size), $file), 'intern' => $intern];
+    }
+
+    /**
+     * Pfad der Fassung in Originalauflösung; erzeugt sie bei Bedarf (Sperre je Bild, höchstens REQUEST_SLOTS
+     * gleichzeitig). null, wenn es sie nicht gibt: gerade kein Platz frei, oder der letzte Versuch ist keinen Tag her
+     * und gescheitert (Format, Speicher, Zeitlimit). Der Merker wird vor dem Versuch geschrieben und erst nach Erfolg
+     * gelöscht: Bricht PHP mittendrin ab, lädt nicht jeder weitere Klick das Original erneut aus Drive.
+     */
+    private function original(array $photo): ?string
+    {
+        $file = $this->path($photo, self::ORIGINAL);
+        $marker = $this->files->path(self::markerPath($photo), false);
+        if (is_file($file)) {
+            return $file;
+        }
+        if (is_file($marker) && (int) @filemtime($marker) > $this->time->timestamp() - self::ORIGINAL_RETRY) {
+            return null;
+        }
+        $imageLock = $this->lockFile(self::imageLockName((int) $photo['id']), $this->waitSeconds);
+        if (!is_resource($imageLock)) {
+            return null;
+        }
+        try {
+            if (is_file($file)) {
+                return $file; // inzwischen von einem anderen Prozess erzeugt
+            }
+            $slot = $this->requestSlot();
+            if ($slot === null) {
+                return null;
+            }
+            try {
+                @file_put_contents($marker, (string) $this->time->timestamp());
+                @touch($marker, $this->time->timestamp());
+                if (!$this->renderOriginal($photo, $file)) {
+                    return null;
+                }
+                @unlink($marker);
+                return $file;
+            } finally {
+                self::unlock($slot);
+            }
+        } finally {
+            self::unlock($imageLock);
+        }
+    }
+
+    private function renderOriginal(array $photo, string $target): bool
+    {
+        try {
+            $tmp = $this->drive->download((string) $photo['drive_file_id']);
+        } catch (\RuntimeException) {
+            return false;
+        }
+        try {
+            $this->images->resizeToJpeg($tmp, $target, self::ORIGINAL_EDGE, self::ORIGINAL_QUALITY);
+            return true;
+        } catch (\Throwable) {
+            // RAW: das eingebettete JPEG der Kamera, meist in voller Größe (kleiner als die 1600er lohnt nicht).
+            $preview = $this->files->tempFile();
+            try {
+                return RawPreview::extract($tmp, $preview, self::SIZES['large'] + 1)
+                    && $this->images->resizeToJpeg($preview, $target, self::ORIGINAL_EDGE, self::ORIGINAL_QUALITY) !== [];
+            } catch (\Throwable) {
+                @unlink($target);
+                return false;
+            } finally {
+                @unlink($preview);
+            }
+        } finally {
+            @unlink($tmp);
+        }
     }
 
     /**
@@ -739,6 +890,8 @@ final class GalleryService
                 'id' => (int) $ph['id'],
                 'thumb' => $this->url($ph, 'thumb'),
                 'large' => $this->url($ph, 'large'),
+                // Großansicht: erst large, dann diese nachladen (404, wenn es kein Original gibt: large bleibt)
+                'original' => $this->url($ph, self::ORIGINAL),
                 'width' => (int) $ph['width'],
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
