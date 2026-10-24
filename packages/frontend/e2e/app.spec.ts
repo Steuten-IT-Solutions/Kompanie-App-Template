@@ -2636,6 +2636,44 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await page.locator('.member-rank-open').click();
   await expect(page.getByRole('dialog', { name: 'Dienstgrad' }).locator('.member-rank strong')).toHaveText('Gefreiter');
 
+  // Unter die Schwelle des eigenen Dienstgrads (Issue #178): eigener Abschnitt ganz oben, ohne Schalter.
+  const book = (points: number) =>
+    page.evaluate(
+      async ([userId, n]) => {
+        const c = window.KOMPANIE_CONFIG!;
+        const r = await fetch(c.apiBase + 'points', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [c.csrf.header]: c.csrf.token },
+          body: JSON.stringify({ user_ids: [userId], points: n, reason: 'E2E Schwelle' }),
+        });
+        return r.status;
+      },
+      [id, points],
+    );
+  // Auf 9 Punkte, eins unter der Schwelle des Gefreiten (andere Tests haben schon Punkte vergeben)
+  const current = await page.evaluate(async (userId) => {
+    const c = window.KOMPANIE_CONFIG!;
+    const list = await (
+      await fetch(c.apiBase + 'promotions', { credentials: 'same-origin', headers: { [c.csrf.header]: c.csrf.token } })
+    ).json();
+    return (list as { user_id: number; points: number }[]).find((p) => p.user_id === userId)!.points;
+  }, id);
+  const minus = 9 - current;
+  expect(await book(minus)).toBeLessThan(300);
+  await page.goto('/app/#/verwaltung/befoerderungen');
+  const promotions = page.locator('.promotions');
+  await expect(promotions.locator('li').first()).toHaveText('Unter der Schwelle');
+  await expect(promotions.locator('li').nth(1)).toContainText('Mitglied2');
+  await expect(promotions.locator('li').nth(1)).toHaveClass(/\bbelow\b/);
+  await expect(promotions.locator('.row', { hasText: 'Mitglied2' })).toHaveCount(1);
+  await expect(page.locator('label.toggle')).toHaveCount(0);
+  await shot(page, '24c-befoerderungen-unter-der-schwelle');
+  expect(await book(-minus)).toBeLessThan(300);
+  await page.reload();
+  await expect(promotions.locator('.list-divider', { hasText: 'Unter der Schwelle' })).toHaveCount(0);
+  await expect(promotions.locator('.list-divider').first()).toHaveText(/Schwelle erreicht|Noch nicht erreicht/);
+
   await login(page, 'mitglied2');
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Dienstgrad');

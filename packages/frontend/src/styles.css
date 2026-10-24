@@ -341,6 +341,10 @@ select {
 .row.clickable:active {
   transform: scale(0.99);
 }
+/* Beförderungen: unter der Schwelle des eigenen Dienstgrads (Kandidaten zum Degradieren) mit rotem Rand */
+.promotions .row.below::before {
+  background: var(--danger);
+}
 .row.inactive {
   opacity: 0.55;
 }

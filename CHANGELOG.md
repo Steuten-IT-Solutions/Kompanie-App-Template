@@ -112,6 +112,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   andere Personen nur mit dem internen Kalender stehen weiter in der Mitgliederliste der App.
 - **Eintritt ohne „am“**: Unter *Meins* und in den Mitgliedsdetails steht neben „Eintritt“ nur noch das Datum
   („17.04.2023“) bzw. das Jahr. Der Satz beim Bearbeiten lautet weiter „Eingetreten am …“.
+- **Beförderungen mit Abschnitt „Unter der Schwelle“**: Wer weniger Punkte hat, als sein jetziger Dienstgrad verlangt
+  (Kandidaten zum Degradieren), steht jetzt ganz oben in einem eigenen, rot markierten Abschnitt, zusammen mit der
+  übrigen Übersicht. Der Schalter „Nur unter der Schwelle …“ entfällt. Ist niemand darunter, fehlt der Abschnitt.
 
 ### Behoben
 

@@ -357,24 +357,20 @@ function RankForm({
   );
 }
 
-/** Verwaltung → Beförderungen (nur mit Punkten): erreichte Schwellen oben, dann nach fehlenden Punkten. */
+/**
+ * Verwaltung → Beförderungen (nur mit Punkten): zuerst, wer unter der Schwelle des eigenen Dienstgrads liegt (Kandidaten
+ * zum Degradieren, Issue #178), dann erreichte Schwellen, dann nach fehlenden Punkten.
+ */
 export function Promotions() {
   const { data, error, loading, reload } = useAsync(api.promotions, [], 'promotions');
-  const [below, setBelow] = useState(false);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
   // Nach Abschnitten gruppiert; innerhalb eines Abschnitts bleibt die Reihenfolge des Servers (sort ist stabil).
-  const list = (data ?? [])
-    .filter((p) => (below ? p.below_current_threshold : p.next_rank !== null))
-    .sort((a, b) => section(a) - section(b));
-  const headings = ['Schwelle erreicht', 'Noch nicht erreicht', `Höchster ${rank}`];
+  const list = (data ?? []).filter((p) => p.below_current_threshold || p.next_rank !== null).sort((a, b) => section(a) - section(b));
+  const headings = ['Unter der Schwelle', 'Schwelle erreicht', 'Noch nicht erreicht'];
   return (
     <div>
-      <label className="toggle">
-        <input type="checkbox" checked={below} onChange={(e) => setBelow(e.target.checked)} />
-        Nur unter der Schwelle des aktuellen {rank}s (Kandidaten zum Degradieren)
-      </label>
       {list.length === 0 ? (
         <Empty>Niemand gefunden.</Empty>
       ) : (
@@ -387,7 +383,7 @@ export function Promotions() {
               <Fragment key={p.user_id}>
                 {heading && <li className="section-title list-divider">{heading}</li>}
                 <li
-                  className={`card row clickable ${due ? 'due' : ''}`}
+                  className={`card row clickable ${p.below_current_threshold ? 'below' : due ? 'due' : ''}`}
                   onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
                 >
                   <div className="row-main">
@@ -400,7 +396,6 @@ export function Promotions() {
                         (due
                           ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
                           : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
-                      {p.below_current_threshold && ' · unter der Schwelle'}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -420,9 +415,12 @@ function isDue(p: { points_to_next: number | null }): boolean {
   return p.points_to_next !== null && p.points_to_next <= 0;
 }
 
-/** Abschnitt der Beförderungsliste: 0 Schwelle erreicht, 1 noch nicht erreicht, 2 kein höherer Dienstgrad. */
-function section(p: { points_to_next: number | null; next_rank: unknown }): number {
-  return isDue(p) ? 0 : p.next_rank === null ? 2 : 1;
+/**
+ * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 noch nicht
+ * erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste nicht erreicht; jeder steht in genau einem Abschnitt.
+ */
+function section(p: { points_to_next: number | null; below_current_threshold?: boolean }): number {
+  return p.below_current_threshold ? 0 : isDue(p) ? 1 : 2;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
