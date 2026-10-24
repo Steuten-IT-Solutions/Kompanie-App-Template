@@ -324,7 +324,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         if ($members === []) {
             return $html . '<p class="ka">Noch keine Mitglieder eingetragen.</p>';
         }
-        // Die Liste der API hat nur die kleine Vorschau (128 Pixel); für die Galerie die größeren Fassungen.
+        // Die Liste der API hat nur die kleine Vorschau (128 Pixel); für die Galerie die größeren Fassungen. Alte Fotos
+        // ohne 1024er (Issue #109): Großansicht mit der 480er, dann ohne srcset (dieselbe Datei, keine falsche Breite).
         $medium = $app->memberPhotos()->urls(480);
         $large = $app->memberPhotos()->urls(1024);
         $original = $app->memberPhotos()->urls(MemberPhotoService::MAX_EDGE); // nachgeladen; fehlt bei älteren Fotos (404)
@@ -334,13 +335,17 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $name = esc_html($m['name']);
             $caption = '<span class="ka-mitglied-name">' . $name . '</span>';
             if (isset($medium[$m['id']], $large[$m['id']])) {
+                $srcset = $large[$m['id']] !== $medium[$m['id']]
+                    ? sprintf(' srcset="%1$s 320w, %2$s 683w" sizes="(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw"', esc_url($medium[$m['id']]), esc_url($large[$m['id']]))
+                    : '';
                 $html .= sprintf(
-                    '<li class="ka-mitglied"><a href="%1$s" data-ka-lightbox="mitglieder" data-ka-original="%5$s" data-ka-titel="%2$s"><img src="%3$s" srcset="%3$s 320w, %1$s 683w" sizes="(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw" alt="%2$s" loading="lazy" width="320" height="480" />%4$s</a></li>',
+                    '<li class="ka-mitglied"><a href="%1$s" data-ka-lightbox="mitglieder" data-ka-original="%5$s" data-ka-titel="%2$s"><img src="%3$s"%6$s alt="%2$s" loading="lazy" width="320" height="480" />%4$s</a></li>',
                     esc_url($large[$m['id']]),
                     esc_attr($m['name']),
                     esc_url($medium[$m['id']]),
                     $caption,
                     esc_url($original[$m['id']] ?? $large[$m['id']]),
+                    $srcset,
                 );
             } elseif ($placeholder !== '') {
                 // Ohne Großansicht: Das Platzhalterbild zeigt nicht die Person.

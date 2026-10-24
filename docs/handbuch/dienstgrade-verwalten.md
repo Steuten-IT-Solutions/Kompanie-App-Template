@@ -13,7 +13,8 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 
 ## Was du hier siehst
 - Die {bereich.ranks} vom niedrigsten (oben) zum höchsten (unten), jeweils mit Abzeichen, Bezeichnung, Schwelle („ab … {bereich.points}“ oder „ohne Schwelle“) und wie oft er vergeben ist. Deaktivierte tragen das Schild „inaktiv“.
-- Bei jedem {begriff.rank} die Knöpfe **niedriger**, **höher**, **Ändern**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen**.
+- Ab zwei {bereich.ranks} links bei jedem ein Griff (sechs Punkte) zum Verschieben.
+- Bei jedem {begriff.rank} die Knöpfe **Ändern**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen**.
 - Darunter das Abzeichen: eine Vorschau auf heller und dunkler Fläche („hell“, „dunkel“) mit **Ersetzen** und **Entfernen**, ohne Abzeichen der Knopf **Abzeichen hochladen**.
 - Unten das Formular **Neuer {begriff.rank}** mit **Bezeichnung**, **{bereich.points}schwelle (optional)** und **Anlegen**.
 
@@ -28,8 +29,11 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ![Ausgefülltes Formular für einen neuen {begriff.rank}](bild:dienstgrade-verwalten-neu)
 
 ### Die Reihenfolge ändern
-1. Tippe beim {begriff.rank} auf **niedriger** oder **höher**. Er rückt eine Stufe weiter.
-2. Wiederhole das, bis er an der richtigen Stelle steht.
+1. Halte den Griff links am {begriff.rank} fest und ziehe ihn an die neue Stelle: nach oben niedriger, nach unten höher.
+2. Lass los. Die Reihenfolge ist sofort gespeichert.
+3. Mit Tastatur: Tippe auf den Griff und verschiebe den {begriff.rank} mit den Pfeiltasten.
+4. Passt die neue Reihenfolge nicht zu den Schwellen, springt der {begriff.rank} zurück, und oben steht, welche {bereich.ranks} nicht passen.
+5. Während du einen {begriff.rank} änderst, lässt sich nichts verschieben.
 
 ### Bezeichnung oder Schwelle ändern
 1. Tippe beim {begriff.rank} auf **Ändern**.

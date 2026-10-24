@@ -65,6 +65,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   nach einem Moment durch die Originalauflösung ersetzt (App und Webseite). In der Galerie entsteht sie aus dem
   Original in Google Drive, wenn jemand das Bild zum ersten Mal öffnet. Mitgliedsfotos lädt die App jetzt bis
   4096 Pixel hoch; vorhandene Fotos haben die volle Auflösung erst, wenn sie neu hochgeladen werden.
+- **Kalender: Aktualisierung einstellbar**: Unter *Einstellungen → Kalender* (und mit WordPress auch im Backend) legt
+  ihr fest, nach wie vielen Minuten die App neue Termine bei Google holt (1 bis 1440, Standard 15). Kürzere Zeiten
+  zeigen Änderungen wie gelöschte Termine schneller; Speichern und „Kalender testen“ laden sofort neu.
+- **Punktekatalog und Dienstgrade per Ziehen sortieren**: Wie bei Titeln hat jeder Eintrag links einen Griff. Mit
+  Maus, Finger oder Pfeiltasten ändert ihr die Reihenfolge; sie gilt auch für die Vorlagen beim Punkte vergeben. Neue
+  Vorlagen kommen ans Ende. Bei Dienstgraden ersetzt das die Knöpfe „niedriger“ und „höher“; passt ein Zug nicht zu den
+  Punkteschwellen, springt der Dienstgrad zurück und die App sagt, welche nicht passen.
 
 ### Geändert
 
@@ -114,6 +121,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Dokumente: Überschrift mit Linien links und rechts und einem Pfeil, der beim Aufklappen nach unten zeigt.
 - **`[kompanie_mitglieder]` ohne Anwärter**: Die Galerie auf der Webseite zeigt nur noch Mitglieder. Anwärter und
   andere Personen nur mit dem internen Kalender stehen weiter in der Mitgliederliste der App.
+- **Eintritt ohne „am“**: Unter *Meins* und in den Mitgliedsdetails steht neben „Eintritt“ nur noch das Datum
+  („17.04.2023“) bzw. das Jahr. Der Satz beim Bearbeiten lautet weiter „Eingetreten am …“.
+- **Beförderungen mit Abschnitt „Unter der Schwelle“**: Wer weniger Punkte hat, als sein jetziger Dienstgrad verlangt
+  (Kandidaten zum Degradieren), steht jetzt ganz oben in einem eigenen, rot markierten Abschnitt, zusammen mit der
+  übrigen Übersicht. Der Schalter „Nur unter der Schwelle …“ entfällt. Ist niemand darunter, fehlt der Abschnitt.
 
 ### Behoben
 
@@ -124,6 +136,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Eingabefelder in Umfragen**: Die Felder *Frage* und *Antwortmöglichkeiten* sowie *Ende* beim Anlegen oder
   Bearbeiten einer Umfrage sehen jetzt aus wie alle anderen Eingabefelder der App (bisher graue, eckige Kästen).
+- **Großansicht älterer Mitgliedsfotos auf der Webseite**: In `[kompanie_mitglieder]` öffnete sich bei Fotos, die vor
+  der Fassung in 1024 Pixeln hochgeladen wurden, beim Antippen kein Bild. Jetzt zeigt die Großansicht dann das größte
+  vorhandene Foto (480 Pixel). Wer volle Auflösung will, lädt das Foto neu hoch.
+- **Abstände in der Verwaltung**: Unter *Listen* stößt die Karte „Neue Liste“ nicht mehr an die letzte Liste, und beim
+  Bearbeiten eines Amts hat „Amtszeit eintragen“ (oder das Formular für eine neue Amtszeit) wieder Abstand nach oben
+  und unten. Dasselbe gilt überall, wo eine Formular-Karte auf eine Liste, einen Hinweis oder einen breiten Knopf folgt.
 
 ### Sicherheit
 

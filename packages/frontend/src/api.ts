@@ -1291,6 +1291,8 @@ export const api = {
   createCatalogItem: (title: string, points: number) => request<CatalogItem>('POST', '/catalog', { title, points }),
   updateCatalogItem: (id: number, data: Partial<Pick<CatalogItem, 'title' | 'points' | 'active' | 'sort'>>) =>
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
+  /** Reihenfolge des ganzen Katalogs (alle IDs, auch inaktive); Antwort: der Katalog mit inaktiven (Issue #176) */
+  reorderCatalog: (ids: number[]) => request<CatalogItem[]>('PUT', '/catalog/order', { ids }),
 
   directory: () => request<DirectoryEntry[]>('GET', '/directory'),
   /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
