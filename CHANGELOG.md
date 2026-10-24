@@ -17,6 +17,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Ämter nach Jahren**: Auf breiten Bildschirmen zeigt der Schalter „Jahre“ im Tab Ämter alle Ämter nebeneinander,
+  eine Spalte je Amt und eine Zeile je Jahr. So sieht man auf einen Blick, wer wann welches Amt hatte.
 - **Ämter: Einzahl, Hinweis bei Titeln, einzelnes Amt auf der Webseite**: Ein Amt hat jetzt ein Feld für die Einzahl
   („Kapitän“ zu „Kapitäne“), die auf der Seite einer Person bei ihren Amtszeiten steht. Titel, die ein Amt vergibt,
   zeigen in *Titel verwalten* und in den Mitgliedsdetails „Wird über das Amt … vergeben“ mit einem Link zum Amt. Der

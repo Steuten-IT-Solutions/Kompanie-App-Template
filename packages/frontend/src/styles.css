@@ -3535,6 +3535,92 @@ fieldset.feature-list legend {
   justify-content: flex-end;
   margin: 0 0 4px;
 }
+.offices-tools .segmented {
+  margin: 0 auto 0 0;
+}
+/* Jahresübersicht der Ämter (nur auf breiten Bildschirmen): waagerecht scrollt nur das Raster, nie die Seite */
+.year-grid-scroll {
+  overflow-x: auto;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.year-grid {
+  display: grid;
+  column-gap: 3px;
+  min-width: min-content;
+  padding: 8px 8px 12px 0;
+  font-size: 0.72rem;
+}
+.yg-group,
+.yg-office {
+  padding: 4px 6px;
+  background: var(--card);
+  /* Bezeichnungen nach den Regeln der Sprache trennen, nicht mitten im Wort abschneiden */
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+.yg-group {
+  font-family: var(--font-head);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--accent);
+}
+.yg-office {
+  font-weight: 600;
+  color: var(--ink-2);
+  align-self: end;
+  border-bottom: 1px solid var(--line);
+}
+.yg-year {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+  color: var(--ink-2);
+  z-index: 0;
+}
+.yg-year.decade {
+  border-top-color: var(--line-strong);
+}
+.yg-year span {
+  position: sticky;
+  left: 0;
+  width: 3.5rem;
+  padding-left: 8px;
+  background: var(--card);
+  font-variant-numeric: tabular-nums;
+}
+.yg-year.decade span {
+  font-weight: 700;
+  color: var(--ink);
+}
+.yg-bar {
+  z-index: 1;
+  margin: 1px 0;
+  padding: 2px 5px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary-text) 14%, var(--card));
+  border-left: 3px solid var(--primary-text);
+  color: var(--ink);
+  line-height: 1.25;
+}
+.yg-bar.current {
+  background: color-mix(in srgb, var(--primary-text) 26%, var(--card));
+}
+.yg-bar.honor {
+  background: color-mix(in srgb, var(--accent) 22%, var(--card));
+  border-left-color: var(--accent);
+}
+.yg-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .office-group .section-title {
   margin-top: 18px;
 }

@@ -24,6 +24,12 @@ Tippe unten in der Leiste auf **{bereich.directory}** und oben auf **{bereich.of
 
 ![Aufgeklappte Chronik eines Amts](bild:aemter-chronik)
 
+### Alle Ämter nach Jahren sehen (breiter Bildschirm)
+1. Tippe oben auf **Jahre**. Den Schalter **Chronik | Jahre** gibt es nur auf breiten Bildschirmen, etwa am Computer oder Tablet quer.
+2. Jedes Amt hat eine Spalte, nach Gruppen geordnet; jede Zeile ist ein Jahr, das neueste oben. Ein Balken zeigt, wer das Amt in diesen Jahren hatte. Wer es gleichzeitig mit anderen hatte (z. B. Fahne), steht daneben.
+3. Laufende Amtszeiten sind kräftiger gefärbt, Ehrungen tragen einen Stern. Zeigst du mit der Maus auf einen Balken, stehen dort Jahre, Personen und Zusatz.
+4. Gibt es viele Ämter, schiebst du die Übersicht seitlich. **Chronik** führt zurück zu den Karten. Die App merkt sich deine Wahl.
+
 ### Die Ämter einer Person sehen
 1. Tippe in der Chronik oder unter **Im Amt** auf ihren Namen.
 2. Es öffnet sich ihre Seite mit allen ihren Ämtern als Zeitstrahl.

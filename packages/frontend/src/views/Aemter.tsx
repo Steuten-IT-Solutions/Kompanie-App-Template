@@ -1,9 +1,10 @@
-import { useState, type ReactElement } from 'react';
-import { api, type Office, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
+import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
+import { api, type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { lanes, yearRange } from '../yearGrid';
 
 const sec = brand.labels.sections;
 
@@ -254,10 +255,130 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
   );
 }
 
-/** Alle Ämter nach Gruppen; je Amt eine aufklappbare Karte mit dem Zeitstrahl. */
+/** Ab dieser Breite gibt es die Jahresübersicht (eine Spalte je Amt braucht Platz). */
+const WIDE = '(min-width: 1000px)';
+const VIEW_KEY = 'kompanie.offices.view';
+
+function useWide(): boolean {
+  const [wide, setWide] = useState(() => window.matchMedia?.(WIDE).matches ?? false);
+  useEffect(() => {
+    const media = window.matchMedia?.(WIDE);
+    if (!media) return;
+    const update = () => setWide(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return wide;
+}
+
+function loadView(): 'chronik' | 'jahre' {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'jahre' ? 'jahre' : 'chronik';
+  } catch {
+    return 'chronik';
+  }
+}
+
+/**
+ * Jahresübersicht (Issue #112, R14, nur auf breiten Bildschirmen): eine Spalte je Amt, nach Gruppen, eine Zeile je Jahr
+ * (neueste oben). Jede Amtszeit ist ein Balken über ihre Jahre; gleichzeitige Amtszeiten eines Amts stehen
+ * nebeneinander. Laufende sind hervorgehoben, Ehrungen tragen einen Stern. Waagerecht scrollt nur das Raster.
+ */
+export function YearGrid({
+  groups,
+  offices,
+  thisYear = new Date().getFullYear(),
+}: {
+  groups: OfficeGroup[];
+  offices: Office[];
+  thisYear?: number;
+}) {
+  const years = yearRange(
+    offices.flatMap((o) => o.terms),
+    thisYear,
+  );
+  if (years.length === 0) return <Empty>Noch keine Einträge.</Empty>;
+  const top = years[0];
+  const firstRow = 3; // Zeile 1: Gruppen, Zeile 2: Ämter
+  const row = (year: number) => firstRow + (top - year);
+  const ordered = [
+    ...groups.map((g) => ({ key: `g${g.id}`, title: g.title, offices: offices.filter((o) => o.group_id === g.id) })),
+    { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null) },
+  ].filter((s) => s.offices.length > 0);
+  const cells: ReactElement[] = [];
+  let column = 2; // Spalte 1: Jahre
+  for (const section of ordered) {
+    const sectionStart = column;
+    for (const o of section.offices) {
+      const { bars, count } = lanes(o.terms, thisYear);
+      cells.push(
+        <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
+          {o.title}
+        </div>,
+      );
+      for (const { term, lane, first, last } of bars) {
+        const names = term.holders.map((h) => h.name).join(', ');
+        const label = `${o.title}: ${termYears(term)} · ${names}${term.note ? ` · ${term.note}` : ''}${term.honor ? ' · Ehrung' : ''}`;
+        const style: CSSProperties = { gridColumn: column + lane, gridRow: `${row(last)} / ${row(first) + 1}` };
+        cells.push(
+          <div
+            key={`t${term.id}`}
+            className={`yg-bar${term.current ? ' current' : ''}${term.honor ? ' honor' : ''}`}
+            style={style}
+            title={label}
+            role="listitem"
+            aria-label={label}
+          >
+            <span className="yg-name">
+              {term.honor ? '★ ' : ''}
+              {names}
+            </span>
+          </div>,
+        );
+      }
+      column += count;
+    }
+    if (section.title) {
+      cells.push(
+        <div key={`h${section.key}`} className="yg-group" style={{ gridColumn: `${sectionStart} / ${column}`, gridRow: 1 }}>
+          {section.title}
+        </div>,
+      );
+    }
+  }
+  return (
+    <div className="year-grid-scroll">
+      <div
+        className="year-grid"
+        role="list"
+        aria-label={`${sec.offices} nach Jahren`}
+        style={{
+          gridTemplateColumns: `3.5rem repeat(${column - 2}, minmax(6.5rem, 1fr))`,
+          gridTemplateRows: `auto auto repeat(${years.length}, 1.6rem)`,
+        }}
+      >
+        {years.map((y) => (
+          <div
+            key={y}
+            className={`yg-year${y % 10 === 0 ? ' decade' : ''}`}
+            style={{ gridRow: row(y), gridColumn: `1 / ${column}` }}
+            aria-hidden="true"
+          >
+            <span>{y}</span>
+          </div>
+        ))}
+        {cells}
+      </div>
+    </div>
+  );
+}
+
+/** Alle Ämter nach Gruppen; je Amt eine aufklappbare Karte mit dem Zeitstrahl, auf breiten Bildschirmen auch nach Jahren. */
 export function OfficesView() {
   const { data, error, loading, reload } = useOffices();
   const [open, setOpen] = useState<Set<number>>(new Set());
+  const wide = useWide();
+  const [view, setView] = useState(loadView);
 
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
@@ -277,25 +398,49 @@ export function OfficesView() {
   ].filter((s) => s.offices.length > 0);
   const all = offices.every((o) => open.has(o.id));
 
+  const years = wide && view === 'jahre';
+  const choose = (next: 'chronik' | 'jahre') => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // ohne Speicher (z. B. privates Fenster) gilt die Wahl nur bis zum Neuladen
+    }
+  };
+
   return (
     <div className="offices">
       <div className="button-row offices-tools">
-        <button
-          type="button"
-          className="btn btn-small btn-secondary"
-          onClick={() => setOpen(all ? new Set() : new Set(offices.map((o) => o.id)))}
-        >
-          {all ? 'Alle zuklappen' : 'Alle aufklappen'}
-        </button>
+        {wide && (
+          <div className="segmented" role="group" aria-label="Ansicht">
+            <button type="button" className={!years ? 'active' : ''} aria-pressed={!years} onClick={() => choose('chronik')}>
+              Chronik
+            </button>
+            <button type="button" className={years ? 'active' : ''} aria-pressed={years} onClick={() => choose('jahre')}>
+              Jahre
+            </button>
+          </div>
+        )}
+        {!years && (
+          <button
+            type="button"
+            className="btn btn-small btn-secondary"
+            onClick={() => setOpen(all ? new Set() : new Set(offices.map((o) => o.id)))}
+          >
+            {all ? 'Alle zuklappen' : 'Alle aufklappen'}
+          </button>
+        )}
       </div>
-      {sections.map((s) => (
-        <section key={s.key} className="office-group">
-          {s.title && <h2 className="section-title">{s.title}</h2>}
-          {s.offices.map((o) => (
-            <OfficeCard key={o.id} office={o} open={open.has(o.id)} onToggle={() => toggle(o.id)} />
-          ))}
-        </section>
-      ))}
+      {years && <YearGrid groups={data?.groups ?? []} offices={offices} />}
+      {!years &&
+        sections.map((s) => (
+          <section key={s.key} className="office-group">
+            {s.title && <h2 className="section-title">{s.title}</h2>}
+            {s.offices.map((o) => (
+              <OfficeCard key={o.id} office={o} open={open.has(o.id)} onToggle={() => toggle(o.id)} />
+            ))}
+          </section>
+        ))}
     </div>
   );
 }
