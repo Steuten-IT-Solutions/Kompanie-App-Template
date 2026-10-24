@@ -1235,7 +1235,39 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await page.setViewportSize({ width: 360, height: 740 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen)
+  // Auch im dunklen Modus schwarz auf weiß; Zeilen werden nicht geteilt, der Kopf steht auf jeder Seite (Issue #121).
+  // Mit vielen Zeilen über mehrere Seiten (nicht gespeichert, die Druckansicht zeigt den Entwurf).
+  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: '+ 5 leere Zeilen' }).click();
+  await page.emulateMedia({ media: 'print', colorScheme: 'dark' });
+  const printed = await page.evaluate(() => {
+    const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
+    const rows = [...document.querySelectorAll('.list-print-root .list-table tbody tr')];
+    return {
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      body: css('body').backgroundColor,
+      sheet: [css('.list-print-root .list-sheet').color, css('.list-print-root .list-sheet').backgroundColor],
+      cell: css('.list-print-root .list-table tbody td').color,
+      title: css('.list-print-root .list-sheet-title').color,
+      head: css('.list-print-root .list-table thead').display,
+      rows: rows.length,
+      avoid: rows.every((r) => getComputedStyle(r).breakInside === 'avoid'),
+    };
+  });
+  expect(printed).toEqual({
+    html: 'rgb(255, 255, 255)',
+    body: 'rgb(255, 255, 255)',
+    sheet: ['rgb(0, 0, 0)', 'rgb(255, 255, 255)'],
+    cell: 'rgb(0, 0, 0)',
+    title: 'rgb(255, 255, 255)',
+    head: 'table-header-group',
+    rows: members + 42,
+    avoid: true,
+  });
+  if (SHOTS) await page.pdf({ path: `${SHOTS}/40e-liste-dunkel-mehrseitig.pdf`, format: 'A4', preferCSSPageSize: true });
+  await page.emulateMedia({ media: 'screen', colorScheme: 'light' });
+
+  // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen); die leeren Zeilen von eben verwerfen
+  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Alle Listen/ }).click();
   await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
