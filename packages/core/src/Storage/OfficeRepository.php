@@ -11,7 +11,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  *
  * @phpstan-type Group array{id: int, title: string, sort: int}
  * @phpstan-type Office array{id: int, group_id: int|null, title: string, sort: int, title_id: int|null}
- * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string}
+ * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool}
  * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int}
  */
 final class OfficeRepository
@@ -127,16 +127,17 @@ final class OfficeRepository
     /**
      * Amtszeit mit Inhabern anlegen bzw. ersetzen, in einer Transaktion.
      *
-     * @param array{kind: string, start_year: int, end_year: int|null, note: string} $term
+     * @param array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool} $term
      * @param list<array{user_id: int|null, name: string}> $holders
      */
     public function saveTerm(?int $id, int $officeId, array $term, array $holders): int
     {
-        return (int) $this->db->transaction(function () use ($id, $officeId, $term, $holders): int {
+        $row = ['honor' => $term['honor'] ? 1 : 0] + $term;
+        return (int) $this->db->transaction(function () use ($id, $officeId, $row, $holders): int {
             if ($id === null) {
-                $id = $this->db->insert('office_terms', ['office_id' => $officeId] + $term);
+                $id = $this->db->insert('office_terms', ['office_id' => $officeId] + $row);
             } else {
-                $this->db->update('office_terms', $term, ['id' => $id]);
+                $this->db->update('office_terms', $row, ['id' => $id]);
                 $this->db->execute('DELETE FROM {office_holders} WHERE term_id = ?', [$id]);
             }
             foreach ($holders as $i => $h) {
@@ -208,6 +209,7 @@ final class OfficeRepository
             'start_year' => (int) $r['start_year'],
             'end_year' => $r['end_year'] === null ? null : (int) $r['end_year'],
             'note' => (string) $r['note'],
+            'honor' => (bool) ($r['honor'] ?? false),
         ];
     }
 

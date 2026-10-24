@@ -98,19 +98,19 @@ export function Timeline({
     rows.push(
       <li
         key={key}
-        className={`tl-item ${i % 2 === 0 ? 'tl-left' : 'tl-right'}${term.current ? ' current' : ''}${term.kind === 'point' ? ' point' : ''}`}
+        className={`tl-item ${i % 2 === 0 ? 'tl-left' : 'tl-right'}${term.current ? ' current' : ''}${term.honor ? ' honor' : ''}`}
       >
         <When term={term} />
         <span className="tl-dot" aria-hidden="true">
-          {term.kind === 'point' ? '★' : ''}
+          {term.honor ? '★' : ''}
         </span>
         <div className="tl-card">
           <span className="visually-hidden">{termYears(term)}: </span>
-          {(office || term.current || term.kind === 'point' || duration) && (
+          {(office || term.current || term.honor || duration) && (
             <div className="tl-meta">
               {office && <span className="tl-office">{office}</span>}
               {term.current && <span className="badge timeline-now">im Amt</span>}
-              {term.kind === 'point' && <span className="badge timeline-honor">Ehrung</span>}
+              {term.honor && <span className="badge timeline-honor">Ehrung</span>}
               {duration && <span className="tl-duration">{duration}</span>}
             </div>
           )}

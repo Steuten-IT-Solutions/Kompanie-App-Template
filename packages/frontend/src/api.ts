@@ -900,6 +900,8 @@ export interface OfficeTerm {
   start_year: number;
   end_year: number | null;
   note: string;
+  /** Haken „Ehrung“ (bei jeder Art): Stern und Abzeichen im Zeitstrahl */
+  honor: boolean;
   /** Zeitraum ohne Ende */
   current: boolean;
   holders: OfficeHolder[];
@@ -928,6 +930,7 @@ export interface OfficeTermInput {
   start_year: number;
   end_year: number | null;
   note: string;
+  honor: boolean;
   holders: ({ user_id: number } | { name: string })[];
 }
 
@@ -939,6 +942,7 @@ export interface OfficeImportRow {
   start_year?: number;
   end_year?: number | null;
   note?: string;
+  honor?: boolean;
   holders?: { name: string; user_id: number | null }[];
   duplicate?: boolean;
   error?: string;
