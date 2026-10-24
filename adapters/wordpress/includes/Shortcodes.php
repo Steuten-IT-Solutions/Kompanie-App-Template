@@ -12,7 +12,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
  *
  * [kompanie_termine anzahl="10"]  Kommende öffentliche Termine aus der App.
  * [kompanie_galerie]              Galerie (Jahre → Alben → Bilder).
- * [kompanie_aemter gruppe="…"]    Ämter mit Inhabern und Chronik (optional nur eine Gruppe).
+ * [kompanie_aemter gruppe="…" amt="…"]  Ämter mit Inhabern und Chronik (optional nur eine Gruppe und/oder ein Amt).
  * [kompanie_mitglieder]           Mitglieder (ohne Anwärter) als Bildergalerie (Foto mit Namen, Großansicht beim Antippen).
  */
 final class Shortcodes
@@ -225,16 +225,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         // Immer die Sicht eines Gastes: Fotos nur von Personen, die auch in der öffentlichen Mitgliederliste stehen.
         $overview = $app->offices()->overview(null);
         $photos = $app->memberPhotos()->urls(480);
-        // Typografische Anführungszeichen (gruppe=„…“ bzw. ”…”, z. B. aus Word oder dem Editor) erkennt WordPress
-        // nicht als Anführungszeichen: Sie landen im Wert, und ein Leerzeichen teilt ihn (der Rest kommt als
-        // Attribute ohne Namen). Deshalb wieder zusammensetzen und die Zeichen entfernen.
-        $wanted = (string) ($atts['gruppe'] ?? '');
-        foreach ($atts as $k => $v) {
-            if (is_int($k) && $wanted !== '') {
-                $wanted .= ' ' . $v;
-            }
-        }
-        $wanted = trim((string) preg_replace('/^[\s"\'\p{Pi}\p{Pf}„‚]+|[\s"\'\p{Pi}\p{Pf}„‚]+$/u', '', $wanted));
+        $wanted = self::attribute($atts, 'gruppe');
+        $wantedOffice = mb_strtolower(self::attribute($atts, 'amt'));
         $groups = [];
         foreach ($overview['groups'] as $g) {
             if ($wanted === '' || mb_strtolower($g['title']) === mb_strtolower($wanted)) {
@@ -243,6 +235,9 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         }
         $byGroup = [];
         foreach ($overview['offices'] as $o) {
+            if ($wantedOffice !== '' && mb_strtolower($o['title']) !== $wantedOffice) {
+                continue;
+            }
             if ($o['group_id'] === null ? $wanted === '' : isset($groups[$o['group_id']])) {
                 $byGroup[$o['group_id'] ?? 0][] = $o;
             }
@@ -252,7 +247,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             return $html . '<p class="ka">Noch keine Ämter eingetragen.</p>';
         }
         $html .= '<div class="ka">';
-        // Überschrift nur, wenn mehrere Gruppen erscheinen; mit gruppe="…" steht sie meist schon auf der Seite.
+        // Überschrift nur, wenn mehrere Gruppen erscheinen; mit gruppe="…" oder amt="…" steht sie meist schon auf der Seite.
         $headings = count($byGroup) > 1;
         foreach ($byGroup as $groupId => $offices) {
             if ($headings) {
@@ -265,6 +260,30 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '</div>';
         }
         return $html . '</div>';
+    }
+
+    /**
+     * Wert eines Attributs. Typografische Anführungszeichen (gruppe=„…“ bzw. ”…”, z. B. aus Word oder dem Editor) erkennt
+     * WordPress nicht als Anführungszeichen: Sie landen im Wert, und ein Leerzeichen teilt ihn (der Rest kommt als
+     * Attribute ohne Namen direkt dahinter). Deshalb wieder zusammensetzen und die Zeichen entfernen.
+     *
+     * @param array<int|string, mixed> $atts
+     */
+    private static function attribute(array $atts, string $name): string
+    {
+        $value = '';
+        $collecting = false;
+        foreach ($atts as $k => $v) {
+            if ($k === $name) {
+                $value = (string) $v;
+                $collecting = true;
+            } elseif (is_int($k) && $collecting) {
+                $value .= ' ' . $v;
+            } else {
+                $collecting = false;
+            }
+        }
+        return trim((string) preg_replace('/^[\s"\'\p{Pi}\p{Pf}„‚]+|[\s"\'\p{Pi}\p{Pf}„‚]+$/u', '', $value));
     }
 
     /** Ein Amt: laufende Amtszeiten (sonst die letzte) mit Fotos, darunter die übrigen als aufklappbare Chronik. */

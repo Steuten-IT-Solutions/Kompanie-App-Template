@@ -10,7 +10,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Ämter (Issue #112): Gruppen, Ämter, Amtszeiten und ihre Inhaber.
  *
  * @phpstan-type Group array{id: int, title: string, sort: int}
- * @phpstan-type Office array{id: int, group_id: int|null, title: string, sort: int, title_id: int|null}
+ * @phpstan-type Office array{id: int, group_id: int|null, title: string, singular: string, sort: int, title_id: int|null}
  * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null}
  * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int}
  */
@@ -69,12 +69,12 @@ final class OfficeRepository
         return $row === null ? null : self::office($row);
     }
 
-    public function insertOffice(?int $groupId, string $title, int $sort): int
+    public function insertOffice(?int $groupId, string $title, int $sort, string $singular = ''): int
     {
-        return $this->db->insert('offices', ['group_id' => $groupId, 'title' => $title, 'sort' => $sort, 'title_id' => null]);
+        return $this->db->insert('offices', ['group_id' => $groupId, 'title' => $title, 'singular' => $singular, 'sort' => $sort, 'title_id' => null]);
     }
 
-    /** @param array{group_id?: int|null, title?: string, sort?: int, title_id?: int|null} $data */
+    /** @param array{group_id?: int|null, title?: string, singular?: string, sort?: int, title_id?: int|null} $data */
     public function updateOffice(int $id, array $data): void
     {
         if ($data !== []) {
@@ -212,6 +212,7 @@ final class OfficeRepository
             'id' => (int) $r['id'],
             'group_id' => $r['group_id'] === null ? null : (int) $r['group_id'],
             'title' => (string) $r['title'],
+            'singular' => (string) ($r['singular'] ?? ''),
             'sort' => (int) $r['sort'],
             'title_id' => $r['title_id'] === null ? null : (int) $r['title_id'],
         ];

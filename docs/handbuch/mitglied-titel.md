@@ -28,7 +28,7 @@ Mit **✕** oder der Zurück-Taste schließt du es wieder.
 
 ## Gut zu wissen
 - Wer Benachrichtigungen eingeschaltet hat, bekommt eine Nachricht, wenn ihm ein neuer Titel verliehen wird. Beim Entfernen nicht.
-- Titel, die mit einem Amt verknüpft sind, folgen den Amtszeiten und lassen sich hier nicht von Hand ändern. Versuchst du es, meldet die App beim Speichern, welches Amt den Titel vergibt.
+- Titel, die mit einem Amt verknüpft sind, folgen den Amtszeiten und lassen sich hier nicht von Hand ändern. Ihr Häkchen ist grau, darunter steht **Wird über das Amt „…“ vergeben**. Darfst du {bereich.offices} verwalten, führt ein Tipp auf den Namen des Amts direkt dorthin.
 - Neue {bereich.titles} bekommen nur Mitglieder. Wer kein Mitglied mehr ist, z. B. nach einem Wechsel zur Rolle {rolle.guest}, behält seine {bereich.titles}; du kannst sie dort nur noch entfernen. Das gilt auch für ehemalige Mitglieder (Liste **Ehemalige** der Verwaltung, nur für alle, die Mitglieder anlegen dürfen).
 - Die Kachel **{bereich.titles}** zeigt die Titel des Mitglieds; das Mitglied sieht sie unter **Meins** in seiner Übersicht.
 

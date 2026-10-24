@@ -1290,6 +1290,66 @@ test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem
   expect(status.every((s) => s < 300)).toBe(true);
 });
 
+test('Ämter: Einzahl auf der Seite einer Person, Hinweis mit Link bei Titeln, die ein Amt vergibt (Issue #112)', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const office = `Wartleute ${id}`;
+  const title = `Wartlauf ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const ids = await page.evaluate(
+    async ({ id, office, title }) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const send = async (method: string, path: string, body: unknown) =>
+        (
+          await fetch(cfg.apiBase + path, {
+            method,
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+            body: JSON.stringify(body),
+          })
+        ).json();
+      const user = await send('POST', 'users', { first_name: 'Theo', last_name: `Titelprobe${id}` });
+      const t = await send('POST', 'titles', { title });
+      const o = await send('POST', 'offices', { title: office, singular: `Wartmann ${id}` });
+      await send('POST', `offices/${o.id}/terms`, { start_year: 2020, holders: [{ user_id: user.id }] });
+      await send('PATCH', `offices/${o.id}`, { title_id: t.id });
+      return { user: user.id as number, title: t.id as number, office: o.id as number };
+    },
+    { id, office, title },
+  );
+
+  // Titel verwalten: Hinweis mit Link zum Amt
+  await adminMenu(page, 'Titel');
+  const row = page.locator('.title-list .row', { hasText: title });
+  await expect(row).toContainText(`Wird über das Amt „${office}“ vergeben`);
+  await row.getByRole('button', { name: `das Amt „${office}“` }).click();
+  await expect(page).toHaveURL(new RegExp(`#/verwaltung/aemter/${ids.office}$`));
+  await expect(page.getByLabel(/^Einzahl/)).toHaveValue(`Wartmann ${id}`);
+
+  // Mitgliedsdetails: Häkchen gesperrt, Hinweis darunter
+  await page.goto(`/app/#/verwaltung/mitglied/${ids.user}`);
+  await page.locator('.member-titles-tile').click();
+  const box = page.locator('.member-titles').getByLabel(title);
+  await expect(box).toBeChecked();
+  await expect(box).toBeDisabled();
+  await expect(page.locator('.member-titles .title-office-note')).toContainText(`Wird über das Amt „${office}“ vergeben`);
+  await page.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
+
+  // Seite der Person: die Einzahl statt der Bezeichnung des Amts
+  await page.goto(`/app/#/mitglieder/${ids.user}`);
+  await expect(page.locator('.member-page .tl-item', { hasText: `Wartmann ${id}` })).toContainText('seit 2020');
+  await expect(page.locator('.member-page .tl-item', { hasText: office })).toHaveCount(0);
+
+  const status = await page.evaluate(async (ids) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const del = (path: string) =>
+      fetch(cfg.apiBase + path, { method: 'DELETE', credentials: 'same-origin', headers: { [cfg.csrf.header]: cfg.csrf.token } }).then(
+        (r) => r.status,
+      );
+    return [await del(`offices/${ids.office}`), await del(`members/${ids.user}`), await del(`titles/${ids.title}`)];
+  }, ids);
+  expect(status.every((s) => s < 300)).toBe(true);
+});
+
 test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
   const title = `Unterschriften ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);

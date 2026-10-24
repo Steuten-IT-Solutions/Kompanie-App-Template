@@ -1121,8 +1121,10 @@ final class ApiScenario
         [$s, $group] = $this->req('POST', '/office-groups', ['title' => 'Kptest Verein']);
         $c->ok($s === 201 && is_int($group['id'] ?? null), 'Gruppe anlegen → 201');
         [$s, $office] = $this->req('POST', '/offices', ['title' => 'Kptest Vorsitz', 'group_id' => $group['id'] ?? null]);
-        $c->ok($s === 201 && ($office['group_id'] ?? null) === ($group['id'] ?? 0), 'Amt anlegen → 201');
+        $c->ok($s === 201 && ($office['group_id'] ?? null) === ($group['id'] ?? 0) && ($office['singular'] ?? null) === '', 'Amt anlegen → 201');
         $oid = (int) ($office['id'] ?? 0);
+        [$s, $d] = $this->req('PATCH', "/offices/$oid", ['singular' => 'Kptest Vorsitzender']);
+        $c->ok($s === 200 && ($d['singular'] ?? '') === 'Kptest Vorsitzender', 'Einzahl des Amts setzen');
         [$s, $title] = $this->req('POST', '/titles', ['title' => 'Kptest Vorsitz']);
         $tid = (int) ($title['id'] ?? 0);
         [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kptest Früher']]]);

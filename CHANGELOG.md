@@ -17,6 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Ämter: Einzahl, Hinweis bei Titeln, einzelnes Amt auf der Webseite**: Ein Amt hat jetzt ein Feld für die Einzahl
+  („Kapitän“ zu „Kapitäne“), die auf der Seite einer Person bei ihren Amtszeiten steht. Titel, die ein Amt vergibt,
+  zeigen in *Titel verwalten* und in den Mitgliedsdetails „Wird über das Amt … vergeben“ mit einem Link zum Amt. Der
+  Shortcode `[kompanie_aemter amt="…"]` zeigt auf der Webseite nur ein Amt.
 - **Hilfe als Bedienungsanleitung zu jedem Bildschirm**: Das „?“ oben öffnet jetzt die Anleitung genau zu der Seite,
   auf der man gerade ist – mit Bildschirmfotos aus der eigenen App (in euren Farben und mit euren Bezeichnungen) und
   Schritt für Schritt erklärt: wozu die Seite da ist, wie man sie öffnet, was man dort sieht und wie man vorgeht. Die
@@ -75,6 +79,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Keine Daten der App in Suchmaschinen**: Alle Antworten der Schnittstelle, auch die öffentliche Mitgliederliste und
+  die Ämter, tragen jetzt den Hinweis `noindex` für Suchmaschinen, wie schon die App-Seite und die Fotos.
 - **Ämter enden mit dem Ausscheiden**: Wer unter *Austritt* als ehemalig eingetragen wird, hat danach keine laufenden
   Ämter mehr. Sie enden mit dem Jahr des Ausscheidens (ohne Datum mit dem aktuellen Jahr, nie vor ihrem Beginn); teilt
   die Person ein Amt mit anderen, bleiben die anderen im Amt. Verknüpfte Titel entfallen damit. Das Fenster zeigt vorher,

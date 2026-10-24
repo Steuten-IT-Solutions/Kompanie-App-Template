@@ -34,4 +34,4 @@ Tippe unten in der Leiste auf **{bereich.directory}** und oben auf **{bereich.of
 - Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
 - Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins**.
 
-> **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe.
+> **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe und `[kompanie_aemter amt="…"]` nur ein Amt (beides lässt sich kombinieren, z. B. wenn es ein Amt in zwei Gruppen gibt).
