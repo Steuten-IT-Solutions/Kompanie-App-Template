@@ -61,6 +61,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
   Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Logo. `[kompanie_mitglieder]`
   zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
+- **Kalender: Aktualisierung einstellbar**: Unter *Einstellungen → Kalender* (und mit WordPress auch im Backend) legt
+  ihr fest, nach wie vielen Minuten die App neue Termine bei Google holt (1 bis 1440, Standard 15). Kürzere Zeiten
+  zeigen Änderungen wie gelöschte Termine schneller; Speichern und „Kalender testen“ laden sofort neu.
 
 ### Geändert
 

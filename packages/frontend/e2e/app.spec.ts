@@ -2489,12 +2489,34 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
       .filter({ has: page.getByText(title, { exact: true }) })
       .click();
   };
+  // Zwischenspeicher-Dauer (Issue #177): 1441 lehnt schon das Feld ab; eine reine Änderung der Minuten wird gespeichert.
+  const cacheMinutes = async () => {
+    const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
+    const field = cal.getByLabel('Aktualisieren alle … Minuten');
+    await expect(field).toHaveValue('15');
+    await field.fill('1441');
+    await cal.getByRole('button', { name: 'Speichern' }).click();
+    expect(await field.evaluate((el: HTMLInputElement) => el.validity.rangeOverflow && el.validationMessage !== '')).toBe(true);
+    await expect(page.locator('.toast')).toHaveCount(0);
+    await field.fill('30');
+    await cal.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.reload();
+    await expect(
+      page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' }).getByLabel('Aktualisieren alle … Minuten'),
+    ).toHaveValue('30');
+    await page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' }).getByLabel('Aktualisieren alle … Minuten').fill('15');
+    await page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' }).getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.locator('.toast').waitFor({ state: 'detached' });
+  };
   if (!STANDALONE) {
     // WordPress: Neuigkeiten kommen aus den Beiträgen (keine Seite); Kalender und Galerie sind einstellbar.
     // Die Test-Instanz hat keine Attrappen für Google, deshalb nur Speichern und Prüfen der Eingabe.
     await expect(page.locator('.settings-link').filter({ has: page.getByText('Galerie', { exact: true }) })).toBeVisible();
     await expect(page.locator('.settings-link').filter({ has: page.getByText('Neuigkeiten', { exact: true }) })).toHaveCount(0);
     await open('Kalender');
+    await cacheMinutes();
     const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
     await cal.locator('input[type=url]').fill('ftp://falsch');
     await cal.getByRole('button', { name: 'Speichern' }).click();
@@ -2507,6 +2529,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
 
   await page.getByRole('button', { name: 'Kalender testen' }).click();
   await expect(page.getByText(/3 Termine gefunden/)).toBeVisible();
+  await cacheMinutes();
 
   const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
   // Speichern ohne Änderung ist kein Fehler.

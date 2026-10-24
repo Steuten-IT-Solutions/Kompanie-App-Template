@@ -523,6 +523,17 @@ $app->settings->delete('drive_oauth');
 $app->settings->set('calendar_ids', '');
 $app->calendar()->clearCache();
 
+// Zwischenspeicher-Dauer (Issue #177) auch im WP-Admin: geprüft wie in der App, ungültig ändert nichts.
+$calendarBefore = ['calendar_ics_url' => (string) $app->settings->get('calendar_ics_url', ''), 'calendar_ids' => '', 'google_api_key' => (string) $app->settings->get('google_api_key', '')];
+$c->ok(str_contains($renderSettings(), 'id="calendar_cache_minutes" name="calendar_cache_minutes" value="15"'), 'Einstellungsseite: Feld „Aktualisieren alle … Minuten“ mit 15');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, $calendarBefore + ['calendar_cache_minutes' => '1441', 'calendar_ics_url' => 'https://anders.example/k.ics'])
+    === ['Der Zwischenspeicher muss zwischen 1 und 1440 Minuten liegen.', true]
+    && $app->settings->get('calendar_ics_url') === $calendarBefore['calendar_ics_url'], '1441 Minuten abgelehnt, nichts geändert');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => 'x'] + $calendarBefore)[1], 'Keine Zahl abgelehnt');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '30'] + $calendarBefore) === ['Gespeichert.', false]
+    && $app->settingsService()->get()['calendar']['cache_minutes'] === 30 && str_contains($renderSettings(), 'name="calendar_cache_minutes" value="30"'), '30 Minuten gespeichert');
+KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '15'] + $calendarBefore);
+
 $c->section('Mit Google verbinden');
 $page = $renderSettings();
 $redirect = admin_url('admin-post.php');
