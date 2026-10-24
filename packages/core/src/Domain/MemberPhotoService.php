@@ -203,13 +203,21 @@ final class MemberPhotoService
         return $photo === null ? null : $this->app->env->memberPhotoUrl($userId, $photo['version'], self::DEFAULT_SIZE);
     }
 
-    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel oder eine andere aus SIZES), für Listen mit einer Abfrage */
+    /**
+     * @return array<int, string> Benutzer-ID => Adresse (128 Pixel oder eine andere aus SIZES), für Listen. Fotos von vor
+     *   Datenbankversion 18 haben keine 1024er: Für sie die nächstkleinere Größe (Issue #109). Die Auslieferung bleibt
+     *   genau (s=1024 liefert 1024 Pixel oder 404), so stimmen ETag und srcset.
+     */
     public function urls(int $size = self::DEFAULT_SIZE): array
     {
         $size = in_array($size, [...self::SIZES, self::MAX_EDGE], true) ? $size : self::DEFAULT_SIZE;
+        // Nur innerhalb von SIZES ausweichen; die Originalauflösung (MAX_EDGE) lädt die Großansicht nach und bleibt bei 404
+        // bei der Fassung davor.
+        $index = array_search($size, self::SIZES, true);
+        $missing = is_int($index) && $index > 0 ? $this->repository()->withoutImage($size) : [];
         $out = [];
         foreach ($this->repository()->versions() as $userId => $version) {
-            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, $size);
+            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, isset($missing[$userId]) ? self::SIZES[$index - 1] : $size);
         }
         return $out;
     }

@@ -57,10 +57,13 @@ export function profileHint(v: ProfileVisibility): string {
 /** Eintritt eines Eintrags zum Bearbeiten (ältere Server ohne date: das Jahr). */
 const editValue = (j: JoinYear | null): string => (j ? editYearOrDate(j.date ?? String(j.year)) : '');
 
-/** Eintritt zum Anzeigen: „am 12.03.2005“ bzw. „2005“. */
-export const joinText = (j: JoinYear): string => {
-  const d = j.date ?? String(j.year);
-  return d.length === 4 ? d : `am ${formatYearOrDate(d)}`;
+/** Eintritt zum Anzeigen neben der Beschriftung „Eintritt“: „12.03.2005“ bzw. „2005“. */
+export const joinText = (j: JoinYear): string => formatYearOrDate(j.date ?? String(j.year));
+
+/** Eintritt als Satz: „Eingetreten am 12.03.2005“ bzw. „Eingetreten 2005“. */
+const joinedSentence = (j: JoinYear): string => {
+  const text = joinText(j);
+  return text.length === 4 ? `Eingetreten ${text}` : `Eingetreten am ${text}`;
 };
 
 /** Grobe Prüfung (der Server prüft genau, auch ob es den Tag gibt): Text = Fehlermeldung, sonst die Eingabe. */
@@ -207,7 +210,7 @@ export function MemberJoinYear({
     <form className="member-join-year" onSubmit={save}>
       <h3 className="section-title">Eintritt</h3>
       <div className="card member-join-year-card">
-        <p className="member-join-year-current">{joinYear ? `Eingetreten ${joinText(joinYear)}` : 'Nicht eingetragen.'}</p>
+        <p className="member-join-year-current">{joinYear ? joinedSentence(joinYear) : 'Nicht eingetragen.'}</p>
         {joinYear && config?.features.directory && (
           <p className="muted small">
             Auf der Seite unter „{sec.directory}“: {PROFILE_OPTIONS[joinYear.profile]} (wählt nur die Person selbst)
