@@ -548,6 +548,7 @@ final class Api
             // Punktekatalog
             new Route('GET', '/catalog', $L, fn (Request $r) => $a->scores()->catalog($r->queryFlag('all') && $this->can(Cap::ManagePoints)), 'points'),
             new Route('POST', '/catalog', Cap::ManagePoints, fn (Request $r) => Response::created($a->scores()->createCatalogItem($r->body)), 'points', $denyManage),
+            new Route('PUT', '/catalog/order', Cap::ManagePoints, fn (Request $r) => $a->scores()->reorderCatalog($r->input('ids')), 'points', $denyManage),
             new Route('PATCH', '/catalog/{id}', Cap::ManagePoints, fn (Request $r) => $a->scores()->updateCatalogItem($r->id(), $r->body), 'points', $denyManage),
 
             // Dienstgrade: Liste für Mitglieder, Pflege, Befördern und Degradieren, Beförderungsübersicht

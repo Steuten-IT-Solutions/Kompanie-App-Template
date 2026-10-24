@@ -192,6 +192,13 @@ final class SettingsPage
                         <th scope="row"><label for="google_api_key">Google-API-Schlüssel</label></th>
                         <td><input type="password" autocomplete="off" class="regular-text" id="google_api_key" name="google_api_key" value="<?php echo esc_attr((string) $s->get('google_api_key', '')); ?>" /></td>
                     </tr>
+                    <tr>
+                        <th scope="row"><label for="calendar_cache_minutes">Aktualisieren alle … Minuten</label></th>
+                        <td><input type="number" class="small-text" min="1" max="1440" step="1" required id="calendar_cache_minutes" name="calendar_cache_minutes" value="<?php echo esc_attr((string) max(1, (int) $s->get('calendar_cache_minutes', 15))); ?>" />
+                        <p class="description">So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt (1 bis 1440 Minuten).
+                            Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der Termine dauert dann öfter länger.
+                            Zusätzlich erneuert die App den Kalender stündlich im Hintergrund; Speichern und „Kalender testen“ laden sofort neu.</p></td>
+                    </tr>
                 </table>
                 <?php submit_button('Speichern und testen', 'primary', 'submit', false); ?>
             </form>
@@ -539,13 +546,33 @@ final class SettingsPage
     private static function saveCalendar(App $app): never
     {
         self::guard('kompanie_app_calendar');
-        $url = isset($_POST['calendar_ics_url']) ? esc_url_raw(trim(wp_unslash($_POST['calendar_ics_url'])), ['http', 'https', 'webcal']) : '';
-        $app->settings->set('calendar_ics_url', $url);
-        $app->settings->set('calendar_ids', isset($_POST['calendar_ids']) ? sanitize_text_field(wp_unslash($_POST['calendar_ids'])) : '');
-        $app->settings->set('google_api_key', isset($_POST['google_api_key']) ? sanitize_text_field(wp_unslash($_POST['google_api_key'])) : '');
-        $app->calendar()->clearCache();
+        [$message, $error] = self::applyCalendar($app, wp_unslash($_POST));
         $app->scheduleTasks();
-        self::back('Gespeichert.', false, 'kalender', ['kompanie_test' => 1]);
+        self::back($message, $error, 'kalender', $error ? [] : ['kompanie_test' => 1]);
+    }
+
+    /**
+     * Kalender aus dem Formular speichern (ohne Weiterleitung, damit testbar). Die Dauer des Zwischenspeichers (Issue
+     * #177) prüft SettingsService wie in der App; ist sie ungültig, bleibt alles unverändert.
+     *
+     * @param array<string, mixed> $post
+     * @return array{0: string, 1: bool} Meldung und ob sie ein Fehler ist
+     */
+    public static function applyCalendar(App $app, array $post): array
+    {
+        $text = static fn (string $key): string => isset($post[$key]) && is_scalar($post[$key]) ? (string) $post[$key] : '';
+        if (isset($post['calendar_cache_minutes'])) {
+            try {
+                $app->settingsService()->update(['calendar_cache_minutes' => $text('calendar_cache_minutes')]);
+            } catch (ApiError $e) {
+                return [$e->getMessage(), true];
+            }
+        }
+        $app->settings->set('calendar_ics_url', esc_url_raw(trim($text('calendar_ics_url')), ['http', 'https', 'webcal']));
+        $app->settings->set('calendar_ids', sanitize_text_field($text('calendar_ids')));
+        $app->settings->set('google_api_key', sanitize_text_field($text('google_api_key')));
+        $app->calendar()->clearCache();
+        return ['Gespeichert.', false];
     }
 
     private static function saveGallery(App $app): never

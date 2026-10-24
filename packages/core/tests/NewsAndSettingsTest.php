@@ -231,6 +231,7 @@ final class NewsAndSettingsTest extends TestCase
         foreach ([
             ['calendar_ics_url' => 'javascript:alert(1)'],
             ['calendar_cache_minutes' => 0],
+            ['calendar_cache_minutes' => 1441],
             ['calendar_ids' => 'a b'],
             ['google_api_key' => 'x"y'],
             ['news_source' => 'ftp'],

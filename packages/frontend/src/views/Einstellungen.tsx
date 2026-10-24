@@ -608,10 +608,14 @@ function GoogleLink() {
   );
 }
 
+/** Zwischenspeicher des Kalenders in Minuten (Grenzen wie SettingsService::update auf dem Server). */
+const CACHE_MINUTES = { min: 1, max: 1440 };
+
 export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const c = settings.calendar;
   const [url, setUrl] = useState('');
   const [ids, setIds] = useState(c.calendar_ids);
+  const [minutes, setMinutes] = useState(String(c.cache_minutes));
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -650,11 +654,16 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       onSubmit={(e) => {
         e.preventDefault();
         const idsChanged = ids.trim() !== c.calendar_ids;
+        // Die Grenzen prüfen der Browser (min/max am Feld) und genau noch einmal der Server.
+        const cacheMinutes = Number(minutes);
+        // Nur die Dauer geändert: auch ohne neue Adresse oder IDs speichern (Issue #177).
+        const cache = cacheMinutes !== c.cache_minutes ? { calendar_cache_minutes: cacheMinutes } : {};
         if (!url.trim() && !idsChanged) {
+          if ('calendar_cache_minutes' in cache) return save(cache);
           if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
           return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
         }
-        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim() }, () => setUrl(''));
+        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
       }}
     >
       <p className="muted small">
@@ -699,6 +708,25 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         <span className="small muted">
           In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Geheime Adresse im iCal-Format. Sie wird nicht wieder
           angezeigt.
+        </span>
+      </label>
+      <label className="field">
+        <span>Aktualisieren alle … Minuten</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={CACHE_MINUTES.min}
+          max={CACHE_MINUTES.max}
+          step={1}
+          required
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+        />
+        <span className="small muted">
+          So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt ({CACHE_MINUTES.min} bis{' '}
+          {CACHE_MINUTES.max} Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der
+          Termine dauert dann öfter länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und
+          Speichern laden sofort neu.
         </span>
       </label>
       {c.source !== 'none' && (
