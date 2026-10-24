@@ -2278,6 +2278,7 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 60, description: In der Gruppe eindeutig ohne Groß-/Kleinschreibung }
+                singular: { type: string, maxLength: 60, description: Einzahl (optional) }
                 group_id: { type: [integer, 'null'] }
       responses:
         '201':
@@ -2351,7 +2352,7 @@ paths:
       - { name: id, in: path, required: true, schema: { type: integer } }
     patch:
       tags: [Ämter]
-      summary: Umbenennen, Gruppe wechseln, mit einem Titel verknüpfen
+      summary: Umbenennen, Einzahl ändern, Gruppe wechseln, mit einem Titel verknüpfen
       description: |
         `title_id` verknüpft das Amt mit einem Titel (je Titel höchstens ein Amt): Wer eine laufende Amtszeit hat (Konto,
         Mitglied), bekommt ihn, wer keine hat, verliert ihn; von Hand ist er dann nicht mehr zu vergeben. `null` löst die
@@ -2365,6 +2366,7 @@ paths:
               type: object
               properties:
                 title: { type: string, maxLength: 60 }
+                singular: { type: string, maxLength: 60, description: 'Einzahl; leer: keine eigene' }
                 group_id: { type: [integer, 'null'] }
                 title_id: { type: [integer, 'null'] }
       responses:
@@ -5482,11 +5484,12 @@ components:
 
     OfficeRef:
       type: object
-      required: [id, group_id, title, title_id]
+      required: [id, group_id, title, singular, title_id]
       properties:
         id: { type: integer }
         group_id: { type: [integer, 'null'] }
         title: { type: string, maxLength: 60 }
+        singular: { type: string, maxLength: 60, description: 'Eigene Einzahl („Kapitän“ zu „Kapitäne“); leer ohne' }
         title_id: { type: [integer, 'null'], description: Verknüpfter Titel }
 
     OfficeHolder:
@@ -5543,7 +5546,7 @@ components:
               items: { $ref: '#/components/schemas/OfficeTerm' }
             holder_title:
               type: [string, 'null']
-              description: Einzahl für den Zeitstrahl einer Person („Kompaniekönig“ statt „Kompaniekönige“) = Name des verknüpften Titels; null ohne Verknüpfung oder ohne Bereich `titles`
+              description: Einzahl für den Zeitstrahl einer Person („Kompaniekönig“ statt „Kompaniekönige“) = eigene Einzahl (`singular`), sonst Name des verknüpften Titels (nur mit Bereich `titles`); null ohne beides
             linked_title: { type: [string, 'null'], description: Nur mit manage_offices }
 
     OfficesOverview:

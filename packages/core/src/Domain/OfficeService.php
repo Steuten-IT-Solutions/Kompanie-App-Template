@@ -97,8 +97,10 @@ final class OfficeService
                 'id' => $o['id'],
                 'group_id' => $o['group_id'],
                 'title' => $o['title'],
-                // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“, null ohne verknüpften Titel
-                'holder_title' => $titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null,
+                'singular' => $o['singular'],
+                // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“; die eigene Einzahl des
+                // Amts, sonst der verknüpfte Titel, null ohne beides (dann die Bezeichnung)
+                'holder_title' => $o['singular'] !== '' ? $o['singular'] : ($titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null),
                 'terms' => array_map(function (array $t) use ($holders, $users, $photos, $directory, $former, $manager, $viewer): array {
                     return self::termOut($t) + ['holders' => array_map(function (array $h) use ($users, $photos, $directory, $former, $manager, $viewer): array {
                         $user = $h['user_id'] !== null ? ($users[$h['user_id']] ?? null) : null;
@@ -180,14 +182,14 @@ final class OfficeService
     {
         $repo = $this->repository();
         $groupId = $this->validGroupId($in['group_id'] ?? null);
-        $id = $repo->insertOffice($groupId, $this->validOfficeTitle($in['title'] ?? null, $groupId, null), $repo->maxOfficeSort() + 10);
+        $id = $repo->insertOffice($groupId, $this->validOfficeTitle($in['title'] ?? null, $groupId, null), $repo->maxOfficeSort() + 10, $this->validSingular($in['singular'] ?? ''));
         return $this->office($id);
     }
 
     /**
      * Umbenennen, in eine andere Gruppe verschieben, mit einem Titel verknüpfen (title_id, null löst die Verknüpfung).
      *
-     * @param array<string, mixed> $in title, group_id, title_id
+     * @param array<string, mixed> $in title, singular, group_id, title_id
      * @return array<string, mixed>
      */
     public function updateOffice(int $id, array $in): array
@@ -201,6 +203,9 @@ final class OfficeService
         }
         if (array_key_exists('title', $in) || $groupId !== $office['group_id']) {
             $data['title'] = $this->validOfficeTitle(array_key_exists('title', $in) ? $in['title'] : $office['title'], $groupId, $id);
+        }
+        if (array_key_exists('singular', $in)) {
+            $data['singular'] = $this->validSingular($in['singular']);
         }
         // Neu verknüpft: den Titel an die laufenden Amtszeiten anpassen. Ein bisher verknüpfter Titel bleibt bei seinen
         // Trägern und ist wieder von Hand zu vergeben.
@@ -938,7 +943,7 @@ final class OfficeService
      */
     private function officeOut(array $o): array
     {
-        return ['id' => $o['id'], 'group_id' => $o['group_id'], 'title' => $o['title'], 'title_id' => $o['title_id']];
+        return ['id' => $o['id'], 'group_id' => $o['group_id'], 'title' => $o['title'], 'singular' => $o['singular'], 'title_id' => $o['title_id']];
     }
 
     /** @return array<string, mixed> */
@@ -969,6 +974,16 @@ final class OfficeService
             }
         }
         return $title;
+    }
+
+    /** Einzahl des Amts (optional, z. B. „Kapitän“ zu „Kapitäne“). */
+    private function validSingular(mixed $raw): string
+    {
+        $singular = Text::line(is_string($raw) ? $raw : '', self::TITLE_MAX + 1);
+        if (mb_strlen($singular) > self::TITLE_MAX) {
+            throw ApiError::invalid(sprintf('Die Einzahl darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+        }
+        return $singular;
     }
 
     private function validName(mixed $raw, string $missing): string

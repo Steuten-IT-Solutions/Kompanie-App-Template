@@ -567,6 +567,21 @@ select {
   border: 1.5px solid var(--line-strong);
   box-shadow: none;
 }
+/* Verweis mitten im Text (z. B. „Wird über das Amt … vergeben“): sieht aus wie ein Link */
+.link-button {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.title-office-note {
+  margin: -4px 0 8px 32px;
+}
 .btn-link {
   background: none;
   box-shadow: none;

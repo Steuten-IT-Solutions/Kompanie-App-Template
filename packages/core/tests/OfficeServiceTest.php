@@ -479,4 +479,71 @@ final class OfficeServiceTest extends TestCase
         $backup->restore($tables, ['office_groups', 'offices', 'office_terms', 'office_holders']);
         $this->assertSame([false, true], array_column($this->overviewOffice($office, null)['terms'], 'honor'));
     }
+    /**
+     * Die Chronik der Webseite aus Issue #112 (Stand 21.10.2026): 2 Gruppen, 26 Ämter, 145 Amtszeiten. Personennamen
+     * sind durch Platzhalter ersetzt (gleiche Person, gleicher Platzhalter); Jahre, Zusätze und Aufbau sind unverändert.
+     */
+    public function testImportOfTheWebsiteChronicle(): void
+    {
+        $this->setUpApp();
+        $csv = (string) file_get_contents(__DIR__ . '/fixtures/aemter-145.csv');
+        $preview = $this->ok('POST', '/offices/import', ['csv' => $csv, 'link' => false]);
+        $this->assertSame([2, 26, 145], [$preview['groups_new'], $preview['offices_new'], $preview['terms_new']]);
+        $this->assertSame([], array_values(array_filter($preview['rows'], static fn (array $r): bool => isset($r['error']))));
+
+        $this->ok('POST', '/offices/import', ['csv' => $csv, 'link' => false, 'apply' => true]);
+        $all = $this->ok('GET', '/offices');
+        $this->assertSame(['Bruderschaft', 'Kompanie'], array_column($all['groups'], 'title'));
+        $this->assertCount(26, $all['offices']);
+        $terms = array_merge(...array_map(static fn (array $o): array => $o['terms'], $all['offices']));
+        $this->assertCount(145, $terms);
+        $count = static fn (callable $f): int => count(array_filter($terms, $f));
+        $this->assertSame(25, $count(static fn (array $t): bool => $t['current']), 'laufend („heute“)');
+        $this->assertSame(9, $count(static fn (array $t): bool => $t['kind'] === 'point'), 'einzelne Jahre');
+        $this->assertSame(8, $count(static fn (array $t): bool => $t['honor']), 'Ehrungen: nur die Ehrenmitglieder, nicht das einzelne Jahr beim Schatzmeister');
+        $this->assertSame(4, $count(static fn (array $t): bool => count($t['holders']) === 2), 'zwei Personen in einer Amtszeit');
+        $this->assertSame(15, $count(static fn (array $t): bool => $t['note'] !== ''), 'mit Zusatz');
+
+        // Gleich benannte Ämter in beiden Gruppen bleiben getrennt.
+        $byName = [];
+        foreach ($all['offices'] as $o) {
+            $byName[$o['title']][] = $o;
+        }
+        $this->assertCount(2, $byName['Ehrenmitglieder']);
+        $this->assertCount(2, $byName['2. Schatzmeister']);
+        // Die App sortiert selbst: laufende zuerst, dann nach Beginn absteigend (auf der Webseite nicht überall so).
+        $flag = $byName['Fahne'][0]['terms'];
+        $this->assertSame([[2025, null], [2006, null], [2006, null], [2006, null], [2006, null], [2023, 2025], [2009, 2023]], array_map(static fn (array $t): array => [$t['start_year'], $t['end_year']], $flag));
+        // Dieselbe Person mehrfach mit Lücke
+        $spiess = array_map(static fn (array $t): array => [$t['start_year'], $t['end_year'], $t['holders'][0]['name']], $byName['1. Spieße'][0]['terms']);
+        $this->assertSame([1983, 1993], array_slice($spiess[3], 0, 2));
+        $this->assertSame([1974, 1980], array_slice($spiess[4], 0, 2));
+        $this->assertSame($spiess[3][2], $spiess[4][2]);
+
+        $again = $this->ok('POST', '/offices/import', ['csv' => $csv, 'link' => false]);
+        $this->assertSame([0, 0, 0], [$again['groups_new'], $again['offices_new'], $again['terms_new']], 'zweiter Import: alles schon da');
+    }
+    /** Eigene Einzahl des Amts für den Zeitstrahl einer Person; leer: der verknüpfte Titel, sonst nichts (Bezeichnung). */
+    public function testSingularOfAnOffice(): void
+    {
+        $this->setUpApp();
+        $kings = $this->office('Kompaniekönige');
+        $this->assertSame('', $this->overviewOffice($kings, null)['singular']);
+        $this->assertNull($this->overviewOffice($kings, null)['holder_title']);
+
+        $title = (int) $this->ok('POST', '/titles', ['title' => 'König der Kompanie'])['id'];
+        $this->ok('PATCH', "/offices/$kings", ['title_id' => $title]);
+        $this->assertSame('König der Kompanie', $this->overviewOffice($kings, null)['holder_title'], 'ohne Einzahl: verknüpfter Titel');
+
+        $res = $this->ok('PATCH', "/offices/$kings", ['singular' => '  Kompaniekönig ']);
+        $this->assertSame('Kompaniekönig', $res['singular']);
+        $this->assertSame(['Kompaniekönig', 'Kompaniekönig'], [$this->overviewOffice($kings, null)['singular'], $this->overviewOffice($kings, null)['holder_title']], 'eigene Einzahl vor dem Titel');
+        $this->assertSame('Kompaniekönig', $this->ok('PATCH', "/offices/$kings", ['title' => 'Könige'])['singular'], 'Umbenennen lässt die Einzahl');
+        $this->assertSame(400, $this->call('PATCH', "/offices/$kings", ['singular' => str_repeat('x', 61)])->status);
+        $this->ok('PATCH', "/offices/$kings", ['singular' => '']);
+        $this->assertSame('König der Kompanie', $this->overviewOffice($kings, null)['holder_title']);
+
+        $captains = (int) $this->ok('POST', '/offices', ['title' => 'Kapitäne', 'singular' => 'Kapitän'])['id'];
+        $this->assertSame('Kapitän', $this->overviewOffice($captains, null)['holder_title']);
+    }
 }

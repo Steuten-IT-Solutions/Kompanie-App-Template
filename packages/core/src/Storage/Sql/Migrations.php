@@ -1052,6 +1052,12 @@ final class Migrations
                 'mysql' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for bigint(20) unsigned DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for INTEGER DEFAULT NULL'],
             ],
+            // Ämter (Issue #112): eigene Einzahl („Kapitän“ zu „Kapitäne“) für den Zeitstrahl einer Person; leer: wie bisher
+            // der Name des verknüpften Titels bzw. die Bezeichnung.
+            27 => [
+                'mysql' => ["ALTER TABLE {offices} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {offices} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
+            ],
         ];
     }
 

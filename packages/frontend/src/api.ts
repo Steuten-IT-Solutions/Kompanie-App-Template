@@ -925,7 +925,9 @@ export interface Office {
   id: number;
   group_id: number | null;
   title: string;
-  /** Einzahl für den Zeitstrahl einer Person: Name des verknüpften Titels (nur mit Bereich Titel, nur in GET /offices) */
+  /** Eigene Einzahl („Kapitän“ zu „Kapitäne“), leer ohne */
+  singular?: string;
+  /** Einzahl für den Zeitstrahl einer Person: eigene Einzahl, sonst Name des verknüpften Titels (nur mit Bereich Titel); nur in GET /offices */
   holder_title?: string | null;
   /** Laufende zuerst, dann nach Beginn absteigend */
   terms: OfficeTerm[];
@@ -1468,7 +1470,7 @@ export const api = {
   deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
   reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
   createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),
-  updateOffice: (id: number, data: { title?: string; group_id?: number | null; title_id?: number | null }) =>
+  updateOffice: (id: number, data: { title?: string; singular?: string; group_id?: number | null; title_id?: number | null }) =>
     request<Office>('PATCH', `/offices/${id}`, data),
   deleteOffice: (id: number) => request<{ deleted: boolean }>('DELETE', `/offices/${id}`),
   reorderOffices: (ids: number[]) => request<Office[]>('PUT', '/offices/order', { ids }),

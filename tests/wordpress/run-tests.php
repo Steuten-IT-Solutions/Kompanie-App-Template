@@ -816,6 +816,16 @@ $html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
 $html = do_shortcode('[kompanie_aemter gruppe=”Kpwp Bruderschaft”]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän'), 'gruppe mit typografischen Anführungszeichen');
+foreach (['/kompanie-app/v1/offices', '/kompanie-app/v1/directory'] as $route) {
+    $res = rest_do_request(new WP_REST_Request('GET', $route));
+    $c->ok($res->get_status() === 200 && ($res->get_headers()['X-Robots-Tag'] ?? '') === 'noindex', "GET $route ohne Anmeldung: noindex");
+}
+$html = do_shortcode('[kompanie_aemter amt="kpwp kapitän"]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'ka-gruppe">'), 'amt="…" zeigt nur dieses Amt (ohne Überschrift)');
+$html = do_shortcode('[kompanie_aemter gruppe=„Kpwp Kompanie“ amt=„Kpwp Kapitän“]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister'), 'gruppe und amt mit typografischen Anführungszeichen');
+$html = do_shortcode('[kompanie_aemter gruppe="Kpwp Bruderschaft" amt="Kpwp Kapitän"]');
+$c->ok(!str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'Noch keine Ämter eingetragen.'), 'amt in einer anderen Gruppe: nichts');
 $html = do_shortcode('[kompanie_mitglieder]');
 $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
     && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');

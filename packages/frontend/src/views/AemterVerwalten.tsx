@@ -339,6 +339,7 @@ function usePeople() {
 function OfficeEditor({ office, groups, onToast, reload }: { office: Office; groups: OfficeGroup[]; onToast: Toast; reload: () => void }) {
   const { busy, error, run } = useRunner(onToast, reload);
   const [title, setTitle] = useState(office.title);
+  const [singular, setSingular] = useState(office.singular ?? '');
   const [group, setGroup] = useState(office.group_id === null ? '' : String(office.group_id));
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
@@ -411,7 +412,12 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
         onSubmit={async (e) => {
           e.preventDefault();
           await run(
-            () => api.updateOffice(office.id, { title: title.trim(), group_id: group === '' ? null : Number(group) }),
+            () =>
+              api.updateOffice(office.id, {
+                title: title.trim(),
+                singular: singular.trim(),
+                group_id: group === '' ? null : Number(group),
+              }),
             'Gespeichert',
           );
         }}
@@ -420,6 +426,16 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
         <label className="field">
           <span>Bezeichnung</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </label>
+        <label className="field">
+          <span>Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)</span>
+          <input
+            type="text"
+            maxLength={60}
+            value={singular}
+            placeholder={office.linked_title ?? ''}
+            onChange={(e) => setSingular(e.target.value)}
+          />
         </label>
         <label className="field">
           <span>Gruppe</span>
@@ -432,6 +448,9 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             <option value="">Ohne Gruppe</option>
           </select>
         </label>
+        <p className="muted small">
+          Die Einzahl steht auf der Seite einer Person bei ihren Amtszeiten. Leer: der Name des verknüpften Titels, sonst die Bezeichnung.
+        </p>
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
             Speichern
