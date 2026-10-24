@@ -1315,6 +1315,77 @@ test('Ämter: Einzahl auf der Seite einer Person, Hinweis mit Link bei Titeln, d
   expect(status.every((s) => s < 300)).toBe(true);
 });
 
+test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gemerkt (Issue #112)', async ({ page }) => {
+  const id = Date.now() % 1000000;
+  const office = `Fähnriche ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const officeId = await page.evaluate(
+    async ({ id, office }) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const post = async (path: string, body: unknown) =>
+        (
+          await fetch(cfg.apiBase + path, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+            body: JSON.stringify(body),
+          })
+        ).json();
+      const o = await post('offices', { title: office });
+      // Zwei gleichzeitig (zwei Spuren), ein Vorgänger, eine Ehrung als einzelnes Jahr
+      await post(`offices/${o.id}/terms`, { start_year: 2006, holders: [{ name: `Anna Alt ${id}` }] });
+      await post(`offices/${o.id}/terms`, { start_year: 2010, holders: [{ name: `Bert Bunt ${id}` }] });
+      await post(`offices/${o.id}/terms`, { start_year: 1990, end_year: 2006, holders: [{ name: `Carl Clau ${id}` }] });
+      await post(`offices/${o.id}/terms`, { kind: 'point', start_year: 2000, honor: true, holders: [{ name: `Dora Dank ${id}` }] });
+      return o.id as number;
+    },
+    { id, office },
+  );
+
+  // Schmal: keine Umschaltung
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.goto('/app/#/mitglieder/aemter');
+  await expect(page.locator('.office-card', { hasText: office })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Ansicht' })).toHaveCount(0);
+
+  // Breit: „Jahre“ zeigt das Raster; die Seite selbst scrollt nicht seitlich
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.getByRole('group', { name: 'Ansicht' }).getByRole('button', { name: 'Jahre' }).click();
+  const grid = page.locator('.year-grid');
+  await expect(grid).toBeVisible();
+  await expect(grid.locator('.yg-office', { hasText: office })).toBeVisible();
+  const bar = (name: string) => grid.locator('.yg-bar', { hasText: name });
+  await expect(bar(`Anna Alt ${id}`)).toHaveClass(/current/);
+  await expect(bar(`Bert Bunt ${id}`)).toHaveClass(/current/);
+  await expect(bar(`Dora Dank ${id}`)).toHaveClass(/honor/);
+  await expect(bar(`Dora Dank ${id}`)).toContainText('★');
+  await expect(bar(`Carl Clau ${id}`)).toHaveAttribute('title', `${office}: 1990–2006 · Carl Clau ${id}`);
+  // Gleichzeitige Amtszeiten nebeneinander, die Nachfolge in derselben Spalte
+  const x = async (name: string) => (await bar(name).boundingBox())!.x;
+  expect(await x(`Anna Alt ${id}`)).toBe(await x(`Carl Clau ${id}`));
+  expect(await x(`Bert Bunt ${id}`)).not.toBe(await x(`Anna Alt ${id}`));
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await shot(page, '1d-aemter-jahre');
+
+  // Gemerkt: nach dem Neuladen wieder die Jahre
+  await page.reload();
+  await expect(page.locator('.year-grid')).toBeVisible();
+  await page.getByRole('group', { name: 'Ansicht' }).getByRole('button', { name: 'Chronik' }).click();
+  await expect(page.locator('.year-grid')).toHaveCount(0);
+
+  const status = await page.evaluate(async (officeId) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    return (
+      await fetch(cfg.apiBase + `offices/${officeId}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+      })
+    ).status;
+  }, officeId);
+  expect(status).toBeLessThan(300);
+});
+
 test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, CSV und Druck', async ({ page }) => {
   const title = `Unterschriften ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);
