@@ -341,6 +341,10 @@ select {
 .row.clickable:active {
   transform: scale(0.99);
 }
+/* Beförderungen: unter der Schwelle des eigenen Dienstgrads (Kandidaten zum Degradieren) mit rotem Rand */
+.promotions .row.below::before {
+  background: var(--danger);
+}
 .row.inactive {
   opacity: 0.55;
 }
@@ -1167,6 +1171,15 @@ button.member-date {
 .form.card {
   padding: 16px;
   margin-bottom: 16px;
+}
+/*
+ * Formular-Karte nach einer Liste, einem Leerhinweis oder einem breiten Knopf (Issue #179): derselbe Abstand wie unter
+ * ihr. Die Eltern sind Blöcke, die Ränder fallen zusammen, also kein doppelter Abstand nach einer Karte.
+ */
+.card-list + .form.card,
+.empty + .form.card,
+.btn-block + .form.card {
+  margin-top: 16px;
 }
 .form.card h3,
 .settings-section h3 {
@@ -3996,7 +4009,7 @@ button.spotlight-person:focus-visible {
   margin-bottom: 18px;
 }
 .office-admin-terms {
-  margin: 8px 0 0;
+  margin: 8px 0 16px;
 }
 .office-term-row {
   display: flex;

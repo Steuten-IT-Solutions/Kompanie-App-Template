@@ -13,7 +13,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 
 ## Was du hier siehst
 - **Neue Vorlage** und **{bereich.points}**: das Formular für eine neue Vorlage, mit dem Knopf **Hinzufügen**.
-- Darunter alle Vorlagen mit Bezeichnung, „aktiv“ oder „deaktiviert“ und rechts der Punktzahl.
+- Darunter alle Vorlagen mit Bezeichnung, „aktiv“ oder „deaktiviert“ und rechts der Punktzahl. Ab zwei Vorlagen hat jede links einen Griff (sechs Punkte) zum Verschieben.
 - Bei jeder Vorlage die Knöpfe **Wert ändern** und **Deaktivieren** (bzw. **Aktivieren**).
 - Ohne Vorlagen steht dort „Noch keine Vorlagen. Lege oben die erste an.“
 
@@ -25,6 +25,11 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 
 ![Ausgefülltes Formular für eine neue Vorlage](bild:punktekatalog-neu)
 
+### Die Reihenfolge ändern
+1. Halte den Griff links an der Vorlage fest und ziehe sie an die neue Stelle. Am Rand des Bildschirms scrollt die Seite mit.
+2. Lass los. Die Reihenfolge ist sofort gespeichert.
+3. Mit Tastatur: Tippe auf den Griff und verschiebe die Vorlage mit den Pfeiltasten nach oben oder unten.
+
 ### Die Punktzahl ändern
 1. Tippe bei der Vorlage auf **Wert ändern**.
 2. Trage im Fenster die neue Punktzahl ein und bestätige.
@@ -34,7 +39,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 2. Brauchst du sie wieder, tippe auf **Aktivieren**.
 
 ## Gut zu wissen
-- Die Liste ist alphabetisch sortiert.
+- Die Reihenfolge hier gilt auch für die Auswahl **Vorlage aus dem Katalog** beim Vergeben. Neue Vorlagen kommen ans Ende. Deaktivierte lassen sich ebenso verschieben.
 - Eine Vorlage lässt sich nicht löschen, nur deaktivieren.
 - Ändern betrifft nur künftige Einträge. Was schon vergeben ist, bleibt, wie es ist.
 - Die Bezeichnung einer Vorlage lässt sich hier nicht ändern; lege bei Bedarf eine neue an und deaktiviere die alte.
