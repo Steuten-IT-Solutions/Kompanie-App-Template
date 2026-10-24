@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { devices, expect, test, type Page } from '@playwright/test';
+import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
@@ -99,6 +99,30 @@ async function login(page: Page, user: string, password = PASSWORD) {
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
+}
+
+/** Senkrechter Abstand zwischen der Unterkante von a und der Oberkante von b (Pixel). */
+async function gapBetween(a: Locator, b: Locator): Promise<number> {
+  const [ra, rb] = [await a.boundingBox(), await b.boundingBox()];
+  return Math.round(rb!.y - (ra!.y + ra!.height));
+}
+
+/** Bildschirmfotos schmal (360 px) und breit, hell und dunkel; danach wieder wie vorher. */
+async function shotsNarrowAndWide(page: Page, name: string) {
+  if (!SHOTS) return;
+  const before = page.viewportSize()!;
+  for (const [width, suffix] of [
+    [360, 'schmal'],
+    [1000, 'breit'],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.screenshot({ path: `${SHOTS}/${name}-${suffix}${scheme === 'dark' ? '-dunkel' : ''}.png`, fullPage: true });
+    }
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.setViewportSize(before);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -1048,6 +1072,17 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await form.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
   await expect(page.locator('.office-term-row').first()).toContainText('seit 2020');
+  // Abstände um „Amtszeit eintragen“ wie zwischen Karten, auch mit offenem Formular (Issue #179)
+  const addTerm = page.getByRole('button', { name: 'Amtszeit eintragen' });
+  expect(await gapBetween(page.locator('.office-term-row').last(), addTerm)).toBe(16);
+  expect(await gapBetween(addTerm, page.locator('.btn-block + .card'))).toBe(16);
+  await shotsNarrowAndWide(page, '1a-amt-bearbeiten');
+  await addTerm.click();
+  form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  expect(await gapBetween(page.locator('.office-term-row').last(), form)).toBe(16);
+  expect(await gapBetween(form, page.locator('form.card:has-text("Neue Amtszeit") + .card'))).toBe(16);
+  await shotsNarrowAndWide(page, '1a-amt-bearbeiten-neue-amtszeit');
+  await form.getByRole('button', { name: 'Abbrechen' }).click();
 
   // Ohne Anmeldung: Zeitstrahl im Tab Mitglieder, laufende Amtszeit oben
   await page.context().clearCookies();
@@ -1206,6 +1241,9 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
   await expect(page.locator('.toast')).toHaveText('Liste kopiert');
+  // Abstand zwischen der letzten Liste und „Neue Liste“ (Issue #179)
+  expect(await gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
+  await shotsNarrowAndWide(page, '40d-listen-uebersicht');
   for (const t of [`${title} (Kopie)`, title]) {
     page.once('dialog', (d) => d.accept());
     await page

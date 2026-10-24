@@ -125,6 +125,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Großansicht älterer Mitgliedsfotos auf der Webseite**: In `[kompanie_mitglieder]` öffnete sich bei Fotos, die vor
   der Fassung in 1024 Pixeln hochgeladen wurden, beim Antippen kein Bild. Jetzt zeigt die Großansicht dann das größte
   vorhandene Foto (480 Pixel). Wer volle Auflösung will, lädt das Foto neu hoch.
+- **Abstände in der Verwaltung**: Unter *Listen* stößt die Karte „Neue Liste“ nicht mehr an die letzte Liste, und beim
+  Bearbeiten eines Amts hat „Amtszeit eintragen“ (oder das Formular für eine neue Amtszeit) wieder Abstand nach oben
+  und unten. Dasselbe gilt überall, wo eine Formular-Karte auf eine Liste, einen Hinweis oder einen breiten Knopf folgt.
 
 ## [0.2.0] – 2026-10-22
 

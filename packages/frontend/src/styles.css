@@ -1153,6 +1153,15 @@ button.member-date {
   padding: 16px;
   margin-bottom: 16px;
 }
+/*
+ * Formular-Karte nach einer Liste, einem Leerhinweis oder einem breiten Knopf (Issue #179): derselbe Abstand wie unter
+ * ihr. Die Eltern sind Blöcke, die Ränder fallen zusammen, also kein doppelter Abstand nach einer Karte.
+ */
+.card-list + .form.card,
+.empty + .form.card,
+.btn-block + .form.card {
+  margin-top: 16px;
+}
 .form.card h3,
 .settings-section h3 {
   margin: 0;
@@ -3981,7 +3990,7 @@ button.spotlight-person:focus-visible {
   margin-bottom: 18px;
 }
 .office-admin-terms {
-  margin: 8px 0 0;
+  margin: 8px 0 16px;
 }
 .office-term-row {
   display: flex;
