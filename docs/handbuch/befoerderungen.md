@@ -9,7 +9,7 @@ Die Beförderungsübersicht zeigt, wer genug {bereich.points} für den nächsten
 ![Die Beförderungsübersicht mit den Abschnitten Unter der Schwelle, Schwelle erreicht und Noch nicht erreicht](bild:befoerderungen)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf den Knopf **Beförderungen**. Mit **‹ Verwaltung** kommst du zurück.
+Tippe unten auf **Verwaltung** und dann auf den Knopf **Beförderungen**. Mit **‹ Verwaltung** kommst du zurück. Die kleine Zahl im roten Kreis an der Ecke des Knopfs zeigt, wie viele Mitglieder gerade die Schwelle für ihre nächste Beförderung erreicht haben (Abschnitt **Schwelle erreicht**); ist es niemand, fehlt sie.
 
 ## Was du hier siehst
 - **Unter der Schwelle** (ganz oben, rot markiert): wer weniger {bereich.points} hat, als sein jetziger {begriff.rank} verlangt. Das sind Kandidaten zum Degradieren. Ist niemand darunter, fehlt der Abschnitt.
