@@ -2,10 +2,11 @@ import { api, type Me, type Penalty } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
+import { useFocusEntry } from '../focus';
 
-export function PenaltyRow({ p, actions }: { p: Penalty; actions?: React.ReactNode }) {
+export function PenaltyRow({ p, actions, focused }: { p: Penalty; actions?: React.ReactNode; focused?: boolean }) {
   return (
-    <li className="card row">
+    <li className={`card row ${focused ? 'focused' : ''}`} data-focus-id={p.id}>
       <div className="row-main">
         <div className="row-title">{p.reason}</div>
         <div className="row-sub">
@@ -21,8 +22,9 @@ export function PenaltyRow({ p, actions }: { p: Penalty; actions?: React.ReactNo
   );
 }
 
-export default function Strafen({ me }: { me: Me }) {
+export default function Strafen({ me, focus }: { me: Me; focus?: string }) {
   const { data, error, loading, reload } = useAsync(api.myPenalties, [], 'me/penalties');
+  const flash = useFocusEntry(focus, !error && !!data?.some((p) => String(p.id) === focus));
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -43,7 +45,7 @@ export default function Strafen({ me }: { me: Me }) {
           <h2 className="section-title">Offen</h2>
           <ul className="card-list">
             {open.map((p) => (
-              <PenaltyRow key={p.id} p={p} />
+              <PenaltyRow key={p.id} p={p} focused={flash === String(p.id)} />
             ))}
           </ul>
         </>
@@ -53,7 +55,7 @@ export default function Strafen({ me }: { me: Me }) {
           <h2 className="section-title">Bezahlt</h2>
           <ul className="card-list">
             {paid.map((p) => (
-              <PenaltyRow key={p.id} p={p} />
+              <PenaltyRow key={p.id} p={p} focused={flash === String(p.id)} />
             ))}
           </ul>
         </>
