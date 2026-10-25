@@ -42,6 +42,7 @@ final class ApiScenario
             $this->directory();
             $this->offices();
             $this->lists();
+            $this->activity();
             $this->accounts();
             $this->formerMembers();
             $this->events();
@@ -1215,6 +1216,46 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
         $this->req('PUT', '/admin/features', ['lists' => true]);
         $c->ok($this->req('DELETE', "/lists/$id")[0] === 200 && $this->req('DELETE', '/lists/' . (int) ($copy['id'] ?? 0))[0] === 200 && $this->req('GET', "/lists/$id")[0] === 404, 'Aufräumen: Listen löschen');
+    }
+
+    /**
+     * Nutzungsauswertung (Issue #175): Nutzung an den Routen erfasst, Auswertung nur für Admins, Erfassung je Person aus
+     * löscht die Einträge, gezählt wird weiter ohne Personenbezug; Konto löschen entfernt seine Einträge.
+     */
+    private function activity(): void
+    {
+        $c = $this->c;
+        $c->section('Nutzungsauswertung');
+        $admin = $this->user('kptest_nutzung_admin', 'admin');
+        $m = $this->user('kptest_nutzung_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/me')[0] === 200, 'Mitglied öffnet sein Konto');
+        $c->ok($this->req('GET', '/admin/activity')[0] === 403, 'Mitglied sieht die Auswertung nicht → 403');
+
+        $this->d->actAs($admin);
+        [$s, $o] = $this->req('GET', '/admin/activity');
+        $last = array_column((array) ($o['members'] ?? []), 'last_active', 'id');
+        $c->ok($s === 200 && ($o['personal'] ?? null) === true && is_int($last[$m] ?? null), 'Übersicht: je Person an, Mitglied zuletzt aktiv');
+        $c->ok(($o['active']['d1'] ?? 0) >= 1 && ($o['active']['d1'] ?? 0) <= ($o['users'] ?? 0), 'Aktive Konten heute, höchstens so viele wie Konten');
+        [$s, $e] = $this->req('GET', '/admin/activity/entries', [], ['user_id' => $m]);
+        $c->ok($s === 200 && array_map(static fn (mixed $r): array => is_array($r) ? [$r['area'] ?? '', $r['action'] ?? ''] : [], (array) ($e['entries'] ?? [])) === [['app', 'view']], 'Verlauf der Person: nur Bereich und Aktion');
+        [$s, $status] = $this->req('GET', '/admin/status');
+        $usage = $status['statusReports']['payload']['usage'] ?? null;
+        $c->ok($s === 200 && ($status['statusReports']['payload']['format'] ?? null) === 3 && is_array($usage) && array_keys($usage) === ['users', 'active', 'areas'], 'Lebenszeichen (Beispiel): Format 3 mit usage');
+
+        [$s, $d] = $this->req('PUT', '/admin/activity/settings', ['personal' => false]);
+        $c->ok($s === 200 && ($d['personal'] ?? null) === false, 'Erfassung je Person aus');
+        [, $e] = $this->req('GET', '/admin/activity/entries');
+        [, $o] = $this->req('GET', '/admin/activity');
+        $c->ok(($e['entries'] ?? null) === [] && is_array($o) && array_key_exists('members', $o) && $o['members'] === null, 'Aus: Einträge je Person gelöscht, keine Liste der Konten');
+        $this->req('PUT', '/admin/activity/settings', ['personal' => true]);
+
+        $this->d->actAs($m);
+        $this->req('GET', '/me');
+        $this->d->actAs($admin);
+        $c->ok($this->req('DELETE', "/members/$m")[0] === 200, 'Konto löschen');
+        [, $e] = $this->req('GET', '/admin/activity/entries', [], ['user_id' => $m]);
+        $c->ok(($e['entries'] ?? null) === [], 'Gelöschtes Konto: keine Einträge mehr');
     }
 
     private function birthdays(): void

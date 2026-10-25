@@ -20,6 +20,7 @@ Je Thema eine Zeile mit einem kurzen Satz. Tippe auf eine Zeile, um ihre Seite z
 - **{bereich.gallery}**: der Ordner in Google Drive mit den Fotoalben. Siehe [{bereich.gallery} einrichten](seite:admin-galerie).
 - **Kalender**: woher der Kalender für Mitglieder kommt. Siehe [Kalender einrichten](seite:admin-kalender).
 - **Neuigkeiten**: woher die {bereich.news} kommen. Heißt der Bereich bei euch anders als „News“, steht hier sein Name. Die Seite gibt es nur in der eigenständigen App (ohne WordPress).
+- **Nutzung**: wer die App wann nutzt und welche Bereiche. Siehe [Nutzung](seite:admin-nutzung).
 - **Zustand und Updates**: Ampel je Bereich, installierte Version, Updates und Fehlerprotokoll. Siehe [Zustand und Updates](seite:admin-zustand).
 - **Datensicherung**: Sicherung herunterladen oder einspielen. Siehe [Datensicherung](seite:admin-updates-und-sicherung).
 - **Wartungsmodus**: die App vorübergehend nur für {rolle.admin}s öffnen. Siehe [Wartungsmodus](seite:admin-wartungsmodus).

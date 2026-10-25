@@ -278,8 +278,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               }}
             />
             <span>
-              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen, schwere Fehler sofort, jeweils mit Fehlercode und
-              Ursache (z. B. „Kalender: HTTP 404“), ohne Namen, Inhalte oder Fehlertexte
+              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen mit Nutzungszahlen (Zahl der Konten, aktive
+              Konten, Personen je Bereich), schwere Fehler sofort, jeweils mit Fehlercode und Ursache (z. B. „Kalender: HTTP 404“), ohne
+              Namen, Inhalte oder Fehlertexte
             </span>
           </label>
           {reports && (

@@ -42,6 +42,11 @@ enum Capability: string
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
+    /**
+     * Nutzungsauswertung ansehen: wer wann welchen Bereich genutzt hat (Issue #175). Nur Admins; nicht an Rollen vergebbar
+     * (Roles::GRANTABLE), solange offen ist, wer außer dem Admin die Auswertung je Person sehen darf.
+     */
+    case ViewActivity = 'view_activity';
     /** Einstellungen und Updates (WordPress: Recht manage_options; zusätzlich gibt es dort das Formular im WP-Admin). */
     case ManageSettings = 'manage_settings';
 
