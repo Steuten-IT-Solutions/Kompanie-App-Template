@@ -3650,6 +3650,8 @@ test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Ko
   await card.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Nachricht geändert');
   const edited = page.locator('.board-card', { hasText: title });
+  // Nach dem Speichern lädt die App das Brett neu und baut die Karte neu auf (neues updated_at): erst danach klicken.
+  await expect(edited.locator('.board-text')).toContainText('Zweite Fassung');
   await edited.getByRole('button', { name: 'Verlauf' }).click();
   const history = edited.locator('.board-history');
   await expect(history.locator('.board-revision')).toHaveCount(2);
