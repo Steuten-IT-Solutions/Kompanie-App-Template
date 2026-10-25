@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Tests;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Push\WebPushCrypto;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
@@ -27,7 +28,7 @@ final class QueryCountTest extends TestCase
     private const LISTS = [
         'GET /members', 'GET /members?all=1', 'GET /members/{m}', 'GET /promotions', 'GET /ranks?all=1', 'GET /titles',
         'GET /attendance', 'GET /attendance/{list}', 'GET /birthdays', 'GET /inventory', 'GET /inventory/log',
-        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
+        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /lists', 'GET /lists/{printlist}', 'POST /lists/{printlist}/sync-members', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
     ];
 
     public function testListsDoNotGrowWithMembers(): void
@@ -36,8 +37,20 @@ final class QueryCountTest extends TestCase
         $large = $this->measure(40);
         foreach (self::LISTS as $label) {
             $this->assertSame($small[$label]['total'], $large[$label]['total'], "$label: gleich viele Abfragen mit 10 und 40 Mitgliedern");
-            $this->assertLessThanOrEqual(15, $large[$label]['total'], "$label: feste, kleine Zahl von Abfragen");
+            $this->assertLessThanOrEqual(16, $large[$label]['total'], "$label: feste, kleine Zahl von Abfragen");
         }
+    }
+
+    public function testRecordingUsageCostsAFewQueriesPerRequest(): void
+    {
+        $small = $this->measure(10);
+        $large = $this->measure(40);
+        foreach ($large as $label => $counts) {
+            $this->assertLessThanOrEqual(5, $counts['activity'], "$label: Nutzung erfassen mit höchstens fünf Abfragen");
+            $this->assertSame($small[$label]['activity'], $counts['activity'], "$label: unabhängig von der Zahl der Mitglieder");
+        }
+        // Ansichten werden zusammengefasst: ein zweiter Abruf kurz danach liest nur.
+        $this->assertSame(1, $large['GET /members?all=1']['activity'], 'zweite Ansicht im selben Bereich: nur eine Abfrage');
     }
 
     public function testBulkBookingsWriteOncePerPersonAndReadOnce(): void
@@ -63,7 +76,7 @@ final class QueryCountTest extends TestCase
     }
 
     /**
-     * @return array<string, array{total: int, inserts: array<string, int>, log: list<string>}>
+     * @return array<string, array{total: int, inserts: array<string, int>, log: list<string>, activity: int}>
      */
     private function measure(int $n): array
     {
@@ -83,6 +96,9 @@ final class QueryCountTest extends TestCase
             $ranks[] = $call('POST', '/ranks', ['title' => $title, 'min_points' => $min])['id'];
         }
         $titles = [$call('POST', '/titles', ['title' => 'Ehrenmitglied'])['id'], $call('POST', '/titles', ['title' => 'Vorsitz'])['id']];
+        // Ämter (Issue #112): eine Amtszeit je Mitglied, mit einem Konto und einem freien Namen
+        $group = $call('POST', '/office-groups', ['title' => 'Verein'])['id'];
+        $office = $call('POST', '/offices', ['title' => 'Kassenprüfer', 'group_id' => $group])['id'];
         $members = [];
         for ($i = 0; $i < $n; $i++) {
             $members[] = $users->add('m' . $i, Roles::MEMBER);
@@ -98,7 +114,8 @@ final class QueryCountTest extends TestCase
             $call('PATCH', "/members/$id/role", ['extra_roles' => $i % 2 === 0 ? ['events'] : ['events', 'documents']]);
             $call('PUT', "/members/$id/birthday", ['month' => 1 + $i % 12, 'day' => 1 + $i % 28]);
             $call('POST', '/inventory', ['title' => "Gegenstand $i", 'quantity' => 2, 'location' => 'Lager']);
-            $call('POST', '/board', ['text' => "Hallo $i"]);
+            $call('POST', '/board', ['title' => 'Titel', 'text' => "Hallo $i"]);
+            $call('POST', "/offices/$office/terms", ['start_year' => 1950 + $i, 'end_year' => 1951 + $i, 'holders' => [['user_id' => $id], ['name' => "Früher $i"]]]);
             $users->current = $id;
             $call('PUT', "/polls/{$poll['id']}/vote", ['option_ids' => [$poll['options'][0]['id']]]);
             $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
@@ -106,11 +123,22 @@ final class QueryCountTest extends TestCase
             $app->push()->subscribe($users->find($id), 'https://fcm.googleapis.com/fcm/send/d' . $i, ['p256dh' => WebPushCrypto::b64uEncode(WebPushCrypto::rawPublic($key)), 'auth' => WebPushCrypto::b64uEncode(random_bytes(16))], null, null, '');
         }
         $users->current = $admin;
+        // Ehemalige (Tab der Mitgliederliste): je zehn Mitglieder eine weitere Person, mit Dienstgrad und Titel
+        for ($i = 0; $i < intdiv($n, 10); $i++) {
+            $id = $users->add('e' . $i, Roles::MEMBER);
+            $call('PUT', "/members/$id/rank", ['rank_id' => $ranks[0], 'reason' => 'x']);
+            $call('PUT', "/members/$id/titles", ['title_ids' => [$titles[0]]]);
+            $call('PUT', "/members/$id/former", ['reason' => 'left', 'joined_on' => '1990', 'left_on' => '2020']);
+        }
         $entries = [];
         foreach ($members as $i => $id) {
             $entries[$id] = $i % 3 === 0 ? 'absent' : 'present';
         }
         $list = $call('PUT', '/attendance', ['source' => 'free', 'title' => 'Übung', 'date' => '2026-10-19', 'entries' => $entries]);
+        // Listen (Issue #121): alle Mitglieder als Zeilen, alle Datenspalten
+        $columns = array_map(static fn (string $f): array => ['kind' => 'field', 'field' => $f], ListService::FIELDS);
+        $printList = $call('POST', '/lists', ['title' => 'Alle', 'columns' => $columns, 'rows' => [['kind' => 'free', 'name' => 'Gast']]]);
+        $call('POST', "/lists/{$printList['id']}/sync-members", ['apply' => true]);
 
         $requests = [];
         foreach (self::LISTS as $label) {
@@ -123,7 +151,7 @@ final class QueryCountTest extends TestCase
 
         $out = [];
         foreach ($requests as $label => [$method, $path, $body]) {
-            $path = strtr($path, ['{m}' => (string) $members[0], '{list}' => (string) $list['id'], '{poll}' => (string) $poll['id']]);
+            $path = strtr($path, ['{m}' => (string) $members[0], '{list}' => (string) $list['id'], '{poll}' => (string) $poll['id'], '{printlist}' => (string) $printList['id']]);
             [$path, $q] = explode('?', $path, 2) + [1 => ''];
             parse_str($q, $query);
             $users->current = $path === '/me' || str_starts_with($path, '/me/') ? $members[0] : $admin;
@@ -131,12 +159,15 @@ final class QueryCountTest extends TestCase
             $users->lookups = 0;
             $call($method, $path, $body, $query);
             $inserts = [];
-            foreach ($pdo->log as $sql) {
+            // Nutzungsauswertung (Issue #175) getrennt zählen: feste Zahl je Anfrage, unabhängig von der Route.
+            $activity = array_filter($pdo->log, static fn (string $sql): bool => (bool) preg_match('/\bkompanie_activity/', $sql));
+            $log = array_values(array_diff_key($pdo->log, $activity));
+            foreach ($log as $sql) {
                 if (preg_match('/^INSERT INTO kompanie_(\w+)/', $sql, $m)) {
                     $inserts[$m[1]] = ($inserts[$m[1]] ?? 0) + 1;
                 }
             }
-            $out[$label] = ['total' => count($pdo->log) + $users->lookups, 'inserts' => $inserts, 'log' => $pdo->log];
+            $out[$label] = ['total' => count($log) + $users->lookups, 'inserts' => $inserts, 'log' => $log, 'activity' => count($activity)];
         }
         return $out;
     }

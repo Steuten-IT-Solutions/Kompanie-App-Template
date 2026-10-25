@@ -1,37 +1,48 @@
 ---
-titel: Updates und Datensicherung
-reihenfolge: 130
+titel: Datensicherung
+reihenfolge: 132
 rechte: [manage_settings]
 ---
-## Updates
-Unter **Verwaltung → Einstellungen → Zustand und Updates** siehst du die installierte Version und wann zuletzt nach Updates gesucht wurde. Die App sucht einmal am Tag selbst; mit **Nach Updates suchen** geht es sofort.
+Hier lädst du eine Sicherung aller Daten der App herunter, spielst eine Sicherung wieder ein oder lässt die App jede Woche eine Sicherung in Google Drive ablegen.
 
-Neue Versionen spielt die App automatisch ein, solange **Updates automatisch einspielen (empfohlen)** eingeschaltet ist. Ausnahmen:
-- Eine neue Hauptversion spielt die App nie automatisch ein. Lies vorher die Hinweise zur Version und tippe dann auf **Hauptversion einspielen**.
-- Mit WordPress kann die Webseite automatische Updates sperren. Dann zeigt die App das an, und du spielst neue Versionen hier von Hand ein.
+![Die Seite Datensicherung](bild:admin-updates-und-sicherung)
 
-Gibt es eine neue Version, tippst du auf **Jetzt auf … aktualisieren**, um sie sofort einzuspielen (das dauert bis zu zwei Minuten). Danach lädt die App neu. Kann die Version auf eurem Server nicht laufen (z. B. zu alte PHP- oder WordPress-Version, fehlende Schreibrechte), steht der Grund darüber; dann muss das zuerst behoben werden.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Datensicherung**.
 
-Schlägt ein Update fehl, läuft die bisherige Version weiter, und der Grund steht unter **Updates**. Vor Updates mit Änderungen an der Datenbank und vor einer neuen Hauptversion sichert die App die Daten automatisch auf dem Server (die letzten fünf Sicherungen bleiben).
+## Was du hier siehst
+- **Datensicherung**: was die Sicherung enthält, mit den Knöpfen **Sicherung herunterladen** und **Sicherung wiederherstellen …**.
+- **Sicherungen in Google Drive**: der Schalter **Wöchentlich in Google Drive sichern**, darunter wann zuletzt gesichert wurde, **Ordner öffnen** und **Jetzt in Google Drive sichern**. Fehlt die nötige Verbindung zu Google, steht hier stattdessen, was zu tun ist.
 
-Wird eine fehlerhafte Version zurückgezogen, wechselt die App von selbst auf eine geprüfte Version (außer automatische Updates sind gesperrt); mit **Jetzt auf … wechseln** geht das sofort. Gibt es noch keine geprüfte Version, meldest du dich bei den Betreuern der App.
+## So gehst du vor
+### Eine Sicherung herunterladen
+1. Tippe auf **Sicherung herunterladen**.
+2. Der Browser speichert eine Datei `sicherung-<Datum>.json`. Bewahre sie an einem sicheren Ort auf, nicht nur auf dem Server.
 
-### Auf eine ältere Version zurück
-Klappt nach einem Update etwas nicht mehr, öffnest du **Auf eine ältere Version zurück**, wählst eine frühere Version derselben Hauptversion und tippst auf **Zurückrollen**. Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein, erst wieder die nächste neuere. Hinter eine neue Hauptversion zurück geht es nicht per Klick, sondern nur mit Hilfe der Betreuer der App.
+### Sicherungen in Google Drive einschalten
+1. Verbinde die App unter **Google-Zugang** über **Mit Google verbinden** und setze dabei das Häkchen für eigene Dateien in Google Drive (siehe [Google-Zugang](seite:admin-google)).
+2. Schalte hier **Wöchentlich in Google Drive sichern** ein.
+3. Willst du gleich eine Sicherung haben, tippe auf **Jetzt in Google Drive sichern**.
 
-### Vorabversionen
-Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist – noch bevor sie für alle freigegeben wird. Beim Einschalten fragt die App nach. Das ist für eine Testseite gedacht: Vorabversionen können noch Fehler enthalten. Schaltest du es wieder aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
+### Eine Sicherung wiederherstellen
+1. Tippe auf **Sicherung wiederherstellen …**.
+2. Wähle die Sicherungsdatei. Liegt sie in Google Drive, lädst du sie vorher von dort herunter.
+3. Bestätige die Rückfrage. Die Sicherung ersetzt **alle** Daten der App; danach lädt die App neu.
 
-## Datensicherung
-Unter **Verwaltung → Einstellungen → Datensicherung** tippst du auf **Sicherung herunterladen**. Die Datei enthält alle App-Daten, die Einstellungen und Zugangsschlüssel, ohne WordPress auch die Konten. Behandle sie wie ein Passwort und bewahre sie an einem sicheren Ort auf. Die Ampel unter **Zustand und Updates** wird gelb, wenn noch nie eine Sicherung heruntergeladen wurde oder die letzte älter als 90 Tage ist.
+## Gut zu wissen
+- **Inhalt:** Die Sicherung enthält alle Daten der App, die Einstellungen, die Zugangsschlüssel und die Konten (Passwörter nur als Prüfwerte), dazu die Dateien der {bereich.documents}, die Abzeichen der {bereich.ranks} und die Anmeldungen der Geräte für Benachrichtigungen. Mit WordPress sind alle Benutzer der Webseite dabei. Behandle die Datei wie ein Passwort.
+- **Nicht enthalten:** die Fotos der {bereich.gallery} (die App holt sie danach neu aus Google Drive; bei vielen Fotos dauert das einige Stunden), wartende Fehlermeldungen und der Zustand dieser Installation (z. B. Update-Stand, Fehlerprotokoll). Mit WordPress gehören Beiträge, Seiten, Design und andere Plugins zu WordPress selbst; dafür braucht es eine Sicherung von WordPress bzw. vom Hoster.
+- **Automatische Sicherungen vor Updates** liegen auf demselben Server und sind mit ihm verloren. Deshalb zusätzlich herunterladen oder in Google Drive sichern. Die Ampel unter [Zustand und Updates](seite:admin-zustand) wird gelb, wenn 30 Tage lang keine Sicherung heruntergeladen oder in Google Drive abgelegt wurde.
+- **Google Drive:** Die App legt im verbundenen Google-Konto einen eigenen Ordner an, lädt einmal pro Woche eine Sicherung hoch und behält die letzten acht. Sie sieht und ändert dort nur Dateien, die sie selbst angelegt hat. Scheitert das Hochladen (z. B. weil der Speicher voll ist), steht der Grund hier und in der Ampel; die App versucht es am nächsten Tag wieder. Mit einem Dienstkonto geht das nicht. Gib den Ordner nicht frei: Die Sicherungen enthalten Zugangsschlüssel und Passwort-Prüfwerte.
+- **Wiederherstellen ohne WordPress:** geht auch auf einer neuen Installation, z. B. beim Umzug, aber nicht aus einer Sicherung der WordPress-Version. Danach melden sich alle neu an.
+- **Wiederherstellen mit WordPress:** geht nur auf derselben Webseite (Adresse). Fehlende Konten legt die App dabei mit ihrer bisherigen Nummer wieder an; alle melden sich mit ihrem bisherigen Benutzernamen und Passwort an. Vorhandene Konten behalten Anmeldedaten und E-Mail und bekommen nur ihre Rolle in der App aus der Sicherung. Gehört eine Konto-Nummer aus der Sicherung inzwischen jemand anderem, bricht das Wiederherstellen ab und nennt das Konto; geändert wird dann nichts.
+- Eine Sicherung aus einer neueren Version lässt sich erst einspielen, wenn die App aktualisiert ist. Rückgängig machen lässt sich ein Wiederherstellen nur mit einer anderen Sicherung.
 
-### Wiederherstellen
-Mit **Sicherung wiederherstellen …** wählst du eine Sicherungsdatei. Nach einer Rückfrage ersetzt sie **alle** Daten der App; rückgängig machen lässt sich das nur mit einer anderen Sicherung.
-- Mit WordPress geht das nur auf derselben Webseite, z. B. nach einem missglückten Update.
-- Ohne WordPress auch auf einer neuen Installation (z. B. beim Umzug), aber nicht aus einer Sicherung des WordPress-Plugins. Danach melden sich alle neu an.
-- Eine Sicherung aus einer neueren Version lässt sich erst einspielen, wenn die App aktualisiert ist.
+### Nach dem Verlust der Webseite (WordPress)
+1. Installiere WordPress unter derselben Adresse neu. Lege den Administrator mit **Benutzername und E-Mail deines bisherigen Kontos** an (oder mit einem Namen und einer E-Mail, die es bisher nicht gab).
+2. Installiere das Plugin der Kompanie und öffne die App.
+3. Spiele unter **Einstellungen → Datensicherung** die neueste Sicherung ein.
 
-### Was nicht in der Sicherung ist
-Die Fotos der {bereich.gallery} sind nicht in der Sicherung; die App holt sie danach neu aus Google Drive. Auch die Dateien der {bereich.documents} und die Abzeichen der {bereich.ranks} sind nicht in der Sicherung, nur ihre Angaben (Titel, Kategorie, Stand bzw. welcher {begriff.rank} welches Abzeichen hat). Sie bleiben auf dem Server. Beim Umzug ohne WordPress nimm die Ordner `data/files/dokumente` und `data/files/abzeichen` mit (bzw. das Datenverzeichnis, falls es woanders liegt). Sonst lassen sich die Dokumente danach nicht öffnen und müssen neu hochgeladen werden; fehlende Abzeichen zeigt die App nicht an, bis du sie neu hochlädst. Die Fotos der Mitglieder liegen dagegen in der Datenbank und sind in der Sicherung enthalten.
-
-Was die Ampel bedeutet, steht unter [Zustand und Statusmeldungen](seite:admin-zustand).
+## Siehe auch
+- [Zustand und Updates](seite:admin-zustand)
+- [Google-Zugang](seite:admin-google)

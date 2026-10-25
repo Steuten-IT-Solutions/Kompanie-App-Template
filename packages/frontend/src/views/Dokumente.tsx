@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, can, type DocumentInfo, type DocVisibility } from '../api';
+import { can, type DocumentInfo, type DocVisibility } from '../api';
 import brand from '../generated/brand';
 import { previewRole } from '../preview';
 import {
@@ -16,7 +16,8 @@ import { formatBytes, formatDate } from '../format';
 import { detectPlatform } from '../install';
 import { pruneDocumentCache, whenControlled } from '../offline';
 import { navigate } from '../router';
-import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 const PdfViewer = lazyView(() => import('./PdfViewer'));
 
@@ -107,21 +108,16 @@ export function DocGroupSection({
   children: ReactNode;
 }) {
   if (!group.title) return <section className="doc-group">{children}</section>;
-  const bodyId = `doc-group-${groupKey(group)}`;
   return (
-    <section className="doc-group">
-      <h3 className="section-title doc-group-title">
-        <button type="button" className="doc-group-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
-          {group.title} ({group.docs.length})
-          <span className="doc-group-arrow" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      </h3>
-      <div id={bodyId} className="doc-group-body" hidden={!open}>
-        {children}
-      </div>
-    </section>
+    <FoldSection
+      id={`doc-group-${groupKey(group)}`}
+      className="doc-group"
+      title={`${group.title} (${group.docs.length})`}
+      open={open}
+      onToggle={onToggle}
+    >
+      {children}
+    </FoldSection>
   );
 }
 
@@ -210,7 +206,8 @@ function ImageView({ doc }: { doc: DocumentInfo }) {
 }
 
 export default function Dokumente({ docId, onToast }: { docId?: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(api.documents);
+  // Mit Schlüssel: Beim Öffnen eines Dokuments und beim Zurückkehren steht die Liste sofort da (statt „Lädt …“).
+  const { data, error, loading, reload } = useAsync(sources.documents.load, sources.documents.deps, sources.documents.key);
   const [offline, setOffline] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [sort, setSort] = useDocSort();

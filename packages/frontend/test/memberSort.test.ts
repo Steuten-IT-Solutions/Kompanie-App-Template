@@ -1,9 +1,23 @@
-// Sortierung der Mitgliederliste (src/memberSort.ts): nach Nachname, Vorname oder Punkten, auf- oder absteigend; die Wahl
-// merkt sich das Gerät.
+// Sortierung der Mitgliederliste (src/memberSort.ts): nach Nachname, Vorname, Eintritt, Austritt oder Punkten, auf- oder absteigend;
+// die Wahl merkt sich das Gerät.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MemberSummary } from '../src/api.ts';
-import { defaultDir, dirLabel, listName, loadMemberOrder, saveMemberOrder, sortMembers, splitName } from '../src/memberSort.ts';
+import {
+  browseOrder,
+  defaultDir,
+  dirLabel,
+  orderFor,
+  setBrowseOrder,
+  joinKey,
+  leftKey,
+  listName,
+  loadMemberOrder,
+  saveMemberOrder,
+  sortMembers,
+  sortRowsByName,
+  splitName,
+} from '../src/memberSort.ts';
 
 const m = (id: number, first: string, last: string, points: number | null = null): MemberSummary => ({
   id,
@@ -76,6 +90,81 @@ test('ohne Nachnamen (Funktionskonto) zählt beim Nachnamen der Vorname', () => 
   assert.deepEqual(names(sortMembers(withRole, { sort: 'last-name', dir: 'asc' })).slice(2, 4), ['Kassenwart', 'Maria von Berg']);
 });
 
+test('nach Eintritt: früheste bzw. neueste zuerst, nur das Jahr vor den Tagen des Jahres, ohne Angabe immer am Ende', () => {
+  const f = (id: number, first: string, last: string, joined_on: string, founder = false) => ({
+    ...m(id, first, last),
+    joined_on,
+    founder,
+  });
+  const former = [
+    f(1, 'Anna', 'Zimmer', '1990-05-01'),
+    f(2, 'Bernd', 'Becker', ''),
+    f(3, 'Carl', 'Adam', '1990'),
+    f(4, 'Dora', 'Gründer', '', true),
+    f(5, 'Emil', 'Berg', '2001-02-03'),
+    f(6, 'Fritz', 'Alt', '1990-05-01'),
+  ];
+  assert.deepEqual(names(sortMembers(former, { sort: 'joined', dir: 'asc' })), [
+    'Dora Gründer',
+    'Carl Adam',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Emil Berg',
+    'Bernd Becker',
+  ]);
+  assert.deepEqual(names(sortMembers(former, { sort: 'joined', dir: 'desc' })), [
+    'Emil Berg',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Carl Adam',
+    'Dora Gründer',
+    'Bernd Becker',
+  ]);
+  // Mitglieder (Jahr bzw. Datum) und Ehemalige in der Liste für alle (nur Jahre)
+  assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: 2004 }), '2004');
+  assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: null }), null);
+  assert.equal(joinKey({ ...m(7, 'G', 'H'), join_year: 2004, join_date: '2004-06-01' }), '2004-06-01', 'ganzes Datum vor dem Jahr');
+  assert.equal(joinKey({ ...m(8, 'I', 'J'), joined_year: '1975', founder: true }), '1975');
+  assert.equal(defaultDir('joined'), 'asc');
+  assert.equal(dirLabel('joined', 'asc'), 'Früheste zuerst');
+  assert.equal(dirLabel('joined', 'desc'), 'Neueste zuerst');
+});
+
+test('nach Austritt (Ehemalige): früheste bzw. neueste zuerst, nur das Jahr vor den Tagen des Jahres, ohne Angabe immer am Ende', () => {
+  const f = (id: number, first: string, last: string, left_on: string) => ({ ...m(id, first, last), left_on, founder: id === 4 });
+  const former = [
+    f(1, 'Anna', 'Zimmer', '2010-05-01'),
+    f(2, 'Bernd', 'Becker', ''),
+    f(3, 'Carl', 'Adam', '2010'),
+    f(4, 'Dora', 'Gründer', ''),
+    f(5, 'Emil', 'Berg', '2021-02-03'),
+    f(6, 'Fritz', 'Alt', '2010-05-01'),
+  ];
+  // Gründungsmitglied zählt hier nicht (anders als beim Eintritt).
+  assert.deepEqual(names(sortMembers(former, { sort: 'left', dir: 'asc' })), [
+    'Carl Adam',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Emil Berg',
+    'Bernd Becker',
+    'Dora Gründer',
+  ]);
+  assert.deepEqual(names(sortMembers(former, { sort: 'left', dir: 'desc' })), [
+    'Emil Berg',
+    'Fritz Alt',
+    'Anna Zimmer',
+    'Carl Adam',
+    'Bernd Becker',
+    'Dora Gründer',
+  ]);
+  // Liste für alle: nur Jahre
+  assert.equal(leftKey({ ...m(7, 'G', 'H'), left_year: '1999' }), '1999');
+  assert.equal(leftKey({ ...m(7, 'G', 'H'), left_year: '' }), null);
+  assert.equal(defaultDir('left'), 'asc');
+  assert.equal(dirLabel('left', 'asc'), 'Früheste zuerst');
+  assert.equal(dirLabel('left', 'desc'), 'Neueste zuerst');
+});
+
 test('Anzeige: bei Nachname „Nachname, Vorname“, sonst der Anzeigename', () => {
   assert.equal(listName(list[3], 'last-name'), 'von Berg, Maria');
   assert.equal(listName(list[3], 'first-name'), 'Maria von Berg');
@@ -118,4 +207,49 @@ test('ohne localStorage gilt der Standard', () => {
   Object.assign(globalThis, { localStorage: { getItem: fail, setItem: fail } });
   saveMemberOrder({ sort: 'first-name', dir: 'desc' });
   assert.deepEqual(loadMemberOrder(), { sort: 'last-name', dir: 'asc' });
+});
+
+type Row = { kind: 'member' | 'free'; name: string; first_name?: string; last_name?: string; deleted?: boolean };
+
+test('Listen (Issue #121), nach Namen sortieren: Nachname, Vorname, Umlaute wie Grundbuchstaben; leere und gelöschte Zeilen ans Ende', () => {
+  const member = (first: string, last: string): Row => ({
+    kind: 'member',
+    name: `${first} ${last}`.trim(),
+    first_name: first,
+    last_name: last,
+  });
+  const rows: Row[] = [
+    { kind: 'free', name: '' },
+    member('Ada', 'Zander'),
+    { kind: 'member', name: '', deleted: true },
+    { kind: 'free', name: 'Gast Nachbarverein' },
+    member('Bernd', 'Özdemir'),
+    member('Kasse', ''),
+    member('Anna', 'Müller'),
+    member('Zoe', 'Müller'),
+  ];
+  assert.deepEqual(
+    sortRowsByName(rows).map((r) => (r.deleted ? '(gelöscht)' : r.name)),
+    ['Kasse', 'Anna Müller', 'Zoe Müller', 'Gast Nachbarverein', 'Bernd Özdemir', 'Ada Zander', '', '(gelöscht)'],
+  );
+});
+
+test('orderFor: gemerkte Sortierung nur, wenn die Liste sie anbietet', () => {
+  assert.deepEqual(orderFor({ sort: 'points', dir: 'desc' }, ['last-name', 'points']), { sort: 'points', dir: 'desc' });
+  assert.deepEqual(orderFor({ sort: 'points', dir: 'desc' }, ['last-name', 'first-name']), { sort: 'last-name', dir: 'asc' });
+});
+
+test('browseOrder: Reihenfolge nur für dieselbe Liste und wenn die Person darin steht', () => {
+  setBrowseOrder('mitglied', [
+    { id: 4, name: 'Anna' },
+    { id: 2, name: 'Bernd' },
+    { id: 9, name: 'Carla' },
+  ]);
+  assert.deepEqual(
+    browseOrder('mitglied', 2)?.map((e) => `${e.id} ${e.name}`),
+    ['4 Anna', '2 Bernd', '9 Carla'],
+  );
+  assert.equal(browseOrder('mitglied', 5), null);
+  assert.equal(browseOrder('ehemalige', 2), null);
+  assert.equal(browseOrder('directory', 2), null);
 });

@@ -8,14 +8,15 @@ namespace KompanieApp\Core\Auth;
  * Feste Rollen und die Rollen älterer Installationen.
  *
  * Welche Rollen es gibt und welche Rechte sie haben, entscheidet der Admin der Kompanie in der App
- * (Domain\RoleService). Fest sind guest (keine Rechte), candidate (Anwärter: nur der interne Kalender,
- * Issue #23), member (Mitgliederbereich, Rolle neuer Konten) und admin (alle Rechte); sie lassen sich nur
- * umbenennen. Weitere Standardrollen bringen die Bereiche
- * mit, wenn der Admin sie einschaltet (Domain\Features, z. B. „Punkte verwalten“).
+ * (Domain\RoleService). Fest sind guest (keine Rechte), member (Mitgliederbereich, Rolle neuer Konten) und admin
+ * (alle Rechte); sie lassen sich nur umbenennen (Mitglied und Admin bekommen auch einen Punktefaktor). Weitere
+ * Standardrollen bringen die Bereiche mit, wenn der Admin sie einschaltet (Domain\Features, z. B. „Punkte verwalten“).
+ * Anwärter (Issue #23) legt der Admin als eigene Rolle an, z. B. nur mit dem internen Kalender.
  */
 final class Roles
 {
     public const GUEST = 'guest';
+    /** Frühere feste Rolle „Anwärter“; Installationen, die sie hatten, behalten sie als eigene Rolle (RoleService). */
     public const CANDIDATE = 'candidate';
     public const MEMBER = 'member';
     public const ADMIN = 'admin';
@@ -34,7 +35,6 @@ final class Roles
      */
     public const TEMPLATES = [
         self::GUEST => [],
-        self::CANDIDATE => ['calendar'],
         self::MEMBER => ['member'],
         self::ADMIN => [],
     ];
@@ -57,6 +57,7 @@ final class Roles
     public const GRANTABLE = [
         Capability::Member,
         Capability::Calendar,
+        Capability::ViewIntern,
         Capability::ManagePoints,
         Capability::ManagePenalties,
         Capability::ManageRanks,
@@ -67,13 +68,15 @@ final class Roles
         Capability::PostBoard,
         Capability::ManagePolls,
         Capability::ManageInventory,
+        Capability::ManageOffices,
+        Capability::ManageLists,
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];
 
     /**
-     * Rechte nach den festen und früheren Rollen, ohne die Einstellungen der Installation (für Adapter,
-     * solange die App noch nicht steht, und für Tests).
+     * Rechte nach den festen und früheren Rollen (auch Anwärter), ohne die Einstellungen der Installation (für
+     * Adapter, solange die App noch nicht steht, und für Tests).
      *
      * @return Capability[]
      */
@@ -82,20 +85,24 @@ final class Roles
         if ($key === self::ADMIN) {
             return Capability::cases();
         }
-        $caps = self::TEMPLATES[$key] ?? self::LEGACY[$key] ?? [];
+        $caps = self::TEMPLATES[$key] ?? self::LEGACY[$key] ?? ($key === self::CANDIDATE ? [Capability::Calendar->value] : []);
         return self::withImplied(array_values(array_filter(array_map(static fn (string $c): ?Capability => Capability::tryFrom($c), $caps))));
     }
 
     /**
-     * Der Mitgliederbereich schließt den internen Kalender ein.
+     * Der Mitgliederbereich schließt den internen Kalender und den Bereich „Intern“ ein (Capability::withoutMember).
      *
      * @param Capability[] $caps
      * @return Capability[]
      */
     public static function withImplied(array $caps): array
     {
-        if (in_array(Capability::Member, $caps, true) && !in_array(Capability::Calendar, $caps, true)) {
-            $caps[] = Capability::Calendar;
+        if (in_array(Capability::Member, $caps, true)) {
+            foreach (Capability::withoutMember() as $implied) {
+                if (!in_array($implied, $caps, true)) {
+                    $caps[] = $implied;
+                }
+            }
         }
         return $caps;
     }

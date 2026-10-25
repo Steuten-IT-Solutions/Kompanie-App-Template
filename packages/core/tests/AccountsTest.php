@@ -221,10 +221,10 @@ final class AccountsTest extends TestCase
         $this->assertSame(400, $this->call('POST', '/users/bulk', ['people' => array_fill(0, 51, ['name' => 'X'])])->status);
 
         $people[2]['username'] = 'cara';
-        $res = $this->call('POST', '/users/bulk', ['people' => $people, 'level' => 'candidate']);
+        $res = $this->call('POST', '/users/bulk', ['people' => $people, 'level' => TestApp::candidateRole($this->app)]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
         $this->assertSame(['anna.alt', 'ben', 'cara'], array_column($res->data, 'username'));
-        $this->assertSame(['candidate', 'candidate', 'candidate'], array_column($res->data, 'level'));
+        $this->assertSame(array_fill(0, 3, TestApp::candidateRole($this->app)), array_column($res->data, 'level'));
         $this->assertTrue(array_reduce($res->data, static fn (bool $ok, array $c): bool => $ok && strlen((string) $c['password']) >= 12, true));
 
         // Zwei gleiche Namen ohne Benutzernamen: verschiedene Benutzernamen.

@@ -1,6 +1,6 @@
 # Baut, signiert und veröffentlicht die App einer Kompanie. Läuft nur im Kern-Repo, von Hand oder aus
 # „Kompanien abgleichen“ (kompanien-abgleichen.yml, z. B. nach einer Änderung im Kompanie-Repo):
-# - Job „build“ ohne Geheimnisse: npm, Branding aus kompanie.json und Logo, Bildschirmfotos.
+# - Job „build“ ohne Geheimnisse: npm, Branding aus kompanie.json und Logo, Bildschirmfotos (auch fürs Handbuch).
 #   Sein Ergebnis gilt als nicht vertrauenswürdig (hier laufen fremde Pakete und Daten der Kompanie).
 # - Job „publish“ hinter der Environment „veroeffentlichen“ (Secrets KOMPANIE_SIGNING_KEY und
 #   KOMPANIE_APP_KEY, Variable KOMPANIE_APP_ID; nur Branches main und develop), ohne npm: übernimmt aus „build“ nur
@@ -77,7 +77,11 @@ jobs:
         with:
           php-version: '8.2'
           extensions: pdo_sqlite, gd, sodium, zip, mbstring, curl, openssl, simplexml, intl
-          tools: none
+          tools: composer
+
+      # PHPMailer (Issue #172): Der Build nimmt den Lizenztext aus vendor/ in die Drittanbieter-Hinweise (Issue #173).
+      - name: PHP-Abhängigkeiten (PHPMailer)
+        run: composer install --no-dev --no-interaction --no-progress --working-dir=core
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -100,6 +104,12 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           scripts/screenshots.sh "$OUT/screenshots"
+
+      # Bildschirmfotos für die Anleitungen im Handbuch (in Farben und mit Bezeichnungen der Kompanie). Sie liegen in der
+      # gebauten Oberfläche (App: Hilfe, Download-Seite: Handbuch), damit die App sie nicht bündeln muss.
+      - name: Bilder für das Handbuch
+        working-directory: core
+        run: scripts/handbuch-bilder.sh packages/frontend/dist/handbuch/bilder
 
       - name: Ergebnis zusammenstellen
         working-directory: core
@@ -158,7 +168,11 @@ jobs:
         with:
           php-version: '8.2'
           extensions: sodium, zip, mbstring
-          tools: none
+          tools: composer
+
+      # PHPMailer (Issue #172): kommt mit composer install aus composer.lock und ins Paket der eigenständigen Version.
+      - name: PHP-Abhängigkeiten (PHPMailer)
+        run: composer install --no-dev --no-interaction --no-progress --working-dir=core
 
       - name: Name des Kompanie-Repos
         id: name

@@ -18,7 +18,7 @@ async function login(page: Page) {
   await page.getByLabel('Benutzername').fill('mitglied1');
   await page.getByLabel('Passwort').fill('test1234');
   await page.locator('form.login button[type=submit]').click();
-  await expect(page.locator('.topbar-account')).toHaveText('Konto');
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {

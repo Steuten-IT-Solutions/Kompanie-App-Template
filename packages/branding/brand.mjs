@@ -65,6 +65,9 @@ const DEFAULTS = {
     polls: 'Umfragen',
     birthdays: 'Geburtstage',
     inventory: 'Inventar',
+    directory: 'Mitglieder',
+    offices: 'Ämter',
+    lists: 'Listen',
   },
   rank: 'Dienstgrad',
 };
@@ -126,7 +129,7 @@ export function initialsSvg(name, background, foreground) {
 
 /**
  * Kleinster Kreis um alle Punkte (Welzl, schrittweise): Mittelpunkt und Radius. Für Logos, die nicht rechteckig sind,
- * z. B. ein Wappen oben eckig und unten rund: Mittig auf diesen Kreis gesetzt, haben die Ecken überall denselben
+ * z. B. ein Schild oben eckig und unten rund: Mittig auf diesen Kreis gesetzt, haben die Ecken überall denselben
  * Abstand zum runden Zuschnitt (Android-Icon, Startbildschirm), statt nur oben und unten gleich viel Rand.
  */
 export function enclosingCircle(points) {

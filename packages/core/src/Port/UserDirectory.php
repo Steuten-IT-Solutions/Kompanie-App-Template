@@ -35,6 +35,14 @@ interface UserDirectory
     public function list(bool $includeGuests): array;
 
     /**
+     * Hinterlegte Mailadressen (Issue #172, Mailversand); Konten ohne Adresse fehlen oder haben ''.
+     *
+     * @param int[] $ids
+     * @return array<int, string> ID => Adresse
+     */
+    public function emails(array $ids): array;
+
+    /**
      * Legt ein Konto als Mitglied oder als Anwärter (Auth\Roles) an und gibt seine ID zurück. Anzeigename ist
      * „Vorname Nachname“ (Domain\PersonName::join).
      */
@@ -86,4 +94,21 @@ interface UserDirectory
      * @throws \DomainException wenn es so nicht geht
      */
     public function removeAccount(int $id): void;
+
+    /**
+     * Konto stilllegen (ehemaliges Mitglied): Rolle Gast in der App, alle Sitzungen beendet. Alle Daten bleiben. Standalone
+     * sperrt zusätzlich die Anmeldung. WordPress: Der Benutzer der Webseite bleibt angemeldet und kann sich weiter auf der
+     * Webseite anmelden, hat in der App aber keine Rolle mehr (wie ein Gast).
+     *
+     * @throws \DomainException wenn es so nicht geht (z. B. Administratoren bei WordPress)
+     */
+    public function deactivate(int $id): void;
+
+    /**
+     * Stillgelegtes Konto wieder aufnehmen: Grundrolle setzen (geprüft hat der Kern) und, wo gesperrt, die Anmeldung wieder
+     * erlauben.
+     *
+     * @throws \DomainException wenn es so nicht geht
+     */
+    public function reactivate(int $id, string $role): void;
 }

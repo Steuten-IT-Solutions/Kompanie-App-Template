@@ -6,7 +6,7 @@
  *       prüft Kopfbereich, Platzhalter, Verweise und ob jeder Bereich mit eigenen Rechten eine Seite hat
  *   php scripts/handbuch.php --app=packages/frontend/src/generated/handbuch.json
  *       Seiten für die Hilfe in der App (offline, passend zur Version); gefiltert wird in der App
- *   php scripts/handbuch.php --site=ordner [--brand=ordner mit brand.json und theme.css]
+ *   php scripts/handbuch.php --site=ordner [--brand=ordner mit brand.json und theme.css] [--bilder=ordner]
  *       statische Seiten für GitHub Pages der Kompanie (unter /handbuch/), mit ihren Bezeichnungen
  *
  * Seitenaufbau:
@@ -14,35 +14,40 @@
  *   titel: Punkte vergeben
  *   reihenfolge: 40
  *   rechte: [manage_points]       wer die Seite in der App sieht ([] = alle, auch Gäste; [member] = Mitglieder)
+ *   einrecht: [create_users, …]   nur, wer mindestens eines dieser Rechte hat (optional; für Bildschirme, die
+ *                                 Personen mit verschiedenen Aufgaben sehen, z. B. die Mitgliederliste der Verwaltung)
  *   bereiche: [points]            nur, wenn diese Bereiche eingeschaltet sind (optional)
  *   variante: wordpress           nur in dieser Variante (optional: wordpress oder standalone)
  *   ---
  *   Markdown: ## und ### Überschriften, Absätze, Listen (- oder 1.), **fett**, *kursiv*, `Code`,
- *   [Text](https://…), [Text](seite:name) für eine andere Handbuchseite, > Hinweis.
- *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory}, {begriff.rank},
- *   {rolle.guest|candidate|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
+ *   [Text](https://…), [Text](seite:name) für eine andere Handbuchseite, > Hinweis,
+ *   ![Beschreibung](bild:name) als eigene Zeile für ein Bildschirmfoto (erzeugt von scripts/handbuch-bilder.sh).
+ *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory|directory|offices|lists}, {begriff.rank},
+ *   {rolle.guest|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
  */
 
 declare(strict_types=1);
 
-const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'create_users', 'promote_users', 'manage_settings'];
-const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory'];
+require __DIR__ . '/markdown.php';
+
+const CAPABILITIES = ['member', 'calendar', 'view_intern', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
+const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
-const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory'];
+const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists'];
 /** Bereiche, die andere voraussetzen (wie Domain\Features, Feld requires): Ist der erste an, sind es auch diese. */
 const FEATURE_REQUIRES = ['polls' => ['board']];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
 const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
-const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'begriff.rank', 'rolle.guest', 'rolle.candidate', 'rolle.member', 'rolle.admin'];
+const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'bereich.directory', 'bereich.offices', 'bereich.lists', 'begriff.rank', 'rolle.guest', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
     'bereich.events' => 'Termine', 'bereich.calendar' => 'Kalender', 'bereich.news' => 'News', 'bereich.gallery' => 'Galerie',
-    'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'bereich.titles' => 'Titel', 'bereich.attendance' => 'Anwesenheit', 'bereich.documents' => 'Dokumente', 'bereich.board' => 'Schwarzes Brett', 'bereich.polls' => 'Umfragen', 'bereich.birthdays' => 'Geburtstage', 'bereich.inventory' => 'Inventar', 'begriff.rank' => 'Dienstgrad',
-    'rolle.guest' => 'Gast', 'rolle.candidate' => 'Anwärter', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
+    'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'bereich.titles' => 'Titel', 'bereich.attendance' => 'Anwesenheit', 'bereich.documents' => 'Dokumente', 'bereich.board' => 'Schwarzes Brett', 'bereich.polls' => 'Umfragen', 'bereich.birthdays' => 'Geburtstage', 'bereich.inventory' => 'Inventar', 'bereich.directory' => 'Mitglieder', 'bereich.offices' => 'Ämter', 'bereich.lists' => 'Listen', 'begriff.rank' => 'Dienstgrad',
+    'rolle.guest' => 'Gast', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
 ];
 
 $root = dirname(__DIR__);
-$opt = getopt('', ['check', 'app:', 'site:', 'brand::', 'src::']);
+$opt = getopt('', ['check', 'app:', 'site:', 'brand::', 'bilder::', 'src::']);
 $src = (string) ($opt['src'] ?? $root . '/docs/handbuch');
 
 /** @return array{0: array<string, mixed>, 1: string[]} Seiten nach Name, Fehler */
@@ -83,14 +88,15 @@ function load(string $dir): array
             }
         }
         // Ohne [ ] wäre es ein Text und die Seite stünde für alle offen: lieber als Fehler melden.
-        foreach (['rechte', 'bereiche'] as $listKey) {
+        foreach (['rechte', 'einrecht', 'bereiche'] as $listKey) {
             if (array_key_exists($listKey, $meta) && !is_array($meta[$listKey])) {
                 $errors[] = "$slug.md: „{$listKey}“ muss eine Liste in [ ] sein, z. B. {$listKey}: [member]";
             }
         }
         $rechte = is_array($meta['rechte'] ?? null) ? $meta['rechte'] : [];
+        $einrecht = is_array($meta['einrecht'] ?? null) ? $meta['einrecht'] : [];
         $bereiche = is_array($meta['bereiche'] ?? null) ? $meta['bereiche'] : [];
-        foreach (array_diff($rechte, CAPABILITIES) as $c) {
+        foreach (array_unique(array_diff([...$rechte, ...$einrecht], CAPABILITIES)) as $c) {
             $errors[] = "$slug.md: unbekanntes Recht „{$c}“";
         }
         foreach (array_diff($bereiche, FEATURES) as $f) {
@@ -99,6 +105,12 @@ function load(string $dir): array
         $variante = (string) ($meta['variante'] ?? '');
         if ($variante !== '' && !in_array($variante, ['wordpress', 'standalone'], true)) {
             $errors[] = "$slug.md: variante nur wordpress oder standalone";
+        }
+        // Bilder nur als eigene Zeile mit Beschreibung und gültigem Namen (sonst stünde der Verweis als Text da).
+        preg_match_all('/bild:/', $m[2], $refs);
+        preg_match_all('/^!\[[^\]]+\]\(bild:[a-z0-9-]+\)$/m', $m[2], $okImages);
+        if (count($refs[0]) !== count($okImages[0])) {
+            $errors[] = "$slug.md: Bild nur als eigene Zeile ![Beschreibung](bild:name), Name nur mit a–z, 0–9 und -";
         }
         preg_match_all('/\{([a-z]+\.[a-z]+)\}/', $m[2] . ' ' . (string) ($meta['titel'] ?? ''), $ph);
         foreach (array_diff(array_unique($ph[1]), PLACEHOLDERS) as $p) {
@@ -109,6 +121,7 @@ function load(string $dir): array
             'titel' => (string) ($meta['titel'] ?? $slug),
             'reihenfolge' => (int) ($meta['reihenfolge'] ?? 0),
             'rechte' => $rechte,
+            'einrecht' => $einrecht,
             'bereiche' => $bereiche,
             'variante' => $variante,
             'markdown' => $m[2],
@@ -133,12 +146,12 @@ function load(string $dir): array
         }
     }
     foreach (RIGHTS_WITH_PAGE as $cap) {
-        if (!array_filter($pages, static fn (array $p): bool => $p['rechte'] === [$cap])) {
-            $errors[] = "Für das Recht „{$cap}“ fehlt eine eigene Handbuchseite (rechte: [{$cap}])";
+        if (!array_filter($pages, static fn (array $p): bool => $p['rechte'] === [$cap] || ($p['rechte'] === [] && in_array($cap, $p['einrecht'], true)))) {
+            $errors[] = "Für das Recht „{$cap}“ fehlt eine eigene Handbuchseite (rechte: [{$cap}] oder einrecht mit {$cap})";
         }
     }
     foreach (FEATURES_WITH_ROLE as $feature => $cap) {
-        if (!array_filter($pages, static fn (array $p): bool => in_array($feature, $p['bereiche'], true) && in_array($cap, $p['rechte'], true))) {
+        if (!array_filter($pages, static fn (array $p): bool => in_array($feature, $p['bereiche'], true) && (in_array($cap, $p['rechte'], true) || in_array($cap, $p['einrecht'], true)))) {
             $errors[] = "Bereich „{$feature}“ hat eigene Rechte ($cap), aber keine Handbuchseite dafür";
         }
     }
@@ -148,10 +161,12 @@ function load(string $dir): array
 /**
  * Sieht jeder, der $from sieht, auch $to? Admins (manage_settings) haben alle Rechte. Bereiche und
  * Variante des Ziels dürfen nicht enger sein; vorausgesetzte Bereiche (FEATURE_REQUIRES) zählen als eingeschaltet.
+ * Von „einrecht“ der Quelle hat die Person nur irgendeines: Das Ziel braucht dann eines davon in seinem „einrecht“.
  */
 function reachable(array $from, array $to): bool
 {
-    $held = in_array('manage_settings', $from['rechte'], true) ? CAPABILITIES : $from['rechte'];
+    $admin = in_array('manage_settings', $from['rechte'], true);
+    $held = $admin ? CAPABILITIES : $from['rechte'];
     // Der Mitgliederbereich schließt den internen Kalender ein.
     if (in_array('member', $held, true)) {
         $held[] = 'calendar';
@@ -160,7 +175,10 @@ function reachable(array $from, array $to): bool
     foreach ($from['bereiche'] as $f) {
         $features = [...$features, ...(FEATURE_REQUIRES[$f] ?? [])];
     }
+    $oneOf = $to['einrecht'] === [] || $admin || array_intersect($to['einrecht'], $held) !== []
+        || ($from['einrecht'] !== [] && array_diff($from['einrecht'], $to['einrecht']) === []);
     return array_diff($to['rechte'], $held) === []
+        && $oneOf
         && array_diff($to['bereiche'], $features) === []
         && ($to['variante'] === '' || $to['variante'] === $from['variante']);
 }
@@ -170,87 +188,12 @@ function group(array $page): string
 {
     $r = $page['rechte'];
     return match (true) {
+        $r === [] && $page['einrecht'] !== [] => 'Für Aufgaben in der Verwaltung',
         $r === [] => 'Für alle',
         in_array('manage_settings', $r, true) => 'Für Admins',
         $r === ['member'], $r === ['calendar'] => 'Für Mitglieder',
         default => 'Für Aufgaben in der Verwaltung',
     };
-}
-
-/**
- * Markdown (kleine Auswahl) → HTML. Alles wird maskiert; Platzhalter bleiben als Text stehen.
- * $link bildet seite:name auf eine Adresse ab.
- */
-function render(string $md, callable $link): string
-{
-    $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $inline = static function (string $s) use ($h, $link): string {
-        $s = $h($s);
-        $s = (string) preg_replace_callback('/`([^`]+)`/', static fn (array $m): string => '<code>' . $m[1] . '</code>', $s);
-        $s = (string) preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $s);
-        $s = (string) preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/', '<em>$1</em>', $s);
-        return (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', static function (array $m) use ($link): string {
-            $url = html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            if (str_starts_with($url, 'seite:')) {
-                return '<a href="' . htmlspecialchars($link(substr($url, 6)), ENT_QUOTES) . '" data-seite="' . htmlspecialchars(substr($url, 6), ENT_QUOTES) . '">' . $m[1] . '</a>';
-            }
-            if (!preg_match('#^https://#', $url)) {
-                return $m[1]; // nur https-Verweise
-            }
-            return '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" target="_blank" rel="noopener noreferrer">' . $m[1] . '</a>';
-        }, $s);
-    };
-    $out = [];
-    $para = [];
-    $list = null;
-    $items = [];
-    $flushPara = static function () use (&$para, &$out, $inline): void {
-        if ($para) {
-            $out[] = '<p>' . $inline(implode(' ', $para)) . '</p>';
-            $para = [];
-        }
-    };
-    $flushList = static function () use (&$list, &$items, &$out, $inline): void {
-        if ($list) {
-            $out[] = "<$list>" . implode('', array_map(static fn (string $i): string => '<li>' . $inline($i) . '</li>', $items)) . "</$list>";
-            $list = null;
-            $items = [];
-        }
-    };
-    foreach (explode("\n", $md) as $line) {
-        $t = rtrim($line);
-        if (trim($t) === '') {
-            $flushPara();
-            $flushList();
-            continue;
-        }
-        if (preg_match('/^(#{2,3})\s+(.+)$/', $t, $m)) {
-            $flushPara();
-            $flushList();
-            $level = strlen($m[1]);
-            $out[] = "<h$level>" . $inline($m[2]) . "</h$level>";
-        } elseif (preg_match('/^\s*[-*]\s+(.+)$/', $t, $m) || preg_match('/^\s*\d+\.\s+(.+)$/', $t, $m)) {
-            $flushPara();
-            $type = preg_match('/^\s*\d+\./', $t) ? 'ol' : 'ul';
-            if ($list !== $type) {
-                $flushList();
-                $list = $type;
-            }
-            $items[] = $m[1];
-        } elseif (preg_match('/^>\s?(.*)$/', $t, $m)) {
-            $flushPara();
-            $flushList();
-            $out[] = '<p class="hinweis">' . $inline($m[1]) . '</p>';
-        } elseif ($list && preg_match('/^\s{2,}(.+)$/', $t, $m)) {
-            $items[count($items) - 1] .= ' ' . $m[1]; // Fortsetzung eines Listenpunkts
-        } else {
-            $flushList();
-            $para[] = trim($t);
-        }
-    }
-    $flushPara();
-    $flushList();
-    return implode("\n", $out);
 }
 
 [$pages, $errors] = load($src);
@@ -276,9 +219,11 @@ if (isset($opt['app'])) {
             'titel' => $p['titel'],
             'gruppe' => group($p),
             'rechte' => $p['rechte'],
+            'einrecht' => $p['einrecht'],
             'bereiche' => $p['bereiche'],
             'variante' => $p['variante'] === '' ? null : $p['variante'],
-            'html' => render($p['markdown'], static fn (string $s): string => '#/hilfe/' . $s),
+            // Bilder: Die App setzt die Adresse ihres Ordners ein (src="bild:name", views/Hilfe.tsx).
+            'html' => kompanie_markdown($p['markdown'], static fn (string $s): string => '#/hilfe/' . $s, static fn (string $n): string => 'bild:' . $n),
         ];
     }
     $file = (string) $opt['app'];
@@ -353,6 +298,9 @@ a { color: var(--primary-text, #2f5d8a); }
 code { background: var(--line, #e3e6e1); padding: 1px 6px; border-radius: 5px; font-size: 0.9em; overflow-wrap: anywhere; }
 .hinweis { background: var(--card, #fff); border-left: 4px solid var(--accent, #d9a441); padding: 10px 14px; border-radius: 6px; }
 .gruppe { margin-top: 26px; }
+.hilfe-bild { margin: 16px 0; text-align: center; }
+.hilfe-bild img { max-width: min(100%, 360px); height: auto; border: 1px solid var(--line, #e3e6e1); border-radius: 12px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); }
+.hilfe-bild figcaption { color: var(--muted, #5b6560); font-size: 0.85rem; margin-top: 6px; }
 .gruppe ul { padding-left: 1.2em; }
 .wenn { color: var(--muted, #5b6560); font-size: 0.9rem; }
 footer { color: var(--muted, #5b6560); font-size: 0.85rem; padding-bottom: 32px; }
@@ -372,6 +320,21 @@ HTML;
     foreach (glob($dir . '/*.html') ?: [] as $old) {
         unlink($old);
     }
+    // Bildschirmfotos (scripts/handbuch-bilder.sh) nach bilder/; ohne --bilder bleiben die vorhandenen (z. B. beim
+    // Freigeben einer Version). Ohne Foto entfällt das Bild auf der Seite.
+    @mkdir($dir . '/bilder', 0775, true);
+    $imageDir = (string) ($opt['bilder'] ?? '');
+    if ($imageDir !== '') {
+        foreach (glob($dir . '/bilder/*.jpg') ?: [] as $old) {
+            unlink($old);
+        }
+        foreach (glob($imageDir . '/*.jpg') ?: [] as $file) {
+            if (preg_match('/^[a-z0-9-]+\.jpg$/', basename($file)) && !is_link($file)) {
+                copy($file, $dir . '/bilder/' . basename($file));
+            }
+        }
+    }
+    $siteImage = static fn (string $n): ?string => is_file("$dir/bilder/$n.jpg") ? "bilder/$n.jpg" : null;
     $featureNames = static fn (array $b): string => implode(', ', array_map(static fn (string $f): string => $labels['bereich.' . $f] ?? $f, $b));
     $groups = [];
     foreach ($pages as $p) {
@@ -383,7 +346,7 @@ HTML;
             $note[] = $p['variante'] === 'wordpress' ? 'nur mit WordPress' : 'nur ohne WordPress';
         }
         $wenn = $note ? '<p class="wenn">' . $h(ucfirst(implode('; ', $note))) . '.</p>' : '';
-        $body = '<h1>' . $fill($h($p['titel'])) . '</h1>' . $wenn . $fill(render($p['markdown'], static fn (string $s): string => $s . '.html'));
+        $body = '<h1>' . $fill($h($p['titel'])) . '</h1>' . $wenn . $fill(kompanie_markdown($p['markdown'], static fn (string $s): string => $s . '.html', $siteImage));
         $title = strtr($p['titel'], array_combine(array_map(static fn (string $k): string => '{' . $k . '}', array_keys($labels)), $labels));
         file_put_contents("$dir/{$p['slug']}.html", $layout($title, $body));
         $groups[group($p)][] = '<li><a href="' . $h($p['slug']) . '.html">' . $fill($h($p['titel'])) . '</a>' . ($note ? ' <span class="wenn">(' . $h(implode('; ', $note)) . ')</span>' : '') . '</li>';

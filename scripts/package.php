@@ -23,6 +23,7 @@
  * In beide Pakete kommt update.json: Adresse der Update-Liste (Standard bei --kompanie=org/repo:
  * https://org.github.io/repo/updates.json), vertrauenswürdige Schlüssel (TrustedKeys; mit
  * --trust-signing-key zusätzlich der Signaturschlüssel – nur für Tests), Statusmeldungen, Fehlermeldungen, Hilfe.
+ * Dazu LICENSE und THIRD-PARTY-NOTICES.txt (beim Bauen erzeugt, siehe docs/LIZENZEN.md) im Hauptordner.
  * Mit --require-signature muss der Signaturschlüssel in TrustedKeys stehen, sonst könnten die
  * Installationen keine Updates prüfen, und --kompanie ist Pflicht.
  *
@@ -66,6 +67,10 @@ if (!isset($codeHashOnly)) {
     $dist = rtrim((string) ($opt['dist'] ?? $root . '/packages/frontend/dist'), '/');
     if (!is_file($dist . '/index.html') || !is_file($dist . '/sw.js')) {
         $fail("Die App ist nicht gebaut ($dist). Erst scripts/build-frontend.sh ausführen.");
+    }
+    // Entsteht beim Bauen aus den Bausteinen, die in der App stecken (packages/frontend/build/licenses.ts, Issue #173).
+    if (!is_file($dist . '/THIRD-PARTY-NOTICES.txt')) {
+        $fail("THIRD-PARTY-NOTICES.txt fehlt im Build ($dist). Die App mit dem aktuellen Kern neu bauen.");
     }
     $brand = json_decode((string) @file_get_contents((string) ($opt['brand'] ?? $root . '/packages/frontend/src/generated/brand.json')), true);
     if (($brand['name'] ?? null) !== trim($kompanie['name'])) {
@@ -154,8 +159,12 @@ function kompanie_code_hash(string $root): string
         'build' => [
             'package.json' => $root . '/package.json',
             'package-lock.json' => $root . '/package-lock.json',
+            // PHP-Abhängigkeiten (PHPMailer, nur in der eigenständigen Version mitgeliefert)
+            'composer.json' => $root . '/composer.json',
+            'composer.lock' => $root . '/composer.lock',
             'build-frontend.sh' => $root . '/scripts/build-frontend.sh',
             'package.php' => $root . '/scripts/package.php',
+            'LICENSE' => $root . '/LICENSE',
             // Kern-Version: Eine neue Version ergibt einen neuen Stand, auch ohne andere Änderung am Code.
             'VERSION' => $root . '/VERSION',
         ],
@@ -232,7 +241,12 @@ if (isset($opt['config-hash'])) {
 }
 
 $core = kompanie_files($root . '/packages/core/src');
-$app = kompanie_files($dist, [], false);
+// Lizenzhinweise der Drittanbieter liegen neben LICENSE im Hauptordner des Pakets, nicht unter app/.
+$app = kompanie_files($dist, ['#^THIRD-PARTY-NOTICES\.txt$#'], false);
+$licenses = [
+    'LICENSE' => $root . '/LICENSE',
+    'THIRD-PARTY-NOTICES.txt' => $dist . '/THIRD-PARTY-NOTICES.txt',
+];
 // Zwischenspeicher und Komprimierung der App-Dateien (Apache/LiteSpeed), in beide Pakete. Aus dem Repo,
 // nicht aus dem Build: Dateien wie .htaccess nimmt scripts/import-build.php aus dem Build nie an.
 $appHtaccess = [
@@ -262,6 +276,9 @@ foreach ($app as $rel => $src) {
 foreach ($appHtaccess as $rel => $src) {
     $wp["kompanie-app/$rel"] = $src;
 }
+foreach ($licenses as $rel => $src) {
+    $wp["kompanie-app/$rel"] = $src;
+}
 $wp['kompanie-app/kompanie.json'] = $kompanieJson;
 $wp['kompanie-app/update.json'] = $updateEntry;
 
@@ -280,6 +297,19 @@ foreach ($appHtaccess as $rel => $src) {
     $sa["kompanie-app/$rel"] = $src;
 }
 $sa['kompanie-app/core/.htaccess'] = ['content' => (string) file_get_contents($root . '/adapters/standalone/src/.htaccess')];
+// PHPMailer (LGPL-2.1, Issue #172) für den Mailversand, aus composer install. Unter src/, weil ältere Versionen beim Update
+// nur die Einträge aus StandaloneUpdateTarget::PROGRAM tauschen; src/ ist per .htaccess gesperrt. WordPress nutzt die
+// eigene Kopie von WordPress (wp-includes/PHPMailer), das Plugin liefert keine mit.
+$phpmailer = $root . '/vendor/phpmailer/phpmailer';
+foreach (['src/PHPMailer.php', 'src/SMTP.php', 'src/Exception.php', 'LICENSE', 'VERSION'] as $file) {
+    if (!is_file("$phpmailer/$file")) {
+        $fail("PHPMailer fehlt ($phpmailer/$file). Vorher „composer install --no-dev“ ausführen.");
+    }
+    $sa['kompanie-app/src/lib/PHPMailer/' . basename($file)] = "$phpmailer/$file";
+}
+foreach ($licenses as $rel => $src) {
+    $sa["kompanie-app/$rel"] = $src;
+}
 $sa['kompanie-app/sw.js'] = $dist . '/sw.js';
 $sa['kompanie-app/kompanie.json'] = $kompanieJson;
 $sa['kompanie-app/VERSION'] = ['content' => $version . "\n"];

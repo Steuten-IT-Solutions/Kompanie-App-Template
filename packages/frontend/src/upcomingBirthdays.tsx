@@ -2,18 +2,17 @@
 // bei den Terminen. Alles Übrige (ganze Liste, eigener Geburtstag, Pflege) steht in birthdays.tsx und wird erst bei
 // Bedarf geladen.
 
-import { api, can, config, type BirthdayEntry } from './api';
+import { type BirthdayEntry } from './api';
 import brand from './generated/brand';
 import { parseLocalDate } from './format';
 import { navigate } from './router';
 import { ErrorBox, useAsync } from './ui';
+import { sources } from './viewData';
 
 const sec = brand.labels.sections;
 
-/** Wer Geburtstage sieht und seinen eintragen kann: Bereich an, Mitglieder (wie BirthdayService::isMember im Kern). */
-export function birthdaysVisible(): boolean {
-  return !!config?.features.birthdays && can('member');
-}
+// Steht bei den Daten der Ansichten (viewData.ts): Das Vorabladen braucht es auch.
+export { birthdaysVisible } from './viewData';
 
 const weekdayDate = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -52,7 +51,8 @@ export function UpcomingBirthdays({ always = false }: { always?: boolean }) {
 
 /** Lädt die anstehenden Geburtstage (nur mit `on`), z. B. gleichzeitig mit den Terminen. */
 export function useUpcomingBirthdays(on: boolean) {
-  return useAsync(() => (on ? api.birthdays(7) : Promise.resolve(null)), [], 'geburtstage-anstehend');
+  const s = sources.upcomingBirthdays;
+  return useAsync(() => (on ? s.load() : Promise.resolve(null)), s.deps, s.key);
 }
 
 /** Die Karte zu schon geladenen Daten (useUpcomingBirthdays). */

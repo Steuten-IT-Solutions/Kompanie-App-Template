@@ -43,8 +43,9 @@ final class PushService
     public const TASK_WATCH = 'push_watch';
     public const WATCH_INTERVAL = 900;
 
-    /** Diese Einstellungen gehören zur Installation (Backup::LOCAL_SETTINGS). */
+    /** Schlüssel für Web Push; mit den Abos in der Sicherung, damit Benachrichtigungen nach einem Umzug weiter ankommen. */
     public const VAPID_SETTING = 'push_vapid';
+    /** Diese Einstellungen gehören zur Installation (Backup::LOCAL_SETTINGS). */
     public const CALENDAR_SETTING = 'push_calendar_seen';
     public const NEWS_SETTING = 'push_news_seen';
     /** Neue Art „Schwarzes Brett“ den bestehenden Abos schon einmal hinzugefügt (beim ersten Einschalten des Bereichs). */
@@ -84,6 +85,12 @@ final class PushService
     private const LEASE = 600;
     private const MAX_ATTEMPTS = 3;
     public const TTL = 86400;
+    /**
+     * Obergrenze der Zustelldauer bei den Push-Diensten (Issue #172): Firebase Cloud Messaging (Chrome, Android) nimmt
+     * 0 bis 2 419 200 Sekunden (28 Tage) an; das ist die kleinste dokumentierte Grenze der verbreiteten Dienste.
+     * Gilt für das Schwarze Brett, dessen Nachrichten beliebig lange sichtbar sein können.
+     */
+    public const MAX_TTL = 2419200;
     /** Ab so vielen neuen Kalenderterminen auf einmal eine Sammelnachricht */
     private const SUMMARY_FROM = 4;
     /** Neue Termine weiter in der Zukunft lösen nichts aus (z. B. ein ganzer Jahreskalender). */
@@ -533,14 +540,14 @@ final class PushService
 
     /**
      * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, außer denen des Verfassers. Dringend
-     * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt.
+     * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt, höchstens MAX_TTL (Issue #172).
      *
      * @param Message $message
-     * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens TTL)
+     * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens MAX_TTL)
      */
     public function notifyBoard(array $message, int $authorId, int $ttl): int
     {
-        return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl);
+        return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl, self::MAX_TTL);
     }
 
     /**
@@ -549,9 +556,10 @@ final class PushService
      *
      * @param Message $message
      * @param \Closure(int): bool $include Benutzer-ID → bekommt die Nachricht
-     * @param int $ttl Sekunden, höchstens TTL; 0 oder weniger: nichts
+     * @param int $ttl Sekunden, höchstens $maxTtl; 0 oder weniger: nichts
+     * @param int $maxTtl Obergrenze (Standard TTL, höchstens MAX_TTL)
      */
-    public function notifyAudience(string $type, array $message, \Closure $include, string $urgency = 'normal', int $ttl = self::TTL): int
+    public function notifyAudience(string $type, array $message, \Closure $include, string $urgency = 'normal', int $ttl = self::TTL, int $maxTtl = self::TTL): int
     {
         if (!$this->typeEnabled($type) || $ttl <= 0) {
             return 0;
@@ -569,7 +577,7 @@ final class PushService
                 $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
             }
         }
-        return $this->enqueue($items, $urgency, min(self::TTL, $ttl));
+        return $this->enqueue($items, $urgency, min($maxTtl, self::MAX_TTL, $ttl));
     }
 
     /** @param 'members'|'board'|'all' $audience */

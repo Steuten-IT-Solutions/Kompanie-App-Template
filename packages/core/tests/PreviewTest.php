@@ -65,7 +65,7 @@ final class PreviewTest extends TestCase
         $this->assertNotNull($user);
         $this->assertSame([$this->admin, 'admin', Roles::MEMBER, true], [$user->id, $user->login, $user->role, $user->preview]);
         $this->assertFalse($user->isAdmin());
-        $this->assertSame([Capability::Member, Capability::Calendar], $user->capabilities);
+        $this->assertSame([Capability::Member, Capability::Calendar, Capability::ViewIntern], $user->capabilities);
         $this->assertSame([], $this->app->roles()->extraRolesOf($user));
         $this->assertSame($this->admin, $preview->realUser()?->id);
         $this->assertSame($user, $this->app->authContext->currentUser(), 'einmal je Anfrage gebaut');
@@ -107,16 +107,16 @@ final class PreviewTest extends TestCase
 
     public function testReadOnlyOnServerExceptLogout(): void
     {
-        foreach ([['POST', '/board', ['text' => 'Hallo', 'push' => false]], ['PUT', '/me/birthday', ['month' => 1, 'day' => 2]], ['POST', '/me/push/test', []], ['POST', '/auth/login', ['username' => 'admin', 'password' => 'x']], ['PATCH', '/admin/settings', []], ['DELETE', "/members/{$this->m}", []]] as [$method, $path, $body]) {
+        foreach ([['POST', '/board', ['title' => 'Titel', 'text' => 'Hallo', 'push' => false]], ['PUT', '/me/birthday', ['month' => 1, 'day' => 2]], ['POST', '/me/push/test', []], ['POST', '/auth/login', ['username' => 'admin', 'password' => 'x']], ['PATCH', '/admin/settings', []], ['DELETE', "/members/{$this->m}", []]] as [$method, $path, $body]) {
             $res = $this->call($method, $path, $body, 'member');
             $this->assertSame([403, 'preview_readonly', 'In der Vorschau kannst du nichts ändern.'], [$res->status, $res->data['code'] ?? null, $res->data['message'] ?? null], "$method $path");
         }
-        $this->assertSame(403, $this->call('POST', '/board', ['text' => 'Hallo'], null, [Preview::QUERY => 'member'])->status, 'auch über den Parameter');
-        $this->assertSame('preview_readonly', $this->call('POST', '/board', ['text' => 'Hallo'], 'gibtsnicht')->data['code'] ?? null, 'auch ungültig');
+        $this->assertSame(403, $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo'], null, [Preview::QUERY => 'member'])->status, 'auch über den Parameter');
+        $this->assertSame('preview_readonly', $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo'], 'gibtsnicht')->data['code'] ?? null, 'auch ungültig');
         $this->assertSame(200, $this->call('POST', '/auth/logout', [], 'member')->status, 'Abmelden geht');
         $this->assertFalse($this->app->preview()->requested(), 'nach der Anfrage keine Vorschau mehr');
         $this->users->current = $this->admin;
-        $this->assertSame(201, $this->call('POST', '/board', ['text' => 'Hallo', 'push' => false])->status, 'ohne Vorschau wieder möglich');
+        $this->assertSame(201, $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo', 'push' => false])->status, 'ohne Vorschau wieder möglich');
     }
 
     public function testConfigReflectsPreview(): void
@@ -192,9 +192,14 @@ final class PreviewTest extends TestCase
                 $this->app->preview()->begin(null);
             }
         };
-        $this->assertSame([200, 'no-store'], [$badge('candidate')['status'], $badge('candidate')['headers']['Cache-Control']]);
+        $cand = TestApp::candidateRole($this->app);
+        $this->assertSame([200, 'no-store'], [$badge($cand)['status'], $badge($cand)['headers']['Cache-Control']]);
+        $this->assertNotSame('no-store', $badge(null)['headers']['Cache-Control']);
+        // Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen, sonst nur Mitglieder und Anwärter.
+        $this->assertSame(200, $badge('guest')['status']);
+        $this->assertSame(200, $badge(Preview::PUBLIC)['status']);
+        $this->app->features()->update(['directory' => false]);
         $this->assertSame(403, $badge('guest')['status']);
         $this->assertSame(401, $badge(Preview::PUBLIC)['status']);
-        $this->assertNotSame('no-store', $badge(null)['headers']['Cache-Control']);
     }
 }

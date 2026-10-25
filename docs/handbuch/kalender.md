@@ -1,20 +1,38 @@
 ---
-titel: "{bereich.calendar}"
-reihenfolge: 35
+titel: "{bereich.events} mit Kalender"
+reihenfolge: 31
 rechte: [calendar]
 bereiche: [calendar]
 ---
-Angemeldete {rolle.member} und {rolle.candidate} sehen unter **{bereich.events}** den Kalender der Kompanie mit allen kommenden Terminen, auch den internen, nach Monaten geordnet. Gäste ohne Anmeldung sehen dort nur die öffentlichen Termine (wenn die Kompanie sie nutzt).
+Bist du angemeldet, siehst du unter **{bereich.events}** alle kommenden Termine aus dem Kalender der {kompanie.name}, auch die internen, nach Monaten geordnet. Du kannst einen Termin in deinen eigenen Kalender übernehmen.
 
-## Was im Kalender steht
-Die Termine kommen aus dem Kalender der Kompanie (z. B. Google Kalender), bis etwa ein Jahr im Voraus. Termine, die dort als privat markiert oder abgesagt sind, erscheinen nicht. Neue oder geänderte Termine erscheinen nicht sofort, sondern nach kurzer Zeit.
+![Termine aus dem Kalender der Kompanie, oben die anstehenden Geburtstage](bild:kalender)
 
-> Die öffentlichen Termine, die Gäste sehen, stehen hier nicht zusätzlich. Du siehst sie nur, wenn sie auch im Kalender der Kompanie eingetragen sind.
+## So öffnest du die Seite
+Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 
-## Einen Termin ansehen
-In der Liste stehen Datum, Titel, Uhrzeit und, falls angegeben, der Ort. Ein Tipp auf einen Termin klappt ihn auf und zeigt die Beschreibung und diese Knöpfe:
-- **In meinen Kalender**: Die App lädt eine Kalenderdatei herunter; das Handy bietet an, den Termin in den eigenen Kalender zu übernehmen.
-- **Karte**: nur, wenn ein Ort angegeben ist; öffnet den Ort in Google Maps.
+## Was du hier siehst
+- **Anstehende {bereich.birthdays}** (oben, nur für {rolle.member} und nur, wenn die {kompanie.name} {bereich.birthdays} nutzt): wer heute oder in den nächsten 7 Tagen Geburtstag hat. Mit **Alle {bereich.birthdays}** öffnest du die ganze Liste.
+- **Öffentliche Termine verwalten**: nur, wenn du öffentliche Termine pflegen darfst.
+- **Monatsüberschrift**: z. B. „Oktober 2026“; darunter die Termine dieses Monats.
+- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
 
-## Benachrichtigt werden
-Mit den Arten **{bereich.events}: neue und geänderte** und **Erinnerung am Vortag** bekommst du Nachrichten zu den Terminen aus diesem Kalender, siehe [Benachrichtigungen](seite:benachrichtigungen).
+## So gehst du vor
+### Einen Termin ansehen
+1. Tippe auf den Termin. Er klappt auf und zeigt die Beschreibung, falls es eine gibt.
+2. Tippe auf **In meinen Kalender**, um den Termin in deinen eigenen Kalender zu übernehmen: Die App lädt eine Kalenderdatei herunter. Öffne sie, und dein Handy oder Computer bietet die Übernahme an.
+3. Ist ein Ort angegeben, zeigt **Karte** ihn in Google Maps.
+4. Tippe noch einmal auf den Termin, um ihn wieder zuzuklappen.
+
+![Aufgeklappter Termin mit Beschreibung und dem Knopf „In meinen Kalender“](bild:kalender-termin)
+
+## Gut zu wissen
+- Die Termine kommen aus dem Kalender der {kompanie.name} (z. B. einem Google Kalender), bis etwa ein Jahr im Voraus. Termine, die dort als privat markiert oder abgesagt sind, erscheinen nicht.
+- Neue oder geänderte Termine erscheinen nicht sofort, sondern nach kurzer Zeit.
+- Die öffentlichen Termine, die Gäste ohne Anmeldung sehen, stehen hier nicht zusätzlich. Du siehst sie nur, wenn sie auch im Kalender der {kompanie.name} eingetragen sind.
+- Diese Ansicht haben angemeldete {rolle.member} und Personen mit Zugang zum internen Kalender (z. B. Anwärter). Gäste ohne Anmeldung sehen unter **{bereich.events}** nur die öffentlichen Termine.
+- Über neue und geänderte Termine und mit einer Erinnerung am Vortag kann dich die App benachrichtigen, siehe [Benachrichtigungen](seite:benachrichtigungen).
+
+## Siehe auch
+- [Benachrichtigungen](seite:benachrichtigungen)
+- [Die App im Überblick](seite:app-ueberblick)

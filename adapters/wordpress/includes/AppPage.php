@@ -15,9 +15,11 @@ use KompanieApp\Core\Http\FileCache;
  * /app/manifest.webmanifest  → Web-App-Manifest
  * /app/sw.js                 → Service Worker (Bereich /app/)
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
+ * /app/foto/<id>/video       → Galerievideo in Ausschnitten aus Drive (Range; interne nur für Mitglieder)
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
+ * /app/bild/<kennung>        → Bild in formatiertem Inhalt (Signatur, Schwarzes Brett; wer den Inhalt sehen darf)
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -66,7 +68,7 @@ final class AppPage
         if ($path === '') {
             return;
         }
-        if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto)/#', $path)) {
+        if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto|bild)/#', $path)) {
             // Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
             // der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
             $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
@@ -80,14 +82,18 @@ final class AppPage
             self::sendServiceWorker($app);
         } elseif ($path === 'csrf') {
             self::sendCsrf($app);
-        } elseif (preg_match('#^foto/(\d+)/(thumb|large)$#', $path, $m)) {
+        } elseif (preg_match('#^foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
             self::sendPhoto($app, (int) $m[1], $m[2]);
+        } elseif (preg_match('#^foto/(\d+)/video/?$#', $path, $m)) {
+            self::sendVideo($app, (int) $m[1]);
         } elseif (preg_match('#^dokument/(\d+)/?$#', $path, $m)) {
             self::sendDocument($app, (int) $m[1]);
         } elseif (preg_match('#^abzeichen/(\d+)/?$#', $path, $m)) {
             self::sendBadge($app, (int) $m[1]);
         } elseif (preg_match('#^mitgliedsfoto/(\d+)/?$#', $path, $m)) {
             self::sendMemberPhoto($app, (int) $m[1]);
+        } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
+            self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {
             self::sendApp($app);
         }
@@ -186,6 +192,56 @@ final class AppPage
         header('Content-Type: image/jpeg');
         header('Content-Length: ' . filesize($res['file']));
         readfile($res['file']);
+    }
+
+    /** Galerievideo (Issue #182): Ausschnitt aus Drive, Status und Bereich wie im Kern festgelegt. */
+    private static function sendVideo(App $app, int $id): void
+    {
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        if ($app->maintenance()->active() && $app->maintenance()->blocks($app->authContext->currentUser())) {
+            status_header(503);
+            nocache_headers();
+            return;
+        }
+        $res = self::videoResponse($app, $id);
+        status_header($res['status']);
+        header('X-Content-Type-Options: nosniff');
+        header('Accept-Ranges: bytes');
+        if (isset($res['contentRange'])) {
+            header('Content-Range: ' . $res['contentRange']);
+        }
+        if ($res['status'] !== 206 || !isset($res['body'])) {
+            nocache_headers();
+            if (isset($res['retryAfter'])) {
+                header('Retry-After: ' . (int) $res['retryAfter']);
+            }
+            return;
+        }
+        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
+        header('ETag: ' . $res['etag']);
+        header('Content-Type: ' . $res['mime']);
+        header('Content-Length: ' . strlen($res['body']));
+        echo $res['body']; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten aus Drive
+    }
+
+    /**
+     * Galerievideo: Rechte und Ausschnitt aus dem Kern (Konto nur bei internen Videos).
+     *
+     * @return array{status: int, body?: string, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     */
+    public static function videoResponse(App $app, int $id): array
+    {
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nur „bytes=a-b“, der Kern prüft das Format
+        $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
+        return $app->gallery()->deliverVideo($id, $range, static function () use ($app): array {
+            $user = $app->authContext->currentUser();
+            return [(bool) $user?->isMember(), $user !== null];
+        });
     }
 
     /**
@@ -315,7 +371,16 @@ final class AppPage
 
     private static function sendMemberPhoto(App $app, int $id): void
     {
-        $res = self::memberPhotoResponse($app, $id);
+        self::sendBody(self::memberPhotoResponse($app, $id));
+    }
+
+    /**
+     * Antwort mit Inhalt aus dem Kern (Fotos der Mitglieder, Bilder in formatierten Inhalten): Status, Header, Inhalt.
+     *
+     * @param array{status: int, headers: array<string, string>, body?: string} $res
+     */
+    private static function sendBody(array $res): void
+    {
         if (!defined('DONOTCACHEPAGE')) {
             define('DONOTCACHEPAGE', true);
         }
@@ -332,7 +397,7 @@ final class AppPage
         }
         if ($res['status'] === 200 && isset($res['body'])) {
             header('Content-Length: ' . strlen($res['body']));
-            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG, vom Kern neu erzeugt
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG bzw. PNG, vom Kern neu erzeugt
             echo $res['body'];
         }
     }

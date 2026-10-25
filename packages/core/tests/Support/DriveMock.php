@@ -47,6 +47,14 @@ final class DriveMock
     public int $downloads = 0;
     /** Downloads scheitern (HTTP 500), z. B. bei einer Störung. */
     public bool $downloadFails = false;
+    /** Drive-Datei-ID => Inhalt der Datei (statt des erzeugten JPEGs), z. B. eine RAW-Datei. */
+    public array $contents = [];
+    /** Drive-Datei-IDs, für die Google ein Vorschaubild (thumbnailLink) hat. */
+    public array $thumbnails = [];
+    /** @var string[] Range-Kopfzeilen der Abrufe von Ausschnitten */
+    public array $ranges = [];
+    /** @var string[] abgerufene Vorschaubild-Adressen */
+    public array $thumbnailRequests = [];
     public string $privateKey = '';
     private string $publicKey;
 
@@ -75,10 +83,7 @@ final class DriveMock
             'A2' => [['id' => 'I2', 'name' => 'intern', 'mimeType' => $folder]],
             'I2' => [['id' => 'IMG4', 'name' => 'd.jpg', 'mimeType' => 'image/jpeg', 'md5Checksum' => 'm4']],
             'Y2025' => [['id' => 'A3', 'name' => 'Maifest', 'mimeType' => $folder, 'createdTime' => '2025-05-08T00:00:00Z']],
-            'A3' => [
-                ['id' => 'IMG5', 'name' => 'e.png', 'mimeType' => 'image/png', 'md5Checksum' => 'm5'],
-                ['id' => 'VID1', 'name' => 'film.mp4', 'mimeType' => 'video/mp4', 'md5Checksum' => 'v1'],
-            ],
+            'A3' => [['id' => 'IMG5', 'name' => 'e.png', 'mimeType' => 'image/png', 'md5Checksum' => 'm5']],
         ];
     }
 
@@ -158,15 +163,34 @@ final class DriveMock
                     ? ['status' => 200, 'body' => (string) json_encode(['items' => $this->calendarItems])]
                     : ['status' => $this->calendarStatus, 'body' => '{"error":{"message":"Not Found"}}'];
             }
+            if (str_starts_with($url, 'https://lh3.googleusercontent.com/drive-storage/')) {
+                $this->thumbnailRequests[] = $url;
+                return ($headers['Authorization'] ?? '') === 'Bearer TOKEN123'
+                    ? ['status' => 200, 'body' => self::jpeg(1600, 1200)]
+                    : ['status' => 403, 'body' => ''];
+            }
             if (!str_starts_with($url, DriveClient::FILES_URL)) {
                 return ['status' => 404, 'body' => ''];
             }
             if (($headers['Authorization'] ?? '') !== 'Bearer TOKEN123') {
                 return ['status' => 401, 'body' => '{"error":{"message":"Kein Token"}}'];
             }
+            $id = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\\?.*$#', '$1', $url));
+            if (str_contains($url, 'alt=media') && preg_match('/^bytes=(\d+)-(\d+)$/', (string) ($headers['Range'] ?? ''), $r)) {
+                // Ausschnitt (Videos abspielen): 206 mit Content-Range wie bei Google
+                $this->ranges[] = (string) $headers['Range'];
+                $content = $this->contents[$id] ?? self::jpeg();
+                $end = min((int) $r[2], strlen($content) - 1);
+                return ['status' => 206, 'headers' => ['content-range' => 'bytes ' . $r[1] . '-' . $end . '/' . strlen($content)], 'body' => substr($content, (int) $r[1], $end - (int) $r[1] + 1)];
+            }
             if (str_contains($url, 'alt=media')) {
                 $this->downloads++;
-                return $this->downloadFails ? ['status' => 500, 'body' => ''] : ['status' => 200, 'body' => self::jpeg()];
+                return $this->downloadFails ? ['status' => 500, 'body' => ''] : ['status' => 200, 'body' => $this->contents[$id] ?? self::jpeg()];
+            }
+            if (str_contains($url, 'fields=thumbnailLink')) {
+                return ['status' => 200, 'body' => (string) json_encode(in_array($id, $this->thumbnails, true)
+                    ? ['thumbnailLink' => 'https://lh3.googleusercontent.com/drive-storage/' . $id . '=s220']
+                    : [])];
             }
             parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
             preg_match("/'([^']+)' in parents/", (string) $q['q'], $m);

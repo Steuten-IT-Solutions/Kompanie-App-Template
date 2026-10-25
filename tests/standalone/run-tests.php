@@ -241,10 +241,10 @@ try {
     $c->ok($swAgain[0] === 304 && !isset($swAgain[2]['content-length']), 'sw.js über index.php: passender ETag → 304 ohne Inhalt');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron&key=falsch', [], null)[0] === 403, 'Cron mit falschem Schlüssel → 403');
     $c->ok($d->send('GET', $kernel->cronUrl(), [], null)[0] === 200, 'Cron mit Schlüssel → 200');
-    // Schwarzes Brett (Issue #5): Der Cron führt das Aufräumen aus und löscht abgelaufene Nachrichten.
+    // Schwarzes Brett (Issue #5, #172): Der Cron führt das Aufräumen aus und löscht Nachrichten 30 Tage nach ihrem Ende.
     $kdb = $kernel->db();
     $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
-    $kdb->insert('board_messages', ['body' => 'Kpsa abgelaufen', 'author_id' => 1, 'created_at' => $past(90000), 'updated_at' => $past(90000), 'expires_at' => $past(3600)]);
+    $kdb->insert('board_messages', ['title' => 'Kpsa', 'body' => 'Kpsa abgelaufen', 'author_id' => 1, 'created_at' => $past(32 * 86400), 'updated_at' => $past(32 * 86400), 'expires_at' => $past(31 * 86400)]);
     $kdb->execute('UPDATE {tasks} SET next_run = ? WHERE name = ?', [time() - 1, \KompanieApp\Core\Domain\BoardService::TASK]);
     $kdb->execute('DELETE FROM {settings} WHERE name = ?', [KompanieApp\Standalone\PseudoScheduler::NEXT_SETTING]); // nächsten Lauf neu lesen
     $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {tasks} WHERE name = ?', [\KompanieApp\Core\Domain\BoardService::TASK]) === 1, 'Schwarzes Brett: Aufräumen eingeplant');
@@ -253,7 +253,7 @@ try {
     for ($i = 0; $i < 50 && (int) $kdb->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpsa abgelaufen']) > 0; $i++) {
         usleep(100000);
     }
-    $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpsa abgelaufen']) === 0, 'Cron löscht abgelaufene Nachrichten am Brett');
+    $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpsa abgelaufen']) === 0, 'Cron löscht Nachrichten am Brett 30 Tage nach ihrem Ende');
     // Umfragen (Issue #4): Der Cron führt die Erinnerung aus (bald endende Umfrage wird einmal als erinnert vermerkt).
     $pollTask = \KompanieApp\Core\Domain\PollService::TASK;
     $c->ok((int) $kdb->scalar('SELECT COUNT(*) FROM {tasks} WHERE name = ?', [$pollTask]) === 1, 'Umfragen: Erinnerung eingeplant');
@@ -306,7 +306,16 @@ try {
     $c->ok($asMember[0] === 200 && ($asMember[2]['cache-control'] ?? '') === 'no-store', 'Vorschau als Mitglied: internes Foto, nicht speichern');
     $c->ok($d->send('GET', $photoUrl . '&vorschau=guest', $annaCookie, null)[0] === 403, 'Vorschau als Gast: internes Foto → 403');
     $c->ok($d->send('GET', $photoUrl, $annaCookie + ['X-Kompanie-Preview' => '@public'], null)[0] === 401, 'Vorschau ohne Anmeldung (Header): internes Foto → 401');
-    $kdb->execute('DELETE FROM {photos} WHERE id = ?', [$photoId]);
+    // Videos (Issue #182): Rechte vor dem Abruf aus Drive; ohne Google-Zugang (dieser Testserver) 502.
+    $videoId = $kdb->insert('photos', ['album_id' => $albumId, 'drive_file_id' => 'video-1', 'name' => 'film.mp4', 'is_intern' => 1, 'file_key' => 'video' . bin2hex(random_bytes(4)), 'status' => 'ready', 'media' => 'video', 'mime' => 'video/mp4', 'bytes' => 1000]);
+    $videoUrl = $base . 'index.php?r=/foto/' . $videoId . '/video';
+    $guestVideo = $d->send('GET', $videoUrl, ['Range' => 'bytes=0-'], null);
+    $c->ok($guestVideo[0] === 401 && ($guestVideo[2]['accept-ranges'] ?? '') === 'bytes' && ($guestVideo[2]['cache-control'] ?? '') === 'no-store', 'Internes Video ohne Anmeldung → 401');
+    $c->ok($d->send('GET', $videoUrl, $annaCookie + ['Range' => 'bytes=0-'], null)[0] === 502, 'Internes Video als Mitglied: Abruf aus Drive (hier ohne Zugang → 502)');
+    $tooFar = $d->send('GET', $videoUrl, $annaCookie + ['Range' => 'bytes=1000-'], null);
+    $c->ok($tooFar[0] === 416 && ($tooFar[2]['content-range'] ?? '') === 'bytes */1000', 'Bereich hinter dem Ende → 416 mit Größe');
+    $c->ok($d->send('GET', $base . 'index.php?r=/foto/' . $photoId . '/video', $annaCookie, null)[0] === 404, 'Bild als Video → 404');
+    $kdb->execute('DELETE FROM {photos} WHERE id IN (?, ?)', [$photoId, $videoId]);
     $kdb->execute('DELETE FROM {albums} WHERE id = ?', [$albumId]);
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');
@@ -318,6 +327,10 @@ try {
     [$s, $badge] = $d->request('POST', '/ranks/' . ($badgeRank['id'] ?? 0) . '/badge', ['file' => ['name' => 'abzeichen.svg', 'data' => base64_encode($svgBadge)]]);
     $badgeUrl = (string) ($badge['badge_url'] ?? '');
     $c->ok($s === 200 && str_starts_with($badgeUrl, $base . 'index.php?r=/abzeichen/' . ($badgeRank['id'] ?? 0) . '&v='), 'SVG-Abzeichen hochgeladen, Adresse im Bereich der App');
+    // Mit der öffentlichen Mitgliederliste (Issue #112) sieht jeder die Abzeichen; ohne sie nur Mitglieder und Anwärter.
+    $anon = $d->send('GET', $badgeUrl, [], null);
+    $c->ok($anon[0] === 200 && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public'), 'Mit Mitgliederliste: Abzeichen ohne Anmeldung, öffentlich zu speichern');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
     $anon = $d->send('GET', $badgeUrl, [], null);
     $c->ok($anon[0] === 401 && ($anon[2]['x-content-type-options'] ?? '') === 'nosniff', 'Abzeichen ohne Anmeldung → 401');
     $cookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)];
@@ -343,6 +356,7 @@ try {
     $c->ok($pngRes[0] === 200 && ($pngRes[2]['content-type'] ?? '') === 'image/png' && !isset($pngRes[2]['content-security-policy']) && ($pngSize[0] ?? 0) === 64 && ($pngSize[1] ?? 0) === 32, 'PNG-Abzeichen: image/png, s=64 liefert 64 Pixel');
     $old = $d->send('GET', $badgeUrl, $cookie, null);
     $c->ok($old[0] === 200 && ($old[2]['content-type'] ?? '') === 'image/png' && ($old[2]['cache-control'] ?? '') === 'private, no-cache', 'Alte Adresse nach dem Ersetzen: neues Abzeichen, nicht lange speichern');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
 
     $c->section('Fotos der Mitglieder (Auslieferung)');
     $mona = $users->add('Mona Foto', 'mona', 'mona@example.org', 'mona-passwort', Roles::MEMBER);
@@ -353,17 +367,58 @@ try {
     [$s, $monaPhoto] = $d->request('PUT', '/members/' . $mona . '/photo', ['file' => ['name' => 'mona.jpg', 'data' => base64_encode((string) ob_get_clean())]]);
     $monaUrl = (string) ($monaPhoto['photo_url'] ?? '');
     $c->ok($s === 200 && str_starts_with($monaUrl, $base . 'index.php?r=/mitgliedsfoto/' . $mona . '&v=') && str_ends_with($monaUrl, '&s=128'), 'Foto hochgeladen, Adresse im Bereich der App');
+    // Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung und privat.
+    $public = $d->send('GET', $monaUrl, [], null);
+    $c->ok($public[0] === 200 && ($public[2]['cache-control'] ?? '') === 'public, max-age=86400' && ($public[2]['x-robots-tag'] ?? '') === 'noindex', 'Mit Mitgliederliste: Foto ohne Anmeldung, einen Tag öffentlich, noindex');
+    foreach (['directory', 'offices'] as $route) {
+        $res = $d->send('GET', $base . 'index.php?r=/api/v1/' . $route, ['Accept' => 'application/json'], null);
+        $c->ok(($res[2]['x-robots-tag'] ?? '') === 'noindex', "GET /$route ohne Anmeldung: noindex (Status {$res[0]})");
+    }
+    $d->request('PUT', '/admin/features', ['directory' => false]);
     $c->ok($d->send('GET', $monaUrl, [], null)[0] === 401, 'Foto ohne Anmeldung → 401');
     $monaCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($mona)];
     $own = $d->send('GET', $monaUrl, $monaCookie, null);
     $c->ok($own[0] === 200 && ($own[2]['content-type'] ?? '') === 'image/jpeg' && ($own[2]['x-content-type-options'] ?? '') === 'nosniff' && ($own[2]['cache-control'] ?? '') === 'private, max-age=86400', 'Eigenes Foto: image/jpeg, nosniff, einen Tag privat');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
     $c->ok($d->send('GET', $monaUrl, $monaCookie + ['If-None-Match' => (string) ($own[2]['etag'] ?? '-')], null)[0] === 304, 'Foto: passender ETag → 304');
     $large = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=480', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
     $c->ok(($large[0] ?? 0) === 480 && ($large[1] ?? 0) === 320 && ($large['mime'] ?? '') === 'image/jpeg', 'Wer Mitglieder verwaltet, sieht das Foto; s=480 liefert 480 Pixel');
-    $c->ok($d->send('GET', $monaUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)], null)[0] === 403, 'Andere Mitglieder sehen das Foto nicht → 403');
+    $xlarge = @getimagesizefromstring((string) file_get_contents(str_replace('&s=128', '&s=1024', $monaUrl), false, stream_context_create(['http' => ['header' => 'Cookie: ' . $cookie['Cookie']]])));
+    $c->ok(($xlarge[0] ?? 0) === 900 && ($xlarge[1] ?? 0) === 600, 's=1024 liefert das Foto so groß wie hochgeladen (nie vergrößert)');
+    // Mitgliederliste für alle (Bereich directory): an sehen andere Mitglieder das Foto, aus nicht.
+    $ottoCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($otto)];
+    $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 200, 'Mit Mitgliederliste sehen andere Mitglieder das Foto');
+    $d->request('PUT', '/admin/features', ['directory' => false]);
+    $c->ok($d->send('GET', $monaUrl, $ottoCookie, null)[0] === 403, 'Ohne Mitgliederliste sehen andere Mitglieder das Foto nicht → 403');
     $c->ok($d->send('GET', $monaUrl . '&vorschau=member', $cookie, null)[0] === 403, 'Vorschau als Mitglied: fremdes Foto → 403');
+    $d->request('PUT', '/admin/features', ['directory' => true]);
     [$s] = $d->request('DELETE', '/members/' . $mona);
     $c->ok($s === 200 && $d->send('GET', $monaUrl, $cookie, null)[0] === 404, 'Konto gelöscht: Foto weg (404)');
+
+    $c->section('Bilder in formatierten Inhalten (Schwarzes Brett, Issue #172)');
+    $png = imagecreatetruecolor(6, 4);
+    ob_start();
+    imagepng($png);
+    [$s, $up] = $d->request('POST', '/rich-images', ['file' => ['name' => 'logo.png', 'data' => base64_encode((string) ob_get_clean())]]);
+    $c->ok($s === 201 && ($up['url'] ?? '') === $base . 'index.php?r=/bild/' . ($up['uid'] ?? ''), 'Bild hochgeladen, Adresse im Bereich der App');
+    [$s, $msg] = $d->request('POST', '/board', ['title' => 'Kpsa Bild', 'text' => '<p>Bild:</p><img data-image="' . ($up['uid'] ?? '') . '">', 'push' => false, 'mail' => false]);
+    preg_match('#<img src="([^"]+)"#', (string) ($msg['text'] ?? ''), $img);
+    $imgUrl = html_entity_decode($img[1] ?? '');
+    $c->ok($s === 201 && str_starts_with($imgUrl, $base . 'index.php?r=/bild/'), 'Nachricht mit Bild, ausgeliefert mit Adresse');
+    $c->ok($d->send('GET', $imgUrl, [], null)[0] === 401, 'Bild ohne Anmeldung → 401');
+    $res = $d->send('GET', $imgUrl, $ottoCookie, null);
+    $c->ok($res[0] === 200 && ($res[2]['content-type'] ?? '') === 'image/png' && ($res[2]['x-content-type-options'] ?? '') === 'nosniff' && ($res[2]['cache-control'] ?? '') === 'private, max-age=86400', 'Mitglied sieht das Bild der Nachricht: image/png, nosniff, privat');
+    $c->ok($d->send('GET', $imgUrl, $ottoCookie + ['If-None-Match' => (string) ($res[2]['etag'] ?? '-')], null)[0] === 304, 'Bild: passender ETag → 304');
+    $d->request('DELETE', '/board/' . (int) ($msg['id'] ?? 0));
+    $c->ok($d->send('GET', $imgUrl, $ottoCookie, null)[0] === 403, 'Nachricht gelöscht: Mitglied sieht das Bild nicht mehr → 403');
+    $c->ok($d->send('GET', $imgUrl, $cookie, null)[0] === 200, 'Mit post_board im Verlauf weiter sichtbar');
+    $c->ok($d->send('GET', $base . 'index.php?r=/bild/' . str_repeat('0', 32), $cookie, null)[0] === 404, 'Unbekanntes Bild → 404');
+    // PHPMailer (Mailversand): in der Entwicklung aus vendor/, im Paket aus src/lib/PHPMailer
+    $c->ok(\KompanieApp\Core\Mail\PhpMailerMailer::unavailable() === null, 'PHPMailer über den Autoloader der eigenständigen Version verfügbar');
+    [$s, $mail] = $d->request('GET', '/admin/mail');
+    $c->ok($s === 200 && array_key_exists('unavailable', (array) $mail) && $mail['unavailable'] === null && ($mail['configured'] ?? true) === false, 'Einstellungen → E-Mail: verfügbar, noch nicht eingerichtet');
+    [$s, $mail] = $d->request('PATCH', '/admin/mail', ['from' => 'info@example.org', 'host' => 'smtp.example.org', 'password' => 'geheim-smtp']);
+    $c->ok($s === 200 && ($mail['password_set'] ?? false) === true && !str_contains((string) json_encode($mail), 'geheim-smtp'), 'SMTP-Passwort gespeichert, nie ausgeliefert');
 
     $c->section('Dokumente: Fassung in der Adresse, Prüfung per ETag');
     [$s, $upDoc] = $d->request('POST', '/documents', ['title' => 'Kpsa Satzung', 'date' => '2026-10-01', 'file' => ['name' => 'satzung.pdf', 'data' => base64_encode("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")]]);
@@ -608,11 +663,20 @@ try {
     $d->actAs($anna);
     [, $ev] = $d->request('POST', '/events', ['title' => 'Sicherungstest', 'start_date' => '2031-05-01']);
     $backup = new StandaloneBackup($kernel);
+    // Abzeichen eines Dienstgrads: Datei in der Sicherung, nach dem Umzug wieder da.
+    $rankId = $kernel->db()->insert('ranks', ['title' => 'Sicherungsrang', 'sort' => 99, 'badge_file' => 'abz-sicherung', 'badge_ext' => 'svg', 'badge_version' => 'v1']);
+    $badge = $kernel->app()->files->path('abzeichen/abz-sicherung.svg', false);
+    file_put_contents($badge, '<svg xmlns="http://www.w3.org/2000/svg"/>');
     $export = $backup->export();
+    $c->ok(isset($export['files']['abzeichen/abz-sicherung.svg']), 'Export enthält die Abzeichen der Dienstgrade');
+    unlink($badge);
     $c->ok($export['format'] === 'kompanie-app-backup' && count($export['tables']['users']) >= 2 && !isset($export['tables']['sessions']), 'Export enthält Daten und Benutzer, keine Sitzungen');
     $d->request('DELETE', '/events/' . $ev['id']);
     $backup->import((string) json_encode($export));
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Import stellt gelöschte Daten wieder her');
+    $c->ok(is_file($badge), 'Import legt die Abzeichen wieder ab');
+    $kernel->db()->execute('DELETE FROM {ranks} WHERE id = ?', [$rankId]);
+    @unlink($badge);
     $c->ok((int) $kernel->db()->scalar('SELECT COUNT(*) FROM {sessions}') === 0, 'Nach dem Import müssen sich alle neu anmelden');
     $c->ok($kernel->users()->verifyPassword($anna, 'anna-passwort'), 'Passwörter bleiben erhalten');
     $noAdmin = $export;

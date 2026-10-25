@@ -40,7 +40,7 @@ final class PushTriggers
             $value = (float) $r['points'];
             $title = $value < 0 ? $label . ' abgezogen' : $label . ' erhalten';
             $body = ($value > 0 ? '+' : '−') . self::number(abs($value)) . ' – ' . (string) $r['reason'];
-            $messages[] = [(int) $r['user_id'], PushService::message($title, $body, 'meins/punkte', 'punkte-' . $r['id'])];
+            $messages[] = [(int) $r['user_id'], PushService::message($title, $body, 'meins/punkte/' . $r['id'], 'punkte-' . $r['id'])];
         }
         // Alle Personen einer Buchung gemeinsam (Abos mit einer Abfrage, ein INSERT in die Warteschlange)
         $this->push->notifyUsers(PushService::TYPE_POINTS, $messages);
@@ -73,14 +73,18 @@ final class PushTriggers
     }
 
     /**
-     * @param array{id: int, text: string, author_name: string|null, expires_at: string|null} $item neue Nachricht (BoardService::create)
+     * Neue Nachricht am Brett (Issue #172): Überschrift „<Brett>: <Verfasser>“, Text = Titel der Nachricht. Zustellbar
+     * bis zum Enddatum, höchstens PushService::MAX_TTL (Obergrenze der Push-Dienste): Das begrenzt nur, wie lange ein
+     * ausgeschaltetes Gerät die Benachrichtigung nachgeliefert bekommt, nicht, wie lange die Nachricht sichtbar ist.
+     *
+     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null} $item neue Nachricht (BoardService::create)
      */
     public function boardPosted(array $item, int $authorId): int
     {
         $expires = $item['expires_at'] !== null ? (int) strtotime($item['expires_at']) : 0;
-        $ttl = $expires - $this->app->time()->timestamp();
+        $ttl = min($expires - $this->app->time()->timestamp(), PushService::MAX_TTL);
         $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
-        return $this->push->notifyBoard(PushService::message($title, $item['text'], 'brett', 'brett-' . $item['id']), $authorId, $ttl);
+        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl);
     }
 
     /**
@@ -158,8 +162,8 @@ final class PushTriggers
             $tag = 'strafe-' . $r['id'];
             $messages[] = [
                 (int) $r['user_id'],
-                PushService::message($title, 'Tippen zum Ansehen.', 'meins/strafen', $tag),
-                PushService::message($title, self::euro((int) $r['amount_cents']) . ' – ' . (string) $r['reason'], 'meins/strafen', $tag),
+                PushService::message($title, 'Tippen zum Ansehen.', 'meins/strafen/' . $r['id'], $tag),
+                PushService::message($title, self::euro((int) $r['amount_cents']) . ' – ' . (string) $r['reason'], 'meins/strafen/' . $r['id'], $tag),
             ];
         }
         $this->push->notifyUsers(PushService::TYPE_PENALTIES, $messages);
@@ -178,7 +182,7 @@ final class PushTriggers
             return 0;
         }
         $title = $before !== null ? 'Termin geändert' : 'Neuer Termin';
-        return $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($title, $this->eventBody($event), 'termine', 'termin-p' . $event['id']), false);
+        return $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($title, $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']), false);
     }
 
     /** Alle 15 Minuten (Aufgabe push_watch). */
@@ -249,11 +253,11 @@ final class PushTriggers
             $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neue Termine', sprintf('%d neue Termine im Kalender, z. B. %s', count($diff['new']), $titles), 'termine', 'termine-neu'), true);
         } else {
             foreach ($diff['new'] as $ev) {
-                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neuer Termin', $this->eventBody($ev), 'termine', 'termin-' . $ev['id']), true);
+                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neuer Termin', $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
             }
         }
         foreach ($diff['changed'] as $ev) {
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Termin geändert', $this->eventBody($ev), 'termine', 'termin-' . $ev['id']), true);
+            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Termin geändert', $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
         }
         return $count;
     }
@@ -325,7 +329,7 @@ final class PushTriggers
             try {
                 $list = $this->eventsOn($this->app->calendar()->events(), $tomorrow);
                 if ($list !== []) {
-                    $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list), true);
+                    $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list, ''), true);
                 }
             } catch (\RuntimeException) {
                 // Kalender nicht erreichbar: dann eben keine Erinnerung aus dem Kalender.
@@ -334,7 +338,7 @@ final class PushTriggers
         if ($this->app->features()->enabled('events')) {
             $list = $this->eventsOn($this->app->events()->upcoming(), $tomorrow);
             if ($list !== []) {
-                $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list), false);
+                $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list, 'p'), false);
             }
         }
         return $count;
@@ -350,10 +354,22 @@ final class PushTriggers
     }
 
     /**
+     * Ziel einer Termin-Benachrichtigung: die Terminliste, die zu diesem Termin scrollt (Issue #190). Die Kennung ist die
+     * der Liste, die die Empfänger sehen: Kalendertermine wie im Kalender, öffentliche Termine mit „p“ davor.
+     */
+    public static function eventRoute(string $id): string
+    {
+        return 'termine/termin/' . rawurlencode($id);
+    }
+
+    /**
+     * Bei genau einem Termin führt die Erinnerung zu diesem, sonst zur Liste.
+     *
      * @param list<array<string, mixed>> $events
+     * @param string $prefix vor der Kennung: „p“ für öffentliche Termine
      * @return array{title: string, body: string, route: string, tag: string}
      */
-    private function reminderMessage(array $events): array
+    private function reminderMessage(array $events, string $prefix): array
     {
         $parts = [];
         foreach ($events as $ev) {
@@ -361,7 +377,8 @@ final class PushTriggers
             $parts[] = (string) $ev['title'] . ($extra !== [] ? ' (' . implode(', ', $extra) . ')' : '');
         }
         $title = count($events) === 1 ? 'Morgen: ' . $events[0]['title'] : sprintf('Morgen: %d Termine', count($events));
-        return PushService::message($title, implode(' · ', $parts), 'termine', 'erinnerung');
+        $route = count($events) === 1 ? self::eventRoute($prefix . $events[0]['id']) : 'termine';
+        return PushService::message($title, implode(' · ', $parts), $route, 'erinnerung');
     }
 
     /** @param array<string, mixed> $ev */

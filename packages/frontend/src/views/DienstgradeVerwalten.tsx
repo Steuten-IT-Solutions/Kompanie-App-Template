@@ -4,6 +4,7 @@ import brand from '../generated/brand';
 import { formatDate } from '../format';
 import { navigate } from '../router';
 import { RankBadge, RankLabel } from '../RankBadge';
+import { useDragSort, useSaveQueue } from '../dragSort';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
 
@@ -76,11 +77,12 @@ function BadgePreview({ rank: r }: { rank: Rank }) {
 }
 
 /**
- * Verwaltung → Dienstgrade: anlegen, umbenennen, Schwelle (nur mit Punkten), Reihenfolge, deaktivieren, löschen.
+ * Verwaltung → Dienstgrade: anlegen, umbenennen, Schwelle (nur mit Punkten), Reihenfolge (Ziehen am Griff), deaktivieren,
+ * löschen.
  * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad.
  */
 export function RankList({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.ranks(true), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.ranks(true), [], 'ranks-all');
   const [title, setTitle] = useState('');
   const [min, setMin] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
@@ -139,19 +141,23 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
     }
   }
 
-  async function move(list: Rank[], index: number, dir: -1 | 1) {
-    const ids = list.map((r) => r.id);
-    [ids[index], ids[index + dir]] = [ids[index + dir], ids[index]];
-    setBusy(true);
+  // Reihenfolge per Ziehen am Griff (Issue #176), gesperrt, solange ein Dienstgrad bearbeitet wird. Steigen die Schwellen
+  // dann nicht mehr mit der Reihenfolge, lehnt der Server ab: Meldung zeigen und die gespeicherte Reihenfolge laden.
+  const saveOrder = useSaveQueue();
+  function reorder(next: Rank[]) {
+    // Gleich in der neuen Reihenfolge zeigen, damit der Eintrag nach dem Loslassen nicht zurückspringt
+    setData(next);
     setFormError(null);
-    try {
-      setData(await api.reorderRanks(ids));
-    } catch (e) {
-      setFormError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    saveOrder(
+      () => api.reorderRanks(next.map((r) => r.id)),
+      setData,
+      (e) => {
+        setFormError(e.message);
+        reload();
+      },
+    );
   }
+  const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -165,6 +171,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         {points
           ? `Mit ${sec.points}schwelle: befördern erst ab der Schwelle, degradieren jederzeit. Ohne Schwelle frei.`
           : `Befördern und degradieren geht frei; mit dem Bereich ${sec.points} kommen ${sec.points}schwellen dazu.`}
+        {list.length > 1 && ` Zum Umsortieren einen ${rank} am Griff links ziehen; die Schwellen müssen mit der Reihenfolge steigen.`}
       </p>
       {missing && (
         <p className="small">
@@ -182,7 +189,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         <ul className="card-list">
           {list.map((r, i) =>
             editing === r.id ? (
-              <li key={r.id} className="card">
+              <li key={r.id} {...sort.itemProps(i, 'card')}>
                 <RankForm
                   rank={r}
                   thresholdLabel={thresholdLabel}
@@ -194,7 +201,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                 />
               </li>
             ) : (
-              <li key={r.id} className={`card row ${r.active ? '' : 'inactive'}`}>
+              <li key={r.id} {...sort.itemProps(i, `card row ${r.active ? '' : 'inactive'}`)}>
+                {list.length > 1 && sort.handle(i, r.title)}
                 <div className="row-main">
                   <div className="row-title">
                     <RankLabel url={r.badge_url} title={r.title} />
@@ -206,22 +214,6 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                     {r.assigned ? `${r.assigned}× vergeben` : 'nicht vergeben'}
                   </div>
                   <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy || i === 0}
-                      onClick={() => move(list, i, -1)}
-                      aria-label={`${r.title} eine Stufe niedriger`}
-                    >
-                      niedriger
-                    </button>
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy || i === list.length - 1}
-                      onClick={() => move(list, i, 1)}
-                      aria-label={`${r.title} eine Stufe höher`}
-                    >
-                      höher
-                    </button>
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(r.id)}>
                       Ändern
                     </button>
@@ -308,7 +300,9 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         <button className="btn btn-block" type="submit" disabled={busy}>
           Anlegen
         </button>
-        <p className="muted small">Neue {sec.ranks} kommen ans obere Ende; mit „niedriger“ und „höher“ änderst du die Reihenfolge.</p>
+        <p className="muted small">
+          Neue {sec.ranks} kommen ans Ende der Liste, also als höchster {rank}; den Platz änderst du per Ziehen am Griff.
+        </p>
       </form>
     </div>
   );
@@ -357,24 +351,20 @@ function RankForm({
   );
 }
 
-/** Verwaltung → Beförderungen (nur mit Punkten): erreichte Schwellen oben, dann nach fehlenden Punkten. */
+/**
+ * Verwaltung → Beförderungen (nur mit Punkten): zuerst, wer unter der Schwelle des eigenen Dienstgrads liegt (Kandidaten
+ * zum Degradieren, Issue #178), dann erreichte Schwellen, dann nach fehlenden Punkten.
+ */
 export function Promotions() {
-  const { data, error, loading, reload } = useAsync(api.promotions, []);
-  const [below, setBelow] = useState(false);
+  const { data, error, loading, reload } = useAsync(api.promotions, [], 'promotions');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
   // Nach Abschnitten gruppiert; innerhalb eines Abschnitts bleibt die Reihenfolge des Servers (sort ist stabil).
-  const list = (data ?? [])
-    .filter((p) => (below ? p.below_current_threshold : p.next_rank !== null))
-    .sort((a, b) => section(a) - section(b));
-  const headings = ['Schwelle erreicht', 'Noch nicht erreicht', `Höchster ${rank}`];
+  const list = (data ?? []).filter((p) => p.below_current_threshold || p.next_rank !== null).sort((a, b) => section(a) - section(b));
+  const headings = ['Unter der Schwelle', 'Schwelle erreicht', 'Noch nicht erreicht'];
   return (
     <div>
-      <label className="toggle">
-        <input type="checkbox" checked={below} onChange={(e) => setBelow(e.target.checked)} />
-        Nur unter der Schwelle des aktuellen {rank}s (Kandidaten zum Degradieren)
-      </label>
       {list.length === 0 ? (
         <Empty>Niemand gefunden.</Empty>
       ) : (
@@ -387,7 +377,7 @@ export function Promotions() {
               <Fragment key={p.user_id}>
                 {heading && <li className="section-title list-divider">{heading}</li>}
                 <li
-                  className={`card row clickable ${due ? 'due' : ''}`}
+                  className={`card row clickable ${p.below_current_threshold ? 'below' : due ? 'due' : ''}`}
                   onClick={() => navigate(`verwaltung/mitglied/${p.user_id}/dienstgrad`)}
                 >
                   <div className="row-main">
@@ -400,7 +390,6 @@ export function Promotions() {
                         (due
                           ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
                           : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
-                      {p.below_current_threshold && ' · unter der Schwelle'}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -420,9 +409,12 @@ function isDue(p: { points_to_next: number | null }): boolean {
   return p.points_to_next !== null && p.points_to_next <= 0;
 }
 
-/** Abschnitt der Beförderungsliste: 0 Schwelle erreicht, 1 noch nicht erreicht, 2 kein höherer Dienstgrad. */
-function section(p: { points_to_next: number | null; next_rank: unknown }): number {
-  return isDue(p) ? 0 : p.next_rank === null ? 2 : 1;
+/**
+ * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 noch nicht
+ * erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste nicht erreicht; jeder steht in genau einem Abschnitt.
+ */
+function section(p: { points_to_next: number | null; below_current_threshold?: boolean }): number {
+  return p.below_current_threshold ? 0 : isDue(p) ? 1 : 2;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
@@ -446,7 +438,7 @@ export function MemberRank({
   focus?: boolean;
 }) {
   // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
-  const ranks = useAsync(() => api.ranks(true), []);
+  const ranks = useAsync(() => api.ranks(true), [], 'ranks-all');
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);

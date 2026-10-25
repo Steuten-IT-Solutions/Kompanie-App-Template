@@ -152,7 +152,7 @@ test('Kleinster Kreis um Punkte', () => {
   assert.ok(near(two.x, 2) && near(two.y, 0) && near(two.r, 2), JSON.stringify(two));
 });
 
-test('Wappen (oben eckig, unten rund): Ecken und Spitze gleich weit von der Mitte des Icons', async () => {
+test('Logo oben eckig, unten rund: Ecken und Spitze gleich weit von der Mitte des Icons', async () => {
   // 300 × 400, oben gerade, unten ein Halbkreis; außerhalb durchsichtig.
   const shield = await sharp(
     Buffer.from(
@@ -182,7 +182,7 @@ test('Wappen (oben eckig, unten rund): Ecken und Spitze gleich weit von der Mitt
   const corner = Math.hypot(left - c, top - c);
   const tip = bottom + 1 - c;
   assert.ok(Math.abs(corner - tip) <= 3, `Ecke ${corner.toFixed(1)}, Spitze ${tip.toFixed(1)}`);
-  assert.ok(top - 0 > info.height - 1 - bottom, 'oben mehr Rand als unten (Wappen nach unten gerückt)');
+  assert.ok(top - 0 > info.height - 1 - bottom, 'oben mehr Rand als unten (Logo nach unten gerückt)');
 });
 
 test('Zu kleines Logo wird abgelehnt, kein Logo ergibt Initialen', async () => {

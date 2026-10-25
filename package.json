@@ -1,6 +1,11 @@
 {
   "name": "kompanie-app",
   "private": true,
+  "license": "GPL-2.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Steuten-IT-Solutions/Kompanie-App-Template.git"
+  },
   "workspaces": [
     "packages/branding",
     "packages/frontend"

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { api, type NewsItem } from '../api';
+import { type NewsItem } from '../api';
 import { newsDate } from '../format';
 import GuestPushButton from '../GuestPushButton';
 import { navigate } from '../router';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 // Mit DOMPurify (ca. 12 kB gzip): erst laden, wenn jemand einen Beitrag öffnet.
 const NewsDetail = lazyView(() => import('./NewsArtikel'));
@@ -15,7 +16,8 @@ export default function News({ id }: { id?: string }) {
 function NewsList() {
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<NewsItem[]>([]);
-  const { data, error, loading, reload } = useAsync(() => api.news(page), [page], 'news');
+  const s = sources.news(page);
+  const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
 
   useEffect(() => {
     if (data) setItems((prev) => (page === 1 ? data.items : [...prev, ...data.items]));
