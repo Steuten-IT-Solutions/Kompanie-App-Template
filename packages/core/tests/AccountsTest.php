@@ -37,7 +37,7 @@ final class AccountsTest extends TestCase
     public function testEditNameEmailAndLogin(): void
     {
         $this->assertSame(
-            ['name' => 'Mitglied', 'first_name' => 'Mitglied', 'last_name' => '', 'login' => 'mitglied', 'email' => '', 'can_change_login' => true],
+            ['name' => 'Mitglied', 'first_name' => 'Mitglied', 'last_name' => '', 'login' => 'mitglied', 'email' => '', 'phone' => '', 'can_change_login' => true],
             $this->call('GET', "/members/{$this->m}/account")->data,
         );
         $res = $this->call('PATCH', "/members/{$this->m}/account", ['name' => 'Max Muster', 'email' => 'max@example.org', 'username' => 'max']);
@@ -62,6 +62,58 @@ final class AccountsTest extends TestCase
         $this->users->adminsAssignable = false;
         $this->assertSame(400, $this->call('PATCH', "/members/{$this->m}/account", ['username' => 'moritz'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['name' => 'Moritz'])->status);
+    }
+
+    public function testOwnEmailAndPhone(): void
+    {
+        $this->users->current = $this->m;
+        $this->assertSame(['email' => '', 'phone' => ''], $this->call('GET', '/me/account')->data);
+
+        // Handynummer ohne Passwort; Leerzeichen werden vereinheitlicht.
+        $res = $this->call('PATCH', '/me/account', ['email' => '', 'phone' => ' +49  171 1234567 ']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['email' => '', 'phone' => '+49 171 1234567'], $res->data);
+        $this->assertSame(400, $this->call('PATCH', '/me/account', ['phone' => 'abc 123'])->status);
+        $this->assertSame(400, $this->call('PATCH', '/me/account', ['phone' => '12'])->status, 'zu wenige Ziffern');
+
+        // Neue E-Mail-Adresse nur mit dem aktuellen Passwort.
+        $this->assertSame(400, $this->call('PATCH', '/me/account', ['email' => 'neu@example.org', 'phone' => '+49 171 1234567'])->status);
+        $this->assertSame(400, $this->call('PATCH', '/me/account', ['email' => 'neu@example.org', 'current_password' => 'falsch'])->status);
+        $res = $this->call('PATCH', '/me/account', ['email' => 'neu@example.org', 'phone' => '', 'current_password' => 'geheim123']);
+        $this->assertSame(['email' => 'neu@example.org', 'phone' => ''], $res->data);
+        $this->assertSame(200, $this->call('PATCH', '/me/account', ['email' => 'Neu@Example.org'])->status, 'nur Groß-/Kleinschreibung');
+        $this->assertSame(400, $this->call('PATCH', '/me/account', ['email' => 'kein-mail', 'current_password' => 'geheim123'])->status);
+
+        // Name und Benutzername lassen sich hier nicht ändern; die Verwaltung sieht die Handynummer.
+        $this->call('PATCH', '/me/account', ['phone' => '0171/1234567', 'name' => 'Anders', 'username' => 'anders']);
+        $this->users->current = $this->admin;
+        $p = $this->call('GET', "/members/{$this->m}/account")->data;
+        $this->assertSame(['Mitglied', 'mitglied', '0171/1234567'], [$p['name'], $p['login'], $p['phone']]);
+
+        // Ohne Anmeldung nicht.
+        $this->users->current = null;
+        $this->assertSame(401, $this->call('GET', '/me/account')->status);
+    }
+
+    public function testOpenPenaltiesOfAllMembers(): void
+    {
+        $other = $this->users->add('anna', Roles::MEMBER);
+        $first = $this->call('POST', '/penalties', ['user_ids' => [$this->m, $other], 'amount_cents' => 200, 'reason' => 'Zu spät', 'date' => '2026-05-01'])->data;
+        $rows = $this->call('POST', '/penalties', ['user_ids' => [$this->m], 'amount_cents' => 350, 'reason' => 'Handy', 'date' => '2026-06-01'])->data;
+        $paid = $this->call('POST', '/penalties', ['user_ids' => [$other], 'amount_cents' => 100, 'reason' => 'Bezahlt', 'date' => '2026-06-02'])->data;
+        $this->call('PATCH', '/penalties/' . $paid[0]['id'], ['status' => 'paid']);
+        $cancelled = $this->call('POST', '/penalties', ['user_ids' => [$other], 'amount_cents' => 100, 'reason' => 'Storniert'])->data;
+        $this->call('DELETE', '/penalties/' . $cancelled[0]['id']);
+
+        $open = $this->call('GET', '/penalties/open')->data;
+        $this->assertSame([[$rows[0]['id'], 'Mitglied', 350], [$first[1]['id'], 'Anna', 200], [$first[0]['id'], 'Mitglied', 200]], array_map(
+            static fn (array $p): array => [$p['id'], $p['user_name'], $p['amount_cents']],
+            $open,
+        ), 'nur offene, neueste zuerst, mit Namen');
+        $this->assertSame('open', $open[0]['status']);
+
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('GET', '/penalties/open')->status, 'nur wer Strafen verwaltet');
     }
 
     public function testFirstAndLastName(): void
@@ -135,6 +187,7 @@ final class AccountsTest extends TestCase
         // Mitglied bekommt Punkte und Strafe; Anna bekommt Punkte, die das Mitglied (als Admin-Vertretung) einträgt.
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
         $this->call('POST', '/penalties', ['user_ids' => [$this->m], 'amount_cents' => 200, 'reason' => 'Zu spät']);
+        $this->call('PATCH', "/members/{$this->m}/account", ['phone' => '0171 1234567']);
         $this->users->setRole($this->m, Roles::ADMIN);
         $this->users->current = $this->m;
         $this->call('POST', '/points', ['user_ids' => [$other], 'points' => 3, 'reason' => 'Aufbau']);
@@ -145,6 +198,7 @@ final class AccountsTest extends TestCase
         $this->assertNull($this->users->find($this->m));
         $this->assertSame([], $this->app->db->select('SELECT id FROM {points} WHERE user_id = ?', [$this->m]));
         $this->assertSame([], $this->app->db->select('SELECT id FROM {penalties} WHERE user_id = ?', [$this->m]));
+        $this->assertSame([], $this->app->db->select('SELECT phone FROM {member_contacts} WHERE user_id = ?', [$this->m]));
 
         // Nächste Anfrage (eigene App wie im Betrieb; die Namen werden je Anfrage zwischengespeichert).
         $this->users->current = $other;

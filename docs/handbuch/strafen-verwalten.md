@@ -37,11 +37,16 @@ Wer zusätzlich die {bereich.attendance} erfasst, kann aus einer {bereich.attend
 
 Anders als bei {bereich.points} merkt sich die Liste nicht, wer schon einen Eintrag hat. Trägst du zweimal ein, gibt es zwei Einträge.
 
+### Alle offenen Einträge ansehen
+1. Tippe oben auf die Kachel **Offen gesamt** (nur antippbar, wenn etwas offen ist).
+2. Die Liste zeigt alle offenen Einträge, nach Mitgliedern sortiert und je Mitglied mit Summe.
+3. Tippe bei einem Eintrag auf **Bezahlt**, wenn er bezahlt ist. Ein Tipp auf den Namen öffnet die {bereich.penalties} des Mitglieds; dort gibt es auch **Doch offen** und **Stornieren**.
+
 ## Gut zu wissen
 - Ein Eintrag darf höchstens 1.000 € betragen. Betrag und Grund sind Pflicht.
 - {bereich.penalties} gibt es nur für Mitglieder, keine Gäste.
 - Wer Benachrichtigungen eingeschaltet hat, bekommt eine Nachricht zum neuen Eintrag.
-- Als bezahlt markierst du einen Eintrag auf der Seite des Mitglieds. Dort stornierst du auch falsche Einträge.
+- Als bezahlt markierst du einen Eintrag in der Liste aller offenen oder auf der Seite des Mitglieds. Falsche Einträge stornierst du auf der Seite des Mitglieds.
 - In der Mitgliederliste der Verwaltung steht bei jedem Mitglied, wie viel bei ihm noch offen ist.
 
 ## Siehe auch

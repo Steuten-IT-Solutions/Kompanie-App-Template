@@ -57,7 +57,7 @@ final class Backup
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'push_subscriptions'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'push_subscriptions'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).

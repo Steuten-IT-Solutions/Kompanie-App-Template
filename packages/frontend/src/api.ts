@@ -288,6 +288,17 @@ export interface Penalty {
   created_by_name: string | null;
 }
 
+/** Offene Strafe für die Liste aller offenen (Verwaltung) */
+export interface OpenPenalty extends Penalty {
+  user_name: string | null;
+}
+
+/** Eigene Kontaktangaben (Meins → Konto) */
+export interface OwnAccount {
+  email: string;
+  phone: string;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -1296,6 +1307,8 @@ export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
+  /** Handynummer oder '' */
+  phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
 }
@@ -1530,7 +1543,11 @@ export const api = {
   },
   createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
+  /** Eigene E-Mail-Adresse und Handynummer; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+  ownAccount: () => request<OwnAccount>('GET', '/me/account'),
+  updateOwnAccount: (data: { email: string; phone: string; current_password?: string }) =>
+    request<OwnAccount>('PATCH', '/me/account', data),
+  updateAccount: (id: number, data: Partial<PersonName> & { email?: string; phone?: string; username?: string }) =>
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
@@ -1718,6 +1735,7 @@ export const api = {
 
   givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string }) =>
     request<Penalty[]>('POST', '/penalties', data),
+  openPenalties: () => request<OpenPenalty[]>('GET', '/penalties/open'),
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),
   deletePenalty: (id: number) => request<{ deleted: boolean }>('DELETE', `/penalties/${id}`),
 

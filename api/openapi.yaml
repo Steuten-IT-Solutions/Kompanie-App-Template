@@ -393,6 +393,35 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /me/account:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene E-Mail-Adresse und Handynummer (Meins → Konto)
+      responses:
+        '200': { $ref: '#/components/responses/OwnAccount' }
+        '401': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Eigene Daten]
+      summary: Eigene E-Mail-Adresse und Handynummer ändern
+      description: |
+        Eine neue E-Mail-Adresse nur mit dem aktuellen Passwort (wie beim Passwortwechsel höchstens 5 Versuche in
+        15 Minuten). Felder, die fehlen, bleiben; Name und Benutzername ändert hier niemand.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, description: 'Leer entfernt sie' }
+                phone: { type: string, maxLength: 30, description: 'Ziffern, Leerzeichen und + ( ) / -, 5 bis 20 Ziffern; leer entfernt sie' }
+                current_password: { type: string, description: 'Pflicht, wenn sich die E-Mail-Adresse ändert' }
+      responses:
+        '200': { $ref: '#/components/responses/OwnAccount' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
   /me/password:
     post:
       tags: [Eigene Daten]
@@ -3249,7 +3278,7 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Verwaltung]
-      summary: Vor- und Nachname, E-Mail und Benutzername ändern; ein neuer Benutzername meldet das Konto auf allen Geräten ab
+      summary: Vor- und Nachname, E-Mail, Handynummer und Benutzername ändern; ein neuer Benutzername meldet das Konto auf allen Geräten ab
       description: Der Anzeigename wird „Vorname Nachname“. Felder, die fehlen, bleiben.
       x-capability: create_users
       requestBody:
@@ -3263,6 +3292,7 @@ paths:
                 last_name: { type: string, description: 'Nachname (darf leer sein)' }
                 name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
                 email: { type: string }
+                phone: { type: string, maxLength: 30, description: 'Leer entfernt sie' }
                 username: { type: string }
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
@@ -3608,6 +3638,26 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Penalty' }
         '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /penalties/open:
+    get:
+      tags: [Verwaltung]
+      summary: Alle offenen Strafen, neueste zuerst, mit dem Namen der Person
+      x-capability: manage_penalties
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/Penalty'
+                    - type: object
+                      properties:
+                        user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         '403': { $ref: '#/components/responses/Error' }
 
   /penalties/{id}:
@@ -4683,7 +4733,17 @@ components:
               last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
               login: { type: string }
               email: { type: string }
+              phone: { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist' }
               can_change_login: { type: boolean, description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)' }
+    OwnAccount:
+      description: Eigene Kontaktangaben
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email: { type: string }
+              phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
     AttendanceGroups:
       description: Je Rolle (ohne Gast), als welche sie im Zähler zählt
       content:

@@ -3,7 +3,7 @@ titel: Mein Konto
 reihenfolge: 20
 rechte: []
 ---
-In deinem Konto stehen dein Name und deine Rolle. Hier stellst du die Benachrichtigungen und die Darstellung ein, änderst dein Passwort und meldest dich ab. Als {rolle.member} trägst du hier auch deinen Geburtstag und deinen Eintritt ein.
+In deinem Konto stehen dein Name, deine Rolle, deine E-Mail-Adresse und deine Handynummer. Hier stellst du die Benachrichtigungen und die Darstellung ein, änderst dein Passwort und meldest dich ab. Als {rolle.member} trägst du hier auch deinen Geburtstag und deinen Eintritt ein.
 
 ![Mein Konto mit Name, Rolle und der Karte Geburtstag](bild:anmelden-und-konto)
 
@@ -14,6 +14,7 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 
 ## Was du hier siehst
 - **Name und Rolle**: dein Name und deine Rolle, z. B. {rolle.member}, und dein Foto, wenn jemand eines hochgeladen hat. Ändern kann das Foto, wer Mitglieder anlegen darf.
+- **Kontakt**: deine E-Mail-Adresse und Handynummer, wie die {kompanie.name} sie hat.
 - **Geburtstag** (nur für {rolle.member}, wenn die {kompanie.name} {bereich.birthdays} nutzt): dein Geburtstag und wer ihn sieht.
 - **Eintritt** (nur für {rolle.member}, wenn die {kompanie.name} die Liste {bereich.directory} nutzt): wann du eingetreten bist und wer das auf deiner Seite in der Liste sieht.
 - **Benachrichtigungen einstellen**: worüber dich die App auf diesem Gerät benachrichtigt. Darunter, wenn die {kompanie.name} den Mailversand eingerichtet hat, der Schalter für Nachrichten vom Brett per E-Mail (anfangs an).
@@ -24,6 +25,14 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 - **Abmelden**: dich auf diesem Gerät abmelden.
 
 ## So gehst du vor
+### E-Mail-Adresse und Handynummer ändern
+1. Tippe in der Karte **Kontakt** auf **Ändern**.
+2. Trage die neue **E-Mail-Adresse** bzw. **Handynummer** ein. Ein leeres Feld entfernt die Angabe.
+3. Hast du die E-Mail-Adresse geändert, gib zur Bestätigung dein **Aktuelles Passwort** ein.
+4. Tippe auf **Speichern**.
+
+Die Handynummer darf Ziffern, Leerzeichen und + ( ) / - enthalten, z. B. +49 171 1234567. Sehen können beides nur du und wer Mitglieder anlegen darf.
+
 ### Deinen Geburtstag eintragen
 1. Wähle in der Karte **Geburtstag** **Tag** und **Monat**; das **Jahr** ist freiwillig.
 2. Lege mit **Anderen Mitgliedern zeigen** und **Alter anzeigen** fest, was die anderen sehen.

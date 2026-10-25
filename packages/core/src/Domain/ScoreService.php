@@ -136,6 +136,18 @@ final class ScoreService
     }
 
     /**
+     * Alle offenen Strafen, neueste zuerst, mit dem Namen der Person (user_name; UserNames::DELETED ohne Konto).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function openPenalties(): array
+    {
+        $rows = $this->penalties->open();
+        $this->names->prime([...array_column($rows, 'created_by'), ...array_column($rows, 'user_id')]);
+        return array_map(fn (array $r): array => $this->formatPenalty($r) + ['user_name' => $this->names->name((int) $r['user_id'])], $rows);
+    }
+
+    /**
      * @param array<string, mixed> $in user_ids, amount_cents, reason, date
      * @return array<int, array<string, mixed>>
      */

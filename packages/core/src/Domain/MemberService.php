@@ -11,12 +11,15 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\Authenticator;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\UserDirectory;
+use KompanieApp\Core\Storage\MemberContactRepository;
 
 /** Mitglieder, Rollen und Passwörter. */
 final class MemberService
 {
     /** WordPress speichert höchstens 100 Zeichen (user_email); vorab prüfen, damit Mehrere-Anlegen nicht mittendrin scheitert. */
     public const EMAIL_MAX = 100;
+    /** Handynummer: so lang wie die Spalte in member_contacts */
+    public const PHONE_MAX = 30;
 
     public function __construct(
         private readonly UserDirectory $users,
@@ -26,6 +29,8 @@ final class MemberService
         private readonly ?RoleService $roles = null,
         /** @var (\Closure(User): ?string)|null Grundrolle vor dem Ausscheiden, wenn die Person ehemalig ist (FormerMemberService) */
         private readonly ?\Closure $formerRole = null,
+        private readonly ?MemberContactRepository $contacts = null,
+        private readonly ?Time $time = null,
     ) {
     }
 
@@ -508,7 +513,7 @@ final class MemberService
     /**
      * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt).
      *
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
      */
     public function profile(int $id, ?User $actor = null): array
     {
@@ -517,15 +522,15 @@ final class MemberService
             $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht sehen.');
         }
         $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        return $p + ['can_change_login' => $this->users->canChangeLogin()];
+        return $p + ['phone' => $this->contacts?->phone($id) ?? '', 'can_change_login' => $this->users->canChangeLogin()];
     }
 
     /**
      * Vor- und Nachname, E-Mail und Benutzername ändern (Issue #24). Ein neuer Benutzername beendet alle Sitzungen des
      * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet.
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), email, username
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
+     * @param array<string, mixed> $in first_name, last_name (oder name), email, phone, username
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
      */
     public function updateProfile(User $actor, int $id, array $in): array
     {
@@ -546,6 +551,7 @@ final class MemberService
                 throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
             }
         }
+        $phone = array_key_exists('phone', $in) ? self::phone($in['phone']) : null;
         $login = null;
         if (array_key_exists('username', $in)) {
             $wanted = trim(is_string($in['username']) ? $in['username'] : '');
@@ -567,10 +573,56 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }
+        if ($phone !== null && $this->contacts !== null) {
+            $this->contacts->setPhone($id, $phone, $this->time?->nowUtc() ?? gmdate('Y-m-d H:i:s'));
+        }
         if ($login !== null && $actor->id === $id) {
             $this->auth->afterPasswordChange($id);
         }
         return $this->profile($id);
+    }
+
+    /**
+     * Eigene E-Mail-Adresse und Handynummer (Meins → Konto).
+     *
+     * @return array{email: string, phone: string}
+     */
+    public function ownAccount(User $user): array
+    {
+        $p = $this->profile($user->id);
+        return ['email' => $p['email'], 'phone' => $p['phone']];
+    }
+
+    /**
+     * Eigene E-Mail-Adresse und Handynummer ändern. Eine neue E-Mail-Adresse nur mit dem aktuellen Passwort: Über sie
+     * lässt sich (bei WordPress) das Passwort zurücksetzen, eine fremde Sitzung soll so nicht das Konto übernehmen.
+     *
+     * @param array<string, mixed> $in email, phone, current_password
+     * @return array{email: string, phone: string}
+     */
+    public function updateOwnAccount(User $user, array $in): array
+    {
+        $current = $this->users->profile($user->id) ?? throw ApiError::notFound('Konto nicht gefunden.');
+        $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
+        if (mb_strtolower($email) !== mb_strtolower($current['email'])) {
+            $this->checkPassword($user, $in['current_password'] ?? null);
+        }
+        $this->updateProfile($user, $user->id, array_intersect_key($in, ['email' => true, 'phone' => true]));
+        return $this->ownAccount($user);
+    }
+
+    /** Handynummer prüfen und vereinheitlichen; leer heißt „keine“. */
+    private static function phone(mixed $raw): string
+    {
+        $phone = Text::line(is_string($raw) ? $raw : '');
+        if ($phone === '') {
+            return '';
+        }
+        $digits = strlen((string) preg_replace('/\D/', '', $phone));
+        if (mb_strlen($phone) > self::PHONE_MAX || preg_match('#^\+?[0-9 ()/-]+$#', $phone) !== 1 || $digits < 5 || $digits > 20) {
+            throw ApiError::invalid('Die Handynummer ist ungültig. Erlaubt sind Ziffern, Leerzeichen und + ( ) / -, z. B. +49 171 1234567.');
+        }
+        return $phone;
     }
 
     /**
@@ -598,15 +650,7 @@ final class MemberService
     {
         $current = is_string($current) ? $current : '';
         $new = is_string($new) ? $new : '';
-        // Wer nur eine fremde Sitzung hat (z. B. ein nicht abgemeldetes Gerät), soll das Passwort
-        // nicht unbegrenzt raten und so das Konto übernehmen können.
-        // Jeder Versuch wird vor der Prüfung atomar gezählt (auch bei gleichzeitigen Anfragen).
-        if ($this->cache !== null && $this->cache->increment('pwchange_' . $user->id, 900) > self::PASSWORD_ATTEMPTS) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
-        }
-        if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
-            throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
-        }
+        $this->checkPassword($user, $current);
         if (mb_strlen($new) < Passwords::MIN_LENGTH) {
             throw ApiError::invalid(sprintf('Das neue Passwort muss mindestens %d Zeichen lang sein.', Passwords::MIN_LENGTH));
         }
@@ -622,5 +666,21 @@ final class MemberService
             throw ApiError::forbidden($e->getMessage());
         }
         $this->auth->afterPasswordChange($user->id);
+    }
+
+    /**
+     * Aktuelles Passwort prüfen (Passwort oder E-Mail-Adresse ändern). Wer nur eine fremde Sitzung hat (z. B. ein nicht
+     * abgemeldetes Gerät), soll das Passwort nicht unbegrenzt raten und so das Konto übernehmen können. Jeder Versuch
+     * wird vor der Prüfung atomar gezählt (auch bei gleichzeitigen Anfragen).
+     */
+    private function checkPassword(User $user, mixed $current): void
+    {
+        $current = is_string($current) ? $current : '';
+        if ($this->cache !== null && $this->cache->increment('pwchange_' . $user->id, 900) > self::PASSWORD_ATTEMPTS) {
+            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
+        }
+        if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
+            throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
+        }
     }
 }

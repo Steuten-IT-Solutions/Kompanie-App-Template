@@ -67,6 +67,7 @@ use KompanieApp\Core\Push\PushTriggers;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
+use KompanieApp\Core\Storage\MemberContactRepository;
 use KompanieApp\Core\Storage\MemberRoleRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
@@ -567,6 +568,8 @@ final class App
             $this->cache,
             $this->roles(),
             fn (User $user): ?string => $this->formerMembers()->previousRole($user),
+            new MemberContactRepository($this->db),
+            $this->time(),
         ));
     }
 

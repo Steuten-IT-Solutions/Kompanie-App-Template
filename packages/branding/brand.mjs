@@ -127,6 +127,75 @@ export function initialsSvg(name, background, foreground) {
 </svg>`;
 }
 
+/**
+ * Kleinster Kreis um alle Punkte (Welzl, schrittweise): Mittelpunkt und Radius. Für Logos, die nicht rechteckig sind,
+ * z. B. ein Schild oben eckig und unten rund: Mittig auf diesen Kreis gesetzt, haben die Ecken überall denselben
+ * Abstand zum runden Zuschnitt (Android-Icon, Startbildschirm), statt nur oben und unten gleich viel Rand.
+ */
+export function enclosingCircle(points) {
+  const circle2 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, r: Math.hypot(a.x - b.x, a.y - b.y) / 2 });
+  const circle3 = (a, b, c) => {
+    const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+    if (Math.abs(d) < 1e-9) {
+      // auf einer Linie: Kreis um die beiden äußersten
+      const pairs = [circle2(a, b), circle2(a, c), circle2(b, c)];
+      return pairs.reduce((m, k) => (k.r > m.r ? k : m));
+    }
+    const sa = a.x * a.x + a.y * a.y;
+    const sb = b.x * b.x + b.y * b.y;
+    const sc = c.x * c.x + c.y * c.y;
+    const x = (sa * (b.y - c.y) + sb * (c.y - a.y) + sc * (a.y - b.y)) / d;
+    const y = (sa * (c.x - b.x) + sb * (a.x - c.x) + sc * (b.x - a.x)) / d;
+    return { x, y, r: Math.hypot(a.x - x, a.y - y) };
+  };
+  const inside = (k, p) => Math.hypot(p.x - k.x, p.y - k.y) <= k.r + 1e-7;
+  // Gemischt, damit es schnell bleibt (Umrisspunkte kommen geordnet); mit festem Startwert, damit jeder Build dieselben
+  // Icons ergibt.
+  const pts = [...points];
+  let seed = 12345;
+  for (let i = pts.length - 1; i > 0; i--) {
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+    const j = seed % (i + 1);
+    [pts[i], pts[j]] = [pts[j], pts[i]];
+  }
+  const n = pts.length;
+  let k = { x: 0, y: 0, r: -1 };
+  for (let i = 0; i < n; i++) {
+    if (inside(k, pts[i])) continue;
+    k = { x: pts[i].x, y: pts[i].y, r: 0 };
+    for (let j = 0; j < i; j++) {
+      if (inside(k, pts[j])) continue;
+      k = circle2(pts[i], pts[j]);
+      for (let m = 0; m < j; m++) {
+        if (!inside(k, pts[m])) k = circle3(pts[i], pts[j], pts[m]);
+      }
+    }
+  }
+  return k;
+}
+
+/** Mittelpunkt des Kreises um die sichtbaren Pixel eines Bilds (PNG mit Alphakanal); ohne Durchsichtiges: Bildmitte. */
+async function visibleCenter(png) {
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h, channels } = info;
+  // Je Zeile das erste und letzte sichtbare Pixel (mit seinen äußeren Ecken) genügt: Der Kreis hängt nur vom Umriss ab.
+  const points = [];
+  for (let y = 0; y < h; y++) {
+    let first = -1;
+    let last = -1;
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * channels + 3] > 16) {
+        if (first < 0) first = x;
+        last = x;
+      }
+    }
+    if (first >= 0) points.push({ x: first, y }, { x: first, y: y + 1 }, { x: last + 1, y }, { x: last + 1, y: y + 1 });
+  }
+  if (points.length === 0) return { x: w / 2, y: h / 2, width: w, height: h };
+  const k = enclosingCircle(points);
+  return { x: k.x, y: k.y, width: w, height: h };
+}
+
 function findLogo(assetsDir) {
   for (const ext of ['svg', 'png', 'jpg', 'jpeg', 'webp']) {
     const f = join(assetsDir, `logo.${ext}`);
@@ -180,12 +249,18 @@ async function images(logoInput, outDir, publicDir, warnings) {
     .toBuffer();
   writeFileSync(join(outDir, 'logo-small.webp'), small);
 
+  // Mittig auf den kleinsten Kreis um das Sichtbare statt auf das umgebende Rechteck (siehe enclosingCircle).
+  const center = await visibleCenter(logo);
   const icon = async (size, inner, file) => {
-    const content = await sharp(logo)
-      .resize(inner, inner, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
-      .toBuffer();
+    const scale = Math.min(inner / center.width, inner / center.height);
+    const w = Math.max(1, Math.round(center.width * scale));
+    const h = Math.max(1, Math.round(center.height * scale));
+    const content = await sharp(logo).resize(w, h, { fit: 'fill' }).toBuffer();
+    const clamp = (v, max) => Math.min(Math.max(v, 0), max);
+    const left = clamp(Math.round(size / 2 - center.x * scale), size - w);
+    const top = clamp(Math.round(size / 2 - center.y * scale), size - h);
     await sharp({ create: { width: size, height: size, channels: 4, background: '#ffffff' } })
-      .composite([{ input: content, gravity: 'center' }])
+      .composite([{ input: content, left, top }])
       .flatten({ background: '#ffffff' })
       .png()
       .toFile(join(publicDir, 'icons', file));

@@ -134,11 +134,14 @@ export function StatCard({
   value,
   tone,
   onClick,
+  action,
 }: {
   label: string;
   value: string;
   tone?: 'good' | 'warn' | 'neutral';
   onClick?: () => void;
+  /** Hinweis auf der Kachel mit onClick, z. B. „Alle offenen ansehen“ */
+  action?: string;
 }) {
   const className = `stat stat-${tone ?? 'neutral'}`;
   if (onClick) {
@@ -146,6 +149,7 @@ export function StatCard({
       <button type="button" className={`${className} stat-button`} onClick={onClick}>
         <span className="stat-value">{value}</span>
         <span className="stat-label">{label}</span>
+        {action && <span className="stat-action">{action} ›</span>}
       </button>
     );
   }

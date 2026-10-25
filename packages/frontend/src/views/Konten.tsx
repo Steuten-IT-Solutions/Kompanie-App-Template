@@ -336,6 +336,7 @@ export function AccountPanel({
         await api.updateAccount(id, {
           ...trimName(editing),
           email: editing.email.trim(),
+          phone: editing.phone.trim(),
           ...(p.can_change_login ? { username: editing.login.trim() } : {}),
         }),
       );
@@ -391,6 +392,15 @@ export function AccountPanel({
             <span>E-Mail (optional)</span>
             <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
           </label>
+          <label className="field">
+            <span>Handynummer (optional)</span>
+            <input
+              type="tel"
+              autoComplete="off"
+              value={editing.phone}
+              onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
+            />
+          </label>
           {formError && (
             <p className="form-error" role="alert">
               {formError}
@@ -412,6 +422,11 @@ export function AccountPanel({
             {p.email && (
               <>
                 {' · '}E-Mail: {p.email}
+              </>
+            )}
+            {p.phone && (
+              <>
+                {' · '}Handy: <a href={`tel:${p.phone.replace(/[^\d+]/g, '')}`}>{p.phone}</a>
               </>
             )}
           </p>

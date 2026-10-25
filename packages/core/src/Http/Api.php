@@ -529,6 +529,9 @@ final class Api
                 $a->birthdays()->remove($this->user()->id);
                 return ['birthday' => null];
             }, 'birthdays', $denyBirthdays),
+            // Eigene E-Mail-Adresse und Handynummer (Meins → Konto); eine neue E-Mail-Adresse nur mit dem aktuellen Passwort.
+            new Route('GET', '/me/account', $L, fn () => $a->members()->ownAccount($this->user())),
+            new Route('PATCH', '/me/account', $L, fn (Request $r) => $a->members()->updateOwnAccount($this->user(), $r->body)),
             // Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
             new Route('GET', '/me/join-year', Cap::Member, fn () => ['join_year' => $a->joinYears()->of($this->user()->id)], null, $denyMember),
             new Route('PUT', '/me/join-year', Cap::Member, fn (Request $r) => ['join_year' => $a->joinYears()->saveOwn($this->user(), $r->body)], null, $denyMember),
@@ -1112,6 +1115,8 @@ final class Api
                 $this->notify(static fn () => $a->pushTriggers()->penaltiesAdded($rows));
                 return Response::created($rows);
             }, 'penalties', $denyManage),
+            // Alle offenen Strafen (Verwaltung → Strafen: Karte „Offen gesamt“), mit Namen
+            new Route('GET', '/penalties/open', Cap::ManagePenalties, fn () => $a->scores()->openPenalties(), 'penalties', $denyManage),
             new Route('PATCH', '/penalties/{id}', Cap::ManagePenalties, fn (Request $r) => $a->scores()->setPenaltyStatus($r->id(), $r->input('status'), $this->user()->id), 'penalties', $denyManage),
             new Route('DELETE', '/penalties/{id}', Cap::ManagePenalties, function (Request $r) use ($a) {
                 $a->scores()->cancelPenalty($r->id(), $this->user()->id);
