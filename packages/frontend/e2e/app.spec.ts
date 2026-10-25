@@ -3460,7 +3460,7 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
   // Verlauf einer Person: nur Bereich, Aktion und Zeit
   const members = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Mitglieder', exact: true }) });
   await members.locator('.row', { hasText: 'zuletzt aktiv' }).first().click();
-  await expect(page.locator('.usage-history li').first()).toContainText(/angesehen|angemeldet|angelegt|geändert/);
+  await expect(page.locator('.usage-history li').first()).toContainText(/angesehen|angelegt|geändert|gelöscht|abgestimmt|angemeldet/);
   await page.keyboard.press('Escape');
 
   // Ausschalten löscht die Einträge je Person; die Liste der Mitglieder verschwindet, gezählt wird weiter.
