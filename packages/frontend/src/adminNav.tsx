@@ -3,6 +3,7 @@ import { can, config } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { usePromotionsDue } from './promotionsDue';
 
 const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
@@ -242,14 +243,28 @@ export function AdminIcon({ id }: { id: string }) {
 
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
+  const due = usePromotionsDue();
   return (
     <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
       <ul className="admin-tiles">
         {(group ? setupTabs() : startTabs()).map((t) => (
           <li key={t.id}>
-            <button type="button" className="card admin-tile" onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}>
+            <button
+              type="button"
+              className="card admin-tile"
+              title={
+                t.id === 'befoerderungen' && due ? `${due} ${due === 1 ? 'Mitglied' : 'Mitglieder'} zur Beförderung bereit` : undefined
+              }
+              onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+            >
               <AdminIcon id={t.id} />
               <span>{t.label}</span>
+              {t.id === 'befoerderungen' && !!due && (
+                // Zahl im Kreis an der Ecke: wie viele Mitglieder gerade zur Beförderung bereit sind (erklärt im title).
+                <span className="count-badge" aria-hidden="true">
+                  {due > 99 ? '99+' : due}
+                </span>
+              )}
             </button>
           </li>
         ))}

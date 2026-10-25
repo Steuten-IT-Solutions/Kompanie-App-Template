@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, config, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
+import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
 import brand from '../generated/brand';
 import { formatDate } from '../format';
 import { navigate } from '../router';
@@ -7,6 +7,8 @@ import { RankBadge, RankLabel } from '../RankBadge';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
+import { isDue } from '../promotionCheck';
+import { notePromotions } from '../promotionsDue';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -357,6 +359,10 @@ function RankForm({
  */
 export function Promotions() {
   const { data, error, loading, reload } = useAsync(api.promotions, [], 'promotions');
+  // Zahl an der Kachel „Beförderungen“ gleich mit aktualisieren.
+  useEffect(() => {
+    if (data) notePromotions(data);
+  }, [data]);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
@@ -405,15 +411,11 @@ export function Promotions() {
   );
 }
 
-function isDue(p: { points_to_next: number | null }): boolean {
-  return p.points_to_next !== null && p.points_to_next <= 0;
-}
-
 /**
  * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 noch nicht
  * erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste nicht erreicht; jeder steht in genau einem Abschnitt.
  */
-function section(p: { points_to_next: number | null; below_current_threshold?: boolean }): number {
+function section(p: Promotion): number {
   return p.below_current_threshold ? 0 : isDue(p) ? 1 : 2;
 }
 

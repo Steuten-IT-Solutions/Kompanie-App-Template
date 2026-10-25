@@ -73,6 +73,8 @@ import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_OPTIONS } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
+import { newlyDue } from '../promotionCheck';
+import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
 
 type Sub =
   | 'mitglieder'
@@ -94,6 +96,41 @@ const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
+
+/** Hinweis nach dem Vergeben von Punkten: Diese Mitglieder haben neu die Schwelle für eine Beförderung erreicht. */
+function ReachedNotice() {
+  const reached = useReached();
+  if (reached.length === 0) return null;
+  return (
+    <div className="card notice-card" role="status">
+      <h3 className="section-title">
+        {reached.length === 1 ? 'Neue Beförderungsschwelle erreicht' : 'Neue Beförderungsschwellen erreicht'}
+      </h3>
+      <ul className="notice-list">
+        {reached.map((r) => (
+          <li key={r.user_id}>
+            <strong>{r.name}</strong>: Schwelle für „{r.rank}“ erreicht
+          </li>
+        ))}
+      </ul>
+      <div className="button-row">
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setReached([]);
+            navigate('verwaltung/befoerderungen');
+          }}
+        >
+          Zu den Beförderungen
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setReached([])}>
+          Schließen
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Verwaltung({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const [sub, arg] = [path[0] as Sub | 'mitglied' | 'neu' | 'neu-mehrere' | 'import' | 'einrichtungen' | undefined, path[1]];
@@ -120,6 +157,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
   return (
     <div>
       {(showBack || setup) && <AdminBack from={active ?? undefined} />}
+      <ReachedNotice />
       {setup ? (
         <AdminMenu group="einrichtungen" />
       ) : sub === 'mitglied' && arg ? (
@@ -1463,7 +1501,10 @@ function GivePoints({
     if (!Number.isInteger(n) || n === 0) return setFormError('Bitte eine ganze Punktzahl ungleich 0 angeben.');
     if (!reason.trim()) return setFormError('Bitte einen Grund angeben.');
     setBusy(true);
+    setReached([]);
     try {
+      // Stand vor der Buchung, um danach neu erreichte Beförderungsschwellen zu erkennen (nur wer Beförderungen sehen darf).
+      const before = promotionsAllowed() ? await api.promotions().catch(() => null) : null;
       const rows = await api.givePoints({
         user_ids: selected,
         points: n,
@@ -1475,6 +1516,8 @@ function GivePoints({
       });
       // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
       onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
+      const after = before && (await refreshPromotions());
+      if (before && after) setReached(newlyDue(before, after));
       if (fixed) {
         setCatalogId('');
         setPoints('');
