@@ -84,6 +84,8 @@ export interface AppConfig {
   user: AppUser | null;
   /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
   setupPending?: boolean;
+  /** Nur für Admins: Datensicherung als Datei herunterladen (Stück für Stück erzeugt); fehlt bei älteren Servern */
+  backupUrl?: string | null;
   /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
   maintenance?: MaintenanceInfo;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */

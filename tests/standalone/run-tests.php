@@ -720,6 +720,18 @@ try {
     $d->actAs($anna);
     [$s, $dl] = $d->request('GET', '/admin/backup');
     $c->ok($s === 200 && ($dl['format'] ?? '') === 'kompanie-app-backup' && !isset($dl['settings']['update_state']), 'GET /admin/backup liefert die Sicherung (ohne Update-Zustand)');
+    // Als Datei über <App>/sicherung (Stück für Stück erzeugt), wie der Knopf in der App
+    [, $cfgAnna] = $d->request('GET', '/config');
+    $c->ok(($cfgAnna['backupUrl'] ?? '') === $base . 'index.php?r=/sicherung', '/config nennt Admins die Adresse der Datensicherung');
+    $file = $d->send('GET', $base . 'index.php?r=/sicherung', ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)], null);
+    $c->ok($file[0] === 200 && str_starts_with((string) ($file[2]['content-disposition'] ?? ''), 'attachment; filename="sicherung-')
+        && ($file[1]['format'] ?? '') === 'kompanie-app-backup' && isset($file[1]['tables']['users']) && ($file[2]['cache-control'] ?? '') === 'no-store', 'Datensicherung als Datei heruntergeladen');
+    $c->ok($d->send('GET', $base . 'index.php?r=/sicherung', ['Cookie' => Sessions::COOKIE . '=' . $d->token($max)], null)[0] === 403
+        && $d->send('GET', $base . 'index.php?r=/sicherung', [], null)[0] === 401, 'Datensicherung nur für Admins (Mitglied 403, ohne Anmeldung 401)');
+    $d->actAs($max);
+    $cfgMax = (array) $d->request('GET', '/config')[1];
+    $c->ok(array_key_exists('backupUrl', $cfgMax) && $cfgMax['backupUrl'] === null, '/config: Mitglieder bekommen keine Adresse');
+    $d->actAs($anna);
     $d->request('DELETE', '/events/' . (int) $kernel->db()->scalar("SELECT id FROM {events} WHERE title = 'Sicherungstest'"));
     $c->ok($d->request('POST', '/admin/backup', ['backup' => json_encode($dl)])[0] === 400, 'Wiederherstellen ohne Bestätigung → 400');
     $d->actAs($max);

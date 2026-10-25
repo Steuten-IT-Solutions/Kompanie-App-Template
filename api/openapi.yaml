@@ -5676,6 +5676,7 @@ components:
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
         reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
+        backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         preview:
           type: [object, 'null']

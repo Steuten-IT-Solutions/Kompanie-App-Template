@@ -81,4 +81,9 @@ final class PreviewEnvironment implements Environment
     {
         return $this->preview->url($this->inner->attachmentUrl($uid));
     }
+
+    public function backupUrl(): string
+    {
+        return $this->inner->backupUrl();
+    }
 }

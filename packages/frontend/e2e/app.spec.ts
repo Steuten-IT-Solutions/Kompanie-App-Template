@@ -2757,6 +2757,8 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
     backup.getByRole('button', { name: 'Sicherung herunterladen' }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/^sicherung-\d{4}-\d{2}-\d{2}\.json$/);
+  // Der Server schreibt die Datei Stück für Stück direkt in den Download (eigene Route statt API-Antwort).
+  expect(decodeURIComponent(download.url())).toMatch(/sicherung\/?$/);
   const data = JSON.parse(await (await import('node:fs/promises')).readFile((await download.path())!, 'utf8'));
   expect(data.format).toBe('kompanie-app-backup');
   expect(data.variant).toBe(STANDALONE ? 'standalone' : 'wordpress');
@@ -2774,7 +2776,7 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   const apiBase = await page.evaluate(() => new URL(window.KOMPANIE_CONFIG!.apiBase, location.href).href);
   await expect.poll(async () => (await cachedUrls()).some((u) => u.startsWith(decodeURIComponent(apiBase)))).toBe(true);
-  expect((await cachedUrls()).filter((u) => u.includes('/admin/'))).toEqual([]);
+  expect((await cachedUrls()).filter((u) => u.includes('/admin/') || /[/=]sicherung\/?$/.test(u))).toEqual([]);
   // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
   await page.goto('/app/#/einstellungen/zustand');
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();

@@ -106,4 +106,9 @@ final class StandaloneEnvironment implements Environment
     {
         return $this->route('anhang/' . $uid);
     }
+
+    public function backupUrl(): string
+    {
+        return $this->route('sicherung');
+    }
 }

@@ -41,6 +41,7 @@ use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\MailingService;
 use KompanieApp\Core\Domain\AttachmentService;
+use KompanieApp\Core\Domain\BackupDownload;
 use KompanieApp\Core\Domain\MailService;
 use KompanieApp\Core\Domain\RichImageService;
 use KompanieApp\Core\Domain\SignatureService;
@@ -514,6 +515,12 @@ final class App
     public function boardMail(): BoardMailService
     {
         return $this->service(BoardMailService::class, fn () => new BoardMailService($this));
+    }
+
+    /** Datensicherung als Datei herunterladen (<App>/sicherung) */
+    public function backupDownload(): BackupDownload
+    {
+        return $this->service(BackupDownload::class, fn () => new BackupDownload($this));
     }
 
     /** Dateianhänge (Schwarzes Brett, E-Mails aus der Verwaltung) */

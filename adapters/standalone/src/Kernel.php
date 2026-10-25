@@ -40,6 +40,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
  *   /bild/<kennung>          Bild in formatiertem Inhalt (index.php?r=/bild/…)
  *   /anhang/<kennung>        Dateianhang (index.php?r=/anhang/…), immer als Download
+ *   /sicherung               Datensicherung herunterladen, nur Admins (index.php?r=/sicherung)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
@@ -348,6 +349,9 @@ final class Kernel
             $this->beginPreview();
             $app = $this->app();
             $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
+        } elseif ($path === '/sicherung') {
+            $app = $this->app();
+            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
         } elseif (preg_match('#^/anhang/([a-f0-9]{32})$#', $path, $m)) {
             $this->beginPreview();
             $app = $this->app();
@@ -635,6 +639,23 @@ final class Kernel
         } elseif ($res['status'] === 200 && isset($res['path'])) {
             header('Content-Length: ' . filesize($res['path']));
             readfile($res['path']);
+        } elseif ($res['status'] === 200 && isset($res['write'])) {
+            // Stück für Stück an den Browser (Datensicherung): ohne Puffer, mit Zeit für große Sicherungen.
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(300);
+            }
+            $out = fopen('php://output', 'wb');
+            try {
+                ($res['write'])($out);
+            } catch (\Throwable $e) {
+                // Kopf ist schon gesendet: Die Datei bleibt unvollständig (ungültiges JSON, das Einspielen lehnt sie ab).
+                error_log('Kompanie-App: Sicherung nicht vollständig heruntergeladen: ' . $e->getMessage());
+            } finally {
+                fclose($out);
+            }
         }
     }
 
