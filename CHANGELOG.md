@@ -98,6 +98,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   eingetragen ist, z. B. „Eintritt 01.04.2005“ (bisher nur das Jahr). Bei den Ehemaligen stehen Eintritt und
   Ausscheiden ebenso mit ganzem Datum, z. B. „01.04.1985 – 03.05.2010“; wer dort nur Jahre eingetragen hat, sieht
   weiter nur die Jahre. Das gilt für alle, die die Angaben sehen dürfen, bei den Ehemaligen also auch ohne Anmeldung.
+- **Geburtstag im selben Format wie Eintritt und Austritt**: Auf *Meins*, in der Verwaltung und auf der Seite einer
+  Person in der Mitgliederliste steht der Geburtstag jetzt als „02.12.1987“ (bisher „2. Dezember 1987“), ohne Jahr als
+  „02.12.“.
 - **Liste der Ehemaligen**: *Filter und Sortierung* ist wie in der Mitgliederliste zunächst eingeklappt und klappt mit
   einem Tipp auf. Ist der Filter nach dem Grund gesetzt, steht am eingeklappten Bereich „aktiv“.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
