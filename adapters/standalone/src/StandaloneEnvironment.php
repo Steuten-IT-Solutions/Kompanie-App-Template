@@ -101,4 +101,9 @@ final class StandaloneEnvironment implements Environment
     {
         return $this->route('bild/' . $uid);
     }
+
+    public function attachmentUrl(string $uid): string
+    {
+        return $this->route('anhang/' . $uid);
+    }
 }

@@ -39,6 +39,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
  *   /bild/<kennung>          Bild in formatiertem Inhalt (index.php?r=/bild/…)
+ *   /anhang/<kennung>        Dateianhang (index.php?r=/anhang/…), immer als Download
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
@@ -347,6 +348,10 @@ final class Kernel
             $this->beginPreview();
             $app = $this->app();
             $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
+        } elseif (preg_match('#^/anhang/([a-f0-9]{32})$#', $path, $m)) {
+            $this->beginPreview();
+            $app = $this->app();
+            $this->sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === '/google/callback') {
             $this->sendGoogleCallback();
         } elseif ($path === '/cron') {
@@ -627,6 +632,9 @@ final class Kernel
         if ($res['status'] === 200 && isset($res['body'])) {
             header('Content-Length: ' . strlen($res['body']));
             echo $res['body'];
+        } elseif ($res['status'] === 200 && isset($res['path'])) {
+            header('Content-Length: ' . filesize($res['path']));
+            readfile($res['path']);
         }
     }
 

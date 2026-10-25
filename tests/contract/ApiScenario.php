@@ -937,6 +937,22 @@ final class ApiScenario
         $c->ok($s === 200 && ($edited['title'] ?? '') === "Kptest Brett $sfx geändert" && ($edited['text'] ?? '') === '<p>geändert</p>', 'Titel und Inhalt geändert');
         [$s, $h] = $this->req('GET', "/board/$id/history");
         $c->ok($s === 200 && array_column((array) ($h['revisions'] ?? []), 'action') === ['created', 'expires', 'title', 'content'], 'Verlauf mit allen Änderungen');
+        // Dateianhänge: jeder Dateityp, hinzufügen und entfernen mit Verlauf
+        $this->d->actAs($m);
+        $c->ok($this->req('POST', '/attachments', ['file' => ['name' => 'x.txt', 'data' => base64_encode('x')]])[0] === 403, 'Anhang hochladen ohne post_board/send_mail → 403');
+        $this->d->actAs($admin);
+        [$s, $att] = $this->req('POST', '/attachments', ['file' => ['name' => "Kptest $sfx.zip", 'data' => base64_encode("PK\x05\x06" . str_repeat("\0", 18))]]);
+        $c->ok($s === 201 && ($att['name'] ?? '') === "Kptest $sfx.zip" && ($att['mime'] ?? '') === 'application/zip' && ($att['size'] ?? 0) === 22, 'Anhang hochgeladen');
+        [$s, $edited] = $this->req('PATCH', "/board/$id", ['attachments' => [$att['uid'] ?? '']]);
+        $c->ok($s === 200 && array_column((array) ($edited['attachments'] ?? []), 'name') === ["Kptest $sfx.zip"], 'Anhang an die Nachricht');
+        $this->d->actAs($cand);
+        [, $d] = $this->req('GET', '/board');
+        $listed = array_column((array) ($d['items'] ?? []), null, 'id')[$id] ?? [];
+        $c->ok(array_column((array) ($listed['attachments'] ?? []), 'uid') === [$att['uid'] ?? ''], 'Anwärter sieht den Anhang');
+        $this->d->actAs($admin);
+        [$s, $edited] = $this->req('PATCH', "/board/$id", ['attachments' => []]);
+        [, $h] = $this->req('GET', "/board/$id/history");
+        $c->ok($s === 200 && ($edited['attachments'] ?? null) === [] && in_array('attachments', array_column((array) ($h['revisions'] ?? []), 'action'), true), 'Anhang entfernt, im Verlauf');
         [$s, $mail] = $this->req('GET', '/board/mail');
         $c->ok($s === 200 && isset($mail['available'], $mail['recipients']), 'Haken „E-Mail senden“: Stand des Mailversands');
         [$s, $sig] = $this->req('PUT', '/me/signature', ['content' => "<p>Gruß $sfx</p>"]);

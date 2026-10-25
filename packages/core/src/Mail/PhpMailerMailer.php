@@ -189,6 +189,9 @@ final class PhpMailerMailer implements Mailer
         foreach ($mail->images as $img) {
             $m->addStringEmbeddedImage($img['bytes'], $img['cid'], $img['name'], PHPMailer::ENCODING_BASE64, $img['mime']);
         }
+        foreach ($mail->attachments as $file) {
+            $m->addAttachment($file['path'], $file['name'], PHPMailer::ENCODING_BASE64, $file['mime']);
+        }
         return $m;
     }
 

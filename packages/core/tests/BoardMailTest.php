@@ -202,7 +202,7 @@ final class BoardMailTest extends TestCase
         $before = (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_messages}');
         $res = $this->call('POST', '/board', ['title' => 'Groß', 'text' => '<p>x</p>', 'push' => false]);
         $this->assertSame(400, $res->status);
-        $this->assertSame('Die Mail ist mit Bildern 1,5 MB groß, der Mailserver nimmt höchstens 1 KB an. Bilder verkleinern oder ohne E-Mail senden.', $res->data['message']);
+        $this->assertSame('Die Mail ist mit Bildern und Anhängen 1,5 MB groß, der Mailserver nimmt höchstens 1 KB an. Bilder oder Anhänge verkleinern oder ohne E-Mail senden.', $res->data['message']);
         $this->assertSame($before, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_messages}'), 'nichts veröffentlicht, nichts verschickt');
         $this->assertSame(1, $this->mailer->checks, 'Limit einmal gelesen und gemerkt');
         $this->assertSame(201, $this->call('POST', '/board', ['title' => 'Groß', 'text' => '<p>x</p>', 'push' => false, 'mail' => false])->status, 'ohne E-Mail geht es');

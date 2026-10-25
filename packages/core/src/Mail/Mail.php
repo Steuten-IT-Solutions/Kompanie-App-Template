@@ -6,7 +6,7 @@ namespace KompanieApp\Core\Mail;
 
 /**
  * Eine Mail an genau einen Empfänger: Betreff, HTML- und Text-Teil (multipart/alternative) und eingebettete Bilder
- * (multipart/related, im HTML als cid:<Kennung>). Absender und Antwortadresse setzt der Mailer aus den Einstellungen.
+ * (multipart/related, im HTML als cid:<Kennung>), dazu Dateianhänge (multipart/mixed). Absender und Antwortadresse setzt der Mailer aus den Einstellungen.
  *
  * Zugestellt wird nur an $to. Ohne $headerTo steht $to auch in der Kopfzeile To. Mit $headerTo (auch leer) zeigen die
  * Kopfzeilen To und Cc stattdessen $headerTo und $headerCc (E-Mails aus der Verwaltung: jeder Empfänger bekommt die
@@ -19,6 +19,7 @@ final class Mail
      * @param list<array{cid: string, mime: string, bytes: string, name: string}> $images
      * @param list<array{email: string, name: string}>|null $headerTo
      * @param list<array{email: string, name: string}> $headerCc
+     * @param list<array{name: string, mime: string, path: string}> $attachments Dateianhänge (multipart/mixed)
      */
     public function __construct(
         public readonly string $to,
@@ -29,6 +30,7 @@ final class Mail
         public readonly array $images = [],
         public readonly ?array $headerTo = null,
         public readonly array $headerCc = [],
+        public readonly array $attachments = [],
     ) {
     }
 

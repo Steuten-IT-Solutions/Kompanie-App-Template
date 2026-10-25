@@ -103,6 +103,10 @@ final class MailingTest extends TestCase
         $this->assertSame(['members' => 3, 'with_email' => 2], ['members' => $member['members'], 'with_email' => $member['with_email']]);
         $names = array_column($options['members'], 'name');
         $this->assertNotContains('Gisela Gast', $names, 'Gäste nicht wählbar');
+        // WordPress liefert Gäste mit gespeicherter Rolle auch ohne includeGuests: trotzdem nicht wählbar
+        $this->users->listGuests = true;
+        $this->assertNotContains('Gisela Gast', array_column($this->call('GET', '/mails/options')->data['members'], 'name'));
+        $this->users->listGuests = false;
         $this->assertStringNotContainsString('mitglied@example.org', (string) json_encode($options), 'Adressen werden nicht ausgeliefert');
 
         // Recht über die Standardrolle des Bereichs als Zusatzrolle

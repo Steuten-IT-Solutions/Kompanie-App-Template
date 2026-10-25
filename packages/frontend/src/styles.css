@@ -4919,3 +4919,58 @@ button.spotlight-person:focus-visible {
   padding: 16px;
   margin-bottom: 16px;
 }
+
+/* Dateianhänge (Schwarzes Brett, E-Mails) */
+.attachment-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.attachment-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.attachment-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.attachment-name {
+  overflow-wrap: anywhere;
+}
+.attachment-list-edit li {
+  padding: 4px 4px 4px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+}
+.attachment-list-edit .attachment-name {
+  flex: 1;
+  min-width: 0;
+}
+.attachment-remove {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+.attachment-add {
+  align-self: flex-start;
+  cursor: pointer;
+}
+.attachment-add.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

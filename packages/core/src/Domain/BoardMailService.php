@@ -19,8 +19,8 @@ use KompanieApp\Core\Storage\UserSettings;
  *   unter Konto → Benachrichtigungen nicht abgeschaltet haben (user_settings board_mail = 0; Standard an), ohne den
  *   Verfasser (wie bei der Benachrichtigung).
  * - Jede Mail einzeln an einen Empfänger; Absender ist die Kompanieadresse (MailService), Betreff der Titel, HTML- und
- *   Text-Teil, Bilder eingebettet (cid:), weil die Bildadressen der App eine Anmeldung brauchen. Fußzeile mit Link
- *   zur App, Verfasser und Hinweis zum Abschalten.
+ *   Text-Teil, Bilder eingebettet (cid:), weil die Bildadressen der App eine Anmeldung brauchen, Dateianhänge der
+ *   Nachricht als Anhänge der Mail. Fußzeile mit Link zur App, Verfasser und Hinweis zum Abschalten.
  * - Versand im Hintergrund (Aufgabe board_mail, nach dem Einreihen vorgezogen, sonst alle 15 Minuten), in Portionen
  *   (MailService::batching) innerhalb eines Zeitbudgets je Lauf; zusammen mit den E-Mails aus der Verwaltung
  *   (MailingService) in einer Warteschlange (MailService::runQueue), damit Portionen und Pausen für alle Mails gelten. Vorübergehende Fehler (Verbindung, 4xx) werden bis zu
@@ -107,17 +107,18 @@ final class BoardMailService
      * Vor dem Senden: Passt die fertige Mail (mit eingebetteten Bildern) zur gemeldeten Höchstgröße des Servers? Ohne
      * gemeldetes Limit keine Prüfung. Wirft eine verständliche Meldung, bevor etwas veröffentlicht oder verschickt wird.
      */
-    public function checkSize(string $title, string $body, User $author): void
+    /** @param list<array<string, mixed>> $files Anhänge (AttachmentService::resolve) */
+    public function checkSize(string $title, string $body, User $author, array $files = []): void
     {
         $max = $this->serverMaxSize();
         if ($max === null) {
             return;
         }
-        $mail = $this->compose(0, $title, $body, $author->name, ['name' => 'Empfänger', 'email' => 'empfaenger@example.org']);
+        $mail = $this->compose(0, $title, $body, $author->name, ['name' => 'Empfänger', 'email' => 'empfaenger@example.org'], $this->app->attachments()->forMail($files));
         $size = $this->app->mailer()->measure($mail);
         if ($size > $max) {
             throw ApiError::invalid(sprintf(
-                'Die Mail ist mit Bildern %s groß, der Mailserver nimmt höchstens %s an. Bilder verkleinern oder ohne E-Mail senden.',
+                'Die Mail ist mit Bildern und Anhängen %s groß, der Mailserver nimmt höchstens %s an. Bilder oder Anhänge verkleinern oder ohne E-Mail senden.',
                 ServerLimits::format($size),
                 ServerLimits::format($max),
             ));
@@ -180,6 +181,7 @@ final class BoardMailService
     {
         $stats = ['sent' => 0, 'failed' => 0, 'processed' => 0];
         $messages = [];
+        $files = [];
         $names = new UserNames($this->app->users);
         foreach ($this->due($nowTs, $limit) as $row) {
             if (microtime(true) - $start > MailService::BUDGET) {
@@ -192,7 +194,8 @@ final class BoardMailService
                 continue;
             }
             $recipient = ['name' => (string) ($this->app->users->find((int) $row['user_id'])?->name ?? ''), 'email' => (string) $row['email']];
-            $mail = $this->compose($mid, $message['title'], $message['body'], (string) $names->name($message['author_id']), $recipient);
+            $files[$mid] ??= $this->app->attachments()->forMail($this->app->attachments()->of(AttachmentService::OWNER_BOARD, $mid));
+            $mail = $this->compose($mid, $message['title'], $message['body'], (string) $names->name($message['author_id']), $recipient, $files[$mid]);
             $result = $mailer->send($mail);
             $attempts = (int) $row['attempts'] + 1;
             $stats['processed']++;
@@ -265,8 +268,9 @@ final class BoardMailService
      * Die fertige Mail für einen Empfänger.
      *
      * @param array{name: string, email: string} $recipient
+     * @param list<array{name: string, mime: string, path: string}> $attachments
      */
-    public function compose(int $messageId, string $title, string $body, string $authorName, array $recipient): Mail
+    public function compose(int $messageId, string $title, string $body, string $authorName, array $recipient, array $attachments = []): Mail
     {
         $images = [];
         $html = (string) preg_replace_callback('/<img data-image="([a-f0-9]{32})"([^>]*)>/', function (array $m) use (&$images): string {
@@ -292,7 +296,7 @@ final class BoardMailService
             . '<p style="font-size: 12px; color: #777777; margin: 0">' . $esc($optOut) . '</p>'
             . '</body></html>';
         $text = $title . "\n\n" . RichText::excerpt($body) . "\n\n-- \n" . $footer . "\nIn der App ansehen: " . $url . "\n\n" . $optOut . "\n";
-        return new Mail($recipient['email'], $recipient['name'], $title, $document, $text, array_values($images));
+        return new Mail($recipient['email'], $recipient['name'], $title, $document, $text, array_values($images), attachments: $attachments);
     }
 
     /**

@@ -1362,6 +1362,43 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {mailing_recipients}_status ON {mailing_recipients} (status)',
                 ],
             ],
+            // Dateianhänge am Schwarzen Brett und an E-Mails aus der Verwaltung (AttachmentService): Datei geschützt in der
+            // Dateiablage (anhaenge/anh-<uid>.bin), hier Besitzer (draft, board, mail), Name, Typ und Größe.
+            33 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {attachments} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  uid varchar(32) NOT NULL,
+  owner_type varchar(20) NOT NULL,
+  owner_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  name varchar(255) NOT NULL,
+  mime varchar(100) NOT NULL,
+  bytes bigint(20) unsigned NOT NULL,
+  file varchar(64) NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uid (uid),
+  KEY owner (owner_type, owner_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {attachments} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL,
+  owner_type TEXT NOT NULL,
+  owner_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  file TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {attachments}_uid ON {attachments} (uid)',
+                    'CREATE INDEX IF NOT EXISTS {attachments}_owner ON {attachments} (owner_type, owner_id)',
+                ],
+            ],
         ];
     }
 

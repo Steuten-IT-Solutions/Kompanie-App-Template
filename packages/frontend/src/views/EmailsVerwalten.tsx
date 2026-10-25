@@ -7,7 +7,9 @@ import {
   type MailListItem,
   type MailOptions,
   type MailSelection,
+  type Attachment,
 } from '../api';
+import { AttachmentList, AttachmentsField } from '../attachments';
 import { ComposeEditor } from '../composeEditor';
 import { formatShortTime } from '../format';
 import RichTextView from '../richtext/RichTextView';
@@ -25,6 +27,8 @@ interface Draft extends Record<MailField, MailSelection> {
   text: string;
   /** Cc und Bcc aufgeklappt */
   copies: boolean;
+  /** schon hochgeladene Anhänge (Entwürfe auf dem Server, 7 Tage gültig) */
+  attachments: Attachment[];
 }
 
 const emptySelection = (): MailSelection => ({ roles: [], users: [], emails: [] });
@@ -35,6 +39,7 @@ const emptyDraft = (): Draft => ({
   cc: emptySelection(),
   bcc: emptySelection(),
   copies: false,
+  attachments: [],
 });
 const isEmpty = (s: MailSelection) => s.roles.length === 0 && s.users.length === 0 && s.emails.length === 0;
 
@@ -50,7 +55,15 @@ function readDraft(): Draft | null {
         emails: Array.isArray(o.emails) ? o.emails.filter((x) => typeof x === 'string') : [],
       };
     };
-    return { subject: raw.subject, text: raw.text, to: sel(raw.to), cc: sel(raw.cc), bcc: sel(raw.bcc), copies: !!raw.copies };
+    return {
+      subject: raw.subject,
+      text: raw.text,
+      to: sel(raw.to),
+      cc: sel(raw.cc),
+      bcc: sel(raw.bcc),
+      copies: !!raw.copies,
+      attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+    };
   } catch {
     return null;
   }
@@ -63,6 +76,12 @@ function saveDraft(draft: Draft | null): void {
   } catch {
     // privater Modus o. ä.: Entwurf nur bis zum Verlassen der Seite
   }
+}
+
+/** Entwurf speichern und zurückgeben (für setDraft mit Funktion). */
+function withSaved(draft: Draft): Draft {
+  saveDraft(draft);
+  return draft;
 }
 
 export function mailSummaryText(mail: BoardMailSummary): string {
@@ -300,9 +319,10 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
         `An: ${p.to} · Cc: ${p.cc} · Bcc: ${p.bcc}`,
         `Absender: ${options.from_name} <${options.from}>`,
       ];
+      if (draft.attachments.length > 0) lines.push(`Anhänge: ${draft.attachments.map((a) => a.name).join(', ')}`);
       if (p.skipped.length > 0) lines.push('', `Ohne Mailadresse (bekommen nichts): ${p.skipped.join(', ')}`);
       if (!window.confirm(lines.join('\n'))) return;
-      await api.sendMail({ subject: draft.subject, text: draft.text, ...selection });
+      await api.sendMail({ subject: draft.subject, text: draft.text, attachments: draft.attachments.map((a) => a.uid), ...selection });
       saveDraft(null);
       setDraft(emptyDraft());
       setEditorKey((k) => k + 1);
@@ -359,6 +379,12 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
           saveDraft={() => saveDraft(draft)}
         />
       </div>
+      <AttachmentsField
+        id="mail-attachments"
+        items={draft.attachments}
+        onAdd={(a) => setDraft((d) => withSaved({ ...d, attachments: [...d.attachments, a] }))}
+        onRemove={(uid) => setDraft((d) => withSaved({ ...d, attachments: d.attachments.filter((a) => a.uid !== uid) }))}
+      />
       {error && <p className="form-error small">{error}</p>}
       <button
         className="btn btn-block"
@@ -420,6 +446,7 @@ function Detail({ id }: { id: number }) {
             ))}
           </dl>
           <RichTextView html={data.text} className="board-text" />
+          <AttachmentList items={data.attachments} />
           <p className="muted small mail-status">Versand: {mailSummaryText(data.mail)}</p>
           {data.mail.pending > 0 && (
             <button type="button" className="btn btn-link" onClick={load}>

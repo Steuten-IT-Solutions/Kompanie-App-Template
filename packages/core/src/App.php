@@ -40,6 +40,7 @@ use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\MailingService;
+use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\MailService;
 use KompanieApp\Core\Domain\RichImageService;
 use KompanieApp\Core\Domain\SignatureService;
@@ -408,6 +409,12 @@ final class App
     public function userDeleted(int $userId): void
     {
         UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
+        // Noch nicht gespeicherte Dateianhänge samt Dateien (Anhänge gespeicherter Nachrichten und Mails bleiben bei ihnen).
+        try {
+            $this->attachments()->deleteDraftsOf($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Entwürfe von Anhängen nicht gelöscht: ' . $e->getMessage());
+        }
         $this->roles()->forget($userId);
         try {
             $this->activity()->forget($userId);
@@ -507,6 +514,12 @@ final class App
     public function boardMail(): BoardMailService
     {
         return $this->service(BoardMailService::class, fn () => new BoardMailService($this));
+    }
+
+    /** Dateianhänge (Schwarzes Brett, E-Mails aus der Verwaltung) */
+    public function attachments(): AttachmentService
+    {
+        return $this->service(AttachmentService::class, fn () => new AttachmentService($this));
     }
 
     /** E-Mails aus der Verwaltung (Bereich mail) */

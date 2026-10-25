@@ -1625,6 +1625,10 @@ paths:
                 title: { type: string }
                 text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
                 expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
+                attachments:
+                  type: array
+                  items: { type: string }
+                  description: 'Alle Anhänge danach (Kennungen): bisherige behalten, neue Entwürfe kommen dazu, fehlende werden gelöscht; steht im Verlauf'
       responses:
         '200':
           description: Geändert
@@ -1778,6 +1782,7 @@ paths:
                   properties:
                     subject: { type: string, maxLength: 255 }
                     text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
+                    attachments: { type: array, items: { type: string }, description: 'Kennungen eigener Entwürfe aus `POST /attachments`' }
       responses:
         '201':
           description: Zum Versand eingereiht
@@ -1802,6 +1807,56 @@ paths:
               schema: { $ref: '#/components/schemas/MailDetail' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+
+  /attachments:
+    post:
+      tags: [Schwarzes Brett]
+      summary: Dateianhang hochladen (Schwarzes Brett, E-Mails)
+      description: |
+        Für alle mit `post_board` oder `send_mail`. Jeder Dateityp, höchstens `max_bytes` (`GET /attachments/limits`,
+        20 MB oder weniger, wenn der Server kleinere Anfragen annimmt). Die Datei ist zunächst ein Entwurf des Kontos;
+        `POST /board`, `PATCH /board/{id}` bzw. `POST /mails` übernehmen sie über ihre Kennung. Nie gespeicherte
+        Entwürfe werden nach 7 Tagen gelöscht.
+      x-capability: 'post_board oder send_mail'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string }
+                    data: { type: string, description: 'Inhalt als Base64 (auch als data:-Adresse)' }
+      responses:
+        '201':
+          description: Hochgeladen (Entwurf)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Attachment' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /attachments/limits:
+    get:
+      tags: [Schwarzes Brett]
+      summary: Höchstgröße eines Anhangs
+      x-capability: 'post_board oder send_mail'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [max_bytes]
+                properties:
+                  max_bytes: { type: integer }
+        '403': { $ref: '#/components/responses/Error' }
 
   /rich-images:
     post:
@@ -5008,6 +5063,10 @@ components:
         mail:
           type: boolean
           description: 'Nur beim Schreiben (POST); Standard: true, wenn der Mailversand eingerichtet ist. true ohne Einrichtung → 400.'
+        attachments:
+          type: array
+          items: { type: string, pattern: '^[a-f0-9]{32}$' }
+          description: 'Kennungen von Anhängen (eigene Entwürfe aus `POST /attachments`); sonst → 400'
     BoardItem:
       type: object
       required: [kind, id, title, text, excerpt, author_name, created_at, updated_at, expires_at]
@@ -5019,8 +5078,9 @@ components:
         excerpt: { type: string, description: Reiner Textauszug (z. B. für den Text-Teil der Mail) }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
         created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel oder Inhalt ändern' }
+        updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
+        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' }, description: 'Dateianhänge; sehen alle, die die Nachricht sehen' }
         last_edit:
           description: 'Nur mit post_board: wer zuletzt Titel, Inhalt oder Enddatum geändert hat (null: unverändert)'
           oneOf:
@@ -5040,6 +5100,15 @@ components:
         failed: { type: integer }
         pending: { type: integer }
         cancelled: { type: integer, description: 'Nicht mehr verschickt, weil die Nachricht gelöscht wurde' }
+    Attachment:
+      type: object
+      required: [uid, name, size, mime, url]
+      properties:
+        uid: { type: string, description: 'Kennung (32 Hex-Zeichen)' }
+        name: { type: string, description: Dateiname }
+        size: { type: integer, description: Bytes }
+        mime: { type: string, description: 'Typ aus der Endung (für die Mail), sonst application/octet-stream' }
+        url: { type: string, description: 'Download nach Anmeldung (<App>/anhang/<uid>), immer als Anhang (Content-Disposition attachment)' }
     MailSelection:
       type: object
       description: Empfänger eines Felds (An, Cc oder Bcc)
@@ -5068,6 +5137,7 @@ components:
         text: { type: string, description: 'Formatierter Inhalt (HTML), Bilder mit Adresse' }
         author_name: { type: [string, 'null'] }
         created_at: { type: string, format: date-time }
+        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
         selection:
           type: object
           properties:
@@ -5102,15 +5172,16 @@ components:
         deleted_at: { type: [string, 'null'], format: date-time }
         deleted_by_name: { type: [string, 'null'] }
         active: { type: boolean, description: Noch sichtbar }
+        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
     BoardRevision:
       type: object
       properties:
         id: { type: integer }
-        action: { type: string, enum: [created, title, content, expires, deleted, mailed] }
+        action: { type: string, enum: [created, title, content, expires, attachments, deleted, mailed] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
-        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum; bei deleted {expires_at}); null bei created und mailed' }
-        after: { description: 'Neuer Stand; bei created {title, text, expires_at}, bei mailed {recipients}, bei deleted null' }
+        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed' }
+        after: { description: 'Neuer Stand; bei created {title, text, expires_at, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
     SignatureResponse:
       type: object
       required: [signature]

@@ -90,4 +90,9 @@ final class WpEnvironment implements Environment
     {
         return $this->appUrl('bild/' . $uid);
     }
+
+    public function attachmentUrl(string $uid): string
+    {
+        return $this->appUrl('anhang/' . $uid);
+    }
 }

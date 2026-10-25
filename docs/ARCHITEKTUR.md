@@ -298,6 +298,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Verlauf `GET /mails`, `GET /mails/{id}` für `send_mail`; Aufgabe `mailing_cleanup` (täglich) löscht Mails nach 365 Tagen samt Protokoll und Bildern. Sicherungen enthalten `mailings`, nicht `mailing_recipients`; Konto löschen entfernt dessen Zeilen im Protokoll.
 - App: *Verwaltung → E-Mails* (`#/verwaltung/mail`, `views/EmailsVerwalten.tsx`), Empfängerfelder mit Kärtchen und Vorschlägen, derselbe Editor wie am Brett (`composeEditor.tsx`, mit „Signatur einfügen“ und Rücksprung aus der Signatur-Einrichtung), Entwurf je Gerät.
 
+### Dateianhänge (Schwarzes Brett, E-Mails)
+
+- `AttachmentService`, Tabelle `attachments` (Migration 33: Kennung, Besitzer `draft`/`board`/`mail`, Name, MIME-Typ aus der Endung, Größe, Datei), Dateien geschützt unter `anhaenge/anh-<Kennung>.bin`. Jeder Dateityp, je Datei höchstens `DocumentService::requestLimit()` (20 MB oder weniger nach `post_max_size`; `GET /attachments/limits`).
+- `POST /attachments` (Recht `post_board` oder `send_mail`) legt einen Entwurf des Kontos an. `POST /board`, `PATCH /board/{id}` und `POST /mails` nennen die Kennungen (`attachments`); übernommen werden nur eigene Entwürfe bzw. schon vorhandene Anhänge desselben Inhalts. `PATCH` setzt die Liste genau: Fehlende werden samt Datei gelöscht, die Änderung steht im Verlauf (`attachments`, vorher/nachher als Dateinamen) und gibt der Nachricht ein neues `updated_at`.
+- Auslieferung `<App>/anhang/<Kennung>` (beide Adapter, `Environment::attachmentUrl`) nach Anmeldung und Rechten wie beim Inhalt (Brett: `BoardService::canSeeImage`, Mail: `send_mail`, Entwurf: eigenes Konto); immer `Content-Disposition: attachment`, `nosniff`, `Content-Security-Policy: sandbox`, Typ nur für PDF und Bilder (außer SVG), sonst `application/octet-stream`. Der Service Worker reicht diese Adressen immer durch.
+- Mails (Brett und Verwaltung) hängen die Dateien an (`Mail::attachments`, `multipart/mixed`); die Größenprüfung gegen `SIZE` zählt sie mit.
+- Aufräumen: mit der Nachricht (`board_cleanup`) bzw. Mail (`mailing_cleanup`); nie gespeicherte Entwürfe nach 7 Tagen (beide Aufgaben); Konto löschen entfernt seine Entwürfe samt Dateien. Sicherungen enthalten Tabelle und Dateien gespeicherter Anhänge (`Backup::FILE_DIRS`), keine Entwürfe.
+
 ### Umfragen (Issue #4)
 
 - Bereich `polls`, Recht `manage_polls` (Standardrolle „Umfragen verwalten“: `member`, `manage_polls`). Braucht den Bereich `board` (`requires`), denn laufende Umfragen stehen am Schwarzen Brett; es gibt keinen eigenen Tab und nichts unter „Meins“. Tabellen `polls`, `poll_options`, `poll_votes`, `poll_answers` (Migration 11), in Sicherungen enthalten.

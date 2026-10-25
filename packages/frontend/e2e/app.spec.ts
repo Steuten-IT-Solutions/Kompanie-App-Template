@@ -4146,6 +4146,84 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
 });
 
+test('Anhänge: am Brett anhängen, Mitglied lädt herunter, beim Bearbeiten ändern (Verlauf); an einer E-Mail', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  page.on('dialog', (d) => void d.accept());
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Schwarzes Brett');
+  const form = page.locator('.board-form');
+  await form.getByLabel('Titel').fill(`Mit Anhang ${id}`);
+  await form.getByLabel('Text der Nachricht').click();
+  await page.keyboard.type('Siehe Anhang.');
+  await form.locator('.attachments-field input[type=file]').setInputFiles([
+    { name: `Einladung ${id}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 Einladung') },
+    { name: 'Werkzeug.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') },
+  ]);
+  await expect(form.locator('.attachment-list-edit li')).toHaveCount(2);
+  await form.getByRole('button', { name: 'Werkzeug.exe entfernen' }).click();
+  await expect(form.locator('.attachment-list-edit li')).toHaveCount(1);
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht veröffentlicht');
+  const card = page.locator('.board-card', { hasText: `Mit Anhang ${id}` });
+  await expect(card.locator('.attachment-link')).toHaveText(new RegExp(`Einladung ${id}\\.pdf`));
+  await shot(page, '33g-brett-anhang');
+
+  // Mitglied sieht den Anhang und lädt ihn herunter
+  const member = await browser.newPage();
+  await login(member, 'mitglied1');
+  await member.locator('.board-banner').getByText(`Mit Anhang ${id}`).click();
+  const memberCard = member.locator('.board-card', { hasText: `Mit Anhang ${id}` });
+  const [download] = await Promise.all([member.waitForEvent('download'), memberCard.locator('.attachment-link').click()]);
+  expect(download.suggestedFilename()).toBe(`Einladung ${id}.pdf`);
+  await member.close();
+
+  // Bearbeiten: zweiten Anhang dazu, ersten entfernen; im Verlauf (im Bearbeiten steht der Titel in einem Feld)
+  const editCard = page.locator(`.board-card[data-focus-id="${await card.getAttribute('data-focus-id')}"]`);
+  await editCard.getByRole('button', { name: 'Bearbeiten' }).click();
+  await editCard
+    .locator('.attachments-field input[type=file]')
+    .setInputFiles({ name: 'Plan.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('PK') });
+  await expect(editCard.locator('.attachment-list-edit li')).toHaveCount(2);
+  await editCard.getByRole('button', { name: `Einladung ${id}.pdf entfernen` }).click();
+  await editCard.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht geändert');
+  await expect(editCard.locator('.attachment-link')).toHaveText(/Plan\.xlsx/);
+  await editCard.getByRole('button', { name: 'Verlauf' }).click();
+  await expect(editCard.locator('.board-revision', { hasText: 'Anhänge geändert' })).toContainText(`Einladung ${id}.pdf`);
+  await editCard.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht gelöscht');
+
+  // E-Mail mit Anhang (Mailversand eingerichtet, Server nicht erreichbar)
+  await page.goto('/app/#/einstellungen/email');
+  const section = page.locator('#einstellungen-email');
+  await section.getByLabel('Kompanieadresse (Absender)').fill('info@musterkompanie.example');
+  await section.getByLabel('Mailserver (SMTP)').fill('127.0.0.1');
+  await section.getByRole('spinbutton', { name: 'Port', exact: true }).fill('9');
+  await section.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.reload();
+  await adminMenu(page, 'E-Mails');
+  const mail = page.locator('.mail-form');
+  await mail.locator('.mail-to-input').fill(`anhang-${id}@example.net`);
+  await mail.locator('.mail-to-input').press('Enter');
+  await mail.getByLabel('Betreff').fill(`Satzung ${id}`);
+  await mail.getByLabel('Text der E-Mail').click();
+  await page.keyboard.type('Anbei die Satzung.');
+  await mail
+    .locator('.attachments-field input[type=file]')
+    .setInputFiles({ name: 'Satzung.docx', mimeType: 'application/octet-stream', buffer: Buffer.from('PK') });
+  await expect(mail.locator('.attachment-list-edit li')).toHaveCount(1);
+  await mail.getByRole('button', { name: 'Senden' }).click();
+  await expect(page.locator('.toast')).toHaveText('E-Mail wird versendet');
+  await page.locator('.mail-history-item', { hasText: `Satzung ${id}` }).click();
+  await expect(page.locator('.mail-detail .attachment-link')).toHaveText(/Satzung\.docx/);
+
+  await page.goto('/app/#/einstellungen/email');
+  await section.getByLabel('Mailserver (SMTP)').fill('');
+  await section.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+});
+
 test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespeichert in UTC, in Berlin richtig angezeigt', async ({
   browser,
   page,

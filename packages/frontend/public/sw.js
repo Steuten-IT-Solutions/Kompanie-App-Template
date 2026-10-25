@@ -174,6 +174,17 @@ function isPreview(request, url) {
   return request.headers.has('X-Kompanie-Preview') || url.searchParams.has('vorschau');
 }
 
+/**
+ * Dateianhang (Schwarzes Brett, E-Mails): <App>/anhang/<Kennung>, ?kompanie_app=anhang/<Kennung> oder ?r=/anhang/<Kennung>.
+ * Immer durchreichen: Ein Download-Link ist eine Navigation, darf aber nie als App-Seite gespeichert oder durch sie ersetzt
+ * werden; die Rechte prüft jedes Mal der Server.
+ */
+function isAttachment(url) {
+  const scope = new URL(self.registration.scope);
+  if (url.pathname.startsWith(scope.pathname) && /^anhang\/[a-f0-9]{32}\/?$/.test(url.pathname.slice(scope.pathname.length))) return true;
+  return /^\/?anhang\/[a-f0-9]{32}$/.test(url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '');
+}
+
 /** Kennung eines Dokuments aus seiner Adresse: <App>/dokument/<id>, ?kompanie_app=dokument/<id> oder ?r=/dokument/<id> */
 function documentId(url) {
   const scope = new URL(self.registration.scope);
@@ -407,6 +418,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (isGoogleCallback(url)) return;
   if (isPreview(request, url)) return;
+  if (isAttachment(url)) return;
 
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;

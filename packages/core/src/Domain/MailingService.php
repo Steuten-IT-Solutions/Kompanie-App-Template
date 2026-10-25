@@ -16,7 +16,7 @@ use KompanieApp\Core\Port\Mailer;
  * E-Mails aus der Verwaltung (Bereich mail, Recht send_mail).
  *
  * - Geschrieben wird wie am Schwarzen Brett: Betreff und formatierter Inhalt (RichText, Bilder über RichImageService,
- *   eingebettet als cid:), die eigene Signatur lässt sich einfügen.
+ *   eingebettet als cid:), die eigene Signatur lässt sich einfügen; dazu beliebige Dateianhänge (AttachmentService).
  * - Empfänger je An, Cc und Bcc: Rollen (Grund- und Zusatzrollen, ohne Gäste), einzelne Konten und freie Adressen. Jede
  *   Adresse bekommt die Mail einmal; steht sie in mehreren Feldern, gilt An vor Cc vor Bcc. Konten ohne gültige Adresse
  *   werden übersprungen (die Vorschau nennt sie). Wer schreibt, bekommt die Mail nur, wenn er sich selbst auswählt.
@@ -58,7 +58,7 @@ final class MailingService
     {
         $available = $this->available();
         $config = $this->app->mail()->config();
-        $users = $this->app->users->list(false);
+        $users = $this->accounts();
         $emails = $this->emailsOf($users);
         $members = [];
         $counts = [];
@@ -130,9 +130,10 @@ final class MailingService
         if ($recipients === []) {
             throw ApiError::invalid('Keiner der gewählten Empfänger hat eine Mailadresse. Bitte Empfänger auswählen.');
         }
-        $this->checkSize($subject, $body, $recipients);
+        $files = $this->app->attachments()->resolve($author, $in['attachments'] ?? null, AttachmentService::OWNER_MAIL);
+        $this->checkSize($subject, $body, $recipients, $files);
         $now = $this->app->time()->nowUtc();
-        $id = $this->app->db->transaction(function () use ($author, $subject, $body, $selection, $recipients, $now): int {
+        $id = $this->app->db->transaction(function () use ($author, $subject, $body, $selection, $recipients, $now, $files): int {
             $id = $this->app->db->insert('mailings', [
                 'author_id' => $author->id, 'subject' => $subject, 'body' => $body,
                 'selection' => (string) json_encode($selection, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'created_at' => $now,
@@ -141,6 +142,7 @@ final class MailingService
             if ($claimed !== $body) {
                 $this->app->db->update('mailings', ['body' => $claimed], ['id' => $id]);
             }
+            $this->app->attachments()->assign($files, AttachmentService::OWNER_MAIL, $id);
             foreach ($recipients as $r) {
                 $this->app->db->insert('mailing_recipients', [
                     'mailing_id' => $id, 'user_id' => $r['user_id'], 'field' => $r['field'], 'name' => mb_substr($r['name'], 0, 191),
@@ -204,6 +206,7 @@ final class MailingService
             'author_name' => $names->name((int) $row['author_id']),
             'created_at' => Time::utcToIso((string) $row['created_at']),
             'selection' => $described,
+            'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $this->app->attachments()->of(AttachmentService::OWNER_MAIL, $id)),
             'mail' => $this->summaries([$id])[$id] ?? self::emptySummary(),
             'log' => array_map(static fn (array $r): array => [
                 'field' => (string) $r['field'],
@@ -247,14 +250,18 @@ final class MailingService
             $mid = (int) $row['mailing_id'];
             if (!array_key_exists($mid, $mailings)) {
                 $m = $this->find($mid);
-                $mailings[$mid] = $m === null ? null : ['row' => $m, 'header' => $this->headerRecipients($mid)];
+                $mailings[$mid] = $m === null ? null : [
+                    'row' => $m,
+                    'header' => $this->headerRecipients($mid),
+                    'files' => $this->app->attachments()->forMail($this->app->attachments()->of(AttachmentService::OWNER_MAIL, $mid)),
+                ];
             }
             if ($mailings[$mid] === null) {
                 $this->mark((int) $row['id'], BoardMailService::CANCELLED, (int) $row['attempts'], null);
                 continue;
             }
             $m = $mailings[$mid]['row'];
-            $mail = $this->compose((string) $m['subject'], (string) $m['body'], ['email' => (string) $row['email'], 'name' => (string) $row['name']], $mailings[$mid]['header']);
+            $mail = $this->compose((string) $m['subject'], (string) $m['body'], ['email' => (string) $row['email'], 'name' => (string) $row['name']], $mailings[$mid]['header'], $mailings[$mid]['files']);
             $result = $mailer->send($mail);
             $attempts = (int) $row['attempts'] + 1;
             $stats['processed']++;
@@ -281,8 +288,9 @@ final class MailingService
      *
      * @param array{email: string, name: string} $recipient
      * @param array{to: list<array{email: string, name: string}>, cc: list<array{email: string, name: string}>} $header
+     * @param list<array{name: string, mime: string, path: string}> $attachments
      */
-    public function compose(string $subject, string $body, array $recipient, array $header): Mail
+    public function compose(string $subject, string $body, array $recipient, array $header, array $attachments = []): Mail
     {
         $images = [];
         $html = (string) preg_replace_callback('/<img data-image="([a-f0-9]{32})"([^>]*)>/', function (array $m) use (&$images): string {
@@ -298,12 +306,16 @@ final class MailingService
             . '<body style="margin: 0; padding: 16px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #222222; background-color: #ffffff">'
             . $html
             . '</body></html>';
-        return new Mail($recipient['email'], $recipient['name'], $subject, $document, RichText::excerpt($body) . "\n", array_values($images), $header['to'], $header['cc']);
+        return new Mail($recipient['email'], $recipient['name'], $subject, $document, RichText::excerpt($body) . "\n", array_values($images), $header['to'], $header['cc'], $attachments);
     }
 
-    /** Aufgabe mailing_cleanup: Mails, die älter als KEEP_DAYS Tage sind, samt Protokoll und Bildern löschen. */
+    /**
+     * Aufgabe mailing_cleanup: Mails, die älter als KEEP_DAYS Tage sind, samt Protokoll, Bildern und Anhängen löschen;
+     * dazu nie gespeicherte Entwürfe von Anhängen (auch ohne Schwarzes Brett, dessen Aufgabe sie sonst aufräumt).
+     */
     public function cleanup(): int
     {
+        $this->app->attachments()->cleanupDrafts();
         $before = gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() - self::KEEP_DAYS * 86400);
         $ids = array_map(static fn (array $r): int => (int) $r['id'], $this->app->db->select('SELECT id FROM {mailings} WHERE created_at < ?', [$before]));
         if ($ids === []) {
@@ -315,6 +327,7 @@ final class MailingService
             $this->app->db->execute('DELETE FROM {mailings} WHERE id IN (' . $in . ')', $ids);
             $this->app->richImages()->repository()->deleteOwners(RichImageService::OWNER_MAIL, $ids);
         });
+        $this->app->attachments()->deleteOwners(AttachmentService::OWNER_MAIL, $ids);
         return count($ids);
     }
 
@@ -389,7 +402,7 @@ final class MailingService
     public function resolve(array $selection): array
     {
         $users = [];
-        foreach ($this->app->users->list(false) as $u) {
+        foreach ($this->accounts() as $u) {
             $users[$u->id] = $u;
         }
         $emails = $this->emailsOf(array_values($users));
@@ -433,19 +446,20 @@ final class MailingService
      * Passt die fertige Mail zur gemeldeten Höchstgröße des Mailservers? Gemessen mit allen Empfängern in den Kopfzeilen.
      *
      * @param list<array{user_id: int, name: string, email: string, field: string}> $recipients
+     * @param list<array<string, mixed>> $files Anhänge
      */
-    private function checkSize(string $subject, string $body, array $recipients): void
+    private function checkSize(string $subject, string $body, array $recipients, array $files): void
     {
         $max = $this->app->boardMail()->serverMaxSize();
         if ($max === null) {
             return;
         }
         $header = self::header($recipients);
-        $mail = $this->compose($subject, $body, ['email' => $recipients[0]['email'], 'name' => $recipients[0]['name']], $header);
+        $mail = $this->compose($subject, $body, ['email' => $recipients[0]['email'], 'name' => $recipients[0]['name']], $header, $this->app->attachments()->forMail($files));
         $size = $this->app->mailer()->measure($mail);
         if ($size > $max) {
             throw ApiError::invalid(sprintf(
-                'Die Mail ist mit Bildern %s groß, der Mailserver nimmt höchstens %s an. Bitte Bilder verkleinern.',
+                'Die Mail ist mit Bildern und Anhängen %s groß, der Mailserver nimmt höchstens %s an. Bitte Bilder oder Anhänge verkleinern.',
                 ServerLimits::format($size),
                 ServerLimits::format($max),
             ));
@@ -472,6 +486,17 @@ final class MailingService
     {
         $rows = $this->app->db->select("SELECT name, email, field FROM {mailing_recipients} WHERE mailing_id = ? AND field IN ('to', 'cc') ORDER BY id", [$mailingId]);
         return self::header(array_map(static fn (array $r): array => ['name' => (string) $r['name'], 'email' => (string) $r['email'], 'field' => (string) $r['field']], $rows));
+    }
+
+    /**
+     * Wählbare Konten: alle mit einer Rolle außer Gast. list(false) lässt Gäste je nach Adapter noch durch (WordPress:
+     * Konten mit gespeicherter Rolle „guest“), deshalb hier ausdrücklich.
+     *
+     * @return list<User>
+     */
+    private function accounts(): array
+    {
+        return array_values(array_filter($this->app->users->list(false), static fn (User $u): bool => $u->role !== Roles::GUEST));
     }
 
     /** @return array<string, mixed>|null */

@@ -46,6 +46,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   beliebige Adressen. Der Text entsteht im selben Editor wie am Schwarzen Brett, mit **Signatur einfügen**. Jede Adresse
   bekommt die Mail einmal; An und Cc sehen sich gegenseitig, Bcc sieht niemand. Vor dem Senden nennt eine Rückfrage die
   Zahl der Empfänger und wer keine Adresse hat. Versendete Mails stehen ein Jahr im Verlauf, mit dem Stand je Empfänger.
+- **Dateianhänge am Schwarzen Brett und an E-Mails**: Beim Schreiben einer Nachricht am Brett oder einer E-Mail aus
+  der Verwaltung lassen sich Dateien jeder Art anhängen (je Datei bis 20 MB, bei manchen Servern weniger). Am Brett
+  sehen und laden alle sie herunter, die die Nachricht sehen; mit **E-Mail senden** hängen sie auch an der Mail.
+  Beim Bearbeiten einer Nachricht kommen Anhänge dazu oder werden entfernt; das steht im Verlauf. Heruntergeladen wird
+  immer als Datei, nie im Browser geöffnet.
 - **Lizenzen**: Unter *Hilfe → Lizenzen* steht, unter welcher Lizenz die App steht (GPL-2.0-or-later), wo es den
   vollständigen Quellcode gibt und welche Bausteine anderer Anbieter in der App enthalten sind, jeweils mit ihrer
   Lizenz. Beide Pakete enthalten dazu die Dateien `LICENSE` und `THIRD-PARTY-NOTICES.txt`.

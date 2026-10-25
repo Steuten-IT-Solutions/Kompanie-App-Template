@@ -39,6 +39,9 @@ final class FakeMailer implements Mailer
         foreach ($mail->images as $img) {
             $n += (int) ceil(strlen($img['bytes']) / 3) * 4;
         }
+        foreach ($mail->attachments as $file) {
+            $n += (int) ceil((int) filesize($file['path']) / 3) * 4;
+        }
         return $n;
     }
 

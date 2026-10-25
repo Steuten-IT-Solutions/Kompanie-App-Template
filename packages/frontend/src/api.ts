@@ -762,6 +762,8 @@ export interface BoardMessage {
   updated_at: string;
   /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+  /** Dateianhänge (fehlt bei älteren Servern) */
+  attachments?: Attachment[];
   /** nur mit post_board: wer zuletzt geändert hat */
   last_edit?: { name: string | null; at: string } | null;
   /** nur mit post_board: Mailversand (null: ohne Mail) */
@@ -781,9 +783,10 @@ export interface BoardEnded {
   deleted_at: string | null;
   deleted_by_name: string | null;
   active: boolean;
+  attachments?: Attachment[];
 }
 
-export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'deleted' | 'mailed';
+export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'attachments' | 'deleted' | 'mailed';
 
 /** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
 export interface BoardRevision {
@@ -819,6 +822,17 @@ export interface BoardInput {
   expires_at?: string | null;
   push?: boolean;
   mail?: boolean;
+  /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
+  attachments?: string[];
+}
+
+/** Dateianhang (Schwarzes Brett, E-Mails): Download über url nach Anmeldung */
+export interface Attachment {
+  uid: string;
+  name: string;
+  size: number;
+  mime: string;
+  url: string;
 }
 
 /** Haken „E-Mail senden“ */
@@ -870,6 +884,7 @@ export interface MailListItem {
 
 export interface MailDetail extends MailListItem {
   text: string;
+  attachments: Attachment[];
   selection: Record<MailField, { roles: { key: Level; label: string }[]; users: { id: number; name: string | null }[]; emails: string[] }>;
   log: {
     field: MailField;
@@ -1663,7 +1678,7 @@ export const api = {
   // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
-  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at'>>) =>
+  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'attachments'>>) =>
     request<BoardMessage>('PATCH', `/board/${id}`, changes),
   boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
   boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
@@ -1671,7 +1686,11 @@ export const api = {
   // E-Mails aus der Verwaltung (send_mail)
   mailOptions: () => request<MailOptions>('GET', '/mails/options'),
   mailPreview: (selection: Record<MailField, MailSelection>) => request<MailPreview>('POST', '/mails/preview', selection),
-  sendMail: (input: { subject: string; text: string } & Record<MailField, MailSelection>) => request<MailDetail>('POST', '/mails', input),
+  sendMail: (input: { subject: string; text: string; attachments: string[] } & Record<MailField, MailSelection>) =>
+    request<MailDetail>('POST', '/mails', input),
+  // Dateianhänge (Schwarzes Brett, E-Mails)
+  attachmentLimits: () => request<{ max_bytes: number }>('GET', '/attachments/limits'),
+  uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
   // Formatierte Inhalte (Issue #172): Bilder, Signatur, Mails vom Brett
