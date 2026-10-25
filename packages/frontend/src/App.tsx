@@ -11,6 +11,7 @@ import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
 import { navigate, useRoute, viewKey } from './router';
+import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
@@ -311,7 +312,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Knopf dort, Tab unten).
   const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
   // „‹ Verwaltung“ nur auf der Seite, zu der der Knopf führt; Unterseiten haben ihren eigenen Rückweg.
-  const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === path.join('/');
+  // brett/<id> (Ziel einer Benachrichtigung) ist dieselbe Seite wie brett.
+  const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === (tab === 'brett' ? 'brett' : path.join('/'));
   const activeTab: View = adminView ? 'verwaltung' : tab;
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
   const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
@@ -492,7 +494,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : path[1] === 'geburtstage' && birthdaysVisible() ? (
                 <BirthdayPage />
               ) : (
-                <Termine />
+                <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}
             {tab === 'news' && <News id={newsId} />}
             {tab === 'galerie' && <Galerie albumId={albumId} />}
@@ -503,10 +505,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 <Dokumente docId={docId} onToast={showToast} />
               ))}
             {tab === 'mitglieder' && <Mitglieder path={path.slice(1)} />}
-            {tab === 'meins' && <Meins sub={path[1]} onToast={showToast} onLogout={() => logout(showToast)} />}
+            {tab === 'meins' && <Meins sub={path[1]} focus={focusId(path[2])} onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {adminStart && <AdminBack />}
-            {tab === 'brett' && <Brett onToast={showToast} />}
+            {tab === 'brett' && <Brett focus={focusId(path[1])} onToast={showToast} />}
             {tab === 'umfragen' && <Umfragen path={path.slice(1)} onToast={showToast} />}
             {tab === 'inventar' && <Inventar path={path.slice(1)} onToast={showToast} />}
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}

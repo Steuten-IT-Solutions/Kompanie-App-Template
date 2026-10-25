@@ -2,9 +2,11 @@ import { api, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatPoints } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
+import { useFocusEntry } from '../focus';
 
-export default function Punkte({ me }: { me: Me }) {
+export default function Punkte({ me, focus }: { me: Me; focus?: string }) {
   const { data, error, loading, reload } = useAsync(api.myPoints, [], 'me/points');
+  const flash = useFocusEntry(focus, !error && !!data?.some((p) => String(p.id) === focus));
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -19,7 +21,7 @@ export default function Punkte({ me }: { me: Me }) {
       ) : (
         <ul className="card-list">
           {points.map((p) => (
-            <li key={p.id} className="card row">
+            <li key={p.id} className={`card row ${flash === String(p.id) ? 'focused' : ''}`} data-focus-id={p.id}>
               <div className="row-main">
                 <div className="row-title">{p.reason}</div>
                 <div className="row-sub">
