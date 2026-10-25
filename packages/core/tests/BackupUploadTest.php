@@ -31,6 +31,8 @@ final class BackupUploadTest extends TestCase
     /** Antwort beim Hochladen der Daten (z. B. 507, wenn der Speicher voll ist). */
     private int $putStatus = 200;
     private int $ids = 0;
+    /** Content-Range je Hochladen der Daten (null: in einem Stück) */
+    private array $puts = [];
 
     protected function setUp(): void
     {
@@ -46,6 +48,11 @@ final class BackupUploadTest extends TestCase
             public function export(): array
             {
                 return ['format' => Backup::FORMAT, 'formatVersion' => Backup::FORMAT_VERSION, 'tables' => (new Backup($this->holder->app->db))->dump(Backup::CORE_TABLES)];
+            }
+
+            public function exportTo($out): void
+            {
+                (new Backup($this->holder->app->db))->write($out, Backup::CORE_TABLES, null, ['format' => Backup::FORMAT, 'formatVersion' => Backup::FORMAT_VERSION], []);
             }
 
             public function import(string $json): void
@@ -73,6 +80,17 @@ final class BackupUploadTest extends TestCase
                     return ['status' => $this->putStatus, 'body' => '{"error":{"message":"The user\'s Drive storage quota has been exceeded."}}'];
                 }
                 $id = substr($url, strlen('https://upload.example/session/'));
+                $this->puts[] = $headers['Content-Range'] ?? null;
+                // In Stücken (Content-Range): anhängen, 308 bis zum letzten Stück
+                if (isset($headers['Content-Range']) && preg_match('#^bytes (\d+)-(\d+)/(\d+)$#', $headers['Content-Range'], $m) === 1) {
+                    if ((int) $m[1] !== strlen($this->drive[$id]['content']) || (int) $m[2] - (int) $m[1] + 1 !== strlen((string) $body)) {
+                        return ['status' => 400, 'body' => '{"error":{"message":"Falscher Bereich"}}'];
+                    }
+                    $this->drive[$id]['content'] .= (string) $body;
+                    return (int) $m[2] + 1 < (int) $m[3]
+                        ? ['status' => 308, 'headers' => ['range' => 'bytes=0-' . $m[2]], 'body' => '']
+                        : ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+                }
                 $this->drive[$id]['content'] = (string) $body;
                 return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
             }
@@ -211,6 +229,28 @@ final class BackupUploadTest extends TestCase
         $this->assertNull($status['error']);
         $this->assertNotNull($status['last_ok']);
         $this->assertSame('ok', $this->backupItem()['level']);
+    }
+
+    public function testBackupIsStreamedAndLargeFilesGoInChunks(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->app->backupUpload()->upload();
+        $backup = array_values($this->drive)[0]['content'];
+        $data = json_decode($backup, true);
+        $this->assertSame(Backup::FORMAT, $data['format'] ?? null, 'Sicherung Stück für Stück erzeugt, gültiges JSON');
+        $this->assertSame((new Backup($this->app->db))->dump(Backup::CORE_TABLES), $data['tables']);
+        $this->assertSame([null], $this->puts, 'klein: in einem Stück');
+
+        // Große Datei: Stücke mit Content-Range, 308 dazwischen, zuletzt die ID
+        $this->puts = [];
+        $file = tempnam(sys_get_temp_dir(), 'gross');
+        $content = random_bytes(600 * 1024);
+        file_put_contents($file, $content);
+        $id = $this->app->drive()->uploadFile('ORDNER', 'gross.bin', $file, 'application/octet-stream', 256 * 1024);
+        @unlink($file);
+        $this->assertSame(['bytes 0-262143/614400', 'bytes 262144-524287/614400', 'bytes 524288-614399/614400'], $this->puts);
+        $this->assertSame($content, $this->drive[$id]['content']);
     }
 
     public function testDeletedFolderIsCreatedAgain(): void

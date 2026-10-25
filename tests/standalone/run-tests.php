@@ -683,11 +683,18 @@ try {
     $badge = $kernel->app()->files->path('abzeichen/abz-sicherung.svg', false);
     file_put_contents($badge, '<svg xmlns="http://www.w3.org/2000/svg"/>');
     $export = $backup->export();
+    // Stück für Stück geschrieben (vor einem Update, nach Google Drive): dieselbe Sicherung
+    $stream = fopen('php://temp', 'w+b');
+    $backup->exportTo($stream);
+    rewind($stream);
+    $streamed = (string) stream_get_contents($stream);
+    $same = static fn (array $a): array => array_diff_key($a, ['created' => 1]);
+    $c->ok($same((array) json_decode($streamed, true)) == $same($export), 'exportTo schreibt dieselbe Sicherung wie export');
     $c->ok(isset($export['files']['abzeichen/abz-sicherung.svg']), 'Export enthält die Abzeichen der Dienstgrade');
     unlink($badge);
     $c->ok($export['format'] === 'kompanie-app-backup' && count($export['tables']['users']) >= 2 && !isset($export['tables']['sessions']), 'Export enthält Daten und Benutzer, keine Sitzungen');
     $d->request('DELETE', '/events/' . $ev['id']);
-    $backup->import((string) json_encode($export));
+    $backup->import($streamed);
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Import stellt gelöschte Daten wieder her');
     $c->ok(is_file($badge), 'Import legt die Abzeichen wieder ab');
     $kernel->db()->execute('DELETE FROM {ranks} WHERE id = ?', [$rankId]);

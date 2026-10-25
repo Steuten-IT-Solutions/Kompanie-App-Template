@@ -48,6 +48,74 @@ final class BackupTest extends TestCase
         $this->assertSame([], Backup::parseFiles(null), 'ältere Sicherung ohne Dateien');
     }
 
+    /** write(): gleiches Ergebnis wie dump() und dumpFiles(), Portionen ohne Lücken oder Doppelte, Kopf und Ende an ihrem Platz. */
+    public function testStreamedBackupEqualsTheFullOne(): void
+    {
+        $db = $this->app->db;
+        // Mehr als eine Portion (200 Zeilen) in einer Tabelle mit zusammengesetztem Schlüssel, deren erste Spalte sich wiederholt
+        for ($u = 1; $u <= 90; $u++) {
+            foreach (['r1', 'r2', 'r3'] as $role) {
+                $db->insert('member_roles', ['user_id' => $u, 'role' => $role, 'assigned_at' => '2026-10-25 12:00:00']);
+            }
+        }
+        // Tabelle mit großen Zeilen (zeilenweise gelesen)
+        for ($i = 1; $i <= 3; $i++) {
+            $this->app->richImages()->repository()->insert(str_repeat((string) $i, 32), 'board', $i, 1, 'image/png', 1, 1, str_repeat("\x89PNG-$i", 1000), '2026-10-25 12:00:00');
+        }
+        // Dateien: Dokument (Größe kein Vielfaches von 3 und über einem Block), Abzeichen, Anhang, Entwurf (nicht gesichert)
+        $doc = random_bytes(3 * 1024 * 1024 + 2);
+        $this->put('dokumente/dok-aa.pdf', $doc);
+        $db->insert('documents', ['title' => 'Satzung', 'category_id' => null, 'file' => 'dok-aa.pdf', 'ext' => 'pdf', 'size' => strlen($doc), 'version' => 'v1', 'visibility' => 'members', 'doc_date' => '2026-10-25', 'uploaded_by' => 1, 'created_at' => '2026-10-25 12:00:00', 'updated_at' => '2026-10-25 12:00:00']);
+        $this->put('abzeichen/abz-bb.svg', '<svg/>');
+        $db->insert('ranks', ['title' => 'Gefreiter', 'sort' => 1, 'badge_file' => 'abz-bb']);
+        foreach (['board' => 'a', 'draft' => 'b'] as $owner => $c) {
+            $uid = str_repeat($c, 32);
+            $this->put('anhaenge/anh-' . $uid . '.bin', "Anhang $owner");
+            $db->insert('attachments', ['uid' => $uid, 'owner_type' => $owner, 'owner_id' => 1, 'user_id' => 1, 'name' => "$owner.txt", 'mime' => 'text/plain', 'bytes' => 10, 'file' => 'anh-' . $uid . '.bin', 'created_at' => '2026-10-25 12:00:00']);
+        }
+
+        $backup = new Backup($db);
+        $out = fopen('php://temp', 'w+b');
+        $backup->write($out, Backup::CORE_TABLES, $this->app->files, ['format' => Backup::FORMAT, 'formatVersion' => Backup::FORMAT_VERSION], ['settings' => ['a' => 1]]);
+        rewind($out);
+        $json = (string) stream_get_contents($out);
+        $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+        $tables = $backup->dump(Backup::CORE_TABLES);
+        $this->assertSame(['format', 'formatVersion', 'tables', 'files', 'settings'], array_keys($data));
+        $this->assertSame($tables, $data['tables'], 'dieselben Zeilen wie dump()');
+        $this->assertCount(270, $data['tables']['member_roles'], 'über Portionsgrenzen ohne Lücken oder Doppelte');
+        $this->assertSame(Backup::dumpFiles($this->app->files, $tables), $data['files'], 'dieselben Dateien wie dumpFiles()');
+        $this->assertSame(['abzeichen/abz-bb.svg', 'anhaenge/anh-' . str_repeat('a', 32) . '.bin', 'dokumente/dok-aa.pdf'], array_keys($data['files']), 'Anhänge gespeicherter Inhalte, keine Entwürfe');
+        $this->assertSame($doc, base64_decode($data['files']['dokumente/dok-aa.pdf'], true), 'Base64 in Blöcken = Base64 der Datei');
+        $this->assertSame(['a' => 1], $data['settings']);
+        $this->assertSame(Backup::parse($json)['tables'], $tables, 'Backup::parse nimmt die Sicherung an');
+    }
+
+    /** write() braucht kaum mehr Arbeitsspeicher als eine große Zeile bzw. ein Block, unabhängig von der Größe der Sicherung. */
+    public function testStreamedBackupNeedsLittleMemory(): void
+    {
+        if (!function_exists('memory_reset_peak_usage')) {
+            $this->markTestSkipped('memory_reset_peak_usage gibt es erst ab PHP 8.2.');
+        }
+        $db = $this->app->db;
+        for ($i = 0; $i < 30; $i++) {
+            $this->app->richImages()->repository()->insert(sprintf('%032x', $i), 'board', $i, 1, 'image/png', 1, 1, random_bytes(1024 * 1024), '2026-10-25 12:00:00');
+        }
+        $file = tempnam(sys_get_temp_dir(), 'sicherung');
+        $out = fopen($file, 'wb');
+        gc_collect_cycles();
+        $before = memory_get_usage();
+        memory_reset_peak_usage();
+        (new Backup($db))->write($out, Backup::CORE_TABLES, $this->app->files, ['format' => Backup::FORMAT], []);
+        $peak = memory_get_peak_usage() - $before;
+        fclose($out);
+        $size = (int) filesize($file);
+        @unlink($file);
+        $this->assertGreaterThan(40 * 1024 * 1024, $size, 'Sicherung mit 30 Bildern zu je 1 MB (Base64)');
+        $this->assertLessThan(12 * 1024 * 1024, $peak, sprintf('Arbeitsspeicher: %.1f MB für eine Sicherung von %.1f MB', $peak / 1048576, $size / 1048576));
+    }
+
     /** @return array<string, array{0: mixed}> */
     public static function brokenFiles(): array
     {

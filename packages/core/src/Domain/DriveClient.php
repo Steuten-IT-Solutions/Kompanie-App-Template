@@ -32,6 +32,8 @@ use KompanieApp\Core\Port\Settings;
 final class DriveClient
 {
     public const SETTING = 'drive_service_account';
+    /** uploadFile(): Größe der Stücke (Vielfaches von 256 KB). */
+    public const UPLOAD_CHUNK = 8 * 1024 * 1024;
     /**
      * Verbindung über OAuth: {client_id, client_secret, refresh_token, email, scope}. Entsteht über „Mit Google
      * verbinden“ (saveClient, createState, authorizeUrl, exchangeCode) oder durch die Übernahme einer früheren App
@@ -579,24 +581,66 @@ final class DriveClient
     }
 
     /**
-     * Lädt eine Datei in einen Ordner hoch (fortsetzbares Hochladen, auch für Dateien über 5 MB) und gibt ihre ID zurück.
+     * Lädt eine Datei in einen Ordner hoch (fortsetzbares Hochladen) und gibt ihre ID zurück. Größere Dateien gehen in
+     * Stücken von $chunk Bytes (Vielfaches von 256 KB, wie Google es verlangt): Die Datei muss nie ganz in den
+     * Arbeitsspeicher (große Sicherungen).
      *
      * @throws \RuntimeException mit verständlicher Meldung
      */
-    public function upload(string $folderId, string $name, string $content, string $mime): string
+    public function uploadFile(string $folderId, string $name, string $path, string $mime, int $chunk = self::UPLOAD_CHUNK): string
+    {
+        $size = @filesize($path);
+        $in = $size === false ? false : @fopen($path, 'rb');
+        if ($in === false) {
+            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+        }
+        try {
+            $location = $this->startUpload($folderId, $name, $mime, $size);
+            if ($size <= $chunk) {
+                return self::uploadedId($this->http->request('PUT', $location, ['Content-Type' => $mime], (string) stream_get_contents($in), 300));
+            }
+            for ($start = 0; $start < $size; $start += $chunk) {
+                $part = (string) fread($in, $chunk);
+                $end = $start + strlen($part) - 1;
+                $res = $this->http->request('PUT', $location, [
+                    'Content-Type' => $mime,
+                    'Content-Range' => sprintf('bytes %d-%d/%d', $start, $end, $size),
+                ], $part, 300);
+                if ($end + 1 < $size) {
+                    // 308: Stück angenommen, weiter
+                    if ($res['status'] !== 308) {
+                        throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+                    }
+                    continue;
+                }
+                return self::uploadedId($res);
+            }
+            throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).');
+        } finally {
+            fclose($in);
+        }
+    }
+
+    /** Beginnt ein fortsetzbares Hochladen; Rückgabe: Adresse der Sitzung. */
+    private function startUpload(string $folderId, string $name, string $mime, int $length): string
     {
         $token = $this->accessToken();
         $start = $this->http->request('POST', self::UPLOAD_URL . '?uploadType=resumable&supportsAllDrives=true&fields=id', [
             'Authorization' => 'Bearer ' . $token,
             'Content-Type' => 'application/json; charset=UTF-8',
             'X-Upload-Content-Type' => $mime,
-            'X-Upload-Content-Length' => (string) strlen($content),
+            'X-Upload-Content-Length' => (string) $length,
         ], (string) json_encode(['name' => $name, 'parents' => [$folderId], 'mimeType' => $mime], JSON_UNESCAPED_UNICODE), 30);
         $location = $start['headers']['location'] ?? '';
         if ($start['status'] !== 200 || !str_starts_with($location, 'https://')) {
             throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht beginnen: ' . self::errorMessage(json_decode($start['body'], true), $start['status']));
         }
-        $res = $this->http->request('PUT', $location, ['Content-Type' => $mime], $content, 300);
+        return $location;
+    }
+
+    /** @param array{status: int, body: string} $res letzte Antwort beim Hochladen */
+    private static function uploadedId(array $res): string
+    {
         $body = json_decode($res['body'], true);
         if (!in_array($res['status'], [200, 201], true) || !is_string($body['id'] ?? null)) {
             throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));

@@ -67,6 +67,13 @@ final class Backup
     public const KEEP_IF_MISSING = ['push_subscriptions'];
     /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente, Abzeichen der Dienstgrade, Anhänge. */
     public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge'];
+    /** JSON-Optionen der Sicherung (wie beim Herunterladen, Hochladen nach Drive und vor einem Update). */
+    public const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
+    /** write(): Zeilen je Abfrage; Tabellen mit großen Zeilen (Fotos und Bilder als Base64) zeilenweise. */
+    private const CHUNK_ROWS = 200;
+    private const HEAVY_TABLES = ['member_photos', 'rich_images'];
+    /** write(): Block einer Datei (Vielfaches von 3, damit die Base64-Teile aneinanderpassen). */
+    private const FILE_BLOCK = 3 * 1024 * 1024;
 
     public function __construct(private readonly Connection $db)
     {
@@ -145,6 +152,26 @@ final class Backup
      */
     public static function dumpFiles(FileStorage $files, array $tables): array
     {
+        $out = [];
+        foreach (self::fileList($files, $tables) as $path => $file) {
+            $data = file_get_contents($file);
+            if ($data === false) {
+                throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+            }
+            $out[$path] = base64_encode($data);
+        }
+        return $out;
+    }
+
+    /**
+     * Dateien, auf die eine Zeile der Sicherung verweist (nur die nötigen Spalten: documents.file, ranks.badge_file,
+     * attachments.owner_type und file).
+     *
+     * @param array<string, array<int, array<string, mixed>>> $tables
+     * @return array<string, string> Pfad in der Sicherung => Pfad der Datei, sortiert
+     */
+    public static function fileList(FileStorage $files, array $tables): array
+    {
         $wanted = [
             'dokumente' => array_map('strval', array_column($tables['documents'] ?? [], 'file')),
             'abzeichen' => array_values(array_filter(array_map('strval', array_column($tables['ranks'] ?? [], 'badge_file')))),
@@ -162,15 +189,104 @@ final class Backup
                 if (!$referenced || !is_file($file) || !self::validFileName($name)) {
                     continue;
                 }
-                $data = file_get_contents($file);
-                if ($data === false) {
-                    throw new \RuntimeException('Die Datei ' . $dir . '/' . $name . ' ließ sich nicht lesen.');
-                }
-                $out[$dir . '/' . $name] = base64_encode($data);
+                $out[$dir . '/' . $name] = $file;
             }
         }
         ksort($out);
         return $out;
+    }
+
+    /**
+     * Schreibt die Sicherung Stück für Stück als JSON in $out, im selben Format wie export() der Adapter: erst $head,
+     * dann tables (je Tabelle in Portionen gelesen), files (je Datei in Blöcken Base64-kodiert), dann $tail. So braucht
+     * eine Sicherung nur so viel Arbeitsspeicher wie die größte Portion bzw. ein Block, nicht die ganze Sicherung
+     * (Fotos und Dokumente machen sie schnell größer als memory_limit).
+     *
+     * @param resource $out
+     * @param list<string> $tables
+     * @param array<string, mixed> $head Felder vor tables (format, formatVersion, created, …)
+     * @param array<string, mixed> $tail Felder nach files (accounts, settings)
+     * @throws \RuntimeException wenn sich nicht schreiben oder lesen lässt, \JsonException bei nicht kodierbaren Werten
+     */
+    public function write($out, array $tables, ?FileStorage $files, array $head, array $tail): void
+    {
+        $put = static function (string $chunk) use ($out): void {
+            $len = strlen($chunk);
+            for ($done = 0; $done < $len;) {
+                $n = fwrite($out, $done === 0 ? $chunk : substr($chunk, $done));
+                if ($n === false || $n === 0) {
+                    throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                }
+                $done += $n;
+            }
+        };
+        $json = static fn (mixed $v): string => json_encode($v, self::JSON_FLAGS | JSON_THROW_ON_ERROR);
+        $put('{');
+        foreach ($head as $key => $value) {
+            $put($json((string) $key) . ':' . $json($value) . ',');
+        }
+        $put('"tables":{');
+        $refs = [];
+        foreach (array_values($tables) as $i => $table) {
+            $put(($i > 0 ? ',' : '') . $json($table) . ':[');
+            $first = true;
+            // Portionen brauchen eine eindeutige Reihenfolge: große Tabellen haben eine eindeutige id vorn, die übrigen
+            // werden nach allen Spalten sortiert (darin steckt jeder Schlüssel, auch zusammengesetzte wie bei member_roles).
+            $heavy = in_array($table, self::HEAVY_TABLES, true);
+            $size = $heavy ? 1 : self::CHUNK_ROWS;
+            $order = $heavy ? '1' : implode(', ', array_map('strval', array_keys(array_fill(1, max(1, count($this->columns($table))), 1))));
+            for ($offset = 0; ; $offset += $size) {
+                $rows = $this->db->select(sprintf('SELECT * FROM {%s} ORDER BY %s LIMIT %d OFFSET %d', $table, $order, $size, $offset));
+                foreach ($rows as $row) {
+                    $put(($first ? '' : ',') . $json($row));
+                    $first = false;
+                    if ($table === 'documents' || $table === 'ranks' || $table === 'attachments') {
+                        $refs[$table][] = array_intersect_key($row, ['file' => 1, 'badge_file' => 1, 'owner_type' => 1]);
+                    }
+                }
+                if (count($rows) < $size) {
+                    break;
+                }
+            }
+            $put(']');
+        }
+        $put('},"files":{');
+        if ($files !== null) {
+            $first = true;
+            foreach (self::fileList($files, $refs) as $path => $file) {
+                $in = @fopen($file, 'rb');
+                if ($in === false) {
+                    throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                }
+                try {
+                    $put(($first ? '' : ',') . $json($path) . ':"');
+                    $first = false;
+                    // Blöcke mit einem Vielfachen von 3 Bytes: Base64 der Blöcke hintereinander = Base64 der Datei.
+                    while (!feof($in)) {
+                        $block = fread($in, self::FILE_BLOCK);
+                        if ($block === false) {
+                            throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                        }
+                        while ($block !== '' && strlen($block) % 3 !== 0 && !feof($in)) {
+                            $more = fread($in, 3 - strlen($block) % 3);
+                            if ($more === false || $more === '') {
+                                break;
+                            }
+                            $block .= $more;
+                        }
+                        $put(base64_encode($block));
+                    }
+                    $put('"');
+                } finally {
+                    fclose($in);
+                }
+            }
+        }
+        $put('}');
+        foreach ($tail as $key => $value) {
+            $put(',' . $json((string) $key) . ':' . $json($value));
+        }
+        $put('}');
     }
 
     /**
