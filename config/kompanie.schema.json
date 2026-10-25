@@ -213,6 +213,13 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "mail": {
+              "type": "string",
+              "default": "E-Mails",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },

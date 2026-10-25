@@ -25,6 +25,7 @@ export type Capability =
   | 'manage_inventory'
   | 'manage_offices'
   | 'manage_lists'
+  | 'send_mail'
   | 'create_users'
   | 'promote_users'
   | 'view_activity'
@@ -46,7 +47,8 @@ export type Feature =
   | 'inventory'
   | 'directory'
   | 'offices'
-  | 'lists';
+  | 'lists'
+  | 'mail';
 
 export interface AppUser {
   id: number;
@@ -760,6 +762,8 @@ export interface BoardMessage {
   updated_at: string;
   /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+  /** Dateianhänge (fehlt bei älteren Servern) */
+  attachments?: Attachment[];
   /** nur mit post_board: wer zuletzt geändert hat */
   last_edit?: { name: string | null; at: string } | null;
   /** nur mit post_board: Mailversand (null: ohne Mail) */
@@ -779,9 +783,10 @@ export interface BoardEnded {
   deleted_at: string | null;
   deleted_by_name: string | null;
   active: boolean;
+  attachments?: Attachment[];
 }
 
-export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'deleted' | 'mailed';
+export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'attachments' | 'deleted' | 'mailed';
 
 /** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
 export interface BoardRevision {
@@ -817,6 +822,17 @@ export interface BoardInput {
   expires_at?: string | null;
   push?: boolean;
   mail?: boolean;
+  /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
+  attachments?: string[];
+}
+
+/** Dateianhang (Schwarzes Brett, E-Mails): Download über url nach Anmeldung */
+export interface Attachment {
+  uid: string;
+  name: string;
+  size: number;
+  mime: string;
+  url: string;
 }
 
 /** Haken „E-Mail senden“ */
@@ -825,6 +841,60 @@ export interface BoardMailInfo {
   recipients: number;
   reason: string | null;
   server_max_size: number | null;
+}
+
+/** E-Mails aus der Verwaltung: Felder für Empfänger */
+export type MailField = 'to' | 'cc' | 'bcc';
+
+/** Empfänger eines Felds: Rollen, Konten und freie Adressen */
+export interface MailSelection {
+  roles: Level[];
+  users: number[];
+  emails: string[];
+}
+
+/** Formular „E-Mail schreiben“: eingerichtet? Absender, wählbare Rollen und Mitglieder (ohne Adressen) */
+export interface MailOptions {
+  available: boolean;
+  reason: string | null;
+  from: string;
+  from_name: string;
+  roles: { key: Level; label: string; members: number; with_email: number }[];
+  members: { id: number; name: string; roles: Level[]; email: boolean }[];
+  server_max_size: number | null;
+}
+
+/** Wer die Mail bekäme (Bestätigung vor dem Senden) */
+export interface MailPreview {
+  recipients: number;
+  to: number;
+  cc: number;
+  bcc: number;
+  /** ausgewählte Konten ohne gültige Adresse */
+  skipped: string[];
+}
+
+export interface MailListItem {
+  id: number;
+  subject: string;
+  author_name: string | null;
+  created_at: string;
+  mail: BoardMailSummary;
+}
+
+export interface MailDetail extends MailListItem {
+  text: string;
+  attachments: Attachment[];
+  selection: Record<MailField, { roles: { key: Level; label: string }[]; users: { id: number; name: string | null }[]; emails: string[] }>;
+  log: {
+    field: MailField;
+    name: string | null;
+    email: string;
+    status: 'pending' | 'sent' | 'failed' | 'cancelled';
+    attempts: number;
+    error: string | null;
+    at: string | null;
+  }[];
 }
 
 /** Technische Grenzen des Servers für Bilder (Bytes; null = keine). */
@@ -1608,11 +1678,21 @@ export const api = {
   // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
-  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at'>>) =>
+  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'attachments'>>) =>
     request<BoardMessage>('PATCH', `/board/${id}`, changes),
   boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
   boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
   boardEnded: () => request<{ items: BoardEnded[]; keep_days: number }>('GET', '/board/history'),
+  // E-Mails aus der Verwaltung (send_mail)
+  mailOptions: () => request<MailOptions>('GET', '/mails/options'),
+  mailPreview: (selection: Record<MailField, MailSelection>) => request<MailPreview>('POST', '/mails/preview', selection),
+  sendMail: (input: { subject: string; text: string; attachments: string[] } & Record<MailField, MailSelection>) =>
+    request<MailDetail>('POST', '/mails', input),
+  // Dateianhänge (Schwarzes Brett, E-Mails)
+  attachmentLimits: () => request<{ max_bytes: number }>('GET', '/attachments/limits'),
+  uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
+  mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
+  mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
   // Formatierte Inhalte (Issue #172): Bilder, Signatur, Mails vom Brett
   richImageLimits: () => request<RichImageLimits>('GET', '/rich-images/limits'),
   uploadRichImage: async (file: File) => request<RichImage>('POST', '/rich-images', { file: await encodeFile(file) }),

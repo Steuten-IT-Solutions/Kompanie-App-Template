@@ -23,11 +23,17 @@ use KompanieApp\Core\Mail\PhpMailerMailer;
  *   Minuten zwischen den Portionen, 0 = ohne Pause): Viele Hoster begrenzen Mails pro Stunde.
  * - „Verbindung prüfen“ zeigt das vom Server gemeldete Limit (SIZE); es wird in mail_server_size gemerkt und vor dem
  *   Versand gegen die fertige Mail geprüft (BoardMailService).
+ * - Eine Warteschlange für alle Mails (runQueue, Aufgabe board_mail): erst die vom Schwarzen Brett, dann die aus der
+ *   Verwaltung (MailingService); Portionsgröße und Pause gelten für alle zusammen.
  */
 final class MailService
 {
     public const SECURE = ['starttls', 'ssl', 'none'];
     public const SIZE_SETTING = 'mail_server_size';
+    /** Einstellung: frühester nächster Versandlauf nach einer Portion (Pause zwischen den Portionen, Unix-Zeit). */
+    public const NEXT_SETTING = 'board_mail_next';
+    /** Sekunden Arbeit je Versandlauf (Webspace bricht PHP oft nach 30 Sekunden ab). */
+    public const BUDGET = 20;
 
     public function __construct(private readonly App $app)
     {
@@ -110,7 +116,7 @@ final class MailService
             'configured' => $this->configured(),
             'unavailable' => $this->unavailable(),
             'server_max_size' => $this->serverMaxSize(),
-            'pending' => $this->app->boardMail()->pendingCount(),
+            'pending' => $this->app->boardMail()->pendingCount() + $this->app->mailings()->pendingCount(),
         ] + $this->batching();
     }
 
@@ -218,6 +224,69 @@ final class MailService
             return ['sent' => false, 'message' => 'Die Testmail konnte nicht gesendet werden: ' . $result->error];
         }
         return ['sent' => true, 'message' => 'Testmail an ' . $address . ' gesendet.'];
+    }
+
+    /**
+     * Versandlauf (Aufgabe board_mail): eine Portion wartender Mails im Zeitbudget, vom Brett (Bereich an) und aus der
+     * Verwaltung (Bereich an). Bleibt etwas übrig, folgt nach der Pause bzw. gleich der nächste Lauf.
+     *
+     * @return array{sent: int, failed: int, pending: int}
+     */
+    public function runQueue(): array
+    {
+        $queues = array_values(array_filter([
+            $this->app->features()->enabled('board') ? $this->app->boardMail() : null,
+            $this->app->features()->enabled(MailingService::FEATURE) ? $this->app->mailings() : null,
+        ]));
+        $pending = static fn (): int => array_sum(array_map(static fn (BoardMailService|MailingService $q): int => $q->pendingCount(), $queues));
+        $stats = ['sent' => 0, 'failed' => 0, 'pending' => 0];
+        if ($queues === [] || !$this->configured()) {
+            $stats['pending'] = $pending();
+            return $stats;
+        }
+        $nowTs = $this->app->time()->timestamp();
+        $next = $this->app->settings->get(self::NEXT_SETTING);
+        if (is_numeric($next) && (int) $next > $nowTs) {
+            $stats['pending'] = $pending();
+            return $stats;
+        }
+        ['batch_size' => $size, 'batch_pause' => $pause] = $this->batching();
+        $mailer = $this->app->mailer();
+        $start = microtime(true);
+        $left = $size;
+        $processed = 0;
+        try {
+            foreach ($queues as $queue) {
+                if ($size > 0 && $left <= 0) {
+                    break;
+                }
+                $result = $queue->sendDue($mailer, $size > 0 ? $left : 0, $start, $nowTs);
+                $left -= $result['processed'];
+                $processed += $result['processed'];
+                $stats['sent'] += $result['sent'];
+                $stats['failed'] += $result['failed'];
+            }
+            if ($processed > 0) {
+                $this->rememberServerSize($mailer->serverMaxSize());
+            }
+        } finally {
+            $mailer->close();
+        }
+        $stats['pending'] = $pending();
+        if ($stats['pending'] > 0 && $processed > 0) {
+            if ($pause > 0) {
+                $this->app->settings->set(self::NEXT_SETTING, $nowTs + $pause * 60);
+            } else {
+                $this->app->scheduler->runSoon(BoardMailService::TASK);
+            }
+        }
+        return $stats;
+    }
+
+    /** Wartende Mail fällig? Nach einem Fehler erst nach einer Pause (5, 10, 20, 40 Minuten). */
+    public static function isDue(int $attempts, string $updatedAt, int $nowTs): bool
+    {
+        return $attempts === 0 || (int) strtotime($updatedAt . ' UTC') + 300 * (2 ** ($attempts - 1)) <= $nowTs;
     }
 
     private function requireConfigured(): void

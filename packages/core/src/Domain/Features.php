@@ -56,6 +56,8 @@ final class Features
         'offices' => ['label' => 'Ämter', 'description' => 'Wer welches Amt wann hatte, auch frühere Inhaber, als Zeitstrahl für alle sichtbar; laufende Ämter können Titel vergeben.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_offices']],
         // Listen (Issue #121): nur für alle mit manage_lists, Werte der Mitglieder nur, soweit sie sie ohnehin sehen.
         'lists' => ['label' => 'Listen', 'description' => 'Listen zum Ausdrucken oder als CSV, z. B. Unterschriften- oder Teilnehmerlisten, mit eigenen Spalten und den Mitgliedern als Zeilen; nur für alle, die sie verwalten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_lists']],
+        // E-Mails: in der Verwaltung schreiben und versenden (An, Cc, Bcc); braucht den Mailversand (Einstellungen → E-Mail).
+        'mail' => ['label' => 'E-Mails', 'description' => 'E-Mails aus der App an Rollen, einzelne Mitglieder und beliebige Adressen schreiben, mit An, Cc und Bcc und Versandprotokoll; nur für alle, die sie versenden dürfen.', 'requires' => [], 'setup' => 'email', 'role' => ['member', 'send_mail']],
     ];
 
     /** @var array<string, bool>|null */
@@ -139,6 +141,7 @@ final class Features
             'calendar' => $this->app->calendar()->isConfigured(),
             'gallery' => $this->app->gallery()->isConfigured(),
             'news' => $this->app->news->available(),
+            'mail' => $this->app->mail()->configured(),
             default => true,
         };
     }

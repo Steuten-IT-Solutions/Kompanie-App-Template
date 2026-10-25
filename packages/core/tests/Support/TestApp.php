@@ -37,7 +37,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily', 'member_contacts'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily', 'member_contacts', 'mailings', 'mailing_recipients', 'attachments'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }

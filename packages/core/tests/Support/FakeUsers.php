@@ -88,13 +88,16 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return isset($u['first'], $u['last']) ? [$u['first'], $u['last']] : PersonName::split($u['name']);
     }
 
+    /** Wie WordPress: list(false) liefert auch Konten mit gespeicherter Rolle „guest“ (der Kern muss selbst prüfen). */
+    public bool $listGuests = false;
+
     public function list(bool $includeGuests): array
     {
         $this->lookups++;
         $out = [];
         foreach (array_keys($this->users) as $id) {
             $u = $this->user($id);
-            if ($includeGuests || $u->role !== Roles::GUEST) {
+            if ($includeGuests || $this->listGuests || $u->role !== Roles::GUEST) {
                 $out[] = $u;
             }
         }

@@ -14,7 +14,7 @@ Hast du unten **Intern**, tippe dort auf den Knopf **{bereich.board}**. Oder tip
 Das Banner erscheint nur, solange es eine Nachricht gibt oder eine laufende Umfrage, auf die du noch nicht geantwortet hast.
 
 ## Was du hier siehst
-- **Aktuelle Nachrichten**: jede Nachricht mit dem Namen der Person, die sie geschrieben hat, der Uhrzeit (bei einer geänderten Nachricht mit „(geändert)“), dem Titel, dem vollständigen Text mit Bildern und **Sichtbar bis** mit Tag und Uhrzeit. Gibt es keine, steht dort **Zurzeit gibt es keine Nachrichten.**
+- **Aktuelle Nachrichten**: jede Nachricht mit dem Namen der Person, die sie geschrieben hat, der Uhrzeit (bei einer geänderten Nachricht mit „(geändert)“), dem Titel, dem vollständigen Text mit Bildern, den Anhängen (📎, ein Tipp lädt die Datei herunter) und **Sichtbar bis** mit Tag und Uhrzeit. Gibt es keine, steht dort **Zurzeit gibt es keine Nachrichten.**
 - **Laufende {bereich.polls}**: nur für {rolle.member}, wenn die {kompanie.name} {bereich.polls} nutzt. Jede Umfrage mit ihrem Ende, der Frage und dem Hinweis **offen** (noch nicht geantwortet) oder **beantwortet**.
 - **Teilnehmen** bzw. **Antwort ansehen**: öffnet die Umfrage. Dort antwortest du oder siehst deine Antwort und die Ergebnisse.
 - **Beendete {bereich.polls}**: öffnet die Liste aller {bereich.polls}, auch der beendeten.

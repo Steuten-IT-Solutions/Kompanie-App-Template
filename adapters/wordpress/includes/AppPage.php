@@ -20,6 +20,7 @@ use KompanieApp\Core\Http\FileCache;
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
  * /app/bild/<kennung>        → Bild in formatiertem Inhalt (Signatur, Schwarzes Brett; wer den Inhalt sehen darf)
+ * /app/anhang/<kennung>      → Dateianhang (Schwarzes Brett, E-Mails; wer den Inhalt sehen darf), immer als Download
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -94,6 +95,8 @@ final class AppPage
             self::sendMemberPhoto($app, (int) $m[1]);
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
+        } elseif (preg_match('#^anhang/([a-f0-9]{32})/?$#', $path, $m)) {
+            self::sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {
             self::sendApp($app);
         }
@@ -399,6 +402,10 @@ final class AppPage
             header('Content-Length: ' . strlen($res['body']));
             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG bzw. PNG, vom Kern neu erzeugt
             echo $res['body'];
+        } elseif ($res['status'] === 200 && isset($res['path'])) {
+            // Dateianhang: immer als Download (Content-Disposition attachment, nosniff, CSP sandbox; AttachmentService)
+            header('Content-Length: ' . filesize($res['path']));
+            readfile($res['path']);
         }
     }
 

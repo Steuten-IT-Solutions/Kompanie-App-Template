@@ -17,10 +17,17 @@ const MIN_LENGTH = 8;
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
 /**
- * Eine Signatur einrichten können Mitglieder und Anwärter sowie alle, die am Brett schreiben (wie SignatureService::allowed);
- * genutzt wird sie bisher nur am Brett, deshalb nur mit diesem Bereich.
+ * Eine Signatur einrichten können Mitglieder und Anwärter sowie alle, die am Brett schreiben oder E-Mails versenden (wie
+ * SignatureService::allowed); genutzt wird sie am Brett und bei E-Mails, deshalb nur mit einem dieser Bereiche.
  */
-const signatureAllowed = () => !!config?.features.board && (can('member') || can('calendar') || can('post_board'));
+const signatureAllowed = () =>
+  (!!config?.features.board && (can('member') || can('calendar') || can('post_board'))) || (!!config?.features.mail && can('send_mail'));
+
+/** Rückwege von der Signatur-Einrichtung zum Entwurf (composeEditor.tsx): Seite => Beschriftung des Knopfs. */
+const RETURN_LABELS: Record<string, string> = {
+  brett: `‹ Zurück zur Nachricht (${brand.labels.sections.board})`,
+  'verwaltung/mail': '‹ Zurück zur E-Mail',
+};
 
 function returnTarget(): string | null {
   try {
@@ -32,7 +39,8 @@ function returnTarget(): string | null {
 
 /**
  * Signatur (Issue #172): formatiert mit Text und Bildern, mit Vorschau; einrichten, ändern, löschen. Kommt man vom
- * Schreiben am Brett (Signatur noch nicht eingerichtet), führt ein Knopf zurück; der Entwurf dort bleibt erhalten.
+ * Schreiben am Brett oder einer E-Mail (Signatur noch nicht eingerichtet), führt ein Knopf zurück; der Entwurf dort bleibt
+ * erhalten.
  */
 function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
   const [saved, setSaved] = useState<string | null | undefined>(undefined);
@@ -63,7 +71,7 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
       // egal
     }
     setBack(null);
-    navigate('brett');
+    if (back) navigate(back);
   };
 
   async function save() {
@@ -140,9 +148,9 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
         </button>
       )}
       {error && <p className="form-error small">{error}</p>}
-      {back === 'brett' && draft === null && (
+      {back && RETURN_LABELS[back] && draft === null && (
         <button className="btn btn-block signature-back" onClick={goBack}>
-          ‹ Zurück zur Nachricht ({brand.labels.sections.board})
+          {RETURN_LABELS[back]}
         </button>
       )}
     </section>

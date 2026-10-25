@@ -28,7 +28,7 @@ final class QueryCountTest extends TestCase
     private const LISTS = [
         'GET /members', 'GET /members?all=1', 'GET /members/{m}', 'GET /promotions', 'GET /ranks?all=1', 'GET /titles',
         'GET /attendance', 'GET /attendance/{list}', 'GET /birthdays', 'GET /inventory', 'GET /inventory/log',
-        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /lists', 'GET /lists/{printlist}', 'POST /lists/{printlist}/sync-members', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
+        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /lists', 'GET /lists/{printlist}', 'POST /lists/{printlist}/sync-members', 'GET /mails/options', 'POST /mails/preview', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
     ];
 
     public function testListsDoNotGrowWithMembers(): void
@@ -145,6 +145,7 @@ final class QueryCountTest extends TestCase
             [$method, $path] = explode(' ', $label, 2);
             $requests[$label] = [$method, $path, []];
         }
+        $requests['POST /mails/preview'] = ['POST', '/mails/preview', ['to' => ['roles' => [Roles::MEMBER]], 'cc' => ['users' => $members]]];
         $requests['POST /points'] = ['POST', '/points', ['user_ids' => $members, 'points' => 1, 'reason' => 'Alle']];
         $requests['POST /penalties'] = ['POST', '/penalties', ['user_ids' => $members, 'amount_cents' => 100, 'reason' => 'Alle']];
         $requests['PUT /attendance'] = ['PUT', '/attendance', ['id' => $list['id'], 'entries' => array_map(static fn (string $s): string => $s === 'absent' ? 'excused' : 'absent', $entries)]];

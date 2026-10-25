@@ -25,6 +25,7 @@ const ALL_FEATURES = [
   'directory',
   'offices',
   'lists',
+  'mail',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -97,6 +98,8 @@ const PATHS = [
   ['verwaltung', 'strafe', 'anwesenheit-3'],
   ['verwaltung', 'listen'],
   ['verwaltung', 'listen', '3'],
+  ['verwaltung', 'mail'],
+  ['verwaltung', 'mail', '3'],
   ['verwaltung', 'neu'],
   ['verwaltung', 'neu-mehrere'],
   ['verwaltung', 'import'],
@@ -189,6 +192,7 @@ test('Eine eigene Seite je Bildschirm', () => {
     [['verwaltung', 'import'], 'mitglieder-import'],
     [['verwaltung', 'anwesenheit', '3'], 'anwesenheitsliste'],
     [['verwaltung', 'listen', '3'], 'liste-bearbeiten'],
+    [['verwaltung', 'mail', '3'], 'emails'],
     [['verwaltung', 'punkte', 'anwesenheit-3'], 'punkte-vergeben'],
     [['verwaltung', 'strafe', 'anwesenheit-3'], 'strafen-verwalten'],
     [['verwaltung', 'mitglied', '7'], 'mitglied-uebersicht'],

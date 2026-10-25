@@ -23,6 +23,7 @@ export const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'manage_inventory', label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf` },
   { key: 'manage_offices', label: `${sec.offices}: Gruppen, Ämter und Amtszeiten pflegen, auch frühere` },
   { key: 'manage_lists', label: `${sec.lists}: zum Drucken und als CSV anlegen und bearbeiten` },
+  { key: 'send_mail', label: `${sec.mail}: an Rollen, Mitglieder und beliebige Adressen schreiben und versenden, Verlauf` },
   { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
   { key: 'promote_users', label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)' },
 ];

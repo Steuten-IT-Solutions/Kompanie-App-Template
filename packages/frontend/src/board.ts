@@ -10,7 +10,7 @@ import { api, can, config, type BoardItem } from './api';
 import { DATA_UPDATED } from './dataCache';
 
 export const BOARD_CHANGED = 'kompanie-board-changed';
-/** Nach dem Einrichten der Signatur (Konto) zurück zum Brett, wo der Entwurf wartet (Issue #172). */
+/** Nach dem Einrichten der Signatur (Konto) zurück zum Brett bzw. zur E-Mail, wo der Entwurf wartet (Issue #172). */
 export const SIGNATURE_RETURN_KEY = 'kompanie-signature-return';
 const DISMISSED_KEY = 'kompanie-board-dismissed';
 

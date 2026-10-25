@@ -413,6 +413,21 @@ try {
     $c->ok($d->send('GET', $imgUrl, $ottoCookie, null)[0] === 403, 'Nachricht gelöscht: Mitglied sieht das Bild nicht mehr → 403');
     $c->ok($d->send('GET', $imgUrl, $cookie, null)[0] === 200, 'Mit post_board im Verlauf weiter sichtbar');
     $c->ok($d->send('GET', $base . 'index.php?r=/bild/' . str_repeat('0', 32), $cookie, null)[0] === 404, 'Unbekanntes Bild → 404');
+
+    $c->section('Dateianhänge (Schwarzes Brett, E-Mails)');
+    [$s, $att] = $d->request('POST', '/attachments', ['file' => ['name' => 'Seite <1>.html', 'data' => base64_encode('<script>alert(1)</script>')]]);
+    $attUrl = (string) ($att['url'] ?? '');
+    $c->ok($s === 201 && ($att['name'] ?? '') === 'Seite 1.html' && $attUrl === $base . 'index.php?r=/anhang/' . ($att['uid'] ?? ''), 'Anhang hochgeladen (jeder Dateityp), Adresse im Bereich der App');
+    $c->ok($d->send('GET', $attUrl, $ottoCookie, null)[0] === 403, 'Entwurf: andere sehen ihn nicht → 403');
+    [$s, $msg] = $d->request('POST', '/board', ['title' => 'Kpsa Anhang', 'text' => '<p>anbei</p>', 'push' => false, 'mail' => false, 'attachments' => [$att['uid'] ?? '']]);
+    $c->ok($s === 201 && array_column((array) ($msg['attachments'] ?? []), 'uid') === [$att['uid'] ?? ''], 'Nachricht mit Anhang');
+    $c->ok($d->send('GET', $attUrl, [], null)[0] === 401, 'Anhang ohne Anmeldung → 401');
+    $res = $d->send('GET', $attUrl, $ottoCookie, null);
+    $c->ok($res[0] === 200 && ($res[2]['content-type'] ?? '') === 'application/octet-stream'
+        && str_starts_with((string) ($res[2]['content-disposition'] ?? ''), 'attachment;') && ($res[2]['x-content-type-options'] ?? '') === 'nosniff'
+        && str_contains((string) ($res[2]['content-security-policy'] ?? ''), 'sandbox'), 'Mitglied lädt den Anhang herunter: immer als Download, HTML nie als HTML');
+    $d->request('DELETE', '/board/' . (int) ($msg['id'] ?? 0));
+    $c->ok($d->send('GET', $attUrl, $ottoCookie, null)[0] === 403 && $d->send('GET', $attUrl, $cookie, null)[0] === 200, 'Nachricht gelöscht: nur noch mit post_board');
     // PHPMailer (Mailversand): in der Entwicklung aus vendor/, im Paket aus src/lib/PHPMailer
     $c->ok(\KompanieApp\Core\Mail\PhpMailerMailer::unavailable() === null, 'PHPMailer über den Autoloader der eigenständigen Version verfügbar');
     [$s, $mail] = $d->request('GET', '/admin/mail');

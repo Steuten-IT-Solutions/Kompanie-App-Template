@@ -2,7 +2,7 @@
 titel: Verwaltung
 reihenfolge: 50
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_offices, manage_lists, create_users, promote_users, post_board, manage_polls, manage_inventory, manage_settings]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_offices, manage_lists, send_mail, create_users, promote_users, post_board, manage_polls, manage_inventory, manage_settings]
 ---
 Die Verwaltung ist dein Einstieg in alle Aufgaben, die du in der Kompanie übernimmst: Mitglieder pflegen, {bereich.points} vergeben, {bereich.offices} eintragen und mehr. Jede Aufgabe hat hier einen eigenen Knopf.
 
@@ -21,6 +21,7 @@ Du siehst nur die Knöpfe, für die du das Recht hast und deren Bereich die Komp
 - **{bereich.attendance}**: Anwesenheitslisten je Termin.
 - **{bereich.board}**, **{bereich.polls}** und **{bereich.inventory}**: führen zu den eigenen Seiten dieser Bereiche.
 - **{bereich.lists}**: Listen zum Drucken.
+- **{bereich.mail}**: E-Mails an Rollen, Mitglieder und beliebige Adressen schreiben.
 - **Einrichtungen**: was ihr einmal anlegt und selten ändert. Dahinter liegen die Knöpfe
   - **{bereich.points}katalog**: Vorlagen zum Vergeben von {bereich.points} pflegen,
   - **{bereich.ranks}**: {bereich.ranks} und ihre Schwellen pflegen,

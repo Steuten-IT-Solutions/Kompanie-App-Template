@@ -44,6 +44,8 @@ enum Capability: string
     case ManageOffices = 'manage_offices';
     /** Listen zum Drucken und als CSV anlegen, bearbeiten und löschen (Bereich Listen, Issue #121). */
     case ManageLists = 'manage_lists';
+    /** E-Mails aus der Verwaltung schreiben und versenden, Verlauf mit Versandprotokoll sehen (Bereich E-Mails). */
+    case SendMail = 'send_mail';
     /** Mitglieder anlegen, Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */

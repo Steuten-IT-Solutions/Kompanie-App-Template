@@ -67,4 +67,9 @@ final class FakeEnvironment implements Environment
     {
         return 'https://example.org/app/bild/' . $uid;
     }
+
+    public function attachmentUrl(string $uid): string
+    {
+        return 'https://example.org/app/anhang/' . $uid;
+    }
 }

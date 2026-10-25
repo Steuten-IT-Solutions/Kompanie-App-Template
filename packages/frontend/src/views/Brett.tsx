@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   api,
   type BoardEnded,
@@ -8,18 +8,18 @@ import {
   type BoardMessage,
   type BoardPoll,
   type BoardRevision,
+  type Attachment,
 } from '../api';
-import { boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, SIGNATURE_RETURN_KEY, useBoard } from '../board';
+import { AttachmentList, AttachmentsField } from '../attachments';
+import { boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
+import { ComposeEditor } from '../composeEditor';
 import { BoardMeta, pollEndText } from '../BoardBanner';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
-import { Empty, ErrorBox, lazyView, Loading } from '../ui';
-
-// Editor für formatierte Nachrichten (TipTap): erst laden, wenn jemand schreibt oder bearbeitet.
-const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
+import { Empty, ErrorBox, Loading } from '../ui';
 
 /** Entwurf der neuen Nachricht (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung nicht verloren. */
 const DRAFT_KEY = 'kompanie-board-draft';
@@ -32,12 +32,16 @@ interface Draft {
   expires: string;
   push: boolean;
   mail: boolean;
+  /** schon hochgeladene Anhänge (Entwürfe auf dem Server, 7 Tage gültig) */
+  attachments: Attachment[];
 }
 
 function readDraft(): Draft | null {
   try {
     const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
-    return raw && typeof raw === 'object' && typeof raw.title === 'string' && typeof raw.text === 'string' ? (raw as Draft) : null;
+    return raw && typeof raw === 'object' && typeof raw.title === 'string' && typeof raw.text === 'string'
+      ? ({ ...raw, attachments: Array.isArray(raw.attachments) ? raw.attachments : [] } as Draft)
+      : null;
   } catch {
     return null;
   }
@@ -52,47 +56,18 @@ function saveDraft(draft: Draft | null): void {
   }
 }
 
+/** Entwurf speichern und zurückgeben (für setDraft mit Funktion). */
+function withSaved(draft: Draft): Draft {
+  saveDraft(draft);
+  return draft;
+}
+
 const defaultExpires = () => toLocalInput(new Date(Date.now() + DAY).toISOString());
 
-/** Eigene Signatur (für „Signatur einfügen“); undefined, solange sie lädt. */
-function useSignature(): string | null | undefined {
-  const [html, setHtml] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
-    let alive = true;
-    api
-      .signature()
-      .then((r) => alive && setHtml(r.signature?.content ?? null))
-      .catch(() => alive && setHtml(null));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return html;
-}
-
-function setupSignature(draft?: Draft): void {
-  if (draft) saveDraft(draft);
-  try {
-    sessionStorage.setItem(SIGNATURE_RETURN_KEY, 'brett');
-  } catch {
-    // ohne Speicher: kein Weg zurück, der Entwurf bleibt trotzdem
-  }
-  navigate('meins/konto/signatur');
-}
-
+/** Editor mit „Signatur einfügen“ (wie bei E-Mails aus der Verwaltung); der Entwurf bleibt beim Sprung zur Signatur erhalten. */
 function Editor(props: { value: string; onChange: (html: string) => void; label: string; id: string; draft?: Draft }) {
-  const signature = useSignature();
-  return (
-    <Suspense fallback={<Loading />}>
-      <RichTextEditor
-        value={props.value}
-        onChange={props.onChange}
-        label={props.label}
-        id={props.id}
-        signature={signature === undefined ? undefined : { html: signature, onSetup: () => setupSignature(props.draft) }}
-      />
-    </Suspense>
-  );
+  const { draft, ...rest } = props;
+  return <ComposeEditor {...rest} returnTo="brett" saveDraft={draft ? () => saveDraft(draft) : undefined} />;
 }
 
 /** „Sichtbar bis“: Ortszeit des Geräts, nicht in der Vergangenheit, ohne Obergrenze. */
@@ -126,7 +101,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     const saved = readDraft();
     return saved
       ? { ...saved, expires: saved.expires || defaultExpires() }
-      : { title: '', text: '', expires: defaultExpires(), push: true, mail: true };
+      : { title: '', text: '', expires: defaultExpires(), push: true, mail: true, attachments: [] };
   });
   const [editorKey, setEditorKey] = useState(0);
   const [mailInfo, setMailInfo] = useState<BoardMailInfo | null>(null);
@@ -160,12 +135,20 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
       `Benachrichtigung: ${draft.push ? 'an alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter)' : 'keine'}`,
       `E-Mail: ${mailOn ? `an ${mailInfo?.recipients ?? 0} Empfänger` : 'keine'}`,
     ];
+    if (draft.attachments.length > 0) lines.push(`Anhänge: ${draft.attachments.map((a) => a.name).join(', ')}`);
     if (!window.confirm(lines.join('\n'))) return;
     setBusy(true);
     try {
-      await api.postBoard({ title: draft.title, text: draft.text, expires_at: expires, push: draft.push, mail: mailOn });
+      await api.postBoard({
+        title: draft.title,
+        text: draft.text,
+        expires_at: expires,
+        push: draft.push,
+        mail: mailOn,
+        attachments: draft.attachments.map((a) => a.uid),
+      });
       saveDraft(null);
-      setDraft({ title: '', text: '', expires: defaultExpires(), push: true, mail: true });
+      setDraft({ title: '', text: '', expires: defaultExpires(), push: true, mail: true, attachments: [] });
       setEditorKey((k) => k + 1);
       onToast('Nachricht veröffentlicht');
       await refreshBoard();
@@ -194,6 +177,12 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
           draft={draft}
         />
       </div>
+      <AttachmentsField
+        id="board-new-attachments"
+        items={draft.attachments}
+        onAdd={(a) => setDraft((d) => withSaved({ ...d, attachments: [...d.attachments, a] }))}
+        onRemove={(uid) => setDraft((d) => withSaved({ ...d, attachments: d.attachments.filter((a) => a.uid !== uid) }))}
+      />
       <ExpiresField value={draft.expires} onChange={(expires) => update({ expires })} />
       <label className="toggle">
         <input type="checkbox" className="board-push" checked={draft.push} onChange={(e) => update({ push: e.target.checked })} />
@@ -230,6 +219,7 @@ const ACTIONS: Record<BoardRevision['action'], string> = {
   title: 'Titel geändert',
   content: 'Inhalt geändert',
   expires: 'Enddatum geändert',
+  attachments: 'Anhänge geändert',
   deleted: 'gelöscht',
   mailed: 'per E-Mail versendet',
 };
@@ -248,6 +238,7 @@ function History({ id }: { id: number }) {
     if (r.action === 'expires') return <span>{formatUntil(String(v))}</span>;
     if (r.action === 'title') return <span>{String(v)}</span>;
     if (r.action === 'content') return <RichTextView html={String(v)} className="board-rev-content" />;
+    if (r.action === 'attachments') return <span>{Array.isArray(v) && v.length > 0 ? v.join(', ') : 'keine'}</span>;
     return null;
   };
   return (
@@ -262,7 +253,7 @@ function History({ id }: { id: number }) {
                 r.after !== null &&
                 ` (an ${(r.after as { recipients?: number }).recipients ?? 0} Empfänger)`}
             </span>
-            {(r.action === 'title' || r.action === 'content' || r.action === 'expires') && (
+            {(r.action === 'title' || r.action === 'content' || r.action === 'expires' || r.action === 'attachments') && (
               <div className="board-diff">
                 <div className="board-before">
                   <span className="muted small">vorher</span>
@@ -296,7 +287,7 @@ function History({ id }: { id: number }) {
 }
 
 function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolean; onToast: (msg: string) => void }) {
-  const [edit, setEdit] = useState<{ title: string; text: string; expires: string } | null>(null);
+  const [edit, setEdit] = useState<{ title: string; text: string; expires: string; attachments: Attachment[] } | null>(null);
   const [history, setHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -320,9 +311,11 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
 
   function save() {
     if (!edit) return;
-    const changes: { title?: string; text?: string; expires_at?: string | null } = {};
+    const changes: { title?: string; text?: string; expires_at?: string | null; attachments?: string[] } = {};
     if (edit.title !== item.title) changes.title = edit.title;
     if (edit.text !== item.text) changes.text = edit.text;
+    const uids = edit.attachments.map((a) => a.uid);
+    if (uids.join() !== (item.attachments ?? []).map((a) => a.uid).join()) changes.attachments = uids;
     const expires = fromLocalInput(edit.expires);
     if (expires && toLocalInput(expires) !== toLocalInput(item.expires_at)) changes.expires_at = expires;
     if (Object.keys(changes).length === 0) return setEdit(null);
@@ -336,6 +329,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
         <>
           <h3 className="board-title">{item.title}</h3>
           <RichTextView html={item.text} className="board-text" />
+          <AttachmentList items={item.attachments} />
         </>
       ) : (
         <div className="form board-edit">
@@ -357,6 +351,12 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
               id={`board-edit-${item.id}`}
             />
           </div>
+          <AttachmentsField
+            id={`board-edit-attachments-${item.id}`}
+            items={edit.attachments}
+            onAdd={(a) => setEdit((d) => (d ? { ...d, attachments: [...d.attachments, a] } : d))}
+            onRemove={(uid) => setEdit((d) => (d ? { ...d, attachments: d.attachments.filter((a) => a.uid !== uid) } : d))}
+          />
           <ExpiresField value={edit.expires} onChange={(expires) => setEdit({ ...edit, expires })} />
         </div>
       )}
@@ -374,7 +374,9 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
             <button
               className="btn btn-secondary"
               disabled={busy}
-              onClick={() => setEdit({ title: item.title, text: item.text, expires: toLocalInput(item.expires_at) })}
+              onClick={() =>
+                setEdit({ title: item.title, text: item.text, expires: toLocalInput(item.expires_at), attachments: item.attachments ?? [] })
+              }
             >
               Bearbeiten
             </button>
@@ -448,6 +450,7 @@ function Ended() {
                   </span>
                   <h3 className="board-title">{m.title}</h3>
                   <RichTextView html={m.text} className="board-text" />
+                  <AttachmentList items={m.attachments} />
                   <button className="btn btn-link" aria-expanded={shown === m.id} onClick={() => setShown(shown === m.id ? null : m.id)}>
                     {shown === m.id ? 'Verlauf ausblenden' : 'Verlauf'}
                   </button>

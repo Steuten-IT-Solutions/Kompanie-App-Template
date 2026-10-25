@@ -70,6 +70,7 @@ final class Roles
         Capability::ManageInventory,
         Capability::ManageOffices,
         Capability::ManageLists,
+        Capability::SendMail,
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];

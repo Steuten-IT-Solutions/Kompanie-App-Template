@@ -4,7 +4,7 @@ reihenfolge: 63
 rechte: [post_board]
 bereiche: [board]
 ---
-Hier schreibst du eine dringende Nachricht ans {bereich.board}, z. B. „Training fällt heute aus“. Ihr Titel steht als Banner oben auf jeder Seite der App, so lange du willst (anfangs 24 Stunden). Den Text gestaltest du wie in einem Mailprogramm, auf Wunsch mit deiner Signatur. Außerdem änderst oder löschst du hier Nachrichten und siehst, wer was geändert hat.
+Hier schreibst du eine dringende Nachricht ans {bereich.board}, z. B. „Training fällt heute aus“. Ihr Titel steht als Banner oben auf jeder Seite der App, so lange du willst (anfangs 24 Stunden). Den Text gestaltest du wie in einem Mailprogramm, auf Wunsch mit deiner Signatur und mit Dateien im Anhang. Außerdem änderst oder löschst du hier Nachrichten und siehst, wer was geändert hat.
 
 ![Die Seite des {bereich.board}s mit dem Formular Neue Nachricht](bild:schwarzes-brett-schreiben)
 
@@ -13,7 +13,7 @@ Tippe unten auf **Verwaltung** und dann auf **{bereich.board}**. Ist das deine e
 
 ## Was du hier siehst
 - **‹ Verwaltung**: zurück zur Startseite der Verwaltung (nur, wenn du dort mehrere Aufgaben hast).
-- **Neue Nachricht**: die Felder **Titel** und **Text**, darüber die Werkzeugleiste zum Gestalten, das Feld **Sichtbar bis**, die Haken **Benachrichtigung senden** und **E-Mail senden** und der Knopf **Veröffentlichen**.
+- **Neue Nachricht**: die Felder **Titel** und **Text**, darüber die Werkzeugleiste zum Gestalten, **Anhänge** mit **Datei anhängen**, das Feld **Sichtbar bis**, die Haken **Benachrichtigung senden** und **E-Mail senden** und der Knopf **Veröffentlichen**.
 - **Aktuelle Nachrichten**: alle Nachrichten, die gerade stehen, mit **Sichtbar bis**, **Bearbeiten**, **Löschen** und **Verlauf**. Darunter steht, wer die Nachricht zuletzt wann geändert hat und wie weit der Mailversand ist.
 - **Verlauf: abgelaufene und gelöschte Nachrichten**: Nachrichten der letzten 30 Tage, die abgelaufen sind oder jemand gelöscht hat, mit ihrem Verlauf.
 - **Laufende {bereich.polls}**: wie bei allen {rolle.member}n, wenn die {kompanie.name} {bereich.polls} nutzt; darunter **Beendete {bereich.polls}** und, wenn du {bereich.polls} verwalten darfst, **{bereich.polls} verwalten**.
@@ -41,11 +41,12 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 ### Eine Nachricht veröffentlichen
 1. Gib unter **Neue Nachricht** einen **Titel** ein. Er steht im Banner, in der Benachrichtigung und als Betreff der Mail.
 2. Schreibe darunter den **Text** und gestalte ihn mit der Werkzeugleiste.
-3. Wähle bei **Sichtbar bis**, bis wann die Nachricht stehen soll. Vorgegeben sind 24 Stunden ab jetzt.
-4. Lass den Haken bei **Benachrichtigung senden**, wenn alle sofort Bescheid bekommen sollen.
-5. Lass den Haken bei **E-Mail senden**, wenn alle die Nachricht auch per Mail bekommen sollen. Dahinter steht, an wie viele.
-6. Tippe auf **Veröffentlichen**.
-7. Prüfe in der Nachfrage Titel, Ende und Versandwege und bestätige. Die Nachricht steht sofort am Brett.
+3. Willst du Dateien mitschicken, tippe unter **Anhänge** auf **Datei anhängen** und wähle eine oder mehrere Dateien. Erlaubt ist jede Art von Datei; mit **×** nimmst du eine wieder heraus.
+4. Wähle bei **Sichtbar bis**, bis wann die Nachricht stehen soll. Vorgegeben sind 24 Stunden ab jetzt.
+5. Lass den Haken bei **Benachrichtigung senden**, wenn alle sofort Bescheid bekommen sollen.
+6. Lass den Haken bei **E-Mail senden**, wenn alle die Nachricht auch per Mail bekommen sollen. Dahinter steht, an wie viele.
+7. Tippe auf **Veröffentlichen**.
+8. Prüfe in der Nachfrage Titel, Ende, Versandwege und Anhänge und bestätige. Die Nachricht steht sofort am Brett.
 
 ![Eine neue Nachricht im Formular, bereit zum Veröffentlichen](bild:schwarzes-brett-schreiben-neu)
 
@@ -63,14 +64,14 @@ Schrift, Farben, Aufzählungen und Tabellen kommen mit. Bilder übernimmt die Ap
 
 ### Eine Nachricht ändern
 1. Tippe bei der Nachricht auf **Bearbeiten**.
-2. Ändere **Titel**, **Text** oder **Sichtbar bis**. Das Ende kannst du verlängern oder verkürzen.
+2. Ändere **Titel**, **Text**, **Anhänge** oder **Sichtbar bis**. Das Ende kannst du verlängern oder verkürzen; Anhänge kannst du dazunehmen oder mit **×** entfernen.
 3. Tippe auf **Speichern**. Mit **Abbrechen** bleibt alles, wie es war.
 
 ![Eine Nachricht wird bearbeitet](bild:schwarzes-brett-schreiben-bearbeiten)
 
 ### Nachsehen, wer was geändert hat
 1. Tippe bei der Nachricht auf **Verlauf**.
-2. Du siehst jede Änderung mit Zeit und Namen. Bei Titel, Text und Ende stehen der alte und der neue Stand nebeneinander (**vorher**, **nachher**).
+2. Du siehst jede Änderung mit Zeit und Namen. Bei Titel, Text, Anhängen und Ende stehen der alte und der neue Stand nebeneinander (**vorher**, **nachher**).
 3. Unter **Mailversand je Empfänger** siehst du, an wen die Mail ging und ob es geklappt hat.
 
 ![Der Verlauf einer Nachricht mit vorher und nachher](bild:schwarzes-brett-verlauf)
@@ -84,7 +85,8 @@ Unter **Verlauf: abgelaufene und gelöschte Nachrichten** steht sie noch 30 Tage
 ## Gut zu wissen
 - Mit **Benachrichtigung senden** bekommen alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) eine Benachrichtigung mit dem Titel, außer dir selbst. Das gilt für alle, die die Art **{bereich.board}: dringende Nachrichten** auf ihrem Gerät eingeschaltet haben.
 - **E-Mail senden** gibt es, wenn ein {rolle.admin} den Mailversand eingerichtet hat. Die Mail geht an alle {rolle.member} und Personen mit dem internen Kalender, für die eine Mailadresse hinterlegt ist und die Mails vom Brett nicht abgeschaltet haben, außer dir. Jede Person bekommt ihre eigene Mail; die Adressen der anderen sieht niemand.
-- Ist die Mail mit ihren Bildern größer, als der Mailserver annimmt, sagt die App das vor dem Veröffentlichen. Verkleinere dann die Bilder oder nimm den Haken **E-Mail senden** weg.
+- Anhänge sehen und laden alle herunter, die die Nachricht sehen. Mit **E-Mail senden** hängen sie auch an der Mail. Eine Datei darf höchstens 20 MB groß sein (bei manchen Servern weniger; die App sagt es dann).
+- Ist die Mail mit ihren Bildern und Anhängen größer, als der Mailserver annimmt, sagt die App das vor dem Veröffentlichen. Verkleinere dann Bilder oder Anhänge oder nimm den Haken **E-Mail senden** weg.
 - Ändern verschickt keine neue Benachrichtigung und keine neue Mail. Ändern sich Titel oder Text, sehen auch die die Nachricht wieder im Banner, die sie ausgeblendet hatten. Ändert sich nur das Ende, bleibt sie ausgeblendet.
 - Ändern und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Nachricht geschrieben hat. Den Verlauf sehen nur Personen mit diesem Recht.
 - Eine Längengrenze für Titel und Text gibt es nicht. Sehr lange Titel kürzt das Banner, gespeichert wird alles. Grenzen setzt nur der Server, z. B. bei sehr großen Bildern; die App sagt dir dann, welche.

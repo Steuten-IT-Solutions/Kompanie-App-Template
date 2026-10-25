@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
@@ -713,7 +714,8 @@ final class Api
                 }
                 // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
                 if ($mail && is_string($r->input('title')) && is_string($r->input('text'))) {
-                    $a->boardMail()->checkSize(Text::line($r->input('title')), RichText::sanitize($r->input('text')), $this->user());
+                    $files = $a->attachments()->resolve($this->user(), $r->input('attachments'), AttachmentService::OWNER_BOARD);
+                    $a->boardMail()->checkSize(Text::line($r->input('title')), RichText::sanitize($r->input('text')), $this->user(), $files);
                 }
                 $item = $a->board()->create($this->user(), $r->body);
                 $author = $this->user()->id;
@@ -737,6 +739,18 @@ final class Api
                 $a->board()->delete($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'board', $denyRights),
+
+            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): Empfänger wählen (Rollen, Mitglieder, freie
+            // Adressen je An, Cc und Bcc), Vorschau der Empfänger, senden (Versand im Hintergrund), Verlauf mit Protokoll
+            new Route('GET', '/mails/options', Cap::SendMail, fn () => $a->mailings()->options(), 'mail', $denyRights),
+            new Route('POST', '/mails/preview', Cap::SendMail, fn (Request $r) => $a->mailings()->preview($r->body), 'mail', $denyRights),
+            new Route('GET', '/mails', Cap::SendMail, fn () => $a->mailings()->list(), 'mail', $denyRights),
+            new Route('POST', '/mails', Cap::SendMail, fn (Request $r) => Response::created($a->mailings()->send($this->user(), $r->body)), 'mail', $denyRights),
+            new Route('GET', '/mails/{id}', Cap::SendMail, fn (Request $r) => $a->mailings()->detail($r->id()), 'mail', $denyRights),
+
+            // Dateianhänge (Schwarzes Brett, E-Mails): hochladen als Entwurf des Kontos, Höchstgröße je Datei
+            new Route('GET', '/attachments/limits', [Cap::PostBoard, Cap::SendMail], fn () => ['max_bytes' => AttachmentService::maxBytes()]),
+            new Route('POST', '/attachments', [Cap::PostBoard, Cap::SendMail], fn (Request $r) => Response::created($a->attachments()->upload($this->user(), $r->input('file')))),
 
             // Formatierte Inhalte (Issue #172): Bilder hochladen (Entwurf des Kontos), Grenzen des Servers
             new Route('GET', '/rich-images/limits', $L, fn () => $a->richImages()->limits()),

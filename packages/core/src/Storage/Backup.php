@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  * Schwarzes Brett (Issue #172): Nachrichten mit Verlauf, Bilder in formatierten Inhalten (rich_images, in der Datenbank),
  * Signaturen und Einstellungen der Konten sind enthalten; Warteschlange und Protokoll der Mails (board_mails) nicht.
+ * E-Mails aus der Verwaltung (mailings) mit Inhalt und Auswahl der Empfänger sind enthalten, ihr Protokoll mit den
+ * Adressen (mailing_recipients) nicht.
  * Ebenso wenig die Nutzungsauswertung (activity*, Issue #175): Einträge je Person werden nach 90 Tagen gelöscht und sollen
  * nicht in Sicherungen weiterleben.
  */
@@ -57,14 +59,14 @@ final class Backup
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'push_subscriptions'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'push_subscriptions'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
      */
     public const KEEP_IF_MISSING = ['push_subscriptions'];
-    /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente und Abzeichen der Dienstgrade. */
-    public const FILE_DIRS = ['dokumente', 'abzeichen'];
+    /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente, Abzeichen der Dienstgrade, Anhänge. */
+    public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge'];
 
     public function __construct(private readonly Connection $db)
     {
@@ -108,6 +110,10 @@ final class Backup
             if (in_array('board_messages', $allowed, true)) {
                 $this->db->execute('DELETE FROM {board_mails}');
             }
+            // Ebenso das Protokoll der E-Mails aus der Verwaltung.
+            if (in_array('mailings', $allowed, true)) {
+                $this->db->execute('DELETE FROM {mailing_recipients}');
+            }
             foreach ($allowed as $t) {
                 if (!isset($tables[$t]) || !is_array($tables[$t])) {
                     continue;
@@ -132,7 +138,7 @@ final class Backup
     }
 
     /**
-     * Dateien der Dokumente und Abzeichen, auf die eine Zeile der Sicherung verweist.
+     * Dateien der Dokumente, Abzeichen und Anhänge, auf die eine Zeile der Sicherung verweist.
      *
      * @param array<string, array<int, array<string, mixed>>> $tables aus dump()
      * @return array<string, string> Pfad => Inhalt als Base64
@@ -142,14 +148,16 @@ final class Backup
         $wanted = [
             'dokumente' => array_map('strval', array_column($tables['documents'] ?? [], 'file')),
             'abzeichen' => array_values(array_filter(array_map('strval', array_column($tables['ranks'] ?? [], 'badge_file')))),
+            // Anhänge gespeicherter Nachrichten und Mails, keine Entwürfe
+            'anhaenge' => array_map('strval', array_column(array_filter($tables['attachments'] ?? [], static fn (mixed $r): bool => is_array($r) && ($r['owner_type'] ?? '') !== 'draft'), 'file')),
         ];
         $out = [];
         foreach (self::FILE_DIRS as $dir) {
             $base = dirname($files->path($dir . '/x', false));
             foreach (glob($base . '/*') ?: [] as $file) {
                 $name = basename($file);
-                $referenced = $dir === 'dokumente'
-                    ? in_array($name, $wanted['dokumente'], true)
+                $referenced = $dir === 'dokumente' || $dir === 'anhaenge'
+                    ? in_array($name, $wanted[$dir], true)
                     : array_filter($wanted['abzeichen'], static fn (string $b): bool => str_starts_with($name, $b . '-') || str_starts_with($name, $b . '.')) !== [];
                 if (!$referenced || !is_file($file) || !self::validFileName($name)) {
                     continue;

@@ -61,4 +61,10 @@ interface Environment
      * der Anmeldung und der Rechte: <App>/bild/<Kennung>. Eine Kennung hat immer denselben Inhalt.
      */
     public function richImageUrl(string $uid): string;
+
+    /**
+     * Adresse eines Dateianhangs (Schwarzes Brett, E-Mails aus der Verwaltung), ausgeliefert nach Prüfung der Anmeldung
+     * und der Rechte, immer als Download: <App>/anhang/<Kennung>. Eine Kennung hat immer denselben Inhalt.
+     */
+    public function attachmentUrl(string $uid): string;
 }

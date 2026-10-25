@@ -227,6 +227,6 @@ final class BoardRebuildTest extends TestCase
         $this->assertSame("• eins\n• zwei", $item['excerpt']);
         $this->assertSame(BoardService::KIND_MESSAGE, $item['kind']);
         $member = $this->as($this->m)->call('GET', '/board')->data['items'][0];
-        $this->assertSame(['kind', 'id', 'title', 'text', 'excerpt', 'author_name', 'created_at', 'updated_at', 'expires_at'], array_keys($member));
+        $this->assertSame(['kind', 'id', 'title', 'text', 'excerpt', 'author_name', 'created_at', 'updated_at', 'expires_at', 'attachments'], array_keys($member));
     }
 }
