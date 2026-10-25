@@ -4124,7 +4124,9 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
     .click();
   await to.fill('Mitglied1');
   await to.press('Enter');
-  await expect(form.locator('.mail-chip-missing')).toContainText('ohne Adresse');
+  // Testaufbau: In der eigenständigen Version hat Mitglied1 keine Mailadresse (markiert), in WordPress schon.
+  if (STANDALONE) await expect(form.locator('.mail-chip-missing')).toContainText('ohne Adresse');
+  else await expect(form.locator('.mail-chip', { hasText: 'Mitglied1' })).not.toHaveClass(/mail-chip-missing/);
   // Cc und Bcc: freie Adressen (eine ungültige bleibt mit Hinweis stehen)
   await form.getByRole('button', { name: 'Cc und Bcc hinzufügen' }).click();
   await form.locator('.mail-cc-input').fill('extern@example.net');
@@ -4149,9 +4151,10 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await expect(page.locator('.mail-form').getByLabel('Betreff')).toHaveValue(`Einladung ${id}`);
   await page.locator('.mail-form').getByRole('button', { name: 'Senden' }).click();
   await expect(page.locator('.toast')).toHaveText('E-Mail wird versendet');
-  expect(dialogs.at(-1)).toContain(`„Einladung ${id}“ jetzt an 3 Empfänger senden?`);
-  expect(dialogs.at(-1)).toContain('An: 1 · Cc: 1 · Bcc: 1');
-  expect(dialogs.at(-1)).toContain('Ohne Mailadresse (bekommen nichts): Mitglied1');
+  expect(dialogs.at(-1)).toContain(`„Einladung ${id}“ jetzt an ${STANDALONE ? 3 : 4} Empfänger senden?`);
+  expect(dialogs.at(-1)).toContain(`An: ${STANDALONE ? 1 : 2} · Cc: 1 · Bcc: 1`);
+  if (STANDALONE) expect(dialogs.at(-1)).toContain('Ohne Mailadresse (bekommen nichts): Mitglied1');
+  else expect(dialogs.at(-1)).not.toContain('Ohne Mailadresse');
   await expect(page.locator('.mail-form').getByLabel('Betreff')).toHaveValue('');
   // Verlauf und Versand je Empfänger
   await page.locator('.mail-history-item', { hasText: `Einladung ${id}` }).click();
@@ -4160,7 +4163,7 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await expect(detail.locator('.mail-selection')).toContainText('Admin (Rolle), Mitglied1');
   await expect(detail.locator('.mail-selection')).toContainText(`geheim-${id}@example.net`);
   await detail.getByText('Versand je Empfänger').click();
-  await expect(detail.locator('.board-mail-log li')).toHaveCount(3);
+  await expect(detail.locator('.board-mail-log li')).toHaveCount(STANDALONE ? 3 : 4);
   await shot(page, '33f-email-verlauf');
   await page.getByRole('button', { name: '‹ E-Mails' }).click();
   await expect(page.locator('.mail-form')).toBeVisible();
