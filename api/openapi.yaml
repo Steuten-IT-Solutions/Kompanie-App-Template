@@ -3502,6 +3502,7 @@ paths:
                 email: { type: string }
                 phone: { type: string, maxLength: 30, description: 'Leer entfernt sie' }
                 username: { type: string }
+                current_password: { type: string, description: 'Pflicht, wenn jemand die eigene E-Mail-Adresse ändert' }
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
         '400': { $ref: '#/components/responses/Error' }

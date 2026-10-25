@@ -209,7 +209,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 #### Eigene E-Mail-Adresse und Handynummer
 
 - `GET`/`PATCH /me/account` (angemeldet, Meins → Konto): E-Mail-Adresse und Handynummer der Person selbst (`MemberService::ownAccount`/`updateOwnAccount`). Eine neue E-Mail-Adresse nur mit `current_password` (gleiche Begrenzung wie beim Passwortwechsel, `MemberService::checkPassword`), weil sich bei WordPress darüber das Passwort zurücksetzen lässt. Name und Benutzername ändert hier niemand.
-- Die Handynummer gibt es in WordPress und der Benutzertabelle der eigenständigen Version nicht: Tabelle `member_contacts` (Migration 31) mit `user_id`, `phone`, `updated_at`; `UserData::purge` löscht sie mit dem Konto, die Sicherung enthält sie (`Backup::CORE_TABLES`). Erlaubt sind Ziffern, Leerzeichen und `+ ( ) / -`, 5 bis 20 Ziffern, höchstens 30 Zeichen. Wer Konten verwaltet, sieht und ändert sie mit `GET`/`PATCH /members/{id}/account` (`phone`).
+- Die Handynummer gibt es in WordPress und der Benutzertabelle der eigenständigen Version nicht: Tabelle `member_contacts` (Migration 31) mit `user_id`, `phone`, `updated_at`; `UserData::purge` löscht sie mit dem Konto, die Sicherung enthält sie (`Backup::CORE_TABLES`). Erlaubt sind Ziffern, Leerzeichen und `+ ( ) / -`, 5 bis 20 Ziffern, höchstens 30 Zeichen. Wer Konten verwaltet, sieht und ändert sie mit `GET`/`PATCH /members/{id}/account` (`phone`), auch beim eigenen Konto (Verwaltung → Mitglied → Konto, ohne Löschen); die eigene E-Mail-Adresse ändert `MemberService::updateProfile` auf beiden Wegen nur mit `current_password`.
 
 #### Ehemalige Mitglieder
 

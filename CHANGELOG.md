@@ -231,6 +231,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Netz, in der Vorschau „App als Rolle ansehen“ und im Wartungsmodus lädt die App nichts im Voraus.
 - **Anwesenheitsliste ohne Rollen-Abzeichen**: Hinter den Namen stehen keine Rollen (etwa Admin, Vorstand, Gast) mehr,
   wie überall sonst in der App auch.
+- **Eigenes Konto auch in der Verwaltung ändern**: Auf der eigenen Seite unter *Verwaltung → Mitglieder → Konto und
+  Rolle* gibt es jetzt auch den Bereich „Konto“ mit **Angaben ändern**, etwa für die eigene Handynummer als Admin.
+  Löschen lässt sich das eigene Konto dort nicht. Eine neue eigene E-Mail-Adresse verlangt hier wie unter *Meins →
+  Konto* das aktuelle Passwort.
 
 ### Behoben
 

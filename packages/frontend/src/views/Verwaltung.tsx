@@ -948,8 +948,9 @@ function MemberDetailView({
         {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
         {/* Gäste gehören nicht zur Kompanie. */}
         {formerEditable && formerPanel(false)}
-        {can('create_users') && !self && (
-          <AccountPanel id={m.id} level={m.level} former={!!m.former} onChanged={reload} onToast={onToast} />
+        {/* Das eigene Konto ohne Löschen; E-Mail und Handynummer auch unter Meins → Konto. */}
+        {can('create_users') && (
+          <AccountPanel id={m.id} level={m.level} former={!!m.former} self={self} onChanged={reload} onToast={onToast} />
         )}
       </FoldSection>
 

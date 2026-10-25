@@ -297,11 +297,15 @@ function plainName(s: string): string {
   return t.value;
 }
 
-/** Mitgliedsdetails: Vor- und Nachname, Benutzername und E-Mail ändern, Konto löschen (Issue #24). */
+/**
+ * Mitgliedsdetails: Vor- und Nachname, Benutzername, E-Mail und Handynummer ändern, Konto löschen (Issue #24). Das
+ * eigene Konto ohne Löschen; eine neue eigene E-Mail-Adresse nur mit dem aktuellen Passwort (wie unter Meins → Konto).
+ */
 export function AccountPanel({
   id,
   level,
   former = false,
+  self = false,
   onChanged,
   onToast,
 }: {
@@ -309,6 +313,8 @@ export function AccountPanel({
   level: Level;
   /** ehemalig: Der Hinweis auf „Als ehemalig eintragen“ entfällt */
   former?: boolean;
+  /** das eigene Konto */
+  self?: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -316,6 +322,7 @@ export function AccountPanel({
   const [editing, setEditing] = useState<AccountProfile | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const wordpress = config?.variant === 'wordpress';
@@ -324,12 +331,14 @@ export function AccountPanel({
   // Keine Rechte für dieses Konto (z. B. ein Admin): kein Bereich „Konto“.
   if (error) return null;
   const p = data!;
+  const ownEmailChanged = self && editing !== null && normalizeEmail(editing.email).toLowerCase() !== p.email.toLowerCase();
 
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!editing) return;
-    setBusy(true);
     setFormError(null);
+    if (ownEmailChanged && !password) return setFormError('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+    setBusy(true);
     try {
       setData(
         await api.updateAccount(id, {
@@ -337,9 +346,11 @@ export function AccountPanel({
           email: normalizeEmail(editing.email),
           phone: normalizePhone(editing.phone),
           ...(p.can_change_login ? { username: editing.login.trim() } : {}),
+          ...(ownEmailChanged ? { current_password: password } : {}),
         }),
       );
       setEditing(null);
+      setPassword('');
       onToast('Gespeichert');
       onChanged();
     } catch (err) {
@@ -383,12 +394,22 @@ export function AccountPanel({
             />
           </label>
           {p.can_change_login ? (
-            <p className="muted small">Ein neuer Benutzername meldet die Person auf allen Geräten ab.</p>
+            <p className="muted small">
+              {self
+                ? 'Ein neuer Benutzername meldet dich auf deinen anderen Geräten ab.'
+                : 'Ein neuer Benutzername meldet die Person auf allen Geräten ab.'}
+            </p>
           ) : (
             <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
           )}
           <EmailField value={editing.email} onChange={(email) => setEditing({ ...editing, email })} />
           <PhoneField value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
+          {ownEmailChanged && (
+            <label className="field">
+              <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
+              <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+          )}
           {formError && (
             <p className="form-error" role="alert">
               {formError}
@@ -398,7 +419,15 @@ export function AccountPanel({
             <button className="btn" type="submit" disabled={busy}>
               Speichern
             </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setPassword('');
+                setFormError(null);
+              }}
+            >
               Abbrechen
             </button>
           </div>
@@ -422,7 +451,7 @@ export function AccountPanel({
             <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(p)}>
               Angaben ändern
             </button>
-            {level !== 'admin' && (
+            {level !== 'admin' && !self && (
               <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
                 {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
               </button>
