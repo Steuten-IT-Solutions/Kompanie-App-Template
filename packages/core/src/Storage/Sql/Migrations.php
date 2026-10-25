@@ -1267,6 +1267,22 @@ WHERE title IS NULL",
 )',
                 ],
             ],
+            // Videos in der Galerie (Issue #182): media 'image' oder 'video'; bei Videos Dateityp, Größe in Bytes und Dauer aus
+            // Drive. Abgespielt wird aus Drive (GalleryService::deliverVideo), gespeichert wird nur das Vorschaubild.
+            30 => [
+                'mysql' => [
+                    "ALTER TABLE {photos} ADD COLUMN media varchar(10) NOT NULL DEFAULT 'image'",
+                    "ALTER TABLE {photos} ADD COLUMN mime varchar(100) NOT NULL DEFAULT ''",
+                    'ALTER TABLE {photos} ADD COLUMN bytes bigint(20) unsigned NOT NULL DEFAULT 0',
+                    'ALTER TABLE {photos} ADD COLUMN duration_ms bigint(20) unsigned NOT NULL DEFAULT 0',
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {photos} ADD COLUMN media TEXT NOT NULL DEFAULT 'image'",
+                    "ALTER TABLE {photos} ADD COLUMN mime TEXT NOT NULL DEFAULT ''",
+                    'ALTER TABLE {photos} ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0',
+                    'ALTER TABLE {photos} ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0',
+                ],
+            ],
         ];
     }
 

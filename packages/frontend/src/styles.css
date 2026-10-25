@@ -1632,6 +1632,38 @@ code {
   object-fit: cover;
   display: block;
 }
+/* Video: ▶ in der Mitte, Dauer unten links; ohne Vorschaubild nur die Fläche */
+.photo-video {
+  cursor: pointer;
+}
+.photo-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 3px;
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+.photo-duration {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  font-size: 0.65rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 65%);
+  color: #fff;
+  pointer-events: none;
+}
 /* Kleines Schloss auf internen Bildern (nur für Mitglieder) */
 .photo-lock {
   position: absolute;
@@ -1663,6 +1695,17 @@ code {
 }
 .lightbox img.zoomed {
   transition: none;
+}
+/* Videos (Issue #182): Player des Browsers; Wischen darauf bedient den Player, nicht das Blättern (Galerie.tsx) */
+.lightbox video {
+  max-width: calc(100vw / var(--kompanie-zoom, 1));
+  max-height: calc(80vh / var(--kompanie-zoom, 1));
+  background: #000;
+}
+.lb-error {
+  color: #fff;
+  text-align: center;
+  padding: 0 24px;
 }
 .lb-btn {
   position: absolute;

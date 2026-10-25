@@ -20,13 +20,13 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **{bereich.ga
 
 ## So gehst du vor
 ### Den Ordner in Google Drive vorbereiten
-Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und darin je Album ein Ordner mit den Bildern. Bilder im Unterordner `intern` eines Albums sehen nur Mitglieder.
+Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und darin je Album ein Ordner mit den Bildern und Videos. Bilder und Videos im Unterordner `intern` eines Albums sehen nur Mitglieder. Freigeben musst du den Ordner nicht: Auch Videos spielt die App über den Google-Zugang ab.
 
 ### Den Ordner verbinden
 1. Richte zuerst den [Google-Zugang](seite:admin-google) ein. Mit einem Dienstkonto gibst du den Galerie-Ordner vorher für dessen E-Mail-Adresse frei (Rolle Betrachter).
 2. Öffne den Galerie-Ordner in Google Drive und kopiere die Adresse aus der Adresszeile des Browsers (z. B. `https://drive.google.com/drive/folders/…`).
 3. Füge sie bei **Link zum Galerie-Ordner** ein und tippe auf **Speichern**.
-4. Tippe auf **Jetzt abgleichen**. Die App liest die Alben, bereitet die Bilder auf und zeigt dabei den Fortschritt, am Ende zum Beispiel „Fertig: 3 Alben, 12 Bilder.“
+4. Tippe auf **Jetzt abgleichen**. Die App liest die Alben, bereitet die Bilder auf und zeigt dabei den Fortschritt, am Ende zum Beispiel „Fertig: 3 Alben, 12 Bilder und Videos.“
 
 ![Nach dem Abgleich: wie viele Alben und Bilder gefunden wurden](bild:admin-galerie-abgleich)
 
@@ -37,6 +37,8 @@ Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und
 
 ## Gut zu wissen
 - Was beim Abgleich nicht fertig wird, bereitet die App stündlich im Hintergrund weiter auf. Neue Bilder in Google Drive kommen ebenso stündlich dazu.
+- Videos zeigt die {bereich.gallery} als MP4 oder WebM. Andere Formate (z. B. MOV vom iPhone, AVI) stehen in der Liste als „Videoformat nicht unterstützt“. Abhilfe: das Video als MP4 speichern (viele Handys bieten das beim Teilen oder Exportieren an) und in denselben Ordner legen.
+- Die App speichert Videos nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.
 - Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das Vorschaubild von Google. In der Liste bleiben vor allem beschädigte Dateien.
 - Die {bereich.gallery} erscheint für die anderen erst, wenn der Bereich an und ein Ordner eingetragen ist (siehe [Bereiche](seite:admin-bereiche)).
 - Wie der Abgleich zuletzt lief, zeigt auch die Ampel unter [Zustand und Updates](seite:admin-zustand).

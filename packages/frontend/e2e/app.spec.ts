@@ -2469,6 +2469,35 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   expect(asGuest.status()).toBe(401);
 });
 
+test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Range)', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/#/galerie');
+  const card = page.locator('.album-card', { hasText: 'Umzug' });
+  await expect(card).toContainText('1 Bild · 1 Video');
+  await card.click();
+  await expect(page.locator('.photo')).toHaveCount(2);
+  const tile = page.locator('.photo-video');
+  await expect(tile).toHaveCount(1);
+  await expect(tile.locator('.photo-play')).toBeVisible();
+  await expect(tile.locator('.photo-duration')).toHaveText('0:02');
+  // Der Browser fragt das Video mit Range ab; die App reicht den Ausschnitt aus Drive durch.
+  const videoResponse = page.waitForResponse((r) => /\/foto\/\d+\/video/.test(r.url()));
+  await tile.click();
+  const video = page.locator('.lightbox video');
+  await expect(video).toHaveAttribute('src', /\/foto\/\d+\/video/);
+  const res = await videoResponse;
+  expect(res.status()).toBe(206);
+  expect(res.headers()['content-type']).toBe('video/webm');
+  expect(res.headers()['content-range']).toMatch(/^bytes 0-\d+\/\d+$/);
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(1);
+  expect(await video.evaluate((v: HTMLVideoElement) => Math.round(v.duration))).toBe(2);
+  // Blättern zum Bild: das Video verschwindet.
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lightbox video')).toHaveCount(0);
+  await expect(page.locator('.lightbox img')).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
 test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
@@ -3031,7 +3060,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   const gallery = page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' });
   await expect(gallery.getByText('test@example.iam.gserviceaccount.com')).toBeVisible();
   await gallery.getByRole('button', { name: 'Jetzt abgleichen' }).click();
-  await expect(gallery.getByText('Fertig: 2 Alben, 4 Bilder.')).toBeVisible();
+  await expect(gallery.getByText('Fertig: 3 Alben, 6 Bilder und Videos.')).toBeVisible();
 
   await open('Neuigkeiten');
   const news = page.locator('.settings-section', { hasText: 'Neuigkeiten' });

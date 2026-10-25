@@ -40,6 +40,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   diesem Termin. Die Terminliste scrollt dorthin, klappt ihn auf und hebt ihn kurz hervor. Das gilt auch für die
   Erinnerung an einen einzelnen Termin am nächsten Tag, für Nachrichten am Schwarzen Brett sowie für eigene Punkte und
   Strafen. Ist der Eintrag nicht mehr da, öffnet sich wie bisher die Liste.
+- **Videos in der Galerie**: Videos in den Album-Ordnern in Google Drive erscheinen jetzt im Album, mit ▶ und Dauer,
+  in der App und auf der Webseite (`[kompanie_galerie]`). Antippen spielt sie ab. Videos im Ordner `intern` sehen wie
+  Bilder nur Mitglieder. Die App spielt sie direkt aus Google Drive ab und speichert sie nicht; der Ordner muss dafür
+  nicht freigegeben werden. Unterstützt sind MP4 und WebM; andere Formate (z. B. MOV, AVI) stehen unter
+  *Einstellungen → Galerie* in der Liste „ließen sich nicht laden“ als nicht unterstützt.
 - **Ämter nach Jahren**: Auf breiten Bildschirmen zeigt der Schalter „Jahre“ im Tab Ämter alle Ämter nebeneinander,
   eine Spalte je Amt und eine Zeile je Jahr. So sieht man auf einen Blick, wer wann welches Amt hatte.
 - **Ämter: Einzahl, Hinweis bei Titeln, einzelnes Amt auf der Webseite**: Ein Amt hat jetzt ein Feld für die Einzahl

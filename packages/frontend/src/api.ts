@@ -338,7 +338,10 @@ export interface NewsItem {
 export interface GalleryAlbumSummary {
   id: number;
   title: string;
+  /** Bilder und Videos zusammen */
   count: number;
+  /** davon Videos; fehlt bei älteren Servern */
+  video_count?: number;
   intern_count: number;
   cover: string | null;
 }
@@ -350,8 +353,15 @@ export interface GalleryYear {
 
 export interface GalleryPhoto {
   id: number;
+  /** fehlt bei älteren Servern (dann ein Bild) */
+  type?: 'image' | 'video';
+  /** Vorschaubild; bei Videos '' ohne Vorschaubild */
   thumb: string;
   large: string;
+  /** Video: Adresse zum Abspielen (Ausschnitte aus Drive), Dateityp und Dauer in Sekunden (0 unbekannt) */
+  video?: string;
+  mime?: string;
+  duration?: number;
   /** Originalauflösung für die Großansicht: wird nach large nachgeladen; 404, wenn es sie nicht gibt (large bleibt) */
   original?: string;
   width: number;
@@ -1979,6 +1989,8 @@ export interface FailedPhoto {
   intern: boolean;
   error: string;
   attempts: number;
+  /** Video in einem Format, das die Galerie nicht abspielt (nur MP4 und WebM); fehlt bei älteren Servern */
+  unsupported?: boolean;
   drive_url: string;
 }
 

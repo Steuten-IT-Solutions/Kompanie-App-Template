@@ -51,6 +51,8 @@ final class DriveMock
     public array $contents = [];
     /** Drive-Datei-IDs, für die Google ein Vorschaubild (thumbnailLink) hat. */
     public array $thumbnails = [];
+    /** @var string[] Range-Kopfzeilen der Abrufe von Ausschnitten */
+    public array $ranges = [];
     /** @var string[] abgerufene Vorschaubild-Adressen */
     public array $thumbnailRequests = [];
     public string $privateKey = '';
@@ -81,10 +83,7 @@ final class DriveMock
             'A2' => [['id' => 'I2', 'name' => 'intern', 'mimeType' => $folder]],
             'I2' => [['id' => 'IMG4', 'name' => 'd.jpg', 'mimeType' => 'image/jpeg', 'md5Checksum' => 'm4']],
             'Y2025' => [['id' => 'A3', 'name' => 'Maifest', 'mimeType' => $folder, 'createdTime' => '2025-05-08T00:00:00Z']],
-            'A3' => [
-                ['id' => 'IMG5', 'name' => 'e.png', 'mimeType' => 'image/png', 'md5Checksum' => 'm5'],
-                ['id' => 'VID1', 'name' => 'film.mp4', 'mimeType' => 'video/mp4', 'md5Checksum' => 'v1'],
-            ],
+            'A3' => [['id' => 'IMG5', 'name' => 'e.png', 'mimeType' => 'image/png', 'md5Checksum' => 'm5']],
         ];
     }
 
@@ -177,6 +176,13 @@ final class DriveMock
                 return ['status' => 401, 'body' => '{"error":{"message":"Kein Token"}}'];
             }
             $id = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\\?.*$#', '$1', $url));
+            if (str_contains($url, 'alt=media') && preg_match('/^bytes=(\d+)-(\d+)$/', (string) ($headers['Range'] ?? ''), $r)) {
+                // Ausschnitt (Videos abspielen): 206 mit Content-Range wie bei Google
+                $this->ranges[] = (string) $headers['Range'];
+                $content = $this->contents[$id] ?? self::jpeg();
+                $end = min((int) $r[2], strlen($content) - 1);
+                return ['status' => 206, 'headers' => ['content-range' => 'bytes ' . $r[1] . '-' . $end . '/' . strlen($content)], 'body' => substr($content, (int) $r[1], $end - (int) $r[1] + 1)];
+            }
             if (str_contains($url, 'alt=media')) {
                 $this->downloads++;
                 return $this->downloadFails ? ['status' => 500, 'body' => ''] : ['status' => 200, 'body' => $this->contents[$id] ?? self::jpeg()];
