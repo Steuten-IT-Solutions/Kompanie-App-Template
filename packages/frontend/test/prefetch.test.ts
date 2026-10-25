@@ -99,7 +99,7 @@ test('Fehler beim Vorabladen: kein Eintrag unter „Fehler melden“, eine früh
   assert.equal(dataCache.has(cacheKey('documents', [])), false);
 });
 
-test('Die Ansicht wartet auf eine laufende Vorab-Anfrage; gerade geladen gilt einmal als frisch', async () => {
+test('Beim Antippen geladen gilt einmal als frisch', async () => {
   dataCache.clear();
   const log: string[] = [];
   const a = source('news', log);
@@ -107,12 +107,26 @@ test('Die Ansicht wartet auf eine laufende Vorab-Anfrage; gerade geladen gilt ei
   const done = p.tap([a.s]);
   await tick();
   const k = cacheKey('news', []);
-  assert.ok(pendingPrefetch(k), 'läuft');
   a.d.resolve({ items: [] });
   await done;
-  assert.equal(pendingPrefetch(k), undefined);
+  assert.equal(pendingPrefetch(k), undefined, 'nichts läuft mehr');
   assert.equal(takeFresh(k), true);
   assert.equal(takeFresh(k), false, 'nur einmal');
+});
+
+test('Wartet die Ansicht schon auf die Anfrage, gilt die Antwort danach nicht als frisch', async () => {
+  dataCache.clear();
+  const log: string[] = [];
+  const a = source('member', log);
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  const done = p.tap([a.s]);
+  await tick();
+  const k = cacheKey('member', []);
+  assert.ok(pendingPrefetch(k)); // die Ansicht öffnet, während die Anfrage noch läuft
+  a.d.resolve({ id: 2 });
+  await done;
+  assert.equal(dataCache.has(k), true);
+  assert.equal(takeFresh(k), false, 'beim nächsten Öffnen lädt sie wieder im Hintergrund neu');
 });
 
 test('Eine eigene Änderung während des Vorabladens: nichts ablegen, nicht frisch, nicht abwarten', async () => {

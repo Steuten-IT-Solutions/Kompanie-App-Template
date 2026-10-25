@@ -47,7 +47,8 @@ export function cacheKey(key: string, deps: unknown[]): string {
   return `${key}|${JSON.stringify(deps)}`;
 }
 
-const pending = new Map<string, { since: number; promise: Promise<unknown> }>();
+/** joined: Eine Ansicht wartet schon auf die Antwort (pendingPrefetch); sie gilt dann nicht mehr als frisch. */
+const pending = new Map<string, { since: number; promise: Promise<unknown>; joined?: boolean }>();
 /**
  * Beim Antippen vorab geladen, noch nicht angezeigt: Zeitpunkt; bis FRESH_MS danach fragt die Ansicht beim Öffnen nicht
  * noch einmal. Nicht im Leerlauf oder beim Wischen: Bis die Ansicht öffnet, kann sich dann auf dem Server (z. B. an
@@ -69,12 +70,13 @@ export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>, 
   if (!p) {
     const since = generation;
     p = fn();
-    pending.set(k, { since, promise: p });
+    const entry: { since: number; promise: Promise<unknown>; joined?: boolean } = { since, promise: p };
+    pending.set(k, entry);
     p.then(
       (d) => {
         if (d === null || since !== generation) return;
         dataCache.set(k, d, since);
-        if (markFresh) fresh.set(k, Date.now());
+        if (markFresh && !entry.joined) fresh.set(k, Date.now());
       },
       () => {},
     ).finally(() => pending.delete(k));
@@ -91,7 +93,9 @@ export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>, 
  */
 export function pendingPrefetch(k: string): Promise<unknown> | undefined {
   const p = pending.get(k);
-  return p && p.since === generation ? p.promise : undefined;
+  if (!p || p.since !== generation) return undefined;
+  p.joined = true;
+  return p.promise;
 }
 
 /** Gerade erst beim Antippen vorab geladen (höchstens FRESH_MS her)? Gilt nur einmal: Danach lädt die Ansicht wie sonst im Hintergrund neu. */
