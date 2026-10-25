@@ -239,6 +239,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   App danach noch einmal nach und zeigt den neuen Stand.
 - **Shortcodes mittig**: Manche Themes (z. B. Astra) rückten `[kompanie_mitglieder]`, `[kompanie_termine]` und die
   Inhaber in `[kompanie_aemter]` nach rechts ein; links war mehr Platz als rechts. Die Listen stehen jetzt bündig.
+- **Doppelpunkt bei den Empfängern einer E-Mail**: In der Ansicht einer gesendeten E-Mail (*Verwaltung → E-Mails*)
+  steht jetzt „An:“, „Cc:“ und „Bcc:“ statt „An“, „Cc“ und „Bcc“.
 
 ### Behoben
 
