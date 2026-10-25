@@ -9,7 +9,7 @@ Unter **{bereich.offices}** siehst du, wer welches Amt gerade hat und wer es fr�
 ![{bereich.offices} nach Gruppen](bild:aemter)
 
 ## So öffnest du die Seite
-Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und oben auf **{bereich.offices}**. Nutzt die Kompanie keine Mitgliederliste, heißt der Knopf unter **Intern** gleich **{bereich.offices}**.
+Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und oben auf **{bereich.offices}**. Ohne Anmeldung gibt es **Intern** nicht, dann tippst du unten gleich auf **{bereich.directory}**. Nutzt die Kompanie keine Mitgliederliste, heißt der Knopf gleich **{bereich.offices}**.
 
 ## Was du hier siehst
 - **Alle aufklappen** (bzw. **Alle zuklappen**): öffnet oder schließt alle Karten auf einmal.

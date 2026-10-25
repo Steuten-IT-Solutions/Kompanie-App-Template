@@ -975,8 +975,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   // Öffentliche Liste (ohne Anmeldung): Die Rolle steht wie ein Titel neben dem Namen.
   await page.context().clearCookies();
   await page.goto('/app/');
-  // Ohne Anmeldung gibt es unter „Intern“ nur die Mitglieder: Sie öffnen gleich.
-  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
   await expect(page.locator('.directory .member-row', { hasText: last }).locator('.badge-candidate')).toHaveText('Anwärter');
 
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -1000,7 +999,9 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
-test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zurück; ohne Anmeldung gleich die Mitglieder', async ({ page }) => {
+test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zurück; ohne Anmeldung Mitglieder als eigener Tab', async ({
+  page,
+}) => {
   await login(page, 'mitglied1');
   const tabbar = page.locator('.tabbar');
   await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveCount(0);
@@ -1022,13 +1023,18 @@ test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zur
   await page.getByRole('button', { name: '‹ Intern' }).click();
   await expect(page).toHaveURL(/#\/intern$/);
 
-  // Ohne Anmeldung nur die Mitglieder: „Intern“ öffnet sie gleich, ohne Rückweg zur Startseite.
+  // Ohne Anmeldung nur die Mitglieder: kein „Intern“, die Mitglieder stehen unten als eigener Tab.
   await page.context().clearCookies();
   await page.goto('/app/');
-  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveCount(0);
+  await tabbar.getByRole('button', { name: 'Mitglieder' }).click();
   await expect(page).toHaveURL(/#\/mitglieder$/);
   await expect(page.locator('.directory .member-row').first()).toBeVisible();
+  await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('button', { name: '‹ Intern' })).toHaveCount(0);
+  // Auch ein Link auf #/intern führt Gäste nicht auf eine leere Seite.
+  await page.goto('/app/#/intern');
+  await expect(page.locator('.admin-tiles')).toHaveCount(0);
 });
 
 test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte oder Rollen', async ({ page }) => {
@@ -1049,8 +1055,7 @@ test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte ode
   await page.context().clearCookies();
   await page.goto('/app/');
   await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
-  // Ohne Anmeldung gibt es unter „Intern“ nur die Mitglieder: Sie öffnen gleich.
-  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
   await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
   await expect(list).not.toContainText(/Punkte|offen/);
 });
@@ -1178,8 +1183,7 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   // Ohne Anmeldung: Zeitstrahl im Tab Mitglieder, laufende Amtszeit oben
   await page.context().clearCookies();
   await page.goto('/app/');
-  // Ohne Anmeldung gibt es unter „Intern“ nur die Mitglieder: Sie öffnen gleich.
-  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
   await page.getByRole('button', { name: 'Ämter', exact: true }).click();
   await expect(page).toHaveURL(/#\/mitglieder\/aemter$/);
   const card = page.locator('.office-card', { hasText: office });

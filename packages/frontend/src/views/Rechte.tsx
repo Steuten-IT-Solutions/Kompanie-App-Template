@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { api, type Capability, type MemberRights } from '../api';
-import { CAPABILITIES } from '../capabilities';
+import { CAPABILITIES, WITHOUT_MEMBER, withoutMember } from '../capabilities';
 
-/** Rechte nach den Rollen und Ausnahmen; der Mitgliederbereich schließt den internen Kalender ein. */
+/** Rechte nach den Rollen und Ausnahmen; der Mitgliederbereich schließt Kalender und „Intern“ ein. */
 function effective(r: MemberRights): Set<Capability> {
   const out = new Set<Capability>([...r.role, ...r.grant].filter((c) => !r.revoke.includes(c)));
-  if (out.has('member')) out.add('calendar');
+  if (out.has('member')) WITHOUT_MEMBER.forEach((c) => out.add(c));
   return out;
 }
 
@@ -38,10 +38,10 @@ export function MemberRightsPanel({
   const [busy, setBusy] = useState(false);
   const fromRole = effective({ ...rights, grant: [], revoke: [] });
   const member = checked.has('member');
-  const isOn = (c: Capability) => checked.has(c) || (c === 'calendar' && member);
+  const isOn = (c: Capability) => checked.has(c) || (withoutMember(c) && member);
 
-  // Was von den Rollen abweicht; der Kalender zählt neben dem Mitgliederbereich nicht extra.
-  const grant = [...checked].filter((c) => !fromRole.has(c) && !(c === 'calendar' && member));
+  // Was von den Rollen abweicht; Kalender und „Intern“ zählen neben dem Mitgliederbereich nicht extra.
+  const grant = [...checked].filter((c) => !fromRole.has(c) && !(withoutMember(c) && member));
   const revoke = [...fromRole].filter((c) => !isOn(c));
   const dirty =
     grant.length !== rights.grant.length ||
@@ -82,13 +82,13 @@ export function MemberRightsPanel({
           <legend className="field-label">Rechte von {name}</legend>
           {CAPABILITIES.map((c) => {
             const on = isOn(c.key);
-            const changed = !(c.key === 'calendar' && member) && on !== fromRole.has(c.key);
+            const changed = !(withoutMember(c.key) && member) && on !== fromRole.has(c.key);
             return (
               <label key={c.key} className="toggle feature-toggle">
                 <input
                   type="checkbox"
                   checked={on}
-                  disabled={!rights.editable.includes(c.key) || (c.key === 'calendar' && member)}
+                  disabled={!rights.editable.includes(c.key) || (withoutMember(c.key) && member)}
                   onChange={(e) => toggle(c.key, e.target.checked)}
                 />
                 <span>

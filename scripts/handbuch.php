@@ -30,7 +30,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/markdown.php';
 
-const CAPABILITIES = ['member', 'calendar', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
+const CAPABILITIES = ['member', 'calendar', 'view_intern', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
 const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists'];

@@ -1,18 +1,12 @@
-import { useEffect } from 'react';
 import { AdminIcon } from './adminNav';
-import { navigate, redirect } from './router';
+import { navigate } from './router';
 
-/** Bereich von „Intern“: eigene Ansicht (#/<id>), die die Person sehen darf (App.tsx). */
+/** Bereich von „Intern“: eigene Ansicht (#/<id>); „Intern“ gibt es mit dem Recht view_intern (App.tsx). */
 export type InternTab = { id: string; label: string };
 
-/** Startseite von „Intern“: je Bereich (Mitglieder, Dokumente) ein Knopf mit Symbol wie in der Verwaltung; gibt es nur
- * einen, öffnet er gleich. */
+/** Startseite von „Intern“: je Bereich, den die Person sieht (Mitglieder, Dokumente), ein Knopf mit Symbol wie in der
+ * Verwaltung. */
 export function InternMenu({ tabs }: { tabs: InternTab[] }) {
-  const only = tabs.length === 1 ? tabs[0].id : null;
-  useEffect(() => {
-    if (only) redirect(only);
-  }, [only]);
-  if (only) return null;
   return (
     <nav aria-label="Intern">
       <ul className="admin-tiles">
@@ -29,9 +23,8 @@ export function InternMenu({ tabs }: { tabs: InternTab[] }) {
   );
 }
 
-/** Zurück zur Startseite von „Intern“; nur, wenn es dort mehr als einen Bereich gibt. */
-export function InternBack({ tabs }: { tabs: InternTab[] }) {
-  if (tabs.length < 2) return null;
+/** Zurück zur Startseite von „Intern“. */
+export function InternBack() {
   return (
     <button type="button" className="btn btn-link back" onClick={() => navigate('intern')}>
       ‹ Intern

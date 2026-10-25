@@ -173,10 +173,10 @@ final class RoleService
         $base = $this->grantedFor($id, $target->role);
         $next = self::normalized($base, ['grant' => $grant, 'revoke' => $revoke]);
         $caps = array_diff(array_merge(self::values($base), $next['grant']), $next['revoke']);
-        if (in_array(Capability::Calendar->value, $revoke, true) && in_array(Capability::Member->value, $caps, true)) {
-            throw ApiError::invalid('Der interne Kalender gehört zum Mitgliederbereich und lässt sich nur mit ihm entziehen.');
+        if (array_intersect(self::values(Capability::withoutMember()), $revoke) !== [] && in_array(Capability::Member->value, $caps, true)) {
+            throw ApiError::invalid('Der interne Kalender und „Intern“ gehören zum Mitgliederbereich und lassen sich nur mit ihm entziehen.');
         }
-        if (!in_array(Capability::Member->value, $caps, true) && array_diff($caps, [Capability::Calendar->value]) !== []) {
+        if (!in_array(Capability::Member->value, $caps, true) && array_diff($caps, self::values(Capability::withoutMember())) !== []) {
             throw ApiError::invalid('Rechte zum Verwalten brauchen auch den Mitgliederbereich.');
         }
         $old = self::normalized($base, $this->loadOverrides()[$id] ?? self::NO_OVERRIDES);
@@ -248,7 +248,7 @@ final class RoleService
     }
 
     /**
-     * Rechte der Rolle mit den Ausnahmen. Ohne Mitgliederbereich bleibt höchstens der interne Kalender: Verwalten
+     * Rechte der Rolle mit den Ausnahmen. Ohne Mitgliederbereich bleiben höchstens Kalender und „Intern“: Verwalten
      * setzt ihn voraus, auch wenn ein Rollenwechsel die Ausnahmen so zusammenbringt.
      *
      * @param Capability[] $base Rechte der Rolle (ohne den im Mitgliederbereich enthaltenen Kalender)
@@ -265,7 +265,7 @@ final class RoleService
             }
         }
         if (!in_array(Capability::Member, $caps, true)) {
-            return in_array(Capability::Calendar, $caps, true) ? [Capability::Calendar] : [];
+            return array_values(array_filter(Capability::withoutMember(), static fn (Capability $c): bool => in_array($c, $caps, true)));
         }
         return Roles::withImplied($caps);
     }
@@ -284,7 +284,7 @@ final class RoleService
         $grant = array_diff($o['grant'], $values);
         $revoke = array_intersect($o['revoke'], $values);
         if (in_array(Capability::Member->value, array_diff(array_merge($values, $grant), $revoke), true)) {
-            $grant = array_diff($grant, [Capability::Calendar->value]);
+            $grant = array_diff($grant, self::values(Capability::withoutMember()));
         }
         return ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)];
     }
@@ -849,7 +849,7 @@ final class RoleService
         if ($role === null || ($key !== Roles::MEMBER && !$role['new_accounts'])) {
             return false;
         }
-        $basic = array_diff(self::values($this->capabilities($key)), [Capability::Member->value, Capability::Calendar->value]) === [];
+        $basic = array_diff(self::values($this->capabilities($key)), [Capability::Member->value, ...self::values(Capability::withoutMember())]) === [];
         return $actor->isAdmin() || $basic || $this->canHandle($actor, $key);
     }
 
@@ -1066,13 +1066,16 @@ final class RoleService
             $out[$cap->value] = $cap->value;
         }
         // Verwalten setzt den Mitgliederbereich voraus (sonst sähe die Person ihre Mitglieder nicht); nur den
-        // internen Kalender gibt es auch ohne (wie bei Anwärtern).
-        if (array_diff(array_keys($out), [Capability::Calendar->value]) !== [] && !isset($out[Capability::Member->value])) {
+        // internen Kalender und „Intern“ gibt es auch ohne (wie bei Anwärtern).
+        $basic = self::values(Capability::withoutMember());
+        if (array_diff(array_keys($out), $basic) !== [] && !isset($out[Capability::Member->value])) {
             throw ApiError::invalid('Rollen mit Rechten brauchen auch den Mitgliederbereich.');
         }
-        // Der Mitgliederbereich schließt den Kalender ein: nicht doppelt speichern.
+        // Der Mitgliederbereich schließt Kalender und „Intern“ ein: nicht doppelt speichern.
         if (isset($out[Capability::Member->value])) {
-            unset($out[Capability::Calendar->value]);
+            foreach ($basic as $c) {
+                unset($out[$c]);
+            }
         }
         return array_values($out);
     }

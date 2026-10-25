@@ -20,7 +20,9 @@ Hier lernst du den Aufbau der App kennen: die Kopfleiste oben, die Leiste mit de
 
 Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt und ob du angemeldet bist:
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
-- **Intern**: führt zu **{bereich.directory}** (für alle, wenn die {kompanie.name} die Liste oder die {bereich.offices} nutzt) und zu den **{bereich.documents}** (nur für angemeldete {rolle.member}), siehe [Intern](seite:intern).
+- **{bereich.directory}**: für alle, wenn die {kompanie.name} die Liste nutzt. Nutzt sie nur die {bereich.offices}, heißt der Knopf **{bereich.offices}**.
+- **{bereich.documents}**: nur für angemeldete {rolle.member}.
+- **Intern**: Für {rolle.member} (und wer das Recht **Intern** hat) stehen {bereich.directory} und {bereich.documents} nicht einzeln unten, sondern zusammen unter **Intern**.
 - **Verwaltung**: nur, wenn du eine Aufgabe in der Verwaltung hast, z. B. {bereich.points} vergeben.
 - **Meins** (ganz rechts): deine eigenen Daten und dein Konto, sobald du angemeldet bist.
 

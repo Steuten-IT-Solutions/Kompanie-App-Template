@@ -524,7 +524,7 @@ final class ApiScenario
         sort($caps);
         $c->ok($s === 200 && ($d['preview']['role'] ?? '') === 'member' && is_string($d['preview']['label'] ?? null), '/config meldet die Vorschau mit Bezeichnung');
         $c->ok(($d['user']['id'] ?? 0) === $admin && ($d['user']['level'] ?? '') === 'member' && ($d['user']['extra_roles'] ?? null) === [], 'Vorschau: dieselbe Person mit der Rolle, ohne Zusatzrollen');
-        $c->ok($caps === ['calendar', 'member'], 'Vorschau: genau die Rechte der Rolle');
+        $c->ok($caps === ['calendar', 'member', 'view_intern'], 'Vorschau: genau die Rechte der Rolle');
         $c->ok(($d['setupPending'] ?? null) === false, 'Vorschau: kein Einrichtungsassistent');
         [$s, $me] = $this->req('GET', '/me');
         $c->ok($s === 200 && ($me['id'] ?? 0) === $admin && ($me['level'] ?? '') === 'member', '/me: eigene Daten des Admins mit der Rolle');
@@ -658,6 +658,16 @@ final class ApiScenario
         $aufnahme = (string) (array_column((array) $d, 'key', 'label')['Kptest Aufnahme'] ?? '');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Nur Kalender', 'capabilities' => ['calendar']])[0] === 201, 'Eigene Rolle nur mit dem Kalender');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
+        // „Intern“ (Navigation): wie der Kalender auch ohne Mitgliederbereich, in ihm enthalten.
+        [$s, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Intern', 'capabilities' => ['calendar', 'view_intern']]);
+        $intern = array_column((array) $d, null, 'label')['Kptest Intern'] ?? [];
+        $c->ok($s === 201 && ($intern['capabilities'] ?? null) === ['calendar', 'view_intern'], 'Eigene Rolle mit Kalender und „Intern“, ohne Mitgliederbereich');
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Intern Mitglied', 'capabilities' => ['member', 'view_intern']]);
+        $internMember = array_column((array) $d, null, 'label')['Kptest Intern Mitglied'] ?? [];
+        $c->ok(($internMember['capabilities'] ?? null) === ['member'], '„Intern“ im Mitgliederbereich enthalten, nicht doppelt gespeichert');
+        foreach ([$intern, $internMember] as $r) {
+            $this->req('DELETE', '/admin/roles/' . (string) ($r['key'] ?? ''));
+        }
         $holder = $this->user('kptest_anw_aufnahme', $aufnahme);
         $this->d->actAs($holder);
         [$s, $u] = $this->req('POST', '/users', ['name' => 'Kptest Anwärterin', 'level' => $this->anw]);

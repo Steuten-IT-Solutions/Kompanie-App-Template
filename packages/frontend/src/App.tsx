@@ -48,6 +48,8 @@ const Mitglieder = lazyView(() => import('./views/Mitglieder'));
 // Programmteile der Tabs, die erst bei Bedarf geladen werden: vorab anstoßen (Issue #104).
 const tabViews: Partial<Record<string, { preload: () => void }>> = {
   galerie: Galerie,
+  dokumente: Dokumente,
+  mitglieder: Mitglieder,
   intern: {
     preload: () => {
       Dokumente.preload();
@@ -58,13 +60,13 @@ const tabViews: Partial<Record<string, { preload: () => void }>> = {
   verwaltung: Verwaltung,
 };
 
-type Tab = 'termine' | 'news' | 'galerie' | 'intern' | 'meins' | 'verwaltung';
-/** Bereiche unter „Intern“ (Knöpfe auf seiner Startseite), in dieser Reihenfolge. */
+/** Bereiche unter „Intern“ (Knöpfe auf seiner Startseite), in dieser Reihenfolge. Ohne das Recht view_intern stehen sie
+ * unten als eigene Tabs (z. B. Mitglieder für Gäste). */
 type InternView = 'mitglieder' | 'dokumente';
 const INTERN: InternView[] = ['mitglieder', 'dokumente'];
+type Tab = 'termine' | 'news' | 'galerie' | 'intern' | InternView | 'meins' | 'verwaltung';
 type View =
   | Tab
-  | InternView
   | 'brett'
   | 'umfragen'
   | 'inventar'
@@ -112,19 +114,21 @@ const tabLabels = (): Record<Tab, string> => ({
   news: sec.news,
   galerie: sec.gallery,
   intern: 'Intern',
+  ...internLabels(),
   meins: 'Meins',
   verwaltung: 'Verwaltung',
 });
 
-const internLabels = (): Record<InternView, string> => ({
-  // Nur Ämter ohne Mitgliederliste (Issue #112): Der Bereich heißt dann wie die Ämter.
-  mitglieder: features?.directory || !features?.offices ? sec.directory : sec.offices,
-  dokumente: sec.documents,
-});
+function internLabels(): Record<InternView, string> {
+  return {
+    // Nur Ämter ohne Mitgliederliste (Issue #112): Der Bereich heißt dann wie die Ämter.
+    mitglieder: features?.directory || !features?.offices ? sec.directory : sec.offices,
+    dokumente: sec.documents,
+  };
+}
 
 const titles = (): Record<View, string> => ({
   ...tabLabels(),
-  ...internLabels(),
   news: newsTitle(),
   brett: sec.board,
   umfragen: sec.polls,
@@ -163,6 +167,10 @@ function Icon({ name }: { name: Tab }) {
     news: 'M4 4h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2V4zm15 4h1a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0V8h2zM7 7v4h7V7H7zm0 6v1.5h7V13H7zm0 3v1.5h7V16H7z',
     galerie:
       'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
+    dokumente:
+      'M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 13v1.5h8V13H8zm0 3v1.5h8V16H8zm0-6v1.5h4V10H8z',
+    mitglieder:
+      'M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm8.5 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13c-3 0-7 1.5-7 4.5V20h14v-2.5C15 14.5 11 13 8 13zm8.5 0c-.6 0-1.3.1-2 .2 1.4 1 2.5 2.4 2.5 4.3V20h6v-2.5c0-3-3.9-4.5-6.5-4.5z',
     intern: 'M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 4v8h14v-8H5z',
     meins: 'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z',
     verwaltung:
@@ -300,8 +308,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     galerie: !!features?.gallery,
     dokumente: docsAllowed,
     mitglieder: membersAllowed,
-    // Intern: Startseite mit je einem Knopf für Mitglieder und Dokumente
-    intern: docsAllowed || membersAllowed,
+    // Intern: Startseite mit je einem Knopf für Mitglieder und Dokumente, mit dem Recht view_intern (Mitglieder haben es)
+    intern: can('view_intern') && (docsAllowed || membersAllowed),
     // Eigene Daten (Mitglieder) und das Konto (alle Angemeldeten)
     meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
@@ -321,7 +329,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
   };
   const internTabs: InternTab[] = INTERN.filter((v) => allowed[v]).map((v) => ({ id: v, label: internLabels()[v] }));
   // „Meins“ ganz rechts, die Verwaltung davor.
-  const tabs = (['termine', 'news', 'galerie', 'intern', 'verwaltung', 'meins'] as Tab[]).filter((t) => allowed[t]);
+  // Mitglieder und Dokumente: mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab (z. B. Mitglieder für Gäste).
+  const tabs = (['termine', 'news', 'galerie', ...(allowed.intern ? ['intern'] : INTERN), 'verwaltung', 'meins'] as Tab[]).filter(
+    (t) => allowed[t],
+  );
   const requested = path[0] as View;
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
   const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
@@ -331,9 +342,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // „‹ Verwaltung“ nur auf der Seite, zu der der Knopf führt; Unterseiten haben ihren eigenen Rückweg.
   // brett/<id> (Ziel einer Benachrichtigung) ist dieselbe Seite wie brett.
   const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === (tab === 'brett' ? 'brett' : path.join('/'));
-  // Mitglieder und Dokumente gehören zu „Intern“ (Tab unten); „‹ Intern“ auf ihrer ersten Seite, Unterseiten (ein
-  // Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg.
-  const internView = (INTERN as View[]).includes(tab);
+  // Mitglieder und Dokumente gehören zu „Intern“ (Tab unten), wenn es ihn gibt; „‹ Intern“ auf ihrer ersten Seite,
+  // Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg.
+  const internView = allowed.intern && (INTERN as View[]).includes(tab);
   const internStart = (tab === 'dokumente' && !path[1]) || (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
   const activeTab: View = adminView ? 'verwaltung' : internView ? 'intern' : tab;
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
@@ -522,7 +533,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'news' && <News id={newsId} />}
             {tab === 'galerie' && <Galerie albumId={albumId} />}
             {tab === 'intern' && <InternMenu tabs={internTabs} />}
-            {internView && internStart && <InternBack tabs={internTabs} />}
+            {internView && internStart && <InternBack />}
             {tab === 'dokumente' &&
               (path[1] === 'verwalten' && can('manage_documents') ? (
                 <DokumenteVerwalten onToast={showToast} />

@@ -362,8 +362,9 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 
 | Recht | Bedeutung |
 |---|---|
-| `member` | eigene Punkte/Strafen, interne Galerie; schließt `calendar` ein |
+| `member` | eigene Punkte/Strafen, interne Galerie; schließt `calendar` und `view_intern` ein |
 | `calendar` | interner Kalender (allein z. B. für Anwärter) |
+| `view_intern` | Navigation: Mitglieder und Dokumente unten gesammelt unter „Intern“ statt als eigene Tabs; regelt nicht, was die Person sieht (auch allein vergebbar) |
 | `manage_points` | Punkte vergeben und stornieren, Katalog pflegen |
 | `manage_penalties` | Strafen vergeben, als bezahlt markieren, stornieren |
 | `manage_ranks` | Dienstgradliste pflegen, befördern und degradieren |
@@ -387,7 +388,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Rolle | Rechte |
   |---|---|
   | `guest` (Gast) | nur öffentliche Inhalte |
-  | `member` (Mitglied) | `member` (mit `calendar`) – Rolle neuer Konten; Punktefaktor änderbar |
+  | `member` (Mitglied) | `member` (mit `calendar` und `view_intern`) – Rolle neuer Konten; Punktefaktor änderbar |
   | `admin` (Admin) | alle; Punktefaktor änderbar |
 
   Reihenfolge überall (Auswahl, Zusatzrollen; Zähler umgekehrt, von unten nach oben) so, wie der Admin alle Rollen per Ziehen ordnet (`PUT /admin/roles/order`, auch die festen); anfangs `guest`, `member`, eigene Rollen, `admin`. Neue Rollen kommen ans Ende, vor `admin`, wenn der dort steht.
@@ -410,7 +411,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Listen | Listen verwalten | `member`, `manage_lists` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
-- **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) geht auch allein.
+- **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) und `view_intern` (Navigation „Intern“) gehen auch ohne (`Capability::withoutMember()`).
 - **Eigene Rollen für neue Konten und zum Aufnehmen:** Je eigener Rolle `new_accounts` (wählbar beim Anlegen von Konten, `POST /users`; `member` immer) und `promotable` (wer `create_users` hat, macht Personen dieser Rolle zum Mitglied, `POST /members/{id}/promote`; nur für Rollen ohne `member`). Wer kein Admin ist, legt Konten nur mit Rollen an, die höchstens `member` bzw. `calendar` haben oder deren Rechte er weitergeben darf (`RoleService::canCreateAs`). Andere Rollenwechsel bleiben bei `promote_users`.
 - **Anwärter** (Issue #23) sind eine eigene Rolle, z. B. nur mit `calendar`, `new_accounts` und `promotable`. Bis zu dieser Version war `candidate` fest; `RoleService::migrateCandidate` macht sie einmalig (Einstellung `roles_candidate_own`) zu einer eigenen Rolle mit demselben Schlüssel, ihrem Namen, `calendar`, `new_accounts` und `promotable`, vor `member` (die Zähler zeigen die Rollen von unten nach oben, Anwärter also nach den Mitgliedern) – auch, wenn sie nie gespeichert war, aber jemand sie hat. Neue Installationen haben sie nicht. `member` schließt `calendar` ein (wirksame Rechte, nicht gespeichert). Bei WordPress steht die Rolle in der Benutzer-Option; eine eigene WP-Rolle gibt es nicht.
 - **Keine Rechte weitergeben, die man nicht hat:** Wer Rollen vergeben darf, ohne Admin zu sein, vergibt und ändert nur Rollen, deren Rechte er selbst hat und die weder Konten anlegen noch Rollen vergeben dürfen. Dieselbe Regel gilt für das Zurücksetzen von Passwörtern (sonst ließe sich ein Konto mit mehr Rechten übernehmen).

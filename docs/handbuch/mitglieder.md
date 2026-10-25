@@ -9,7 +9,7 @@ Unter **{bereich.directory}** siehst du, wer zur Kompanie gehört: alle {rolle.m
 ![Liste unter {bereich.directory}](bild:mitglieder)
 
 ## So öffnest du die Seite
-Tippe unten in der Leiste auf **Intern** und dann auf **{bereich.directory}**. Mit **‹ Intern** kommst du zurück. Gibt es unter **Intern** nur diesen Bereich (z. B. ohne Anmeldung), öffnet er gleich.
+Tippe unten in der Leiste auf **Intern** und dann auf **{bereich.directory}**; mit **‹ Intern** kommst du zurück. Ohne Anmeldung gibt es **Intern** nicht: Dann tippst du unten gleich auf **{bereich.directory}**.
 
 ## Was du hier siehst
 - **Umschalter** oben: **{bereich.directory}**, **{bereich.offices}** (wenn die Kompanie sie nutzt; dazu gibt es eine eigene Handbuchseite) und **Ehemalige**. Die App merkt sich auf diesem Gerät, was du zuletzt gewählt hast.
