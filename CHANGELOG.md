@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Ämter nach Jahren**: Auf breiten Bildschirmen zeigt der Schalter „Jahre“ im Tab Ämter alle Ämter nebeneinander,
+  eine Spalte je Amt und eine Zeile je Jahr. So sieht man auf einen Blick, wer wann welches Amt hatte.
+- **Ämter: Einzahl, Hinweis bei Titeln, einzelnes Amt auf der Webseite**: Ein Amt hat jetzt ein Feld für die Einzahl
+  („Kapitän“ zu „Kapitäne“), die auf der Seite einer Person bei ihren Amtszeiten steht. Titel, die ein Amt vergibt,
+  zeigen in *Titel verwalten* und in den Mitgliedsdetails „Wird über das Amt … vergeben“ mit einem Link zum Amt. Der
+  Shortcode `[kompanie_aemter amt="…"]` zeigt auf der Webseite nur ein Amt.
 - **Hilfe als Bedienungsanleitung zu jedem Bildschirm**: Das „?“ oben öffnet jetzt die Anleitung genau zu der Seite,
   auf der man gerade ist – mit Bildschirmfotos aus der eigenen App (in euren Farben und mit euren Bezeichnungen) und
   Schritt für Schritt erklärt: wozu die Seite da ist, wie man sie öffnet, was man dort sieht und wie man vorgeht. Die
@@ -69,6 +75,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   auf eurem Server und nicht in der Datensicherung; mit einem Konto werden auch seine Einträge gelöscht. Die Erfassung
   je Person ist eingeschaltet und lässt sich dort ausschalten; dann zählt die App nur noch ohne Namen. Bitte
   informiert eure Mitglieder darüber, z. B. in der Datenschutzerklärung.
+- **Großansicht in voller Auflösung**: Galerie und Mitgliedsfotos erscheinen beim Antippen erst wie bisher und werden
+  nach einem Moment durch die Originalauflösung ersetzt (App und Webseite). In der Galerie entsteht sie aus dem
+  Original in Google Drive, wenn jemand das Bild zum ersten Mal öffnet. Mitgliedsfotos lädt die App jetzt bis
+  4096 Pixel hoch; vorhandene Fotos haben die volle Auflösung erst, wenn sie neu hochgeladen werden.
+- **Kalender: Aktualisierung einstellbar**: Unter *Einstellungen → Kalender* (und mit WordPress auch im Backend) legt
+  ihr fest, nach wie vielen Minuten die App neue Termine bei Google holt (1 bis 1440, Standard 15). Kürzere Zeiten
+  zeigen Änderungen wie gelöschte Termine schneller; Speichern und „Kalender testen“ laden sofort neu.
+- **Punktekatalog und Dienstgrade per Ziehen sortieren**: Wie bei Titeln hat jeder Eintrag links einen Griff. Mit
+  Maus, Finger oder Pfeiltasten ändert ihr die Reihenfolge; sie gilt auch für die Vorlagen beim Punkte vergeben. Neue
+  Vorlagen kommen ans Ende. Bei Dienstgraden ersetzt das die Knöpfe „niedriger“ und „höher“; passt ein Zug nicht zu den
+  Punkteschwellen, springt der Dienstgrad zurück und die App sagt, welche nicht passen.
 
 ### Geändert
 
@@ -77,6 +94,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Tagen aktiv waren und wie viele Personen welchen Bereich in den letzten 30 Tagen genutzt haben. Was genau gesendet
   wird, steht wie bisher unter *Einstellungen → Zustand und Updates*; dort lassen sich die Statusmeldungen auch
   ausschalten.
+- **Keine Daten der App in Suchmaschinen**: Alle Antworten der Schnittstelle, auch die öffentliche Mitgliederliste und
+  die Ämter, tragen jetzt den Hinweis `noindex` für Suchmaschinen, wie schon die App-Seite und die Fotos.
+- **Ämter enden mit dem Ausscheiden**: Wer unter *Austritt* als ehemalig eingetragen wird, hat danach keine laufenden
+  Ämter mehr. Sie enden mit dem Jahr des Ausscheidens (ohne Datum mit dem aktuellen Jahr, nie vor ihrem Beginn); teilt
+  die Person ein Amt mit anderen, bleiben die anderen im Amt. Verknüpfte Titel entfallen damit. Das Fenster zeigt vorher,
+  welche Ämter enden. Ein später geändertes Austrittsdatum zieht das Ende nach; „Wieder aufnehmen“ öffnet nichts wieder.
+- **Ämter: Haken „Ehrung“ an der Amtszeit**: Ob eine Amtszeit eine Ehrung ist (Stern und Hinweis „Ehrung“ im
+  Zeitstrahl), entscheidet jetzt ein eigener Haken, bei einem einzelnen Jahr wie bei einem Zeitraum. Ein einzelnes Jahr
+  ohne Haken, etwa ein Königsjahr, erscheint als gewöhnliches Jahr. Bisherige einzelne Jahre behalten ihren Stern. Der
+  Import kennt dafür die 8. Spalte `ehrung` (`ja`, `nein` oder leer); ältere Tabellen mit 7 Spalten ergeben keine
+  Ehrungen mehr.
 - **Verwaltung aufgeräumt: Knopf „Einrichtungen“**: Punktekatalog, Dienstgrade, Titel und Ämter – was man einmal
   anlegt und selten ändert – liegen jetzt hinter dem neuen Knopf „Einrichtungen“ ganz unten vor „Einstellungen“.
   „Listen“ steht jetzt nach „Inventar“. Darf jemand nur einen der vier Bereiche pflegen, steht sein Knopf wie bisher
@@ -100,6 +128,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   eingetragen ist, z. B. „Eintritt 01.04.2005“ (bisher nur das Jahr). Bei den Ehemaligen stehen Eintritt und
   Ausscheiden ebenso mit ganzem Datum, z. B. „01.04.1985 – 03.05.2010“; wer dort nur Jahre eingetragen hat, sieht
   weiter nur die Jahre. Das gilt für alle, die die Angaben sehen dürfen, bei den Ehemaligen also auch ohne Anmeldung.
+- **Geburtstag im selben Format wie Eintritt und Austritt**: Auf *Meins*, in der Verwaltung und auf der Seite einer
+  Person in der Mitgliederliste steht der Geburtstag jetzt als „02.12.1987“ (bisher „2. Dezember 1987“), ohne Jahr als
+  „02.12.“.
 - **Liste der Ehemaligen**: *Filter und Sortierung* ist wie in der Mitgliederliste zunächst eingeklappt und klappt mit
   einem Tipp auf. Ist der Filter nach dem Grund gesetzt, steht am eingeklappten Bereich „aktiv“.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
@@ -123,6 +154,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Dokumente: Überschrift mit Linien links und rechts und einem Pfeil, der beim Aufklappen nach unten zeigt.
 - **`[kompanie_mitglieder]` ohne Anwärter**: Die Galerie auf der Webseite zeigt nur noch Mitglieder. Anwärter und
   andere Personen nur mit dem internen Kalender stehen weiter in der Mitgliederliste der App.
+- **Eintritt ohne „am“**: Unter *Meins* und in den Mitgliedsdetails steht neben „Eintritt“ nur noch das Datum
+  („17.04.2023“) bzw. das Jahr. Der Satz beim Bearbeiten lautet weiter „Eingetreten am …“.
+- **Beförderungen mit Abschnitt „Unter der Schwelle“**: Wer weniger Punkte hat, als sein jetziger Dienstgrad verlangt
+  (Kandidaten zum Degradieren), steht jetzt ganz oben in einem eigenen, rot markierten Abschnitt, zusammen mit der
+  übrigen Übersicht. Der Schalter „Nur unter der Schwelle …“ entfällt. Ist niemand darunter, fehlt der Abschnitt.
 
 ### Behoben
 
@@ -133,6 +169,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Eingabefelder in Umfragen**: Die Felder *Frage* und *Antwortmöglichkeiten* sowie *Ende* beim Anlegen oder
   Bearbeiten einer Umfrage sehen jetzt aus wie alle anderen Eingabefelder der App (bisher graue, eckige Kästen).
+- **Großansicht älterer Mitgliedsfotos auf der Webseite**: In `[kompanie_mitglieder]` öffnete sich bei Fotos, die vor
+  der Fassung in 1024 Pixeln hochgeladen wurden, beim Antippen kein Bild. Jetzt zeigt die Großansicht dann das größte
+  vorhandene Foto (480 Pixel). Wer volle Auflösung will, lädt das Foto neu hoch.
+- **Abstände in der Verwaltung**: Unter *Listen* stößt die Karte „Neue Liste“ nicht mehr an die letzte Liste, und beim
+  Bearbeiten eines Amts hat „Amtszeit eintragen“ (oder das Formular für eine neue Amtszeit) wieder Abstand nach oben
+  und unten. Dasselbe gilt überall, wo eine Formular-Karte auf eine Liste, einen Hinweis oder einen breiten Knopf folgt.
+
+### Sicherheit
+
+- **Keine Metadaten in Bildern**: Gespeicherte Bilder enthalten keine EXIF-Daten mehr, auch keinen GPS-Ort, auch
+  wenn der Server sie nicht verkleinern musste.
 
 ## [0.2.0] – 2026-10-22
 

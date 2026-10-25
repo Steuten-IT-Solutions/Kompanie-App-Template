@@ -22,9 +22,11 @@ export function canSetBirthdays(): boolean {
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
-/** „14. März 1990“ bzw. ohne Jahr „14. März“ */
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** „14.03.1990“ bzw. ohne Jahr „14.03.“ – wie Eintritt und Austritt (TT.MM.JJJJ) */
 export function formatBirthday(b: { day: number; month: number; year?: number | null }): string {
-  return `${b.day}. ${MONTHS[b.month - 1] ?? ''}${b.year ? ` ${b.year}` : ''}`;
+  return `${pad2(b.day)}.${pad2(b.month)}.${b.year ?? ''}`;
 }
 
 /** Eingabe als Text, wie sie in den Feldern steht. */

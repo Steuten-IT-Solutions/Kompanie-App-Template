@@ -31,11 +31,12 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ### Eine Amtszeit eintragen
 1. Tippe auf das Amt. Es öffnet sich mit allen seinen Amtszeiten.
 2. Tippe auf **Amtszeit eintragen**.
-3. Wähle die **Art**: **Zeitraum (von–bis oder bis heute)** oder **Einzelnes Jahr (z. B. eine Ehrung)**.
+3. Wähle die **Art**: **Zeitraum (von–bis oder bis heute)** oder **Einzelnes Jahr**.
 4. Trage **Von (Jahr)** und, wenn die Amtszeit vorbei ist, **Bis** ein. Leer heißt: läuft noch.
 5. Wähle unter **Personen** bei **Profil**, wer die Person ist: **Ohne Profil** (kein Konto, z. B. frühere oder verstorbene Mitglieder; dann trägst du den **Name**n ein), **Mitglied** oder **Ehemaliger** (dann wählst du sie aus). Mit **Weitere Person** trägst du mehrere ein.
 6. Trage, wenn gewünscht, einen **Zusatz** ein, z. B. „Unter …“ oder „Ehrenvorsitz“.
-7. Tippe auf **Speichern**.
+7. Setze den Haken bei **Ehrung**, wenn es eine Ehrung ist (z. B. Ehrenmitglied). Das geht bei beiden Arten. Im Zeitstrahl trägt sie dann einen Stern und den Hinweis **Ehrung**. Ein einzelnes Jahr ohne Haken (z. B. ein Königsjahr) erscheint als gewöhnliches Jahr.
+8. Tippe auf **Speichern**.
 
 ![Amtszeiten eines Amts](bild:aemter-verwalten-amt)
 
@@ -44,14 +45,15 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ### Eine Amtszeit ändern oder beenden
 1. Tippe im Amt bei der Amtszeit auf **Bearbeiten** (oder **Löschen**).
 2. Endet ein Amt, trage bei der Amtszeit das Jahr unter **Bis** ein und tippe auf **Speichern**.
+3. Wird jemand als ehemalig eingetragen, enden seine laufenden Amtszeiten von selbst mit dem Jahr des Ausscheidens (siehe *Ehemalige*). Eine solche Amtszeit kannst du hier wie jede andere ändern; danach zieht eine Änderung des Austrittsdatums sie nicht mehr nach.
 
 ### Ein Amt umbenennen oder löschen
-1. Öffne das Amt und ändere unter **Amt bearbeiten** **Bezeichnung** oder **Gruppe**; tippe auf **Speichern**.
+1. Öffne das Amt und ändere unter **Amt bearbeiten** **Bezeichnung**, **Einzahl** oder **Gruppe**; tippe auf **Speichern**.
 2. **Amt löschen** löscht das Amt mit allen Amtszeiten. **‹ Alle {bereich.offices}** führt zurück.
 
 ### Eine Tabelle importieren
 1. Tippe auf **Tabelle importieren**.
-2. Füge die Tabelle ins Feld **Tabelle** ein oder wähle eine CSV-Datei. Eine Zeile je Amtszeit, Spalten durch Semikolon oder Tabulator getrennt: `gruppe;amt;beginn;ende;art;personen;zusatz`.
+2. Füge die Tabelle ins Feld **Tabelle** ein oder wähle eine CSV-Datei. Eine Zeile je Amtszeit, Spalten durch Semikolon oder Tabulator getrennt: `gruppe;amt;beginn;ende;art;personen;zusatz;ehrung`.
 3. Lass **Personen mit dem Konto verknüpfen, wenn der Name genau zu einem Konto passt** angehakt, wenn die App Namen mit Konten verbinden soll.
 4. Tippe auf **Vorschau**, prüfe die Zeilen und tippe auf **Übernehmen**.
 
@@ -60,14 +62,15 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 - Löschen lässt sich nur eine leere Gruppe.
 - Ehemalige stehen bei **Ehemaliger** zur Auswahl, wenn sie in der Verwaltung als ehemalig eingetragen sind.
 - Wird ein Konto gelöscht, bleiben seine Amtszeiten mit dem Namen stehen; nur die Verbindung zum Konto fällt weg.
-- Import: **ende** ist ein Jahr, „heute“ für eine laufende Amtszeit oder leer für ein einzelnes Jahr. **art** ist meist leer; „zeitraum“ oder „zeitpunkt“ erzwingt die Art. Mehrere **personen** trennst du mit „&“. Eine Kopfzeile ist erlaubt. Gruppen und Ämter findet die App nach ihrem Namen oder legt sie an. Was es genau so schon gibt, überspringt sie; du kannst dieselbe Tabelle also gefahrlos noch einmal einspielen. Zeilen mit Fehler musst du erst korrigieren.
+- Import: **ende** ist ein Jahr, „heute“ für eine laufende Amtszeit oder leer für ein einzelnes Jahr. **art** ist meist leer; „zeitraum“ oder „zeitpunkt“ erzwingt die Art. Mehrere **personen** trennst du mit „&“. **ehrung** ist „ja“ für eine Ehrung, sonst leer oder „nein“. Eine Kopfzeile ist erlaubt. Gruppen und Ämter findet die App nach ihrem Namen oder legt sie an. Was es genau so schon gibt, überspringt sie; du kannst dieselbe Tabelle also gefahrlos noch einmal einspielen. Zeilen mit Fehler musst du erst korrigieren.
+- Import älterer Tabellen mit nur 7 Spalten (ohne **ehrung**): Daraus entstehen keine Ehrungen, auch nicht bei „zeitpunkt“. Früher wurde aus jedem einzelnen Jahr eine Ehrung. Ergänze bei Ehrungen also die Spalte mit „ja“ oder setze den Haken danach von Hand. Eine Zeile, die sich nur im Wert der Ehrung von einer vorhandenen Amtszeit unterscheidet, gilt als schon vorhanden.
 
 ### {bereich.titles} automatisch vergeben
 Nutzt die Kompanie {bereich.titles}, kannst du im Amt unter **{bereich.titles} vergeben** einen Titel bei **Verknüpfter {bereich.titles}** wählen (dafür musst du auch {bereich.titles} verwalten dürfen). Bevor du auf **Verknüpfen** tippst, zeigt die App, wer den Titel bekommt und wer ihn verliert.
-- Wer eine laufende Amtszeit hat (mit Konto, als {rolle.member}), bekommt den Titel automatisch; wer keine laufende mehr hat, verliert ihn. Einzelne Jahre (Ehrungen) vergeben keinen Titel.
+- Wer eine laufende Amtszeit hat (mit Konto, als {rolle.member}), bekommt den Titel automatisch; wer keine laufende mehr hat, verliert ihn. Einzelne Jahre und beendete Amtszeiten vergeben keinen Titel, mit oder ohne Haken **Ehrung**.
 - Von Hand lässt sich ein verknüpfter Titel nicht mehr vergeben oder entfernen. Ein Titel gehört zu höchstens einem Amt.
 - **Verknüpfung lösen** ändert an den vergebenen Titeln nichts; danach vergibst du sie wieder von Hand.
-- Auf der Seite einer Person steht bei ihren Amtszeiten der Name des Titels statt der Bezeichnung des Amts. Benenne das Amt also in der Mehrzahl („Kompaniekönige“) und den Titel in der Einzahl („Kompaniekönig“).
+- Auf der Seite einer Person steht bei ihren Amtszeiten die **Einzahl** des Amts („Kapitän“ statt „Kapitäne“). Ist keine eingetragen, steht dort der Name des verknüpften Titels, sonst die Bezeichnung. Benenne das Amt also in der Mehrzahl („Kompaniekönige“) und trage die Einzahl („Kompaniekönig“) ein oder gib sie dem Titel.
 
 ## Siehe auch
 - [{bereich.offices}](seite:aemter)

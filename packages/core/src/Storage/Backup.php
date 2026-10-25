@@ -108,7 +108,7 @@ final class Backup
                     if (!is_array($row)) {
                         throw new \RuntimeException('Die Sicherung ist beschädigt (Tabelle ' . $t . ').');
                     }
-                    $row = array_intersect_key($row, $columns);
+                    $row = array_intersect_key(self::olderRow($t, $row), $columns);
                     foreach ($row as $v) {
                         if (!is_scalar($v) && $v !== null) {
                             throw new \RuntimeException('Die Sicherung ist beschädigt (Tabelle ' . $t . ').');
@@ -206,6 +206,21 @@ final class Backup
     private static function validFileName(string $name): bool
     {
         return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,150}$/', $name) === 1 && !str_starts_with($name, 'index.') && !str_ends_with($name, '.tmp');
+    }
+
+    /**
+     * Zeile einer älteren Sicherung, der eine später hinzugekommene Spalte fehlt, deren Wert sich aus der Zeile ergibt
+     * (sonst gilt die Vorgabe der Spalte): Amtszeiten ohne honor (vor Issue #180) waren als einzelnes Jahr eine Ehrung.
+     *
+     * @param array<mixed> $row
+     * @return array<mixed>
+     */
+    private static function olderRow(string $table, array $row): array
+    {
+        if ($table === 'office_terms' && !array_key_exists('honor', $row)) {
+            $row['honor'] = ($row['kind'] ?? '') === 'point' ? 1 : 0;
+        }
+        return $row;
     }
 
     /** @return string[] Spaltennamen einer Tabelle */

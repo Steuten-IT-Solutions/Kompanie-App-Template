@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\MemberPhotoService;
 
 /**
  * Shortcodes für die Webseite, in den Farben der Kompanie.
  *
  * [kompanie_termine anzahl="10"]  Kommende öffentliche Termine aus der App.
  * [kompanie_galerie]              Galerie (Jahre → Alben → Bilder).
- * [kompanie_aemter gruppe="…"]    Ämter mit Inhabern und Chronik (optional nur eine Gruppe).
+ * [kompanie_aemter gruppe="…" amt="…"]  Ämter mit Inhabern und Chronik (optional nur eine Gruppe und/oder ein Amt).
  * [kompanie_mitglieder]           Mitglieder (ohne Anwärter) als Bildergalerie (Foto mit Namen, Großansicht beim Antippen).
  */
 final class Shortcodes
@@ -87,7 +88,10 @@ final class Shortcodes
 </style>';
     }
 
-    /** Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). */
+    /**
+     * Großansicht. Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). Erst erscheint das Bild
+     * hinter href, data-ka-original (Originalauflösung) wird nachgeladen und ersetzt es, sobald es ganz da ist.
+     */
     private static function lightbox(): string
     {
         return '<script>
@@ -97,7 +101,8 @@ var g=a.getAttribute("data-ka-lightbox"),links=[].slice.call(document.querySelec
 var box=document.createElement("div");box.className="ka-lb";box.setAttribute("role","dialog");box.setAttribute("aria-modal","true");
 box.innerHTML="<img alt=\"\"><button class=\"ka-lb-close\" aria-label=\"Schließen\">✕</button><button class=\"ka-lb-prev\" aria-label=\"Vorheriges Bild\">‹</button><button class=\"ka-lb-next\" aria-label=\"Nächstes Bild\">›</button><div class=\"ka-lb-count\"></div>";
 var img=box.querySelector("img"),cnt=box.querySelector(".ka-lb-count");
-function show(n){i=(n+links.length)%links.length;img.src=links[i].href;var t=links[i].getAttribute("data-ka-titel");img.alt=t||"";cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;}
+function show(n){i=(n+links.length)%links.length;var l=links[i],o=l.getAttribute("data-ka-original");img.src=l.href;var t=l.getAttribute("data-ka-titel");img.alt=t||"";cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;
+if(o){var big=new Image();big.onload=function(){if(links[i]===l)img.src=o;};big.src=o;}}
 function close(){document.removeEventListener("keydown",key);box.remove();a.focus();}
 function key(ev){if(ev.key==="Escape")close();if(ev.key==="ArrowLeft")show(i-1);if(ev.key==="ArrowRight")show(i+1);}
 box.addEventListener("click",function(ev){if(ev.target===box||ev.target.classList.contains("ka-lb-close"))close();});
@@ -182,8 +187,9 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '<h2>' . esc_html($album['title']) . ' <small>' . esc_html($album['year']) . '</small></h2><div class="ka-grid">';
             foreach ($album['photos'] as $ph) {
                 $html .= sprintf(
-                    '<a class="ka-foto" href="%s" data-ka-lightbox><img src="%s" alt="%s" loading="lazy" width="400" height="400" /></a>',
+                    '<a class="ka-foto" href="%s" data-ka-lightbox data-ka-original="%s"><img src="%s" alt="%s" loading="lazy" width="400" height="400" /></a>',
                     esc_url($ph['large']),
+                    esc_url($ph['original']),
                     esc_url($ph['thumb']),
                     esc_attr($album['title']),
                 );
@@ -219,16 +225,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         // Immer die Sicht eines Gastes: Fotos nur von Personen, die auch in der öffentlichen Mitgliederliste stehen.
         $overview = $app->offices()->overview(null);
         $photos = $app->memberPhotos()->urls(480);
-        // Typografische Anführungszeichen (gruppe=„…“ bzw. ”…”, z. B. aus Word oder dem Editor) erkennt WordPress
-        // nicht als Anführungszeichen: Sie landen im Wert, und ein Leerzeichen teilt ihn (der Rest kommt als
-        // Attribute ohne Namen). Deshalb wieder zusammensetzen und die Zeichen entfernen.
-        $wanted = (string) ($atts['gruppe'] ?? '');
-        foreach ($atts as $k => $v) {
-            if (is_int($k) && $wanted !== '') {
-                $wanted .= ' ' . $v;
-            }
-        }
-        $wanted = trim((string) preg_replace('/^[\s"\'\p{Pi}\p{Pf}„‚]+|[\s"\'\p{Pi}\p{Pf}„‚]+$/u', '', $wanted));
+        $wanted = self::attribute($atts, 'gruppe');
+        $wantedOffice = mb_strtolower(self::attribute($atts, 'amt'));
         $groups = [];
         foreach ($overview['groups'] as $g) {
             if ($wanted === '' || mb_strtolower($g['title']) === mb_strtolower($wanted)) {
@@ -237,6 +235,9 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         }
         $byGroup = [];
         foreach ($overview['offices'] as $o) {
+            if ($wantedOffice !== '' && mb_strtolower($o['title']) !== $wantedOffice) {
+                continue;
+            }
             if ($o['group_id'] === null ? $wanted === '' : isset($groups[$o['group_id']])) {
                 $byGroup[$o['group_id'] ?? 0][] = $o;
             }
@@ -246,7 +247,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             return $html . '<p class="ka">Noch keine Ämter eingetragen.</p>';
         }
         $html .= '<div class="ka">';
-        // Überschrift nur, wenn mehrere Gruppen erscheinen; mit gruppe="…" steht sie meist schon auf der Seite.
+        // Überschrift nur, wenn mehrere Gruppen erscheinen; mit gruppe="…" oder amt="…" steht sie meist schon auf der Seite.
         $headings = count($byGroup) > 1;
         foreach ($byGroup as $groupId => $offices) {
             if ($headings) {
@@ -259,6 +260,30 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '</div>';
         }
         return $html . '</div>';
+    }
+
+    /**
+     * Wert eines Attributs. Typografische Anführungszeichen (gruppe=„…“ bzw. ”…”, z. B. aus Word oder dem Editor) erkennt
+     * WordPress nicht als Anführungszeichen: Sie landen im Wert, und ein Leerzeichen teilt ihn (der Rest kommt als
+     * Attribute ohne Namen direkt dahinter). Deshalb wieder zusammensetzen und die Zeichen entfernen.
+     *
+     * @param array<int|string, mixed> $atts
+     */
+    private static function attribute(array $atts, string $name): string
+    {
+        $value = '';
+        $collecting = false;
+        foreach ($atts as $k => $v) {
+            if ($k === $name) {
+                $value = (string) $v;
+                $collecting = true;
+            } elseif (is_int($k) && $collecting) {
+                $value .= ' ' . $v;
+            } else {
+                $collecting = false;
+            }
+        }
+        return trim((string) preg_replace('/^[\s"\'\p{Pi}\p{Pf}„‚]+|[\s"\'\p{Pi}\p{Pf}„‚]+$/u', '', $value));
     }
 
     /** Ein Amt: laufende Amtszeiten (sonst die letzte) mit Fotos, darunter die übrigen als aufklappbare Chronik. */
@@ -318,21 +343,28 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         if ($members === []) {
             return $html . '<p class="ka">Noch keine Mitglieder eingetragen.</p>';
         }
-        // Die Liste der API hat nur die kleine Vorschau (128 Pixel); für die Galerie die größeren Fassungen.
+        // Die Liste der API hat nur die kleine Vorschau (128 Pixel); für die Galerie die größeren Fassungen. Alte Fotos
+        // ohne 1024er (Issue #109): Großansicht mit der 480er, dann ohne srcset (dieselbe Datei, keine falsche Breite).
         $medium = $app->memberPhotos()->urls(480);
         $large = $app->memberPhotos()->urls(1024);
+        $original = $app->memberPhotos()->urls(MemberPhotoService::MAX_EDGE); // nachgeladen; fehlt bei älteren Fotos (404)
         $placeholder = self::membersPlaceholder($app);
         $html .= self::lightbox() . '<ul class="ka ka-mitglieder">';
         foreach ($members as $m) {
             $name = esc_html($m['name']);
             $caption = '<span class="ka-mitglied-name">' . $name . '</span>';
             if (isset($medium[$m['id']], $large[$m['id']])) {
+                $srcset = $large[$m['id']] !== $medium[$m['id']]
+                    ? sprintf(' srcset="%1$s 320w, %2$s 683w" sizes="(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw"', esc_url($medium[$m['id']]), esc_url($large[$m['id']]))
+                    : '';
                 $html .= sprintf(
-                    '<li class="ka-mitglied"><a href="%1$s" data-ka-lightbox="mitglieder" data-ka-titel="%2$s"><img src="%3$s" srcset="%3$s 320w, %1$s 683w" sizes="(min-width: 977px) 13vw, (min-width: 768px) 33vw, 50vw" alt="%2$s" loading="lazy" width="320" height="480" />%4$s</a></li>',
+                    '<li class="ka-mitglied"><a href="%1$s" data-ka-lightbox="mitglieder" data-ka-original="%5$s" data-ka-titel="%2$s"><img src="%3$s"%6$s alt="%2$s" loading="lazy" width="320" height="480" />%4$s</a></li>',
                     esc_url($large[$m['id']]),
                     esc_attr($m['name']),
                     esc_url($medium[$m['id']]),
                     $caption,
+                    esc_url($original[$m['id']] ?? $large[$m['id']]),
+                    $srcset,
                 );
             } elseif ($placeholder !== '') {
                 // Ohne Großansicht: Das Platzhalterbild zeigt nicht die Person.

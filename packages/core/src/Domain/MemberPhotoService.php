@@ -16,8 +16,8 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  * - Hochladen, ersetzen und entfernen nur, wer Konten anlegen darf (create_users), und nur bei Konten, die er verwalten
  *   darf (MemberService::guardAccount); optional schon beim Anlegen (auch mehrere auf einmal).
  * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
- *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert), in der
- *   Datenbank (MemberPhotoRepository).
+ *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert) und, soweit
+ *   möglich, in Originalauflösung (MAX_EDGE), in der Datenbank (MemberPhotoRepository).
  * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
  *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste und der Ehemaligen (Issue #112,
  *   inDirectory).
@@ -27,8 +27,17 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
 final class MemberPhotoService
 {
     public const MAX_BYTES = 5 * 1024 * 1024;
-    /** Größte Kantenlänge eines hochgeladenen Bilds (schützt den Arbeitsspeicher beim Verkleinern). */
+    /**
+     * Größte Kantenlänge eines hochgeladenen Bilds (schützt den Arbeitsspeicher beim Verkleinern); zugleich die
+     * Fassung in Originalauflösung (s=4096): Die Großansicht lädt sie nach der 1024er nach.
+     */
     public const MAX_EDGE = 4096;
+    public const ORIGINAL_QUALITY = 90;
+    /**
+     * Höchstens so groß wird die Originalauflösung gespeichert (sonst mit geringerer Qualität, notfalls gar nicht):
+     * Base64 rund 4 MB, das nimmt auch eine Datenbank mit knapper Grenze für eine Anweisung (max_allowed_packet) an.
+     */
+    public const ORIGINAL_MAX_BYTES = 3 * 1024 * 1024;
     /** 1024: vergrößerte Ansicht in der App, scharf auch auf Handys mit hoher Pixeldichte. */
     public const SIZES = [128, 480, 1024];
     /** photo_url zeigt auf diese Größe; die App ändert s bei Bedarf. */
@@ -146,6 +155,45 @@ final class MemberPhotoService
         }
         $version = substr(hash('sha256', implode('', $images) . random_bytes(8)), 0, 16);
         $this->repository()->save($userId, $images, $version, $actor->id, $this->app->time()->nowUtc());
+        $original = $this->original($photo);
+        try {
+            $this->repository()->saveOriginal($userId, $original);
+        } catch (\RuntimeException) {
+            // Datenbank nimmt das große Foto nicht an: Die Großansicht bleibt bei 1024 Pixeln.
+            $this->repository()->saveOriginal($userId, null);
+        }
+    }
+
+    /**
+     * Originalauflösung (höchstens MAX_EDGE, nie vergrößert, ohne Metadaten) als JPEG, höchstens ORIGINAL_MAX_BYTES;
+     * null, wenn das nicht geht (dann bleibt es bei 1024 Pixeln).
+     *
+     * @param array{bytes: string, ext: string} $photo
+     */
+    private function original(array $photo): ?string
+    {
+        $tmp = $this->app->files->tempFile();
+        $source = $tmp . '.' . $photo['ext'];
+        $target = $tmp . '-original.jpg';
+        try {
+            if (@file_put_contents($source, $photo['bytes']) === false) {
+                return null;
+            }
+            foreach ([self::ORIGINAL_QUALITY, 82, 74] as $quality) {
+                $this->app->images->resizeToJpeg($source, $target, self::MAX_EDGE, $quality);
+                $jpeg = @file_get_contents($target);
+                if (is_string($jpeg) && $jpeg !== '' && strlen($jpeg) <= self::ORIGINAL_MAX_BYTES) {
+                    return $jpeg;
+                }
+            }
+            return null;
+        } catch (\RuntimeException) {
+            return null;
+        } finally {
+            @unlink($source);
+            @unlink($target);
+            @unlink($tmp);
+        }
     }
 
     /** Adresse des Fotos (128 Pixel) oder null. */
@@ -155,13 +203,21 @@ final class MemberPhotoService
         return $photo === null ? null : $this->app->env->memberPhotoUrl($userId, $photo['version'], self::DEFAULT_SIZE);
     }
 
-    /** @return array<int, string> Benutzer-ID => Adresse (128 Pixel oder eine andere aus SIZES), für Listen mit einer Abfrage */
+    /**
+     * @return array<int, string> Benutzer-ID => Adresse (128 Pixel oder eine andere aus SIZES), für Listen. Fotos von vor
+     *   Datenbankversion 18 haben keine 1024er: Für sie die nächstkleinere Größe (Issue #109). Die Auslieferung bleibt
+     *   genau (s=1024 liefert 1024 Pixel oder 404), so stimmen ETag und srcset.
+     */
     public function urls(int $size = self::DEFAULT_SIZE): array
     {
-        $size = in_array($size, self::SIZES, true) ? $size : self::DEFAULT_SIZE;
+        $size = in_array($size, [...self::SIZES, self::MAX_EDGE], true) ? $size : self::DEFAULT_SIZE;
+        // Nur innerhalb von SIZES ausweichen; die Originalauflösung (MAX_EDGE) lädt die Großansicht nach und bleibt bei 404
+        // bei der Fassung davor.
+        $index = array_search($size, self::SIZES, true);
+        $missing = is_int($index) && $index > 0 ? $this->repository()->withoutImage($size) : [];
         $out = [];
         foreach ($this->repository()->versions() as $userId => $version) {
-            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, $size);
+            $out[$userId] = $this->app->env->memberPhotoUrl($userId, $version, isset($missing[$userId]) ? self::SIZES[$index - 1] : $size);
         }
         return $out;
     }
@@ -228,7 +284,12 @@ final class MemberPhotoService
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;
         $photo = $this->repository()->find($userId);
-        $body = $photo !== null && in_array($size, self::SIZES, true) ? $this->repository()->image($userId, $size) : null;
+        // Originalauflösung (MAX_EDGE) fehlt bei älteren Fotos: 404, die Großansicht zeigt dann die 1024er weiter.
+        $body = $photo === null ? null : match (true) {
+            in_array($size, self::SIZES, true) => $this->repository()->image($userId, $size),
+            $size === self::MAX_EDGE => $this->repository()->original($userId),
+            default => null,
+        };
         if ($photo === null || $body === null) {
             return $deny(404);
         }

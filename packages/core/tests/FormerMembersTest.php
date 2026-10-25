@@ -48,7 +48,7 @@ final class FormerMembersTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
         $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'joined_on' => '03.05.1993', 'left_on' => '2016-06-30']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['reason' => 'left', 'joined_on' => '1993-05-03', 'founder' => false, 'left_on' => '2016-06-30', 'previous_level' => Roles::MEMBER], $res->data);
+        $this->assertSame(['reason' => 'left', 'joined_on' => '1993-05-03', 'founder' => false, 'left_on' => '2016-06-30', 'previous_level' => Roles::MEMBER, 'offices_ended' => 0], $res->data);
 
         $this->assertSame(Roles::GUEST, $this->users->find($this->m)?->role, 'keine Rechte mehr');
         $this->assertNotContains($this->m, $this->memberIds());
@@ -266,5 +266,155 @@ final class FormerMembersTest extends TestCase
         $this->assertSame(['deceased', '2014-04-07', true], [$res->data['rows'][0]['reason'], $res->data['rows'][0]['left_on'], $res->data['rows'][0]['founder']]);
         $this->assertSame(400, $this->call('POST', '/members/former/import', ['csv' => ' '])->status);
         $this->assertSame(400, $this->call('POST', '/members/former/import', ['csv' => str_repeat("A;B\n", 501)])->status, 'zu viele Zeilen');
+    }
+    // ---- Ämter enden beim Ausscheiden (Issue #181) ----
+
+    /**
+     * @param list<array<string, mixed>> $holders
+     * @param array<string, mixed> $extra kind, end_year, note, honor
+     */
+    private function officeTerm(string $office, int $start, array $holders, array $extra = []): int
+    {
+        $offices = $this->app->offices();
+        $id = null;
+        foreach ($offices->repository()->offices() as $o) {
+            if ($o['title'] === $office) {
+                $id = $o['id'];
+            }
+        }
+        $id ??= (int) $offices->createOffice(['title' => $office])['id'];
+        return (int) $offices->createTerm($id, $extra + ['start_year' => $start, 'holders' => $holders])['id'];
+    }
+
+    /** @return array<string, mixed> Amtszeit mit Inhabern (Namen) */
+    private function officeTermState(int $id): array
+    {
+        $repo = $this->app->offices()->repository();
+        $t = $repo->findTerm($id);
+        $this->assertNotNull($t);
+        return ['end_year' => $t['end_year'], 'holders' => array_column($repo->holdersOf($id), 'name')];
+    }
+
+    public function testMarkEndsRunningOfficesWithTheYearOfLeaving(): void
+    {
+        $flag = $this->officeTerm('Fahne', 2006, [['user_id' => $this->m]]);
+        $honor = $this->officeTerm('Ehrenspieß', 2025, [['user_id' => $this->m]], ['honor' => true]);
+        $preview = $this->call('GET', "/members/{$this->m}/former/offices", []);
+        $this->assertSame(200, $preview->status);
+        $preview = $this->app->api()->handle(new Request('GET', "/members/{$this->m}/former/offices", ['left_on' => '15.03.2026']));
+        $this->assertSame(['end_year' => 2026, 'terms' => [
+            ['office' => 'Fahne', 'start_year' => 2006, 'end_year' => 2026, 'clamped' => false, 'shared' => false],
+            ['office' => 'Ehrenspieß', 'start_year' => 2025, 'end_year' => 2026, 'clamped' => false, 'shared' => false],
+        ]], $preview->data, 'Vorschau in der Reihenfolge der Ämter; laufende Ehrung endet ebenso');
+        $this->assertNull($this->officeTermState($flag)['end_year'], 'Vorschau ändert nichts');
+
+        $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2026-03-15']);
+        $this->assertSame(2, $res->data['offices_ended']);
+        $this->assertSame([2026, 2026], [$this->officeTermState($flag)['end_year'], $this->officeTermState($honor)['end_year']]);
+    }
+
+    public function testEmptyLeavingDateEndsWithThisYearAndNeverBeforeTheStart(): void
+    {
+        $now = $this->officeTerm('Kasse', 2020, [['user_id' => $this->m]]);
+        $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'deceased']);
+        $this->assertSame(1, $res->data['offices_ended']);
+        $this->assertSame(2026, $this->officeTermState($now)['end_year'], 'ohne Datum: dieses Jahr (Uhr: 2026)');
+
+        $other = $this->users->add('zweites', Roles::MEMBER);
+        $late = $this->officeTerm('Vorsitz', 2024, [['user_id' => $other]]);
+        $preview = $this->app->api()->handle(new Request('GET', "/members/$other/former/offices", ['left_on' => '2019']))->data;
+        $this->assertSame([2024, true], [$preview['terms'][0]['end_year'], $preview['terms'][0]['clamped']], 'Austritt vor dem Beginn: Ende = Beginn, mit Hinweis');
+        $this->call('PUT', "/members/$other/former", ['reason' => 'left', 'left_on' => '2019']);
+        $this->assertSame(2024, $this->officeTermState($late)['end_year']);
+    }
+
+    public function testSharedTermIsSplitAndOthersKeepRunning(): void
+    {
+        $other = $this->users->add('zweites', Roles::MEMBER);
+        $shared = $this->officeTerm('Minister', 2022, [['name' => 'Hans Hof'], ['user_id' => $this->m], ['user_id' => $other]], ['note' => 'Unter Ida Igel', 'honor' => true]);
+        $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2025']);
+
+        $this->assertSame(['end_year' => null, 'holders' => ['Hans Hof', 'Zweites']], $this->officeTermState($shared), 'die anderen laufen weiter');
+        $repo = $this->app->offices()->repository();
+        $mine = array_values(array_filter($repo->terms(), static fn (array $t): bool => $t['id'] !== $shared));
+        $this->assertCount(1, $mine);
+        $this->assertSame(['period', 2022, 2025, 'Unter Ida Igel', true, $this->m], [$mine[0]['kind'], $mine[0]['start_year'], $mine[0]['end_year'], $mine[0]['note'], $mine[0]['honor'], $mine[0]['ended_for']]);
+        $holders = $repo->holdersOf($mine[0]['id']);
+        $this->assertSame([[$this->m, 'Mitglied']], array_map(static fn (array $h): array => [$h['user_id'], $h['name']], $holders), 'mit Konto und gespeichertem Namen');
+    }
+
+    public function testPointsAndEndedTermsStayUnchanged(): void
+    {
+        $point = $this->officeTerm('Ehrenmitglieder', 2010, [['user_id' => $this->m]], ['kind' => 'point', 'honor' => true]);
+        $ended = $this->officeTerm('Kasse', 2000, [['user_id' => $this->m]], ['end_year' => 2005]);
+        $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2026']);
+        $this->assertSame(0, $res->data['offices_ended']);
+        $this->assertNull($this->officeTermState($point)['end_year']);
+        $this->assertSame(2005, $this->officeTermState($ended)['end_year']);
+        $this->assertSame(2, count($this->app->offices()->repository()->terms()), 'nichts gelöscht, nichts geteilt');
+    }
+
+    public function testLinkedTitleIsRemovedOtherTitlesStay(): void
+    {
+        $titles = $this->app->titles();
+        $linked = (int) $titles->create(['title' => 'Kapitän'])['id'];
+        $plain = (int) $titles->create(['title' => 'Ehrenkapitän'])['id'];
+        $this->officeTerm('Kapitäne', 2020, [['user_id' => $this->m]]);
+        $office = $this->app->offices()->repository()->offices()[0]['id'];
+        $this->app->offices()->updateOffice($office, ['title_id' => $linked]);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/titles", ['title_ids' => [$linked, $plain]])->status);
+        $this->assertEqualsCanonicalizing([$linked, $plain], $titles->repository()->assignments()[$this->m] ?? []);
+
+        $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2026']);
+        $this->assertSame([$plain], array_values($titles->repository()->assignments()[$this->m] ?? []), 'verknüpfter Titel entfällt, der andere bleibt');
+    }
+
+    public function testChangingTheLeavingDateMovesOnlyAutomaticEnds(): void
+    {
+        $auto = $this->officeTerm('Fahne', 2006, [['user_id' => $this->m]]);
+        $manual = $this->officeTerm('Kasse', 2010, [['user_id' => $this->m]]);
+        $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2026']);
+        // Von Hand korrigiert: gehört danach der Pflege, ein neues Datum ändert sie nicht mehr.
+        $this->app->offices()->updateTerm($manual, ['end_year' => 2024]);
+
+        $this->call('PATCH', "/members/{$this->m}/former", ['left_on' => '2025']);
+        $this->assertSame([2025, 2024], [$this->officeTermState($auto)['end_year'], $this->officeTermState($manual)['end_year']]);
+        $this->call('PATCH', "/members/{$this->m}/former", ['reason' => 'other']);
+        $this->assertSame(2025, $this->officeTermState($auto)['end_year'], 'gleiches Datum: nichts');
+        $this->call('PATCH', "/members/{$this->m}/former", ['left_on' => '1990']);
+        $this->assertSame(2006, $this->officeTermState($auto)['end_year'], 'nie vor dem Beginn');
+    }
+
+    public function testReactivateDoesNotReopenAndReleasesTheEnds(): void
+    {
+        $term = $this->officeTerm('Fahne', 2006, [['user_id' => $this->m]]);
+        $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2025']);
+        $this->assertSame(200, $this->call('DELETE', "/members/{$this->m}/former")->status);
+        $t = $this->app->offices()->repository()->findTerm($term);
+        $this->assertNotNull($t);
+        $this->assertSame([2025, null], [$t['end_year'], $t['ended_for']], 'bleibt beendet, gehört wieder der Pflege');
+    }
+
+    public function testDeletingTheAccountReleasesTheEnds(): void
+    {
+        $term = $this->officeTerm('Fahne', 2006, [['user_id' => $this->m]]);
+        $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'left_on' => '2025']);
+        $this->assertSame(200, $this->call('DELETE', "/members/{$this->m}")->status);
+        $t = $this->app->offices()->repository()->findTerm($term);
+        $this->assertNotNull($t);
+        $this->assertSame([2025, null], [$t['end_year'], $t['ended_for']]);
+    }
+
+    public function testMarkIsOneTransaction(): void
+    {
+        $this->officeTerm('Fahne', 2006, [['user_id' => $this->m]]);
+        // Schreiben der Amtszeit scheitert (Tabelle weg): Dann bleibt auch der Eintrag als ehemalig aus.
+        $this->app->db->execute('ALTER TABLE {office_terms} RENAME TO {office_terms_weg}');
+        try {
+            $this->assertGreaterThanOrEqual(500, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left'])->status);
+        } finally {
+            $this->app->db->execute('ALTER TABLE {office_terms_weg} RENAME TO {office_terms}');
+        }
+        $this->assertNull($this->app->formerMembers()->repository()->find($this->m), 'kein halber Zustand');
     }
 }

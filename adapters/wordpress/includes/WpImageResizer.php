@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\Domain\JpegMetadata;
 use KompanieApp\Core\Port\ImageResizer;
 
 /** Bildgrößen über den Bildeditor von WordPress (Imagick oder GD). */
@@ -38,6 +39,8 @@ final class WpImageResizer implements ImageResizer
         if (($saved['path'] ?? $targetFile) !== $targetFile && is_file($saved['path'])) {
             rename($saved['path'], $targetFile);
         }
+        // Imagick behält EXIF (auch GPS), wenn resize() nichts zu verkleinern hatte.
+        JpegMetadata::stripFile($targetFile);
         $size = $editor->get_size();
         return ['width' => (int) $size['width'], 'height' => (int) $size['height']];
     }

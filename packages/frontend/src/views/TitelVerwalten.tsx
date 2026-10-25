@@ -1,10 +1,32 @@
 import { useState, type FormEvent } from 'react';
-import { api, type Title, type TitleRef } from '../api';
+import { api, can, type Title, type TitleRef } from '../api';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
+import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 const sec = brand.labels.sections;
+
+/**
+ * Hinweis bei einem Titel, den ein Amt vergibt (Issue #112): Von Hand lässt er sich nicht vergeben oder entfernen. Wer
+ * Ämter pflegt, kommt mit dem Link direkt zum Amt.
+ */
+function OfficeHint({ office }: { office: { id: number; title: string } }) {
+  const name = `das Amt „${office.title}“`;
+  return (
+    <span className="title-office-hint">
+      Wird über{' '}
+      {can('manage_offices') ? (
+        <button type="button" className="link-button" onClick={() => navigate(`verwaltung/aemter/${office.id}`)}>
+          {name}
+        </button>
+      ) : (
+        name
+      )}{' '}
+      vergeben
+    </span>
+  );
+}
 
 /**
  * Verwaltung → Titel: anlegen, umbenennen, Reihenfolge der Anzeige, deaktivieren, löschen.
@@ -107,7 +129,15 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
                     {t.title}
                     {!t.active && <span className="badge badge-level-guest">inaktiv</span>}
                   </div>
-                  <div className="row-sub">{t.assigned ? `${t.assigned}× vergeben` : 'nicht vergeben'}</div>
+                  <div className="row-sub">
+                    {t.assigned ? `${t.assigned}× vergeben` : 'nicht vergeben'}
+                    {t.office && (
+                      <>
+                        {' · '}
+                        <OfficeHint office={t.office} />
+                      </>
+                    )}
+                  </div>
                   <div className="row-actions">
                     <button
                       className="btn btn-small btn-secondary"
@@ -213,17 +243,25 @@ export function MemberTitles({
       ) : (
         <form className="form" onSubmit={save}>
           {options.map((t) => (
-            <label key={t.id} className="toggle">
-              <input
-                type="checkbox"
-                checked={selected.includes(t.id)}
-                onChange={(e) => setSelected(e.target.checked ? [...selected, t.id] : selected.filter((s) => s !== t.id))}
-              />
-              <span>
-                {t.title}
-                {!t.active && <span className="muted small"> (deaktiviert – nach dem Abwählen nicht mehr vergebbar)</span>}
-              </span>
-            </label>
+            <div key={t.id}>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(t.id)}
+                  disabled={!!t.office}
+                  onChange={(e) => setSelected(e.target.checked ? [...selected, t.id] : selected.filter((s) => s !== t.id))}
+                />
+                <span>
+                  {t.title}
+                  {!t.active && <span className="muted small"> (deaktiviert – nach dem Abwählen nicht mehr vergebbar)</span>}
+                </span>
+              </label>
+              {t.office && (
+                <p className="muted small title-office-note">
+                  <OfficeHint office={t.office} />: Ihn bekommt, wer dort eine laufende Amtszeit hat.
+                </p>
+              )}
+            </div>
           ))}
           {formError && (
             <p className="form-error" role="alert">

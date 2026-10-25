@@ -18,6 +18,9 @@ use KompanieApp\Core\Storage\FormerMemberRepository;
  *   Rolle Gast (Port\UserDirectory::deactivate): keine Rechte, nicht in Listen, Umfragen, Geburtstagen oder
  *   Benachrichtigungen; Standalone sperrt die Anmeldung. Zusatzrollen und Ausnahmen bei den Rechten fallen weg, ihr
  *   Stand wird gemerkt (restore), damit „Wieder aufnehmen“ ihn herstellt.
+ * - Laufende Ämter enden mit dem Ausscheiden (Issue #181, OfficeService::endFor), im selben Vorgang wie das Eintragen:
+ *   Endjahr ist das Jahr des Austritts (leer: dieses Jahr), nie vor dem Beginn. Ändert sich das Austrittsdatum, zieht
+ *   die App das Ende nach, solange niemand die Amtszeit von Hand geändert hat; „Wieder aufnehmen“ öffnet nichts wieder.
  * - Verwalten darf, wer Konten anlegt (create_users), mit denselben Grenzen wie beim Löschen (MemberService::guardAccount,
  *   bei Ehemaligen mit ihrer Grundrolle von vorher).
  * - Import (Ersterfassung, z. B. aus einer Chronik): CSV vorname;nachname;eintritt;ausgeschieden;grund. Für jede Person
@@ -151,9 +154,34 @@ final class FormerMemberService
      * Person als ehemalig eintragen: Konto stilllegen, Daten behalten.
      *
      * @param array<string, mixed> $in reason, joined_on, founder, left_on
-     * @return array<string, mixed> wie of()
+     * @return array<string, mixed> wie of(), dazu offices_ended (Zahl der beendeten Amtszeiten)
      */
     public function mark(User $actor, int $id, array $in): array
+    {
+        $target = $this->markable($actor, $id);
+        $data = self::valid($in, $this->app->time()->today());
+        $ended = $this->app->db->transaction(function () use ($actor, $target, $data): int {
+            $this->deactivate($actor, $target, $data);
+            return count($this->app->offices()->endFor($target->id, $this->leftYear($data['left_on']), true));
+        });
+        return ($this->of($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.')) + ['offices_ended' => $ended];
+    }
+
+    /**
+     * Vorschau für „Als ehemalig eintragen“: welche laufenden Ämter mit dem Ausscheiden enden, mit welchem Jahr.
+     *
+     * @return array{end_year: int, terms: list<array{office: string, start_year: int, end_year: int, clamped: bool, shared: bool}>}
+     */
+    public function officesPreview(User $actor, int $id, mixed $leftOn): array
+    {
+        $target = $this->markable($actor, $id);
+        $year = $this->leftYear(self::date(is_string($leftOn) ? $leftOn : '', 'Ausgeschieden', $this->app->time()->today()));
+        $terms = array_map(static fn (array $t): array => array_intersect_key($t, array_flip(['office', 'start_year', 'end_year', 'clamped', 'shared'])), $this->app->offices()->endFor($target->id, $year, false));
+        return ['end_year' => $year, 'terms' => $terms];
+    }
+
+    /** Prüft, ob $actor die Person als ehemalig eintragen darf. */
+    private function markable(User $actor, int $id): User
     {
         if ($actor->id === $id) {
             throw ApiError::invalid('Das eigene Konto kannst du nicht als ehemalig eintragen.');
@@ -169,8 +197,13 @@ final class FormerMemberService
         if ($target->isAdmin() && $this->app->users->countAdmins() <= 1) {
             throw ApiError::invalid('Der letzte Admin kann nicht als ehemalig eingetragen werden.');
         }
-        $this->deactivate($actor, $target, self::valid($in, $this->app->time()->today()));
-        return $this->of($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        return $target;
+    }
+
+    /** Jahr, mit dem die Ämter enden: aus dem Austritt (JJJJ-MM-TT oder JJJJ), sonst dieses Jahr. */
+    private function leftYear(string $leftOn): int
+    {
+        return $leftOn !== '' ? (int) substr($leftOn, 0, 4) : (int) $this->app->time()->today()->format('Y');
     }
 
     /**
@@ -183,7 +216,13 @@ final class FormerMemberService
     {
         [$target, $row] = $this->former($actor, $id, 'Die Angaben dieser Person darfst du nicht ändern.');
         $data = self::valid($in + ['reason' => $row['reason'], 'joined_on' => $row['joined_on'], 'founder' => $row['founder'], 'left_on' => $row['left_on']], $this->app->time()->today());
-        $this->repository()->update($target->id, $data['reason'], $data['joined_on'], $data['founder'], $data['left_on'], $this->app->time()->nowUtc());
+        $this->app->db->transaction(function () use ($target, $data, $row): void {
+            $this->repository()->update($target->id, $data['reason'], $data['joined_on'], $data['founder'], $data['left_on'], $this->app->time()->nowUtc());
+            // Neues Austrittsjahr: automatisch beendete Ämter enden mit ihm (von Hand geänderte nicht, OfficeService::moveEndFor).
+            if ($data['left_on'] !== $row['left_on']) {
+                $this->app->offices()->moveEndFor($target->id, $this->leftYear($data['left_on']));
+            }
+        });
         $this->all = null;
         return $this->of($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
     }
@@ -225,6 +264,7 @@ final class FormerMemberService
             $roles->restoreOverrides($id, $row['restore']['overrides'] ?? null, $level);
         }
         $this->repository()->delete($id);
+        $this->app->offices()->releaseEndsFor($id);
         $this->all = null;
         $after = $this->app->users->find($id) ?? $target;
         return ['id' => $id, 'level' => $after->role, 'extra_roles' => $roles->extraRolesOf($after)];

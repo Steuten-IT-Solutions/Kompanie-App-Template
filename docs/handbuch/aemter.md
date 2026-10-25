@@ -24,14 +24,20 @@ Tippe unten in der Leiste auf **{bereich.directory}** und oben auf **{bereich.of
 
 ![Aufgeklappte Chronik eines Amts](bild:aemter-chronik)
 
+### Alle Ämter nach Jahren sehen (breiter Bildschirm)
+1. Tippe oben auf **Jahre**. Den Schalter **Chronik | Jahre** gibt es nur auf breiten Bildschirmen, etwa am Computer oder Tablet quer.
+2. Jedes Amt hat eine Spalte, nach Gruppen geordnet; jede Zeile ist ein Jahr, das neueste oben. Ein Balken zeigt, wer das Amt in diesen Jahren hatte. Wer es gleichzeitig mit anderen hatte (z. B. Fahne), steht daneben.
+3. Laufende Amtszeiten sind kräftiger gefärbt, Ehrungen tragen einen Stern. Zeigst du mit der Maus auf einen Balken, stehen dort Jahre, Personen und Zusatz.
+4. Gibt es viele Ämter, schiebst du die Übersicht seitlich. **Chronik** führt zurück zu den Karten. Die App merkt sich deine Wahl.
+
 ### Die Ämter einer Person sehen
 1. Tippe in der Chronik oder unter **Im Amt** auf ihren Namen.
 2. Es öffnet sich ihre Seite mit allen ihren Ämtern als Zeitstrahl.
 
 ## Gut zu wissen
-- Die neueste Amtszeit steht oben. Bei langen Listen gliedern Marken wie **2000er** die Jahrzehnte. Ein einzelnes Jahr, z. B. eine Ehrung, trägt einen Stern und den Hinweis **Ehrung**.
+- Die neueste Amtszeit steht oben. Bei langen Listen gliedern Marken wie **2000er** die Jahrzehnte. Eine Ehrung trägt einen Stern und den Hinweis **Ehrung**. Ein einzelnes Jahr ohne Ehrung, z. B. ein Königsjahr, steht wie jede andere Amtszeit da.
 - Antippen lassen sich nur Personen, die in der Mitgliederliste stehen. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
 - Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
 - Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins**.
 
-> **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe.
+> **Für Fortgeschrittene:** Mit WordPress zeigt der Shortcode `[kompanie_aemter]` die Ämter auch auf der Webseite, `[kompanie_aemter gruppe="…"]` nur die Ämter einer Gruppe und `[kompanie_aemter amt="…"]` nur ein Amt (beides lässt sich kombinieren, z. B. wenn es ein Amt in zwei Gruppen gibt).

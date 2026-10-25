@@ -1026,6 +1026,38 @@ final class Migrations
                     "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
                 ],
             ],
+            // Fotos der Mitglieder zusätzlich in Originalauflösung (höchstens MemberPhotoService::MAX_EDGE) für die
+            // Großansicht, die sie nach der 1024er nachlädt. Ohne Vorgabe (NULL): Fotos von vorher haben sie erst nach
+            // erneutem Hochladen, ebenso wenn die Datenbank das große Foto nicht annimmt (max_allowed_packet).
+            24 => [
+                'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN original mediumtext DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN original TEXT DEFAULT NULL'],
+            ],
+            // Ämter (Issue #180): Haken „Ehrung“ an der Amtszeit, bei jeder Art. Bisher galt jedes einzelne Jahr (point) als
+            // Ehrung; diese Einträge bekommen den Haken, damit der Zeitstrahl aussieht wie vorher.
+            25 => [
+                'mysql' => [
+                    'ALTER TABLE {office_terms} ADD COLUMN honor tinyint(1) NOT NULL DEFAULT 0',
+                    "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {office_terms} ADD COLUMN honor INTEGER NOT NULL DEFAULT 0',
+                    "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
+                ],
+            ],
+            // Ämter enden beim Ausscheiden (Issue #181): ended_for ist das Konto, für das die App das Ende beim Eintragen als
+            // ehemalig gesetzt hat. Solange niemand die Amtszeit von Hand ändert, zieht eine Änderung des Austrittsdatums das
+            // Ende nach.
+            26 => [
+                'mysql' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for bigint(20) unsigned DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for INTEGER DEFAULT NULL'],
+            ],
+            // Ämter (Issue #112): eigene Einzahl („Kapitän“ zu „Kapitäne“) für den Zeitstrahl einer Person; leer: wie bisher
+            // der Name des verknüpften Titels bzw. die Bezeichnung.
+            27 => [
+                'mysql' => ["ALTER TABLE {offices} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {offices} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
+            ],
             // Nutzungsauswertung (Issue #175, Domain\ActivityService). Keine Inhalte, keine IP-Adressen, kein User-Agent; nicht
             // in Sicherungen. Zeiten als Unix-Zeit.
             // - activity: wer wann welchen Bereich wie genutzt hat (nur mit Erfassung je Person, 90 Tage, mit dem Konto gelöscht);
@@ -1034,7 +1066,7 @@ final class Migrations
             //   Nutzer und Personen je Bereich;
             // - activity_daily: Tageszahlen ohne Personenbezug je Bereich (Personen, Aktionen); Tag in Ortszeit JJJJ-MM-TT.
             // In beiden steht area '_all' für irgendeinen Bereich.
-            24 => [
+            28 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {activity} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

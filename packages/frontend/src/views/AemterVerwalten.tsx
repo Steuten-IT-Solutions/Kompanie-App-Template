@@ -339,6 +339,7 @@ function usePeople() {
 function OfficeEditor({ office, groups, onToast, reload }: { office: Office; groups: OfficeGroup[]; onToast: Toast; reload: () => void }) {
   const { busy, error, run } = useRunner(onToast, reload);
   const [title, setTitle] = useState(office.title);
+  const [singular, setSingular] = useState(office.singular ?? '');
   const [group, setGroup] = useState(office.group_id === null ? '' : String(office.group_id));
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
@@ -371,6 +372,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
               <strong>{termYears(t)}</strong>
               <span>{t.holders.map((h) => h.name).join(', ')}</span>
               {t.note && <span className="muted small">{t.note}</span>}
+              {t.honor && <span className="badge timeline-honor">Ehrung</span>}
               {t.current && <span className="badge timeline-now">aktuell</span>}
               <span className="row-actions">
                 <button className="btn btn-small btn-secondary" disabled={busy || editing !== null} onClick={() => setEditing(t.id)}>
@@ -410,7 +412,12 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
         onSubmit={async (e) => {
           e.preventDefault();
           await run(
-            () => api.updateOffice(office.id, { title: title.trim(), group_id: group === '' ? null : Number(group) }),
+            () =>
+              api.updateOffice(office.id, {
+                title: title.trim(),
+                singular: singular.trim(),
+                group_id: group === '' ? null : Number(group),
+              }),
             'Gespeichert',
           );
         }}
@@ -419,6 +426,16 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
         <label className="field">
           <span>Bezeichnung</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </label>
+        <label className="field">
+          <span>Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)</span>
+          <input
+            type="text"
+            maxLength={60}
+            value={singular}
+            placeholder={office.linked_title ?? ''}
+            onChange={(e) => setSingular(e.target.value)}
+          />
         </label>
         <label className="field">
           <span>Gruppe</span>
@@ -431,6 +448,9 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             <option value="">Ohne Gruppe</option>
           </select>
         </label>
+        <p className="muted small">
+          Die Einzahl steht auf der Seite einer Person bei ihren Amtszeiten. Leer: der Name des verknüpften Titels, sonst die Bezeichnung.
+        </p>
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
             Speichern
@@ -559,6 +579,7 @@ function TermForm({
   const [start, setStart] = useState(initial ? String(initial.start_year) : '');
   const [end, setEnd] = useState(initial?.end_year != null ? String(initial.end_year) : '');
   const [note, setNote] = useState(initial?.note ?? '');
+  const [honor, setHonor] = useState(initial?.honor ?? false);
   const [holders, setHolders] = useState<HolderRow[]>(
     initial?.holders.map((h) => ({ user: h.user_id ? String(h.user_id) : '', name: h.name })) ?? [{ user: '', name: '' }],
   );
@@ -586,6 +607,7 @@ function TermForm({
           start_year: Number(start),
           end_year: kind === 'period' && end.trim() !== '' ? Number(end) : null,
           note: note.trim(),
+          honor,
           holders: holders.map((h) => (kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim() })),
         });
       }}
@@ -595,7 +617,7 @@ function TermForm({
         <span>Art</span>
         <select value={kind} onChange={(e) => setKind(e.target.value as OfficeTermKind)}>
           <option value="period">Zeitraum (von–bis oder bis heute)</option>
-          <option value="point">Einzelnes Jahr (z. B. eine Ehrung)</option>
+          <option value="point">Einzelnes Jahr</option>
         </select>
       </label>
       <div className="field-row">
@@ -678,6 +700,10 @@ function TermForm({
         <span>Zusatz (optional, z. B. „Unter …“ oder „Ehrenvorsitz“)</span>
         <input type="text" maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
+      <label className="toggle">
+        <input type="checkbox" checked={honor} onChange={(e) => setHonor(e.target.checked)} />
+        <span>Ehrung (im Zeitstrahl mit Stern, z. B. Ehrenmitglied)</span>
+      </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
           Speichern
@@ -691,7 +717,7 @@ function TermForm({
 }
 
 const IMPORT_EXAMPLE =
-  'gruppe;amt;beginn;ende;art;personen;zusatz\nVerein;Vorsitz;2020;heute;;Erika Muster;\nVerein;Ehrenmitglieder;2008;;;Max Beispiel;';
+  'gruppe;amt;beginn;ende;art;personen;zusatz;ehrung\nVerein;Vorsitz;2020;heute;;Erika Muster;;\nVerein;Ehrenmitglieder;2008;;;Max Beispiel;;ja';
 
 /**
  * Tabelle importieren (Ersterfassung): einfügen oder Datei wählen, Vorschau mit Fehlern je Zeile, dann übernehmen.
@@ -731,8 +757,9 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
       <h2 className="member-name">Tabelle importieren</h2>
       <p className="muted small">
         Eine Zeile je Amtszeit, Spalten getrennt durch Semikolon (oder Tabulator, z. B. aus einer Tabellenkalkulation kopiert):{' '}
-        <code>gruppe;amt;beginn;ende;art;personen;zusatz</code>. Ende „heute“ heißt: läuft noch; Ende leer: ein einzelnes Jahr. Art ist
-        meist leer („zeitraum“ oder „zeitpunkt“ erzwingt sie). Mehrere Personen mit „&amp;“ trennen.
+        <code>gruppe;amt;beginn;ende;art;personen;zusatz;ehrung</code>. Ende „heute“ heißt: läuft noch; Ende leer: ein einzelnes Jahr. Art
+        ist meist leer („zeitraum“ oder „zeitpunkt“ erzwingt sie). Mehrere Personen mit „&amp;“ trennen. Ehrung „ja“ markiert die Zeile als
+        Ehrung; leer oder „nein“: keine Ehrung. Ohne diese Spalte (7 Spalten) entstehen keine Ehrungen, auch nicht bei „zeitpunkt“.
       </p>
       <label className="field">
         <span>Tabelle</span>
@@ -791,6 +818,7 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
                     {r.office}: {r.kind && termYears({ kind: r.kind, start_year: r.start_year!, end_year: r.end_year ?? null })} ·{' '}
                     {(r.holders ?? []).map((h) => h.name + (h.user_id ? ' (Konto)' : '')).join(', ')}
                     {r.note ? ` · ${r.note}` : ''}
+                    {r.honor ? ' · Ehrung' : ''}
                     {r.duplicate ? ' · gibt es schon' : ''}
                   </>
                 )}

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { api, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
+import { formatBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { formatYearOrDate, groupCounts } from '../format';
 import { MemberAvatar, preloadAvatar, ZoomableAvatar } from '../memberPhoto';
@@ -80,18 +81,13 @@ export function formerYears(
 export const joinedText = (m: { join_year?: number | null; join_date?: string | null }): string =>
   m.join_date ? formatYearOrDate(m.join_date) : m.join_year ? String(m.join_year) : '';
 
-const dayMonth = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' });
-const fullDate = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
-
 /**
- * Geburtstag und Eintritt auf der Seite einer Person, soweit sie sie zeigt: „Geburtstag 12. März 1988 (38 Jahre) ·
- * Eintritt 01.04.2005“ (bzw. „Eintritt 2005“ mit nur dem Jahr); ohne „Alter anzeigen“ nur Tag und Monat. Leer ohne Angaben.
+ * Geburtstag und Eintritt auf der Seite einer Person, soweit sie sie zeigt: „Geburtstag 12.03.1988 (38 Jahre) ·
+ * Eintritt 01.04.2005“ (bzw. „Eintritt 2005“ mit nur dem Jahr); ohne „Alter anzeigen“ nur Tag und Monat („12.03.“). Leer ohne Angaben.
  */
 export function personFacts(m: { birthday?: DirectoryBirthday | null; join_year?: number | null; join_date?: string | null }): string {
   const b = m.birthday;
-  // Ohne Jahr: 2000 als Maßstab (Schaltjahr, damit der 29.02. bleibt)
-  const date = b && (b.year ? fullDate : dayMonth).format(new Date(b.year ?? 2000, b.month - 1, b.day));
-  const birthday = b ? `Geburtstag ${date}${b.age !== null ? ` (${b.age} Jahre)` : ''}` : '';
+  const birthday = b ? `Geburtstag ${formatBirthday(b)}${b.age !== null ? ` (${b.age} Jahre)` : ''}` : '';
   const joined = joinedText(m);
   return [birthday, joined ? `Eintritt ${joined}` : ''].filter(Boolean).join(' · ');
 }

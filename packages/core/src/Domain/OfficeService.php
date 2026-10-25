@@ -14,13 +14,16 @@ use KompanieApp\Core\Storage\OfficeRepository;
  * Ämter (Issue #112): wer welches Amt wann hatte, auch frühere Inhaber ohne Konto, für den Zeitstrahl.
  *
  * - Gruppen (z. B. Verein und Dachverband) ordnen die Ämter; ein Amt kann auch ohne Gruppe sein.
- * - Eine Amtszeit ist ein Zeitraum in Jahren (ohne Ende: läuft bis heute) oder ein einzelnes Jahr (z. B. eine Ehrung),
- *   mit einem oder mehreren Inhabern und einem kurzen Zusatz. Inhaber sind Konten oder freie Namen.
+ * - Eine Amtszeit ist ein Zeitraum in Jahren (ohne Ende: läuft bis heute) oder ein einzelnes Jahr, mit einem oder mehreren
+ *   Inhabern und einem kurzen Zusatz. Inhaber sind Konten oder freie Namen. Der Haken „Ehrung“ (honor, Issue #180) ist
+ *   bei beiden Arten möglich und ändert nur die Darstellung; einen Titel vergibt nur eine laufende Amtszeit.
  * - Lesen ist öffentlich. Konto und Foto eines Inhabers stehen nur dabei, wenn er in der Mitgliederliste steht (Bereich
  *   directory); wer Ämter verwaltet, sieht die Konten immer.
  * - Ein Amt kann mit einem Titel verknüpft sein: Wer eine laufende Amtszeit hat (Konto, Mitglied), bekommt ihn, wer keine
  *   mehr hat, verliert ihn (syncTitles). Diese Titel lassen sich nicht mehr von Hand vergeben (TitleService::assign).
  * - Wird ein Konto gelöscht, bleiben seine Amtszeiten mit dem gespeicherten Namen stehen (UserData::purge).
+ * - Scheidet jemand aus (FormerMemberService::mark), enden seine laufenden Amtszeiten mit dem Austrittsjahr (endFor,
+ *   Issue #181). Teilt er die Amtszeit mit anderen, bekommt er eine eigene, beendete; die anderen laufen weiter.
  *
  * @phpstan-import-type Office from OfficeRepository
  * @phpstan-import-type Term from OfficeRepository
@@ -94,8 +97,10 @@ final class OfficeService
                 'id' => $o['id'],
                 'group_id' => $o['group_id'],
                 'title' => $o['title'],
-                // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“, null ohne verknüpften Titel
-                'holder_title' => $titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null,
+                'singular' => $o['singular'],
+                // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“; die eigene Einzahl des
+                // Amts, sonst der verknüpfte Titel, null ohne beides (dann die Bezeichnung)
+                'holder_title' => $o['singular'] !== '' ? $o['singular'] : ($titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null),
                 'terms' => array_map(function (array $t) use ($holders, $users, $photos, $directory, $former, $manager, $viewer): array {
                     return self::termOut($t) + ['holders' => array_map(function (array $h) use ($users, $photos, $directory, $former, $manager, $viewer): array {
                         $user = $h['user_id'] !== null ? ($users[$h['user_id']] ?? null) : null;
@@ -177,14 +182,14 @@ final class OfficeService
     {
         $repo = $this->repository();
         $groupId = $this->validGroupId($in['group_id'] ?? null);
-        $id = $repo->insertOffice($groupId, $this->validOfficeTitle($in['title'] ?? null, $groupId, null), $repo->maxOfficeSort() + 10);
+        $id = $repo->insertOffice($groupId, $this->validOfficeTitle($in['title'] ?? null, $groupId, null), $repo->maxOfficeSort() + 10, $this->validSingular($in['singular'] ?? ''));
         return $this->office($id);
     }
 
     /**
      * Umbenennen, in eine andere Gruppe verschieben, mit einem Titel verknüpfen (title_id, null löst die Verknüpfung).
      *
-     * @param array<string, mixed> $in title, group_id, title_id
+     * @param array<string, mixed> $in title, singular, group_id, title_id
      * @return array<string, mixed>
      */
     public function updateOffice(int $id, array $in): array
@@ -198,6 +203,9 @@ final class OfficeService
         }
         if (array_key_exists('title', $in) || $groupId !== $office['group_id']) {
             $data['title'] = $this->validOfficeTitle(array_key_exists('title', $in) ? $in['title'] : $office['title'], $groupId, $id);
+        }
+        if (array_key_exists('singular', $in)) {
+            $data['singular'] = $this->validSingular($in['singular']);
         }
         // Neu verknüpft: den Titel an die laufenden Amtszeiten anpassen. Ein bisher verknüpfter Titel bleibt bei seinen
         // Trägern und ist wieder von Hand zu vergeben.
@@ -260,7 +268,7 @@ final class OfficeService
     // ---- Amtszeiten ----
 
     /**
-     * @param array<string, mixed> $in kind, start_year, end_year, note, holders [{user_id} | {name}]
+     * @param array<string, mixed> $in kind, start_year, end_year, note, honor, holders [{user_id} | {name}]
      * @return array<string, mixed>
      */
     public function createTerm(int $officeId, array $in): array
@@ -287,10 +295,14 @@ final class OfficeService
             'start_year' => $current['start_year'],
             'end_year' => $current['end_year'],
             'note' => $current['note'],
+            'honor' => $current['honor'],
             'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name']], $repo->holdersOf($id)),
         ];
         [$term, $holders] = $this->validTerm($merged);
         $repo->saveTerm($id, $current['office_id'], $term, $holders);
+        if ($current['ended_for'] !== null) {
+            $repo->releaseEnd($id); // von Hand geändert: Ein neues Austrittsdatum zieht das Ende nicht mehr nach
+        }
         $office = $repo->findOffice($current['office_id']);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
         return $this->term($id);
@@ -303,6 +315,100 @@ final class OfficeService
         $repo->deleteTerm($id);
         $office = $repo->findOffice($term['office_id']);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
+    }
+
+    // ---- Ausscheiden (Issue #181) ----
+
+    /**
+     * Laufende Amtszeiten eines Kontos (Zeitraum ohne Ende, auch mit Haken „Ehrung“) beenden, wenn es als ehemalig
+     * eingetragen wird; einzelne Jahre und beendete Amtszeiten bleiben. Ende ist $year, aber nie vor dem Beginn
+     * (clamped). Allein: Die Amtszeit bekommt das Ende. Gemeinsam mit anderen: Für das Konto entsteht eine eigene,
+     * beendete Amtszeit (gleiches Amt, gleicher Beginn, Zusatz und Haken), die anderen laufen unverändert weiter. Danach
+     * gleicht syncTitles die verknüpften Titel ab. Ohne $apply nur die Vorschau.
+     *
+     * @return list<array{term_id: int, office_id: int, office: string, start_year: int, end_year: int, clamped: bool, shared: bool}>
+     */
+    public function endFor(int $userId, int $year, bool $apply): array
+    {
+        $repo = $this->repository();
+        $offices = [];
+        foreach ($this->ordered($repo->groups(), $repo->offices()) as $i => $o) {
+            $offices[$o['id']] = $o + ['pos' => $i];
+        }
+        $holders = $repo->holders();
+        $ending = [];
+        foreach ($repo->terms() as $t) {
+            if (!self::current($t) || !in_array($userId, array_column($holders[$t['id']] ?? [], 'user_id'), true)) {
+                continue;
+            }
+            $ending[] = [$t, $holders[$t['id']]];
+        }
+        usort($ending, static fn (array $a, array $b): int => [$offices[$a[0]['office_id']]['pos'] ?? PHP_INT_MAX, $b[0]['start_year']] <=> [$offices[$b[0]['office_id']]['pos'] ?? PHP_INT_MAX, $a[0]['start_year']]);
+        $out = array_map(static fn (array $e): array => [
+            'term_id' => $e[0]['id'],
+            'office_id' => $e[0]['office_id'],
+            'office' => $offices[$e[0]['office_id']]['title'] ?? '',
+            'start_year' => $e[0]['start_year'],
+            'end_year' => max($e[0]['start_year'], $year),
+            'clamped' => $year < $e[0]['start_year'],
+            'shared' => count($e[1]) > 1,
+        ], $ending);
+        if (!$apply || $ending === []) {
+            return $out;
+        }
+        $this->app->db->transaction(function () use ($repo, $ending, $userId, $year): void {
+            foreach ($ending as [$t, $termHolders]) {
+                $end = max($t['start_year'], $year);
+                if (count($termHolders) === 1) {
+                    $repo->setEnd($t['id'], $end, $userId);
+                    continue;
+                }
+                $mine = [];
+                $others = [];
+                foreach ($termHolders as $h) {
+                    if ($h['user_id'] === $userId) {
+                        $mine[] = $h;
+                    } else {
+                        $others[] = $h;
+                    }
+                }
+                $data = ['kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => null, 'note' => $t['note'], 'honor' => $t['honor']];
+                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name']], $list);
+                $repo->saveTerm($t['id'], $t['office_id'], $data, $keep($others));
+                $repo->setEnd($repo->saveTerm(null, $t['office_id'], $data, $keep($mine)), $end, $userId);
+            }
+        });
+        $titles = [];
+        foreach ($ending as [$t]) {
+            $titles[] = $offices[$t['office_id']]['title_id'] ?? null;
+        }
+        $this->syncTitles(array_values(array_filter(array_unique($titles), static fn (?int $id): bool => $id !== null)));
+        return $out;
+    }
+
+    /**
+     * Austrittsjahr nachträglich geändert: Amtszeiten, die die App für das Konto beendet hat und die seither niemand von
+     * Hand geändert hat (ended_for), enden mit dem neuen Jahr, nie vor ihrem Beginn.
+     *
+     * @return int Zahl der geänderten Amtszeiten
+     */
+    public function moveEndFor(int $userId, int $year): int
+    {
+        $repo = $this->repository();
+        $n = 0;
+        foreach ($repo->terms() as $t) {
+            if ($t['ended_for'] === $userId && $t['end_year'] !== max($t['start_year'], $year)) {
+                $repo->setEnd($t['id'], max($t['start_year'], $year), $userId);
+                $n++;
+            }
+        }
+        return $n;
+    }
+
+    /** Wieder aufgenommen: Die beendeten Amtszeiten bleiben beendet und gehören wieder der Pflege von Hand. */
+    public function releaseEndsFor(int $userId): void
+    {
+        $this->repository()->releaseEndsFor($userId);
     }
 
     // ---- Titel ----
@@ -369,7 +475,8 @@ final class OfficeService
     // ---- Import ----
 
     /**
-     * Ersterfassung aus einer Tabelle (CSV, Semikolon oder Tabulator): gruppe;amt;beginn;ende;art;personen;zusatz.
+     * Ersterfassung aus einer Tabelle (CSV, Semikolon oder Tabulator): gruppe;amt;beginn;ende;art;personen;zusatz;ehrung.
+     * Die Spalte ehrung ist optional (ja, nein oder leer); nur sie macht eine Zeile zur Ehrung.
      * - ende leer und art leer: ein Jahr (Zeitpunkt); „heute“: laufend; art „zeitraum“ oder „zeitpunkt“ erzwingt die Art.
      * - personen mit „&“ getrennt; wer genau so heißt wie genau ein Konto, wird damit verknüpft (link).
      * - Gruppen und Ämter werden nach Namen gefunden oder angelegt; eine Amtszeit, die es genau so schon gibt, wird
@@ -434,6 +541,7 @@ final class OfficeService
                     'start_year' => $term['start_year'],
                     'end_year' => $term['end_year'],
                     'note' => $term['note'],
+                    'honor' => $term['honor'],
                     'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']], $holders),
                 ];
                 $groupKey = mb_strtolower($groupTitle);
@@ -536,7 +644,7 @@ final class OfficeService
     /**
      * @param list<string> $cells
      * @param array<string, list<User>> $accounts Name (klein) => Konten
-     * @return array{0: string, 1: string, 2: array{kind: string, start_year: int, end_year: int|null, note: string}, 3: list<array{user_id: int|null, name: string}>}
+     * @return array{0: string, 1: string, 2: array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool}, 3: list<array{user_id: int|null, name: string}>}
      */
     private function importRow(array $cells, array $accounts): array
     {
@@ -555,6 +663,12 @@ final class OfficeService
             'zeitpunkt' => self::KIND_POINT,
             default => throw ApiError::invalid('Art „zeitraum“ oder „zeitpunkt“ (oder leer) erwartet.'),
         };
+        // Ehrung nur mit der 8. Spalte; ältere Tabellen mit 7 Spalten ergeben keine Ehrungen (auch nicht bei zeitpunkt).
+        $honor = match (mb_strtolower(trim($cells[7] ?? ''))) {
+            '', 'nein' => false,
+            'ja' => true,
+            default => throw ApiError::invalid('Spalte „ehrung“: „ja“, „nein“ oder leer erwartet.'),
+        };
         $names = array_values(array_filter(array_map('trim', explode('&', $cells[5] ?? '')), static fn (string $n): bool => $n !== ''));
         $holders = [];
         foreach ($names as $name) {
@@ -566,6 +680,7 @@ final class OfficeService
             'start_year' => trim($cells[2] ?? ''),
             'end_year' => in_array($end, ['', 'heute'], true) ? null : $end,
             'note' => $cells[6] ?? '',
+            'honor' => $honor,
             'holders' => $holders,
         ]);
         return [$groupTitle, $officeTitle, $term, $holders];
@@ -581,7 +696,7 @@ final class OfficeService
      * Prüft Angaben und Inhaber einer Amtszeit. Konten werden mit ihrem aktuellen Namen gespeichert.
      *
      * @param array<string, mixed> $in
-     * @return array{0: array{kind: string, start_year: int, end_year: int|null, note: string}, 1: list<array{user_id: int|null, name: string}>}
+     * @return array{0: array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool}, 1: list<array{user_id: int|null, name: string}>}
      */
     private function validTerm(array $in): array
     {
@@ -651,7 +766,7 @@ final class OfficeService
             $seen[$key] = true;
             $holders[] = $holder;
         }
-        return [['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note], $holders];
+        return [['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note, 'honor' => Input::bool($in['honor'] ?? false)], $holders];
     }
 
     /**
@@ -767,11 +882,11 @@ final class OfficeService
 
     /**
      * @param Term $t
-     * @return array{id: int, kind: string, start_year: int, end_year: int|null, note: string, current: bool}
+     * @return array{id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, current: bool}
      */
     private static function termOut(array $t): array
     {
-        return ['id' => $t['id'], 'kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => $t['note'], 'current' => self::current($t)];
+        return ['id' => $t['id'], 'kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => $t['note'], 'honor' => $t['honor'], 'current' => self::current($t)];
     }
 
     /**
@@ -828,7 +943,7 @@ final class OfficeService
      */
     private function officeOut(array $o): array
     {
-        return ['id' => $o['id'], 'group_id' => $o['group_id'], 'title' => $o['title'], 'title_id' => $o['title_id']];
+        return ['id' => $o['id'], 'group_id' => $o['group_id'], 'title' => $o['title'], 'singular' => $o['singular'], 'title_id' => $o['title_id']];
     }
 
     /** @return array<string, mixed> */
@@ -859,6 +974,16 @@ final class OfficeService
             }
         }
         return $title;
+    }
+
+    /** Einzahl des Amts (optional, z. B. „Kapitän“ zu „Kapitäne“). */
+    private function validSingular(mixed $raw): string
+    {
+        $singular = Text::line(is_string($raw) ? $raw : '', self::TITLE_MAX + 1);
+        if (mb_strlen($singular) > self::TITLE_MAX) {
+            throw ApiError::invalid(sprintf('Die Einzahl darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+        }
+        return $singular;
     }
 
     private function validName(mixed $raw, string $missing): string

@@ -141,6 +141,7 @@ final class ApiScenario
         $c->ok($this->req('POST', '/points', ['user_ids' => [$m1], 'points' => 100, 'reason' => 'Selbstbedienung'])[0] === 403, 'POST /points als Mitglied → 403');
         $c->ok($this->req('POST', '/penalties', ['user_ids' => [$m2], 'amount_cents' => 500, 'reason' => 'x'])[0] === 403, 'POST /penalties als Mitglied → 403');
         $c->ok($this->req('POST', '/catalog', ['title' => 'x', 'points' => 1])[0] === 403, 'POST /catalog als Mitglied → 403');
+        $c->ok($this->req('PUT', '/catalog/order', ['ids' => []])[0] === 403, 'PUT /catalog/order als Mitglied → 403');
         [$s, $d] = $this->req('GET', '/me');
         $c->ok($s === 200 && $d['level'] === 'member', 'GET /me als Mitglied → level member');
 
@@ -157,6 +158,13 @@ final class ApiScenario
         [, $list] = $this->req('GET', '/catalog');
         [, $all] = $this->req('GET', '/catalog', [], ['all' => '1']);
         $c->ok(!in_array($this->catalogId, array_column($list, 'id'), true) && in_array($this->catalogId, array_column($all, 'id'), true), 'Inaktive Einträge nur mit all=1');
+        // Reihenfolge per Ziehen (Issue #176): alle IDs, auch inaktive; danach wie vorher.
+        $before = array_column($all, 'id');
+        $moved = array_merge([$this->catalogId], array_values(array_diff($before, [$this->catalogId])));
+        [$s, $d] = $this->req('PUT', '/catalog/order', ['ids' => $moved]);
+        $c->ok($s === 200 && array_column($d, 'id') === $moved, 'Katalog umsortieren (mit inaktiven)');
+        $c->ok($this->req('PUT', '/catalog/order', ['ids' => array_slice($moved, 1)])[0] === 400, 'Unvollständige Reihenfolge → 400');
+        $this->req('PUT', '/catalog/order', ['ids' => $before]);
         $this->req('PATCH', '/catalog/' . $this->catalogId, ['active' => true]);
 
         [$s, $d] = $this->req('POST', '/points', ['user_ids' => [$m1, $m2], 'catalog_id' => $this->catalogId, 'date' => '2026-06-27']);
@@ -1114,12 +1122,19 @@ final class ApiScenario
         [$s, $group] = $this->req('POST', '/office-groups', ['title' => 'Kptest Verein']);
         $c->ok($s === 201 && is_int($group['id'] ?? null), 'Gruppe anlegen → 201');
         [$s, $office] = $this->req('POST', '/offices', ['title' => 'Kptest Vorsitz', 'group_id' => $group['id'] ?? null]);
-        $c->ok($s === 201 && ($office['group_id'] ?? null) === ($group['id'] ?? 0), 'Amt anlegen → 201');
+        $c->ok($s === 201 && ($office['group_id'] ?? null) === ($group['id'] ?? 0) && ($office['singular'] ?? null) === '', 'Amt anlegen → 201');
         $oid = (int) ($office['id'] ?? 0);
+        [$s, $d] = $this->req('PATCH', "/offices/$oid", ['singular' => 'Kptest Vorsitzender']);
+        $c->ok($s === 200 && ($d['singular'] ?? '') === 'Kptest Vorsitzender', 'Einzahl des Amts setzen');
         [$s, $title] = $this->req('POST', '/titles', ['title' => 'Kptest Vorsitz']);
         $tid = (int) ($title['id'] ?? 0);
         [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 1980, 'end_year' => 1990, 'holders' => [['name' => 'Kptest Früher']]]);
-        $c->ok($s === 201 && ($d['current'] ?? null) === false, 'Amtszeit mit freiem Namen');
+        $c->ok($s === 201 && ($d['current'] ?? null) === false && ($d['honor'] ?? null) === false, 'Amtszeit mit freiem Namen (ohne Ehrung)');
+        [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['kind' => 'point', 'start_year' => 1985, 'honor' => true, 'holders' => [['name' => 'Kptest Geehrt']]]);
+        $c->ok($s === 201 && ($d['honor'] ?? null) === true && ($d['kind'] ?? '') === 'point', 'Einzelnes Jahr mit Haken „Ehrung“ (Issue #180)');
+        $honorId = (int) ($d['id'] ?? 0);
+        [$s, $d] = $this->req('PATCH', "/office-terms/$honorId", ['honor' => false]);
+        $c->ok($s === 200 && ($d['honor'] ?? null) === false && $this->req('DELETE', "/office-terms/$honorId")[0] === 200, 'Ehrung abwählen, Amtszeit löschen');
         [$s, $d] = $this->req('POST', "/offices/$oid/terms", ['start_year' => 2020, 'holders' => [['user_id' => $m], ['user_id' => $gone]]]);
         $termId = (int) ($d['id'] ?? 0);
         $c->ok($s === 201 && ($d['current'] ?? null) === true && array_column($d['holders'] ?? [], 'user_id') === [$m, $gone], 'Laufende Amtszeit mit zwei Konten');
@@ -1435,8 +1450,20 @@ final class ApiScenario
         $this->d->setPassword($m, 'kptest-passwort-1');
         $this->d->actAs($admin);
         $this->req('POST', '/points', ['user_ids' => [$m], 'points' => 3, 'reason' => 'Kptest Ehemalig']);
+        // Laufendes Amt (Issue #181): Vorschau, dann endet es mit dem Ausscheiden
+        [, $office] = $this->req('POST', '/offices', ['title' => 'Kptest Ehemalig Amt ' . bin2hex(random_bytes(3))]);
+        $officeId = (int) ($office['id'] ?? 0);
+        [, $term] = $this->req('POST', "/offices/$officeId/terms", ['start_year' => 2020, 'holders' => [['user_id' => $m]]]);
+        [$s, $d] = $this->req('GET', "/members/$m/former/offices", [], ['left_on' => '14.03.2024']);
+        $c->ok($s === 200 && ($d['end_year'] ?? 0) === 2024 && ($d['terms'][0]['end_year'] ?? 0) === 2024 && ($d['terms'][0]['clamped'] ?? null) === false, 'Vorschau: laufendes Amt endet 2024');
+        $c->ok($this->req('GET', "/members/$m/former/offices", [], ['left_on' => 'gestern'])[0] === 400, 'Vorschau mit ungültigem Datum → 400');
         [$s, $d] = $this->req('PUT', "/members/$m/former", ['reason' => 'deceased', 'joined_on' => '1980', 'left_on' => '14.03.2024']);
         $c->ok($s === 200 && ($d['reason'] ?? '') === 'deceased' && ($d['left_on'] ?? '') === '2024-03-14' && ($d['previous_level'] ?? '') === 'member', 'Als verstorben eintragen');
+        $c->ok(($d['offices_ended'] ?? null) === 1, 'Ein laufendes Amt beendet');
+        [, $all] = $this->req('GET', '/offices');
+        $ended = array_values(array_filter((array) ($all['offices'] ?? []), static fn (mixed $o): bool => is_array($o) && ($o['id'] ?? 0) === $officeId))[0]['terms'][0] ?? [];
+        $c->ok(($ended['id'] ?? 0) === ($term['id'] ?? -1) && ($ended['end_year'] ?? null) === 2024 && ($ended['current'] ?? null) === false, 'Amtszeit endet mit dem Austrittsjahr');
+        $this->req('DELETE', "/offices/$officeId");
         $c->ok(!in_array($m, array_column((array) $this->req('GET', '/members')[1], 'id'), true), 'Nicht mehr in der Mitgliederliste');
         $former = array_column((array) $this->req('GET', '/members/former')[1], null, 'id');
         $c->ok((float) ($former[$m]['points'] ?? 0) === 3.0, 'In der Liste der Ehemaligen, Punkte bleiben');

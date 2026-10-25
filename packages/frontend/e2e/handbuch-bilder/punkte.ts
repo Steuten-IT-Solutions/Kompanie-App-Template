@@ -86,9 +86,6 @@ const gruppe: Gruppe = async (f) => {
 
   await f.oeffnen('verwaltung/befoerderungen');
   await f.foto('befoerderungen');
-  await page.locator('label.toggle input[type=checkbox]').check();
-  await f.foto('befoerderungen-degradieren');
-  await page.locator('label.toggle input[type=checkbox]').uncheck();
   // Aus der Übersicht öffnen: Der nächste Dienstgrad ist schon vorgeschlagen.
   await page.locator('.promotions li.due').first().click();
   await page.locator('.sheet .rank-change').waitFor();

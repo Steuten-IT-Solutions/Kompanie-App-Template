@@ -24,7 +24,8 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 3. Wähle den **Grund des Ausscheidens**: **Ausgetreten**, **Verstorben** oder **Sonstiges**.
 4. Trage, wenn bekannt, **Ausgeschieden am** (bei Verstorbenen **Verstorben am**) und den **Eintritt** ein, jeweils als TT.MM.JJJJ oder nur das Jahr. Ein schon eingetragener Eintritt steht dort bereits.
 5. Setze den Haken bei **Gründungsmitglied**, wenn es passt.
-6. Tippe auf **Als ehemalig eintragen**.
+6. Hat die Person laufende {bereich.offices}, steht darunter, welche mit dem Ausscheiden enden und mit welchem Jahr, z. B. „Mit dem Ausscheiden enden: Fahne (seit 2006) – Ende 2026.“
+7. Tippe auf **Als ehemalig eintragen**.
 
 ![Fenster Austritt](bild:ehemalige-mitglieder-eintragen)
 
@@ -48,7 +49,11 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 ## Gut zu wissen
 - Danach hat die Person keine Rolle mehr: Sie steht nicht mehr in der Mitgliederliste, nicht in der öffentlichen Liste der {rolle.member}, bekommt keine Benachrichtigungen, nimmt nicht an {bereich.polls} teil und taucht bei den {bereich.birthdays} nicht mehr auf. Sie wird auf allen Geräten abgemeldet und kann sich nicht mehr anmelden.
 - Sind noch {bereich.penalties} offen, weist die App vorher darauf hin. Sie bleiben offen und stehen auch in der Liste der Ehemaligen.
-- Ist ein Amt mit einem Titel verknüpft, verliert eine ehemalige Person diesen Titel beim nächsten Abgleich; ihre Amtszeiten bleiben im Zeitstrahl stehen.
+- Laufende {bereich.offices} enden mit dem Ausscheiden, auch solche mit dem Haken **Ehrung**. Ende ist das Jahr von **Ausgeschieden am**; ist es leer, das aktuelle Jahr. Liegt das Ausscheiden vor dem Beginn einer Amtszeit, endet sie im Jahr ihres Beginns. Einzelne Jahre und schon beendete Amtszeiten bleiben, wie sie sind. Nichts wird gelöscht: Die Amtszeiten bleiben mit der Person im Zeitstrahl.
+- Teilt die Person eine laufende Amtszeit mit anderen (z. B. Fahne), bekommt sie einen eigenen, beendeten Eintrag; die anderen bleiben im Amt.
+- Ist ein Amt mit einem Titel verknüpft, verliert die Person diesen Titel mit dem Ausscheiden. Andere Titel behält sie.
+- Änderst du später **Ausgeschieden am**, ziehen die beim Eintragen beendeten Amtszeiten mit: Sie enden dann mit dem neuen Jahr. Das gilt nicht für Amtszeiten, die inzwischen jemand unter {bereich.offices} von Hand geändert hat.
+- **Wieder aufnehmen** öffnet beendete Amtszeiten nicht wieder. Hat die Person ein Amt weiter inne, trage unter {bereich.offices} eine neue Amtszeit ein oder entferne dort das Ende.
 - Beim Wiederaufnehmen bekommt die Person ihre Rolle von vorher zurück, dazu ihre Zusatzrollen, soweit es sie noch gibt und du sie vergeben darfst. Ausnahmen bei den Rechten stellt nur ein {rolle.admin} wieder her. Gibt es die Rolle nicht mehr, wird sie {rolle.member}.
 - Konten von {rolle.admin}s tragen nur {rolle.admin}s als ehemalig ein. Das eigene Konto kannst du nicht als ehemalig eintragen.
 - Import: **eintritt** und **ausgeschieden** als TT.MM.JJJJ, nur das Jahr oder leer; „Gründer“ als Eintritt trägt ein Gründungsmitglied ohne Datum ein. **grund**: ausgetreten (auch leer), verstorben oder sonstiges. Eine Kopfzeile mit genau diesen Spaltennamen ist erlaubt. Höchstens 500 Zeilen auf einmal.

@@ -312,6 +312,22 @@ $c->ok(str_contains($html, 'Kpwp Fest') && str_contains($html, 'href="https://ex
 $c->ok(!str_contains($html, '⚓'), 'Keine Motive einer bestimmten Kompanie');
 $d->request('DELETE', '/events/' . $ev['id']);
 
+$c->section('Bilder ohne Metadaten');
+// Der Bildeditor von WordPress (Imagick) behält EXIF, wenn er nicht verkleinern muss: auch dann kein GPS-Ort.
+$im = imagecreatetruecolor(60, 40);
+ob_start();
+imagejpeg($im, null, 90);
+$jpeg = (string) ob_get_clean();
+$exif = "Exif\0\0GPSLatitude 51.29";
+$jpeg = substr($jpeg, 0, 2) . "\xFF\xE1" . pack('n', strlen($exif) + 2) . $exif . substr($jpeg, 2);
+$src = wp_tempnam('kpwp') . '.jpg';
+$dst = $src . '-out.jpg';
+file_put_contents($src, $jpeg);
+$size = $app->images->resizeToJpeg($src, $dst, 8192, 90);
+$c->ok($size === ['width' => 60, 'height' => 40] && !str_contains((string) file_get_contents($dst), 'GPSLatitude'), 'Ohne Verkleinerung: JPEG ohne EXIF (' . get_class(wp_get_image_editor($src)) . ')');
+@unlink($src);
+@unlink($dst);
+
 $c->section('Galerie');
 $gallery = $app->gallery();
 $c->ok($gallery->isConfigured(), 'Beispiel-Galerie der Test-Instanz eingerichtet');
@@ -466,7 +482,10 @@ $_GET['album'] = (string) ($album['id'] ?? 0);
 wp_set_current_user(0);
 $html = do_shortcode('[kompanie_galerie]');
 unset($_GET['album']);
-$c->ok(substr_count($html, 'class="ka-foto"') === 2 && !str_contains($html, '/app/foto/'), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
+// Interne Bilder kämen nur über die App (…/foto/<id>/thumb|large); die Originalauflösung öffentlicher Bilder läuft
+// über die App, bis sie erzeugt ist.
+$c->ok(substr_count($html, 'class="ka-foto"') === 2 && !preg_match('#/app/foto/\d+/(thumb|large)#', $html), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
+$c->ok(substr_count($html, 'data-ka-original="') === 2, '[kompanie_galerie] lädt in der Großansicht die Originalauflösung nach');
 
 $c->section('Laufzeit-Konfiguration und App-Seite');
 wp_set_current_user($member);
@@ -522,6 +541,17 @@ remove_filter('pre_http_request', $googleCalFilter, 10);
 $app->settings->delete('drive_oauth');
 $app->settings->set('calendar_ids', '');
 $app->calendar()->clearCache();
+
+// Zwischenspeicher-Dauer (Issue #177) auch im WP-Admin: geprüft wie in der App, ungültig ändert nichts.
+$calendarBefore = ['calendar_ics_url' => (string) $app->settings->get('calendar_ics_url', ''), 'calendar_ids' => '', 'google_api_key' => (string) $app->settings->get('google_api_key', '')];
+$c->ok(str_contains($renderSettings(), 'id="calendar_cache_minutes" name="calendar_cache_minutes" value="15"'), 'Einstellungsseite: Feld „Aktualisieren alle … Minuten“ mit 15');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, $calendarBefore + ['calendar_cache_minutes' => '1441', 'calendar_ics_url' => 'https://anders.example/k.ics'])
+    === ['Der Zwischenspeicher muss zwischen 1 und 1440 Minuten liegen.', true]
+    && $app->settings->get('calendar_ics_url') === $calendarBefore['calendar_ics_url'], '1441 Minuten abgelehnt, nichts geändert');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => 'x'] + $calendarBefore)[1], 'Keine Zahl abgelehnt');
+$c->ok(KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '30'] + $calendarBefore) === ['Gespeichert.', false]
+    && $app->settingsService()->get()['calendar']['cache_minutes'] === 30 && str_contains($renderSettings(), 'name="calendar_cache_minutes" value="30"'), '30 Minuten gespeichert');
+KompanieApp\WordPress\SettingsPage::applyCalendar($app, ['calendar_cache_minutes' => '15'] + $calendarBefore);
 
 $c->section('Mit Google verbinden');
 $page = $renderSettings();
@@ -797,9 +827,30 @@ $html = do_shortcode('[kompanie_aemter gruppe="kpwp bruderschaft"]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'ka-gruppe">'), 'gruppe="…" zeigt nur diese Gruppe (ohne eigene Überschrift)');
 $html = do_shortcode('[kompanie_aemter gruppe=”Kpwp Bruderschaft”]');
 $c->ok(str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'Kpwp Kapitän'), 'gruppe mit typografischen Anführungszeichen');
+foreach (['/kompanie-app/v1/offices', '/kompanie-app/v1/directory'] as $route) {
+    $res = rest_do_request(new WP_REST_Request('GET', $route));
+    $c->ok($res->get_status() === 200 && ($res->get_headers()['X-Robots-Tag'] ?? '') === 'noindex', "GET $route ohne Anmeldung: noindex");
+}
+$html = do_shortcode('[kompanie_aemter amt="kpwp kapitän"]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister') && !str_contains($html, 'ka-gruppe">'), 'amt="…" zeigt nur dieses Amt (ohne Überschrift)');
+$html = do_shortcode('[kompanie_aemter gruppe=„Kpwp Kompanie“ amt=„Kpwp Kapitän“]');
+$c->ok(str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister'), 'gruppe und amt mit typografischen Anführungszeichen');
+$html = do_shortcode('[kompanie_aemter gruppe="Kpwp Bruderschaft" amt="Kpwp Kapitän"]');
+$c->ok(!str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brudermeister') && str_contains($html, 'Noch keine Ämter eingetragen.'), 'amt in einer anderen Gruppe: nichts');
 $html = do_shortcode('[kompanie_mitglieder]');
 $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
     && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+// Foto von vor Datenbankversion 18 ohne 1024er (Issue #109): Großansicht mit der 480er statt einer Adresse mit 404, ohne srcset.
+$app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$member]);
+$medium480 = esc_url((string) $app->memberPhotos()->urls(480)[$member]);
+$oldHtml = do_shortcode('[kompanie_mitglieder]');
+$c->ok(str_contains($oldHtml, 'href="' . $medium480 . '" data-ka-lightbox="mitglieder"') && str_contains($oldHtml, '<img src="' . $medium480 . '" alt=')
+    && !str_contains($oldHtml, 's=1024'), 'Altes Foto ohne 1024er: Großansicht mit der 480er, ohne srcset');
+$_GET['v'] = (string) ($q['v'] ?? '');
+parse_str((string) wp_parse_url(html_entity_decode($medium480), PHP_URL_QUERY), $oldQuery);
+$_GET['s'] = (string) ($oldQuery['s'] ?? '');
+$c->ok(KompanieApp\WordPress\AppPage::memberPhotoResponse($app, $member)['status'] === 200, 'Adresse der Großansicht liefert das Foto');
+unset($_GET['v'], $_GET['s']);
 $body = (string) preg_replace('#<(style|script)\b.*?</\1>#s', '', $html); // CSS und Skript der Großansicht nennen Klassen und „role“
 $c->ok(!str_contains($body, 'ka-klein') && str_contains($body, 'class="ka-mitglied-leer"'), 'Ohne Dienstgrad; ohne Foto die Anfangsbuchstaben');
 $c->ok(!str_contains($body, 'Kpwp_gast_amt') && !str_contains($body, 'punkte') && !str_contains($body, 'role'), 'Ohne Gäste, Punkte oder Rollen');

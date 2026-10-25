@@ -11,14 +11,18 @@ use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
 use KompanieApp\Core\Push\WebPushCrypto;
 use KompanieApp\Core\Storage\Backup;
+use KompanieApp\Core\Storage\Sql\Migrations;
+use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Storage\Sql\Schema;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
+use KompanieApp\Core\Tests\Support\MemorySettings;
 use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Ämter (Issue #112): Gruppen, Amtszeiten mit Jahren und mehreren Inhabern, Reihenfolge im Zeitstrahl, öffentliche
- * Ansicht, Rechte, Verknüpfung mit Titeln, gelöschte Konten und Import.
+ * Ansicht, Rechte, Verknüpfung mit Titeln, gelöschte Konten und Import; Haken „Ehrung“ (Issue #180).
  */
 final class OfficeServiceTest extends TestCase
 {
@@ -59,9 +63,9 @@ final class OfficeServiceTest extends TestCase
     }
 
     /** @param list<array<string, mixed>> $holders */
-    private function term(int $office, int $start, ?int $end, array $holders, string $kind = 'period', string $note = ''): int
+    private function term(int $office, int $start, ?int $end, array $holders, string $kind = 'period', string $note = '', bool $honor = false): int
     {
-        return (int) $this->ok('POST', "/offices/$office/terms", ['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note, 'holders' => $holders])['id'];
+        return (int) $this->ok('POST', "/offices/$office/terms", ['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note, 'honor' => $honor, 'holders' => $holders])['id'];
     }
 
     /** @return array<string, mixed> Amt aus der öffentlichen Übersicht */
@@ -374,5 +378,172 @@ final class OfficeServiceTest extends TestCase
         // Ohne Verknüpfen: nur Namen
         $plain = $this->ok('POST', '/offices/import', ['csv' => "X;Y;2000;;;Mitglied;\n", 'link' => false]);
         $this->assertSame([['name' => 'Mitglied', 'user_id' => null]], $plain['rows'][0]['holders']);
+    }
+    /** Ehrung ist ein Haken an der Amtszeit, unabhängig von der Art: einzelnes Jahr ohne Ehrung, Zeitraum mit Ehrung. */
+    public function testHonorIsAFlagOfTheTerm(): void
+    {
+        $this->setUpApp();
+        $kings = $this->office('Könige');
+        $honorary = $this->office('Ehrenmitglieder');
+        $king = $this->term($kings, 2019, null, [['name' => 'Karl König']], 'point');
+        $member = $this->term($honorary, 2020, null, [['name' => 'Gustav Gans']], 'period', '', true);
+        $old = $this->term($honorary, 2008, null, [['name' => 'Ida Igel']], 'point', 'Ehrenvorsitz', true);
+
+        $byId = static fn (array $office): array => array_column($office['terms'], null, 'id');
+        $this->assertFalse($byId($this->overviewOffice($kings, null))[$king]['honor'], 'einzelnes Jahr ohne Haken: keine Ehrung');
+        $terms = $byId($this->overviewOffice($honorary, null));
+        $this->assertSame([true, true], [$terms[$member]['honor'], $terms[$member]['current']], 'Zeitraum mit Haken');
+        $this->assertSame(['point', true], [$terms[$old]['kind'], $terms[$old]['honor']]);
+
+        // Ändern ohne honor lässt den Haken stehen, mit honor ändert er sich.
+        $this->assertTrue($this->ok('PATCH', "/office-terms/$old", ['note' => 'Ehrenvorsitzender'])['honor']);
+        $this->assertFalse($this->ok('PATCH', "/office-terms/$old", ['honor' => false])['honor']);
+        $this->assertTrue($this->ok('PATCH', "/office-terms/$king", ['honor' => true])['honor']);
+    }
+
+    /** CSV: 8. Spalte ehrung (ja, nein, leer); ohne sie keine Ehrung, auch bei zeitpunkt; andere Werte sind ein Fehler. */
+    public function testImportHonorColumn(): void
+    {
+        $this->setUpApp();
+        $csv = "gruppe;amt;beginn;ende;art;personen;zusatz;ehrung\n"
+            . "Verein;Ehrenmitglieder;2008;;zeitpunkt;Gustav Gans;Ehrenvorsitz;ja\n"
+            . "Verein;Ehrenmitglieder;2010;;;Ida Igel;;JA\n"
+            . "Verein;Könige;2019;;zeitpunkt;Karl König;;nein\n"
+            . "Verein;Könige;2021;;;Hans Hof;;\n"
+            . "Verein;Ehrenmitglieder;2020;heute;;Berta Bauer;;ja\n"
+            . "Verein;Ehrenmitglieder;2012;;zeitpunkt;Anton Alt;\n";
+        $preview = $this->ok('POST', '/offices/import', ['csv' => $csv]);
+        $this->assertSame([true, true, false, false, true, false], array_column($preview['rows'], 'honor'));
+        $this->assertSame(['point', 'period'], [$preview['rows'][5]['kind'], $preview['rows'][4]['kind']], '7 Spalten: zeitpunkt ohne Ehrung');
+
+        $this->ok('POST', '/offices/import', ['csv' => $csv, 'apply' => true]);
+        $honors = [];
+        foreach ($this->ok('GET', '/offices')['offices'] as $o) {
+            foreach ($o['terms'] as $t) {
+                $honors[$t['holders'][0]['name']] = $t['honor'];
+            }
+        }
+        $this->assertSame(['Anton Alt' => false, 'Berta Bauer' => true, 'Gustav Gans' => true, 'Hans Hof' => false, 'Ida Igel' => true, 'Karl König' => false], (static function (array $a): array {
+            ksort($a);
+            return $a;
+        })($honors));
+
+        // Nur der Wert der Ehrung anders: gilt als schon vorhanden.
+        $again = $this->ok('POST', '/offices/import', ['csv' => "Verein;Könige;2019;;zeitpunkt;Karl König;;ja\n"]);
+        $this->assertTrue($again['rows'][0]['duplicate']);
+
+        $bad = $this->ok('POST', '/offices/import', ['csv' => "Verein;Könige;2023;;;Emil Eck;;vielleicht\n"]);
+        $this->assertSame('Spalte „ehrung“: „ja“, „nein“ oder leer erwartet.', $bad['rows'][0]['error']);
+    }
+
+    /** Update (SQLite und MySQL): Bisherige einzelne Jahre waren Ehrungen und bekommen den Haken, Zeiträume nicht. */
+    public function testMigrationMarksPointsAsHonor(): void
+    {
+        foreach (['sqlite', getenv('KOMPANIE_TEST_MYSQL') ? 'mysql' : null] as $driver) {
+            if ($driver === null) {
+                continue;
+            }
+            $db = TestApp::connection($driver);
+            try {
+                $settings = new MemorySettings();
+                (new Migrator($db, $settings, array_filter(Migrations::all(), static fn (int $v): bool => $v < 25, ARRAY_FILTER_USE_KEY)))->migrate();
+                $this->assertNotContains('honor', Schema::columns($db, 'office_terms'), $driver);
+                $office = $db->insert('offices', ['title' => 'Ehrenmitglieder', 'sort' => 10]);
+                $point = $db->insert('office_terms', ['office_id' => $office, 'kind' => 'point', 'start_year' => 2008, 'note' => '']);
+                $period = $db->insert('office_terms', ['office_id' => $office, 'kind' => 'period', 'start_year' => 2010, 'note' => '']);
+
+                $app = TestApp::create($db, new FakeUsers(), [], null, null, $settings);
+                $this->assertSame(Migrations::latest(), (new Migrator($db, $settings))->current(), $driver);
+                $repo = $app->offices()->repository();
+                $this->assertTrue($repo->findTerm($point)['honor'] ?? null, $driver);
+                $this->assertFalse($repo->findTerm($period)['honor'] ?? null, $driver);
+            } finally {
+                TestApp::dropTables($db);
+            }
+        }
+    }
+
+    /** Eine Sicherung von vor dem Haken (ohne honor): einzelne Jahre werden wieder Ehrungen. */
+    public function testOlderBackupKeepsHonors(): void
+    {
+        $this->setUpApp();
+        $office = $this->office('Ehrenmitglieder');
+        $this->term($office, 2008, null, [['name' => 'Gustav Gans']], 'point', '', true);
+        $this->term($office, 2010, 2012, [['name' => 'Ida Igel']]);
+        $backup = new Backup($this->app->db);
+        $tables = $backup->dump(['office_groups', 'offices', 'office_terms', 'office_holders']);
+        $tables['office_terms'] = array_map(static function (array $row): array {
+            unset($row['honor']);
+            return $row;
+        }, $tables['office_terms']);
+        $backup->restore($tables, ['office_groups', 'offices', 'office_terms', 'office_holders']);
+        $this->assertSame([false, true], array_column($this->overviewOffice($office, null)['terms'], 'honor'));
+    }
+    /**
+     * Die Chronik der Webseite aus Issue #112 (Stand 21.10.2026): 2 Gruppen, 26 Ämter, 145 Amtszeiten. Personennamen
+     * sind durch Platzhalter ersetzt (gleiche Person, gleicher Platzhalter); Jahre, Zusätze und Aufbau sind unverändert.
+     */
+    public function testImportOfTheWebsiteChronicle(): void
+    {
+        $this->setUpApp();
+        $csv = (string) file_get_contents(__DIR__ . '/fixtures/aemter-145.csv');
+        $preview = $this->ok('POST', '/offices/import', ['csv' => $csv, 'link' => false]);
+        $this->assertSame([2, 26, 145], [$preview['groups_new'], $preview['offices_new'], $preview['terms_new']]);
+        $this->assertSame([], array_values(array_filter($preview['rows'], static fn (array $r): bool => isset($r['error']))));
+
+        $this->ok('POST', '/offices/import', ['csv' => $csv, 'link' => false, 'apply' => true]);
+        $all = $this->ok('GET', '/offices');
+        $this->assertSame(['Bruderschaft', 'Kompanie'], array_column($all['groups'], 'title'));
+        $this->assertCount(26, $all['offices']);
+        $terms = array_merge(...array_map(static fn (array $o): array => $o['terms'], $all['offices']));
+        $this->assertCount(145, $terms);
+        $count = static fn (callable $f): int => count(array_filter($terms, $f));
+        $this->assertSame(25, $count(static fn (array $t): bool => $t['current']), 'laufend („heute“)');
+        $this->assertSame(9, $count(static fn (array $t): bool => $t['kind'] === 'point'), 'einzelne Jahre');
+        $this->assertSame(8, $count(static fn (array $t): bool => $t['honor']), 'Ehrungen: nur die Ehrenmitglieder, nicht das einzelne Jahr beim Schatzmeister');
+        $this->assertSame(4, $count(static fn (array $t): bool => count($t['holders']) === 2), 'zwei Personen in einer Amtszeit');
+        $this->assertSame(15, $count(static fn (array $t): bool => $t['note'] !== ''), 'mit Zusatz');
+
+        // Gleich benannte Ämter in beiden Gruppen bleiben getrennt.
+        $byName = [];
+        foreach ($all['offices'] as $o) {
+            $byName[$o['title']][] = $o;
+        }
+        $this->assertCount(2, $byName['Ehrenmitglieder']);
+        $this->assertCount(2, $byName['2. Schatzmeister']);
+        // Die App sortiert selbst: laufende zuerst, dann nach Beginn absteigend (auf der Webseite nicht überall so).
+        $flag = $byName['Fahne'][0]['terms'];
+        $this->assertSame([[2025, null], [2006, null], [2006, null], [2006, null], [2006, null], [2023, 2025], [2009, 2023]], array_map(static fn (array $t): array => [$t['start_year'], $t['end_year']], $flag));
+        // Dieselbe Person mehrfach mit Lücke
+        $spiess = array_map(static fn (array $t): array => [$t['start_year'], $t['end_year'], $t['holders'][0]['name']], $byName['1. Spieße'][0]['terms']);
+        $this->assertSame([1983, 1993], array_slice($spiess[3], 0, 2));
+        $this->assertSame([1974, 1980], array_slice($spiess[4], 0, 2));
+        $this->assertSame($spiess[3][2], $spiess[4][2]);
+
+        $again = $this->ok('POST', '/offices/import', ['csv' => $csv, 'link' => false]);
+        $this->assertSame([0, 0, 0], [$again['groups_new'], $again['offices_new'], $again['terms_new']], 'zweiter Import: alles schon da');
+    }
+    /** Eigene Einzahl des Amts für den Zeitstrahl einer Person; leer: der verknüpfte Titel, sonst nichts (Bezeichnung). */
+    public function testSingularOfAnOffice(): void
+    {
+        $this->setUpApp();
+        $kings = $this->office('Kompaniekönige');
+        $this->assertSame('', $this->overviewOffice($kings, null)['singular']);
+        $this->assertNull($this->overviewOffice($kings, null)['holder_title']);
+
+        $title = (int) $this->ok('POST', '/titles', ['title' => 'König der Kompanie'])['id'];
+        $this->ok('PATCH', "/offices/$kings", ['title_id' => $title]);
+        $this->assertSame('König der Kompanie', $this->overviewOffice($kings, null)['holder_title'], 'ohne Einzahl: verknüpfter Titel');
+
+        $res = $this->ok('PATCH', "/offices/$kings", ['singular' => '  Kompaniekönig ']);
+        $this->assertSame('Kompaniekönig', $res['singular']);
+        $this->assertSame(['Kompaniekönig', 'Kompaniekönig'], [$this->overviewOffice($kings, null)['singular'], $this->overviewOffice($kings, null)['holder_title']], 'eigene Einzahl vor dem Titel');
+        $this->assertSame('Kompaniekönig', $this->ok('PATCH', "/offices/$kings", ['title' => 'Könige'])['singular'], 'Umbenennen lässt die Einzahl');
+        $this->assertSame(400, $this->call('PATCH', "/offices/$kings", ['singular' => str_repeat('x', 61)])->status);
+        $this->ok('PATCH', "/offices/$kings", ['singular' => '']);
+        $this->assertSame('König der Kompanie', $this->overviewOffice($kings, null)['holder_title']);
+
+        $captains = (int) $this->ok('POST', '/offices', ['title' => 'Kapitäne', 'singular' => 'Kapitän'])['id'];
+        $this->assertSame('Kapitän', $this->overviewOffice($captains, null)['holder_title']);
     }
 }

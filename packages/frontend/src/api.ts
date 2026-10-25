@@ -352,6 +352,8 @@ export interface GalleryPhoto {
   id: number;
   thumb: string;
   large: string;
+  /** Originalauflösung für die Großansicht: wird nach large nachgeladen; 404, wenn es sie nicht gibt (large bleibt) */
+  original?: string;
   width: number;
   height: number;
   intern: boolean;
@@ -481,6 +483,20 @@ export interface FormerInfo {
   left_on: string;
   /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
   previous_level: Level;
+}
+
+/** Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181). */
+export interface FormerOfficesPreview {
+  end_year: number;
+  terms: {
+    office: string;
+    start_year: number;
+    end_year: number;
+    /** Austritt vor dem Beginn: Das Ende ist der Beginn */
+    clamped: boolean;
+    /** Gemeinsam mit anderen, die weiterlaufen */
+    shared: boolean;
+  }[];
 }
 
 /** Eintrag der Liste „Ehemalige“ (create_users). */
@@ -929,6 +945,8 @@ export interface OfficeTerm {
   start_year: number;
   end_year: number | null;
   note: string;
+  /** Haken „Ehrung“ (bei jeder Art): Stern und Abzeichen im Zeitstrahl */
+  honor: boolean;
   /** Zeitraum ohne Ende */
   current: boolean;
   holders: OfficeHolder[];
@@ -938,7 +956,9 @@ export interface Office {
   id: number;
   group_id: number | null;
   title: string;
-  /** Einzahl für den Zeitstrahl einer Person: Name des verknüpften Titels (nur mit Bereich Titel, nur in GET /offices) */
+  /** Eigene Einzahl („Kapitän“ zu „Kapitäne“), leer ohne */
+  singular?: string;
+  /** Einzahl für den Zeitstrahl einer Person: eigene Einzahl, sonst Name des verknüpften Titels (nur mit Bereich Titel); nur in GET /offices */
   holder_title?: string | null;
   /** Laufende zuerst, dann nach Beginn absteigend */
   terms: OfficeTerm[];
@@ -957,6 +977,7 @@ export interface OfficeTermInput {
   start_year: number;
   end_year: number | null;
   note: string;
+  honor: boolean;
   holders: ({ user_id: number } | { name: string })[];
 }
 
@@ -968,6 +989,7 @@ export interface OfficeImportRow {
   start_year?: number;
   end_year?: number | null;
   note?: string;
+  honor?: boolean;
   holders?: { name: string; user_id: number | null }[];
   duplicate?: boolean;
   error?: string;
@@ -1320,6 +1342,8 @@ export const api = {
   createCatalogItem: (title: string, points: number) => request<CatalogItem>('POST', '/catalog', { title, points }),
   updateCatalogItem: (id: number, data: Partial<Pick<CatalogItem, 'title' | 'points' | 'active' | 'sort'>>) =>
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
+  /** Reihenfolge des ganzen Katalogs (alle IDs, auch inaktive); Antwort: der Katalog mit inaktiven (Issue #176) */
+  reorderCatalog: (ids: number[]) => request<CatalogItem[]>('PUT', '/catalog/order', { ids }),
 
   directory: () => request<DirectoryEntry[]>('GET', '/directory'),
   /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
@@ -1353,7 +1377,9 @@ export const api = {
     request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
-  markFormer: (id: number, data: FormerInput) => request<FormerInfo>('PUT', `/members/${id}/former`, data),
+  markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
+  formerOfficesPreview: (id: number, leftOn: string) =>
+    request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),
   updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
   reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
   createFormer: (data: PersonName & FormerInput & { birthday?: string; photo?: EncodedFile }) =>
@@ -1477,7 +1503,7 @@ export const api = {
   deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
   reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
   createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),
-  updateOffice: (id: number, data: { title?: string; group_id?: number | null; title_id?: number | null }) =>
+  updateOffice: (id: number, data: { title?: string; singular?: string; group_id?: number | null; title_id?: number | null }) =>
     request<Office>('PATCH', `/offices/${id}`, data),
   deleteOffice: (id: number) => request<{ deleted: boolean }>('DELETE', `/offices/${id}`),
   reorderOffices: (ids: number[]) => request<Office[]>('PUT', '/offices/order', { ids }),

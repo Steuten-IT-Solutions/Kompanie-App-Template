@@ -10,8 +10,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Ämter (Issue #112): Gruppen, Ämter, Amtszeiten und ihre Inhaber.
  *
  * @phpstan-type Group array{id: int, title: string, sort: int}
- * @phpstan-type Office array{id: int, group_id: int|null, title: string, sort: int, title_id: int|null}
- * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string}
+ * @phpstan-type Office array{id: int, group_id: int|null, title: string, singular: string, sort: int, title_id: int|null}
+ * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null}
  * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int}
  */
 final class OfficeRepository
@@ -69,12 +69,12 @@ final class OfficeRepository
         return $row === null ? null : self::office($row);
     }
 
-    public function insertOffice(?int $groupId, string $title, int $sort): int
+    public function insertOffice(?int $groupId, string $title, int $sort, string $singular = ''): int
     {
-        return $this->db->insert('offices', ['group_id' => $groupId, 'title' => $title, 'sort' => $sort, 'title_id' => null]);
+        return $this->db->insert('offices', ['group_id' => $groupId, 'title' => $title, 'singular' => $singular, 'sort' => $sort, 'title_id' => null]);
     }
 
-    /** @param array{group_id?: int|null, title?: string, sort?: int, title_id?: int|null} $data */
+    /** @param array{group_id?: int|null, title?: string, singular?: string, sort?: int, title_id?: int|null} $data */
     public function updateOffice(int $id, array $data): void
     {
         if ($data !== []) {
@@ -127,16 +127,17 @@ final class OfficeRepository
     /**
      * Amtszeit mit Inhabern anlegen bzw. ersetzen, in einer Transaktion.
      *
-     * @param array{kind: string, start_year: int, end_year: int|null, note: string} $term
+     * @param array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool} $term
      * @param list<array{user_id: int|null, name: string}> $holders
      */
     public function saveTerm(?int $id, int $officeId, array $term, array $holders): int
     {
-        return (int) $this->db->transaction(function () use ($id, $officeId, $term, $holders): int {
+        $row = ['honor' => $term['honor'] ? 1 : 0] + $term;
+        return (int) $this->db->transaction(function () use ($id, $officeId, $row, $holders): int {
             if ($id === null) {
-                $id = $this->db->insert('office_terms', ['office_id' => $officeId] + $term);
+                $id = $this->db->insert('office_terms', ['office_id' => $officeId] + $row);
             } else {
-                $this->db->update('office_terms', $term, ['id' => $id]);
+                $this->db->update('office_terms', $row, ['id' => $id]);
                 $this->db->execute('DELETE FROM {office_holders} WHERE term_id = ?', [$id]);
             }
             foreach ($holders as $i => $h) {
@@ -144,6 +145,27 @@ final class OfficeRepository
             }
             return $id;
         });
+    }
+
+    /**
+     * Ende einer Amtszeit setzen, die die App für ein Konto beendet (Ausscheiden); $endedFor merkt sich das Konto, null
+     * gibt die Amtszeit an die Pflege von Hand zurück.
+     */
+    public function setEnd(int $id, int $endYear, ?int $endedFor): void
+    {
+        $this->db->update('office_terms', ['end_year' => $endYear, 'ended_for' => $endedFor], ['id' => $id]);
+    }
+
+    /** Amtszeit gehört nicht mehr zu den automatisch beendeten (z. B. nach einer Änderung von Hand). */
+    public function releaseEnd(int $termId): void
+    {
+        $this->db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE id = ?', [$termId]);
+    }
+
+    /** Alle Amtszeiten, die die App für dieses Konto beendet hat, gehören wieder der Pflege von Hand. */
+    public function releaseEndsFor(int $userId): void
+    {
+        $this->db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
     }
 
     public function deleteTerm(int $id): void
@@ -190,6 +212,7 @@ final class OfficeRepository
             'id' => (int) $r['id'],
             'group_id' => $r['group_id'] === null ? null : (int) $r['group_id'],
             'title' => (string) $r['title'],
+            'singular' => (string) ($r['singular'] ?? ''),
             'sort' => (int) $r['sort'],
             'title_id' => $r['title_id'] === null ? null : (int) $r['title_id'],
         ];
@@ -208,6 +231,8 @@ final class OfficeRepository
             'start_year' => (int) $r['start_year'],
             'end_year' => $r['end_year'] === null ? null : (int) $r['end_year'],
             'note' => (string) $r['note'],
+            'honor' => (bool) ($r['honor'] ?? false),
+            'ended_for' => ($r['ended_for'] ?? null) === null ? null : (int) $r['ended_for'],
         ];
     }
 

@@ -361,6 +361,10 @@ try {
     // Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung; ohne sie nur mit Anmeldung und privat.
     $public = $d->send('GET', $monaUrl, [], null);
     $c->ok($public[0] === 200 && ($public[2]['cache-control'] ?? '') === 'public, max-age=86400' && ($public[2]['x-robots-tag'] ?? '') === 'noindex', 'Mit Mitgliederliste: Foto ohne Anmeldung, einen Tag öffentlich, noindex');
+    foreach (['directory', 'offices'] as $route) {
+        $res = $d->send('GET', $base . 'index.php?r=/api/v1/' . $route, ['Accept' => 'application/json'], null);
+        $c->ok(($res[2]['x-robots-tag'] ?? '') === 'noindex', "GET /$route ohne Anmeldung: noindex (Status {$res[0]})");
+    }
     $d->request('PUT', '/admin/features', ['directory' => false]);
     $c->ok($d->send('GET', $monaUrl, [], null)[0] === 401, 'Foto ohne Anmeldung → 401');
     $monaCookie = ['Cookie' => Sessions::COOKIE . '=' . $d->token($mona)];

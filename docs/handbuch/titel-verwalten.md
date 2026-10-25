@@ -39,7 +39,7 @@ Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, d
 ## Gut zu wissen
 - {bereich.titles} sind unabhängig von {bereich.ranks} und {bereich.points}. Ein Mitglied kann mehrere haben.
 - Die Bezeichnung hat höchstens 60 Zeichen, und jede gibt es nur einmal.
-- Ein Titel kann mit einem Amt verknüpft sein (Bereich {bereich.offices}). Dann bekommt ihn, wer das Amt gerade hat, und verliert ihn, wenn die Amtszeit endet. Die Verknüpfung stellst du beim Amt ein. Umbenennen geht trotzdem; löschst du den Titel, fällt die Verknüpfung weg.
+- Ein Titel kann mit einem Amt verknüpft sein (Bereich {bereich.offices}). Dann bekommt ihn, wer das Amt gerade hat, und verliert ihn, wenn die Amtszeit endet. Die Verknüpfung stellst du beim Amt ein. In der Liste steht bei solchen Titeln **Wird über das Amt „…“ vergeben**; darfst du {bereich.offices} verwalten, führt ein Tipp auf den Namen des Amts dorthin. Umbenennen geht trotzdem; löschst du den Titel, fällt die Verknüpfung weg.
 
 ## Siehe auch
 - [{bereich.titles} eines Mitglieds](seite:mitglied-titel)
