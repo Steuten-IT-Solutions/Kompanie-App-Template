@@ -44,6 +44,8 @@ const Brett = lazyView(() => import('./views/Brett'));
 const Umfragen = lazyView(() => import('./views/Umfragen'));
 const Inventar = lazyView(() => import('./views/Inventar'));
 const Mitglieder = lazyView(() => import('./views/Mitglieder'));
+const Dienstgrade = lazyView(() => import('./views/Dienstgrade'));
+const Punktekatalog = lazyView(() => import('./views/Punktekatalog'));
 
 // Programmteile der Tabs, die erst bei Bedarf geladen werden: vorab anstoßen (Issue #104).
 const tabViews: Partial<Record<string, { preload: () => void }>> = {
@@ -54,16 +56,21 @@ const tabViews: Partial<Record<string, { preload: () => void }>> = {
     preload: () => {
       Dokumente.preload();
       Mitglieder.preload();
+      Brett.preload();
+      Dienstgrade.preload();
+      Punktekatalog.preload();
     },
   },
   meins: Meins,
   verwaltung: Verwaltung,
 };
 
-/** Bereiche unter „Intern“ (Knöpfe auf seiner Startseite), in dieser Reihenfolge. Ohne das Recht view_intern stehen sie
- * unten als eigene Tabs (z. B. Mitglieder für Gäste). */
-type InternView = 'mitglieder' | 'dokumente';
-const INTERN: InternView[] = ['mitglieder', 'dokumente'];
+/** Bereiche unter „Intern“ (Knöpfe auf seiner Startseite), in dieser Reihenfolge. Ohne das Recht view_intern stehen
+ * Mitglieder und Dokumente unten als eigene Tabs (z. B. Mitglieder für Gäste); Schwarzes Brett, Dienstgrade und
+ * Punktekatalog gibt es nur unter „Intern“ (Mitglieder haben das Recht immer; das Brett erreicht man sonst über das Banner). */
+type InternView = 'mitglieder' | 'dokumente' | 'brett' | 'dienstgrade' | 'punktekatalog';
+const INTERN: InternView[] = ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
+const OWN_TABS: InternView[] = ['mitglieder', 'dokumente'];
 type Tab = 'termine' | 'news' | 'galerie' | 'intern' | InternView | 'meins' | 'verwaltung';
 type View =
   | Tab
@@ -84,6 +91,8 @@ const VIEWS: View[] = [
   'intern',
   'dokumente',
   'mitglieder',
+  'dienstgrade',
+  'punktekatalog',
   'meins',
   'verwaltung',
   'brett',
@@ -124,6 +133,9 @@ function internLabels(): Record<InternView, string> {
     // Nur Ämter ohne Mitgliederliste (Issue #112): Der Bereich heißt dann wie die Ämter.
     mitglieder: features?.directory || !features?.offices ? sec.directory : sec.offices,
     dokumente: sec.documents,
+    brett: sec.board,
+    dienstgrade: sec.ranks,
+    punktekatalog: `${sec.points}katalog`,
   };
 }
 
@@ -171,6 +183,9 @@ function Icon({ name }: { name: Tab }) {
       'M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 13v1.5h8V13H8zm0 3v1.5h8V16H8zm0-6v1.5h4V10H8z',
     mitglieder:
       'M8 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm8.5 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8 13c-3 0-7 1.5-7 4.5V20h14v-2.5C15 14.5 11 13 8 13zm8.5 0c-.6 0-1.3.1-2 .2 1.4 1 2.5 2.4 2.5 4.3V20h6v-2.5c0-3-3.9-4.5-6.5-4.5z',
+    brett: 'M5 4h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm2 4v2h10V8H7zm0 4v2h6v-2H7z',
+    dienstgrade: 'M12 3 4 8.5v3.5L12 6.5l8 5.5V8.5L12 3zm0 7-8 5.5V19l8-5.5 8 5.5v-3.5L12 10z',
+    punktekatalog: 'M4 5h2v2H4V5zm4 0h12v2H8V5zm-4 6h2v2H4v-2zm4 0h12v2H8v-2zm-4 6h2v2H4v-2zm4 0h12v2H8v-2z',
     intern: 'M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm2 4v8h14v-8H5z',
     meins: 'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7L12 2z',
     verwaltung:
@@ -301,6 +316,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const docsAllowed = isMember() && !!features?.documents;
   // Mitgliederliste und Ämter (Issue #112): für alle, auch ohne Anmeldung.
   const membersAllowed = !!(features?.directory || features?.offices);
+  // Dienstgrade und Punktekatalog zum Nachschlagen: für Mitglieder (wie /ranks; den Katalog brauchen nur sie).
+  const ranksAllowed = isMember() && !!features?.ranks;
+  const catalogAllowed = isMember() && !!features?.points;
   const allowed: Record<View, boolean> = {
     // Geburtstage (Issue #1) stehen bei den Terminen: für Mitglieder auch, wenn es sonst keine Termine gibt.
     termine: !!(features?.events || (features?.calendar && can('calendar'))) || birthdaysVisible(),
@@ -308,8 +326,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
     galerie: !!features?.gallery,
     dokumente: docsAllowed,
     mitglieder: membersAllowed,
-    // Intern: Startseite mit je einem Knopf für Mitglieder und Dokumente, mit dem Recht view_intern (Mitglieder haben es)
-    intern: can('view_intern') && (docsAllowed || membersAllowed),
+    dienstgrade: ranksAllowed,
+    punktekatalog: catalogAllowed,
+    // Intern: Startseite mit je einem Knopf für Mitglieder, Dokumente, Brett, Dienstgrade und Punktekatalog, mit dem Recht
+    // view_intern (Mitglieder haben es)
+    intern: can('view_intern') && (docsAllowed || membersAllowed || boardVisible() || ranksAllowed || catalogAllowed),
     // Eigene Daten (Mitglieder) und das Konto (alle Angemeldeten)
     meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
@@ -327,10 +348,14 @@ export default function App({ notice = null }: { notice?: string | null }) {
     einrichtung: can('manage_settings'),
     hilfe: true,
   };
-  const internTabs: InternTab[] = INTERN.filter((v) => allowed[v]).map((v) => ({ id: v, label: internLabels()[v] }));
+  // Das Brett zum Lesen (Mitglieder und Anwärter); wer schreibt, hat es außerdem in der Verwaltung.
+  const internTabs: InternTab[] = INTERN.filter((v) => (v === 'brett' ? boardVisible() : allowed[v])).map((v) => ({
+    id: v,
+    label: internLabels()[v],
+  }));
   // „Meins“ ganz rechts, die Verwaltung davor.
   // Mitglieder und Dokumente: mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab (z. B. Mitglieder für Gäste).
-  const tabs = (['termine', 'news', 'galerie', ...(allowed.intern ? ['intern'] : INTERN), 'verwaltung', 'meins'] as Tab[]).filter(
+  const tabs = (['termine', 'news', 'galerie', ...(allowed.intern ? ['intern'] : OWN_TABS), 'verwaltung', 'meins'] as Tab[]).filter(
     (t) => allowed[t],
   );
   const requested = path[0] as View;
@@ -342,10 +367,16 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // „‹ Verwaltung“ nur auf der Seite, zu der der Knopf führt; Unterseiten haben ihren eigenen Rückweg.
   // brett/<id> (Ziel einer Benachrichtigung) ist dieselbe Seite wie brett.
   const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === (tab === 'brett' ? 'brett' : path.join('/'));
-  // Mitglieder und Dokumente gehören zu „Intern“ (Tab unten), wenn es ihn gibt; „‹ Intern“ auf ihrer ersten Seite,
-  // Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg.
-  const internView = allowed.intern && (INTERN as View[]).includes(tab);
-  const internStart = (tab === 'dokumente' && !path[1]) || (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
+  // Die Bereiche von „Intern“ gehören zu diesem Tab unten, wenn es ihn gibt; „‹ Intern“ auf ihrer ersten Seite,
+  // Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg. Wer am Brett schreibt,
+  // hat es in der Verwaltung (adminView), auch wenn er es über „Intern“ öffnet.
+  const internView = allowed.intern && !adminView && (INTERN as View[]).includes(tab);
+  const internStart =
+    tab === 'brett' ||
+    tab === 'dienstgrade' ||
+    tab === 'punktekatalog' ||
+    (tab === 'dokumente' && !path[1]) ||
+    (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
   const activeTab: View = adminView ? 'verwaltung' : internView ? 'intern' : tab;
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
   const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
@@ -541,6 +572,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 <Dokumente docId={docId} onToast={showToast} />
               ))}
             {tab === 'mitglieder' && <Mitglieder path={path.slice(1)} />}
+            {tab === 'dienstgrade' && <Dienstgrade />}
+            {tab === 'punktekatalog' && <Punktekatalog />}
             {tab === 'meins' && <Meins sub={path[1]} focus={focusId(path[2])} onToast={showToast} onLogout={() => logout(showToast)} />}
             {tab === 'verwaltung' && <Verwaltung path={path.slice(1)} onToast={showToast} />}
             {adminStart && <AdminBack />}

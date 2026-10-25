@@ -17,6 +17,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Schwarzes Brett, Dienstgrade und Punktekatalog unter „Intern“**: Unter **Intern** gibt es drei neue Knöpfe.
+  **Schwarzes Brett** öffnet das Brett mit allen aktuellen Nachrichten, ohne den Umweg über das Banner (für Mitglieder
+  und Anwärter mit dem Recht **Intern**; wer am Brett schreibt, findet es weiter auch in der Verwaltung).
+  **Dienstgrade** zeigt alle Dienstgrade der Reihe nach mit Abzeichen, den eigenen markiert und, wenn die
+  Kompanie Punkte nutzt, ab wie vielen Punkten jeder erreichbar ist. **Punktekatalog** zeigt, wofür es wie viele Punkte
+  gibt (nur aktive Vorlagen, in der Reihenfolge aus der Verwaltung). Die Knöpfe erscheinen nur, wenn der jeweilige
+  Bereich eingeschaltet ist; Dienstgrade und Punktekatalog sehen nur Mitglieder.
 - **Schwarzes Brett: Titel, Enddatum, formatierte Nachrichten**: Jede Nachricht hat jetzt einen Titel; das Banner
   oben zeigt nur noch ihn, ein Tipp darauf öffnet die ganze Nachricht. Wie lange sie stehen bleibt, wählt man beim
   Schreiben frei (vorgegeben 24 Stunden) und kann es später verlängern oder verkürzen. Der Text lässt sich wie in einem

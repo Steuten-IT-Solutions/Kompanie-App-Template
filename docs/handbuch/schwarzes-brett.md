@@ -9,7 +9,7 @@ Am **{bereich.board}** stehen dringende Nachrichten, z. B. „Training fällt he
 ![Die Seite des {bereich.board}s mit aktuellen Nachrichten und laufenden {bereich.polls}](bild:schwarzes-brett)
 
 ## So öffnest du die Seite
-Tippe im Banner oben auf den Titel einer Nachricht oder auf **Brett öffnen**. Hast du eine Benachrichtigung oder eine Mail zu einer neuen Nachricht bekommen, öffnet ein Tipp darauf bzw. auf **in der App ansehen** ebenfalls diese Seite.
+Hast du unten **Intern**, tippe dort auf den Knopf **{bereich.board}**. Oder tippe im Banner oben auf den Titel einer Nachricht oder auf **Brett öffnen**. Hast du eine Benachrichtigung oder eine Mail zu einer neuen Nachricht bekommen, öffnet ein Tipp darauf bzw. auf **in der App ansehen** ebenfalls diese Seite.
 
 Das Banner erscheint nur, solange es eine Nachricht gibt oder eine laufende Umfrage, auf die du noch nicht geantwortet hast.
 

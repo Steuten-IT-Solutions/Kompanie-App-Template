@@ -36,6 +36,10 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'intern';
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : id ? 'dokument-ansehen' : 'dokumente';
+    case 'dienstgrade':
+      return 'dienstgrade';
+    case 'punktekatalog':
+      return 'punktekatalog-ansehen';
     case 'mitglieder':
       // Ämter (Issue #112): eigener Abschnitt im Tab, ohne Mitgliederverzeichnis der ganze Tab
       return on('offices') && (sub === 'aemter' || !on('directory')) ? 'aemter' : 'mitglieder';
