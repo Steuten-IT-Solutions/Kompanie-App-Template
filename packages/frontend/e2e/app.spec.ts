@@ -2003,6 +2003,121 @@ test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „L
   }
 });
 
+test.describe('Vorabladen (Issue #104)', () => {
+  // page.route und page.on('request') sehen Anfragen, die der Service Worker selbst stellt, nicht.
+  test.use({ serviceWorkers: 'block' });
+
+  /** Anfragen an die API mitschreiben (Pfad, z. B. „/news“), dazu Antworten mit 403. */
+  function watchApi(page: Page) {
+    const paths: string[] = [];
+    const forbidden: string[] = [];
+    page.on('request', (r) => {
+      const m = decodeURIComponent(r.url()).match(/\/api\/v1(\/[^?&]*)/);
+      if (m && r.method() === 'GET') paths.push(m[1]);
+    });
+    page.on('response', (r) => {
+      if (r.status() === 403) forbidden.push(r.url());
+    });
+    return { paths, forbidden, count: (p: string) => paths.filter((x) => x === p).length };
+  }
+
+  /** Termine sind geladen (mit oder ohne öffentliche Termine, je nachdem, welche Tests vorher liefen). */
+  const startPageLoaded = (page: Page) => expect(page.getByText(/Tag der offenen Tür|Keine anstehenden Termine/)).toBeVisible();
+
+  /** Datensparmodus (navigator.connection.saveData) wie in Chrome auf Android */
+  const saveData = (page: Page) =>
+    page.addInitScript(() => Object.defineProperty(navigator, 'connection', { value: { saveData: true, effectiveType: '4g' } }));
+
+  /** API ab jetzt sehr langsam: Was nicht schon vorab da ist, zeigt „Lädt …“ bzw. das Gerüst. */
+  const slowApi = (page: Page, re: RegExp) =>
+    page.route(re, async (route) => {
+      await new Promise((r) => setTimeout(r, 8000));
+      await route.continue().catch(() => undefined);
+    });
+
+  test('Leerlauf: Die übrigen Tabs sind beim ersten Öffnen sofort da, ohne 403', async ({ page }) => {
+    const api = watchApi(page);
+    await login(page, 'mitglied1');
+    await expect(page.getByText('Vereinsabend')).toBeVisible();
+    // Nach dem Start im Leerlauf, eins nach dem anderen (Reihenfolge der Tab-Leiste)
+    await expect.poll(() => api.count('/me')).toBeGreaterThan(0);
+    for (const p of ['/news', '/gallery', '/documents', '/directory']) expect(api.count(p), p).toBeGreaterThan(0);
+    // Nichts aus der Verwaltung (Mitglied hat keine), keine abgelehnten Anfragen
+    expect(api.paths.filter((p) => p.startsWith('/admin'))).toEqual([]);
+    expect(api.forbidden).toEqual([]);
+
+    await slowApi(page, /news|gallery|documents/);
+    try {
+      const tabbar = page.locator('.tabbar');
+      await tabbar.getByRole('button', { name: 'News' }).click();
+      await expect(page.locator('.news-card').first()).toBeVisible({ timeout: 1500 });
+      await tabbar.getByRole('button', { name: 'Galerie' }).click();
+      await expect(page.locator('.album-card').first()).toBeVisible({ timeout: 1500 });
+      await tabbar.getByRole('button', { name: 'Dokumente' }).click();
+      await expect(page.locator('.doc-group, .empty').first()).toBeVisible({ timeout: 1500 });
+      await expect(page.locator('.loading, .skeleton')).toHaveCount(0);
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+  });
+
+  test('Antippen: Die Anfrage startet bei pointerdown, vor dem Wechsel der Ansicht; ebenso ein Album', async ({ page }) => {
+    // Im Datensparmodus lädt die App im Leerlauf nichts vorab: So zählt hier nur das Antippen.
+    await saveData(page);
+    const api = watchApi(page);
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await startPageLoaded(page);
+    const news = page.locator('.tabbar').getByRole('button', { name: 'News' });
+    await news.dispatchEvent('pointerdown');
+    await expect.poll(() => api.count('/news')).toBe(1);
+    await expect(page).not.toHaveURL(/#\/news/);
+    await news.click();
+    await expect(page.locator('.news-card').first()).toBeVisible();
+    // Die Ansicht wartet auf die schon laufende Anfrage bzw. nimmt ihre Antwort, statt noch einmal zu fragen.
+    expect(api.count('/news')).toBe(1);
+
+    await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+    const album = page.locator('.album-card', { hasText: 'Sommerfest' });
+    await expect(album).toBeVisible();
+    const before = api.paths.filter((p) => /^\/gallery\/\d+$/.test(p)).length;
+    await album.dispatchEvent('pointerdown');
+    await expect.poll(() => api.paths.filter((p) => /^\/gallery\/\d+$/.test(p)).length).toBe(before + 1);
+    await album.click();
+    await expect(page.locator('.photo')).toHaveCount(2);
+    expect(api.paths.filter((p) => /^\/gallery\/\d+$/.test(p)).length).toBe(before + 1);
+  });
+
+  test('Datensparmodus: im Leerlauf nichts vorab', async ({ page }) => {
+    await saveData(page);
+    const api = watchApi(page);
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await startPageLoaded(page);
+    // Ohne Datensparmodus käme die erste Vorab-Anfrage nach etwa einer Sekunde (Test oben).
+    await page.waitForTimeout(3000);
+    expect(api.count('/news')).toBe(0);
+    expect(api.count('/gallery')).toBe(0);
+  });
+
+  test('Vorschau „App als Rolle ansehen“: kein Vorabladen, auch nicht beim Antippen', async ({ page }) => {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await page.evaluate(() => sessionStorage.setItem('kompanie-preview', '@public'));
+    const api = watchApi(page);
+    await page.goto('/app/#/termine');
+    await page.reload();
+    await expect(page.locator('.preview-banner')).toHaveText(/Vorschau ohne Anmeldung/);
+    await startPageLoaded(page);
+    await page.waitForTimeout(3000);
+    await page.locator('.tabbar').getByRole('button', { name: 'News' }).dispatchEvent('pointerdown');
+    await page.waitForTimeout(500);
+    expect(api.count('/news')).toBe(0);
+    expect(api.count('/gallery')).toBe(0);
+    await page.locator('.preview-banner').getByRole('button', { name: 'Beenden' }).click();
+    await expect(page.locator('.preview-banner')).toHaveCount(0);
+  });
+});
+
 test('Admin stuft ein Mitglied zum Gast herab und zurück', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Mitglieder');
@@ -3919,6 +4034,17 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   await expect(page.locator('.maintenance-banner')).toContainText('Wartungsmodus aktiv – nur Admins können die App nutzen.');
   await expect(page.locator('.maintenance-banner')).toContainText('bis ca. 18 Uhr');
   await shot(page, '31-wartungsmodus-admin');
+  // Im Wartungsmodus lädt die App nichts vorab (Issue #104), auch für Admins nicht: nur die geöffnete Ansicht.
+  await page.reload();
+  await expect(page.locator('.maintenance-banner')).toBeVisible();
+  await page.waitForTimeout(3000);
+  const prefetched = await page.evaluate(() =>
+    performance
+      .getEntriesByType('resource')
+      .map((e) => decodeURIComponent(e.name))
+      .filter((u) => /\/api\/v1\/(news|gallery|documents|directory)\b/.test(u)),
+  );
+  expect(prefetched).toEqual([]);
 
   // Das Mitglied öffnet die App erneut: nur die Wartungsseite, die gespeicherten Daten bleiben.
   await member.reload();

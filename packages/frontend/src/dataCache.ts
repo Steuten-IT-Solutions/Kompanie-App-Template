@@ -16,6 +16,8 @@ let updateTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Neue Daten im Hintergrund angekommen: offene Ansichten neu laden (mehrere Meldungen kurz hintereinander gebündelt). */
 export function dataUpdated(): void {
+  // Vorab Geladenes ist dann nicht mehr frisch: Die Ansicht fragt beim Öffnen wieder.
+  fresh.clear();
   clearTimeout(updateTimer);
   updateTimer = setTimeout(() => window.dispatchEvent(new Event(DATA_UPDATED)), 100);
 }
@@ -35,6 +37,7 @@ export const dataCache = {
   generation: () => generation,
   clear() {
     entries.clear();
+    fresh.clear();
     generation++;
   },
 };
@@ -44,26 +47,52 @@ export function cacheKey(key: string, deps: unknown[]): string {
   return `${key}|${JSON.stringify(deps)}`;
 }
 
-const pending = new Map<string, Promise<unknown>>();
+const pending = new Map<string, { since: number; promise: Promise<unknown> }>();
+/** Vorab geladen, noch nicht angezeigt: Zeitpunkt; bis FRESH_MS danach fragt die Ansicht beim Öffnen nicht noch einmal. */
+const fresh = new Map<string, number>();
+export const FRESH_MS = 10_000;
 
 /**
- * Daten für eine Ansicht schon laden, bevor sie geöffnet wird (z. B. das nächste Mitglied beim Wischen): Sie liegen
- * dann unter demselben Schlüssel wie bei useAsync(fn, deps, key) und erscheinen beim Öffnen sofort. Lädt nur, wenn noch
- * nichts gespeichert ist und keine Anfrage dafür läuft; Fehler bleiben still (die Ansicht lädt dann selbst).
+ * Daten für eine Ansicht schon laden, bevor sie geöffnet wird (z. B. das nächste Mitglied beim Wischen, ein Tab beim
+ * Antippen, Issue #104): Sie liegen dann unter demselben Schlüssel wie bei useAsync(fn, deps, key) und erscheinen beim
+ * Öffnen sofort. Lädt nur, wenn noch nichts gespeichert ist und keine Anfrage dafür läuft; Fehler bleiben still (die
+ * Ansicht lädt dann selbst).
  */
 export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>): Promise<void> {
   const k = cacheKey(key, deps);
   if (entries.has(k)) return Promise.resolve();
-  let p = pending.get(k);
+  let p = pending.get(k)?.promise;
   if (!p) {
     const since = generation;
-    p = fn()
-      .then((d) => {
-        if (d !== null) dataCache.set(k, d, since);
-      })
-      .catch(() => {})
-      .finally(() => pending.delete(k));
-    pending.set(k, p);
+    p = fn();
+    pending.set(k, { since, promise: p });
+    p.then(
+      (d) => {
+        if (d === null || since !== generation) return;
+        dataCache.set(k, d, since);
+        fresh.set(k, Date.now());
+      },
+      () => {},
+    ).finally(() => pending.delete(k));
   }
-  return p.then(() => {});
+  return p.then(
+    () => {},
+    () => {},
+  );
+}
+
+/**
+ * Laufende Vorab-Anfrage für diesen Schlüssel (cacheKey), wenn sie seit der letzten eigenen Änderung begann: Die
+ * Ansicht wartet dann auf sie, statt dieselben Daten ein zweites Mal anzufragen.
+ */
+export function pendingPrefetch(k: string): Promise<unknown> | undefined {
+  const p = pending.get(k);
+  return p && p.since === generation ? p.promise : undefined;
+}
+
+/** Gerade erst vorab geladen (höchstens FRESH_MS her)? Gilt nur einmal: Danach lädt die Ansicht wie sonst im Hintergrund neu. */
+export function takeFresh(k: string, now = Date.now()): boolean {
+  const at = fresh.get(k);
+  fresh.delete(k);
+  return at !== undefined && now - at < FRESH_MS;
 }

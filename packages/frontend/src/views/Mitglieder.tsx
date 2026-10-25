@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { api, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
+import { config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import brand from '../generated/brand';
 import { formatYearOrDate, groupCounts } from '../format';
 import { MemberAvatar, preloadAvatar, ZoomableAvatar } from '../memberPhoto';
@@ -26,6 +26,7 @@ import { navigate, redirect } from '../router';
 import { PersonName } from '../skeleton';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { OfficesView, PersonOffices, useOffices } from './Aemter';
+import { sources, storedMembersSection, storeMembersSection } from '../viewData';
 
 /** Nach Namen oder Eintritt; Punkte stehen in dieser Liste nicht. */
 const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
@@ -33,25 +34,7 @@ const SORTS: MemberSort[] = ['last-name', 'first-name', 'joined'];
 const FORMER_SORTS: MemberSort[] = [...SORTS, 'left'];
 
 const sec = brand.labels.sections;
-const SECTION_KEY = 'kompanie-members-section';
-
-function storedSection(): string | null {
-  try {
-    return localStorage.getItem(SECTION_KEY);
-  } catch {
-    return null;
-  }
-}
-
 type Section = 'liste' | 'aemter' | 'ehemalige';
-
-function storeSection(section: Section): void {
-  try {
-    localStorage.setItem(SECTION_KEY, section);
-  } catch {
-    // ohne Speicher: beim nächsten Öffnen wieder die Liste
-  }
-}
 
 /**
  * Eintritt und Ausscheiden einer ehemaligen Person, wie eingetragen (ganzes Datum oder nur das Jahr): „Gründungsmitglied ·
@@ -107,14 +90,14 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
   const offices = !!config?.features.offices;
   const id = /^\d+$/.test(path[0] ?? '') ? path[0] : path[0] === 'aemter' && /^\d+$/.test(path[1] ?? '') ? path[1] : null;
   const person = id !== null ? Number(id) : null;
-  const wanted = ['liste', 'aemter', 'ehemalige'].includes(path[0] ?? '') ? path[0] : storedSection();
+  const wanted = ['liste', 'aemter', 'ehemalige'].includes(path[0] ?? '') ? path[0] : storedMembersSection();
   // Auf der Seite einer ehemaligen Person ist „Ehemalige“ markiert, nicht die Mitgliederliste. Die Seite der Person
   // nutzt dieselben Daten mit (meist schon aus der Liste geladen). Ein anderer Pfad baut die Ansicht neu auf (viewKey).
   const showsFormer = directory && person !== null;
   const former = useAsync<DirectoryFormerEntry[] | null>(
-    () => (showsFormer ? api.directoryFormer() : Promise.resolve(null)),
+    () => (showsFormer ? sources.directoryFormer.load() : Promise.resolve(null)),
     [],
-    showsFormer ? 'directory-former' : undefined,
+    showsFormer ? sources.directoryFormer.key : undefined,
   );
   const section: Section = !directory
     ? 'aemter'
@@ -126,7 +109,7 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
         ? (wanted as Section)
         : 'liste';
   const open = (next: Section) => {
-    storeSection(next);
+    storeMembersSection(next);
     navigate(`mitglieder/${next}`);
   };
   const tab = (key: Section, label: string) => (
@@ -282,7 +265,11 @@ function MemberPage({
   /** Ehemalige, geladen von Mitglieder (dort für die Markierung „Ehemalige“ gebraucht) */
   former: ReturnType<typeof useAsync<DirectoryFormerEntry[] | null>>;
 }) {
-  const list = useAsync(() => (directory ? api.directory() : Promise.resolve(null)), [], directory ? 'directory' : undefined);
+  const list = useAsync(
+    () => (directory ? sources.directory.load() : Promise.resolve(null)),
+    [],
+    directory ? sources.directory.key : undefined,
+  );
   // Nur für den Namen ohne Mitgliederliste; die Ämter darunter laden selbst.
   const officeData = useOffices(offices && !directory);
   const findPerson = (id: number | null) => {
@@ -371,12 +358,16 @@ function MemberPage({
  */
 function MemberList({ former = false }: { former?: boolean }) {
   const { data, error, loading, reload } = useAsync<(DirectoryEntry & Partial<DirectoryFormerEntry>)[]>(
-    () => (former ? api.directoryFormer() : api.directory()),
+    () => (former ? sources.directoryFormer : sources.directory).load(),
     [],
-    former ? 'directory-former' : 'directory',
+    (former ? sources.directoryFormer : sources.directory).key,
   );
   // Zähler je Gruppe wie in der Verwaltung; ohne (ältere Server, Fehler) bleibt die Gesamtzahl. Ehemalige ohne Gruppen.
-  const counts = useAsync(() => (former ? Promise.resolve([]) : api.directoryCounts()), [], former ? undefined : 'directory-counts');
+  const counts = useAsync(
+    () => (former ? Promise.resolve([]) : sources.directoryCounts.load()),
+    [],
+    former ? undefined : sources.directoryCounts.key,
+  );
   const [query, setQuery] = useState('');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Gemerkt ist vielleicht die Sortierung nach Punkten aus der Verwaltung: hier dann nach Nachname.

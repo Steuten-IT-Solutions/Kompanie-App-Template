@@ -1140,6 +1140,8 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+  /** Für „Fehler melden“ vermerkt (lastError.ts); Vorabladen vergisst ihn wieder. */
+  noted: ReturnType<typeof noteError> = null;
 }
 
 let csrfToken = config?.csrf.token ?? '';
@@ -1225,8 +1227,9 @@ async function requestFull<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    if (!path.startsWith('/reports')) noteError('Keine Verbindung zum Server');
-    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    const err = new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    if (!path.startsWith('/reports')) err.noted = noteError('Keine Verbindung zum Server');
+    throw err;
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
   // Ausnahme: die Abfrage des Push-Status beim Start, ein POST ohne Änderung an den angezeigten Daten.
@@ -1248,8 +1251,9 @@ async function requestFull<T>(
   if (!res.ok) {
     const message: string = data?.message ?? `Fehler ${res.status}`;
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
-    if (!path.startsWith('/reports')) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
-    throw new ApiError(message, res.status, data?.code ?? '');
+    const err = new ApiError(message, res.status, data?.code ?? '');
+    if (!path.startsWith('/reports')) err.noted = noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
+    throw err;
   }
   return { data: data as T, headers: res.headers };
 }

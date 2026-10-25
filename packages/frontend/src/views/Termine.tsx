@@ -1,23 +1,12 @@
 import { useMemo, useState } from 'react';
-import { api, can, config, type CalendarEvent } from '../api';
+import { can, config } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-
-type EventLike = CalendarEvent & { url?: string };
-
-/** Mitglieder und Anwärter sehen den Kalender mit allen Terminen, Gäste die öffentliche Terminliste. */
-async function loadEvents(): Promise<EventLike[]> {
-  if (can('calendar') && config?.features.calendar) return api.calendar();
-  const list = await api.events();
-  return list.map((ev) => ({ ...ev, id: `p${ev.id}` }));
-}
-
-/** Termine aus Kalender oder öffentlicher Liste – oder (nur Geburtstage an) gar keine. */
-const hasEvents = (): boolean => !!(config?.features.events || (config?.features.calendar && can('calendar')));
+import { hasEvents, sources, type EventLike } from '../viewData';
 
 export default function Termine() {
   // Geburtstage (Issue #1): „Anstehende Geburtstage“ oben; ohne Termine die einzige Karte.
@@ -26,7 +15,7 @@ export default function Termine() {
 }
 
 function EventList() {
-  const { data, error, loading, reload } = useAsync(loadEvents, [], 'termine');
+  const { data, error, loading, reload } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
   const showBirthdays = birthdaysVisible();

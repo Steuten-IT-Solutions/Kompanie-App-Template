@@ -5,13 +5,29 @@
 
 const MAX = 500;
 
-let last: { message: string; at: number } | null = null;
+type Entry = { message: string; at: number };
+let last: Entry | null = null;
+/** Die Meldung vor `last`, für forgetError */
+let previous: Entry | null = null;
 let origin: string | null = null;
 
 /** Letzte Fehlermeldung vermerken: Antworten der API mit Fehler und Programmfehler (window.onerror, React). */
-export function noteError(message: string): void {
+export function noteError(message: string): Entry | null {
   const text = message.replace(/\s+/g, ' ').trim().slice(0, MAX);
-  if (text !== '') last = { message: text, at: Date.now() };
+  if (text === '') return null;
+  previous = last;
+  last = { message: text, at: Date.now() };
+  return last;
+}
+
+/**
+ * Eine vermerkte Meldung wieder vergessen (Fehler beim Vorabladen, Issue #104: die Ansicht lädt dann selbst und meldet
+ * ihn, wenn er bleibt). Ist inzwischen eine neuere vermerkt, bleibt diese.
+ */
+export function forgetError(entry: unknown): void {
+  if (last === null || last !== entry) return;
+  last = previous;
+  previous = null;
 }
 
 /** Die zuletzt vermerkte Fehlermeldung oder null. */
@@ -40,5 +56,6 @@ export function watchRuntimeErrors(): void {
 /** Nur für Tests */
 export function resetLastError(): void {
   last = null;
+  previous = null;
   origin = null;
 }
