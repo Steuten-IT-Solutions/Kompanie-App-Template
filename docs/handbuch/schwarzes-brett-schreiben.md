@@ -84,7 +84,7 @@ Unter **Verlauf: abgelaufene und gelöschte Nachrichten** steht sie noch 30 Tage
 
 ## Gut zu wissen
 - Mit **Benachrichtigung senden** bekommen alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) eine Benachrichtigung mit dem Titel, außer dir selbst. Das gilt für alle, die die Art **{bereich.board}: dringende Nachrichten** auf ihrem Gerät eingeschaltet haben.
-- **E-Mail senden** gibt es, wenn ein {rolle.admin} den Mailversand eingerichtet hat. Die Mail geht an alle {rolle.member} und Personen mit dem internen Kalender, für die eine Mailadresse hinterlegt ist und die Mails vom Brett nicht abgeschaltet haben, außer dir. Jede Person bekommt ihre eigene Mail; die Adressen der anderen sieht niemand.
+- **E-Mail senden** gibt es, wenn ein {rolle.admin} den Mailversand eingerichtet hat. Die Mail geht an alle {rolle.member} und Personen mit dem internen Kalender, für die eine Mailadresse hinterlegt ist und die Mails vom Brett nicht abgeschaltet haben, auch an dich selbst. So siehst du, wie die Mail ankommt. Jede Person bekommt ihre eigene Mail; die Adressen der anderen sieht niemand.
 - Anhänge sehen und laden alle herunter, die die Nachricht sehen. Mit **E-Mail senden** hängen sie auch an der Mail. Eine Datei darf höchstens 20 MB groß sein (bei manchen Servern weniger; die App sagt es dann).
 - Ist die Mail mit ihren Bildern und Anhängen größer, als der Mailserver annimmt, sagt die App das vor dem Veröffentlichen. Verkleinere dann Bilder oder Anhänge oder nimm den Haken **E-Mail senden** weg.
 - Ändern verschickt keine neue Benachrichtigung und keine neue Mail. Ändern sich Titel oder Text, sehen auch die die Nachricht wieder im Banner, die sie ausgeblendet hatten. Ändert sich nur das Ende, bleibt sie ausgeblendet.

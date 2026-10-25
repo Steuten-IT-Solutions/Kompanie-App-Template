@@ -712,7 +712,7 @@ final class Api
                     throw ApiError::invalid('mail muss true oder false sein.');
                 }
                 if ($mail && !$a->boardMail()->available()) {
-                    throw ApiError::invalid($a->boardMail()->info($this->user())['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
+                    throw ApiError::invalid($a->boardMail()->info()['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
                 }
                 // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
                 if ($mail && is_string($r->input('title')) && is_string($r->input('text'))) {
@@ -732,7 +732,7 @@ final class Api
                 return Response::created($item);
             }, 'board', $denyRights),
             // Haken „E-Mail senden“: eingerichtet? Wie viele Empfänger?
-            new Route('GET', '/board/mail', Cap::PostBoard, fn () => $a->boardMail()->info($this->user()), 'board', $denyRights),
+            new Route('GET', '/board/mail', Cap::PostBoard, fn () => $a->boardMail()->info(), 'board', $denyRights),
             // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
             new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended(), 'board', $denyRights),
             new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id()), 'board', $denyRights),

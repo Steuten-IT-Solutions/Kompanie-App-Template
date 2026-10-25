@@ -54,12 +54,12 @@ final class BoardMailService
     }
 
     /** @return array{available: bool, recipients: int, reason: string|null} für das Formular „Neue Nachricht“ */
-    public function info(User $author): array
+    public function info(): array
     {
         $available = $this->available();
         return [
             'available' => $available,
-            'recipients' => $available ? count($this->recipients($author->id)) : 0,
+            'recipients' => $available ? count($this->recipients()) : 0,
             'reason' => $available ? null : ($this->app->mail()->unavailable() ?? 'Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).'),
             'server_max_size' => $this->app->mail()->serverMaxSize(),
         ];
@@ -81,16 +81,16 @@ final class BoardMailService
     }
 
     /**
-     * Empfänger: Konto-ID => [Name, Adresse].
+     * Empfänger: Konto-ID => [Name, Adresse]. Auch der Verfasser, wie alle anderen nur ohne „Mails vom Brett“ abgeschaltet.
      *
      * @return array<int, array{name: string, email: string}>
      */
-    public function recipients(int $authorId): array
+    public function recipients(): array
     {
         $optOut = array_filter((new UserSettings($this->app->db))->all(self::SETTING_OPT), static fn (string $v): bool => $v === '0');
         $users = array_filter(
             $this->app->users->list(false),
-            static fn (User $u): bool => $u->id !== $authorId && !isset($optOut[$u->id]) && BoardService::isRecipient($u),
+            static fn (User $u): bool => !isset($optOut[$u->id]) && BoardService::isRecipient($u),
         );
         $emails = $this->app->users->emails(array_values(array_map(static fn (User $u): int => $u->id, $users)));
         $out = [];
@@ -135,7 +135,7 @@ final class BoardMailService
         if (!$this->available()) {
             throw ApiError::invalid('Der Mailversand ist nicht eingerichtet.');
         }
-        $recipients = $this->recipients($author->id);
+        $recipients = $this->recipients();
         $now = $this->app->time()->nowUtc();
         $this->app->db->transaction(function () use ($recipients, $messageId, $now): void {
             foreach ($recipients as $userId => $r) {
