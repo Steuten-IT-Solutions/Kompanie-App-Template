@@ -37,6 +37,11 @@ final class Api
     private const MAINTENANCE_OPEN = ['/config', '/auth/login', '/auth/logout', '/auth/csrf'];
     /** In der Vorschau (Issue #63) trotz „nur ansehen“ erlaubt: Abmelden (die App beendet dabei auch die Vorschau). */
     public const PREVIEW_OPEN = ['/auth/logout'];
+    /**
+     * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
+     * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
+     */
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/key', '/push/status', '/me/push/status', '/reports/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -100,7 +105,11 @@ final class Api
             }
             $this->authorize($route);
             $result = ($route->handler)($request);
-            return $result instanceof Response ? $result : new Response($result);
+            $response = $result instanceof Response ? $result : new Response($result);
+            if ($response->status < 400 && !in_array($route->path, self::NOT_TRACKED, true)) {
+                $this->app->activity()->record($this->app->authContext->currentUser(), $route->feature ?? 'app', self::action($route));
+            }
+            return $response;
         } catch (ApiError $e) {
             return Response::error($e);
         } catch (\Throwable $e) {
@@ -111,6 +120,20 @@ final class Api
             $this->app->telemetry()->record($db ? Code::DbError : Code::ServerError, Detail::of($kind, $route->method, $route->path), Detail::describe($e));
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
+    }
+
+    /** Art der Nutzung einer Route für die Nutzungsauswertung (Domain\ActivityService::ACTIONS). */
+    private static function action(Route $route): string
+    {
+        if (str_ends_with($route->path, '/vote')) {
+            return 'vote';
+        }
+        return match ($route->method) {
+            'POST' => 'create',
+            'PUT', 'PATCH' => 'update',
+            'DELETE' => 'delete',
+            default => 'view',
+        };
     }
 
     /**
@@ -444,11 +467,12 @@ final class Api
             new Route('GET', '/config', $P, fn () => $this->config()),
             new Route('GET', '/auth/csrf', $L, fn () => ['token' => $a->authenticator->csrfToken()]),
             new Route('POST', '/auth/login', $P, function (Request $r) use ($a) {
-                $a->authenticator->login(
+                $user = $a->authenticator->login(
                     is_string($r->input('username')) ? trim($r->input('username')) : '',
                     is_string($r->input('password')) ? $r->input('password') : '',
                     $r->input('remember') === null ? true : Input::bool($r->input('remember')),
                 );
+                $a->activity()->record($user, 'login', 'login');
                 return $this->config();
             }),
             new Route('POST', '/auth/logout', $L, function () use ($a) {
@@ -847,6 +871,10 @@ final class Api
             new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
 
             // Einstellungen (Admins)
+            // Nutzungsauswertung (Issue #175): nur Admins (view_activity); Erfassung je Person schalten mit den Einstellungen.
+            new Route('GET', '/admin/activity', Cap::ViewActivity, fn (Request $r) => $a->activity()->overview($r->query['from'] ?? null, $r->query['to'] ?? null), null, $denySettings),
+            new Route('GET', '/admin/activity/entries', Cap::ViewActivity, fn (Request $r) => $a->activity()->entries($r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null), null, $denySettings),
+            new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),

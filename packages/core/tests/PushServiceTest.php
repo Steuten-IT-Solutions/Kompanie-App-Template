@@ -335,8 +335,8 @@ final class PushServiceTest extends TestCase
         $this->assertSame('86400', $sent[0]['headers']['TTL']);
         $this->assertMatchesRegularExpression('/^vapid t=[^.]+\.[^.]+\.[^,]+, k=[A-Za-z0-9_-]{87}$/', $sent[0]['headers']['Authorization']);
         $msg = self::decrypt((string) $sent[0]['body'], $a);
-        $this->assertSame('meins/strafen', $msg['route']);
-        $this->assertSame('https://example.org/app/#/meins/strafen', $msg['url'], 'für Service Worker einer früheren App');
+        $this->assertSame('meins/strafen/7', $msg['route'], 'führt zum Eintrag (Issue #190)');
+        $this->assertSame('https://example.org/app/#/meins/strafen/7', $msg['url'], 'für Service Worker einer früheren App');
         $this->assertSame('2,50 € – Zu spät', $msg['body'], 'Details eingeschaltet');
         $this->assertSame(0, $p->repository()->counts()['queued']);
 
@@ -417,6 +417,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame('Tippen zum Ansehen.', $bodies[0]['body'], 'Betrag und Grund nur mit Details');
         $this->assertSame('−1,5 – Abzug', $bodies[1]['body']);
         $this->assertSame('Punkte abgezogen', $bodies[1]['title']);
+        $this->assertSame(['meins/strafen/1', 'meins/punkte/2'], [$bodies[0]['route'], $bodies[1]['route']], 'führt zum Eintrag (Issue #190)');
     }
 
     public function testPromotionCarriesBadgeImage(): void
@@ -471,8 +472,11 @@ final class PushServiceTest extends TestCase
         $this->ics(self::vevent('a', '20261101', 'Probe umbenannt', 'Sporthalle'), self::vevent('b', '20261102', 'Fest'));
         $this->assertSame(1, $app->pushTriggers()->checkCalendar(), 'Ort geändert');
         $app->push()->processQueue();
-        $titles = array_map(fn (array $c): string => self::decrypt((string) $c['body'], $d)['title'], $this->pushes());
-        $this->assertSame(['Neuer Termin', 'Termin geändert'], $titles);
+        $msgs = array_map(fn (array $c): array => self::decrypt((string) $c['body'], $d), $this->pushes());
+        $this->assertSame(['Neuer Termin', 'Termin geändert'], array_column($msgs, 'title'));
+        // Issue #190: Ziel ist der Termin mit der Kennung aus dem Kalender.
+        $ids = array_column($app->calendar()->events(), 'id', 'title');
+        $this->assertSame(['termine/termin/' . $ids['Fest'], 'termine/termin/' . $ids['Probe umbenannt']], array_column($msgs, 'route'));
     }
 
     public function testPublicEventsGoToGuestsAndAccountsWithoutCalendar(): void
@@ -497,6 +501,7 @@ final class PushServiceTest extends TestCase
         $msg = self::decrypt((string) $this->pushes()[0]['body'], $g);
         $this->assertSame('Neuer Termin', $msg['title']);
         $this->assertSame('Sommerfest – Sa 07.11.2026 – Festplatz', $msg['body']);
+        $this->assertSame('termine/termin/p' . $id, $msg['route'], 'öffentlicher Termin mit „p“ wie in der Liste (Issue #190)');
     }
 
     public function testReminderOncePerDayFromTheConfiguredHour(): void
@@ -506,7 +511,7 @@ final class PushServiceTest extends TestCase
         $app->push()->subscribe(null, $g['endpoint'], $g['keys'], ['reminder'], null, '1.1.1.1');
         $admin = $this->users->add('admin', Roles::ADMIN);
         $this->users->current = $admin;
-        $app->api()->handle(new Request('POST', '/events', [], ['title' => 'Vereinsabend', 'start_date' => '2026-10-20', 'start_time' => '19:00']));
+        $id = $app->api()->handle(new Request('POST', '/events', [], ['title' => 'Vereinsabend', 'start_date' => '2026-10-20', 'start_time' => '19:00']))->data['id'];
         $app->push()->repository()->dequeue(array_column($app->push()->repository()->claim('9999-12-31 00:00:00', '9999-12-31 00:00:00', 100), 'id'));
         $tz = new \DateTimeZone('Europe/Berlin');
         $t = $app->pushTriggers();
@@ -519,6 +524,23 @@ final class PushServiceTest extends TestCase
         $msg = self::decrypt((string) $this->pushes()[0]['body'], $g);
         $this->assertSame('Morgen: Vereinsabend', $msg['title']);
         $this->assertSame('Vereinsabend (19:00 Uhr)', $msg['body']);
+        $this->assertSame('termine/termin/p' . $id, $msg['route'], 'ein Termin: dorthin (Issue #190)');
+    }
+
+    public function testReminderForSeveralEventsOpensTheList(): void
+    {
+        $app = $this->app();
+        $g = self::device('g');
+        $app->push()->subscribe(null, $g['endpoint'], $g['keys'], ['reminder'], null, '1.1.1.1');
+        $this->users->current = $this->users->add('admin', Roles::ADMIN);
+        foreach (['Probe', 'Vereinsabend'] as $title) {
+            $app->api()->handle(new Request('POST', '/events', [], ['title' => $title, 'start_date' => '2026-10-20', 'start_time' => '19:00']));
+        }
+        $app->push()->repository()->dequeue(array_column($app->push()->repository()->claim('9999-12-31 00:00:00', '9999-12-31 00:00:00', 100), 'id'));
+        $this->assertSame(1, $app->pushTriggers()->sendReminders(new \DateTimeImmutable('2026-10-19 18:05', new \DateTimeZone('Europe/Berlin'))));
+        $app->push()->processQueue();
+        $msg = self::decrypt((string) $this->pushes()[0]['body'], $g);
+        $this->assertSame(['Morgen: 2 Termine', 'termine'], [$msg['title'], $msg['route']]);
     }
 
     /** Issue #18: ein VAPID-Token je Push-Dienst und Lauf, alle Personen einer Buchung gemeinsam eingereiht. */

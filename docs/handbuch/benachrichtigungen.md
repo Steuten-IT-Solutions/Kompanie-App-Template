@@ -66,6 +66,7 @@ Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nich
 ![Hinweis auf dem iPhone: Benachrichtigungen nur in der installierten App](bild:benachrichtigungen-iphone)
 
 ## Gut zu wissen
+- Tippst du auf eine Nachricht, öffnet die App genau den Eintrag, um den es geht: Bei einem Termin scrollt die Liste unter **{bereich.events}** zu ihm, klappt ihn auf und hebt ihn kurz hervor. Genauso bei Nachrichten am {bereich.board}, bei deinen {bereich.points} und {bereich.penalties}. Ist der Eintrag nicht mehr da, siehst du die Liste.
 - Die Einstellung gilt nur für das Gerät, auf dem du sie vornimmst. Auf weiteren Geräten schaltest du sie dort ein.
 - Mit einem Konto bekommen höchstens 10 Geräte Benachrichtigungen. Schaltest du sie auf einem weiteren ein, fällt das am längsten eingerichtete weg.
 - Meldest du dich in der App ab, schaltet sie die Benachrichtigungen deines Kontos auf diesem Gerät aus. Endet die Anmeldung anders (z. B. abgelaufen), passiert das, sobald die App auf dem Gerät wieder geöffnet wird.

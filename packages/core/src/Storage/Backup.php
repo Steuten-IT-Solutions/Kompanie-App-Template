@@ -25,7 +25,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Die Push-Abos (push_subscriptions) und der Schlüssel dazu (Einstellung push_vapid) sind enthalten, damit Benachrichtigungen
  * nach einem Umzug weiter ankommen; die Warteschlange (push_queue) nicht.
  * Nicht enthalten sind wartende Fehlermeldungen (bug_reports, Issue #64): Sie gehören zur Installation, und Meldungen mit
- * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
+ * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen. Ebenso wenig die Nutzungsauswertung (activity*,
+ * Issue #175): Einträge je Person werden nach 90 Tagen gelöscht und sollen nicht in Sicherungen weiterleben.
  */
 final class Backup
 {
@@ -45,6 +46,8 @@ final class Backup
         'bug_reports_registered',
         // Zustand der Sicherungen in Google Drive (BackupUploadService::STATE_SETTING): letzter Lauf, Fehler.
         'backup_drive_state',
+        // Nutzungsauswertung (Issue #175): Geheimnis des Pseudonyms. Die Tabellen activity* sind keine Kerntabellen der Sicherung.
+        'activity_secret',
         // Web Push: Stand der Abgleiche gehört zu dieser Installation (Schlüssel und Abos sind in der Sicherung).
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];

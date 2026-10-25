@@ -22,9 +22,20 @@ const Konto = lazyView(() => import('./Konto'));
 /**
  * „Meins“: Übersicht (mit Titeln, Daten und Ämtern), Punkte, Strafen, Dienstgrad, Anwesenheit und das Konto,
  * umschaltbar. Die Summen (/me) lädt Meins einmal für alle, nur für Mitglieder; das Konto haben alle Angemeldeten.
- * Ältere Links auf meins/aemter landen in der Übersicht.
+ * Ältere Links auf meins/aemter landen in der Übersicht. meins/punkte/<id> und meins/strafen/<id> springen zu einem
+ * Eintrag (Ziel einer Benachrichtigung, Issue #190).
  */
-export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToast: (msg: string) => void; onLogout: () => void }) {
+export default function Meins({
+  sub,
+  focus,
+  onToast,
+  onLogout,
+}: {
+  sub?: string;
+  focus?: string;
+  onToast: (msg: string) => void;
+  onLogout: () => void;
+}) {
   const member = isMember();
   const me = useAsync(() => (member ? api.me() : Promise.resolve(null)), [], 'me');
   const dataParts = (
@@ -59,9 +70,10 @@ export default function Meins({ sub, onToast, onLogout }: { sub?: string; onToas
       ) : active === 'uebersicht' ? (
         <Uebersicht me={me.data!} />
       ) : active === 'punkte' ? (
-        <Punkte me={me.data!} />
+        // Neu aufbauen, wenn eine Benachrichtigung bei offener Seite auf einen Eintrag zeigt: lädt dann frisch.
+        <Punkte key={focus} me={me.data!} focus={focus} />
       ) : active === 'strafen' ? (
-        <Strafen me={me.data!} />
+        <Strafen key={focus} me={me.data!} focus={focus} />
       ) : active === 'dienstgrad' ? (
         <Dienstgrad />
       ) : active === 'anwesenheit' ? (

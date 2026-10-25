@@ -17,6 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Benachrichtigung öffnet den Eintrag**: Wer auf eine Benachrichtigung zu einem Termin tippt, landet direkt bei
+  diesem Termin. Die Terminliste scrollt dorthin, klappt ihn auf und hebt ihn kurz hervor. Das gilt auch für die
+  Erinnerung an einen einzelnen Termin am nächsten Tag, für Nachrichten am Schwarzen Brett sowie für eigene Punkte und
+  Strafen. Ist der Eintrag nicht mehr da, öffnet sich wie bisher die Liste.
 - **Videos in der Galerie**: Videos in den Album-Ordnern in Google Drive erscheinen jetzt im Album, mit ▶ und Dauer,
   in der App und auf der Webseite (`[kompanie_galerie]`). Antippen spielt sie ab. Videos im Ordner `intern` sehen wie
   Bilder nur Mitglieder. Die App spielt sie direkt aus Google Drive ab und speichert sie nicht; der Ordner muss dafür
@@ -72,6 +76,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
   Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Logo. `[kompanie_mitglieder]`
   zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
+- **Nutzung der App auswerten**: Unter *Einstellungen → Nutzung* sehen Admins, wie viele Konten in den letzten 24
+  Stunden, 7 und 30 Tagen aktiv waren, wie viele Personen je Tag die App genutzt haben und welche Bereiche wie oft
+  genutzt werden, für einen frei wählbaren Zeitraum. Dazu je Person, wann sie zuletzt aktiv war (wer lange nicht da
+  war, steht oben) und ihren Verlauf, außerdem alles als CSV-Datei. Gespeichert werden nur Bereich, Art (z. B.
+  angesehen, angelegt) und Uhrzeit, keine Inhalte und keine IP-Adressen. Die Einträge je Person bleiben 90 Tage, nur
+  auf eurem Server und nicht in der Datensicherung; mit einem Konto werden auch seine Einträge gelöscht. Die Erfassung
+  je Person ist eingeschaltet und lässt sich dort ausschalten; dann zählt die App nur noch ohne Namen. Bitte
+  informiert eure Mitglieder darüber, z. B. in der Datenschutzerklärung.
 - **Großansicht in voller Auflösung**: Galerie und Mitgliedsfotos erscheinen beim Antippen erst wie bisher und werden
   nach einem Moment durch die Originalauflösung ersetzt (App und Webseite). In der Galerie entsteht sie aus dem
   Original in Google Drive, wenn jemand das Bild zum ersten Mal öffnet. Mitgliedsfotos lädt die App jetzt bis
@@ -86,6 +98,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Statusmeldungen mit Nutzungszahlen**: Wenn ihr den Statusmeldungen zugestimmt habt, enthält das stündliche
+  Lebenszeichen jetzt auch Zahlen ohne Namen: wie viele Konten es gibt, wie viele in den letzten 24 Stunden, 7 und 30
+  Tagen aktiv waren und wie viele Personen welchen Bereich in den letzten 30 Tagen genutzt haben. Was genau gesendet
+  wird, steht wie bisher unter *Einstellungen → Zustand und Updates*; dort lassen sich die Statusmeldungen auch
+  ausschalten.
 - **Keine Daten der App in Suchmaschinen**: Alle Antworten der Schnittstelle, auch die öffentliche Mitgliederliste und
   die Ämter, tragen jetzt den Hinweis `noindex` für Suchmaschinen, wie schon die App-Seite und die Fotos.
 - **Ämter enden mit dem Ausscheiden**: Wer unter *Austritt* als ehemalig eingetragen wird, hat danach keine laufenden
@@ -120,6 +137,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   eingetragen ist, z. B. „Eintritt 01.04.2005“ (bisher nur das Jahr). Bei den Ehemaligen stehen Eintritt und
   Ausscheiden ebenso mit ganzem Datum, z. B. „01.04.1985 – 03.05.2010“; wer dort nur Jahre eingetragen hat, sieht
   weiter nur die Jahre. Das gilt für alle, die die Angaben sehen dürfen, bei den Ehemaligen also auch ohne Anmeldung.
+- **Geburtstag im selben Format wie Eintritt und Austritt**: Auf *Meins*, in der Verwaltung und auf der Seite einer
+  Person in der Mitgliederliste steht der Geburtstag jetzt als „02.12.1987“ (bisher „2. Dezember 1987“), ohne Jahr als
+  „02.12.“.
 - **Liste der Ehemaligen**: *Filter und Sortierung* ist wie in der Mitgliederliste zunächst eingeklappt und klappt mit
   einem Tipp auf. Ist der Filter nach dem Grund gesetzt, steht am eingeklappten Bereich „aktiv“.
 - **Erinnerung an die Datensicherung** schon nach 30 statt 90 Tagen ohne Sicherung außerhalb des Servers
@@ -151,6 +171,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Änderungen von anderen Geräten kamen manchmal nicht an**: Fragte die App gerade im Hintergrund nach neuen Daten,
+  während z. B. eine Nachricht am Schwarzen Brett auf einem anderen Gerät geändert wurde, blieb sie beim alten Stand,
+  auch nach dem Neuladen – eine geänderte, vorher ausgeblendete Nachricht erschien dann nicht wieder. Jetzt fragt die
+  App danach noch einmal nach und zeigt den neuen Stand.
 - **Shortcodes mittig**: Manche Themes (z. B. Astra) rückten `[kompanie_mitglieder]`, `[kompanie_termine]` und die
   Inhaber in `[kompanie_aemter]` nach rechts ein; links war mehr Platz als rechts. Die Listen stehen jetzt bündig.
 

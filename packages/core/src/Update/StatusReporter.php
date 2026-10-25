@@ -8,15 +8,16 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Telemetry\Code;
 
 /**
- * Statusmeldungen an uns (Format 2, Issue #20) – nur mit Zustimmung der Kompanie (Einstellung
+ * Statusmeldungen an uns (Format 3, Issue #20 und #175) – nur mit Zustimmung der Kompanie (Einstellung
  * status_reports). Stündlich ein Lebenszeichen, schwere Fehler sofort (siehe Telemetry\Telemetry).
  *
  * Inhalt abschließend (docs/OFFENE-PUNKTE.md, Abschnitt 4): Installations-ID, Kompanie, Version,
  * Variante, PHP-Version, Datenbank, Ampel je Bereich (nur Schlüssel und Stufe), Fehlercodes der
  * letzten 24 Stunden mit Anzahl und Ursache (Telemetry\Detail, z. B. „ics_http_404“), Art und letzter
  * Lauf der Hintergrundaufgaben, eingeschaltete Bereiche, Ergebnis des letzten Updates und
- * Galerie-Abgleichs. Keine Mitgliederdaten, keine Adressen, keine Fehlertexte (die stehen nur im
- * Fehlerprotokoll der Installation).
+ * Galerie-Abgleichs, im Lebenszeichen Nutzungszahlen ohne Personenbezug (usage: Konten, aktive Konten, Personen je
+ * Bereich; Domain\ActivityService::usage). Keine Namen, keine Benutzer-IDs, keine Adressen, keine Fehlertexte (die
+ * stehen nur im Fehlerprotokoll der Installation).
  *
  * Signiert mit HMAC-SHA256 und einem Geheimnis je Installation (Header X-Kompanie-Signature). Das
  * Cockpit lernt das Geheimnis bei der ersten Meldung einer neuen Installation (Feld key, nur bis
@@ -27,6 +28,8 @@ final class StatusReporter
     public const TASK = 'status_report';
     public const SETTING = 'status_reports';
     public const INTERVAL = 3600;
+    /** Format 3 = Format 2 mit usage im Lebenszeichen (Issue #175); das Cockpit muss es vor der App annehmen. */
+    public const FORMAT = 3;
 
     /** Diese Einstellungen gehören zur Installation und kommen nicht in Sicherungen (Backup::LOCAL_SETTINGS). */
     public const ID_SETTING = 'installation_id';
@@ -72,7 +75,7 @@ final class StatusReporter
         $last = $a->settings->get('update_last');
         $gallery = $a->gallery()->status();
         $data = [
-            'format' => 2,
+            'format' => self::FORMAT,
             'installation' => $this->installationId(),
             'kompanie' => (string) ($a->packageConfig['kompanie'] ?? ''),
             'version' => $a->env->version(),
@@ -85,6 +88,8 @@ final class StatusReporter
             'details' => (object) array_map(static fn (array $d): object => (object) $d, $a->telemetry()->details()),
             'cron' => ['kind' => $a->scheduler->kind(), 'last' => $this->lastTaskRun()],
             'features' => array_keys(array_filter($a->features()->all())),
+            // Nutzungszahlen (Issue #175): nur Summen, nur im Lebenszeichen.
+            ...($kind === 'heartbeat' ? ['usage' => $a->activity()->usage()] : []),
             'update' => is_array($last) ? ['ok' => (bool) ($last['ok'] ?? false), 'at' => (int) ($last['at'] ?? 0), 'to' => (string) ($last['to'] ?? '')] : null,
             'updateCheckOk' => (string) (((array) $a->settings->get('update_state', []))['error'] ?? '') === '',
             'gallery' => $a->gallery()->isConfigured() ? ['ok' => ($gallery['error'] ?? '') === '', 'at' => (int) ($gallery['last_sync'] ?? 0)] : null,
