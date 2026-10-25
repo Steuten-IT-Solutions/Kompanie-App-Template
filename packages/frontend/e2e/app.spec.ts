@@ -2007,12 +2007,15 @@ test.describe('Vorabladen (Issue #104)', () => {
   // page.route und page.on('request') sehen Anfragen, die der Service Worker selbst stellt, nicht.
   test.use({ serviceWorkers: 'block' });
 
+  /** Pfad einer API-Anfrage: eigenständig …/api/v1/…, WordPress …/kompanie-app/v1/… (auch ?rest_route=…) */
+  const API_PATH = /\/(?:api|kompanie-app)\/v1(\/[^?&]*)/;
+
   /** Anfragen an die API mitschreiben (Pfad, z. B. „/news“), dazu Antworten mit 403. preview: nur die der Vorschau. */
   function watchApi(page: Page, preview = false) {
     const paths: string[] = [];
     const forbidden: string[] = [];
     page.on('request', (r) => {
-      const m = decodeURIComponent(r.url()).match(/\/api\/v1(\/[^?&]*)/);
+      const m = decodeURIComponent(r.url()).match(API_PATH);
       if (m && r.method() === 'GET' && (!preview || r.headers()['x-kompanie-preview'])) paths.push(m[1]);
     });
     page.on('response', (r) => {
@@ -4044,7 +4047,7 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
     performance
       .getEntriesByType('resource')
       .map((e) => decodeURIComponent(e.name))
-      .filter((u) => /\/api\/v1\/(news|gallery|documents|directory)\b/.test(u)),
+      .filter((u) => /\/(?:api|kompanie-app)\/v1\/(news|gallery|documents|directory)\b/.test(u)),
   );
   expect(prefetched).toEqual([]);
 
