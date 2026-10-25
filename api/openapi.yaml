@@ -3567,6 +3567,86 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /admin/activity:
+    get:
+      tags: [Einstellungen]
+      summary: Nutzungsauswertung (Übersicht)
+      description: |
+        Issue #175. Nur für Admins (`view_activity`, nicht an Rollen vergebbar; bei WordPress auch mit `manage_options`).
+        Erfasst wird an den API-Routen für angemeldete Konten mit einer Rolle in der App, nicht in der Vorschau und nicht
+        für `/config`, `/auth/*` außer der Anmeldung, den Abgleich der Benachrichtigungen und das Formular zum Fehlermelden:
+        nur Bereich, Aktion und Zeit, keine Inhalte, keine IP-Adressen, kein User-Agent. Ansichten zählen höchstens einmal
+        je Person, Bereich und 15 Minuten. Einträge je Person (nur mit `personal`) werden nach 90 Tagen gelöscht, die
+        Tageszahlen ohne Personenbezug bleiben. Nicht in Sicherungen.
+      x-capability: view_activity
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'Beginn (JJJJ-MM-TT); Standard 29 Tage vor dem Ende' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'Ende einschließlich; Standard heute. Höchstens 366 Tage.' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivityOverview' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/activity/entries:
+    get:
+      tags: [Einstellungen]
+      summary: Nutzung je Person im Zeitraum (Verlauf, CSV)
+      description: Neueste zuerst, höchstens 5000 (`truncated` = es gab mehr). Leer, wenn die Erfassung je Person aus ist.
+      x-capability: view_activity
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: user_id, in: query, schema: { type: integer }, description: Nur dieses Konto }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, entries, truncated]
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  truncated: { type: boolean }
+                  entries:
+                    type: array
+                    items: { $ref: '#/components/schemas/ActivityEntry' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/activity/settings:
+    put:
+      tags: [Einstellungen]
+      summary: Erfassung je Person ein- oder ausschalten
+      description: Standard an. Ausschalten löscht sofort alle Einträge je Person und „zuletzt aktiv“; gezählt wird dann nur noch ohne Personenbezug.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [personal]
+              properties:
+                personal: { type: boolean }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [personal]
+                properties:
+                  personal: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/maintenance:
     get:
       tags: [Einstellungen]
@@ -3902,7 +3982,7 @@ paths:
                     properties:
                       enabled: { type: boolean, description: Der Admin hat Statusmeldungen zugestimmt }
                       available: { type: boolean, description: Das Paket nennt einen Empfänger }
-                      payload: { type: object, description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte)' }
+                      payload: { type: object, description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte), Format 3 mit usage (ActivityUsage und areas: Personen je Bereich in 30 Tagen)' }
                   setupDone: { type: boolean }
                   errorLog: { $ref: '#/components/schemas/ErrorLog' }
         '401': { $ref: '#/components/responses/Error' }
@@ -4551,6 +4631,75 @@ components:
         'on': { type: boolean }
         reason: { type: string, description: 'Begründung (Klartext), leer wenn keine' }
         since: { type: integer, description: 'Eingeschaltet seit (Unix-Zeit), 0 wenn aus' }
+    ActivityArea:
+      type: string
+      description: Schlüssel eines Bereichs (siehe Features) oder `app` (Allgemeines wie Verwaltung, Konto, Einstellungen) bzw. `login`
+      pattern: '^[a-z]{1,20}$'
+    ActivityUsage:
+      type: object
+      description: 'Zahlen ohne Personenbezug (auch Inhalt von usage in den Statusmeldungen, Format 3). Immer d1 ≤ d7 ≤ d30 ≤ users.'
+      required: [users, active]
+      properties:
+        users: { type: integer, minimum: 0, description: Konten mit einer Rolle in der App (ohne Gäste und Ehemalige) }
+        active:
+          type: object
+          required: [d1, d7, d30]
+          description: Konten mit mindestens einer Nutzung in den letzten 24 Stunden, 7 bzw. 30 Tagen
+          properties:
+            d1: { type: integer, minimum: 0 }
+            d7: { type: integer, minimum: 0 }
+            d30: { type: integer, minimum: 0 }
+    ActivityOverview:
+      allOf:
+        - $ref: '#/components/schemas/ActivityUsage'
+        - type: object
+          required: [personal, keep_days, from, to, days, areas, members]
+          properties:
+            personal: { type: boolean, description: Erfassung je Person an }
+            keep_days: { type: integer, description: Einträge je Person werden nach so vielen Tagen gelöscht (90) }
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            days:
+              type: array
+              description: Tage im Zeitraum mit Nutzung (Ortszeit)
+              items:
+                type: object
+                required: [day, users, actions]
+                properties:
+                  day: { type: string, format: date }
+                  users: { type: integer, description: Aktive Personen an diesem Tag }
+                  actions: { type: integer, description: Gezählte Nutzungen (Ansichten zusammengefasst) }
+            areas:
+              type: array
+              description: Nutzung je Bereich, meistgenutzte zuerst
+              items:
+                type: object
+                required: [area, label, actions, people]
+                properties:
+                  area: { $ref: '#/components/schemas/ActivityArea' }
+                  label: { type: string }
+                  actions: { type: integer, description: Nutzungen im Zeitraum }
+                  people: { type: integer, description: Personen in den letzten 30 Tagen }
+            members:
+              type: [array, 'null']
+              description: Nur mit Erfassung je Person; alle Konten mit einer Rolle in der App
+              items:
+                type: object
+                required: [id, name, last_active]
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  last_active: { type: [integer, 'null'], description: 'Unix-Zeit; null = nicht aktiv, seit die Erfassung je Person läuft' }
+    ActivityEntry:
+      type: object
+      required: [user_id, name, area, label, action, at]
+      properties:
+        user_id: { type: integer }
+        name: { type: string }
+        area: { $ref: '#/components/schemas/ActivityArea' }
+        label: { type: string }
+        action: { type: string, enum: [view, create, update, delete, vote, login] }
+        at: { type: integer, description: Unix-Zeit }
     Maintenance:
       allOf:
         - $ref: '#/components/schemas/MaintenanceInfo'
@@ -4685,7 +4834,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, manage_settings] }
+              items: { type: string, enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, view_activity, manage_settings] }
               description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -4718,7 +4867,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, manage_settings]
+            enum: [member, calendar, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, create_users, promote_users, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:

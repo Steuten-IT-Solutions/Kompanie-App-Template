@@ -1903,6 +1903,62 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* Nutzungsauswertung (Issue #175): Kennzahlen, Zeitraum, Balken je Tag und Bereich, Verlauf einer Person */
+.usage-stats {
+  margin-top: 12px;
+}
+.usage-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.usage-subtitle {
+  margin: 18px 0 8px;
+}
+.usage-bars {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.usage-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(60px, 40%) 3ch;
+  align-items: center;
+  gap: 8px;
+}
+.usage-bar-label {
+  overflow-wrap: anywhere;
+}
+.usage-bar {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.usage-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--primary);
+}
+.usage-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.usage-members {
+  margin-top: 10px;
+}
+.usage-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
 .error-log {
   list-style: none;
   margin: 0 0 12px;

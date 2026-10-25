@@ -26,6 +26,7 @@ export type Capability =
   | 'manage_lists'
   | 'create_users'
   | 'promote_users'
+  | 'view_activity'
   | 'manage_settings';
 export type Feature =
   | 'events'
@@ -94,6 +95,36 @@ export interface MaintenanceInfo {
 
 export interface MaintenanceState extends MaintenanceInfo {
   log: { at: number; by: number; by_name: string; on: boolean; reason: string }[];
+}
+
+/** Nutzungsauswertung (Issue #175): Zahlen ohne Personenbezug, immer d1 ≤ d7 ≤ d30 ≤ users */
+export interface ActivityUsage {
+  users: number;
+  active: { d1: number; d7: number; d30: number };
+}
+
+export interface ActivityOverview extends ActivityUsage {
+  /** Erfassung je Person an */
+  personal: boolean;
+  keep_days: number;
+  from: string;
+  to: string;
+  days: { day: string; users: number; actions: number }[];
+  /** meistgenutzte zuerst; people = Personen in den letzten 30 Tagen */
+  areas: { area: string; label: string; actions: number; people: number }[];
+  /** nur mit Erfassung je Person; last_active null = nicht aktiv, seit die Erfassung läuft */
+  members: { id: number; name: string; last_active: number | null }[] | null;
+}
+
+export type ActivityAction = 'view' | 'create' | 'update' | 'delete' | 'vote' | 'login';
+
+export interface ActivityEntry {
+  user_id: number;
+  name: string;
+  area: string;
+  label: string;
+  action: ActivityAction;
+  at: number;
 }
 
 declare global {
@@ -1524,6 +1555,15 @@ export const api = {
   features: () => request<FeatureInfo[]>('GET', '/admin/features'),
   setFeatures: (data: Partial<Record<Feature, boolean>>) => request<FeatureInfo[]>('PUT', '/admin/features', data),
   settings: () => request<AdminSettings>('GET', '/admin/settings'),
+  activity: (from?: string, to?: string) =>
+    request<ActivityOverview>('GET', '/admin/activity', undefined, { ...(from ? { from } : {}), ...(to ? { to } : {}) }),
+  activityEntries: (from: string, to: string, userId?: number) =>
+    request<{ from: string; to: string; entries: ActivityEntry[]; truncated: boolean }>('GET', '/admin/activity/entries', undefined, {
+      from,
+      to,
+      ...(userId ? { user_id: String(userId) } : {}),
+    }),
+  setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),

@@ -82,6 +82,11 @@ const gruppe: Gruppe = async (f) => {
   await expect(page.locator('#einstellungen-news [role=status]')).toBeVisible({ timeout: 30_000 });
   await ausschnitt('admin-neuigkeiten-test', '#einstellungen-news');
 
+  // Nutzung (Issue #175): Zahlen aus den Aufrufen der Gruppen davor
+  await f.oeffnen('einstellungen/nutzung');
+  await expect(page.getByRole('heading', { name: 'Aktive Personen je Tag' })).toBeVisible();
+  await f.foto('admin-nutzung');
+
   // Zustand und Updates mit Fehlerprotokoll (Einträge aus handbuch-daten/60-admin.php)
   await f.oeffnen('einstellungen/zustand');
   await f.foto('admin-zustand');

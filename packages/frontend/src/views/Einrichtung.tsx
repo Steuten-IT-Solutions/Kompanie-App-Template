@@ -140,9 +140,9 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
               <input type="checkbox" checked={reports} onChange={(e) => setReports(e.target.checked)} />
               <span>
                 Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen (Version, PHP-Version, Ampel je Bereich,
-                Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So
-                fallen Probleme früher auf. Die Fehlertexte bleiben auf eurem Server (Einstellungen → Zustand und Updates →
-                Fehlerprotokoll).
+                Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“, und Nutzungszahlen: Zahl der Konten, aktive Konten, Personen je
+                Bereich), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So fallen Probleme früher auf. Die Fehlertexte
+                bleiben auf eurem Server (Einstellungen → Zustand und Updates → Fehlerprotokoll).
               </span>
             </label>
           )}

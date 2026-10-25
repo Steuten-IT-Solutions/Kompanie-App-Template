@@ -3977,3 +3977,45 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   await expect(member.locator('.maintenance-page')).toHaveCount(0);
   await member.close();
 });
+
+test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf einer Person, schaltet die Erfassung je Person aus und an', async ({
+  page,
+  browser,
+}) => {
+  // Ein Mitglied nutzt die App (Termine, eigene Punkte).
+  const member = await browser.newPage();
+  await login(member, 'mitglied1');
+  await expect(member.getByText('Vereinsabend')).toBeVisible();
+  await member.close();
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Nutzung', { exact: true }) })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Aktive Personen je Tag' })).toBeVisible();
+  const aktiv = page.locator('.stat', { hasText: 'Aktiv (24 Std.)' }).locator('.stat-value');
+  await expect.poll(async () => Number(await aktiv.textContent())).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('.usage-bars li', { hasText: 'Allgemein' }).first()).toBeVisible();
+  await shot(page, '33-nutzung');
+
+  // Verlauf einer Person: nur Bereich, Aktion und Zeit
+  const members = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Mitglieder', exact: true }) });
+  await members.locator('.row', { hasText: 'zuletzt aktiv' }).first().click();
+  await expect(page.locator('.usage-history li').first()).toContainText(/angesehen|angelegt|geändert|gelöscht|abgestimmt|angemeldet/);
+  await page.keyboard.press('Escape');
+
+  // Ausschalten löscht die Einträge je Person; die Liste der Mitglieder verschwindet, gezählt wird weiter.
+  const schalter = page.getByLabel('Nutzung je Person erfassen (wer, wann, welcher Bereich)');
+  page.once('dialog', (d) => d.accept());
+  // Der Schalter folgt dem Server (erst nach der Antwort umgelegt): klicken, dann auf den neuen Stand warten.
+  await schalter.click();
+  await expect(schalter).not.toBeChecked();
+  await expect(page.getByText('Ausgeschaltet: Die App zählt nur noch')).toBeVisible();
+  await expect(members).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Als CSV-Datei herunterladen' })).toHaveCount(0);
+  await schalter.click();
+  await expect(schalter).toBeChecked();
+  await expect(members).toBeVisible();
+});
