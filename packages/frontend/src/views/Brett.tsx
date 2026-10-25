@@ -13,6 +13,7 @@ import { boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, 
 import { BoardMeta, pollEndText } from '../BoardBanner';
 import brand from '../generated/brand';
 import { navigate } from '../router';
+import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
 import { Empty, ErrorBox, lazyView, Loading } from '../ui';
@@ -294,7 +295,7 @@ function History({ id }: { id: number }) {
   );
 }
 
-function Entry({ item, onToast }: { item: BoardMessage; onToast: (msg: string) => void }) {
+function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolean; onToast: (msg: string) => void }) {
   const [edit, setEdit] = useState<{ title: string; text: string; expires: string } | null>(null);
   const [history, setHistory] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -329,7 +330,7 @@ function Entry({ item, onToast }: { item: BoardMessage; onToast: (msg: string) =
   }
 
   return (
-    <article className="card board-card" data-focus-id={item.id}>
+    <article className={`card board-card ${focused ? 'focused' : ''}`} data-focus-id={item.id}>
       <BoardMeta item={item} />
       {edit === null ? (
         <>
@@ -483,7 +484,8 @@ function PollEntry({ poll }: { poll: BoardPoll }) {
  * schreiben, ändern, löschen, Verlauf. Darunter für Mitglieder alle laufenden Umfragen mit Status und der Weg zu den
  * beendeten (Issue #4).
  */
-export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
+/** `focus`: Kennung einer Nachricht aus der Adresse brett/<id> (Ziel einer Benachrichtigung, Issue #190). */
+export default function Brett({ focus, onToast }: { focus?: string; onToast: (msg: string) => void }) {
   const { items } = useBoard();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -498,6 +500,8 @@ export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
     });
   };
   useEffect(load, []);
+  // Frisch geladen, damit eine gerade gemeldete Nachricht schon dabei ist.
+  const flash = useFocusEntry(focus, !loading && messages.some((m) => String(m.id) === focus));
 
   return (
     <div className="board-page">
@@ -512,7 +516,7 @@ export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
         <>
           <h2 className="board-page-title">Aktuelle Nachrichten</h2>
           {messages.map((item) => (
-            <Entry key={`${item.id}-${item.updated_at}`} item={item} onToast={onToast} />
+            <Entry key={`${item.id}-${item.updated_at}`} item={item} focused={flash === String(item.id)} onToast={onToast} />
           ))}
         </>
       )}

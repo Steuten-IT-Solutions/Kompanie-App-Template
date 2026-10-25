@@ -300,6 +300,7 @@ final class BoardServiceTest extends TestCase
         $this->subscribe($this->m, 'm');
         $this->assertSame(1, $this->app->pushTriggers()->boardPosted(['id' => 1, 'title' => 'x', 'author_name' => 'A', 'expires_at' => $this->clock->now()->modify('+2 hours')->format('c')], $this->admin));
         $this->assertSame(7200, (int) $this->app->db->scalar('SELECT ttl FROM {push_queue}'));
+        $this->assertSame('brett/1', json_decode((string) $this->app->db->scalar('SELECT payload FROM {push_queue}'), true)['route'], 'führt zur Nachricht (Issue #190)');
         $this->assertSame(0, $this->app->pushTriggers()->boardPosted(['id' => 2, 'title' => 'x', 'author_name' => 'A', 'expires_at' => $this->clock->now()->modify('-1 minute')->format('c')], $this->admin), 'abgelaufen: nichts');
         $this->app->push()->processQueue();
         $msg = $this->pushes()[0];
