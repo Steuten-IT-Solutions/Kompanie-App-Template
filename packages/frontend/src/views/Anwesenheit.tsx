@@ -5,7 +5,6 @@ import {
   can,
   countsText,
   config,
-  levelLabel,
   type AttendanceCounts,
   type AttendanceDetail,
   type AttendanceEvent,
@@ -291,12 +290,7 @@ function Editor({
           {filtered.map((p) => (
             <li key={p.id} className="attendance-grid" role="radiogroup" aria-label={p.name}>
               <span className="attendance-name">
-                <span>
-                  {p.name}
-                  {p.role !== 'member' && (
-                    <span className={`badge badge-name ${p.member ? 'badge-role' : 'badge-level-guest'}`}>{levelLabel(p.role)}</span>
-                  )}
-                </span>
+                <span>{p.name}</span>
                 {p.booked && <span className="attendance-booked">{sec.points} gebucht</span>}
               </span>
               {STATUSES.map((st) => (
