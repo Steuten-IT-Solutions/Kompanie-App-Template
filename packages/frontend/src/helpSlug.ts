@@ -116,6 +116,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
   if (tabs[sub]) return tabs[sub];
   if (sub === 'anwesenheit') return arg ? 'anwesenheitsliste' : 'anwesenheit-erfassen';
   if (sub === 'listen') return arg ? 'liste-bearbeiten' : 'listen';
+  if (sub === 'mail') return 'emails';
   const former = sub === 'ehemalige';
   if (former && arg === 'neu') return 'ehemalige-anlegen';
   // Liste der Ehemaligen und ihr Import (die Seiten einer ehemaligen Person wie bei Mitgliedern, unten)

@@ -97,7 +97,16 @@ final class PhpMailerMailer implements Mailer
                 $this->readSize();
             }
             $this->build($mailer, $mail);
-            $mailer->send();
+            if ($mail->hasHeaderRecipients()) {
+                // Kopfzeilen mit den sichtbaren Empfängern erzeugen, zugestellt wird aber nur an $mail->to (smtpSend
+                // nimmt die Empfänger erst in postSend aus to, cc und bcc).
+                $mailer->preSend();
+                $mailer->clearAllRecipients();
+                $mailer->addBCC($mail->to, $mail->toName);
+                $mailer->postSend();
+            } else {
+                $mailer->send();
+            }
             return MailResult::sent();
         } catch (PHPMailerException $e) {
             $smtp = $this->mailer?->getSMTPInstance()->getError() ?? [];
@@ -160,7 +169,19 @@ final class PhpMailerMailer implements Mailer
         $m->Encoding = PHPMailer::ENCODING_QUOTED_PRINTABLE;
         $m->XMailer = ' '; // keinen Hinweis auf die Software senden
         $m->setFrom($this->config['from'], $this->config['from_name'], true);
-        $m->addAddress($mail->to, $mail->toName);
+        if ($mail->hasHeaderRecipients()) {
+            foreach ($mail->headerTo ?? [] as $r) {
+                $m->addAddress($r['email'], $r['name']);
+            }
+            foreach ($mail->headerCc as $r) {
+                $m->addCC($r['email'], $r['name']);
+            }
+            if (($mail->headerTo ?? []) === [] && $mail->headerCc === []) {
+                $m->addBCC($mail->to, $mail->toName); // nur Bcc: To „undisclosed-recipients:;“
+            }
+        } else {
+            $m->addAddress($mail->to, $mail->toName);
+        }
         $m->isHTML(true);
         $m->Subject = $mail->subject;
         $m->Body = $mail->html;

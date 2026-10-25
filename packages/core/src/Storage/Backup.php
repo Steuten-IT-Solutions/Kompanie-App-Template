@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  * Schwarzes Brett (Issue #172): Nachrichten mit Verlauf, Bilder in formatierten Inhalten (rich_images, in der Datenbank),
  * Signaturen und Einstellungen der Konten sind enthalten; Warteschlange und Protokoll der Mails (board_mails) nicht.
+ * E-Mails aus der Verwaltung (mailings) mit Inhalt und Auswahl der Empfänger sind enthalten, ihr Protokoll mit den
+ * Adressen (mailing_recipients) nicht.
  * Ebenso wenig die Nutzungsauswertung (activity*, Issue #175): Einträge je Person werden nach 90 Tagen gelöscht und sollen
  * nicht in Sicherungen weiterleben.
  */
@@ -57,7 +59,7 @@ final class Backup
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'push_subscriptions'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'push_subscriptions'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
@@ -107,6 +109,10 @@ final class Backup
             // Mails vom Brett verweisen auf die IDs der Nachrichten (Issue #172).
             if (in_array('board_messages', $allowed, true)) {
                 $this->db->execute('DELETE FROM {board_mails}');
+            }
+            // Ebenso das Protokoll der E-Mails aus der Verwaltung.
+            if (in_array('mailings', $allowed, true)) {
+                $this->db->execute('DELETE FROM {mailing_recipients}');
             }
             foreach ($allowed as $t) {
                 if (!isset($tables[$t]) || !is_array($tables[$t])) {

@@ -289,6 +289,15 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - `BoardMailService`: Empfänger wie beim Brett, nur mit Adresse (`UserDirectory::emails`) und ohne Abmeldung (`user_settings` `board_mail` = `0`, Standard an, `/me/mail`), ohne Verfasser. Eine Mail je Empfänger, Betreff = Titel, HTML und Text (`multipart/alternative`), Bilder eingebettet (`multipart/related`, `cid:`), Fußzeile mit Link `#/brett/<id>`, Verfasser und Hinweis zum Abschalten. `board_mails` ist Warteschlange und Protokoll (`pending`, `sent`, `failed`, `cancelled`; nicht in Sicherungen). Aufgabe `board_mail` (alle 15 Minuten, nach dem Einreihen vorgezogen) mit Zeitbudget, Portionen, bis zu 5 Versuchen bei vorübergehenden Fehlern (Pause 5, 10, 20, 40 Minuten), dauerhafte (5xx, z. B. 552) sofort als fehlgeschlagen. Löschen der Nachricht bricht ausstehende Mails ab.
 - Höchstgröße: Die EHLO-Antwort (`SIZE`, RFC 1870) wird beim Verbindungsaufbau gelesen und gemerkt (`mail_server_size`, „Verbindung prüfen“ zeigt sie). Mit Limit prüft `POST /board` die fertige Mail vorab und lehnt mit Erklärung ab, bevor etwas veröffentlicht wird; ohne Limit (`SIZE` fehlt, `0` oder ohne Zahl) gibt es keine Prüfung.
 
+### E-Mails aus der Verwaltung
+
+- Bereich `mail` (Bezeichnung „E-Mails“, `labels.sections.mail`), Recht `send_mail` (Standardrolle „E-Mails verwalten“: `member`, `send_mail`). Für die App erst sichtbar, wenn der Mailversand eingerichtet ist (`Features::configured`, Einrichtung `email`); die Routen sperrt nur der Bereich. Tabellen `mailings` (Betreff, bereinigtes HTML, Auswahl als JSON) und `mailing_recipients` (Warteschlange und Protokoll je Empfänger mit Feld `to`/`cc`/`bcc`; `user_id` 0 bei freien Adressen), Migration 32.
+- `MailingService`: Empfänger je An, Cc und Bcc aus Rollen (Grund- und Zusatzrollen, ohne `guest`), Konten (ohne Gäste) und freien Adressen; je Adresse einmal, An vor Cc vor Bcc; Konten ohne gültige Adresse übersprungen (`POST /mails/preview` nennt sie). `GET /mails/options` liefert Rollen und Konten ohne Adressen. Bilder gehören der Mail (`rich_images` Besitzer `mail`, sichtbar mit `send_mail`), in der Mail eingebettet. Keine Fußzeile, keine Abmeldung. Absender und Antworten: Kompanieadresse.
+- Zustellung je Empfänger einzeln (`Mail::headerTo`/`headerCc`): `PhpMailerMailer` baut die Kopfzeilen mit allen Empfängern aus An und Cc (`preSend`) und stellt danach nur an den einen Empfänger zu (`clearAllRecipients`, `addBCC`, `postSend`); Bcc steht nie in den Kopfzeilen, nur Bcc ergibt `To: undisclosed-recipients:;`. So gelten Stand, erneute Versuche und Portionen wie beim Brett.
+- Eine Warteschlange für alle Mails: Aufgabe `board_mail` ruft `MailService::runQueue` (erst Brett, dann Verwaltung; Portionsgröße, Pause `board_mail_next` und Zeitbudget gemeinsam). Eingeplant, wenn Brett oder E-Mails an und der Mailversand eingerichtet ist.
+- Verlauf `GET /mails`, `GET /mails/{id}` für `send_mail`; Aufgabe `mailing_cleanup` (täglich) löscht Mails nach 365 Tagen samt Protokoll und Bildern. Sicherungen enthalten `mailings`, nicht `mailing_recipients`; Konto löschen entfernt dessen Zeilen im Protokoll.
+- App: *Verwaltung → E-Mails* (`#/verwaltung/mail`, `views/EmailsVerwalten.tsx`), Empfängerfelder mit Kärtchen und Vorschlägen, derselbe Editor wie am Brett (`composeEditor.tsx`, mit „Signatur einfügen“ und Rücksprung aus der Signatur-Einrichtung), Entwurf je Gerät.
+
 ### Umfragen (Issue #4)
 
 - Bereich `polls`, Recht `manage_polls` (Standardrolle „Umfragen verwalten“: `member`, `manage_polls`). Braucht den Bereich `board` (`requires`), denn laufende Umfragen stehen am Schwarzen Brett; es gibt keinen eigenen Tab und nichts unter „Meins“. Tabellen `polls`, `poll_options`, `poll_votes`, `poll_answers` (Migration 11), in Sicherungen enthalten.
@@ -382,6 +391,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_inventory` | Inventar sehen und pflegen: anlegen, ändern, umlagern, löschen, Verlauf |
 | `manage_offices` | Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere; Import (Issue #112) |
 | `manage_lists` | Listen zum Drucken und als CSV anlegen, bearbeiten und löschen; Werte nur, soweit sichtbar (Issue #121) |
+| `send_mail` | E-Mails aus der Verwaltung an Rollen, Mitglieder und freie Adressen versenden; Verlauf mit Protokoll |
 | `create_users` | Mitglieder anlegen, Startpasswörter erzeugen; Geburtstage anderer eintragen (nur das Datum); Ehemalige eintragen, wieder aufnehmen, importieren |
 | `promote_users` | Rollen vergeben (Einschränkungen siehe unten) |
 | `manage_settings` | Einstellungen, Updates, Sicherung (Endpunkte `/admin/*`; bei WordPress haben das die WP-Administratoren, die Einstellungen stehen dort zusätzlich im WP-Admin) |
@@ -414,6 +424,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Inventar | Inventar verwalten | `member`, `manage_inventory` |
   | Ämter | Ämter verwalten | `member`, `manage_offices` |
   | Listen | Listen verwalten | `member`, `manage_lists` |
+  | E-Mails | E-Mails verwalten | `member`, `send_mail` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte brauchen `member`; nur `calendar` (interner Kalender) und `view_intern` (Navigation „Intern“) gehen auch ohne (`Capability::withoutMember()`).

@@ -1302,6 +1302,66 @@ WHERE title IS NULL",
 )',
                 ],
             ],
+            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): eine Zeile je geschriebener Mail mit Betreff,
+            // formatiertem Inhalt (bereinigtes HTML) und der Auswahl der Empfänger (JSON: Rollen, Mitglieder und freie
+            // Adressen je An, Cc und Bcc); mailing_recipients ist Warteschlange und Protokoll je Empfänger (field to, cc
+            // oder bcc; user_id 0 bei freien Adressen).
+            32 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {mailings} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  author_id bigint(20) unsigned NOT NULL,
+  subject varchar(255) NOT NULL,
+  body longtext NOT NULL,
+  selection longtext NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY created_at (created_at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {mailing_recipients} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  mailing_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  field varchar(3) NOT NULL,
+  name varchar(191) NOT NULL DEFAULT \'\',
+  email varchar(191) NOT NULL,
+  status varchar(10) NOT NULL,
+  attempts int(11) NOT NULL DEFAULT 0,
+  error text DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY mailing_id (mailing_id),
+  KEY status (status)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {mailings} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author_id INTEGER NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  selection TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {mailings}_created_at ON {mailings} (created_at)',
+                    'CREATE TABLE IF NOT EXISTS {mailing_recipients} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mailing_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL DEFAULT 0,
+  field TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT \'\',
+  email TEXT NOT NULL,
+  status TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {mailing_recipients}_mailing_id ON {mailing_recipients} (mailing_id)',
+                    'CREATE INDEX IF NOT EXISTS {mailing_recipients}_status ON {mailing_recipients} (status)',
+                ],
+            ],
         ];
     }
 

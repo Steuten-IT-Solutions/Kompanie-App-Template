@@ -68,6 +68,7 @@ const DEFAULTS = {
     directory: 'Mitglieder',
     offices: 'Ämter',
     lists: 'Listen',
+    mail: 'E-Mails',
   },
   rank: 'Dienstgrad',
 };

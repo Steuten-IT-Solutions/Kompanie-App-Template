@@ -738,6 +738,14 @@ final class Api
                 return ['deleted' => true];
             }, 'board', $denyRights),
 
+            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): Empfänger wählen (Rollen, Mitglieder, freie
+            // Adressen je An, Cc und Bcc), Vorschau der Empfänger, senden (Versand im Hintergrund), Verlauf mit Protokoll
+            new Route('GET', '/mails/options', Cap::SendMail, fn () => $a->mailings()->options(), 'mail', $denyRights),
+            new Route('POST', '/mails/preview', Cap::SendMail, fn (Request $r) => $a->mailings()->preview($r->body), 'mail', $denyRights),
+            new Route('GET', '/mails', Cap::SendMail, fn () => $a->mailings()->list(), 'mail', $denyRights),
+            new Route('POST', '/mails', Cap::SendMail, fn (Request $r) => Response::created($a->mailings()->send($this->user(), $r->body)), 'mail', $denyRights),
+            new Route('GET', '/mails/{id}', Cap::SendMail, fn (Request $r) => $a->mailings()->detail($r->id()), 'mail', $denyRights),
+
             // Formatierte Inhalte (Issue #172): Bilder hochladen (Entwurf des Kontos), Grenzen des Servers
             new Route('GET', '/rich-images/limits', $L, fn () => $a->richImages()->limits()),
             new Route('POST', '/rich-images', $L, function (Request $r) use ($a) {

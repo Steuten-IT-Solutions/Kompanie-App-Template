@@ -3,7 +3,7 @@ titel: E-Mail einrichten
 reihenfolge: 119
 rechte: [manage_settings]
 ---
-Hier trägst du die Kompanieadresse und den Mailserver ein. Darüber verschickt die App Mails, z. B. Nachrichten aus dem Bereich **{bereich.board}** an alle {rolle.member}. Ohne diese Angaben gibt es beim Schreiben am Brett keinen Haken **E-Mail senden**.
+Hier trägst du die Kompanieadresse und den Mailserver ein. Darüber verschickt die App Mails, z. B. Nachrichten aus dem Bereich **{bereich.board}** an alle {rolle.member} und die E-Mails aus dem Bereich **{bereich.mail}** in der Verwaltung. Ohne diese Angaben gibt es beim Schreiben am Brett keinen Haken **E-Mail senden** und im Bereich **{bereich.mail}** kein Formular.
 
 ![Die Seite E-Mail in den Einstellungen](bild:admin-email)
 

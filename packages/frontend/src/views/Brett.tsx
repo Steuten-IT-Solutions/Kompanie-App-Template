@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
   api,
   type BoardEnded,
@@ -9,17 +9,15 @@ import {
   type BoardPoll,
   type BoardRevision,
 } from '../api';
-import { boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, SIGNATURE_RETURN_KEY, useBoard } from '../board';
+import { boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
+import { ComposeEditor } from '../composeEditor';
 import { BoardMeta, pollEndText } from '../BoardBanner';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
-import { Empty, ErrorBox, lazyView, Loading } from '../ui';
-
-// Editor für formatierte Nachrichten (TipTap): erst laden, wenn jemand schreibt oder bearbeitet.
-const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
+import { Empty, ErrorBox, Loading } from '../ui';
 
 /** Entwurf der neuen Nachricht (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung nicht verloren. */
 const DRAFT_KEY = 'kompanie-board-draft';
@@ -54,45 +52,10 @@ function saveDraft(draft: Draft | null): void {
 
 const defaultExpires = () => toLocalInput(new Date(Date.now() + DAY).toISOString());
 
-/** Eigene Signatur (für „Signatur einfügen“); undefined, solange sie lädt. */
-function useSignature(): string | null | undefined {
-  const [html, setHtml] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
-    let alive = true;
-    api
-      .signature()
-      .then((r) => alive && setHtml(r.signature?.content ?? null))
-      .catch(() => alive && setHtml(null));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return html;
-}
-
-function setupSignature(draft?: Draft): void {
-  if (draft) saveDraft(draft);
-  try {
-    sessionStorage.setItem(SIGNATURE_RETURN_KEY, 'brett');
-  } catch {
-    // ohne Speicher: kein Weg zurück, der Entwurf bleibt trotzdem
-  }
-  navigate('meins/konto/signatur');
-}
-
+/** Editor mit „Signatur einfügen“ (wie bei E-Mails aus der Verwaltung); der Entwurf bleibt beim Sprung zur Signatur erhalten. */
 function Editor(props: { value: string; onChange: (html: string) => void; label: string; id: string; draft?: Draft }) {
-  const signature = useSignature();
-  return (
-    <Suspense fallback={<Loading />}>
-      <RichTextEditor
-        value={props.value}
-        onChange={props.onChange}
-        label={props.label}
-        id={props.id}
-        signature={signature === undefined ? undefined : { html: signature, onSetup: () => setupSignature(props.draft) }}
-      />
-    </Suspense>
-  );
+  const { draft, ...rest } = props;
+  return <ComposeEditor {...rest} returnTo="brett" saveDraft={draft ? () => saveDraft(draft) : undefined} />;
 }
 
 /** „Sichtbar bis“: Ortszeit des Geräts, nicht in der Vergangenheit, ohne Obergrenze. */

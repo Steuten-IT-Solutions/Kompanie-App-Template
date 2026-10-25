@@ -12,6 +12,7 @@ const canTitles = (): boolean => !!config?.features.titles && can('manage_titles
 const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
 const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
+const canMail = (): boolean => !!config?.features.mail && can('send_mail');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen oder Rollen vergeben. */
@@ -43,6 +44,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
       { id: 'listen', label: sec.lists, on: canLists() },
+      { id: 'mail', label: sec.mail, on: canMail() },
       { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
@@ -198,6 +200,12 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="15" rx="2" />
       <path d="M7 9h10M7 13h6M12 4V2" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3.5 6.5l8.5 6.5 8.5-6.5" />
     </>
   ),
   einrichtungen: <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5a2.1 2.1 0 0 0 3 3l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" />,

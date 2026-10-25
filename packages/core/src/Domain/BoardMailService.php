@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Mail\Mail;
+use KompanieApp\Core\Port\Mailer;
 use KompanieApp\Core\Storage\UserSettings;
 
 /**
@@ -21,7 +22,8 @@ use KompanieApp\Core\Storage\UserSettings;
  *   Text-Teil, Bilder eingebettet (cid:), weil die Bildadressen der App eine Anmeldung brauchen. Fußzeile mit Link
  *   zur App, Verfasser und Hinweis zum Abschalten.
  * - Versand im Hintergrund (Aufgabe board_mail, nach dem Einreihen vorgezogen, sonst alle 15 Minuten), in Portionen
- *   (MailService::batching) innerhalb eines Zeitbudgets je Lauf. Vorübergehende Fehler (Verbindung, 4xx) werden bis zu
+ *   (MailService::batching) innerhalb eines Zeitbudgets je Lauf; zusammen mit den E-Mails aus der Verwaltung
+ *   (MailingService) in einer Warteschlange (MailService::runQueue), damit Portionen und Pausen für alle Mails gelten. Vorübergehende Fehler (Verbindung, 4xx) werden bis zu
  *   MAX_ATTEMPTS Mal erneut versucht, dauerhafte (5xx, z. B. 552 „zu groß“) nicht. board_mails ist zugleich das
  *   Protokoll (gesendet / fehlgeschlagen mit Grund), sichtbar für post_board.
  * - Meldet der Mailserver eine Höchstgröße (SIZE), wird die fertige Mail vor dem Einreihen dagegen geprüft; sonst gibt
@@ -32,11 +34,9 @@ final class BoardMailService
     public const TASK = 'board_mail';
     public const INTERVAL = 900;
     public const MAX_ATTEMPTS = 5;
-    /** Sekunden Arbeit je Lauf (Webspace bricht PHP oft nach 30 Sekunden ab). */
-    public const BUDGET = 20;
     public const SETTING_OPT = 'board_mail';
-    /** Einstellung: frühester nächster Lauf nach einer Portion (Pause zwischen den Portionen, Unix-Zeit). */
-    public const NEXT_SETTING = 'board_mail_next';
+    /** Einstellung: frühester nächster Lauf nach einer Portion (MailService::NEXT_SETTING). */
+    public const NEXT_SETTING = MailService::NEXT_SETTING;
 
     public const PENDING = 'pending';
     public const SENT = 'sent';
@@ -161,68 +161,49 @@ final class BoardMailService
     }
 
     /**
-     * Aufgabe board_mail: wartende Mails versenden (eine Portion, im Zeitbudget). Bleibt etwas übrig und gibt es keine
-     * Pause, wird gleich der nächste Lauf angestoßen.
+     * Aufgabe board_mail: wartende Mails versenden, die vom Brett und die aus der Verwaltung (MailService::runQueue).
      *
      * @return array{sent: int, failed: int, pending: int}
      */
     public function runTask(): array
     {
-        $stats = ['sent' => 0, 'failed' => 0, 'pending' => 0];
-        if (!$this->available()) {
-            $stats['pending'] = $this->pendingCount();
-            return $stats;
-        }
-        $nowTs = $this->app->time()->timestamp();
-        $next = $this->app->settings->get(self::NEXT_SETTING);
-        if (is_numeric($next) && (int) $next > $nowTs) {
-            $stats['pending'] = $this->pendingCount();
-            return $stats;
-        }
-        ['batch_size' => $size, 'batch_pause' => $pause] = $this->app->mail()->batching();
-        $due = $this->due($nowTs, $size);
-        if ($due === []) {
-            return $stats;
-        }
-        $mailer = $this->app->mailer();
-        $start = microtime(true);
+        return $this->app->mail()->runQueue();
+    }
+
+    /**
+     * Wartende Mails vom Brett versenden (Teil von MailService::runQueue): höchstens $limit Versuche (0 = ohne
+     * Grenze), solange das Zeitbudget ab $start reicht.
+     *
+     * @return array{sent: int, failed: int, processed: int}
+     */
+    public function sendDue(Mailer $mailer, int $limit, float $start, int $nowTs): array
+    {
+        $stats = ['sent' => 0, 'failed' => 0, 'processed' => 0];
         $messages = [];
         $names = new UserNames($this->app->users);
-        try {
-            foreach ($due as $row) {
-                if (microtime(true) - $start > self::BUDGET) {
-                    break;
-                }
-                $mid = (int) $row['message_id'];
-                $message = $messages[$mid] ??= $this->app->board()->repository()->find($mid);
-                if ($message === null || $message['deleted_at'] !== null) {
-                    $this->mark((int) $row['id'], self::CANCELLED, (int) $row['attempts'], null);
-                    continue;
-                }
-                $recipient = ['name' => (string) ($this->app->users->find((int) $row['user_id'])?->name ?? ''), 'email' => (string) $row['email']];
-                $mail = $this->compose($mid, $message['title'], $message['body'], (string) $names->name($message['author_id']), $recipient);
-                $result = $mailer->send($mail);
-                $attempts = (int) $row['attempts'] + 1;
-                if ($result->ok) {
-                    $this->mark((int) $row['id'], self::SENT, $attempts, null);
-                    $stats['sent']++;
-                } else {
-                    $final = $result->permanent || $attempts >= self::MAX_ATTEMPTS;
-                    $this->mark((int) $row['id'], $final ? self::FAILED : self::PENDING, $attempts, $result->error);
-                    $stats['failed'] += $final ? 1 : 0;
-                    error_log('Kompanie-App: Mail vom Schwarzen Brett an ' . $row['email'] . ' nicht gesendet: ' . $result->error);
-                }
+        foreach ($this->due($nowTs, $limit) as $row) {
+            if (microtime(true) - $start > MailService::BUDGET) {
+                break;
             }
-            $this->app->mail()->rememberServerSize($mailer->serverMaxSize());
-        } finally {
-            $mailer->close();
-        }
-        $stats['pending'] = $this->pendingCount();
-        if ($stats['pending'] > 0) {
-            if ($pause > 0) {
-                $this->app->settings->set(self::NEXT_SETTING, $nowTs + $pause * 60);
+            $mid = (int) $row['message_id'];
+            $message = $messages[$mid] ??= $this->app->board()->repository()->find($mid);
+            if ($message === null || $message['deleted_at'] !== null) {
+                $this->mark((int) $row['id'], self::CANCELLED, (int) $row['attempts'], null);
+                continue;
+            }
+            $recipient = ['name' => (string) ($this->app->users->find((int) $row['user_id'])?->name ?? ''), 'email' => (string) $row['email']];
+            $mail = $this->compose($mid, $message['title'], $message['body'], (string) $names->name($message['author_id']), $recipient);
+            $result = $mailer->send($mail);
+            $attempts = (int) $row['attempts'] + 1;
+            $stats['processed']++;
+            if ($result->ok) {
+                $this->mark((int) $row['id'], self::SENT, $attempts, null);
+                $stats['sent']++;
             } else {
-                $this->app->scheduler->runSoon(self::TASK);
+                $final = $result->permanent || $attempts >= self::MAX_ATTEMPTS;
+                $this->mark((int) $row['id'], $final ? self::FAILED : self::PENDING, $attempts, $result->error);
+                $stats['failed'] += $final ? 1 : 0;
+                error_log('Kompanie-App: Mail vom Schwarzen Brett an ' . $row['email'] . ' nicht gesendet: ' . $result->error);
             }
         }
         return $stats;
@@ -319,7 +300,7 @@ final class BoardMailService
      * gemerkt (keine Prüfung vorab, kein erneutes Warten bei der nächsten Nachricht); der nächste Versandlauf und
      * „Verbindung prüfen“ lesen es neu.
      */
-    private function serverMaxSize(): ?int
+    public function serverMaxSize(): ?int
     {
         $mail = $this->app->mail();
         if ($this->app->settings->get(MailService::SIZE_SETTING) === null) {
@@ -331,7 +312,7 @@ final class BoardMailService
     }
 
     /**
-     * Fällige Mails: wartend, nach einem Fehler erst nach einer Pause (5, 10, 20, 40 Minuten).
+     * Fällige Mails: wartend, nach einem Fehler erst nach einer Pause (MailService::isDue).
      *
      * @return list<array<string, mixed>>
      */
@@ -340,8 +321,7 @@ final class BoardMailService
         $rows = $this->app->db->select('SELECT id, message_id, user_id, email, attempts, updated_at FROM {board_mails} WHERE status = ? ORDER BY id', [self::PENDING]);
         $out = [];
         foreach ($rows as $r) {
-            $attempts = (int) $r['attempts'];
-            if ($attempts > 0 && (int) strtotime($r['updated_at'] . ' UTC') + 300 * (2 ** ($attempts - 1)) > $nowTs) {
+            if (!MailService::isDue((int) $r['attempts'], (string) $r['updated_at'], $nowTs)) {
                 continue;
             }
             $out[] = $r;

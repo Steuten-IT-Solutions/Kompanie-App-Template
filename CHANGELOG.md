@@ -33,6 +33,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Mail an alle Mitglieder und Anwärter mit hinterlegter Adresse, jede einzeln, mit dem Titel als Betreff und den Bildern
   in der Mail. Jede Person kann das unter *Meins → Konto* abschalten. Absender ist die Kompanieadresse, die Admins
   unter *Einstellungen → E-Mail* mit dem Mailserver (SMTP) eintragen, prüfen und mit einer Testmail ausprobieren.
+- **E-Mails aus der Verwaltung**: Der neue Bereich **E-Mails** (Recht „E-Mails versenden“, Standardrolle „E-Mails
+  verwalten“) erscheint unter *Verwaltung*, sobald der Mailversand unter *Einstellungen → E-Mail* eingerichtet ist.
+  Empfänger wählt man wie in einem Mailprogramm in **An**, **Cc** und **Bcc**: ganze Rollen, einzelne Mitglieder oder
+  beliebige Adressen. Der Text entsteht im selben Editor wie am Schwarzen Brett, mit **Signatur einfügen**. Jede Adresse
+  bekommt die Mail einmal; An und Cc sehen sich gegenseitig, Bcc sieht niemand. Vor dem Senden nennt eine Rückfrage die
+  Zahl der Empfänger und wer keine Adresse hat. Versendete Mails stehen ein Jahr im Verlauf, mit dem Stand je Empfänger.
 - **Lizenzen**: Unter *Hilfe → Lizenzen* steht, unter welcher Lizenz die App steht (GPL-2.0-or-later), wo es den
   vollständigen Quellcode gibt und welche Bausteine anderer Anbieter in der App enthalten sind, jeweils mit ihrer
   Lizenz. Beide Pakete enthalten dazu die Dateien `LICENSE` und `THIRD-PARTY-NOTICES.txt`.

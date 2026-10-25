@@ -39,6 +39,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\ListService;
+use KompanieApp\Core\Domain\MailingService;
 use KompanieApp\Core\Domain\MailService;
 use KompanieApp\Core\Domain\RichImageService;
 use KompanieApp\Core\Domain\SignatureService;
@@ -97,6 +98,7 @@ final class App
         PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
         BoardService::TASK => 3600,
         BoardMailService::TASK => BoardMailService::INTERVAL,
+        MailingService::CLEANUP_TASK => 86400,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
@@ -224,7 +226,10 @@ final class App
             // Schwarzes Brett: abgelaufene Nachrichten stündlich löschen (die API liefert sie ohnehin nicht mehr).
             BoardService::TASK => $this->features()->enabled('board'),
             // Mails vom Brett (Issue #172): alle 15 Minuten als Rückfall, nach dem Einreihen vorgezogen; nur eingerichtet.
-            BoardMailService::TASK => $this->features()->enabled('board') && $this->mail()->configured(),
+            // Dieselbe Aufgabe versendet die E-Mails aus der Verwaltung (MailService::runQueue).
+            BoardMailService::TASK => ($this->features()->enabled('board') || $this->features()->enabled(MailingService::FEATURE)) && $this->mail()->configured(),
+            // E-Mails aus der Verwaltung: täglich die nach einem Jahr löschen (auch bei ausgeschaltetem Bereich).
+            MailingService::CLEANUP_TASK => true,
             // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
@@ -289,7 +294,9 @@ final class App
             } elseif ($task === BoardService::TASK) {
                 $this->board()->cleanup();
             } elseif ($task === BoardMailService::TASK) {
-                $this->boardMail()->runTask();
+                $this->mail()->runQueue();
+            } elseif ($task === MailingService::CLEANUP_TASK) {
+                $this->mailings()->cleanup();
             } elseif ($task === PollService::TASK && $this->features()->enabled('polls')) {
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
@@ -500,6 +507,12 @@ final class App
     public function boardMail(): BoardMailService
     {
         return $this->service(BoardMailService::class, fn () => new BoardMailService($this));
+    }
+
+    /** E-Mails aus der Verwaltung (Bereich mail) */
+    public function mailings(): MailingService
+    {
+        return $this->service(MailingService::class, fn () => new MailingService($this));
     }
 
     /** Mailer mit den aktuellen Einstellungen (jedes Mal neu: Einstellungen können sich geändert haben). */

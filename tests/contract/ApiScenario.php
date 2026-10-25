@@ -42,6 +42,7 @@ final class ApiScenario
             $this->directory();
             $this->offices();
             $this->lists();
+            $this->mails();
             $this->activity();
             $this->accounts();
             $this->formerMembers();
@@ -95,7 +96,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -1263,6 +1264,44 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
         $this->req('PUT', '/admin/features', ['lists' => true]);
         $c->ok($this->req('DELETE', "/lists/$id")[0] === 200 && $this->req('DELETE', '/lists/' . (int) ($copy['id'] ?? 0))[0] === 200 && $this->req('GET', "/lists/$id")[0] === 404, 'Aufräumen: Listen löschen');
+    }
+
+    /**
+     * E-Mails aus der Verwaltung: nur mit send_mail; Empfänger aus Rollen, Mitgliedern und freien Adressen je An, Cc und
+     * Bcc, je Adresse einmal; ohne eingerichteten Mailversand wird nichts gesendet.
+     */
+    private function mails(): void
+    {
+        $c = $this->c;
+        $c->section('E-Mails');
+        $admin = $this->user('kptest_mail_admin', 'admin');
+        $m = $this->user('kptest_mail_m', 'member');
+        $guest = $this->user('kptest_mail_gast', 'guest');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/mails/options')[0] === 403 && $this->req('POST', '/mails', ['subject' => 'Kptest', 'text' => 'x'])[0] === 403, 'Ohne send_mail → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/mails')[0] === 401, 'Ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $o] = $this->req('GET', '/mails/options');
+        $keys = array_column((array) ($o['roles'] ?? []), 'key');
+        $c->ok($s === 200 && is_bool($o['available'] ?? null) && in_array('member', $keys, true) && !in_array('guest', $keys, true), 'Formular: Rollen ohne Gäste');
+        $c->ok(in_array($m, array_column((array) ($o['members'] ?? []), 'id'), true) && !in_array($guest, array_column((array) ($o['members'] ?? []), 'id'), true), 'Formular: Mitglieder ohne Gäste');
+        [$s, $p] = $this->req('POST', '/mails/preview', ['to' => ['emails' => ['kptest@example.org']], 'bcc' => ['emails' => ['KPTEST@example.org', 'kptest2@example.org']]]);
+        $c->ok($s === 200 && ($p['recipients'] ?? null) === 2 && ($p['to'] ?? null) === 1 && ($p['bcc'] ?? null) === 1, 'Vorschau: je Adresse einmal, An vor Bcc');
+        $c->ok($this->req('POST', '/mails/preview', ['to' => ['users' => [$guest]]])[0] === 400, 'Gast als Empfänger → 400');
+        $c->ok($this->req('POST', '/mails/preview', ['cc' => ['emails' => ['keine-adresse']]])[0] === 400, 'Ungültige Adresse → 400');
+        $c->ok($this->req('POST', '/mails', ['subject' => '', 'text' => '<p>x</p>', 'to' => ['emails' => ['kptest@example.org']]])[0] === 400, 'Ohne Betreff → 400');
+        if (($o['available'] ?? false) !== true) {
+            $c->ok($this->req('POST', '/mails', ['subject' => 'Kptest', 'text' => '<p>x</p>', 'to' => ['emails' => ['kptest@example.org']]])[0] === 400, 'Mailversand nicht eingerichtet → 400');
+        }
+        $c->ok($this->req('GET', '/mails')[0] === 200 && $this->req('GET', '/mails/999999999')[0] === 404, 'Verlauf; unbekannte Mail → 404');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === ['member', 'send_mail'], 'Standardrolle „E-Mails verwalten“');
+        $this->req('PUT', '/admin/features', ['mail' => false]);
+        [$s, $d] = $this->req('GET', '/mails/options');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['mail' => true]);
     }
 
     /**

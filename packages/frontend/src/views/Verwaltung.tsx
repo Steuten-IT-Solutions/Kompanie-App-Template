@@ -50,6 +50,7 @@ import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
 import { ListAdmin } from './ListenVerwalten';
+import { MailAdmin } from './EmailsVerwalten';
 import { PersonOffices } from './Aemter';
 import {
   browseOrder,
@@ -84,7 +85,8 @@ type Sub =
   | 'titel'
   | 'aemter'
   | 'anwesenheit'
-  | 'listen';
+  | 'listen'
+  | 'mail';
 
 const sec = brand.labels.sections;
 
@@ -158,6 +160,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : active === 'listen' ? (
         <ListAdmin path={path.slice(1)} onToast={onToast} />
+      ) : active === 'mail' ? (
+        <MailAdmin path={path.slice(1)} onToast={onToast} />
       ) : active === 'mitglieder' ? (
         <Members />
       ) : (

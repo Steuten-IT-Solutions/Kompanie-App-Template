@@ -15,7 +15,8 @@ use KompanieApp\Core\Http\ApiError;
  * Kopie in seinen Inhalt ein (die App, beim Speichern kopiert RichImageService::claim ihre Bilder), spätere Änderungen
  * wirken nicht auf schon geschriebene Inhalte.
  *
- * Einrichten können Mitglieder und Anwärter (alle mit internem Kalender) sowie alle, die am Brett schreiben dürfen.
+ * Einrichten können Mitglieder und Anwärter (alle mit internem Kalender) sowie alle, die am Brett schreiben oder E-Mails
+ * aus der Verwaltung versenden dürfen.
  * Beim Löschen des Kontos verschwindet sie samt Bildern (UserData::purge).
  */
 final class SignatureService
@@ -26,7 +27,7 @@ final class SignatureService
 
     public static function allowed(?User $user): bool
     {
-        return $user !== null && ($user->isMember() || $user->can(Capability::Calendar) || $user->can(Capability::PostBoard));
+        return $user !== null && ($user->isMember() || $user->can(Capability::Calendar) || $user->can(Capability::PostBoard) || $user->can(Capability::SendMail));
     }
 
     /** @return array{content: string, updated_at: string|null}|null eigene Signatur mit Bildadressen */

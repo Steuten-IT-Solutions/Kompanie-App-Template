@@ -10,8 +10,8 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\RichImageRepository;
 
 /**
- * Bilder in formatierten Inhalten (Issue #172), allgemeiner Baustein für Signaturen, das Schwarze Brett und später
- * andere Bereiche.
+ * Bilder in formatierten Inhalten (Issue #172), allgemeiner Baustein für Signaturen, das Schwarze Brett, E-Mails aus
+ * der Verwaltung und später andere Bereiche.
  *
  * - Hochladen (POST /rich-images) legt ein Bild als Entwurf (OWNER_DRAFT) des Kontos an. Beim Speichern eines Inhalts
  *   übernimmt dessen Besitzer die Bilder, auf die er verweist (claim): eigene Entwürfe werden umgehängt, Bilder anderer
@@ -29,6 +29,8 @@ final class RichImageService
     public const OWNER_DRAFT = 'draft';
     public const OWNER_SIGNATURE = 'signature';
     public const OWNER_BOARD = 'board';
+    /** E-Mails aus der Verwaltung (MailingService) */
+    public const OWNER_MAIL = 'mail';
     /** Nie gespeicherte Entwürfe so lange aufheben (ein begonnener Text kann über Nacht liegen bleiben). */
     public const DRAFT_KEEP_DAYS = 7;
     public const QUALITY = 88;
@@ -176,7 +178,7 @@ final class RichImageService
 
     /**
      * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht
-     * (BoardService::canSeeImage).
+     * (BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int} $img
      */
@@ -188,6 +190,7 @@ final class RichImageService
         return match ($img['owner_type']) {
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
             self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
+            self::OWNER_MAIL => $this->app->mailings()->canSeeImage($viewer, $img['owner_id']),
             default => false,
         };
     }
