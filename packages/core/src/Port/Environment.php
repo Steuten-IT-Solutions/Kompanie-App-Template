@@ -67,4 +67,7 @@ interface Environment
      * und der Rechte, immer als Download: <App>/anhang/<Kennung>. Eine Kennung hat immer denselben Inhalt.
      */
     public function attachmentUrl(string $uid): string;
+
+    /** Adresse zum Herunterladen der Datensicherung (nur Admins, Domain\BackupDownload): <App>/sicherung. */
+    public function backupUrl(): string;
 }

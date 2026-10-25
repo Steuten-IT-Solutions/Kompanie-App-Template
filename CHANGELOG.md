@@ -229,8 +229,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   die App alle Daten. Diese Sicherung entstand bisher komplett im Arbeitsspeicher; mit vielen Fotos, Dokumenten und
   Bildern war sie größer, als PHP erlaubt (z. B. 256 MB), und das Update wurde nicht eingespielt. Jetzt schreibt die App
   die Sicherung Stück für Stück in die Datei und braucht dafür nur wenige MB, egal wie groß sie ist. Ebenso beim
-  wöchentlichen Hochladen nach Google Drive, das große Sicherungen jetzt in Stücken überträgt. Hinweis: Das gilt ab
-  dieser Version; das Update auf diese Version führt noch die bisherige aus.
+  wöchentlichen Hochladen nach Google Drive, das große Sicherungen jetzt in Stücken überträgt, und bei
+  *Einstellungen → Datensicherung → Sicherung herunterladen*: Der Server schickt die Datei jetzt direkt Stück für
+  Stück an den Browser, statt sie erst ganz zusammenzubauen. Hinweis: Das gilt ab dieser Version; das Update auf
+  diese Version führt noch die bisherige aus.
 - **Änderungen von anderen Geräten kamen manchmal nicht an**: Fragte die App gerade im Hintergrund nach neuen Daten,
   während z. B. eine Nachricht am Schwarzen Brett auf einem anderen Gerät geändert wurde, blieb sie beim alten Stand,
   auch nach dem Neuladen – eine geänderte, vorher ausgeblendete Nachricht erschien dann nicht wieder. Jetzt fragt die

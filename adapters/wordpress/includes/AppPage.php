@@ -21,6 +21,7 @@ use KompanieApp\Core\Http\FileCache;
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
  * /app/bild/<kennung>        → Bild in formatiertem Inhalt (Signatur, Schwarzes Brett; wer den Inhalt sehen darf)
  * /app/anhang/<kennung>      → Dateianhang (Schwarzes Brett, E-Mails; wer den Inhalt sehen darf), immer als Download
+ * /app/sicherung             → Datensicherung herunterladen (nur Admins), Stück für Stück geschrieben
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -95,6 +96,8 @@ final class AppPage
             self::sendMemberPhoto($app, (int) $m[1]);
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
+        } elseif ($path === 'sicherung') {
+            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
         } elseif (preg_match('#^anhang/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {
@@ -406,6 +409,20 @@ final class AppPage
             // Dateianhang: immer als Download (Content-Disposition attachment, nosniff, CSP sandbox; AttachmentService)
             header('Content-Length: ' . filesize($res['path']));
             readfile($res['path']);
+        } elseif ($res['status'] === 200 && isset($res['write'])) {
+            // Datensicherung Stück für Stück an den Browser (Ausgabepuffer sind oben schon geleert).
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(300);
+            }
+            $out = fopen('php://output', 'wb');
+            try {
+                ($res['write'])($out);
+            } catch (\Throwable $e) {
+                // Kopf ist schon gesendet: Die Datei bleibt unvollständig (ungültiges JSON, das Einspielen lehnt sie ab).
+                error_log('Kompanie-App: Sicherung nicht vollständig heruntergeladen: ' . $e->getMessage());
+            } finally {
+                fclose($out);
+            }
         }
     }
 

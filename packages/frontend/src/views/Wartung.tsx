@@ -430,8 +430,22 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
   const fileInput = useRef<HTMLInputElement>(null);
 
   async function download() {
-    setBusy(true);
     setError(null);
+    // Als Datei über die eigene Adresse: Der Server schreibt die Sicherung Stück für Stück, weder er noch der Browser
+    // braucht sie ganz im Arbeitsspeicher (Fotos und Dokumente machen sie schnell groß).
+    if (config?.backupUrl) {
+      const a = document.createElement('a');
+      a.href = config.backupUrl;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      onToast('Sicherung wird heruntergeladen');
+      // Die Ampel zählt die Sicherung, sobald sie ganz geschrieben ist.
+      setTimeout(onChanged, 5000);
+      return;
+    }
+    setBusy(true);
     try {
       const data = await api.backup();
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });

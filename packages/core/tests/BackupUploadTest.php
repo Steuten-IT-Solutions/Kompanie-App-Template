@@ -253,6 +253,29 @@ final class BackupUploadTest extends TestCase
         $this->assertSame($content, $this->drive[$id]['content']);
     }
 
+    public function testDownloadAsFileOnlyForAdminsAndNotInPreview(): void
+    {
+        $download = $this->app->backupDownload();
+        $admin = $this->app->authContext->currentUser();
+        $this->assertNotNull($admin);
+        $this->assertSame(401, $download->forDelivery(null)['status']);
+        $preview = new \KompanieApp\Core\Auth\User($admin->id, $admin->name, $admin->login, $admin->role, $admin->capabilities, preview: true);
+        $this->assertSame(403, $download->forDelivery($preview)['status'], 'nicht in der Vorschau');
+        $member = new \KompanieApp\Core\Auth\User(99, 'Max', 'max', 'member', [\KompanieApp\Core\Auth\Capability::Member]);
+        $this->assertSame(403, $download->forDelivery($member)['status']);
+
+        $res = $download->forDelivery($admin);
+        $this->assertSame(200, $res['status']);
+        $this->assertSame('attachment; filename="sicherung-2026-10-20.json"', $res['headers']['Content-Disposition']);
+        $this->assertNull($this->app->settings->get(StatusService::BACKUP_SETTING), 'erst nach dem Schreiben gezählt');
+        $out = fopen('php://temp', 'w+b');
+        ($res['write'])($out);
+        rewind($out);
+        $this->assertSame(Backup::FORMAT, json_decode((string) stream_get_contents($out), true)['format'] ?? null);
+        $this->assertSame($this->clock->now()->getTimestamp(), $this->app->settings->get(StatusService::BACKUP_SETTING));
+        $this->assertSame('https://example.org/app/sicherung', $this->app->api()->config()['backupUrl']);
+    }
+
     public function testDeletedFolderIsCreatedAgain(): void
     {
         $this->connect();

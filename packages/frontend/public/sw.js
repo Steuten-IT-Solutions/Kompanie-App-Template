@@ -175,14 +175,15 @@ function isPreview(request, url) {
 }
 
 /**
- * Dateianhang (Schwarzes Brett, E-Mails): <App>/anhang/<Kennung>, ?kompanie_app=anhang/<Kennung> oder ?r=/anhang/<Kennung>.
- * Immer durchreichen: Ein Download-Link ist eine Navigation, darf aber nie als App-Seite gespeichert oder durch sie ersetzt
- * werden; die Rechte prüft jedes Mal der Server.
+ * Downloads: Dateianhang (Schwarzes Brett, E-Mails, <App>/anhang/<Kennung>) und Datensicherung (<App>/sicherung), auch als
+ * ?kompanie_app=… oder ?r=/…. Immer durchreichen: Ein Download-Link ist eine Navigation, darf aber nie als App-Seite
+ * gespeichert oder durch sie ersetzt werden; die Rechte prüft jedes Mal der Server.
  */
+const DOWNLOAD = /^(anhang\/[a-f0-9]{32}|sicherung)\/?$/;
 function isAttachment(url) {
   const scope = new URL(self.registration.scope);
-  if (url.pathname.startsWith(scope.pathname) && /^anhang\/[a-f0-9]{32}\/?$/.test(url.pathname.slice(scope.pathname.length))) return true;
-  return /^\/?anhang\/[a-f0-9]{32}$/.test(url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '');
+  if (url.pathname.startsWith(scope.pathname) && DOWNLOAD.test(url.pathname.slice(scope.pathname.length))) return true;
+  return DOWNLOAD.test((url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '').replace(/^\//, ''));
 }
 
 /** Kennung eines Dokuments aus seiner Adresse: <App>/dokument/<id>, ?kompanie_app=dokument/<id> oder ?r=/dokument/<id> */

@@ -95,4 +95,9 @@ final class WpEnvironment implements Environment
     {
         return $this->appUrl('anhang/' . $uid);
     }
+
+    public function backupUrl(): string
+    {
+        return $this->appUrl('sicherung');
+    }
 }

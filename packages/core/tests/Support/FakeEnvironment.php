@@ -72,4 +72,9 @@ final class FakeEnvironment implements Environment
     {
         return 'https://example.org/app/anhang/' . $uid;
     }
+
+    public function backupUrl(): string
+    {
+        return 'https://example.org/app/sicherung';
+    }
 }

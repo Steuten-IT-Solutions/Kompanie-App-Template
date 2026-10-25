@@ -232,7 +232,7 @@ test('Rückkehr von Google wird nie aus dem Speicher beantwortet', async () => {
   assert.ok(await sw.request(`${SCOPE}google?x=1`, 'navigate'), 'andere Adressen wie bisher');
 });
 
-test('Dateianhänge werden immer durchgereicht, auch als Navigation (nie als App-Seite gespeichert)', async () => {
+test('Dateianhänge und Datensicherung werden immer durchgereicht, auch als Navigation (nie als App-Seite gespeichert)', async () => {
   const uid = 'a'.repeat(32);
   const net = { [SCOPE]: () => response('<html>app</html>', 'text/html') };
   const sw = load({ net });
@@ -241,6 +241,8 @@ test('Dateianhänge werden immer durchgereicht, auch als Navigation (nie als App
   assert.equal(await sw.request(`${SCOPE}anhang/${uid}`), undefined);
   assert.equal(await sw.request(`${ORIGIN}/index.php?r=/anhang/${uid}`, 'navigate'), undefined);
   assert.equal(await sw.request(`${ORIGIN}/?kompanie_app=anhang/${uid}`, 'navigate'), undefined);
+  assert.equal(await sw.request(`${SCOPE}sicherung`, 'navigate'), undefined, 'Datensicherung');
+  assert.equal(await sw.request(`${ORIGIN}/index.php?r=/sicherung`, 'navigate'), undefined);
   const pages = (await sw.storage.keys()).length;
   assert.ok(pages >= 1);
   assert.ok(await sw.request(`${SCOPE}anhang/kein-anhang`, 'navigate'), 'andere Adressen wie bisher');
