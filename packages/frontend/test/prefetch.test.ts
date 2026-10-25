@@ -131,6 +131,14 @@ test('Eine eigene Änderung während des Vorabladens: nichts ablegen, nicht fris
   assert.equal(takeFresh(k), false);
 });
 
+test('Im Leerlauf geladen gilt nicht als frisch: Die Ansicht lädt im Hintergrund neu', async () => {
+  dataCache.clear();
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  await p.idle([{ key: 'offices', deps: [], load: () => Promise.resolve({ offices: [] }) }]);
+  assert.equal(dataCache.has(cacheKey('offices', [])), true);
+  assert.equal(takeFresh(cacheKey('offices', [])), false);
+});
+
 test('Frisch nur bis FRESH_MS nach dem Vorabladen', async () => {
   dataCache.clear();
   const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });

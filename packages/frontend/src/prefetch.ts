@@ -45,7 +45,7 @@ export interface PrefetcherOptions {
   idleOk: () => boolean;
   whenIdle?: () => Promise<void>;
   /** dataCache.prefetch */
-  prefetch: (key: string, deps: unknown[], load: () => Promise<unknown>) => Promise<void>;
+  prefetch: (key: string, deps: unknown[], load: () => Promise<unknown>, markFresh: boolean) => Promise<void>;
   /** lastError.forgetError: Der Fehler steht an ApiError.noted. */
   forgetError: (noted: unknown) => void;
 }
@@ -54,12 +54,17 @@ export function createPrefetcher({ blocked, idleOk, whenIdle: idle = whenIdle, p
   const queue: { source: PrefetchSource; idle: boolean }[] = [];
   let running = false;
 
-  const run = (s: PrefetchSource) =>
-    prefetch(s.key, s.deps, () =>
-      s.load().catch((e: unknown) => {
-        forgetError((e as { noted?: unknown } | null)?.noted);
-        throw e;
-      }),
+  // Beim Antippen öffnet die Ansicht gleich: Sie fragt dann nicht noch einmal (dataCache.takeFresh).
+  const run = (s: PrefetchSource, tapped: boolean) =>
+    prefetch(
+      s.key,
+      s.deps,
+      () =>
+        s.load().catch((e: unknown) => {
+          forgetError((e as { noted?: unknown } | null)?.noted);
+          throw e;
+        }),
+      tapped,
     );
 
   async function pump(): Promise<void> {
@@ -71,7 +76,7 @@ export function createPrefetcher({ blocked, idleOk, whenIdle: idle = whenIdle, p
         if (queue[0].idle) await idle();
         const job = queue.shift()!;
         if (blocked() || (job.idle && !idleOk())) continue;
-        await run(job.source);
+        await run(job.source, !job.idle);
       }
     } finally {
       running = false;

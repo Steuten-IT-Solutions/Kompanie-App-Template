@@ -48,7 +48,11 @@ export function cacheKey(key: string, deps: unknown[]): string {
 }
 
 const pending = new Map<string, { since: number; promise: Promise<unknown> }>();
-/** Vorab geladen, noch nicht angezeigt: Zeitpunkt; bis FRESH_MS danach fragt die Ansicht beim Öffnen nicht noch einmal. */
+/**
+ * Beim Antippen vorab geladen, noch nicht angezeigt: Zeitpunkt; bis FRESH_MS danach fragt die Ansicht beim Öffnen nicht
+ * noch einmal. Nicht im Leerlauf oder beim Wischen: Bis die Ansicht öffnet, kann sich dann auf dem Server (z. B. an
+ * einem anderen Gerät) etwas geändert haben; dort lädt sie wie sonst im Hintergrund neu.
+ */
 const fresh = new Map<string, number>();
 export const FRESH_MS = 10_000;
 
@@ -56,9 +60,9 @@ export const FRESH_MS = 10_000;
  * Daten für eine Ansicht schon laden, bevor sie geöffnet wird (z. B. das nächste Mitglied beim Wischen, ein Tab beim
  * Antippen, Issue #104): Sie liegen dann unter demselben Schlüssel wie bei useAsync(fn, deps, key) und erscheinen beim
  * Öffnen sofort. Lädt nur, wenn noch nichts gespeichert ist und keine Anfrage dafür läuft; Fehler bleiben still (die
- * Ansicht lädt dann selbst).
+ * Ansicht lädt dann selbst). markFresh: beim Antippen (siehe `fresh`).
  */
-export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>): Promise<void> {
+export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>, markFresh = false): Promise<void> {
   const k = cacheKey(key, deps);
   if (entries.has(k)) return Promise.resolve();
   let p = pending.get(k)?.promise;
@@ -70,7 +74,7 @@ export function prefetch<T>(key: string, deps: unknown[], fn: () => Promise<T>):
       (d) => {
         if (d === null || since !== generation) return;
         dataCache.set(k, d, since);
-        fresh.set(k, Date.now());
+        if (markFresh) fresh.set(k, Date.now());
       },
       () => {},
     ).finally(() => pending.delete(k));
@@ -90,7 +94,7 @@ export function pendingPrefetch(k: string): Promise<unknown> | undefined {
   return p && p.since === generation ? p.promise : undefined;
 }
 
-/** Gerade erst vorab geladen (höchstens FRESH_MS her)? Gilt nur einmal: Danach lädt die Ansicht wie sonst im Hintergrund neu. */
+/** Gerade erst beim Antippen vorab geladen (höchstens FRESH_MS her)? Gilt nur einmal: Danach lädt die Ansicht wie sonst im Hintergrund neu. */
 export function takeFresh(k: string, now = Date.now()): boolean {
   const at = fresh.get(k);
   fresh.delete(k);
