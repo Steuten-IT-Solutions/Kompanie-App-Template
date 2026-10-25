@@ -112,6 +112,16 @@ final class ActivityRepository
         return $out;
     }
 
+    /** @return array<int, int> Konto => Einträge von $from bis vor $to (nur Konten mit mindestens einem) */
+    public function countsByUser(int $from, int $to): array
+    {
+        $out = [];
+        foreach ($this->db->select('SELECT user_id, COUNT(*) AS n FROM {activity} WHERE at >= ? AND at < ? GROUP BY user_id', [$from, $to]) as $r) {
+            $out[(int) $r['user_id']] = (int) $r['n'];
+        }
+        return $out;
+    }
+
     /**
      * Einträge je Person von $from bis vor $to, neueste zuerst.
      *

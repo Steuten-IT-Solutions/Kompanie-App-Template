@@ -254,6 +254,12 @@ final class ActivityTest extends TestCase
         $last = array_column($o['members'], 'last_active', 'id');
         $this->assertSame([$this->admin, $this->member, $this->other], array_keys(array_filter($last)));
         $this->assertNull($last[$board]);
+        $actions = array_column($o['members'], 'actions', 'id');
+        $this->assertSame(0, $actions[$board]);
+        $this->assertGreaterThan(0, $actions[$this->member]);
+        $later = $this->call('GET', '/admin/activity', [], ['from' => '2026-10-21', 'to' => '2026-10-22'])->data;
+        $this->assertSame([0], array_values(array_unique(array_column($later['members'], 'actions'))), 'im Zeitraum niemand aktiv, „zuletzt aktiv“ bleibt');
+        $this->assertNotNull(array_column($later['members'], 'last_active', 'id')[$this->member]);
 
         $entries = $this->call('GET', '/admin/activity/entries')->data;
         $this->assertSame([['Admin', 'app', 'create'], ['Zweites', 'events', 'view'], ['Mitglied', 'points', 'view']], array_map(static fn (array $e): array => [$e['name'], $e['area'], $e['action']], $entries['entries']), 'neueste zuerst');

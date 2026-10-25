@@ -5426,11 +5426,12 @@ components:
               description: Nur mit Erfassung je Person; alle Konten mit einer Rolle in der App
               items:
                 type: object
-                required: [id, name, last_active]
+                required: [id, name, last_active, actions]
                 properties:
                   id: { type: integer }
                   name: { type: string }
                   last_active: { type: [integer, 'null'], description: 'Unix-Zeit; null = nicht aktiv, seit die Erfassung je Person läuft' }
+                  actions: { type: integer, description: 'Einträge je Person im Zeitraum (0 = im Zeitraum nicht aktiv)' }
     ActivityEntry:
       type: object
       required: [user_id, name, area, label, action, at]

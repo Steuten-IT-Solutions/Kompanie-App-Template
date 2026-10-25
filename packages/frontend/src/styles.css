@@ -2051,6 +2051,10 @@ code {
 .usage-members {
   margin-top: 10px;
 }
+/* Name und „zuletzt aktiv“ (untereinander über .settings-link) zentriert */
+.usage-members .row-main {
+  text-align: center;
+}
 .usage-history {
   list-style: none;
   margin: 0;

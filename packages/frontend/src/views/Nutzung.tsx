@@ -192,7 +192,10 @@ function CsvExport({ from, to, onToast }: { from: string; to: string; onToast: (
   );
 }
 
-/** Konten mit „zuletzt aktiv“; wer lange nicht aktiv war, zuerst. */
+/**
+ * Konten, die im Zeitraum aktiv waren, mit „zuletzt aktiv“; wer am längsten nicht aktiv war, zuerst. Der Schalter zeigt
+ * stattdessen alle, die seit INACTIVE_DAYS Tagen nicht aktiv waren (unabhängig vom Zeitraum).
+ */
 function Members({
   members,
   onOpen,
@@ -204,7 +207,7 @@ function Members({
   const limit = Date.now() / 1000 - INACTIVE_DAYS * 86400;
   const inactive = (m: { last_active: number | null }) => m.last_active === null || m.last_active < limit;
   const sorted = [...members].sort((a, b) => (a.last_active ?? 0) - (b.last_active ?? 0) || a.name.localeCompare(b.name, 'de'));
-  const shown = onlyInactive ? sorted.filter(inactive) : sorted;
+  const shown = sorted.filter(onlyInactive ? inactive : (m) => m.actions > 0);
   return (
     <section className="card settings-section" aria-labelledby="usage-members-title">
       <h3 id="usage-members-title">Mitglieder</h3>
@@ -214,10 +217,13 @@ function Members({
           Nur, wer seit {INACTIVE_DAYS} Tagen nicht aktiv war ({members.filter(inactive).length})
         </span>
       </label>
+      {shown.length === 0 && (
+        <p className="small muted">{onlyInactive ? 'Alle waren in dieser Zeit aktiv.' : 'Im Zeitraum war niemand aktiv.'}</p>
+      )}
       <ul className="card-list usage-members">
         {shown.map((m) => (
           <li key={m.id}>
-            <button type="button" className="row clickable" onClick={() => onOpen(m)}>
+            <button type="button" className="card row clickable settings-link" onClick={() => onOpen(m)}>
               <span className="row-main">
                 <span className="row-title">{m.name}</span>
                 <span className="row-sub">

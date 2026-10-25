@@ -16,7 +16,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Nutzung**.
 - **Aktive Personen je Tag**: ein Balken je Tag, an dem jemand die App genutzt hat.
 - **Nutzung je Bereich**: welcher Bereich wie oft genutzt wurde und von wie vielen Personen in den letzten 30 Tagen. **Allgemein** sind Seiten wie die Verwaltung, das eigene Konto und die Einstellungen.
 - **Als CSV-Datei herunterladen**: alle Einträge im Zeitraum mit Zeit, Name, Bereich und Aktion, z. B. für Excel.
-- **Mitglieder**: alle Konten mit dem Zeitpunkt, an dem sie zuletzt aktiv waren. Wer am längsten nicht aktiv war, steht oben.
+- **Mitglieder**: alle Konten, die im gewählten Zeitraum aktiv waren, mit dem Zeitpunkt, an dem sie zuletzt aktiv waren. Wer am längsten nicht aktiv war, steht oben.
 - **Erfassung je Person**: der Schalter, ob die App sich merkt, wer wann was genutzt hat.
 
 ## So gehst du vor
