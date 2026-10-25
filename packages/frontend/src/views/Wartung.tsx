@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { api, config, type AdminStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
+import { api, config, type AdminStatus, type BackupDriveStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -9,8 +9,14 @@ import { ErrorBox, Loading, useAsync } from '../ui';
  */
 /** Seiten „Zustand und Updates“ und „Datensicherung“ der Einstellungen. */
 export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.status(), []);
-  if (part === 'datensicherung') return <Datensicherung onToast={onToast} onChanged={reload} />;
+  const { data, error, loading, reload } = useAsync(() => api.status(), [], 'admin/status');
+  if (part === 'datensicherung')
+    return (
+      <>
+        <Datensicherung onToast={onToast} onChanged={reload} />
+        <DriveSicherung onToast={onToast} />
+      </>
+    );
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
@@ -108,7 +114,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
         <>
           <p className="small">
             Installiert: <strong>{u.current}</strong>
-            {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)}
+            {u.channel === 'early' && ' (Vorab-Kanal)'} · zuletzt geprüft: {date(u.checked_at)} ·{' '}
+            <a href="#/einstellungen/neuerungen">Was ist neu</a>
           </p>
           {u.withdrawn &&
             (u.fallback ? (
@@ -271,8 +278,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               }}
             />
             <span>
-              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen, schwere Fehler sofort, jeweils mit Fehlercode und
-              Ursache (z. B. „Kalender: HTTP 404“), ohne Namen, Inhalte oder Fehlertexte
+              Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen mit Nutzungszahlen (Zahl der Konten, aktive
+              Konten, Personen je Bereich), schwere Fehler sofort, jeweils mit Fehlercode und Ursache (z. B. „Kalender: HTTP 404“), ohne
+              Namen, Inhalte oder Fehlertexte
             </span>
           </label>
           {reports && (
@@ -422,8 +430,22 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
   const fileInput = useRef<HTMLInputElement>(null);
 
   async function download() {
-    setBusy(true);
     setError(null);
+    // Als Datei über die eigene Adresse: Der Server schreibt die Sicherung Stück für Stück, weder er noch der Browser
+    // braucht sie ganz im Arbeitsspeicher (Fotos und Dokumente machen sie schnell groß).
+    if (config?.backupUrl) {
+      const a = document.createElement('a');
+      a.href = config.backupUrl;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      onToast('Sicherung wird heruntergeladen');
+      // Die Ampel zählt die Sicherung, sobald sie ganz geschrieben ist.
+      setTimeout(onChanged, 5000);
+      return;
+    }
+    setBusy(true);
     try {
       const data = await api.backup();
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -470,12 +492,9 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
     <section className="card settings-section" aria-labelledby="backup-title">
       <h3 id="backup-title">Datensicherung</h3>
       <p className="muted small">
-        Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis und Einstellungen
-        {config?.variant === 'standalone'
-          ? ', die Konten (Passwörter als Prüfwerte, aus denen sich einfache Passwörter erraten lassen)'
-          : ''}{' '}
-        und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln. Vor Updates mit Datenbank-Änderungen sichert die App automatisch.
-        {config?.features.documents && ' Die Dateien der Dokumente sind nicht enthalten (nur ihre Angaben); sie bleiben auf dem Server.'}
+        Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis, Dokumente, Abzeichen und Einstellungen, die Konten (Passwörter als Prüfwerte,
+        aus denen sich einfache Passwörter erraten lassen) und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln und nicht nur
+        auf dem Server aufbewahren. Vor Updates mit Datenbank-Änderungen sichert die App automatisch, aber auf demselben Server.
       </p>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>
@@ -489,6 +508,105 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       {error && (
         <p className="form-error" role="alert">
           {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Sicherungen automatisch in Google Drive (wöchentlich, die letzten acht bleiben). */
+function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload } = useAsync(() => api.backupDrive(), [], 'admin/backup/drive');
+  const [state, setState] = useState<BackupDriveStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const d = state ?? data!;
+
+  async function run(fn: () => Promise<BackupDriveStatus>, done?: string) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      setState(await fn());
+      if (done) onToast(done);
+    } catch (err) {
+      setActionError((err as Error).message);
+      // Der Fehler steht auch im Zustand (z. B. beim Hochladen); neu laden zeigt ihn.
+      setState(await api.backupDrive().catch(() => d));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" aria-labelledby="backup-drive-title">
+      <h3 id="backup-drive-title">Sicherungen in Google Drive</h3>
+      <p className="muted small">
+        Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt: Die App legt einmal pro{' '}
+        {d.every_days === 7 ? 'Woche' : `${d.every_days} Tage`} eine Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und
+        behält die letzten {d.keep}. Die Sicherungen enthalten Zugangsschlüssel und Passwort-Prüfwerte; den Ordner bitte nicht freigeben.
+      </p>
+      {!d.available ? (
+        <p className="small">
+          Dafür braucht die App eine Verbindung über „Mit Google verbinden“ (<a href="#/einstellungen/google">Google-Zugang</a>).
+        </p>
+      ) : !d.access ? (
+        <p className="small">
+          Die Verbindung zu Google erlaubt noch nicht, Dateien anzulegen. Bitte unter <a href="#/einstellungen/google">Google-Zugang</a> die
+          Verbindung trennen und neu mit Google verbinden; dabei das Häkchen für eigene Dateien in Google Drive setzen.
+        </p>
+      ) : null}
+      {(d.available && d.access) || d.enabled ? (
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={d.enabled}
+            disabled={busy || (!d.enabled && !(d.available && d.access))}
+            onChange={(e) => {
+              const on = e.target.checked;
+              void run(
+                () => api.setBackupDrive(on),
+                on ? 'Sicherungen in Google Drive eingeschaltet' : 'Sicherungen in Google Drive ausgeschaltet',
+              );
+            }}
+          />
+          <span>Wöchentlich in Google Drive sichern{d.email ? ` (${d.email})` : ''}</span>
+        </label>
+      ) : null}
+      {d.enabled && (
+        <p className="small">
+          Letzte Sicherung in Google Drive: {date(d.last_ok)}
+          {d.folder_url && (
+            <>
+              {' · '}
+              <a href={d.folder_url} target="_blank" rel="noopener noreferrer">
+                Ordner öffnen
+              </a>
+            </>
+          )}
+        </p>
+      )}
+      {d.enabled && d.error && (
+        <p className="form-error" role="alert">
+          Letzter Versuch ({date(d.last_try)}) fehlgeschlagen: {d.error}
+        </p>
+      )}
+      {d.enabled && d.access && (
+        <div className="button-row">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={busy}
+            onClick={() => void run(() => api.uploadBackupDrive(), 'Sicherung in Google Drive abgelegt')}
+          >
+            {busy ? 'Lädt hoch …' : 'Jetzt in Google Drive sichern'}
+          </button>
+        </div>
+      )}
+      {actionError && !(d.enabled && d.error === actionError) && (
+        <p className="form-error" role="alert">
+          {actionError}
         </p>
       )}
     </section>

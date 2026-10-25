@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
 import {
   api,
+  can,
   applyFeatures,
   newsTitle,
   refreshRoles,
@@ -9,13 +10,17 @@ import {
   type FailedPhoto,
   type Feature,
   type FeatureInfo,
+  type MailSettings,
   type NewsSourceType,
 } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import Neuerungen from './Neuerungen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
+import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
+import { formatBytes } from '../format';
 
 const sec = brand.labels.sections;
 
@@ -24,13 +29,16 @@ const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
+  { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
   { id: 'google', title: 'Google-Zugang', text: `Verbindung zu Google für ${sec.gallery} und Kalender.` },
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
   { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
+  { id: 'nutzung', title: 'Nutzung', text: 'Wer die App wann nutzt und welche Bereiche.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
   { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
+  { id: 'neuerungen', title: 'Was ist neu', text: 'Änderungen von Version zu Version.' },
 ] as const;
 
 /**
@@ -55,9 +63,12 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
+      {page.id === 'email' && <MailSection onToast={onToast} />}
+      {page.id === 'nutzung' && <Nutzung onToast={onToast} />}
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
+      {page.id === 'neuerungen' && <Neuerungen />}
       {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
@@ -71,7 +82,7 @@ function Overview() {
   // ein und schiebt die Zeilen darunter weg.
   const { data, loading } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
-  const pages = PAGES.filter((p) => p.id !== 'news' || !!data?.news);
+  const pages = PAGES.filter((p) => (p.id !== 'news' || !!data?.news) && (p.id !== 'nutzung' || can('view_activity')));
   return (
     <ul className="card-list settings-overview">
       {pages.map((p) => (
@@ -93,15 +104,16 @@ function Overview() {
 
 /** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
 function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.settings(), []);
+  const { data, error, loading, reload, setData, revision } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
+  // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
   const props = { settings: s, onSaved: setData, onToast };
-  if (page === 'google') return <GoogleAccess {...props} />;
-  if (page === 'kalender') return <Calendar {...props} />;
-  if (page === 'galerie') return <Gallery {...props} />;
-  return s.news ? <News {...props} /> : null;
+  if (page === 'google') return <GoogleAccess key={revision} {...props} />;
+  if (page === 'kalender') return <Calendar key={revision} {...props} />;
+  if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  return s.news ? <News key={revision} {...props} /> : null;
 }
 
 /**
@@ -109,7 +121,7 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
  * wann am Geburtstag benachrichtigt wird.
  */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
@@ -181,10 +193,210 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       <p className="small muted">
-        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Mein Konto → Benachrichtigungen).
+        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).
       </p>
     </section>
   );
+}
+
+/**
+ * E-Mail (Issue #172): Kompanieadresse (Absender) und SMTP des Mailservers, Verbindung prüfen, Testmail, Versand in
+ * Portionen. Das Passwort zeigt der Server nie an; leer lassen behält es.
+ */
+function MailSection({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.mailSettings(), [], 'admin/mail');
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  return <MailForm key={JSON.stringify(data)} settings={data!} onSaved={setData} onToast={onToast} />;
+}
+
+function MailForm({
+  settings,
+  onSaved,
+  onToast,
+}: {
+  settings: MailSettings;
+  onSaved: (s: MailSettings) => void;
+  onToast: (msg: string) => void;
+}) {
+  const [form, setForm] = useState({
+    from: settings.from,
+    from_name: settings.from_name,
+    host: settings.host,
+    port: String(settings.port || 587),
+    secure: settings.secure,
+    user: settings.user,
+    password: '',
+    batch_size: String(settings.batch_size),
+    batch_pause: String(settings.batch_pause),
+  });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testTo, setTestTo] = useState('');
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+
+  async function run<T>(action: () => Promise<T>, done: (r: T) => void) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      done(await action());
+    } catch (err) {
+      setMessage({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function save(e: FormEvent) {
+    e.preventDefault();
+    const { password, port, batch_size, batch_pause, ...rest } = form;
+    void run(
+      () =>
+        api.updateMailSettings({
+          ...rest,
+          port: Number(port),
+          batch_size: Number(batch_size),
+          batch_pause: Number(batch_pause),
+          ...(password !== '' ? { password } : {}),
+        }),
+      (s) => {
+        onSaved(s);
+        onToast('Gespeichert');
+      },
+    );
+  }
+
+  return (
+    <form className="card settings-section form" id="einstellungen-email" onSubmit={save}>
+      <h3>E-Mail</h3>
+      <p className="small muted">
+        Über diese Adresse verschickt die App Mails, z. B. Nachrichten aus „{sec.board}“ an die Mitglieder. Antworten und nicht zustellbare
+        Mails gehen an diese Adresse. Die Zugangsdaten stehen beim Anbieter des Postfachs (Hoster oder Mailanbieter) unter „SMTP“ oder
+        „Postausgangsserver“.
+      </p>
+      {settings.unavailable && (
+        <p className="form-error" role="alert">
+          {settings.unavailable}
+        </p>
+      )}
+      <label className="field">
+        <span>Kompanieadresse (Absender)</span>
+        <input
+          type="email"
+          className="mail-from"
+          value={form.from}
+          onChange={set('from')}
+          placeholder="info@beispiel.de"
+          autoComplete="off"
+        />
+      </label>
+      <label className="field">
+        <span>Absendername</span>
+        <input value={form.from_name} onChange={set('from_name')} placeholder={settings.from_name_default} />
+      </label>
+      <label className="field">
+        <span>Mailserver (SMTP)</span>
+        <input className="mail-host" value={form.host} onChange={set('host')} placeholder="smtp.beispiel.de" autoComplete="off" />
+      </label>
+      <div className="field-row">
+        <label className="field">
+          <span>Port</span>
+          <input type="number" min={1} max={65535} value={form.port} onChange={set('port')} />
+        </label>
+        <label className="field">
+          <span>Verschlüsselung</span>
+          <select value={form.secure} onChange={(e) => setForm({ ...form, secure: e.target.value as MailSettings['secure'] })}>
+            <option value="starttls">STARTTLS (meist Port 587)</option>
+            <option value="ssl">SSL/TLS (meist Port 465)</option>
+            <option value="none">keine</option>
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        <span>Benutzername</span>
+        <input value={form.user} onChange={set('user')} autoComplete="off" />
+      </label>
+      <label className="field">
+        <span>Passwort{settings.password_set ? ' (gespeichert – leer lassen, um es zu behalten)' : ''}</span>
+        <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
+      </label>
+      <details>
+        <summary>Versand in Portionen</summary>
+        <p className="small muted">
+          Manche Hoster erlauben nur eine bestimmte Zahl Mails pro Stunde. Dann hier eine Portionsgröße und eine Pause eintragen. 0
+          bedeutet: alle auf einmal bzw. ohne Pause. Die App versucht es alle 15 Minuten; eine Pause dauert deshalb mindestens bis zum
+          nächsten Lauf.
+        </p>
+        <div className="field-row">
+          <label className="field">
+            <span>Mails je Portion</span>
+            <input type="number" min={0} value={form.batch_size} onChange={set('batch_size')} />
+          </label>
+          <label className="field">
+            <span>Pause (Minuten)</span>
+            <input type="number" min={0} value={form.batch_pause} onChange={set('batch_pause')} />
+          </label>
+        </div>
+      </details>
+      <button className="btn btn-block" type="submit" disabled={busy}>
+        Speichern
+      </button>
+      {settings.configured && (
+        <>
+          <div className="button-row">
+            <button
+              type="button"
+              className="btn btn-secondary mail-check"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => api.checkMail(),
+                  (r) => {
+                    onSaved(r.settings);
+                    setMessage({ ok: r.ok, text: r.message + (r.ok ? ` ${maxSizeText(r.size)}` : '') });
+                  },
+                )
+              }
+            >
+              Verbindung prüfen
+            </button>
+          </div>
+          <label className="field">
+            <span>Testmail an (leer: deine eigene Adresse)</span>
+            <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="btn btn-secondary mail-test"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () => api.testMail(testTo.trim() || undefined),
+                (r) => setMessage({ ok: r.sent, text: r.message }),
+              )
+            }
+          >
+            Testmail senden
+          </button>
+        </>
+      )}
+      {message && (
+        <p className={message.ok ? 'small mail-result' : 'form-error mail-result'} role={message.ok ? 'status' : 'alert'}>
+          {message.text}
+        </p>
+      )}
+      <p className="small muted">
+        {settings.server_max_size ? maxSizeText(settings.server_max_size) : 'Der Mailserver hat noch keine Höchstgröße für Mails gemeldet.'}
+        {settings.pending > 0 && ` ${settings.pending} Mails warten auf den Versand.`}
+      </p>
+    </form>
+  );
+}
+
+function maxSizeText(size: number | null): string {
+  return size
+    ? `Der Mailserver nimmt Mails bis ${formatBytes(size)} an (Bilder eingerechnet).`
+    : 'Der Mailserver meldet keine Höchstgröße.';
 }
 
 /** Volle Stunden 00:00 bis 23:00 für die Auswahl einer Uhrzeit. */
@@ -274,6 +486,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
         return list;
       }),
     [],
+    'features',
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -603,10 +816,14 @@ function GoogleLink() {
   );
 }
 
+/** Zwischenspeicher des Kalenders in Minuten (Grenzen wie SettingsService::update auf dem Server). */
+const CACHE_MINUTES = { min: 1, max: 1440 };
+
 export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const c = settings.calendar;
   const [url, setUrl] = useState('');
   const [ids, setIds] = useState(c.calendar_ids);
+  const [minutes, setMinutes] = useState(String(c.cache_minutes));
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -645,11 +862,16 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       onSubmit={(e) => {
         e.preventDefault();
         const idsChanged = ids.trim() !== c.calendar_ids;
+        // Die Grenzen prüfen der Browser (min/max am Feld) und genau noch einmal der Server.
+        const cacheMinutes = Number(minutes);
+        // Nur die Dauer geändert: auch ohne neue Adresse oder IDs speichern (Issue #177).
+        const cache = cacheMinutes !== c.cache_minutes ? { calendar_cache_minutes: cacheMinutes } : {};
         if (!url.trim() && !idsChanged) {
+          if ('calendar_cache_minutes' in cache) return save(cache);
           if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
           return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
         }
-        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim() }, () => setUrl(''));
+        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
       }}
     >
       <p className="muted small">
@@ -696,6 +918,25 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
           angezeigt.
         </span>
       </label>
+      <label className="field">
+        <span>Aktualisieren alle … Minuten</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={CACHE_MINUTES.min}
+          max={CACHE_MINUTES.max}
+          step={1}
+          required
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+        />
+        <span className="small muted">
+          So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt ({CACHE_MINUTES.min} bis{' '}
+          {CACHE_MINUTES.max} Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der
+          Termine dauert dann öfter länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und
+          Speichern laden sofort neu.
+        </span>
+      </label>
       {c.source !== 'none' && (
         <div className="button-row">
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
@@ -736,12 +977,12 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
     try {
       // Erst abgleichen, dann so lange aufbereiten, bis nichts mehr aussteht.
       let r = await api.syncGallery(false);
-      setProgress(`${r.albums} Alben, ${r.photos} Bilder gefunden – ${r.pending} Bilder werden noch aufbereitet …`);
+      setProgress(`${r.albums} Alben, ${r.photos} Bilder und Videos gefunden – ${r.pending} werden noch aufbereitet …`);
       for (let round = 0; r.pending > 0 && r.processed > 0 && round < 50; round++) {
         r = await api.syncGallery(true);
-        setProgress(`${r.albums} Alben, ${r.photos} Bilder – noch ${r.pending} Bilder …`);
+        setProgress(`${r.albums} Alben, ${r.photos} Bilder und Videos – noch ${r.pending} …`);
       }
-      const parts = [`${r.albums} Alben, ${r.photos} Bilder.`];
+      const parts = [`${r.albums} Alben, ${r.photos} Bilder und Videos.`];
       if (r.pending > 0) parts.push(`${r.pending} Bilder werden stündlich automatisch weiter aufbereitet.`);
       if (r.failed > 0) parts.push(`${r.failed} Bilder ließen sich nicht laden (Liste unten).`);
       setProgress((r.pending > 0 || r.failed > 0 ? 'Abgeglichen: ' : 'Fertig: ') + parts.join(' '));
@@ -836,9 +1077,13 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
     <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
       <p className="small muted">
-        Häufige Ursachen: ein Format, das der Server nicht lesen kann (z. B. HEIC vom iPhone, RAW, TIFF), ein Bild, das für den Speicher des
-        Servers zu groß ist, oder eine beschädigte Datei. Abhilfe: das Bild als JPG in denselben Ordner in Google Drive legen (das alte
-        entfernen); der nächste Abgleich nimmt es neu auf.
+        Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das
+        Vorschaubild von Google. Hier stehen Bilder, bei denen auch das nicht ging, z. B. beschädigte Dateien. Abhilfe: das Bild als JPG in
+        denselben Ordner in Google Drive legen (das alte entfernen); der nächste Abgleich nimmt es neu auf.
+      </p>
+      <p className="small muted">
+        Videos zeigt die Galerie als MP4 oder WebM. Andere Formate (z. B. MOV, AVI) stehen hier als „nicht unterstützt“. Abhilfe: das Video
+        als MP4 speichern und in denselben Ordner legen.
       </p>
       {error && (
         <p className="form-error small" role="alert">
@@ -855,7 +1100,8 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
                 <span className="small muted">
                   {' '}
                   {p.album || 'ohne Album'}
-                  {p.intern && ' (intern)'} · {p.attempts === 1 ? '1 Versuch' : `${p.attempts} Versuche`}
+                  {p.intern && ' (intern)'}
+                  {!p.unsupported && ` · ${p.attempts === 1 ? '1 Versuch' : `${p.attempts} Versuche`}`}
                 </span>
                 <br />
                 <span className="small">{p.error || 'ohne Fehlermeldung'}</span>{' '}

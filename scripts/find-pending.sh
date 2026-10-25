@@ -17,7 +17,14 @@ trap 'rm -rf "$WORK"' EXIT
 if [ -n "${ONLY:-}" ]; then
   REPOS="$ONLY"
 else
-  REPOS="$(gh search repos --owner "$ORG" --topic kompanie-app --visibility public --archived=false --limit 500 --json fullName --jq '.[].fullName')"
+  # Über die Liste der Repos der Organisation, nicht über die Suche: Der Such-Index von GitHub lässt ein Repo
+  # nach Änderungen (z. B. direkt nach einer Veröffentlichung) zeitweise weg; dann wurde still nichts gebaut.
+  REPOS="$(gh api --paginate "orgs/$ORG/repos?type=public&per_page=100" \
+    --jq '.[] | select(.archived | not) | select((.topics // []) | index("kompanie-app")) | .full_name')"
+  if [ -z "$REPOS" ]; then
+    echo "::error::Keine Kompanie-Repos gefunden (öffentlich, Topic kompanie-app, in $ORG)." >&2
+    exit 1
+  fi
 fi
 
 PENDING=()

@@ -53,7 +53,7 @@ final class ExtraRolesTest extends TestCase
         $res = $this->setRoles($m, ['penalties', 'events']);
         $this->assertSame(200, $res->status, json_encode($res->data) ?: '');
         $this->assertSame(['id' => $m, 'level' => Roles::MEMBER, 'extra_roles' => ['events', 'penalties']], $res->data, 'Reihenfolge der Rollen, level bleibt die Grundrolle');
-        $this->assertEqualsCanonicalizing(['member', 'calendar', 'manage_penalties', 'manage_events'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(['member', 'calendar', 'view_intern', 'manage_penalties', 'manage_events'], $this->caps($m));
 
         $list = array_column($this->call('GET', '/members')->data, null, 'id');
         $this->assertSame(['events', 'penalties'], $list[$m]['extra_roles']);
@@ -72,7 +72,7 @@ final class ExtraRolesTest extends TestCase
         // Leere Liste: keine Zusatzrollen mehr, Grundrolle unverändert.
         $this->users->current = $this->admin;
         $this->assertSame([], $this->setRoles($m, [])->data['extra_roles']);
-        $this->assertEqualsCanonicalizing(['member', 'calendar'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(['member', 'calendar', 'view_intern'], $this->caps($m));
         // Nur level wie bisher: Zusatzrollen bleiben.
         $this->setRoles($m, ['events']);
         $res = $this->call('PATCH', "/members/$m/role", ['level' => 'points']);
@@ -89,7 +89,7 @@ final class ExtraRolesTest extends TestCase
     public function testOnlyOwnRolesOnTopOfAMemberBaseRole(): void
     {
         $m = $this->users->add('m', Roles::MEMBER);
-        foreach ([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, Roles::ADMIN] as $system) {
+        foreach ([Roles::GUEST, Roles::MEMBER, Roles::ADMIN] as $system) {
             $this->assertSame(400, $this->setRoles($m, [$system])->status, "$system nur als Grundrolle");
         }
         $this->assertSame(400, $this->setRoles($m, ['r99'])->status, 'unbekannte Rolle');
@@ -97,8 +97,8 @@ final class ExtraRolesTest extends TestCase
         $this->assertSame(400, $this->call('PATCH', "/members/$m/role", [])->status, 'nichts angegeben');
         $this->assertSame([], $this->setRoles($m, ['events', 'events'], 'events')->data['extra_roles'], 'Grundrolle als Zusatzrolle fällt weg');
 
-        $candidate = $this->users->add('anwaerter', Roles::CANDIDATE);
-        $this->assertSame(400, $this->setRoles($candidate, ['points'])->status, 'Anwärter: ohne Mitgliederbereich keine Zusatzrollen');
+        $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
+        $this->assertSame(400, $this->setRoles($candidate, ['points'])->status, 'Rolle ohne Mitgliederbereich (Anwärter): keine Zusatzrollen');
         $guest = $this->users->add('gast', Roles::GUEST);
         $this->assertSame(400, $this->setRoles($guest, ['points'])->status);
         $other = $this->users->add('admin2', Roles::ADMIN);
@@ -109,7 +109,7 @@ final class ExtraRolesTest extends TestCase
         $this->assertSame(200, $this->setRoles($candidate, ['points'], Roles::MEMBER)->status);
         $this->assertSame(['points'], $this->call('GET', "/members/$candidate")->data['extra_roles']);
         // Neue Grundrolle ohne Mitgliederbereich: Zusatzrollen fallen weg (sonst wirkten sie nach einem Wechsel zurück wieder).
-        $res = $this->call('PATCH', "/members/$candidate/role", ['level' => Roles::CANDIDATE]);
+        $res = $this->call('PATCH', "/members/$candidate/role", ['level' => TestApp::candidateRole($this->app)]);
         $this->assertSame([], $res->data['extra_roles']);
         $this->assertEqualsCanonicalizing(['calendar'], $this->caps($candidate));
         $this->call('PATCH', "/members/$candidate/role", ['level' => Roles::MEMBER]);
@@ -121,9 +121,9 @@ final class ExtraRolesTest extends TestCase
         // Etwa nach einem Wechsel der Grundrolle im WP-Backend: gespeichert, aber ohne Wirkung.
         $m = $this->users->add('m', Roles::MEMBER);
         $this->setRoles($m, ['points']);
-        $this->users->setRole($m, Roles::CANDIDATE);
+        $this->users->setRole($m, TestApp::candidateRole($this->app));
         $this->assertEqualsCanonicalizing(['calendar'], $this->caps($m));
-        $this->assertSame([], $this->app->roles()->extraRoles($m, Roles::CANDIDATE));
+        $this->assertSame([], $this->app->roles()->extraRoles($m, TestApp::candidateRole($this->app)));
         $this->users->setRole($m, Roles::MEMBER);
         $this->assertContains('manage_points', $this->caps($m));
     }

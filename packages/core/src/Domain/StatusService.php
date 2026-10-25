@@ -13,7 +13,8 @@ use KompanieApp\Core\App;
 final class StatusService
 {
     public const BACKUP_SETTING = 'backup_last';
-    private const BACKUP_REMIND_DAYS = 90;
+    /** Ohne Sicherung außerhalb des Servers (heruntergeladen oder in Google Drive) so viele Tage: gelb. */
+    public const BACKUP_REMIND_DAYS = 30;
 
     public function __construct(private readonly App $app)
     {
@@ -138,10 +139,22 @@ final class StatusService
         if ($this->app->backup === null) {
             return $this->item('backup', 'Datensicherung', 'off', 'In dieser Installation nicht verfügbar.');
         }
-        if ($last === null || $last < $this->app->time()->timestamp() - self::BACKUP_REMIND_DAYS * 86400) {
-            return $this->item('backup', 'Datensicherung', 'warn', 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '. Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren.');
+        $drive = $this->app->backupUpload()->status();
+        $text = 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '.';
+        if ($drive['enabled']) {
+            $text .= ' Letzte Sicherung in Google Drive: ' . $this->date($drive['last_ok']) . '.';
+            if (!$drive['access']) {
+                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Verbindung zu Google erlaubt das Hochladen nicht mehr; bitte unter Einstellungen → Google-Zugang neu verbinden.');
+            }
+            if ($drive['error'] !== null) {
+                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Das letzte Hochladen ist fehlgeschlagen: ' . $drive['error']);
+            }
         }
-        return $this->item('backup', 'Datensicherung', 'ok', 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '.');
+        $newest = max($last ?? 0, $drive['enabled'] ? (int) $drive['last_ok'] : 0);
+        if ($newest < $this->app->time()->timestamp() - self::BACKUP_REMIND_DAYS * 86400) {
+            return $this->item('backup', 'Datensicherung', 'warn', $text . ' Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren oder Sicherungen in Google Drive einschalten.');
+        }
+        return $this->item('backup', 'Datensicherung', 'ok', $text);
     }
 
     private function push(): array

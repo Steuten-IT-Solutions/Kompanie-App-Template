@@ -11,7 +11,8 @@ use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
 
 /**
- * Lesender Zugriff auf Google Drive und, über denselben Zugang, auf den Google Kalender.
+ * Lesender Zugriff auf Google Drive und, über denselben Zugang, auf den Google Kalender. Schreibend nur für die
+ * Datensicherung (BackupUploadService): mit drive.file sieht und ändert die App nur Dateien, die sie selbst angelegt hat.
  *
  * Zwei Wege, in dieser Reihenfolge:
  *  1. „Mit Google verbinden“ (OAuth mit dem eigenen OAuth-Client der Installation): Ein Admin trägt Client-ID und
@@ -31,6 +32,8 @@ use KompanieApp\Core\Port\Settings;
 final class DriveClient
 {
     public const SETTING = 'drive_service_account';
+    /** uploadFile(): Größe der Stücke (Vielfaches von 256 KB). */
+    public const UPLOAD_CHUNK = 8 * 1024 * 1024;
     /**
      * Verbindung über OAuth: {client_id, client_secret, refresh_token, email, scope}. Entsteht über „Mit Google
      * verbinden“ (saveClient, createState, authorizeUrl, exchangeCode) oder durch die Übernahme einer früheren App
@@ -51,8 +54,11 @@ final class DriveClient
     public const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
     /** Lesezugriff auf den Google Kalender (für CalendarService, über denselben Zugang). */
     public const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+    /** Eigene Dateien anlegen und ändern (nur von der App angelegte), für die Datensicherung; nur über „Mit Google verbinden“. */
+    public const BACKUP_SCOPE = 'https://www.googleapis.com/auth/drive.file';
     public const TOKEN_URI = 'https://oauth2.googleapis.com/token';
     public const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+    public const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
     public const FOLDER_MIME = 'application/vnd.google-apps.folder';
     private const TOKEN_CACHE = 'drive_token';
 
@@ -81,6 +87,15 @@ final class DriveClient
     public static function scopes(): string
     {
         return self::SCOPE . ' ' . self::CALENDAR_SCOPE;
+    }
+
+    /**
+     * Berechtigungen beim „Mit Google verbinden“: zusätzlich eigene Dateien für die Datensicherung (ein Dienstkonto hat
+     * in Google Drive keinen eigenen Speicherplatz und bekommt sie deshalb nicht).
+     */
+    public static function oauthScopes(): string
+    {
+        return self::scopes() . ' ' . self::BACKUP_SCOPE;
     }
 
     /** @return array{client_id: string, client_secret: string, refresh_token: string, email: string, scope: string}|null */
@@ -122,6 +137,13 @@ final class DriveClient
             return in_array(self::CALENDAR_SCOPE, preg_split('/\s+/', trim($oauth['scope'])) ?: [], true);
         }
         return $this->serviceAccount() !== null;
+    }
+
+    /** Darf die App Sicherungen in Google Drive ablegen? Nur mit einer OAuth-Verbindung, bei der Google drive.file erlaubt hat. */
+    public function backupAccess(): bool
+    {
+        $oauth = $this->oauth();
+        return $oauth !== null && in_array(self::BACKUP_SCOPE, preg_split('/\s+/', trim($oauth['scope'])) ?: [], true);
     }
 
     /** Ist ein Google-Zugang hinterlegt (OAuth-Verbindung oder Dienstkonto)? */
@@ -291,7 +313,7 @@ final class DriveClient
             'client_id' => $o['client_id'],
             'redirect_uri' => $redirectUri,
             'response_type' => 'code',
-            'scope' => self::scopes(),
+            'scope' => self::oauthScopes(),
             'access_type' => 'offline',
             'prompt' => 'consent',
             'include_granted_scopes' => 'true',
@@ -504,7 +526,7 @@ final class DriveClient
         do {
             $params = [
                 'q' => sprintf("'%s' in parents and trashed = false", str_replace("'", "\\'", $folderId)),
-                'fields' => 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,imageMediaMetadata(width,height,time))',
+                'fields' => 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,size,imageMediaMetadata(width,height,time),videoMediaMetadata(width,height,durationMillis))',
                 'pageSize' => 1000,
                 'orderBy' => 'name',
                 'supportsAllDrives' => 'true',
@@ -524,6 +546,115 @@ final class DriveClient
             $pageToken = $body['nextPageToken'] ?? null;
         } while ($pageToken);
         return $files;
+    }
+
+    /**
+     * Ordner, den die App angelegt hat: ob es ihn noch gibt (nicht im Papierkorb).
+     *
+     * @throws \RuntimeException bei anderen Fehlern als „nicht gefunden“
+     */
+    public function folderExists(string $folderId): bool
+    {
+        $res = $this->http->request('GET', self::FILES_URL . '/' . rawurlencode($folderId) . '?fields=id,trashed&supportsAllDrives=true', ['Authorization' => 'Bearer ' . $this->accessToken()], null, 20);
+        if ($res['status'] === 404) {
+            return false;
+        }
+        $body = json_decode($res['body'], true);
+        if ($res['status'] !== 200 || !is_array($body)) {
+            throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+        }
+        return ($body['trashed'] ?? false) !== true;
+    }
+
+    /** Legt einen Ordner in „Meine Ablage“ an und gibt seine ID zurück. */
+    public function createFolder(string $name): string
+    {
+        $res = $this->http->request('POST', self::FILES_URL . '?fields=id', [
+            'Authorization' => 'Bearer ' . $this->accessToken(),
+            'Content-Type' => 'application/json; charset=UTF-8',
+        ], (string) json_encode(['name' => $name, 'mimeType' => self::FOLDER_MIME], JSON_UNESCAPED_UNICODE), 20);
+        $body = json_decode($res['body'], true);
+        if ($res['status'] !== 200 || !is_string($body['id'] ?? null)) {
+            throw new \RuntimeException('Google Drive: Der Ordner ließ sich nicht anlegen: ' . self::errorMessage($body, $res['status']));
+        }
+        return $body['id'];
+    }
+
+    /**
+     * Lädt eine Datei in einen Ordner hoch (fortsetzbares Hochladen) und gibt ihre ID zurück. Größere Dateien gehen in
+     * Stücken von $chunk Bytes (Vielfaches von 256 KB, wie Google es verlangt): Die Datei muss nie ganz in den
+     * Arbeitsspeicher (große Sicherungen).
+     *
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public function uploadFile(string $folderId, string $name, string $path, string $mime, int $chunk = self::UPLOAD_CHUNK): string
+    {
+        $size = @filesize($path);
+        $in = $size === false ? false : @fopen($path, 'rb');
+        if ($in === false) {
+            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+        }
+        try {
+            $location = $this->startUpload($folderId, $name, $mime, $size);
+            if ($size <= $chunk) {
+                return self::uploadedId($this->http->request('PUT', $location, ['Content-Type' => $mime], (string) stream_get_contents($in), 300));
+            }
+            for ($start = 0; $start < $size; $start += $chunk) {
+                $part = (string) fread($in, $chunk);
+                $end = $start + strlen($part) - 1;
+                $res = $this->http->request('PUT', $location, [
+                    'Content-Type' => $mime,
+                    'Content-Range' => sprintf('bytes %d-%d/%d', $start, $end, $size),
+                ], $part, 300);
+                if ($end + 1 < $size) {
+                    // 308: Stück angenommen, weiter
+                    if ($res['status'] !== 308) {
+                        throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+                    }
+                    continue;
+                }
+                return self::uploadedId($res);
+            }
+            throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).');
+        } finally {
+            fclose($in);
+        }
+    }
+
+    /** Beginnt ein fortsetzbares Hochladen; Rückgabe: Adresse der Sitzung. */
+    private function startUpload(string $folderId, string $name, string $mime, int $length): string
+    {
+        $token = $this->accessToken();
+        $start = $this->http->request('POST', self::UPLOAD_URL . '?uploadType=resumable&supportsAllDrives=true&fields=id', [
+            'Authorization' => 'Bearer ' . $token,
+            'Content-Type' => 'application/json; charset=UTF-8',
+            'X-Upload-Content-Type' => $mime,
+            'X-Upload-Content-Length' => (string) $length,
+        ], (string) json_encode(['name' => $name, 'parents' => [$folderId], 'mimeType' => $mime], JSON_UNESCAPED_UNICODE), 30);
+        $location = $start['headers']['location'] ?? '';
+        if ($start['status'] !== 200 || !str_starts_with($location, 'https://')) {
+            throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht beginnen: ' . self::errorMessage(json_decode($start['body'], true), $start['status']));
+        }
+        return $location;
+    }
+
+    /** @param array{status: int, body: string} $res letzte Antwort beim Hochladen */
+    private static function uploadedId(array $res): string
+    {
+        $body = json_decode($res['body'], true);
+        if (!in_array($res['status'], [200, 201], true) || !is_string($body['id'] ?? null)) {
+            throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));
+        }
+        return $body['id'];
+    }
+
+    /** Löscht eine Datei endgültig (nur eigene Dateien der App, s. BACKUP_SCOPE). */
+    public function deleteFile(string $fileId): void
+    {
+        $res = $this->http->request('DELETE', self::FILES_URL . '/' . rawurlencode($fileId) . '?supportsAllDrives=true', ['Authorization' => 'Bearer ' . $this->accessToken()], null, 20);
+        if (!in_array($res['status'], [200, 204, 404], true)) {
+            throw new \RuntimeException('Google Drive: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+        }
     }
 
     /** Lädt eine Datei in eine temporäre Datei; der Aufrufer löscht sie. */
@@ -556,6 +687,61 @@ final class DriveClient
     }
 
     /**
+     * Lädt das Vorschaubild, das Google selbst für eine Datei erzeugt (thumbnailLink), in eine temporäre Datei;
+     * der Aufrufer löscht sie. Für Formate, die der eigene Server nicht lesen kann (z. B. TIFF). Die Größe wird
+     * über die Endung „=s<Pixel>“ der Adresse gewählt; das ist bei Google nicht dokumentiert, ohne die Endung
+     * kommt das Bild in Googles Standardgröße.
+     *
+     * @throws \RuntimeException wenn Google kein Vorschaubild hat oder der Abruf scheitert
+     */
+    /**
+     * Ausschnitt einer Datei (Bytes $start bis $end einschließlich) per Range-Anfrage, z. B. zum Abspielen eines Videos
+     * aus Drive, ohne es zu speichern.
+     *
+     * @return array{body: string, start: int, end: int, total: int} wie Drive ihn liefert (Content-Range)
+     * @throws \RuntimeException wenn Drive den Ausschnitt nicht liefert
+     */
+    public function downloadRange(string $fileId, int $start, int $end): array
+    {
+        $url = self::FILES_URL . '/' . rawurlencode($fileId) . '?alt=media&supportsAllDrives=true';
+        $res = $this->http->request('GET', $url, ['Authorization' => 'Bearer ' . $this->accessToken(), 'Range' => 'bytes=' . $start . '-' . $end], null, 30);
+        if ($res['status'] === 206 && preg_match('#^bytes (\d+)-(\d+)/(\d+)$#', trim((string) ($res['headers']['content-range'] ?? '')), $m)) {
+            return ['body' => $res['body'], 'start' => (int) $m[1], 'end' => (int) $m[2], 'total' => (int) $m[3]];
+        }
+        if ($res['status'] === 200 && $start === 0) {
+            // Ganze Datei statt Ausschnitt (kleine Datei): nur den angefragten Teil weitergeben.
+            $total = strlen($res['body']);
+            $end = min($end, $total - 1);
+            return ['body' => substr($res['body'], 0, $end + 1), 'start' => 0, 'end' => $end, 'total' => $total];
+        }
+        throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $res['status']);
+    }
+
+    public function thumbnail(string $fileId, int $maxEdge): string
+    {
+        $token = $this->accessToken();
+        $headers = ['Authorization' => 'Bearer ' . $token];
+        $res = $this->http->request('GET', self::FILES_URL . '/' . rawurlencode($fileId) . '?fields=thumbnailLink&supportsAllDrives=true', $headers, null, 20);
+        $body = json_decode($res['body'], true);
+        if ($res['status'] !== 200 || !is_array($body)) {
+            throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+        }
+        $link = (string) ($body['thumbnailLink'] ?? '');
+        if (!str_starts_with($link, 'https://')) {
+            throw new \RuntimeException('Google Drive hat für diese Datei kein Vorschaubild.');
+        }
+        $link = (string) preg_replace('/=s\d+$/', '=s' . $maxEdge, $link);
+        // Nicht öffentlich geteilte Dateien: Abruf mit Anmeldung (laut Drive-API-Referenz zu thumbnailLink).
+        $res = $this->http->request('GET', $link, $headers, null, 30);
+        if ($res['status'] !== 200 || @getimagesizefromstring($res['body']) === false) {
+            throw new \RuntimeException('Das Vorschaubild von Google ließ sich nicht laden: HTTP ' . $res['status']);
+        }
+        $tmp = $this->files->tempFile();
+        file_put_contents($tmp, $res['body']);
+        return $tmp;
+    }
+
+    /**
      * Fehlermeldung aus einer Google-Antwort ({error: {message}} oder {error, error_description}), immer mit
      * HTTP-Status (den braucht auch die Ursache in den Statusmeldungen, Telemetry\Detail).
      */
@@ -584,6 +770,19 @@ final class DriveClient
     public static function isImage(array $f): bool
     {
         return str_starts_with((string) ($f['mimeType'] ?? ''), 'image/');
+    }
+
+    public static function isVideo(array $f): bool
+    {
+        return str_starts_with((string) ($f['mimeType'] ?? ''), 'video/');
+    }
+
+    /** Videos, die die Galerie abspielt; andere Formate spielen viele Browser nicht ab (Liste für Admins). */
+    public const PLAYABLE_VIDEO = ['video/mp4', 'video/webm'];
+
+    public static function isPlayableVideo(string $mime): bool
+    {
+        return in_array(strtolower($mime), self::PLAYABLE_VIDEO, true);
     }
 
     /** Ordner-ID aus einem Drive-Link oder direkt. */

@@ -11,10 +11,11 @@ import {
   type AttendanceStatus,
   type AttendanceSummary,
 } from '../api';
-import { caps, formatDate, formatEventWhen, todayYmd } from '../format';
+import { caps, formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { prefetchOnTap, sources } from '../viewData';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
@@ -34,7 +35,8 @@ async function loadOverview(): Promise<[AttendanceEvent[] | string, AttendanceSu
 }
 
 function Overview({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(loadOverview);
+  // Mit Schlüssel: Beim Zurückkehren aus einer Liste steht die Übersicht sofort da (statt „Lädt …“).
+  const { data, error, loading, reload } = useAsync(loadOverview, [], 'attendance-overview');
   const [showAll, setShowAll] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
@@ -131,7 +133,12 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
       ) : (
         <ul className="card-list attendance-lists">
           {lists.map((l) => (
-            <li key={l.id} className="card row clickable" onClick={() => navigate(`verwaltung/anwesenheit/${l.id}`)}>
+            <li
+              key={l.id}
+              className="card row clickable"
+              onClick={() => navigate(`verwaltung/anwesenheit/${l.id}`)}
+              {...prefetchOnTap(sources.attendance(l.id))}
+            >
               <div className="row-main">
                 <div className="row-title">{l.title}</div>
                 <div className="row-sub">
@@ -152,7 +159,8 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 /* ------------------------------------------------------------------ */
 
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.attendance(id), [id]);
+  const s = sources.attendance(id);
+  const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <Editor key={data!.updated_at} list={data!} onSaved={setData} onToast={onToast} />;
@@ -345,7 +353,7 @@ function GroupCounts({ list }: { list: AttendanceDetail }) {
     <ul className="attendance-groups small muted">
       {rows.map((s) => (
         <li key={s}>
-          <strong>{caps(ATTENDANCE_LABELS[s])}:</strong> {list.counts_by_group[s].map((g) => `${g.label} ${g.count}`).join(' · ')}
+          <strong>{caps(ATTENDANCE_LABELS[s])}:</strong> {list.counts_by_group[s].map((g) => roleCount(g.label, g.count)).join(' · ')}
         </li>
       ))}
     </ul>

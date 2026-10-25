@@ -3,7 +3,8 @@
 // in upcomingBirthdays.tsx.
 
 import { useState, type FormEvent } from 'react';
-import { api, can, config, type Birthday, type BirthdayEntry } from './api';
+import { api, can, config, type Birthday, type BirthdayEntry, type ProfileVisibility } from './api';
+import { PROFILE_OPTIONS, profileChoice, profileHint, ProfileSelect } from './joinYear';
 import { BirthdayRow } from './upcomingBirthdays';
 import brand from './generated/brand';
 import { formatMonth, parseLocalDate } from './format';
@@ -21,9 +22,11 @@ export function canSetBirthdays(): boolean {
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
-/** „14. März 1990“ bzw. ohne Jahr „14. März“ */
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** „14.03.1990“ bzw. ohne Jahr „14.03.“ – wie Eintritt und Austritt (TT.MM.JJJJ) */
 export function formatBirthday(b: { day: number; month: number; year?: number | null }): string {
-  return `${b.day}. ${MONTHS[b.month - 1] ?? ''}${b.year ? ` ${b.year}` : ''}`;
+  return `${pad2(b.day)}.${pad2(b.month)}.${b.year ?? ''}`;
 }
 
 /** Eingabe als Text, wie sie in den Feldern steht. */
@@ -143,7 +146,7 @@ export default function BirthdayPage() {
         </section>
       ))}
       <p className="muted small">
-        Deinen eigenen Geburtstag trägst du unter „Mein Konto“ ein; dort legst du auch fest, ob andere ihn sehen.
+        Deinen eigenen Geburtstag trägst du unter „Meins → Konto“ ein; dort legst du auch fest, ob andere ihn sehen.
       </p>
     </div>
   );
@@ -151,10 +154,11 @@ export default function BirthdayPage() {
 
 /** „Mein Konto“: eigener Geburtstag mit Jahr und den beiden Schaltern. */
 export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.myBirthday(), []);
+  const { data, error, loading, reload, setData } = useAsync(() => api.myBirthday(), [], 'me/birthday');
   const [value, setValue] = useState<BirthdayValue | null>(null);
   const [visible, setVisible] = useState<boolean | null>(null);
   const [showAge, setShowAge] = useState<boolean | null>(null);
+  const [profile, setProfile] = useState<ProfileVisibility | null>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -165,12 +169,15 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
   const v = value ?? toBirthdayValue(current);
   const vis = visible ?? current?.visible ?? true;
   const age = showAge ?? current?.show_age ?? false;
+  const prof = profile ?? current?.profile ?? 'members';
+  const withProfile = profileChoice();
 
   const done = (birthday: Birthday | null, msg: string) => {
     setData({ birthday });
     setValue(null);
     setVisible(null);
     setShowAge(null);
+    setProfile(null);
     onToast(msg);
   };
 
@@ -182,7 +189,7 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
     if (typeof parsed === 'string') return setFormError(parsed);
     setBusy(true);
     try {
-      const res = await api.saveMyBirthday({ ...parsed, visible: vis, show_age: age });
+      const res = await api.saveMyBirthday({ ...parsed, visible: vis, show_age: age, ...(withProfile ? { profile: prof } : {}) });
       done(res.birthday, 'Geburtstag gespeichert');
     } catch (err) {
       setFormError((err as Error).message);
@@ -219,6 +226,16 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
         <input type="checkbox" checked={age} disabled={pending} onChange={(e) => setShowAge(e.target.checked)} />
         Alter anzeigen{!v.year.trim() && ' (nur mit Jahr)'}
       </label>
+      {withProfile && (
+        <>
+          <ProfileSelect value={prof} onChange={setProfile} disabled={pending} />
+          {prof !== 'none' && (
+            <p className="muted small">
+              {profileHint(prof)} {age && v.year.trim() ? 'Dort steht das ganze Datum mit deinem Alter.' : 'Dort stehen nur Tag und Monat.'}
+            </p>
+          )}
+        </>
+      )}
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -286,8 +303,11 @@ export function MemberBirthday({
         <p className="member-birthday-current">{birthday ? formatBirthday(birthday) : 'Nicht eingetragen.'}</p>
         {birthday && (
           <p className="muted small member-birthday-switches">
-            Anderen Mitgliedern zeigen: {birthday.visible ? 'an' : 'aus'} · Alter anzeigen: {birthday.show_age ? 'an' : 'aus'} (stellt nur
-            die Person selbst ein)
+            Anderen Mitgliedern zeigen: {birthday.visible ? 'an' : 'aus'} · Alter anzeigen: {birthday.show_age ? 'an' : 'aus'}
+            {config?.features.directory &&
+              birthday.profile &&
+              ` · Auf der Seite unter „${sec.directory}“: ${PROFILE_OPTIONS[birthday.profile]}`}{' '}
+            (stellt nur die Person selbst ein)
           </p>
         )}
         {editable && (

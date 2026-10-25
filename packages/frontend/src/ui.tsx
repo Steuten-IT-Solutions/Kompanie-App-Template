@@ -1,20 +1,28 @@
-import { Component, lazy, useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { Component, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
-import { dataCache } from './dataCache';
+import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
 
 /**
  * Lädt Daten asynchron; reload() lädt neu.
  * Mit `key` zeigt die Ansicht beim nächsten Öffnen sofort die zuletzt geladenen Daten und
  * aktualisiert sie im Hintergrund (z. B. beim Wechsel zwischen den Tabs; siehe dataCache.ts).
+ * `revision` zählt hoch, wenn die frischen Daten anders sind als die sofort gezeigten aus dem Speicher: Formulare, die
+ * ihre Felder einmal aus den Daten übernehmen, damit als `key` neu aufbauen.
+ * Gab es während des Ladens eine eigene Änderung, ist die Antwort vielleicht veraltet und überschriebe den gespeicherten
+ * Stand (setData): Dann einmal neu laden.
+ * Vorabladen (prefetch.ts, Issue #104): Läuft dafür schon eine Anfrage, wartet die Ansicht auf sie; kam die Antwort gerade
+ * erst (dataCache.takeFresh), fragt sie nicht gleich noch einmal.
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
-  const cacheKey = key === undefined ? null : `${key}|${JSON.stringify(deps)}`;
+  const cacheKey = key === undefined ? null : keyOf(key, deps);
   const cached = () => (cacheKey !== null && dataCache.has(cacheKey) ? dataCache.get<T>(cacheKey) : null);
   const [data, setDataState] = useState<T | null>(cached);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const [revision, setRevision] = useState(0);
 
   const setData = useCallback(
     (d: T | null) => {
@@ -29,18 +37,35 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
     setLoading(true);
     const hit = cached();
     if (hit !== null) setDataState(hit);
-    const since = dataCache.generation();
-    fn()
-      .then((d) => {
-        if (alive) {
-          setDataState(d);
-          setError(null);
-        }
-        // Auch wenn die Ansicht schon geschlossen ist: Beim nächsten Öffnen sind die Daten dann aktuell.
-        if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since);
-      })
-      .catch((e: Error) => alive && setError(e.message))
-      .finally(() => alive && setLoading(false));
+    if (hit !== null && tick === 0 && takeFresh(cacheKey!)) {
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    const load = (retry: boolean) => {
+      const since = dataCache.generation();
+      const running = retry && hit === null && cacheKey !== null ? pendingPrefetch(cacheKey) : undefined;
+      // Schlug das Vorabladen fehl, fragt die Ansicht selbst (und meldet den Fehler, wenn er bleibt).
+      (running ? (running as Promise<T>).catch(() => fn()) : fn())
+        .then((d) => {
+          if (alive && retry && since !== dataCache.generation()) return load(false);
+          if (alive) {
+            if (hit !== null && JSON.stringify(hit) !== JSON.stringify(d)) setRevision((r) => r + 1);
+            setDataState(d);
+            setError(null);
+            setLoading(false);
+          }
+          // Auch wenn die Ansicht schon geschlossen ist: Beim nächsten Öffnen sind die Daten dann aktuell.
+          if (cacheKey !== null && d !== null) dataCache.set(cacheKey, d, since);
+        })
+        .catch((e: Error) => {
+          if (alive) {
+            setError(e.message);
+            setLoading(false);
+          }
+        });
+    };
+    load(true);
     return () => {
       alive = false;
     };
@@ -48,16 +73,17 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
   }, [...deps, tick]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
-  return { data, error, loading, reload, setData };
+  // Der Service Worker hat im Hintergrund neue Daten geholt (Issue #108): neu laden, die Antwort kommt dann aus seinem
+  // Speicher.
+  useEffect(() => {
+    window.addEventListener(DATA_UPDATED, reload);
+    return () => window.removeEventListener(DATA_UPDATED, reload);
+  }, [reload]);
+  return { data, error, loading, reload, setData, revision };
 }
 
-export function Loading() {
-  return (
-    <div className="loading" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" /> Lädt …
-    </div>
-  );
-}
+// Lädt …, mit dem Gerüst der Seite, sobald die App es kennt (skeleton.tsx)
+export { Loading } from './skeleton';
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
@@ -76,12 +102,137 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
-export function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'neutral' }) {
+/** Zeile mit einem Datum der Person; mit onOpen antippbar (öffnet, wo es sich ändern lässt). */
+export function DateRow({ label, onOpen, children }: { label: string; onOpen?: () => void; children: ReactNode }) {
+  const content = (
+    <>
+      <span className="member-date-label">{label}</span>
+      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? 'Nicht eingetragen'}</span>
+      {onOpen && (
+        <span className="chevron" aria-hidden="true">
+          ›
+        </span>
+      )}
+    </>
+  );
   return (
-    <div className={`stat stat-${tone ?? 'neutral'}`}>
+    <li>
+      {onOpen ? (
+        <button type="button" className="member-date" onClick={onOpen}>
+          {content}
+        </button>
+      ) : (
+        <div className="member-date">{content}</div>
+      )}
+    </li>
+  );
+}
+
+/** Kennzahl als Kachel; mit onClick ein Knopf (z. B. öffnet er ein Fenster zum Bearbeiten). */
+export function StatCard({
+  label,
+  value,
+  tone,
+  onClick,
+  action,
+}: {
+  label: string;
+  value: string;
+  tone?: 'good' | 'warn' | 'neutral';
+  onClick?: () => void;
+  /** Hinweis auf der Kachel mit onClick, z. B. „Alle offenen ansehen“ */
+  action?: string;
+}) {
+  const className = `stat stat-${tone ?? 'neutral'}`;
+  if (onClick) {
+    return (
+      <button type="button" className={`${className} stat-button`} onClick={onClick}>
+        <span className="stat-value">{value}</span>
+        <span className="stat-label">{label}</span>
+        {action && <span className="stat-action">{action} ›</span>}
+      </button>
+    );
+  }
+  return (
+    <div className={className}>
       <div className="stat-value">{value}</div>
       <div className="stat-label">{label}</div>
     </div>
+  );
+}
+
+/**
+ * Einklappbarer Abschnitt: Kopf in der Optik von .section-title mit Pfeil „›“, der beim Aufklappen nach unten zeigt.
+ * Für Dokument-Kategorien und „Konto und Rolle“ in den Mitgliedsdetails, damit alle gleich aussehen.
+ */
+export function FoldSection({
+  id,
+  title,
+  open,
+  onToggle,
+  className,
+  children,
+}: {
+  id: string;
+  title: ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const bodyId = `${id}-body`;
+  return (
+    <section id={id} className={className ? `fold ${className}` : 'fold'}>
+      <h3 className="section-title fold-title">
+        <button type="button" className="fold-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+          {title}
+          <span className="fold-arrow" aria-hidden="true">
+            ›
+          </span>
+        </button>
+      </h3>
+      <div id={bodyId} className="fold-body" hidden={!open}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Fenster über der Seite (auf dem Handy von unten, am Computer mittig) mit Überschrift und ✕. Schließen mit ✕, Escape
+ * oder Tippen daneben. Im body, damit Wischen auf der Seite darunter nicht greift (swipe.ts) und nichts die Optik erbt.
+ */
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    // Waagerecht wischen im Fenster ist keine Zurück-Geste des Browsers (die schlösse es und blätterte im Verlauf).
+    const root = document.documentElement.style;
+    const overscroll = root.overscrollBehaviorX;
+    root.overscrollBehaviorX = 'none';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+      root.overscrollBehaviorX = overscroll;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="sheet-head">
+          <h2 className="sheet-title">{title}</h2>
+          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label="Schließen">
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -189,15 +340,30 @@ export function reloadAfterChunkError(): boolean {
  * Selten gebrauchte Ansicht erst bei Bedarf laden (kleinerer App-Start).
  * Fehlt ein Programmteil (z. B. nach einem Update), lädt die App einmal neu (reloadAfterChunkError). Schlägt es danach
  * wieder fehl (z. B. offline ohne gespeicherte Fassung), zeigt die ErrorBoundary eine Meldung.
+ * preload() lädt den Teil schon vorher (Issue #104, z. B. beim Antippen eines Tabs). Ist er schon da, erscheint die
+ * Ansicht ohne Umweg über „Lädt …“: React übernimmt ein sofort erfülltes then synchron.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyView<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
-  return lazy(() =>
-    load().catch((err: unknown) => {
-      if (reloadAfterChunkError()) return new Promise<never>(() => undefined);
-      throw err;
-    }),
+  let loaded: { default: T } | undefined;
+  let running: Promise<{ default: T }> | undefined;
+  const get = () =>
+    (running ??= load().then(
+      (m) => (loaded = m),
+      (err: unknown) => {
+        running = undefined;
+        throw err;
+      },
+    ));
+  const view = lazy(() =>
+    loaded
+      ? ({ then: (resolve: (m: { default: T }) => void) => resolve(loaded!) } as Promise<{ default: T }>)
+      : get().catch((err: unknown) => {
+          if (reloadAfterChunkError()) return new Promise<never>(() => undefined);
+          throw err;
+        }),
   );
+  return Object.assign(view, { preload: () => void get().catch(() => undefined) });
 }
 
 /**

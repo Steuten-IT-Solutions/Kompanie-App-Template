@@ -189,35 +189,40 @@ final class GalleryRepository
         return (int) $this->db->scalar('SELECT COUNT(*) FROM {photos} WHERE status = ?', [self::PENDING]);
     }
 
-    /** @return array<string, mixed>|null nächstes aufzubereitendes Bild: wenigste Versuche, dann neueste Alben zuerst */
-    public function nextPending(): ?array
+    /**
+     * @param int[] $skip in diesem Lauf schon versucht
+     * @return array<string, mixed>|null nächstes aufzubereitendes Bild: wenigste Versuche, dann neueste Alben zuerst
+     */
+    public function nextPending(array $skip = []): ?array
     {
+        $not = $skip === [] ? '' : ' AND p.id NOT IN (' . implode(', ', array_map('intval', $skip)) . ')';
         return $this->db->selectOne(
-            'SELECT p.* FROM {photos} p JOIN {albums} a ON a.id = p.album_id WHERE p.status = ?
-             ORDER BY p.attempts ASC, a.sort_date DESC, p.taken_at ASC, p.id ASC LIMIT 1',
+            "SELECT p.* FROM {photos} p JOIN {albums} a ON a.id = p.album_id WHERE p.status = ?$not
+             ORDER BY p.attempts ASC, a.sort_date DESC, p.taken_at ASC, p.id ASC LIMIT 1",
             [self::PENDING],
         );
     }
 
     /**
-     * Alben mit Anzahl sichtbarer Bilder und Titelbild, in einer Abfrage (keine je Album).
-     * Titelbild: öffentlich vor intern, fertige zuerst, dann nach Aufnahmezeit und Name.
+     * Alben mit Anzahl sichtbarer Bilder und Videos (video_cnt) und Titelbild, in einer Abfrage (keine je Album).
+     * Titelbild: öffentlich vor intern, Bilder vor Videos, fertige zuerst, dann nach Aufnahmezeit und Name.
      * Ohne Fensterfunktionen (ältere MySQL-Versionen): Die ID kommt aus einer Unterabfrage je
      * Zeile, die Spalten des Titelbilds aus einem Join darauf.
      *
      * @return array<int, array<string, mixed>> mit cover_id, cover_file_key, cover_is_intern,
-     *         cover_album_id, cover_status (NULL ohne Titelbild)
+     *         cover_album_id, cover_status, cover_media (NULL ohne Titelbild)
      */
     public function albumSummaries(bool $member): array
     {
         $vis = $member ? '' : ' AND p.is_intern = 0';
         $coverVis = $member ? '' : ' AND c.is_intern = 0';
         return $this->db->select(
-            "SELECT s.*, ph.file_key AS cover_file_key, ph.is_intern AS cover_is_intern, ph.album_id AS cover_album_id, ph.status AS cover_status
+            "SELECT s.*, ph.file_key AS cover_file_key, ph.is_intern AS cover_is_intern, ph.album_id AS cover_album_id, ph.status AS cover_status, ph.media AS cover_media
              FROM (
                 SELECT a.id, a.year, a.title, a.sort_date, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt,
+                    SUM(CASE WHEN p.media = 'video' THEN 1 ELSE 0 END) AS video_cnt,
                     (SELECT c.id FROM {photos} c WHERE c.album_id = a.id AND c.status <> ?$coverVis
-                     ORDER BY c.is_intern ASC, (c.status = 'ready') DESC, c.taken_at ASC, c.name ASC LIMIT 1) AS cover_id
+                     ORDER BY c.is_intern ASC, (c.media = 'image') DESC, (c.status = 'ready') DESC, c.taken_at ASC, c.name ASC LIMIT 1) AS cover_id
                 FROM {albums} a JOIN {photos} p ON p.album_id = a.id
                 WHERE p.status <> ?$vis
                 GROUP BY a.id, a.year, a.title, a.sort_date

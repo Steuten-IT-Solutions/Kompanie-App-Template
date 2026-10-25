@@ -9,8 +9,11 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
 use KompanieApp\Core\Storage\Backup;
+use KompanieApp\Core\Storage\Sql\Migrations;
+use KompanieApp\Core\Storage\Sql\Migrator;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
+use KompanieApp\Core\Tests\Support\MemorySettings;
 use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\TestCase;
 
@@ -63,13 +66,13 @@ final class MemberPhotoTest extends TestCase
         return (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')[$label];
     }
 
-    public function testUploadStoresTwoJpegSizesAndReplaces(): void
+    public function testUploadStoresThreeJpegSizesAndReplaces(): void
     {
         $res = $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('Max.PNG', self::image(2000, 1000, 'png'))]);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $url = (string) $res->data['photo_url'];
         $this->assertMatchesRegularExpression('#^https://example\.org/app/mitgliedsfoto/' . $this->m . '\?v=[0-9a-f]{16}&s=128$#', $url);
-        foreach ([128 => [128, 64], 480 => [480, 240]] as $size => $dims) {
+        foreach ([128 => [128, 64], 480 => [480, 240], 1024 => [1024, 512]] as $size => $dims) {
             $bytes = $this->app->memberPhotos()->repository()->image($this->m, $size);
             $this->assertNotNull($bytes);
             $info = getimagesizefromstring($bytes);
@@ -149,8 +152,13 @@ final class MemberPhotoTest extends TestCase
         $photos = $this->app->memberPhotos();
         $deliver = fn (?int $viewer, mixed $v = null, mixed $s = '480'): array => $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $this->m, $v ?? $info['version'], $s);
 
-        $this->assertSame(401, $deliver(null)['status']);
-        $this->assertSame(403, $deliver($other)['status'], 'andere Mitglieder sehen das Foto nicht');
+        // Mit der öffentlichen Mitgliederliste (Issue #112) auch ohne Anmeldung, dann öffentlich zwischenzuspeichern.
+        $public = $deliver(null);
+        $this->assertSame([200, 'public, max-age=86400'], [$public['status'], $public['headers']['Cache-Control']]);
+        $this->assertSame('public, no-cache', $deliver(null, 'alt')['headers']['Cache-Control']);
+        $this->app->features()->update(['directory' => false]);
+        $this->assertSame(401, $deliver(null)['status'], 'ohne Mitgliederliste nur mit Anmeldung');
+        $this->assertSame(403, $deliver($other)['status'], 'ohne Mitgliederliste sehen andere Mitglieder das Foto nicht');
         $own = $deliver($this->m);
         $this->assertSame([200, 'image/jpeg', 'private, max-age=86400'], [$own['status'], $own['headers']['Content-Type'], $own['headers']['Cache-Control']]);
         $size = getimagesizefromstring($own['body'] ?? '');
@@ -160,6 +168,130 @@ final class MemberPhotoTest extends TestCase
         $this->assertSame('private, no-cache', $deliver($manager, 'alt')['headers']['Cache-Control'], 'veraltete Fassung jedes Mal prüfen');
         $this->assertSame(404, $deliver($manager, null, '64')['status'], 'unbekannte Größe');
         $this->assertSame(404, $photos->forDelivery($this->users->find($manager), $other, 'x', '128')['status'], 'ohne Foto');
+        $size = getimagesizefromstring($deliver($manager, null, '1024')['body'] ?? '');
+        $this->assertNotFalse($size);
+        $this->assertSame(600, $size[0], '1024: so groß wie hochgeladen, nie vergrößert');
+
+        // Vor Datenbankversion 18 hochgeladen: ohne 1024er (die App nimmt dann die 480er), die anderen Größen wie bisher.
+        $this->app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$this->m]);
+        $this->assertSame(404, $deliver($manager, null, '1024')['status']);
+        $this->assertSame(200, $deliver($manager, null, '480')['status']);
+    }
+
+    public function testUrlsFallBackToLargestStoredSize(): void
+    {
+        $other = $this->users->add('anderes', Roles::MEMBER);
+        foreach ([$this->m, $other] as $id) {
+            $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(1200, 800))]);
+        }
+        $photos = $this->app->memberPhotos();
+        $size = static fn (string $url): string => (string) preg_replace('/^.*[?&]s=(\d+).*$/', '$1', $url);
+        $this->assertSame(['1024', '1024'], [$size($photos->urls(1024)[$this->m]), $size($photos->urls(1024)[$other])]);
+
+        // Vor Datenbankversion 18 hochgeladen (Issue #109): Für die Großansicht die 480er statt einer Adresse mit 404.
+        $this->app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$this->m]);
+        $urls = $photos->urls(1024);
+        $this->assertSame($photos->urls(480)[$this->m], $urls[$this->m]);
+        $this->assertSame('1024', $size($urls[$other]), 'andere Fotos bleiben bei 1024');
+        $this->assertSame('128', $size($photos->urls()[$this->m]));
+        $version = $photos->repository()->find($this->m)['version'] ?? '';
+        $res = $photos->forDelivery($this->users->find($this->admin), $this->m, $version, $size($urls[$this->m]));
+        $this->assertSame(200, $res['status']);
+        $this->assertSame(480, getimagesizefromstring($res['body'] ?? '')[0] ?? null);
+    }
+
+    public function testOriginalResolutionForTheLargeView(): void
+    {
+        $exif = JpegMetadataTest::jpegWithMetadata(3000, 2000);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('gross.jpg', $exif)])->status);
+        $repo = $this->app->memberPhotos()->repository();
+        $original = (string) $repo->original($this->m);
+        $info = getimagesizefromstring($original);
+        $this->assertNotFalse($info);
+        $this->assertSame([3000, 2000, 'image/jpeg'], [$info[0], $info[1], $info['mime']], 'volle Auflösung');
+        $this->assertStringNotContainsString('GPSLatitude', $original, 'ohne Metadaten');
+        foreach ([128, 480, 1024] as $size) {
+            $this->assertStringNotContainsString('GPSLatitude', (string) $repo->image($this->m, $size));
+        }
+        $version = (string) $repo->find($this->m)['version'];
+        $photos = $this->app->memberPhotos();
+        $res = $photos->forDelivery(null, $this->m, $version, '4096');
+        $this->assertSame([200, $original], [$res['status'], $res['body'] ?? null]);
+        $this->assertStringEndsWith('&s=4096', $photos->urls(4096)[$this->m]);
+
+        // Kleine Fotos: so groß wie hochgeladen, nie vergrößert.
+        $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('klein.png', self::image(300, 200, 'png'))]);
+        $this->assertSame([300, 200], array_slice((array) getimagesizefromstring((string) $repo->original($this->m)), 0, 2));
+
+        // Ohne Original (vor Datenbankversion 24 hochgeladen): 404, die Großansicht bleibt bei der 1024er.
+        $this->app->db->execute('UPDATE {member_photos} SET original = NULL WHERE user_id = ?', [$this->m]);
+        $version = (string) $repo->find($this->m)['version'];
+        $this->assertSame(404, $photos->forDelivery(null, $this->m, $version, '4096')['status']);
+        $this->assertSame(200, $photos->forDelivery(null, $this->m, $version, '1024')['status']);
+    }
+
+    /** Update einer bestehenden Datenbank (SQLite und MySQL): vorhandene Fotos bleiben, ohne Original; neue bekommen es. */
+    public function testMigrationAddsOriginalToExistingPhotos(): void
+    {
+        foreach (['sqlite', getenv('KOMPANIE_TEST_MYSQL') ? 'mysql' : null] as $driver) {
+            if ($driver === null) {
+                continue;
+            }
+            $db = TestApp::connection($driver);
+            try {
+                $settings = new MemorySettings();
+                $all = Migrations::all();
+                (new Migrator($db, $settings, array_filter($all, static fn (int $v): bool => $v < 24, ARRAY_FILTER_USE_KEY)))->migrate();
+                $this->assertNotContains('original', \KompanieApp\Core\Storage\Sql\Schema::columns($db, 'member_photos'), $driver);
+                $old = base64_encode(self::image(64, 64));
+                $db->insert('member_photos', ['user_id' => 2, 'version' => 'alt', 'small' => $old, 'large' => $old, 'xlarge' => $old, 'updated_by' => 1, 'updated_at' => '2026-01-01 00:00:00']);
+
+                $users = new FakeUsers();
+                $app = TestApp::create($db, $users, [], null, null, $settings);
+                $this->assertSame(Migrations::latest(), (new Migrator($db, $settings))->current(), $driver);
+                $this->assertContains('original', \KompanieApp\Core\Storage\Sql\Schema::columns($db, 'member_photos'), $driver);
+                $repo = $app->memberPhotos()->repository();
+                $this->assertSame('alt', $repo->find(2)['version'] ?? null, $driver);
+                $this->assertSame(self::image(64, 64), $repo->image(2, 1024), $driver);
+                $this->assertNull($repo->original(2), "$driver: vorhandenes Foto ohne Original");
+
+                $users->current = $users->add('admin', Roles::ADMIN);
+                $m = $users->add('mitglied', Roles::MEMBER);
+                $res = $app->api()->handle(new Request('PUT', "/members/{$m}/photo", [], ['file' => self::file('neu.jpg', self::image(2000, 1500))]));
+                $this->assertSame(200, $res->status, $driver);
+                $this->assertSame([2000, 1500], array_slice((array) getimagesizefromstring((string) $repo->original($m)), 0, 2), $driver);
+            } finally {
+                TestApp::dropTables($db);
+            }
+        }
+    }
+
+    public function testDirectoryShowsPhotosOfMembersAndCandidatesToEveryone(): void
+    {
+        $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
+        $guest = $this->users->add('gast', Roles::GUEST);
+        foreach ([$this->m, $guest] as $id) {
+            $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);
+        }
+        $photos = $this->app->memberPhotos();
+        $deliver = function (?int $viewer, int $owner) use ($photos): int {
+            $version = $photos->repository()->find($owner)['version'] ?? '';
+            return $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $owner, $version, '128')['status'];
+        };
+
+        $this->assertSame(200, $deliver($candidate, $this->m), 'Anwärter sieht das Foto eines Mitglieds');
+        $this->assertSame(200, $deliver($guest, $this->m), 'Gäste sehen die Liste (Issue #112)');
+        $this->assertSame(200, $deliver(null, $this->m), 'ohne Anmeldung ebenso');
+        $this->assertSame(403, $deliver($candidate, $guest), 'Gäste stehen nicht in der Liste: Foto bleibt verborgen');
+        $this->assertSame(401, $deliver(null, $guest));
+        // Ehemalige stehen im Tab neben der Liste: ihr Foto bleibt öffentlich, auch als Gast-Konto.
+        $former = $this->users->add('ehemalig', Roles::MEMBER);
+        $this->call('PUT', "/members/$former/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);
+        $this->call('PUT', "/members/$former/former", ['reason' => 'left', 'joined_on' => '', 'left_on' => '2020']);
+        $this->assertSame(200, $deliver(null, $former), 'Ehemalige: Foto öffentlich');
+        $this->app->features()->update(['directory' => false]);
+        $this->assertSame(403, $deliver($candidate, $this->m), 'Bereich aus');
+        $this->assertSame(401, $deliver(null, $this->m), 'Bereich aus');
     }
 
     public function testPhotoWhenCreatingAccounts(): void

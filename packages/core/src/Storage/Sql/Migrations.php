@@ -479,7 +479,8 @@ final class Migrations
                     "ALTER TABLE {ranks} ADD COLUMN badge_version TEXT NOT NULL DEFAULT ''",
                 ],
             ],
-            // Schwarzes Brett (Issue #5): dringende Nachrichten, je 24 Stunden gültig (expires_at), danach gelöscht.
+            // Schwarzes Brett (Issue #5): dringende Nachrichten, gültig bis expires_at (anfangs fest 24 Stunden, seit Issue #172
+            // frei wählbar; Titel, Verlauf usw. in Migration 29).
             10 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {board_messages} (
@@ -788,6 +789,614 @@ final class Migrations
   updated_by INTEGER NOT NULL,
   updated_at TEXT NOT NULL
 )',
+                ],
+            ],
+            // Ämter (Issue #112): Gruppen, Ämter, Amtszeiten (Jahre) und ihre Inhaber. Ein Inhaber ist ein Konto (user_id) oder
+            // ein freier Name; name ist bei Konten die Momentaufnahme und bleibt stehen, wenn das Konto gelöscht wird
+            // (user_id wird dann NULL). kind: period (Zeitraum, end_year NULL = bis heute) oder point (ein Jahr, z. B. eine
+            // Ehrung). offices.title_id verknüpft ein Amt mit einem Titel, der mit laufenden Amtszeiten vergeben wird.
+            17 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {office_groups} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(60) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {offices} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  group_id bigint(20) unsigned DEFAULT NULL,
+  title varchar(60) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  title_id bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY group_id (group_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {office_terms} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  office_id bigint(20) unsigned NOT NULL,
+  kind varchar(10) NOT NULL DEFAULT \'period\',
+  start_year int(11) NOT NULL,
+  end_year int(11) DEFAULT NULL,
+  note varchar(100) NOT NULL DEFAULT \'\',
+  PRIMARY KEY (id),
+  KEY office_id (office_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {office_holders} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  term_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned DEFAULT NULL,
+  name varchar(191) NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY term_id (term_id),
+  KEY user_id (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {office_groups} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE TABLE IF NOT EXISTS {offices} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER DEFAULT NULL,
+  title TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  title_id INTEGER DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {offices}_group_id ON {offices} (group_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_terms} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  office_id INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT \'period\',
+  start_year INTEGER NOT NULL,
+  end_year INTEGER DEFAULT NULL,
+  note TEXT NOT NULL DEFAULT \'\'
+)',
+                    'CREATE INDEX IF NOT EXISTS {office_terms}_office_id ON {office_terms} (office_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_holders} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  term_id INTEGER NOT NULL,
+  user_id INTEGER DEFAULT NULL,
+  name TEXT NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE INDEX IF NOT EXISTS {office_holders}_term_id ON {office_holders} (term_id)',
+                    'CREATE INDEX IF NOT EXISTS {office_holders}_user_id ON {office_holders} (user_id)',
+                ],
+            ],
+            // Fotos der Mitglieder zusätzlich in 1024 Pixeln (xlarge) für die vergrößerte Ansicht. Ohne Vorgabe (NULL):
+            // Fotos von vorher haben diese Fassung erst nach erneutem Hochladen; die App nimmt bis dahin die 480er.
+            18 => [
+                'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge mediumtext DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN xlarge TEXT DEFAULT NULL'],
+            ],
+            // Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden. Das Konto bleibt mit allen Daten, hat
+            // aber die Rolle Gast (Port\UserDirectory::deactivate). reason: left | deceased | other; joined_on und left_on:
+            // JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer; founder: Gründungsmitglied. restore: Rollen und Ausnahmen bei den
+            // Rechten von vorher als JSON, damit „Wieder aufnehmen“ den alten Stand herstellt.
+            19 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {former_members} (
+  user_id bigint(20) unsigned NOT NULL,
+  reason varchar(10) NOT NULL,
+  joined_on varchar(10) NOT NULL DEFAULT \'\',
+  founder tinyint(1) NOT NULL DEFAULT 0,
+  left_on varchar(10) NOT NULL DEFAULT \'\',
+  restore text NOT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {former_members} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  reason TEXT NOT NULL,
+  joined_on TEXT NOT NULL DEFAULT \'\',
+  founder INTEGER NOT NULL DEFAULT 0,
+  left_on TEXT NOT NULL DEFAULT \'\',
+  restore TEXT NOT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
+            // Listen (Issue #121): gespeicherte Listen mit Titel, Spalten und Zeilen zum Drucken und als CSV. Spalten:
+            // kind field (Wert aus der App, field nennt ihn) oder blank (leer zum Ausfüllen auf Papier). Zeilen: kind member
+            // (Konto; user_id wird NULL, wenn das Konto gelöscht wird) oder free (name ist ein freier Name oder leer).
+            // Werte der Mitglieder werden nicht gespeichert, sondern beim Lesen ermittelt.
+            20 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {lists} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(120) NOT NULL,
+  subtitle varchar(200) NOT NULL DEFAULT \'\',
+  list_date date DEFAULT NULL,
+  orientation varchar(10) NOT NULL DEFAULT \'portrait\',
+  created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {list_columns} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  list_id bigint(20) unsigned NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  kind varchar(10) NOT NULL DEFAULT \'blank\',
+  field varchar(20) DEFAULT NULL,
+  label varchar(60) NOT NULL DEFAULT \'\',
+  width varchar(10) NOT NULL DEFAULT \'normal\',
+  checkbox tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY list_id (list_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {list_rows} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  list_id bigint(20) unsigned NOT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  kind varchar(10) NOT NULL DEFAULT \'free\',
+  user_id bigint(20) unsigned DEFAULT NULL,
+  name varchar(100) NOT NULL DEFAULT \'\',
+  PRIMARY KEY (id),
+  KEY list_id (list_id),
+  KEY user_id (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {lists} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  subtitle TEXT NOT NULL DEFAULT \'\',
+  list_date TEXT DEFAULT NULL,
+  orientation TEXT NOT NULL DEFAULT \'portrait\',
+  created_by INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {list_columns} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT \'blank\',
+  field TEXT DEFAULT NULL,
+  label TEXT NOT NULL DEFAULT \'\',
+  width TEXT NOT NULL DEFAULT \'normal\',
+  checkbox INTEGER NOT NULL DEFAULT 0
+)',
+                    'CREATE INDEX IF NOT EXISTS {list_columns}_list_id ON {list_columns} (list_id)',
+                    'CREATE TABLE IF NOT EXISTS {list_rows} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT \'free\',
+  user_id INTEGER DEFAULT NULL,
+  name TEXT NOT NULL DEFAULT \'\'
+)',
+                    'CREATE INDEX IF NOT EXISTS {list_rows}_list_id ON {list_rows} (list_id)',
+                    'CREATE INDEX IF NOT EXISTS {list_rows}_user_id ON {list_rows} (user_id)',
+                ],
+            ],
+            // Seite einer Person in der Mitgliederliste: Geburtstag (birthdays.profile) und Eintrittsjahr (join_years) zeigen
+            // none (nicht), members (nur angemeldeten Mitgliedern) oder public (allen). Beides stellt nur die Person selbst
+            // ein; Standard: nicht zeigen. join_years: Jahr des Eintritts aktiver Mitglieder, einer je Konto.
+            21 => [
+                'mysql' => [
+                    "ALTER TABLE {birthdays} ADD COLUMN profile varchar(10) NOT NULL DEFAULT 'none'",
+                    'CREATE TABLE IF NOT EXISTS {join_years} (
+  user_id bigint(20) unsigned NOT NULL,
+  year smallint(4) unsigned NOT NULL,
+  profile varchar(10) NOT NULL DEFAULT \'none\',
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {birthdays} ADD COLUMN profile TEXT NOT NULL DEFAULT 'none'",
+                    'CREATE TABLE IF NOT EXISTS {join_years} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  year INTEGER NOT NULL,
+  profile TEXT NOT NULL DEFAULT \'none\',
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
+            // Eintritt aktiver Mitglieder auch mit Tag und Monat: join_years.joined_on JJJJ-MM-TT, leer mit nur dem Jahr
+            // (year bleibt in jedem Fall das Jahr).
+            22 => [
+                'mysql' => ["ALTER TABLE {join_years} ADD COLUMN joined_on varchar(10) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {join_years} ADD COLUMN joined_on TEXT NOT NULL DEFAULT ''"],
+            ],
+            // Seite in der Mitgliederliste: Standard ist jetzt „Mitgliedern anzeigen“ (members). Auch bestehende Geburtstage
+            // und Eintritte mit none stellen auf members um (neue Einträge setzt das Programm selbst auf members).
+            23 => [
+                'mysql' => [
+                    "UPDATE {birthdays} SET profile = 'members' WHERE profile = 'none'",
+                    "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
+                ],
+                'sqlite' => [
+                    "UPDATE {birthdays} SET profile = 'members' WHERE profile = 'none'",
+                    "UPDATE {join_years} SET profile = 'members' WHERE profile = 'none'",
+                ],
+            ],
+            // Fotos der Mitglieder zusätzlich in Originalauflösung (höchstens MemberPhotoService::MAX_EDGE) für die
+            // Großansicht, die sie nach der 1024er nachlädt. Ohne Vorgabe (NULL): Fotos von vorher haben sie erst nach
+            // erneutem Hochladen, ebenso wenn die Datenbank das große Foto nicht annimmt (max_allowed_packet).
+            24 => [
+                'mysql' => ['ALTER TABLE {member_photos} ADD COLUMN original mediumtext DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {member_photos} ADD COLUMN original TEXT DEFAULT NULL'],
+            ],
+            // Ämter (Issue #180): Haken „Ehrung“ an der Amtszeit, bei jeder Art. Bisher galt jedes einzelne Jahr (point) als
+            // Ehrung; diese Einträge bekommen den Haken, damit der Zeitstrahl aussieht wie vorher.
+            25 => [
+                'mysql' => [
+                    'ALTER TABLE {office_terms} ADD COLUMN honor tinyint(1) NOT NULL DEFAULT 0',
+                    "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {office_terms} ADD COLUMN honor INTEGER NOT NULL DEFAULT 0',
+                    "UPDATE {office_terms} SET honor = 1 WHERE kind = 'point'",
+                ],
+            ],
+            // Ämter enden beim Ausscheiden (Issue #181): ended_for ist das Konto, für das die App das Ende beim Eintragen als
+            // ehemalig gesetzt hat. Solange niemand die Amtszeit von Hand ändert, zieht eine Änderung des Austrittsdatums das
+            // Ende nach.
+            26 => [
+                'mysql' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for bigint(20) unsigned DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_terms} ADD COLUMN ended_for INTEGER DEFAULT NULL'],
+            ],
+            // Ämter (Issue #112): eigene Einzahl („Kapitän“ zu „Kapitäne“) für den Zeitstrahl einer Person; leer: wie bisher
+            // der Name des verknüpften Titels bzw. die Bezeichnung.
+            27 => [
+                'mysql' => ["ALTER TABLE {offices} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {offices} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
+            ],
+            // Nutzungsauswertung (Issue #175, Domain\ActivityService). Keine Inhalte, keine IP-Adressen, kein User-Agent; nicht
+            // in Sicherungen. Zeiten als Unix-Zeit.
+            // - activity: wer wann welchen Bereich wie genutzt hat (nur mit Erfassung je Person, 90 Tage, mit dem Konto gelöscht);
+            // - activity_last: zuletzt aktiv, eine Zeile je Konto (nur mit Erfassung je Person, mit dem Konto gelöscht);
+            // - activity_seen: zuletzt gesehen je Pseudonym (HMAC der Benutzer-ID) und Bereich, 31 Tage, für die Zahl aktiver
+            //   Nutzer und Personen je Bereich;
+            // - activity_daily: Tageszahlen ohne Personenbezug je Bereich (Personen, Aktionen); Tag in Ortszeit JJJJ-MM-TT.
+            // In beiden steht area '_all' für irgendeinen Bereich.
+            28 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {activity} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  area varchar(20) NOT NULL,
+  action varchar(10) NOT NULL,
+  at int(11) NOT NULL,
+  PRIMARY KEY (id),
+  KEY user_at (user_id, at),
+  KEY at (at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {activity_last} (
+  user_id bigint(20) unsigned NOT NULL,
+  at int(11) NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {activity_seen} (
+  token char(32) NOT NULL,
+  area varchar(20) NOT NULL,
+  at int(11) NOT NULL,
+  PRIMARY KEY (token, area),
+  KEY area_at (area, at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {activity_daily} (
+  day varchar(10) NOT NULL,
+  area varchar(20) NOT NULL,
+  users int(11) NOT NULL DEFAULT 0,
+  actions int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, area)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {activity} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  area TEXT NOT NULL,
+  action TEXT NOT NULL,
+  at INTEGER NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {activity}_user_at ON {activity} (user_id, at)',
+                    'CREATE INDEX IF NOT EXISTS {activity}_at ON {activity} (at)',
+                    'CREATE TABLE IF NOT EXISTS {activity_last} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  at INTEGER NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {activity_seen} (
+  token TEXT NOT NULL,
+  area TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (token, area)
+)',
+                    'CREATE INDEX IF NOT EXISTS {activity_seen}_area_at ON {activity_seen} (area, at)',
+                    'CREATE TABLE IF NOT EXISTS {activity_daily} (
+  day TEXT NOT NULL,
+  area TEXT NOT NULL,
+  users INTEGER NOT NULL DEFAULT 0,
+  actions INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, area)
+)',
+                ],
+            ],
+            // Schwarzes Brett (Issue #172): Titel, formatierter Inhalt (bereinigtes HTML), vorzeitiges Löschen mit Konto und
+            // Zeitpunkt (deleted_at/deleted_by; expires_at wird dabei auf den Zeitpunkt gesetzt, damit auch ältere Versionen
+            // die Nachricht nicht mehr zeigen). Bestehende Nachrichten (reiner Text) werden HTML-escaped, Zeilenumbrüche zu
+            // <br>, und bekommen als Titel ihre erste Zeile (höchstens 80 Zeichen). In MySQL longtext statt text (höchstens
+            // 64 KB); SQLite hat für TEXT keine eigene Grenze. title ist NULL-fähig, damit ältere Versionen weiter schreiben
+            // können (MySQL erlaubt für longtext keinen Standardwert).
+            // Dazu: Signaturen je Konto (user_signatures), Bilder in formatierten Inhalten (rich_images, Base64 wie die Fotos
+            // der Mitglieder; owner_type signature, board oder draft für noch nicht gespeicherte), Änderungsverfolgung
+            // (board_message_revisions, ohne Fremdschlüssel: überdauert das Löschen der Nachricht), Mailversand je
+            // Empfänger (board_mails: Warteschlange und Protokoll) und Einstellungen je Konto (user_settings, z. B.
+            // board_mail = 0 für „keine Mails vom Brett“).
+            29 => [
+                'mysql' => [
+                    'ALTER TABLE {board_messages} ADD COLUMN title longtext DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_at datetime DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_by bigint(20) unsigned DEFAULT NULL',
+                    'ALTER TABLE {board_messages} MODIFY body longtext NOT NULL',
+                    "UPDATE {board_messages} SET
+  title = COALESCE(NULLIF(CASE WHEN CHAR_LENGTH(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1))) > 80
+    THEN CONCAT(LEFT(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)), 79), '…')
+    ELSE TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)) END, ''), 'Nachricht'),
+  body = CONCAT('<p>', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(body, CHAR(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), CHAR(10), '<br>'), '</p>')
+WHERE title IS NULL",
+                    'CREATE TABLE IF NOT EXISTS {user_signatures} (
+  user_id bigint(20) unsigned NOT NULL,
+  content longtext NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {rich_images} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  uid varchar(32) NOT NULL,
+  owner_type varchar(20) NOT NULL,
+  owner_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  mime varchar(20) NOT NULL,
+  width int(11) NOT NULL,
+  height int(11) NOT NULL,
+  bytes bigint(20) unsigned NOT NULL,
+  data longtext NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uid (uid),
+  KEY owner (owner_type, owner_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {board_message_revisions} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  message_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  action varchar(20) NOT NULL,
+  before_value longtext DEFAULT NULL,
+  after_value longtext DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY message_id (message_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {board_mails} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  message_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  email varchar(191) NOT NULL,
+  status varchar(10) NOT NULL,
+  attempts int(11) NOT NULL DEFAULT 0,
+  error text DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY message_id (message_id),
+  KEY status (status)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {user_settings} (
+  user_id bigint(20) unsigned NOT NULL,
+  name varchar(64) NOT NULL,
+  value text NOT NULL,
+  PRIMARY KEY (user_id, name)
+) {options}',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {board_messages} ADD COLUMN title TEXT DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_at TEXT DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_by INTEGER DEFAULT NULL',
+                    "UPDATE {board_messages} SET
+  title = COALESCE(NULLIF(CASE WHEN length(trim(substr(replace(body, char(13), ''), 1, instr(replace(body, char(13), '') || char(10), char(10)) - 1))) > 80
+    THEN substr(trim(substr(replace(body, char(13), ''), 1, instr(replace(body, char(13), '') || char(10), char(10)) - 1)), 1, 79) || '…'
+    ELSE trim(substr(replace(body, char(13), ''), 1, instr(replace(body, char(13), '') || char(10), char(10)) - 1)) END, ''), 'Nachricht'),
+  body = '<p>' || replace(replace(replace(replace(replace(body, char(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), char(10), '<br>') || '</p>'
+WHERE title IS NULL",
+                    'CREATE TABLE IF NOT EXISTS {user_signatures} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  content TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {rich_images} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL,
+  owner_type TEXT NOT NULL,
+  owner_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  mime TEXT NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  bytes INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {rich_images}_uid ON {rich_images} (uid)',
+                    'CREATE INDEX IF NOT EXISTS {rich_images}_owner ON {rich_images} (owner_type, owner_id)',
+                    'CREATE TABLE IF NOT EXISTS {board_message_revisions} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  action TEXT NOT NULL,
+  before_value TEXT DEFAULT NULL,
+  after_value TEXT DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {board_message_revisions}_message_id ON {board_message_revisions} (message_id)',
+                    'CREATE TABLE IF NOT EXISTS {board_mails} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {board_mails}_message_id ON {board_mails} (message_id)',
+                    'CREATE INDEX IF NOT EXISTS {board_mails}_status ON {board_mails} (status)',
+                    'CREATE TABLE IF NOT EXISTS {user_settings} (
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (user_id, name)
+)',
+                ],
+            ],
+            // Videos in der Galerie (Issue #182): media 'image' oder 'video'; bei Videos Dateityp, Größe in Bytes und Dauer aus
+            // Drive. Abgespielt wird aus Drive (GalleryService::deliverVideo), gespeichert wird nur das Vorschaubild.
+            30 => [
+                'mysql' => [
+                    "ALTER TABLE {photos} ADD COLUMN media varchar(10) NOT NULL DEFAULT 'image'",
+                    "ALTER TABLE {photos} ADD COLUMN mime varchar(100) NOT NULL DEFAULT ''",
+                    'ALTER TABLE {photos} ADD COLUMN bytes bigint(20) unsigned NOT NULL DEFAULT 0',
+                    'ALTER TABLE {photos} ADD COLUMN duration_ms bigint(20) unsigned NOT NULL DEFAULT 0',
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {photos} ADD COLUMN media TEXT NOT NULL DEFAULT 'image'",
+                    "ALTER TABLE {photos} ADD COLUMN mime TEXT NOT NULL DEFAULT ''",
+                    'ALTER TABLE {photos} ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0',
+                    'ALTER TABLE {photos} ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0',
+                ],
+            ],
+            // Kontaktangaben, die es in den Benutzerkonten nicht gibt: die Handynummer, die jede Person unter Meins → Konto
+            // selbst pflegt. Eine Zeile je Konto; UserData::purge löscht sie mit dem Konto, die Sicherung enthält sie.
+            31 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {member_contacts} (
+  user_id bigint(20) unsigned NOT NULL,
+  phone varchar(30) NOT NULL DEFAULT \'\',
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {member_contacts} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  phone TEXT NOT NULL DEFAULT \'\',
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
+            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): eine Zeile je geschriebener Mail mit Betreff,
+            // formatiertem Inhalt (bereinigtes HTML) und der Auswahl der Empfänger (JSON: Rollen, Mitglieder und freie
+            // Adressen je An, Cc und Bcc); mailing_recipients ist Warteschlange und Protokoll je Empfänger (field to, cc
+            // oder bcc; user_id 0 bei freien Adressen).
+            32 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {mailings} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  author_id bigint(20) unsigned NOT NULL,
+  subject varchar(255) NOT NULL,
+  body longtext NOT NULL,
+  selection longtext NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY created_at (created_at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {mailing_recipients} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  mailing_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  field varchar(3) NOT NULL,
+  name varchar(191) NOT NULL DEFAULT \'\',
+  email varchar(191) NOT NULL,
+  status varchar(10) NOT NULL,
+  attempts int(11) NOT NULL DEFAULT 0,
+  error text DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY mailing_id (mailing_id),
+  KEY status (status)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {mailings} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author_id INTEGER NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  selection TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {mailings}_created_at ON {mailings} (created_at)',
+                    'CREATE TABLE IF NOT EXISTS {mailing_recipients} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mailing_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL DEFAULT 0,
+  field TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT \'\',
+  email TEXT NOT NULL,
+  status TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {mailing_recipients}_mailing_id ON {mailing_recipients} (mailing_id)',
+                    'CREATE INDEX IF NOT EXISTS {mailing_recipients}_status ON {mailing_recipients} (status)',
+                ],
+            ],
+            // Dateianhänge am Schwarzen Brett und an E-Mails aus der Verwaltung (AttachmentService): Datei geschützt in der
+            // Dateiablage (anhaenge/anh-<uid>.bin), hier Besitzer (draft, board, mail), Name, Typ und Größe.
+            33 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {attachments} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  uid varchar(32) NOT NULL,
+  owner_type varchar(20) NOT NULL,
+  owner_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  name varchar(255) NOT NULL,
+  mime varchar(100) NOT NULL,
+  bytes bigint(20) unsigned NOT NULL,
+  file varchar(64) NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uid (uid),
+  KEY owner (owner_type, owner_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {attachments} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL,
+  owner_type TEXT NOT NULL,
+  owner_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  file TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {attachments}_uid ON {attachments} (uid)',
+                    'CREATE INDEX IF NOT EXISTS {attachments}_owner ON {attachments} (owner_type, owner_id)',
                 ],
             ],
         ];
