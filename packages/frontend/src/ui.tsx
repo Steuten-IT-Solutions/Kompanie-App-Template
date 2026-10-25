@@ -491,11 +491,13 @@ export function PhoneField({
           onChange={(e) => change(e.target.value, national)}
         >
           {COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.flag} +{c.code} {c.name}
+            <option key={c.code} value={c.code} title={c.name} aria-label={`${c.name} +${c.code}`}>
+              {c.flag} +{c.code}
             </option>
           ))}
-          <option value={OTHER}>anderes Land (+ …)</option>
+          <option value={OTHER} aria-label="anderes Land">
+            🌐 andere
+          </option>
         </select>
         <input
           ref={ref}
