@@ -27,11 +27,11 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 ## So gehst du vor
 ### E-Mail-Adresse und Handynummer ändern
 1. Tippe in der Karte **Kontakt** auf **Ändern**.
-2. Trage die neue **E-Mail-Adresse** bzw. **Handynummer** ein. Ein leeres Feld entfernt die Angabe.
+2. Trage die neue **E-Mail-Adresse** bzw. **Handynummer** ein. Für die Handynummer wählst du links das Land (vorgegeben 🇩🇪 +49) und tippst die Nummer wie gewohnt, z. B. 0171 1234567. Ein leeres Feld entfernt die Angabe.
 3. Hast du die E-Mail-Adresse geändert, gib zur Bestätigung dein **Aktuelles Passwort** ein.
 4. Tippe auf **Speichern**.
 
-Die Handynummer darf Ziffern, Leerzeichen und + ( ) / - enthalten, z. B. +49 171 1234567. Sehen können beides nur du und wer Mitglieder anlegen darf.
+Die App bringt beides selbst in die richtige Form: Leerzeichen in der E-Mail-Adresse fallen weg, die Handynummer wird einheitlich gespeichert, z. B. +49 171 1234567. Stimmt etwas nicht, steht es direkt unter dem Feld; bei einem vertippten Anbieter wie „gmial.com“ schlägt die App die richtige Adresse zum Antippen vor. Sehen können beides nur du und wer Mitglieder anlegen darf.
 
 ### Deinen Geburtstag eintragen
 1. Wähle in der Karte **Geburtstag** **Tag** und **Monat**; das **Jahr** ist freiwillig.
