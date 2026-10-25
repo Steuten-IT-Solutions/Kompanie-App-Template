@@ -316,6 +316,18 @@ select {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
 }
+/* Eintrag, auf den eine Benachrichtigung zeigt (Issue #190, focus.ts): kurz mit Akzentfarbe umrandet, blendet aus. */
+.card[data-focus-id] {
+  transition:
+    border-color 0.6s ease-out,
+    box-shadow 0.6s ease-out;
+}
+.card.focused {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent),
+    var(--shadow);
+}
 .row {
   display: flex;
   align-items: center;
