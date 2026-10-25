@@ -154,6 +154,9 @@ function kompanie_code_hash(string $root): string
         'build' => [
             'package.json' => $root . '/package.json',
             'package-lock.json' => $root . '/package-lock.json',
+            // PHP-Abhängigkeiten (PHPMailer, nur in der eigenständigen Version mitgeliefert)
+            'composer.json' => $root . '/composer.json',
+            'composer.lock' => $root . '/composer.lock',
             'build-frontend.sh' => $root . '/scripts/build-frontend.sh',
             'package.php' => $root . '/scripts/package.php',
             // Kern-Version: Eine neue Version ergibt einen neuen Stand, auch ohne andere Änderung am Code.
@@ -280,6 +283,16 @@ foreach ($appHtaccess as $rel => $src) {
     $sa["kompanie-app/$rel"] = $src;
 }
 $sa['kompanie-app/core/.htaccess'] = ['content' => (string) file_get_contents($root . '/adapters/standalone/src/.htaccess')];
+// PHPMailer (LGPL-2.1, Issue #172) für den Mailversand, aus composer install. Unter src/, weil ältere Versionen beim Update
+// nur die Einträge aus StandaloneUpdateTarget::PROGRAM tauschen; src/ ist per .htaccess gesperrt. WordPress nutzt die
+// eigene Kopie von WordPress (wp-includes/PHPMailer), das Plugin liefert keine mit.
+$phpmailer = $root . '/vendor/phpmailer/phpmailer';
+foreach (['src/PHPMailer.php', 'src/SMTP.php', 'src/Exception.php', 'LICENSE', 'VERSION'] as $file) {
+    if (!is_file("$phpmailer/$file")) {
+        $fail("PHPMailer fehlt ($phpmailer/$file). Vorher „composer install --no-dev“ ausführen.");
+    }
+    $sa['kompanie-app/src/lib/PHPMailer/' . basename($file)] = "$phpmailer/$file";
+}
 $sa['kompanie-app/sw.js'] = $dist . '/sw.js';
 $sa['kompanie-app/kompanie.json'] = $kompanieJson;
 $sa['kompanie-app/VERSION'] = ['content' => $version . "\n"];

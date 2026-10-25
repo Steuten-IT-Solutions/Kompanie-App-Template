@@ -214,7 +214,11 @@ jobs:
         with:
           php-version: '8.1'
           extensions: pdo_sqlite, pdo_mysql, gd, sodium, zip, mbstring, curl, openssl, simplexml
-          tools: none
+          tools: composer
+
+      # PHPMailer (Issue #172): kommt mit composer install aus composer.lock und ins Paket der eigenständigen Version.
+      - name: PHP-Abhängigkeiten (PHPMailer)
+        run: composer install --no-dev --no-interaction --no-progress
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
