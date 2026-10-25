@@ -2007,13 +2007,13 @@ test.describe('Vorabladen (Issue #104)', () => {
   // page.route und page.on('request') sehen Anfragen, die der Service Worker selbst stellt, nicht.
   test.use({ serviceWorkers: 'block' });
 
-  /** Anfragen an die API mitschreiben (Pfad, z. B. „/news“), dazu Antworten mit 403. */
-  function watchApi(page: Page) {
+  /** Anfragen an die API mitschreiben (Pfad, z. B. „/news“), dazu Antworten mit 403. preview: nur die der Vorschau. */
+  function watchApi(page: Page, preview = false) {
     const paths: string[] = [];
     const forbidden: string[] = [];
     page.on('request', (r) => {
       const m = decodeURIComponent(r.url()).match(/\/api\/v1(\/[^?&]*)/);
-      if (m && r.method() === 'GET') paths.push(m[1]);
+      if (m && r.method() === 'GET' && (!preview || r.headers()['x-kompanie-preview'])) paths.push(m[1]);
     });
     page.on('response', (r) => {
       if (r.status() === 403) forbidden.push(r.url());
@@ -2103,11 +2103,13 @@ test.describe('Vorabladen (Issue #104)', () => {
   test('Vorschau „App als Rolle ansehen“: kein Vorabladen, auch nicht beim Antippen', async ({ page }) => {
     await login(page, 'admin', ADMIN_PASSWORD);
     await page.evaluate(() => sessionStorage.setItem('kompanie-preview', '@public'));
-    const api = watchApi(page);
+    // Nur Anfragen der Vorschau: Die Admin-Ansicht davor lädt im Leerlauf noch vorab.
+    const api = watchApi(page, true);
     await page.goto('/app/#/termine');
     await page.reload();
     await expect(page.locator('.preview-banner')).toHaveText(/Vorschau ohne Anmeldung/);
     await startPageLoaded(page);
+    expect(api.paths.length).toBeGreaterThan(0); // Die Vorschau lädt ihre Startseite mit dem Header.
     await page.waitForTimeout(3000);
     await page.locator('.tabbar').getByRole('button', { name: 'News' }).dispatchEvent('pointerdown');
     await page.waitForTimeout(500);
