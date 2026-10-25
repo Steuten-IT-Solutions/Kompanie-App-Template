@@ -72,6 +72,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           bereiche: 'admin-bereiche',
           rollen: 'admin-rollen-und-mitglieder',
           benachrichtigungen: 'admin-benachrichtigungen',
+          email: 'admin-email',
           google: 'admin-google',
           galerie: 'admin-galerie',
           kalender: 'admin-kalender',

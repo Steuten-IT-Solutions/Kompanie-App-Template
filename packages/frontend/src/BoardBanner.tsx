@@ -18,9 +18,13 @@ export function BoardMeta({ item }: { item: BoardMessage }) {
   );
 }
 
-/** Reiner Text mit Zeilenumbrüchen (CSS white-space); Links sind bewusst nicht anklickbar. */
-export function BoardText({ text }: { text: string }) {
-  return <p className="board-text">{text}</p>;
+/** Titel einer Nachricht im Banner (Issue #172): nur der Titel, lange Titel kürzt CSS; ein Klick öffnet die Nachricht. */
+export function BoardTitle({ item }: { item: BoardMessage }) {
+  return (
+    <button className="btn btn-link board-text board-banner-title" title={item.title} onClick={() => navigate(`brett/${item.id}`)}>
+      {item.title}
+    </button>
+  );
 }
 
 /** Umfrage im Banner bzw. am Brett: Frage, Ende und der Weg zur Umfrage. */
@@ -29,7 +33,8 @@ export function pollEndText(poll: { ends_at: string | null }): string {
 }
 
 /**
- * Banner oben auf jeder Seite (Issue #5): die neueste gültige Nachricht, weitere aufklappbar („+N weitere“). Dazu für
+ * Banner oben auf jeder Seite (Issue #5): die neueste gültige Nachricht mit ihrem Titel (Issue #172; ein Klick öffnet sie
+ * am Brett), weitere aufklappbar („+N weitere“). Dazu für
  * Mitglieder laufende Umfragen, die sie noch nicht beantwortet haben (Issue #4; beantwortete stehen nur auf der Seite
  * des Bretts). „×“ blendet einen Eintrag auf diesem Gerät aus, bis er geändert wird. Sind alle ausgeblendet, bleibt eine
  * schmale Zeile mit dem Weg zum Brett, solange es gültige Einträge gibt. Unbekannte Arten überspringt das Banner.
@@ -65,7 +70,7 @@ export default function BoardBanner() {
               <div className="board-entry-head">
                 <strong>{sec.board}</strong> <BoardMeta item={item} />
               </div>
-              <BoardText text={item.text} />
+              <BoardTitle item={item} />
             </div>
             <button className="btn btn-link board-dismiss" onClick={() => dismiss(item)} aria-label="Nachricht ausblenden">
               ×
