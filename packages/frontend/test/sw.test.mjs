@@ -287,6 +287,34 @@ test('Mit X-Kompanie-Stale-Ok (Issue #108): gespeicherte Antwort sofort, aus dem
   assert.equal(sw.messages.length, 1);
 });
 
+test('Mit X-Kompanie-Stale-Ok: Läuft die Abfrage im Hintergrund schon, fragt er danach noch einmal (Issue #68)', async () => {
+  let t = 0;
+  const net = { [`${API}board`]: json('["alt"]') };
+  const sw = load({ net, now: () => t });
+  await sw.request(`${API}board`, 'cors', STALE_OK);
+
+  // Die Abfrage im Hintergrund ist schon unterwegs (Server antwortet noch mit dem alten Stand), da ändert jemand die
+  // Nachricht auf einem anderen Gerät, und die App fragt erneut (z. B. nach dem Neuladen).
+  let release;
+  net[`${API}board`] = () => new Promise((resolve) => (release = () => resolve(response('["alt"]', 'application/json'))));
+  t = 20_000;
+  const first = sw.request(`${API}board`, 'cors', STALE_OK);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(sw.fetched.length, 2, 'im Hintergrund unterwegs');
+  const second = sw.request(`${API}board`, 'cors', STALE_OK);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(sw.fetched.length, 2, 'keine zweite Abfrage gleichzeitig');
+  net[`${API}board`] = json('["neu"]');
+  release();
+  assert.equal(await (await first).text(), '["alt"]');
+  assert.equal(await (await second).text(), '["alt"]');
+
+  // Die laufende Abfrage kam mit dem alten Stand zurück; die zweite Anfrage bekommt trotzdem den neuen, samt Meldung.
+  assert.equal(sw.fetched.length, 3, 'danach noch einmal aus dem Netz');
+  assert.equal(JSON.stringify(sw.messages), JSON.stringify([{ type: 'kompanie-data', url: `${API}board` }]));
+  assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK)).text(), '["neu"]');
+});
+
 test('Mit X-Kompanie-Stale-Ok: Fehler im Hintergrund wird gemeldet, dann aus dem Netz; ohne Netz bleibt der Stand', async () => {
   let t = 0;
   const net = { [`${API}events`]: json('["a"]') };

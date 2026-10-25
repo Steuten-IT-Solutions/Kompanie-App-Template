@@ -146,6 +146,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Änderungen von anderen Geräten kamen manchmal nicht an**: Fragte die App gerade im Hintergrund nach neuen Daten,
+  während z. B. eine Nachricht am Schwarzen Brett auf einem anderen Gerät geändert wurde, blieb sie beim alten Stand,
+  auch nach dem Neuladen – eine geänderte, vorher ausgeblendete Nachricht erschien dann nicht wieder. Jetzt fragt die
+  App danach noch einmal nach und zeigt den neuen Stand.
 - **Shortcodes mittig**: Manche Themes (z. B. Astra) rückten `[kompanie_mitglieder]`, `[kompanie_termine]` und die
   Inhaber in `[kompanie_aemter]` nach rechts ein; links war mehr Platz als rechts. Die Listen stehen jetzt bündig.
 
