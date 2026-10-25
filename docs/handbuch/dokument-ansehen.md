@@ -9,7 +9,7 @@ Hier liest du ein Dokument direkt in der App, ohne es herunterzuladen. Das geht 
 ![Ein geöffnetes PDF mit Titel und Stand](bild:dokument-ansehen)
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.documents}**, klappe die Kategorie auf und tippe beim Dokument auf **Öffnen**.
+Tippe unten auf **Intern** und auf **{bereich.documents}**, klappe die Kategorie auf und tippe beim Dokument auf **Öffnen**.
 
 ## Was du hier siehst
 - **‹ Alle {bereich.documents}**: führt zurück zur Liste. Die Kategorie des Dokuments ist dort aufgeklappt.

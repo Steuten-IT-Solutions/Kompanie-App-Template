@@ -9,7 +9,7 @@ Unter **{bereich.documents}** findest du Dateien der {kompanie.name} wie Satzung
 ![Die Liste der {bereich.documents}, nach Kategorien geordnet](bild:dokumente)
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.documents}**.
+Tippe unten auf **Intern** und dann auf **{bereich.documents}**. Mit **‹ Intern** kommst du zurück.
 
 ## Was du hier siehst
 - **Sortierung**: legt fest, in welcher Reihenfolge die {bereich.documents} innerhalb einer Kategorie stehen.

@@ -117,6 +117,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Neuer Bereich „Intern“**: Mitglieder und Dokumente stehen unten nicht mehr als eigene Knöpfe, sondern unter
+  **Intern**. Die Seite zeigt wie die Verwaltung je Bereich einen Knopf; **‹ Intern** führt zurück. Gibt es für jemanden
+  nur einen der beiden (z. B. ohne Anmeldung nur die Mitgliederliste), öffnet **Intern** ihn gleich. Alte Links auf
+  Mitglieder und Dokumente funktionieren weiter.
 - **Benachrichtigung zum Schwarzen Brett**: Sie zeigt jetzt den Titel der Nachricht statt des ganzen Texts und wird,
   wenn die Nachricht länger steht, bis zu 28 Tage nachgeliefert (vorher höchstens einen Tag).
 - **Eigenständige Version**: Das Paket enthält jetzt PHPMailer (LGPL-2.1) für den Mailversand. Mit WordPress nutzt die

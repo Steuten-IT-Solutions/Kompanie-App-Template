@@ -1,7 +1,7 @@
 import { expect, type Locator } from '@playwright/test';
 import type { Gruppe } from './fotograf';
 
-// Fotos für das Handbuch, Teil „inhalte“ (siehe gruppen.ts): Dokumente, Schwarzes Brett, Umfragen.
+// Fotos für das Handbuch, Teil „inhalte“ (siehe gruppen.ts): Intern, Dokumente, Schwarzes Brett, Umfragen.
 // Beispieldaten: tests/standalone/handbuch-daten/40-inhalte.php. Formulare werden nur ausgefüllt, nicht abgeschickt.
 
 /** Kleine PDF-Datei für das Formular „Dokument hochladen“ (wird nicht hochgeladen). */
@@ -18,6 +18,8 @@ const gruppe: Gruppe = async (f) => {
 
   // Dokumente lesen (Mitglied)
   await f.anmelden('mitglied1');
+  await f.oeffnen('intern');
+  await f.foto('intern');
   await f.oeffnen('dokumente');
   await f.foto('dokumente');
   await page.locator('.doc-group .fold-toggle').filter({ hasText: 'Protokolle' }).click();
