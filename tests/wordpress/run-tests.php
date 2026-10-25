@@ -450,13 +450,14 @@ $c->ok(!wp_next_scheduled($hook, $task), 'Normaler Seitenaufruf plant keine Aufg
 delete_option('kompanie_app_' . \KompanieApp\Core\App::PLAN_SETTING);
 Plugin::upgrade(); // nach einem Update passt die vermerkte Version nicht mehr
 $c->ok((bool) wp_next_scheduled($hook, $task), 'Nach einem Update werden die Aufgaben neu eingeplant');
-// Schwarzes Brett (Issue #5): stündlich über WP-Cron; der Hook löscht abgelaufene Nachrichten.
+// Schwarzes Brett (Issue #5, #172): stündlich über WP-Cron; der Hook löscht Nachrichten 30 Tage nach ihrem Ende.
 $boardTask = \KompanieApp\Core\Domain\BoardService::TASK;
 $c->ok(wp_get_schedule($hook, [$boardTask]) === 'hourly', 'Schwarzes Brett: Aufräumen stündlich über WP-Cron');
 $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
-$db->insert('board_messages', ['body' => 'Kpwp abgelaufen', 'author_id' => 1, 'created_at' => $past(90000), 'updated_at' => $past(90000), 'expires_at' => $past(3600)]);
+$expiredBody = 'Kpwp abgelaufen ' . bin2hex(random_bytes(4));
+$db->insert('board_messages', ['title' => 'Kpwp', 'body' => $expiredBody, 'author_id' => 1, 'created_at' => $past(32 * 86400), 'updated_at' => $past(32 * 86400), 'expires_at' => $past(31 * 86400)]);
 do_action($hook, $boardTask);
-$c->ok((int) $db->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpwp abgelaufen']) === 0, 'Aufgabe über den Hook löscht abgelaufene Nachrichten');
+$c->ok((int) $db->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', [$expiredBody]) === 0, 'Aufgabe über den Hook löscht Nachrichten 30 Tage nach ihrem Ende');
 // Umfragen (Issue #4): Erinnerung stündlich über WP-Cron; der Hook vermerkt fällige Umfragen als erinnert (einmal).
 $pollTask = \KompanieApp\Core\Domain\PollService::TASK;
 $c->ok(wp_get_schedule($hook, [$pollTask]) === 'hourly', 'Umfragen: Erinnerung stündlich über WP-Cron');
@@ -486,6 +487,31 @@ unset($_GET['album']);
 // über die App, bis sie erzeugt ist.
 $c->ok(substr_count($html, 'class="ka-foto"') === 2 && !preg_match('#/app/foto/\d+/(thumb|large)#', $html), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
 $c->ok(substr_count($html, 'data-ka-original="') === 2, '[kompanie_galerie] lädt in der Großansicht die Originalauflösung nach');
+
+// Videos (Issue #182): im Album mit ▶, abgespielt in Ausschnitten aus Drive (WpHttpClient mit Range).
+$videoAlbum = null;
+foreach ($overviewGuest[0]['albums'] ?? [] as $a) {
+    if ($a['title'] === 'Umzug') {
+        $videoAlbum = $a;
+    }
+}
+$c->ok(($videoAlbum['count'] ?? 0) === 2 && ($videoAlbum['video_count'] ?? 0) === 1, 'Album mit Bild und Video gezählt');
+$videoAlbum = $videoAlbum ? $gallery->album($videoAlbum['id'], false) : null;
+$video = $videoAlbum ? array_values(array_filter($videoAlbum['photos'], static fn ($p) => $p['type'] === 'video'))[0] ?? null : null;
+$c->ok($video !== null && str_contains($video['video'], '/app/foto/' . $video['id'] . '/video') && $video['mime'] === 'video/webm' && $video['duration'] === 2, 'Video im Album mit Adresse, Dateityp und Dauer');
+$videoFile = (string) file_get_contents(dirname(__DIR__) . '/fixtures/galerie-video.webm');
+$_SERVER['HTTP_RANGE'] = 'bytes=100-199';
+$videoRes = KompanieApp\WordPress\AppPage::videoResponse($app, (int) ($video['id'] ?? 0));
+$c->ok($videoRes['status'] === 206 && $videoRes['contentRange'] === 'bytes 100-199/' . strlen($videoFile) && ($videoRes['body'] ?? '') === substr($videoFile, 100, 100), 'Ausschnitt des Videos aus Drive (206, Content-Range)');
+unset($_SERVER['HTTP_RANGE']);
+$videoRes = KompanieApp\WordPress\AppPage::videoResponse($app, (int) ($video['id'] ?? 0));
+$c->ok($videoRes['status'] === 206 && ($videoRes['body'] ?? '') === $videoFile, 'Ohne Range ab dem Anfang (kleines Video ganz)');
+$_GET['album'] = (string) ($videoAlbum['id'] ?? 0);
+$html = do_shortcode('[kompanie_galerie]');
+unset($_GET['album']);
+$c->ok(substr_count($html, 'class="ka-foto ka-foto-video"') === 1 && str_contains($html, '/app/foto/' . ($video['id'] ?? 0) . '/video') && str_contains($html, 'class="ka-foto-dauer">0:02<'), '[kompanie_galerie] zeigt das Video mit ▶ und Dauer');
+$html = do_shortcode('[kompanie_galerie]');
+$c->ok(str_contains($html, '1 Bild · 1 Video'), '[kompanie_galerie] zählt Bilder und Videos');
 
 $c->section('Laufzeit-Konfiguration und App-Seite');
 wp_set_current_user($member);
@@ -693,11 +719,17 @@ $c->ok(str_contains($env->serviceWorkerUrl(), 'kompanie_app=sw.js'), 'Einfache P
 $c->ok((bool) preg_match('#kompanie_app=dokument(/|%2F)7&v=abc$#', $env->documentUrl(7, 'abc')), 'Einfache Permalinks: Dokument-Adresse mit &v=');
 $c->ok((bool) preg_match('#kompanie_app=abzeichen(/|%2F)7&v=abc&s=64$#', $env->badgeUrl(7, 'abc', 64)), 'Einfache Permalinks: Abzeichen-Adresse mit &v= und &s=');
 $c->ok((bool) preg_match('#kompanie_app=mitgliedsfoto(/|%2F)7&v=abc&s=128$#', $env->memberPhotoUrl(7, 'abc', 128)), 'Einfache Permalinks: Foto-Adresse mit &v= und &s=');
+$c->ok((bool) preg_match('#kompanie_app=bild(/|%2F)0123456789abcdef0123456789abcdef$#', $env->richImageUrl('0123456789abcdef0123456789abcdef')), 'Einfache Permalinks: Bild in formatiertem Inhalt');
 update_option('permalink_structure', $structure);
 $c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
 $c->ok(str_ends_with($env->documentUrl(7, 'abc'), '/app/dokument/7?v=abc'), 'Schöne Permalinks: /app/dokument/7?v=…');
 $c->ok(str_ends_with($env->badgeUrl(7, 'abc', 128), '/app/abzeichen/7?v=abc&s=128'), 'Schöne Permalinks: /app/abzeichen/7?v=…&s=…');
 $c->ok(str_ends_with($env->memberPhotoUrl(7, 'abc', 480), '/app/mitgliedsfoto/7?v=abc&s=480'), 'Schöne Permalinks: /app/mitgliedsfoto/7?v=…&s=…');
+$c->ok(str_ends_with($env->richImageUrl('0123456789abcdef0123456789abcdef'), '/app/bild/0123456789abcdef0123456789abcdef'), 'Schöne Permalinks: /app/bild/<Kennung>');
+// Mailversand (Issue #172): PHPMailer von WordPress, keine eigene Kopie im Plugin
+$c->ok(KompanieApp\Core\Mail\PhpMailerMailer::unavailable() === null, 'PHPMailer verfügbar');
+$c->ok(str_starts_with((string) (new ReflectionClass(PHPMailer\PHPMailer\PHPMailer::class))->getFileName(), ABSPATH . WPINC . '/PHPMailer/'), 'PHPMailer kommt aus wp-includes (die Kopie von WordPress)');
+$c->ok(!is_dir(KOMPANIE_APP_DIR . 'src/lib/PHPMailer') && !is_dir(KOMPANIE_APP_DIR . 'vendor'), 'Das Plugin bringt keine eigene PHPMailer-Kopie mit');
 // Deaktivieren entfernt die /app/-Regeln.
 global $wp_rewrite;
 KompanieApp\WordPress\AppPage::addRewriteRules();

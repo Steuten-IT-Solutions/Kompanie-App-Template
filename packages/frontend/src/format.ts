@@ -118,3 +118,34 @@ export function formatShortTime(iso: string): string {
   const time = `${timeFmt.format(d)} Uhr`;
   return d.toDateString() === new Date().toDateString() ? time : `${weekdayFmt.format(d)}, ${time}`;
 }
+
+/**
+ * Zeitpunkt (ISO 8601) als Wert für ein Feld datetime-local in der Ortszeit des Geräts („JJJJ-MM-TTTHH:MM“); leer bei
+ * null. Für Umfragen (Ende) und das Schwarze Brett (Sichtbar bis).
+ */
+export function toLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Eingabe eines Felds datetime-local (Ortszeit des Geräts, ohne Zeitzone) als eindeutiger Zeitpunkt in UTC
+ * („…Z“); leer = null. Ungültiges geht unverändert an den Server, der es ablehnt.
+ */
+export function fromLocalInput(value: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toISOString();
+}
+
+const yearDateFmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+/** Wie formatShortTime, aber in einem anderen Jahr mit Jahreszahl („Mo., 19. Okt. 2027, 14:05 Uhr“), z. B. „Sichtbar bis“. */
+export function formatUntil(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.getFullYear() === new Date().getFullYear() ? formatShortTime(iso) : `${yearDateFmt.format(d)}, ${timeFmt.format(d)} Uhr`;
+}

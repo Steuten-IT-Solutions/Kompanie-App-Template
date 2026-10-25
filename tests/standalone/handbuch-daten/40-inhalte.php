@@ -103,8 +103,12 @@ $doc('Kassenbericht', $protokolle, -40, 'kassenbericht.pdf', $pdf('Kassenbericht
 $doc('Aufnahmeantrag', $formulare, -200, 'aufnahmeantrag.docx', $docx('Aufnahmeantrag'));
 $doc('Lageplan Festplatz', null, -10, 'lageplan.png', $png());
 
-// Schwarzes Brett: eine kurze Nachricht (steht 24 Stunden, also während aller Fotos).
-$app->board()->create($app->users->find($admin), 'Treffen am Samstag beginnt erst um 10 Uhr.');
+// Schwarzes Brett: eine kurze Nachricht (steht 24 Stunden, also während aller Fotos), einmal geändert (für den Verlauf),
+// und eine Signatur des Admins (Konto → Signatur).
+$boardAdmin = $app->users->find($admin) ?? throw new RuntimeException('Admin fehlt');
+$message = $app->board()->create($boardAdmin, ['title' => 'Treffen am Samstag erst um 10 Uhr', 'text' => '<p>Das Treffen am Samstag beginnt erst um <strong>10 Uhr</strong>.</p>']);
+$app->board()->update($boardAdmin, (int) $message['id'], ['text' => '<p>Das Treffen am Samstag beginnt erst um <strong>10 Uhr</strong>. Treffpunkt ist das Vereinsheim.</p>']);
+$app->signatures()->save($boardAdmin, '<p>Viele Grüße</p><p><strong>Der Vorstand</strong><br><span style="color: #555555">Musterkompanie Beispielstadt</span></p>');
 
 // Umfragen
 $polls = $app->polls();

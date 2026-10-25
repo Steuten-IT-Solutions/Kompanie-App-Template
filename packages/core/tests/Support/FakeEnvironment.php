@@ -62,4 +62,9 @@ final class FakeEnvironment implements Environment
     {
         return 'https://example.org/app/mitgliedsfoto/' . $userId . '?v=' . $version . '&s=' . $size;
     }
+
+    public function richImageUrl(string $uid): string
+    {
+        return 'https://example.org/app/bild/' . $uid;
+    }
 }

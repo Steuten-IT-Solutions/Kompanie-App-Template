@@ -1590,10 +1590,9 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
   await expect(page.locator('.toast')).toHaveText('Liste kopiert');
-  // Erst messen, wenn die Liste neu geladen ist (der Toast kommt vorher): sonst schiebt die Kopie das Formular dazwischen.
-  await expect(page.locator('.row', { hasText: `${title} (Kopie)` })).toBeVisible();
-  // Abstand zwischen der letzten Liste und „Neue Liste“ (Issue #179)
-  expect(await gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
+  // Abstand zwischen der letzten Liste und „Neue Liste“ (Issue #179), erst wenn die Kopie in der Liste steht
+  await expect(page.locator('.row', { hasText: `${title} (Kopie)` }).first()).toBeVisible();
+  await expect.poll(() => gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
   await shotsNarrowAndWide(page, '40d-listen-uebersicht');
   for (const t of [`${title} (Kopie)`, title]) {
     page.once('dialog', (d) => d.accept());
@@ -2475,6 +2474,35 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   expect(asGuest.status()).toBe(401);
 });
 
+test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Range)', async ({ page }) => {
+  await page.context().clearCookies();
+  await page.goto('/app/#/galerie');
+  const card = page.locator('.album-card', { hasText: 'Umzug' });
+  await expect(card).toContainText('1 Bild · 1 Video');
+  await card.click();
+  await expect(page.locator('.photo')).toHaveCount(2);
+  const tile = page.locator('.photo-video');
+  await expect(tile).toHaveCount(1);
+  await expect(tile.locator('.photo-play')).toBeVisible();
+  await expect(tile.locator('.photo-duration')).toHaveText('0:02');
+  // Der Browser fragt das Video mit Range ab; die App reicht den Ausschnitt aus Drive durch.
+  const videoResponse = page.waitForResponse((r) => /\/foto\/\d+\/video/.test(r.url()));
+  await tile.click();
+  const video = page.locator('.lightbox video');
+  await expect(video).toHaveAttribute('src', /\/foto\/\d+\/video/);
+  const res = await videoResponse;
+  expect(res.status()).toBe(206);
+  expect(res.headers()['content-type']).toBe('video/webm');
+  expect(res.headers()['content-range']).toMatch(/^bytes 0-\d+\/\d+$/);
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(1);
+  expect(await video.evaluate((v: HTMLVideoElement) => Math.round(v.duration))).toBe(2);
+  // Blättern zum Bild: das Video verschwindet.
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lightbox video')).toHaveCount(0);
+  await expect(page.locator('.lightbox img')).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
 test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
@@ -3037,7 +3065,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   const gallery = page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' });
   await expect(gallery.getByText('test@example.iam.gserviceaccount.com')).toBeVisible();
   await gallery.getByRole('button', { name: 'Jetzt abgleichen' }).click();
-  await expect(gallery.getByText('Fertig: 2 Alben, 4 Bilder.')).toBeVisible();
+  await expect(gallery.getByText('Fertig: 3 Alben, 6 Bilder und Videos.')).toBeVisible();
 
   await open('Neuigkeiten');
   const news = page.locator('.settings-section', { hasText: 'Neuigkeiten' });
@@ -3660,7 +3688,22 @@ test('Titel: beim Ziehen an den unteren Rand scrollt die Seite mit', async ({ pa
   expect(await order()).toEqual([...names.slice(1), names[0]]);
 });
 
-test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Änderung zeigt es wieder, abgelaufen weg', async ({
+/** Karte einer Nachricht über ihre Kennung (beim Bearbeiten steht der Titel in einem Feld, nicht mehr als Text). */
+async function boardCard(page: Page, title: string): Promise<Locator> {
+  const id = await page.locator('.board-card', { hasText: title }).first().getAttribute('data-focus-id');
+  return page.locator(`.board-card[data-focus-id="${id}"]`);
+}
+
+/** Neue Nachricht am Brett schreiben (Titel, Text im Editor) und veröffentlichen; der Bestätigungsdialog wird angenommen. */
+async function postBoard(page: Page, title: string, text: string) {
+  const form = page.locator('.board-form');
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Text der Nachricht').fill(text);
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(page.locator('.board-card', { hasText: title })).toBeVisible();
+}
+
+test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weitere“, Änderung zeigt es wieder, abgelaufen weg', async ({
   page,
   browser,
 }) => {
@@ -3669,7 +3712,11 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   const second = `Treffpunkt Schützenhaus ${id}`;
   // Admin schreibt (Recht post_board) über „Verwaltung“ → „Schwarzes Brett“; die Verwaltung bleibt markiert.
   const admin = await browser.newPage();
-  admin.on('dialog', (d) => d.accept());
+  const dialogs: string[] = [];
+  admin.on('dialog', (d) => {
+    dialogs.push(d.message());
+    void d.accept();
+  });
   await login(admin, 'admin', ADMIN_PASSWORD);
   await openKonto(admin);
   await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
@@ -3677,23 +3724,38 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await expect(admin.locator('.tabbar button.active')).toHaveText(MANAGER);
   await expect(admin.locator('.topbar-title')).toHaveText('Schwarzes Brett');
   const form = admin.locator('.board-form');
-  await form.getByLabel('Text').fill(`${first}\nHalle gesperrt.`);
-  await expect(form.getByText(`${first.length + 16}/500 Zeichen`)).toBeVisible();
-  await expect(form).toContainText('sofort eine Benachrichtigung');
-  // Haken „Benachrichtigung senden“: standardmäßig an, abwählbar
+  await form.getByLabel('Titel').fill(first);
+  // Formatierter Text: „Halle gesperrt.“ fett über die Werkzeugleiste
+  const editor = form.getByLabel('Text der Nachricht');
+  await editor.click();
+  await admin.keyboard.type('Die ');
+  await form.getByRole('button', { name: 'Fett' }).click();
+  await admin.keyboard.type('Halle ist gesperrt.');
+  await expect(form.getByRole('button', { name: 'Fett' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(form).toContainText('sofort eine Benachrichtigung mit dem Titel');
+  // Sichtbar bis: vorbelegt mit jetzt + 24 Stunden (Ortszeit)
+  await expect(form.getByLabel('Sichtbar bis')).toHaveValue(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  // Haken „Benachrichtigung senden“: standardmäßig an, abwählbar; „E-Mail senden“ ohne eingerichteten Mailversand aus
   await expect(form.getByLabel('Benachrichtigung senden')).toBeChecked();
   await form.getByLabel('Benachrichtigung senden').uncheck();
   await expect(form).toContainText('Ohne Benachrichtigung');
   await form.getByLabel('Benachrichtigung senden').check();
+  await expect(form.getByLabel(/E-Mail senden/)).toBeDisabled();
+  await expect(form).toContainText('Einstellungen → E-Mail');
   await form.getByRole('button', { name: 'Veröffentlichen' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht veröffentlicht');
-  await expect(admin.locator('.board-card', { hasText: first })).toContainText('Halle gesperrt.');
+  // Die Bestätigung nennt Titel, Ende und Versandwege.
+  expect(dialogs.at(-1)).toContain(`„${first}“`);
+  expect(dialogs.at(-1)).toMatch(/Sichtbar bis: .+ Uhr/);
+  expect(dialogs.at(-1)).toContain('E-Mail: keine');
+  const card = admin.locator('.board-card', { hasText: first });
+  await expect(card.locator('.board-text strong, .board-text b')).toHaveText('Halle ist gesperrt.');
 
-  // Mitglied: Banner oben auf jeder Seite.
+  // Mitglied: Banner oben auf jeder Seite, nur mit dem Titel.
   await login(page, 'mitglied1');
   const banner = page.locator('.board-banner');
   await expect(banner).toContainText(first);
-  await expect(banner).toContainText('Halle gesperrt.');
+  await expect(banner).not.toContainText('Halle ist gesperrt.');
   await expect(banner).toContainText(/admin ·/i);
   const tabs = page.locator('.tabbar button');
   for (let i = 0; i < (await tabs.count()); i++) {
@@ -3706,9 +3768,7 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await shot(page, '33-schwarzes-brett');
 
   // Zweite Nachricht: die neueste oben, „+1 weitere“ klappt die erste auf.
-  await admin.locator('.board-form').getByLabel('Text').fill(second);
-  await admin.locator('.board-form').getByRole('button', { name: 'Veröffentlichen' }).click();
-  await expect(admin.locator('.board-card', { hasText: second })).toBeVisible();
+  await postBoard(admin, second, 'Wir treffen uns am Schützenhaus.');
   await page.reload();
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await expect(banner.locator('.board-entry')).toContainText(second);
@@ -3723,16 +3783,39 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await page.reload();
   await expect(banner).toContainText(second);
   await expect(banner).not.toContainText(first);
-  // Auf der Seite des Bretts bleibt sie sichtbar.
-  await banner.getByRole('button', { name: 'Brett öffnen' }).click();
-  await expect(page.locator('.board-card', { hasText: first })).toBeVisible();
+  // Ein Klick auf den Titel öffnet die vollständige Nachricht am Brett; dort bleibt die ausgeblendete sichtbar.
+  await banner.getByRole('button', { name: second }).click();
+  await expect(page.locator('.topbar-title')).toHaveText('Schwarzes Brett');
+  await expect(page.locator('.board-card', { hasText: second })).toContainText('Wir treffen uns am Schützenhaus.');
+  await expect(page.locator('.board-card', { hasText: first })).toContainText('Halle ist gesperrt.');
   await expect(page.locator('.board-form')).toHaveCount(0);
+  // Mitglieder sehen weder Verlauf noch, wer geändert hat.
+  await expect(page.getByRole('button', { name: 'Verlauf' })).toHaveCount(0);
 
-  // Geändert: Die ausgeblendete Nachricht erscheint wieder (ohne neue Benachrichtigung).
-  const card = admin.locator('.board-card', { hasText: first });
-  await card.getByRole('button', { name: 'Bearbeiten' }).click();
-  await card.getByLabel('Text').fill(`${first} – fällt aus, Halle gesperrt`);
-  await card.getByRole('button', { name: 'Speichern' }).click();
+  // Nur das Enddatum geändert: ausgeblendet bleibt ausgeblendet.
+  const firstCard = await boardCard(admin, first);
+  await firstCard.getByRole('button', { name: 'Bearbeiten' }).click();
+  const until = await firstCard.getByLabel('Sichtbar bis').inputValue();
+  const later = new Date(new Date(until).getTime() + 2 * 3600 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  await firstCard
+    .getByLabel('Sichtbar bis')
+    .fill(
+      `${later.getFullYear()}-${pad(later.getMonth() + 1)}-${pad(later.getDate())}T${pad(later.getHours())}:${pad(later.getMinutes())}`,
+    );
+  await firstCard.getByRole('button', { name: 'Speichern' }).click();
+  await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
+  await expect(admin.locator('.board-card', { hasText: first }).locator('.board-last-edit')).toContainText(/Zuletzt geändert von admin/i);
+  await page.goto('/app/#/termine');
+  await page.reload();
+  await expect(banner).toContainText(second);
+  await expect(banner.getByRole('button', { name: /weitere/ })).toHaveCount(0);
+
+  // Titel geändert: Die ausgeblendete Nachricht erscheint wieder (ohne neue Benachrichtigung).
+  const card2 = await boardCard(admin, first);
+  await card2.getByRole('button', { name: 'Bearbeiten' }).click();
+  await card2.getByLabel('Titel').fill(`${first} – fällt aus`);
+  await card2.getByRole('button', { name: 'Speichern' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
   // Nach dem Neuladen kommt zuerst der gespeicherte Stand (Issue #108), die geänderte Fassung folgt, sobald das Netz
   // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
@@ -3741,7 +3824,7 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible();
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await banner.getByRole('button', { name: '+1 weitere' }).click();
-  await expect(banner).toContainText(`${first} – fällt aus, Halle gesperrt`);
+  await expect(banner).toContainText(`${first} – fällt aus`);
 
   // Alle ausgeblendet: Eine schmale Zeile führt weiter zum Brett, auch nach dem Neuladen.
   for (const text of [first, second]) {
@@ -3756,8 +3839,8 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   for (const text of [first, second]) await expect(page.locator('.board-card', { hasText: text })).toBeVisible();
   await page.goto('/app/#/termine');
 
-  // Nach 24 Stunden blendet die App sie selbst aus (Uhr des Browsers vorgestellt).
-  await page.clock.install({ time: new Date(Date.now() + 25 * 3600 * 1000) });
+  // Nach dem Ende blendet die App sie selbst aus (Uhr des Browsers vorgestellt).
+  await page.clock.install({ time: new Date(Date.now() + 27 * 3600 * 1000) });
   await page.reload();
   await expect(page.locator('.topbar-title')).toHaveText('Termine');
   await expect(page.getByText('Vereinsabend')).toBeVisible();
@@ -3770,6 +3853,155 @@ test('Schwarzes Brett: Banner auf allen Seiten, ausblenden, „+1 weitere“, Ä
   }
   await expect(admin.getByText('Zurzeit gibt es keine Nachrichten.')).toBeVisible();
   await admin.close();
+});
+
+test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Konto und Zeitpunkt', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  const title = `Verlauf ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/brett');
+  await postBoard(page, title, 'Erste Fassung');
+  const card = await boardCard(page, title);
+  await card.getByRole('button', { name: 'Bearbeiten' }).click();
+  await card.getByLabel('Text der Nachricht').fill('Zweite Fassung');
+  await card.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht geändert');
+  const edited = page.locator('.board-card', { hasText: title });
+  // Nach dem Speichern lädt die App das Brett neu und baut die Karte neu auf (neues updated_at): erst danach klicken.
+  await expect(edited.locator('.board-text')).toContainText('Zweite Fassung');
+  await edited.getByRole('button', { name: 'Verlauf' }).click();
+  const history = edited.locator('.board-history');
+  await expect(history.locator('.board-revision')).toHaveCount(2);
+  await expect(history.locator('.board-revision').nth(0)).toContainText(/admin: erstellt/i);
+  await expect(history.locator('.board-revision').nth(1)).toContainText(/admin: Inhalt geändert/i);
+  await expect(history.locator('.board-before')).toContainText('Erste Fassung');
+  await expect(history.locator('.board-after')).toContainText('Zweite Fassung');
+  await shot(page, '33b-brett-verlauf');
+
+  await edited.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.board-card', { hasText: title })).toHaveCount(0);
+  await page.getByRole('button', { name: /Verlauf: abgelaufene und gelöschte Nachrichten/ }).click();
+  const ended = page.locator('.board-ended-card', { hasText: title });
+  await expect(ended).toContainText(/gelöscht von admin/i);
+  await ended.getByRole('button', { name: 'Verlauf' }).click();
+  await expect(ended.locator('.board-revision').last()).toContainText(/admin: gelöscht/i);
+});
+
+test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), einfügen, Änderung wirkt nicht auf die Nachricht', async ({
+  page,
+}) => {
+  page.on('dialog', (d) => d.accept());
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Ausgangslage: keine Signatur
+  await openKonto(page);
+  const signatureCard = page.locator('.signature-card');
+  if (await signatureCard.getByRole('button', { name: 'Löschen' }).count()) {
+    await signatureCard.getByRole('button', { name: 'Löschen' }).click();
+    await expect(signatureCard.getByRole('button', { name: 'Signatur einrichten' })).toBeVisible();
+  }
+  await page.goto('/app/#/brett');
+  const form = page.locator('.board-form');
+  await form.getByLabel('Titel').fill(`Mit Signatur ${id}`);
+  await form.getByLabel('Text der Nachricht').fill('Bitte pünktlich sein.');
+  // Ohne Signatur führt der Knopf direkt zur Einrichtung im Konto.
+  await form.getByRole('button', { name: 'Noch keine Signatur – jetzt einrichten' }).click();
+  await expect(page.locator('.signature-card')).toBeVisible();
+  await page.locator('.signature-card').getByLabel('Signatur').fill(`Gruß, der Vorstand ${id}`);
+  // Bild in der Signatur: hochgeladen über den Bildspeicher der App, im Editor gleich sichtbar
+  const uploaded = page.waitForResponse((r) => r.request().method() === 'POST' && decodeURIComponent(r.url()).includes('/rich-images'));
+  await page.locator('.signature-card input[type=file]').setInputFiles(PNG);
+  expect((await uploaded).status()).toBe(201);
+  await expect(page.locator('.signature-card .rich-editor-content img[data-image]')).toHaveCount(1);
+  await page.locator('.signature-card').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Signatur gespeichert');
+  await expect(page.locator('.signature-preview')).toContainText(`Gruß, der Vorstand ${id}`);
+  const previewImage = page.locator('.signature-preview img');
+  await expect(previewImage).toHaveCount(1);
+  await expect.poll(() => previewImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  const signatureImage = await previewImage.getAttribute('data-image');
+  await shot(page, '33c-signatur');
+  // Zurück zum Brett: Der Entwurf ist noch da.
+  await page
+    .locator('.signature-card')
+    .getByRole('button', { name: /Zurück zur Nachricht/ })
+    .click();
+  await expect(form.getByLabel('Titel')).toHaveValue(`Mit Signatur ${id}`);
+  await expect(form.getByLabel('Text der Nachricht')).toContainText('Bitte pünktlich sein.');
+  await form.getByRole('button', { name: 'Signatur einfügen' }).click();
+  await expect(form.getByLabel('Text der Nachricht')).toContainText(`Gruß, der Vorstand ${id}`);
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  const card = page.locator('.board-card', { hasText: `Mit Signatur ${id}` });
+  await expect(card).toContainText(`Gruß, der Vorstand ${id}`);
+  // Das Bild der Signatur wurde für die Nachricht kopiert (eigene Kennung) und lädt.
+  const messageImage = card.locator('.board-text img');
+  await expect.poll(() => messageImage.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  expect(await messageImage.getAttribute('data-image')).not.toBe(signatureImage);
+
+  // Signatur ändern: die Nachricht bleibt, wie sie ist.
+  await openKonto(page);
+  await page.locator('.signature-card').getByRole('button', { name: 'Ändern' }).click();
+  await page.locator('.signature-card').getByLabel('Signatur').fill('Ganz andere Signatur');
+  await page.locator('.signature-card').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.signature-preview')).toContainText('Ganz andere Signatur');
+  await page.goto('/app/#/brett');
+  await expect(page.locator('.board-card', { hasText: `Mit Signatur ${id}` })).toContainText(`Gruß, der Vorstand ${id}`);
+  await page
+    .locator('.board-card', { hasText: `Mit Signatur ${id}` })
+    .getByRole('button', { name: 'Löschen' })
+    .click();
+});
+
+test('Einstellungen → E-Mail: Kompanieadresse und Mailserver speichern, Passwort nie angezeigt', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  await page.getByRole('button', { name: /^E-Mail/ }).click();
+  const section = page.locator('#einstellungen-email');
+  await section.getByLabel('Kompanieadresse (Absender)').fill('info@musterkompanie.example');
+  await section.getByLabel('Mailserver (SMTP)').fill('smtp.musterkompanie.example');
+  await section.getByRole('spinbutton', { name: 'Port', exact: true }).fill('587');
+  await section.getByLabel(/^Passwort/).fill('geheimes-smtp-passwort');
+  await section.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(section.getByLabel(/^Passwort/)).toHaveValue('');
+  await expect(section).toContainText('gespeichert – leer lassen, um es zu behalten');
+  await expect(section.getByRole('button', { name: 'Verbindung prüfen' })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('geheimes-smtp-passwort');
+  await shot(page, '33d-einstellungen-email');
+  // Aufräumen: Mailversand wieder aus (andere Tests erwarten den Haken „E-Mail senden“ deaktiviert)
+  await section.getByLabel('Mailserver (SMTP)').fill('');
+  await section.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+});
+
+test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespeichert in UTC, in Berlin richtig angezeigt', async ({
+  browser,
+  page,
+}) => {
+  const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'de-DE', timezoneId: 'America/New_York' });
+  const ny = await context.newPage();
+  ny.on('dialog', (d) => d.accept());
+  const title = `Zeitzone ${Date.now().toString(36)}`;
+  await login(ny, 'admin', ADMIN_PASSWORD);
+  await ny.goto('/app/#/brett');
+  const form = ny.locator('.board-form');
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Text der Nachricht').fill('Gilt bis Mitte Januar.');
+  // 15. Januar 2031, 10:00 Uhr in New York (EST, UTC−5) = 15:00 UTC = 16:00 Uhr in Berlin (MEZ)
+  await form.getByLabel('Sichtbar bis').fill('2031-01-15T10:00');
+  const posted = ny.waitForResponse((r) => r.request().method() === 'POST' && decodeURIComponent(r.url()).includes('/board'));
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  const body = (await (await posted).json()) as { expires_at: string; id: number };
+  expect(body.expires_at).toBe('2031-01-15T15:00:00+00:00');
+  await expect(ny.locator('.board-card', { hasText: title }).locator('.board-until')).toContainText('15. Jan. 2031, 10:00 Uhr');
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  page.on('dialog', (d) => d.accept());
+  await page.goto('/app/#/brett');
+  const card = page.locator('.board-card', { hasText: title });
+  await expect(card.locator('.board-until')).toContainText('15. Jan. 2031, 16:00 Uhr');
+  await card.getByRole('button', { name: 'Löschen' }).click();
+  await context.close();
 });
 
 test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Ergebnis, ändert; beendet keine Änderung mehr', async ({

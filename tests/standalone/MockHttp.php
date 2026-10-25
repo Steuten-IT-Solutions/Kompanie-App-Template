@@ -19,6 +19,8 @@ final class MockHttp implements ExtendedHttpClient
 
     /** Simulierter Empfänger der Fehlermeldungen (Issue #64): nimmt jede an und legt sie im Datenverzeichnis ab. */
     public const REPORT_URL = 'https://meldungen.test/reports';
+    /** Kleines Video (WebM, 2 Sekunden) für die Galerie */
+    public const VIDEO = __DIR__ . '/../fixtures/galerie-video.webm';
     /** Ergänzung der update.json für die Testinstallation (Kernel, $packageOverride) */
     public const PACKAGE = ['reportUrl' => self::REPORT_URL, 'kompanie' => 'org/kompanie-test'];
 
@@ -54,8 +56,28 @@ final class MockHttp implements ExtendedHttpClient
         if (str_starts_with($url, 'https://news.test/')) {
             return $ok(self::rss(), 'application/rss+xml');
         }
+        if (str_starts_with($url, 'https://lh3.googleusercontent.com/drive-storage/')) {
+            // Vorschaubild eines Videos (thumbnailLink)
+            $im = imagecreatetruecolor(1600, 900);
+            imagefill($im, 0, 0, (int) imagecolorallocate($im, 160, 60, 40));
+            ob_start();
+            imagejpeg($im, null, 80);
+            return $ok((string) ob_get_clean(), 'image/jpeg');
+        }
         if (!str_starts_with($url, 'https://www.googleapis.com/drive/v3/files')) {
             return ['status' => 404, 'headers' => [], 'body' => ''];
+        }
+        if (str_contains($url, '/files/VID1?')) {
+            // Video (Issue #182): Vorschaubild und Ausschnitte per Range wie bei Google
+            if (str_contains($url, 'fields=thumbnailLink')) {
+                return $ok(['thumbnailLink' => 'https://lh3.googleusercontent.com/drive-storage/VID1=s220']);
+            }
+            $video = (string) file_get_contents(self::VIDEO);
+            if (preg_match('/^bytes=(\d+)-(\d+)$/', (string) ($headers['Range'] ?? ''), $r)) {
+                $end = min((int) $r[2], strlen($video) - 1);
+                return ['status' => 206, 'headers' => ['content-type' => 'video/webm', 'content-range' => 'bytes ' . $r[1] . '-' . $end . '/' . strlen($video)], 'body' => substr($video, (int) $r[1], $end - (int) $r[1] + 1)];
+            }
+            return $ok($video, 'video/webm');
         }
         if (preg_match('#/files/([^/?]+)\?alt=media#', $url, $m)) {
             $colors = ['IMG1' => [47, 93, 138], 'IMG2' => [217, 164, 65], 'IMG3' => [46, 107, 63], 'IMG4' => [120, 60, 120]];
@@ -73,6 +95,11 @@ final class MockHttp implements ExtendedHttpClient
             'Y' => [
                 ['id' => 'A1', 'name' => 'Sommerfest', 'mimeType' => $folder, 'createdTime' => $y . '-06-28T00:00:00Z'],
                 ['id' => 'A2', 'name' => 'Vereinsabend', 'mimeType' => $folder, 'createdTime' => $y . '-03-01T00:00:00Z'],
+                ['id' => 'A3', 'name' => 'Umzug', 'mimeType' => $folder, 'createdTime' => $y . '-05-01T00:00:00Z'],
+            ],
+            'A3' => [
+                ['id' => 'IMG5', 'name' => '5.jpg', 'mimeType' => 'image/jpeg', 'md5Checksum' => '5'],
+                ['id' => 'VID1', 'name' => 'umzug.webm', 'mimeType' => 'video/webm', 'md5Checksum' => 'v1', 'size' => (string) filesize(self::VIDEO), 'videoMediaMetadata' => ['width' => 160, 'height' => 90, 'durationMillis' => '2000']],
             ],
             'A1' => [
                 ['id' => 'IMG1', 'name' => '1.jpg', 'mimeType' => 'image/jpeg', 'md5Checksum' => '1'],

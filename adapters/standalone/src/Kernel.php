@@ -34,9 +34,11 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /api/v1/…                API              (index.php?r=/api/v1/…)
  *   /manifest.webmanifest    Manifest         (index.php?r=/manifest.webmanifest)
  *   /foto/<id>/<größe>       Galeriebild      (index.php?r=/foto/…)
+ *   /foto/<id>/video         Galerievideo in Ausschnitten aus Drive (Range)
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
+ *   /bild/<kennung>          Bild in formatiertem Inhalt (index.php?r=/bild/…)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
@@ -329,6 +331,9 @@ final class Kernel
         } elseif (preg_match('#^/foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendPhoto((int) $m[1], $m[2]);
+        } elseif (preg_match('#^/foto/(\d+)/video$#', $path, $m)) {
+            $this->beginPreview();
+            $this->sendVideo((int) $m[1]);
         } elseif (preg_match('#^/dokument/(\d+)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendDocument((int) $m[1]);
@@ -338,6 +343,10 @@ final class Kernel
         } elseif (preg_match('#^/mitgliedsfoto/(\d+)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendMemberPhoto((int) $m[1]);
+        } elseif (preg_match('#^/bild/([a-f0-9]{32})$#', $path, $m)) {
+            $this->beginPreview();
+            $app = $this->app();
+            $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === '/google/callback') {
             $this->sendGoogleCallback();
         } elseif ($path === '/cron') {
@@ -495,6 +504,39 @@ final class Kernel
         readfile($res['file']);
     }
 
+    /** Galerievideo (Issue #182): Ausschnitt aus Drive, Status und Bereich wie im Kern festgelegt. */
+    private function sendVideo(int $id): void
+    {
+        $app = $this->app();
+        $this->securityHeaders();
+        if ($app->maintenance()->active() && $app->maintenance()->blocks($app->authContext->currentUser())) {
+            http_response_code(503);
+            header('Cache-Control: no-store');
+            return;
+        }
+        $res = $app->gallery()->deliverVideo($id, $this->http->header('Range'), static function () use ($app): array {
+            $user = $app->authContext->currentUser();
+            return [(bool) $user?->isMember(), $user !== null];
+        });
+        http_response_code($res['status']);
+        header('Accept-Ranges: bytes');
+        if (isset($res['contentRange'])) {
+            header('Content-Range: ' . $res['contentRange']);
+        }
+        if ($res['status'] !== 206 || !isset($res['body'])) {
+            header('Cache-Control: no-store');
+            if (isset($res['retryAfter'])) {
+                header('Retry-After: ' . (int) $res['retryAfter']);
+            }
+            return;
+        }
+        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
+        header('ETag: ' . $res['etag']);
+        header('Content-Type: ' . $res['mime']);
+        header('Content-Length: ' . strlen($res['body']));
+        echo $res['body'];
+    }
+
     /**
      * Bedingter Abruf: ETag setzen und bei passendem If-None-Match mit 304 ohne Inhalt antworten.
      * Erst aufrufen, wenn die Rechte geprüft sind und Cache-Control gesetzt ist.
@@ -563,7 +605,16 @@ final class Kernel
         $app = $this->app();
         $v = is_string($_GET['v'] ?? null) ? $_GET['v'] : null;
         $s = is_string($_GET['s'] ?? null) ? $_GET['s'] : null;
-        $res = $app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s);
+        $this->sendBody($app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s));
+    }
+
+    /**
+     * Antwort mit Inhalt aus dem Kern (Fotos der Mitglieder, Bilder in formatierten Inhalten): Status, Header, Inhalt.
+     *
+     * @param array{status: int, headers: array<string, string>, body?: string} $res
+     */
+    private function sendBody(array $res): void
+    {
         $this->securityHeaders();
         http_response_code($res['status']);
         foreach ($res['headers'] as $name => $value) {

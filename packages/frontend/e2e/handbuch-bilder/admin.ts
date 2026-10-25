@@ -53,6 +53,14 @@ const gruppe: Gruppe = async (f) => {
   await f.oeffnen('einstellungen/benachrichtigungen');
   await f.foto('admin-benachrichtigungen');
 
+  // E-Mail: Kompanieadresse und Mailserver (Beispielwerte, nicht gespeichert)
+  await f.oeffnen('einstellungen/email');
+  const email = page.locator('#einstellungen-email');
+  await email.getByLabel('Kompanieadresse (Absender)').fill('info@musterkompanie.example');
+  await email.getByLabel('Mailserver (SMTP)').fill('smtp.musterkompanie.example');
+  await email.getByLabel('Benutzername').fill('info@musterkompanie.example');
+  await f.foto('admin-email');
+
   // Google-Zugang: Übersicht und das Formular mit Client-ID (nicht abgeschickt)
   await f.oeffnen('einstellungen/google');
   await f.foto('admin-google');

@@ -60,6 +60,11 @@ final class Shortcodes
 .ka-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .ka-foto{display:block;aspect-ratio:1;overflow:hidden;border-radius:6px;background:rgba(0,0,0,.06)}
 .ka-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.ka-foto-video{position:relative;display:flex;align-items:center;justify-content:center}
+.ka-foto-video::after{content:"▶";position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;padding-left:3px;box-sizing:border-box}
+.ka-foto-dauer{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.65);color:#fff;font-size:.75rem;padding:1px 6px;border-radius:4px}
+.ka-lb video{max-width:96vw;max-height:88vh;background:#000}
+.ka-lb-fehler{color:#fff;text-align:center;padding:0 24px}
 .ka-lb{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center}
 .ka-lb img{max-width:96vw;max-height:88vh;object-fit:contain}
 .ka-lb button{position:absolute;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:999px;width:48px;height:48px;font-size:1.6rem;cursor:pointer}
@@ -90,7 +95,9 @@ final class Shortcodes
 
     /**
      * Großansicht. Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). Erst erscheint das Bild
-     * hinter href, data-ka-original (Originalauflösung) wird nachgeladen und ersetzt es, sobald es ganz da ist.
+     * hinter href, data-ka-original (Originalauflösung) wird nachgeladen und ersetzt es, sobald es ganz da ist. Mit
+     * data-ka-video ein Video (href ist dann seine Adresse, data-ka-poster das Vorschaubild); Wischen auf dem Video
+     * blättert nicht (dort bedient man den Player).
      */
     private static function lightbox(): string
     {
@@ -99,15 +106,19 @@ final class Shortcodes
 document.addEventListener("click",function(e){var a=e.target.closest("[data-ka-lightbox]");if(!a)return;e.preventDefault();
 var g=a.getAttribute("data-ka-lightbox"),links=[].slice.call(document.querySelectorAll("[data-ka-lightbox]")).filter(function(l){return l.getAttribute("data-ka-lightbox")===g}),i=links.indexOf(a);
 var box=document.createElement("div");box.className="ka-lb";box.setAttribute("role","dialog");box.setAttribute("aria-modal","true");
-box.innerHTML="<img alt=\"\"><button class=\"ka-lb-close\" aria-label=\"Schließen\">✕</button><button class=\"ka-lb-prev\" aria-label=\"Vorheriges Bild\">‹</button><button class=\"ka-lb-next\" aria-label=\"Nächstes Bild\">›</button><div class=\"ka-lb-count\"></div>";
-var img=box.querySelector("img"),cnt=box.querySelector(".ka-lb-count");
-function show(n){i=(n+links.length)%links.length;var l=links[i],o=l.getAttribute("data-ka-original");img.src=l.href;var t=l.getAttribute("data-ka-titel");img.alt=t||"";cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;
-if(o){var big=new Image();big.onload=function(){if(links[i]===l)img.src=o;};big.src=o;}}
-function close(){document.removeEventListener("keydown",key);box.remove();a.focus();}
+box.innerHTML="<img alt=\"\"><video controls playsinline preload=\"metadata\" hidden></video><p class=\"ka-lb-fehler\" hidden>Dieses Video kann dein Browser nicht abspielen.</p><button class=\"ka-lb-close\" aria-label=\"Schließen\">✕</button><button class=\"ka-lb-prev\" aria-label=\"Vorheriges Bild\">‹</button><button class=\"ka-lb-next\" aria-label=\"Nächstes Bild\">›</button><div class=\"ka-lb-count\"></div>";
+var img=box.querySelector("img"),vid=box.querySelector("video"),err=box.querySelector(".ka-lb-fehler"),cnt=box.querySelector(".ka-lb-count");
+vid.onerror=function(){if(vid.getAttribute("src")){vid.hidden=true;err.hidden=false;}};
+function show(n){i=(n+links.length)%links.length;var l=links[i],o=l.getAttribute("data-ka-original"),v=l.hasAttribute("data-ka-video");var t=l.getAttribute("data-ka-titel");
+vid.pause();err.hidden=true;img.hidden=v;vid.hidden=!v;
+if(v){img.removeAttribute("src");vid.poster=l.getAttribute("data-ka-poster")||"";vid.src=l.href;}else{vid.removeAttribute("src");vid.load();img.src=l.href;img.alt=t||"";}
+cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;
+if(o&&!v){var big=new Image();big.onload=function(){if(links[i]===l)img.src=o;};big.src=o;}}
+function close(){document.removeEventListener("keydown",key);vid.pause();box.remove();a.focus();}
 function key(ev){if(ev.key==="Escape")close();if(ev.key==="ArrowLeft")show(i-1);if(ev.key==="ArrowRight")show(i+1);}
 box.addEventListener("click",function(ev){if(ev.target===box||ev.target.classList.contains("ka-lb-close"))close();});
 box.querySelector(".ka-lb-prev").onclick=function(){show(i-1)};box.querySelector(".ka-lb-next").onclick=function(){show(i+1)};
-var x0=null;box.addEventListener("touchstart",function(ev){x0=ev.touches[0].clientX},{passive:true});
+var x0=null;box.addEventListener("touchstart",function(ev){x0=ev.target===vid?null:ev.touches[0].clientX},{passive:true});
 box.addEventListener("touchend",function(ev){if(x0===null)return;var dx=ev.changedTouches[0].clientX-x0;if(Math.abs(dx)>40)show(dx<0?i+1:i-1);x0=null;});
 document.addEventListener("keydown",key);document.body.appendChild(box);show(i);box.querySelector(".ka-lb-close").focus();});})();
 </script>';
@@ -186,6 +197,19 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= self::lightbox() . '<div class="ka"><p><a href="' . $back . '">‹ Zur Galerie</a></p>';
             $html .= '<h2>' . esc_html($album['title']) . ' <small>' . esc_html($album['year']) . '</small></h2><div class="ka-grid">';
             foreach ($album['photos'] as $ph) {
+                if (($ph['type'] ?? 'image') === 'video') {
+                    // Ohne Skript öffnet der Link das Video direkt im Browser.
+                    $duration = (int) $ph['duration'];
+                    $html .= sprintf(
+                        '<a class="ka-foto ka-foto-video" href="%s" data-ka-lightbox data-ka-video data-ka-poster="%s" aria-label="%s">%s%s</a>',
+                        esc_url($ph['video']),
+                        esc_url($ph['large']),
+                        esc_attr('Video: ' . $album['title']),
+                        $ph['thumb'] !== '' ? '<img src="' . esc_url($ph['thumb']) . '" alt="" loading="lazy" width="400" height="400" />' : '',
+                        $duration > 0 ? '<span class="ka-foto-dauer">' . esc_html(sprintf('%d:%02d', intdiv($duration, 60), $duration % 60)) . '</span>' : '',
+                    );
+                    continue;
+                }
                 $html .= sprintf(
                     '<a class="ka-foto" href="%s" data-ka-lightbox data-ka-original="%s"><img src="%s" alt="%s" loading="lazy" width="400" height="400" /></a>',
                     esc_url($ph['large']),
@@ -209,12 +233,26 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                     esc_url(add_query_arg('album', $al['id'])),
                     $al['cover'] ? '<img src="' . esc_url($al['cover']) . '" alt="" loading="lazy" />' : '<span class="ka-platzhalter"></span>',
                     esc_html($al['title']),
-                    esc_html(sprintf('%d %s', $al['count'], $al['count'] === 1 ? 'Bild' : 'Bilder')),
+                    esc_html(self::mediaCount((int) $al['count'], (int) ($al['video_count'] ?? 0))),
                 );
             }
             $html .= '</div>';
         }
         return $html . '</div>';
+    }
+
+    /** „3 Bilder · 1 Video“, wie in der App (Galerie.tsx, mediaCount). */
+    private static function mediaCount(int $count, int $videos): string
+    {
+        $images = $count - $videos;
+        $parts = [];
+        if ($images > 0 || $videos === 0) {
+            $parts[] = $images . ' ' . ($images === 1 ? 'Bild' : 'Bilder');
+        }
+        if ($videos > 0) {
+            $parts[] = $videos . ' ' . ($videos === 1 ? 'Video' : 'Videos');
+        }
+        return implode(' · ', $parts);
     }
 
     private static function offices(App $app, array $atts): string

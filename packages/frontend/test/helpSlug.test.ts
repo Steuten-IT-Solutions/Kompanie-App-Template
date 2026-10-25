@@ -75,6 +75,7 @@ const PATHS = [
   ['meins', 'dienstgrad'],
   ['meins', 'anwesenheit'],
   ['meins', 'konto'],
+  ['meins', 'konto', 'signatur'],
   ['meins', 'aemter'],
   ['verwaltung'],
   ['verwaltung', 'einrichtungen'],
@@ -128,6 +129,7 @@ const PATHS = [
     'galerie',
     'news',
     'benachrichtigungen',
+    'email',
     'zustand',
     'wartung',
     'datensicherung',
@@ -159,6 +161,7 @@ test('Meins: ohne Unterseite die Übersicht, sonst die Seite zur Unterseite', ()
   assert.equal(helpSlug(['meins', 'strafen'], withRights(['member'])), 'meine-strafen');
   // Konto unter „Meins“; ohne eigene Daten (z. B. Anwärter) ist es die einzige Unterseite.
   assert.equal(helpSlug(['meins', 'konto'], member), 'anmelden-und-konto');
+  assert.equal(helpSlug(['meins', 'konto', 'signatur'], member), 'signatur', 'Sprung zur Signatur vom Brett (Issue #172)');
   assert.equal(helpSlug(['meins'], withRights(['calendar'])), 'anmelden-und-konto');
 });
 

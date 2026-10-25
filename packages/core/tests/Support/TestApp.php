@@ -12,6 +12,7 @@ use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Infra\NullNewsSource;
 use KompanieApp\Core\Port\BackupProvider;
+use KompanieApp\Core\Port\Mailer;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
@@ -36,7 +37,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'activity', 'activity_last', 'activity_seen', 'activity_daily'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -58,6 +59,7 @@ final class TestApp
         ?NullScheduler $scheduler = null,
         ?NewsSource $news = null,
         ?BackupProvider $backup = null,
+        ?Mailer $mailer = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -77,6 +79,7 @@ final class TestApp
             config: new KompanieConfig($config),
             backup: $backup,
             packageConfig: $packageConfig,
+            customMailer: $mailer,
         );
         $users->capabilities = static fn (string $role, int $id): array => $app->roles()->capabilitiesFor($id, $role);
         $app->upgrade();

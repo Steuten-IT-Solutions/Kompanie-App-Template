@@ -606,25 +606,13 @@ final class PollService
         if (!is_string($value)) {
             throw ApiError::invalid('Ungültiges Ende.');
         }
-        $value = trim($value);
-        $dt = null;
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/', $value, $m) === 1) {
-            if (checkdate((int) $m[2], (int) $m[3], (int) $m[1]) && (int) $m[4] < 24 && (int) $m[5] < 60 && (int) ($m[6] ?? 0) < 60) {
-                $dt = new \DateTimeImmutable(sprintf('%s-%s-%s %s:%s:%s', $m[1], $m[2], $m[3], $m[4], $m[5], $m[6] ?? '00'), $this->app->time()->timezone());
-            }
-        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/', $value) === 1) {
-            try {
-                $dt = new \DateTimeImmutable($value);
-            } catch (\Exception) {
-                $dt = null;
-            }
-        }
-        if ($dt === null) {
+        $utc = $this->app->time()->parseToUtc($value);
+        if ($utc === null) {
             throw ApiError::invalid('Ungültiges Ende (Datum und Uhrzeit erwartet).');
         }
-        if ($dt->getTimestamp() <= $this->app->time()->timestamp()) {
+        if ($utc <= $this->app->time()->nowUtc()) {
             throw ApiError::invalid('Das Ende muss in der Zukunft liegen.');
         }
-        return $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+        return $utc;
     }
 }

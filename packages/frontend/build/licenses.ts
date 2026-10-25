@@ -23,11 +23,16 @@ export const ALLOWED = [
   'MPL-2.0',
   'LGPL-2.1-or-later',
   'LGPL-3.0-or-later',
+  'LGPL-2.1-only',
   'OFL-1.1',
 ] as const;
 
 /** Ältere SPDX-Schreibweisen derselben Lizenzen. */
-const ALIASES: Record<string, string> = { 'LGPL-2.1+': 'LGPL-2.1-or-later', 'LGPL-3.0+': 'LGPL-3.0-or-later' };
+const ALIASES: Record<string, string> = {
+  'LGPL-2.1+': 'LGPL-2.1-or-later',
+  'LGPL-3.0+': 'LGPL-3.0-or-later',
+  'LGPL-2.1': 'LGPL-2.1-only',
+};
 
 /** Woran der Text der Lizenzdatei zu erkennen ist (Kleinbuchstaben, Leerraum zusammengefasst). */
 const FINGERPRINTS: Record<string, (t: string) => boolean> = {
@@ -44,6 +49,7 @@ const FINGERPRINTS: Record<string, (t: string) => boolean> = {
   'MPL-2.0': (t) => /mozilla public license,? version 2\.0/.test(t),
   'LGPL-2.1-or-later': (t) => t.includes('gnu lesser general public license version 2.1'),
   'LGPL-3.0-or-later': (t) => t.includes('gnu lesser general public license version 3'),
+  'LGPL-2.1-only': (t) => t.includes('gnu lesser general public license version 2.1'),
   'OFL-1.1': (t) => /sil open font license,? version 1\.1/.test(t),
 };
 
@@ -123,7 +129,8 @@ export function copyrightLines(text: string): string[] {
         .replace(/\s*\*\/\s*$/, '')
         .trim(),
     )
-    .filter((l) => /copyright\s*(\(c\)|©)?\s*\d{4}|copyright\s*(\(c\)|©)|(\(c\)|©)\s*\d{4}|@license\b.*(\(c\)|©)/i.test(l));
+    .filter((l) => /copyright\s*(\(c\)|©)?\s*\d{4}|copyright\s*(\(c\)|©)|(\(c\)|©)\s*\d{4}|@license\b.*(\(c\)|©)/i.test(l))
+    .filter((l) => !/<(year|name)\b[^>]*>/i.test(l));
 }
 
 /**
@@ -201,6 +208,16 @@ export function composerNotices(root: string): Notice[] {
     const dir = join(root, 'vendor', name);
     if (!existsSync(dir)) throw new Error(`${name}: vendor/${name} fehlt (für den Lizenztext erst „composer install --no-dev“ ausführen).`);
     const text = licenseText(dir, name, chosen);
+    // Copyright-Kopfzeilen der PHP-Dateien in den PSR-4-Ordnern (z. B. „@copyright 2012 - 2020 Marcus Bointon“).
+    const psr4 = Object.values(((p.autoload as { 'psr-4'?: Record<string, string | string[]> } | undefined) ?? {})['psr-4'] ?? {}).flat();
+    const heads = psr4.flatMap((d) => {
+      const sub = join(dir, d);
+      if (!existsSync(sub) || !statSync(sub).isDirectory()) return [];
+      return readdirSync(sub)
+        .filter((f) => f.endsWith('.php'))
+        .sort()
+        .map((f) => readFileSync(join(sub, f), 'utf8').slice(0, 4096));
+    });
     return {
       name,
       version: String(p.version).replace(/^v/, ''),
@@ -208,7 +225,7 @@ export function composerNotices(root: string): Notice[] {
       declared: String(declared),
       source: 'composer',
       homepage: url(p.homepage) || url((p.source as { url?: string } | undefined)?.url),
-      copyright: copyrightLines(text),
+      copyright: [...new Set([...copyrightLines(text), ...heads.flatMap(copyrightLines)])],
       text,
     } satisfies Notice;
   });

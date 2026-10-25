@@ -71,4 +71,9 @@ final class PreviewEnvironment implements Environment
     {
         return $this->preview->url($this->inner->memberPhotoUrl($userId, $version, $size));
     }
+
+    public function richImageUrl(string $uid): string
+    {
+        return $this->preview->url($this->inner->richImageUrl($uid));
+    }
 }
