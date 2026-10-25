@@ -45,10 +45,17 @@ final class WpBackup implements BackupProvider
     public function export(): array
     {
         $tables = (new Backup($this->db))->dump(Backup::CORE_TABLES);
-        $settings = [];
-        foreach (self::settingNames() as $key) {
-            $settings[$key] = get_option(WpSettings::PREFIX . $key);
-        }
+        return [...$this->head(), 'tables' => $tables, 'files' => $this->files !== null ? Backup::dumpFiles($this->files, $tables) : [], ...$this->tail()];
+    }
+
+    public function exportTo($out): void
+    {
+        (new Backup($this->db))->write($out, Backup::CORE_TABLES, $this->files, $this->head(), $this->tail());
+    }
+
+    /** @return array<string, mixed> Felder vor tables */
+    private function head(): array
+    {
         return [
             'format' => Backup::FORMAT,
             'formatVersion' => Backup::FORMAT_VERSION,
@@ -58,11 +65,17 @@ final class WpBackup implements BackupProvider
             'kompanie' => $this->kompanie,
             'site' => self::site(),
             'schema' => ['core' => (int) get_option(WpSettings::PREFIX . Migrator::SETTING, 0)],
-            'tables' => $tables,
-            'files' => $this->files !== null ? Backup::dumpFiles($this->files, $tables) : [],
-            'accounts' => self::accounts(),
-            'settings' => $settings,
         ];
+    }
+
+    /** @return array<string, mixed> Felder nach files */
+    private function tail(): array
+    {
+        $settings = [];
+        foreach (self::settingNames() as $key) {
+            $settings[$key] = get_option(WpSettings::PREFIX . $key);
+        }
+        return ['accounts' => self::accounts(), 'settings' => $settings];
     }
 
     public function canImport(): bool

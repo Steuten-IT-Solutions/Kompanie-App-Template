@@ -110,12 +110,23 @@ final class BackupUploadService
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
+        $tmp = $this->app->files->tempFile();
         try {
-            $json = json_encode($backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
+            // Erst Stück für Stück in eine temporäre Datei, dann in Stücken hochladen: Die Sicherung muss nie ganz in
+            // den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als memory_limit).
+            $out = @fopen($tmp, 'wb');
+            if ($out === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
+            }
+            try {
+                $backup->exportTo($out);
+            } finally {
+                fclose($out);
+            }
             $drive = $this->app->drive();
             $folder = $this->folder();
             $name = self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . '.json';
-            $drive->upload($folder, $name, $json, 'application/json');
+            $drive->uploadFile($folder, $name, $tmp, 'application/json');
             $this->prune($folder);
             $state['last_ok'] = $now;
             $state['error'] = '';
@@ -123,6 +134,7 @@ final class BackupUploadService
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
+            @unlink($tmp);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
         return $this->status();

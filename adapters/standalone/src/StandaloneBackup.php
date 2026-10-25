@@ -30,12 +30,18 @@ final class StandaloneBackup implements BackupProvider
     {
         $app = $this->kernel->app();
         $tables = (new Backup($this->kernel->db()))->dump(self::TABLES);
-        $settings = [];
-        foreach ($this->kernel->db()->select('SELECT name, value FROM {settings} ORDER BY name') as $r) {
-            if (!in_array($r['name'], self::SKIP_SETTINGS, true)) {
-                $settings[(string) $r['name']] = json_decode((string) $r['value'], true);
-            }
-        }
+        return [...$this->head(), 'tables' => $tables, 'files' => Backup::dumpFiles($app->files, $tables), ...$this->tail()];
+    }
+
+    public function exportTo($out): void
+    {
+        (new Backup($this->kernel->db()))->write($out, self::TABLES, $this->kernel->app()->files, $this->head(), $this->tail());
+    }
+
+    /** @return array<string, mixed> Felder vor tables */
+    private function head(): array
+    {
+        $app = $this->kernel->app();
         return [
             'format' => Backup::FORMAT,
             'formatVersion' => Backup::FORMAT_VERSION,
@@ -47,10 +53,19 @@ final class StandaloneBackup implements BackupProvider
                 'core' => (int) $app->settings->get(Migrator::SETTING, 0),
                 'standalone' => (int) $app->settings->get(Migrations::SETTING, 0),
             ],
-            'tables' => $tables,
-            'files' => Backup::dumpFiles($app->files, $tables),
-            'settings' => $settings,
         ];
+    }
+
+    /** @return array<string, mixed> Felder nach files */
+    private function tail(): array
+    {
+        $settings = [];
+        foreach ($this->kernel->db()->select('SELECT name, value FROM {settings} ORDER BY name') as $r) {
+            if (!in_array($r['name'], self::SKIP_SETTINGS, true)) {
+                $settings[(string) $r['name']] = json_decode((string) $r['value'], true);
+            }
+        }
+        return ['settings' => $settings];
     }
 
     public function canImport(): bool

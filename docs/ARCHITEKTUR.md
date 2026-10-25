@@ -637,9 +637,10 @@ Jede Kompanie kann in der App unter *Einstellungen → Zustand und Updates* auf 
 ### Sicherung
 
 - Vor jedem Update mit Migrationen und vor jeder neuen Hauptversion: automatische Sicherung im Export-Format (die letzten fünf, im geschützten Datenbereich).
+- Die automatische Sicherung und die in Google Drive entstehen Stück für Stück (`BackupProvider::exportTo` → `Backup::write`: Tabellen in Portionen, große Tabellen zeilenweise, Dateien in Base64-Blöcken), erst unter vorläufigem Namen (`.tmp`), und werden in Stücken von 8 MB hochgeladen (`DriveClient::uploadFile`). Der Arbeitsspeicher hängt so nicht von der Größe der Sicherung ab. Das Herunterladen in der App baut sie noch als Ganzes (`export()`).
 - Admins können jederzeit **„Datensicherung herunterladen“** und eine Sicherung wieder einspielen. Die Sicherung enthält
   Tabellen, Einstellungen, Konten (Standalone: Tabelle `users`; WordPress: `accounts` mit den Benutzern der Website),
-  die Dateien der Dokumente und Abzeichen (`files`, Base64) sowie Push-Abos und ihren Schlüssel. Nicht enthalten:
+  die Dateien der Dokumente, Abzeichen und Anhänge (`files`, Base64) sowie Push-Abos und ihren Schlüssel. Nicht enthalten:
   Galeriebilder (kommen neu aus Drive), Warteschlangen, Fehlermeldungen und der Zustand der Installation
   (`Backup::LOCAL_SETTINGS`).
 - **Sicherungen in Google Drive** (`BackupUploadService`, optional): wöchentlich in einen eigenen Ordner des über

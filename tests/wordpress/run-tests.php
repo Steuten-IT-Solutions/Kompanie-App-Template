@@ -959,11 +959,18 @@ $app->cache->increment('backup_test', 900);
 $eventId = $app->db->insert('events', ['title' => 'Aus der Sicherung', 'start_date' => '2031-02-03', 'description' => '', 'created_by' => $admin, 'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00']);
 $photoStatus = $app->db->select('SELECT id, status FROM {photos}'); // Wiederherstellen setzt alle Bilder auf „aufbereiten“
 $data = $backup->export();
+// Stück für Stück geschrieben (vor einem Update, nach Google Drive): dieselbe Sicherung, lässt sich einspielen
+$stream = fopen('php://temp', 'w+b');
+$backup->exportTo($stream);
+rewind($stream);
+$streamed = (string) stream_get_contents($stream);
+$same = static fn (array $a): array => array_diff_key($a, ['created' => 1]);
+$c->ok($same((array) json_decode($streamed, true)) == $same($data), 'exportTo schreibt dieselbe Sicherung wie export');
 $c->ok($data['variant'] === 'wordpress' && ($data['settings']['kp_test_opt'] ?? null) === 'vorher', 'Sicherung enthält Daten und Einstellungen');
 $c->ok(!array_key_exists('update_state', $data['settings']) && preg_grep('/^ctr_/', array_keys($data['settings'])) === [], 'Sicherung ohne Update-Zustand und Zähler');
 $app->db->execute('DELETE FROM {events} WHERE id = ?', [$eventId]);
 update_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt', 'nachher');
-$backup->import((string) json_encode($data));
+$backup->import($streamed);
 $c->ok((int) $app->db->scalar('SELECT COUNT(*) FROM {events} WHERE title = ?', ['Aus der Sicherung']) === 1, 'Wiederherstellen bringt die Termine zurück');
 $c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_test_opt') === 'vorher' && get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'update_state') === ['serial' => 5], 'Einstellungen zurück, Update-Zustand bleibt');
 $fremd = $data;
