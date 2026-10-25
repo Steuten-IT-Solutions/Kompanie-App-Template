@@ -356,6 +356,8 @@ function toHex(color: string | undefined): string | null {
 export default function RichTextEditor({ value, onChange, label, signature, id }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(0);
+  /** Größte Bilddatei, die der Server annimmt (nach dem ersten Hochladen bekannt, zur Anzeige) */
+  const [maxBytes, setMaxBytes] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const changeRef = useRef(onChange);
@@ -369,6 +371,7 @@ export default function RichTextEditor({ value, onChange, label, signature, id }
     setBusy((n) => n + 1);
     try {
       const max = (await serverLimits().catch(() => null))?.max_image_bytes ?? null;
+      setMaxBytes(max);
       for (const file of ok) {
         if (max !== null && file.size > max) {
           setNotice(
@@ -501,7 +504,11 @@ export default function RichTextEditor({ value, onChange, label, signature, id }
           if (files.length > 0) void upload(files);
         }}
       />
-      {busy > 0 && <p className="muted small">Bild wird hochgeladen …</p>}
+      {busy > 0 && (
+        <p className="muted small">
+          Bild wird hochgeladen …{maxBytes !== null && ` (der Server nimmt Bilder bis ${formatBytes(maxBytes)} an)`}
+        </p>
+      )}
       {notice && (
         <p className="form-error small rich-notice" role="status">
           {notice}{' '}

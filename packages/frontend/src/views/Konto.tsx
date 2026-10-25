@@ -16,8 +16,11 @@ const MIN_LENGTH = 8;
 // Editor (TipTap): erst laden, wenn jemand die Signatur bearbeitet.
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
-/** Eine Signatur einrichten können Mitglieder und Anwärter sowie alle, die am Brett schreiben (wie SignatureService::allowed). */
-const signatureAllowed = () => can('member') || can('calendar') || can('post_board');
+/**
+ * Eine Signatur einrichten können Mitglieder und Anwärter sowie alle, die am Brett schreiben (wie SignatureService::allowed);
+ * genutzt wird sie bisher nur am Brett, deshalb nur mit diesem Bereich.
+ */
+const signatureAllowed = () => !!config?.features.board && (can('member') || can('calendar') || can('post_board'));
 
 function returnTarget(): string | null {
   try {

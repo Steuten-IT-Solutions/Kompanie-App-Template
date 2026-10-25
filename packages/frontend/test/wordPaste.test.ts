@@ -23,7 +23,7 @@ const WORD = `<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas
 <p class=MsoListParagraphCxSpMiddle style='margin-left:72.0pt;mso-add-space:auto;text-indent:-18.0pt;mso-list:l0 level2 lfo1'><span style='font-family:"Courier New"'><span style='mso-list:Ignore'>o<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span></span>Mütze</p>
 <p class=MsoListParagraphCxSpLast style='text-indent:-18.0pt;mso-list:l0 level1 lfo1'><span style='mso-list:Ignore'>·<span>&nbsp; </span></span>Schuhe</p>
 <p class=MsoNormal>Ablauf:<o:p></o:p></p>
-<p class=MsoListParagraphCxSpFirst style='mso-list:l1 level1 lfo2'><span style='mso-list:Ignore'>1.<span>&nbsp; </span></span>Antreten</p>
+<p class=MsoListParagraphCxSpFirst style='mso-list:l1 level1 lfo2'><span style='mso-list:Ignore'>1.<span>&nbsp; </span></span>Aufstellung</p>
 <p class=MsoListParagraphCxSpLast style='mso-list:l1 level1 lfo2'><span style='mso-list:Ignore'>2.<span>&nbsp; </span></span>Abmarsch</p>
 <p class=MsoNormal><span style='mso-no-proof:yes'><!--[if gte vml 1]><v:shape id="Bild_x0020_1" style='width:90pt;height:30pt'><v:imagedata src="file:///C:/Users/x/AppData/Local/Temp/msohtmlclip1/01/clip_image001.png" o:title=""/></v:shape><![endif]--><![if !vml]><img width=120 height=40 src="file:///C:/Users/x/AppData/Local/Temp/msohtmlclip1/01/clip_image002.png" v:shapes="Bild_x0020_1"><![endif]></span><a name="_Hlk1">Gruß</a><o:p></o:p></p>
 <!--EndFragment-->
@@ -38,7 +38,7 @@ test('erkennt HTML aus Word/Outlook', () => {
 test('Word: Aufzählungen werden echte, verschachtelte Listen', () => {
   const { html } = cleanPastedHtml(WORD, parse);
   assert.match(html, /<ul><li>Uniform<ul><li>Mütze<\/li><\/ul><\/li><li>Schuhe<\/li><\/ul>/);
-  assert.match(html, /<ol><li>Antreten<\/li><li>Abmarsch<\/li><\/ol>/);
+  assert.match(html, /<ol><li>Aufstellung<\/li><li>Abmarsch<\/li><\/ol>/);
   assert.doesNotMatch(html, /·|mso-list|Ignore/);
 });
 

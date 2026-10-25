@@ -362,7 +362,7 @@ function Entry({ item, onToast }: { item: BoardMessage; onToast: (msg: string) =
       <p className="muted small board-until">Sichtbar bis {formatUntil(item.expires_at)}</p>
       {canPost && item.last_edit && (
         <p className="muted small board-last-edit">
-          Zuletzt geändert von {item.last_edit.name ?? 'Unbekannt'} am {formatShortTime(item.last_edit.at)}
+          Zuletzt geändert von {item.last_edit.name ?? 'Unbekannt'} · {formatShortTime(item.last_edit.at)}
         </p>
       )}
       {canPost && item.mail && <p className="muted small board-mail-status">{mailText(item.mail)}</p>}
@@ -442,8 +442,8 @@ function Ended() {
                   <span className="board-meta">
                     {m.author_name ?? 'Unbekannt'} · {formatShortTime(m.created_at)} ·{' '}
                     {m.deleted_at
-                      ? `gelöscht von ${m.deleted_by_name ?? 'Unbekannt'} am ${formatShortTime(m.deleted_at)}`
-                      : `abgelaufen am ${formatShortTime(m.expires_at)}`}
+                      ? `gelöscht von ${m.deleted_by_name ?? 'Unbekannt'} · ${formatShortTime(m.deleted_at)}`
+                      : `abgelaufen · ${formatShortTime(m.expires_at)}`}
                   </span>
                   <h3 className="board-title">{m.title}</h3>
                   <RichTextView html={m.text} className="board-text" />

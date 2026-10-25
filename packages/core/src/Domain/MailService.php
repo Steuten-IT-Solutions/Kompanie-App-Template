@@ -79,11 +79,19 @@ final class MailService
         return is_numeric($v) && (int) $v > 0 ? (int) $v : null;
     }
 
+    /** Limit merken (null: keins gemeldet bzw. nicht erreichbar, gespeichert als 0); nur schreiben, wenn es sich ändert. */
     public function rememberServerSize(?int $size): void
     {
-        if ($this->serverMaxSize() !== $size) {
+        $stored = $this->app->settings->get(self::SIZE_SETTING);
+        if ($stored === null || (int) $stored !== ($size ?? 0)) {
             $this->app->settings->set(self::SIZE_SETTING, $size ?? 0);
         }
+    }
+
+    /** Limit vergessen (anderer Server): beim nächsten Mal neu lesen. */
+    public function forgetServerSize(): void
+    {
+        $this->app->settings->delete(self::SIZE_SETTING);
     }
 
     /** @return array<string, mixed> für Einstellungen → E-Mail (ohne Passwort) */
@@ -167,7 +175,7 @@ final class MailService
             $this->app->settings->set($name, $value);
         }
         if (array_intersect(array_keys($set), ['smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_password']) !== []) {
-            $this->rememberServerSize(null); // anderer Server: Limit neu lesen
+            $this->forgetServerSize(); // anderer Server: Limit neu lesen
         }
         $this->app->scheduleTasks();
         return $this->describe();

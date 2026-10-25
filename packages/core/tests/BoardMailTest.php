@@ -211,6 +211,17 @@ final class BoardMailTest extends TestCase
         $this->mailer->size = null;
         $this->call('POST', '/admin/mail/check');
         $this->assertSame(201, $this->call('POST', '/board', ['title' => 'Groß', 'text' => '<p>x</p>', 'push' => false])->status);
+
+        // Anderer Server, nicht erreichbar: einmal versucht, danach kein Warten bei jeder Nachricht; der Versandlauf liest neu
+        $this->call('PATCH', '/admin/mail', ['host' => 'smtp2.example.org']);
+        $this->mailer->reachable = false;
+        $checks = $this->mailer->checks;
+        $this->assertSame(201, $this->call('POST', '/board', ['title' => 'A', 'text' => '<p>x</p>', 'push' => false])->status);
+        $this->assertSame(201, $this->call('POST', '/board', ['title' => 'B', 'text' => '<p>x</p>', 'push' => false])->status);
+        $this->assertSame($checks + 1, $this->mailer->checks, 'nur ein Verbindungsversuch');
+        $this->mailer->size = 2000000;
+        $this->app->runTask(BoardMailService::TASK);
+        $this->assertSame(2000000, $this->app->mail()->serverMaxSize(), 'beim Versand neu gelesen');
     }
 
     public function testRejectionRetryAndBatching(): void

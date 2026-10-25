@@ -479,7 +479,8 @@ final class Migrations
                     "ALTER TABLE {ranks} ADD COLUMN badge_version TEXT NOT NULL DEFAULT ''",
                 ],
             ],
-            // Schwarzes Brett (Issue #5): dringende Nachrichten, je 24 Stunden gültig (expires_at), danach gelöscht.
+            // Schwarzes Brett (Issue #5): dringende Nachrichten, gültig bis expires_at (anfangs fest 24 Stunden, seit Issue #172
+            // frei wählbar; Titel, Verlauf usw. in Migration 28).
             10 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {board_messages} (

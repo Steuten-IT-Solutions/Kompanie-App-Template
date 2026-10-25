@@ -38,6 +38,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       // Ämter (Issue #112): eigener Abschnitt im Tab, ohne Mitgliederverzeichnis der ganze Tab
       return on('offices') && (sub === 'aemter' || !on('directory')) ? 'aemter' : 'mitglieder';
     case 'meins':
+      // Sprung zur Signatur (vom Schreiben am Brett, Issue #172): deren Anleitung
+      if (sub === 'konto' && path[2] === 'signatur') return 'signatur';
       return (
         {
           uebersicht: 'meins-uebersicht',

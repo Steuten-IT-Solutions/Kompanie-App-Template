@@ -314,16 +314,18 @@ final class BoardMailService
         return new Mail($recipient['email'], $recipient['name'], $title, $document, $text, array_values($images));
     }
 
-    /** Limit des Servers; ist es noch nie gelesen worden, einmal verbinden (sonst keine Prüfung vorab). */
+    /**
+     * Limit des Servers; ist es noch nie gelesen worden, einmal verbinden. Scheitert das, wird „kein Limit bekannt“
+     * gemerkt (keine Prüfung vorab, kein erneutes Warten bei der nächsten Nachricht); der nächste Versandlauf und
+     * „Verbindung prüfen“ lesen es neu.
+     */
     private function serverMaxSize(): ?int
     {
         $mail = $this->app->mail();
         if ($this->app->settings->get(MailService::SIZE_SETTING) === null) {
             $check = $this->app->mailer()->check();
-            if ($check['ok']) {
-                $mail->rememberServerSize($check['size']);
-            }
-            return $check['size'];
+            $mail->rememberServerSize($check['ok'] ? $check['size'] : null);
+            return $check['ok'] ? $check['size'] : null;
         }
         return $mail->serverMaxSize();
     }

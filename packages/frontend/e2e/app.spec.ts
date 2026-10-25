@@ -3588,7 +3588,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
     );
   await firstCard.getByRole('button', { name: 'Speichern' }).click();
   await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
-  await expect(admin.locator('.board-card', { hasText: first }).locator('.board-last-edit')).toContainText('Zuletzt geändert von Admin');
+  await expect(admin.locator('.board-card', { hasText: first }).locator('.board-last-edit')).toContainText(/Zuletzt geändert von admin/i);
   await page.goto('/app/#/termine');
   await page.reload();
   await expect(banner).toContainText(second);
@@ -3653,8 +3653,8 @@ test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Ko
   await edited.getByRole('button', { name: 'Verlauf' }).click();
   const history = edited.locator('.board-history');
   await expect(history.locator('.board-revision')).toHaveCount(2);
-  await expect(history.locator('.board-revision').nth(0)).toContainText('Admin: erstellt');
-  await expect(history.locator('.board-revision').nth(1)).toContainText('Admin: Inhalt geändert');
+  await expect(history.locator('.board-revision').nth(0)).toContainText(/admin: erstellt/i);
+  await expect(history.locator('.board-revision').nth(1)).toContainText(/admin: Inhalt geändert/i);
   await expect(history.locator('.board-before')).toContainText('Erste Fassung');
   await expect(history.locator('.board-after')).toContainText('Zweite Fassung');
   await shot(page, '33b-brett-verlauf');
@@ -3663,9 +3663,9 @@ test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Ko
   await expect(page.locator('.board-card', { hasText: title })).toHaveCount(0);
   await page.getByRole('button', { name: /Verlauf: abgelaufene und gelöschte Nachrichten/ }).click();
   const ended = page.locator('.board-ended-card', { hasText: title });
-  await expect(ended).toContainText('gelöscht von Admin');
+  await expect(ended).toContainText(/gelöscht von admin/i);
   await ended.getByRole('button', { name: 'Verlauf' }).click();
-  await expect(ended.locator('.board-revision').last()).toContainText('Admin: gelöscht');
+  await expect(ended.locator('.board-revision').last()).toContainText(/admin: gelöscht/i);
 });
 
 test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), einfügen, Änderung wirkt nicht auf die Nachricht', async ({
@@ -3740,7 +3740,7 @@ test('Einstellungen → E-Mail: Kompanieadresse und Mailserver speichern, Passwo
   const section = page.locator('#einstellungen-email');
   await section.getByLabel('Kompanieadresse (Absender)').fill('info@musterkompanie.example');
   await section.getByLabel('Mailserver (SMTP)').fill('smtp.musterkompanie.example');
-  await section.getByLabel('Port').fill('587');
+  await section.getByRole('spinbutton', { name: 'Port', exact: true }).fill('587');
   await section.getByLabel(/^Passwort/).fill('geheimes-smtp-passwort');
   await section.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Gespeichert');

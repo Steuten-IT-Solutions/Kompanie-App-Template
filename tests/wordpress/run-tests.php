@@ -450,13 +450,14 @@ $c->ok(!wp_next_scheduled($hook, $task), 'Normaler Seitenaufruf plant keine Aufg
 delete_option('kompanie_app_' . \KompanieApp\Core\App::PLAN_SETTING);
 Plugin::upgrade(); // nach einem Update passt die vermerkte Version nicht mehr
 $c->ok((bool) wp_next_scheduled($hook, $task), 'Nach einem Update werden die Aufgaben neu eingeplant');
-// Schwarzes Brett (Issue #5): stündlich über WP-Cron; der Hook löscht abgelaufene Nachrichten.
+// Schwarzes Brett (Issue #5, #172): stündlich über WP-Cron; der Hook löscht Nachrichten 30 Tage nach ihrem Ende.
 $boardTask = \KompanieApp\Core\Domain\BoardService::TASK;
 $c->ok(wp_get_schedule($hook, [$boardTask]) === 'hourly', 'Schwarzes Brett: Aufräumen stündlich über WP-Cron');
 $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
-$db->insert('board_messages', ['body' => 'Kpwp abgelaufen', 'author_id' => 1, 'created_at' => $past(90000), 'updated_at' => $past(90000), 'expires_at' => $past(3600)]);
+$expiredBody = 'Kpwp abgelaufen ' . bin2hex(random_bytes(4));
+$db->insert('board_messages', ['title' => 'Kpwp', 'body' => $expiredBody, 'author_id' => 1, 'created_at' => $past(32 * 86400), 'updated_at' => $past(32 * 86400), 'expires_at' => $past(31 * 86400)]);
 do_action($hook, $boardTask);
-$c->ok((int) $db->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', ['Kpwp abgelaufen']) === 0, 'Aufgabe über den Hook löscht abgelaufene Nachrichten');
+$c->ok((int) $db->scalar('SELECT COUNT(*) FROM {board_messages} WHERE body = ?', [$expiredBody]) === 0, 'Aufgabe über den Hook löscht Nachrichten 30 Tage nach ihrem Ende');
 // Umfragen (Issue #4): Erinnerung stündlich über WP-Cron; der Hook vermerkt fällige Umfragen als erinnert (einmal).
 $pollTask = \KompanieApp\Core\Domain\PollService::TASK;
 $c->ok(wp_get_schedule($hook, [$pollTask]) === 'hourly', 'Umfragen: Erinnerung stündlich über WP-Cron');

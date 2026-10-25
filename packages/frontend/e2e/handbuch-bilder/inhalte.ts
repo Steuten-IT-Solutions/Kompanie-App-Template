@@ -81,13 +81,31 @@ const gruppe: Gruppe = async (f) => {
   await f.oeffnen('brett');
   await f.foto('schwarzes-brett-schreiben');
   const neu = page.locator('.board-form');
-  await neu.locator('textarea').fill('Heute kein Training – die Halle ist gesperrt.');
+  await neu.getByLabel('Titel').fill('Heute kein Training');
+  await neu.getByLabel('Text der Nachricht').fill('Die Halle ist heute gesperrt. Das nächste Training ist am Donnerstag.');
+  await ausschnitt('schwarzes-brett-werkzeuge', neu.locator('.rich-editor'));
   await ausschnitt('schwarzes-brett-schreiben-neu', neu);
-  await neu.locator('textarea').fill('');
   const eintrag = page.locator('.board-card').filter({ hasText: 'Treffen am Samstag' });
+  const kennung = await eintrag.getAttribute('data-focus-id');
+  await eintrag.getByRole('button', { name: 'Verlauf' }).click();
+  await expect(eintrag.locator('.board-diff')).toBeVisible();
+  await ausschnitt('schwarzes-brett-verlauf', eintrag);
+  await eintrag.getByRole('button', { name: 'Verlauf ausblenden' }).click();
   await eintrag.getByRole('button', { name: 'Bearbeiten' }).click();
-  await ausschnitt('schwarzes-brett-schreiben-bearbeiten', eintrag);
-  await eintrag.getByRole('button', { name: 'Abbrechen' }).click();
+  const bearbeitet = page.locator(`.board-card[data-focus-id="${kennung}"]`);
+  await expect(bearbeitet.locator('.rich-editor')).toBeVisible();
+  await ausschnitt('schwarzes-brett-schreiben-bearbeiten', bearbeitet);
+  await bearbeitet.getByRole('button', { name: 'Abbrechen' }).click();
+
+  // Signatur im Konto (Admin hat eine): Vorschau und Bearbeiten mit der Werkzeugleiste
+  await f.oeffnen('meins/konto/signatur');
+  const signatur = page.locator('.signature-card');
+  await expect(signatur.locator('.signature-preview')).toBeVisible();
+  await ausschnitt('signatur-vorschau', signatur);
+  await signatur.getByRole('button', { name: 'Ändern' }).click();
+  await expect(signatur.locator('.rich-editor')).toBeVisible();
+  await ausschnitt('signatur', signatur);
+  await signatur.getByRole('button', { name: 'Abbrechen' }).click();
 
   // Umfragen verwalten (Admin)
   await f.oeffnen('umfragen/verwalten');
