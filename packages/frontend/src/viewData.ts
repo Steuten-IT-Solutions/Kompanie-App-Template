@@ -36,6 +36,8 @@ export const sources = {
   directoryCounts: source('directory-counts', api.directoryCounts),
   directoryFormer: source('directory-former', api.directoryFormer),
   offices: source('offices', api.offices),
+  ranks: source('ranks', () => api.ranks()),
+  catalog: source('catalog', () => api.catalog()),
   me: source('me', api.me),
   myBirthday: source('me/birthday', api.myBirthday),
   myJoinYear: source('me/join-year', api.myJoinYear),
@@ -71,7 +73,17 @@ export function storeMembersSection(section: string): void {
   }
 }
 
-export type TabId = 'termine' | 'news' | 'galerie' | 'dokumente' | 'mitglieder' | 'meins' | 'verwaltung';
+export type TabId =
+  | 'termine'
+  | 'news'
+  | 'galerie'
+  | 'dokumente'
+  | 'mitglieder'
+  | 'brett'
+  | 'dienstgrade'
+  | 'punktekatalog'
+  | 'meins'
+  | 'verwaltung';
 
 /**
  * Was die Startseite eines Tabs beim Öffnen lädt, mit denselben Bedingungen wie die Ansicht. Ob die Person den Tab sehen
@@ -96,6 +108,14 @@ export function tabSources(tab: TabId): Source[] {
       if (stored === 'ehemalige') return [sources.directoryFormer];
       return [sources.directory, sources.directoryCounts];
     }
+    case 'brett':
+      // Das Brett lädt board.ts beim Start und bei jeder Rückkehr in die App.
+      return [];
+    case 'dienstgrade':
+      // wie Dienstgrade.tsx: die Liste und /me für den eigenen Dienstgrad
+      return [sources.ranks, sources.me];
+    case 'punktekatalog':
+      return [sources.catalog];
     case 'meins': {
       // wie Meins.tsx: Mitglieder sehen zuerst die Übersicht, alle anderen Angemeldeten ihr Konto (lädt nichts vorab)
       if (!isMember()) return [];

@@ -157,6 +157,7 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
     </>
   ),
   katalog: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
+  punktekatalog: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
   dienstgrade: <path d="M5 11l7-5 7 5M5 17l7-5 7 5" />,
   befoerderungen: (
     <>

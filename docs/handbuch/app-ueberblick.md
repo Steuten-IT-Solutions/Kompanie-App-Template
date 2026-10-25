@@ -22,7 +22,7 @@ Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt 
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
 - **{bereich.directory}**: für alle, wenn die {kompanie.name} die Liste nutzt. Nutzt sie nur die {bereich.offices}, heißt der Knopf **{bereich.offices}**.
 - **{bereich.documents}**: nur für angemeldete {rolle.member}.
-- **Intern**: Für {rolle.member} (und wer das Recht **Intern** hat) stehen {bereich.directory} und {bereich.documents} nicht einzeln unten, sondern zusammen unter **Intern**.
+- **Intern**: Für {rolle.member} (und wer das Recht **Intern** hat) stehen {bereich.directory} und {bereich.documents} nicht einzeln unten, sondern zusammen unter **Intern**. {rolle.member} finden dort außerdem das {bereich.board}, die {bereich.ranks} und den {bereich.points}katalog, wenn die {kompanie.name} sie nutzt.
 - **Verwaltung**: nur, wenn du eine Aufgabe in der Verwaltung hast, z. B. {bereich.points} vergeben.
 - **Meins** (ganz rechts): deine eigenen Daten und dein Konto, sobald du angemeldet bist.
 

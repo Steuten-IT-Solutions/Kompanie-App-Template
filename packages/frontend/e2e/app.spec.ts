@@ -1004,7 +1004,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
-test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zurück; ohne Anmeldung Mitglieder als eigener Tab', async ({
+test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktekatalog, „‹ Intern“ führt zurück; ohne Anmeldung Mitglieder als eigener Tab', async ({
   page,
 }) => {
   await login(page, 'mitglied1');
@@ -1015,7 +1015,7 @@ test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zur
   await expect(page).toHaveURL(/#\/intern$/);
   await expect(page.locator('.topbar-title')).toHaveText('Intern');
   const tiles = page.getByRole('navigation', { name: 'Intern' });
-  await expect(tiles.getByRole('button')).toHaveText(['Mitglieder', 'Dokumente']);
+  await expect(tiles.getByRole('button')).toHaveText(['Mitglieder', 'Dokumente', 'Schwarzes Brett', 'Dienstgrade', 'Punktekatalog']);
 
   await tiles.getByRole('button', { name: 'Dokumente', exact: true }).click();
   await expect(page).toHaveURL(/#\/dokumente$/);
@@ -1025,6 +1025,27 @@ test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zur
   await expect(page).toHaveURL(/#\/mitglieder$/);
   await expect(page.locator('.directory .member-row').first()).toBeVisible();
   await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: '‹ Intern' }).click();
+  await expect(page).toHaveURL(/#\/intern$/);
+
+  // Schwarzes Brett zum Lesen: gehört zu „Intern“ (wer schreibt, hat es in der Verwaltung; Test „Schwarzes Brett: Banner …“)
+  await tiles.getByRole('button', { name: 'Schwarzes Brett', exact: true }).click();
+  await expect(page).toHaveURL(/#\/brett$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Schwarzes Brett');
+  await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
+  await page.getByRole('button', { name: '‹ Intern' }).click();
+
+  // Nachschlagen: Dienstgrade und Punktekatalog (nur aktive Vorlagen, mit Punktzahl)
+  await tiles.getByRole('button', { name: 'Dienstgrade', exact: true }).click();
+  await expect(page).toHaveURL(/#\/dienstgrade$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Dienstgrade');
+  await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: '‹ Intern' }).click();
+  await tiles.getByRole('button', { name: 'Punktekatalog', exact: true }).click();
+  await expect(page).toHaveURL(/#\/punktekatalog$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Punktekatalog');
+  await expect(page.locator('.card.row', { hasText: 'Teilnahme Sommerfest' }).locator('.row-value')).toHaveText('+5');
   await page.getByRole('button', { name: '‹ Intern' }).click();
   await expect(page).toHaveURL(/#\/intern$/);
 
@@ -1040,6 +1061,10 @@ test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zur
   // Auch ein Link auf #/intern führt Gäste nicht auf eine leere Seite.
   await page.goto('/app/#/intern');
   await expect(page.locator('.admin-tiles')).toHaveCount(0);
+  // Dienstgrade und Punktekatalog sind nur für Mitglieder.
+  await page.goto('/app/#/punktekatalog');
+  await expect(page.locator('.card.row', { hasText: 'Teilnahme Sommerfest' })).toHaveCount(0);
+  await expect(tabbar.getByRole('button', { name: 'Dienstgrade' })).toHaveCount(0);
 });
 
 test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte oder Rollen', async ({ page }) => {
