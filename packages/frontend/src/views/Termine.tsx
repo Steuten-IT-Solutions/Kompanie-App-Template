@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, can, config, type CalendarEvent } from '../api';
+import { can, config } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
@@ -7,18 +7,7 @@ import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-
-type EventLike = CalendarEvent & { url?: string };
-
-/** Mitglieder und Anwärter sehen den Kalender mit allen Terminen, Gäste die öffentliche Terminliste. */
-async function loadEvents(): Promise<EventLike[]> {
-  if (can('calendar') && config?.features.calendar) return api.calendar();
-  const list = await api.events();
-  return list.map((ev) => ({ ...ev, id: `p${ev.id}` }));
-}
-
-/** Termine aus Kalender oder öffentlicher Liste – oder (nur Geburtstage an) gar keine. */
-const hasEvents = (): boolean => !!(config?.features.events || (config?.features.calendar && can('calendar')));
+import { hasEvents, sources, type EventLike } from '../viewData';
 
 /** `focus`: Kennung eines Termins aus der Adresse termine/termin/<id> (Ziel einer Benachrichtigung, Issue #190). */
 export default function Termine({ focus }: { focus?: string }) {
@@ -28,7 +17,7 @@ export default function Termine({ focus }: { focus?: string }) {
 }
 
 function EventList({ focus }: { focus?: string }) {
-  const { data, error, loading, reload } = useAsync(loadEvents, [], 'termine');
+  const { data, error, loading, reload } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
   const showBirthdays = birthdaysVisible();

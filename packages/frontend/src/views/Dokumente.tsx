@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
-import { api, can, type DocumentInfo, type DocVisibility } from '../api';
+import { can, type DocumentInfo, type DocVisibility } from '../api';
 import brand from '../generated/brand';
 import { previewRole } from '../preview';
 import {
@@ -17,6 +17,7 @@ import { detectPlatform } from '../install';
 import { pruneDocumentCache, whenControlled } from '../offline';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 const PdfViewer = lazyView(() => import('./PdfViewer'));
 
@@ -206,7 +207,7 @@ function ImageView({ doc }: { doc: DocumentInfo }) {
 
 export default function Dokumente({ docId, onToast }: { docId?: number; onToast: (msg: string) => void }) {
   // Mit Schlüssel: Beim Öffnen eines Dokuments und beim Zurückkehren steht die Liste sofort da (statt „Lädt …“).
-  const { data, error, loading, reload } = useAsync(api.documents, [], 'documents');
+  const { data, error, loading, reload } = useAsync(sources.documents.load, sources.documents.deps, sources.documents.key);
   const [offline, setOffline] = useState<Record<number, boolean>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [sort, setSort] = useDocSort();

@@ -1,4 +1,4 @@
-import { api, config, isMember, roleLabels, type Me } from '../api';
+import { config, isMember, roleLabels, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
@@ -14,6 +14,7 @@ import { RankBadge } from '../RankBadge';
 import { birthdaysVisible, formatBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
+import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -37,7 +38,7 @@ export default function Meins({
   onLogout: () => void;
 }) {
   const member = isMember();
-  const me = useAsync(() => (member ? api.me() : Promise.resolve(null)), [], 'me');
+  const me = useAsync(() => (member ? sources.me.load() : Promise.resolve(null)), [], sources.me.key);
   const dataParts = (
     [
       ['uebersicht', 'Übersicht', true],
@@ -94,8 +95,8 @@ function Uebersicht({ me }: { me: Me }) {
   const photo = config?.user?.id === me.id ? config.user.photo_url : null;
   const member = isMember();
   const birthdayOn = birthdaysVisible();
-  const birthday = useAsync(() => (birthdayOn ? api.myBirthday() : Promise.resolve(null)), [], 'me/birthday');
-  const joinYear = useAsync(() => (member ? api.myJoinYear() : Promise.resolve(null)), [], 'me/join-year');
+  const birthday = useAsync(() => (birthdayOn ? sources.myBirthday.load() : Promise.resolve(null)), [], sources.myBirthday.key);
+  const joinYear = useAsync(() => (member ? sources.myJoinYear.load() : Promise.resolve(null)), [], sources.myJoinYear.key);
   // Ändern lassen sich beide unter „Konto“; den Eintritt gibt es dort nur mit der Mitgliederliste.
   const toAccount = () => navigate('meins/konto');
   const rank = f?.ranks ? me.rank : null;

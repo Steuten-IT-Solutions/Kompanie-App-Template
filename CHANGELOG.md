@@ -167,6 +167,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (Kandidaten zum Degradieren), steht jetzt ganz oben in einem eigenen, rot markierten Abschnitt, zusammen mit der
   übrigen Übersicht. Der Schalter „Nur unter der Schwelle …“ entfällt. Ist niemand darunter, fehlt der Abschnitt.
 
+- **Tabs öffnen schon beim ersten Mal ohne Warten**: Nach dem Start lädt die App, sobald nichts anderes zu tun ist, die
+  Daten der übrigen Tabs vorab, und beim Antippen eines Tabs, Albums, einer Umfrage, Anwesenheitsliste oder eines
+  Mitglieds in der Verwaltung beginnt das Laden schon beim Berühren. So erscheinen die Seiten meist sofort statt mit
+  „Lädt …“. Vorab geladen werden nur Daten, keine Bilder oder Dokumente; im Datensparmodus des Handys, bei langsamem
+  Netz, in der Vorschau „App als Rolle ansehen“ und im Wartungsmodus lädt die App nichts im Voraus.
+
 ### Behoben
 
 - **Änderungen von anderen Geräten kamen manchmal nicht an**: Fragte die App gerade im Hintergrund nach neuen Daten,

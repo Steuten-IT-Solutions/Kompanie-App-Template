@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent, type TouchList } from 'react';
-import { api, type GalleryPhoto } from '../api';
+import { type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { prefetchOnTap, sources } from '../viewData';
 
 export default function Galerie({ albumId }: { albumId?: number }) {
   return albumId ? <Album id={albumId} /> : <Overview />;
 }
 
 function Overview() {
-  const { data, error, loading, reload } = useAsync(api.gallery, [], 'galerie');
+  const { data, error, loading, reload } = useAsync(sources.gallery.load, sources.gallery.deps, sources.gallery.key);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
@@ -22,7 +23,7 @@ function Overview() {
           <ul className="album-grid">
             {y.albums.map((a) => (
               <li key={a.id}>
-                <button className="album-card" onClick={() => navigate(`galerie/${a.id}`)}>
+                <button className="album-card" onClick={() => navigate(`galerie/${a.id}`)} {...prefetchOnTap(sources.album(a.id))}>
                   {a.cover ? <img src={a.cover} alt="" loading="lazy" /> : <span className="album-placeholder" />}
                   <span className="album-title">{a.title}</span>
                   <span className="album-count">
@@ -49,7 +50,8 @@ function retryUrl(url: string, n: number): string {
 }
 
 function Album({ id }: { id: number }) {
-  const { data, error, loading, reload } = useAsync(() => api.galleryAlbum(id), [id], 'galerie-album');
+  const s = sources.album(id);
+  const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
   const [open, setOpen] = useState<number | null>(null);
   const [retry, setRetry] = useState(0);
   const pending = !!data?.photos.some((p) => !p.ready);

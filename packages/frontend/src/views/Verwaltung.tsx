@@ -36,6 +36,7 @@ import {
   useAsync,
 } from '../ui';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
+import { prefetchOnTap, sources } from '../viewData';
 import { PersonName, PersonSkeleton } from '../skeleton';
 import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
@@ -385,7 +386,7 @@ function Members() {
       </div>
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row clickable member-row" onClick={() => open(m.id)}>
+          <li key={m.id} className="card row clickable member-row" onClick={() => open(m.id)} {...prefetchOnTap(sources.member(m.id))}>
             {withPhotos && <MemberAvatar url={m.photo_url} name={m.name} size="medium" />}
             <div className="row-main">
               <div className="row-title">
@@ -578,7 +579,8 @@ function MemberDetailView({
   page?: string;
   onToast: (msg: string) => void;
 }) {
-  const { data, error, loading, reload } = useAsync(() => api.member(id), [id], 'member');
+  const s = sources.member(id);
+  const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
   const [busy, setBusy] = useState(false);
   // Erst nach dem Laden entscheiden: Daten aus dem Speicher könnten veraltet sein.
   const target = !loading && data?.id === id ? (data.former ? 'ehemalige' : 'mitglied') : base;
@@ -608,8 +610,9 @@ function MemberDetailView({
     ids,
     index,
     async (n: number) => {
-      await prefetch('member', [n], () => api.member(n));
-      const key = cacheKey('member', [n]);
+      const src = sources.member(n);
+      await prefetch(src.key, src.deps, src.load);
+      const key = cacheKey(src.key, src.deps);
       if (!dataCache.has(key)) return;
       const other = dataCache.get<MemberDetail>(key);
       if (n === prev || n === next) setPrefetched((t) => t + 1);
@@ -1368,7 +1371,8 @@ function useMembersAndCatalog() {
 
 /** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
 function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.attendance(listId), [listId], 'attendance');
+  const s = sources.attendance(listId);
+  const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;

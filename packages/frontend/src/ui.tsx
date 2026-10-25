@@ -1,7 +1,7 @@
 import { Component, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
-import { cacheKey as keyOf, DATA_UPDATED, dataCache } from './dataCache';
+import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
 
 /**
@@ -12,6 +12,8 @@ import { noteError } from './lastError';
  * ihre Felder einmal aus den Daten übernehmen, damit als `key` neu aufbauen.
  * Gab es während des Ladens eine eigene Änderung, ist die Antwort vielleicht veraltet und überschriebe den gespeicherten
  * Stand (setData): Dann einmal neu laden.
+ * Vorabladen (prefetch.ts, Issue #104): Läuft dafür schon eine Anfrage, wartet die Ansicht auf sie; kam die Antwort gerade
+ * erst (dataCache.takeFresh), fragt sie nicht gleich noch einmal.
  */
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: string) {
   const cacheKey = key === undefined ? null : keyOf(key, deps);
@@ -35,9 +37,16 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
     setLoading(true);
     const hit = cached();
     if (hit !== null) setDataState(hit);
+    if (hit !== null && tick === 0 && takeFresh(cacheKey!)) {
+      setError(null);
+      setLoading(false);
+      return;
+    }
     const load = (retry: boolean) => {
       const since = dataCache.generation();
-      fn()
+      const running = retry && hit === null && cacheKey !== null ? pendingPrefetch(cacheKey) : undefined;
+      // Schlug das Vorabladen fehl, fragt die Ansicht selbst (und meldet den Fehler, wenn er bleibt).
+      (running ? (running as Promise<T>).catch(() => fn()) : fn())
         .then((d) => {
           if (alive && retry && since !== dataCache.generation()) return load(false);
           if (alive) {
@@ -327,15 +336,30 @@ export function reloadAfterChunkError(): boolean {
  * Selten gebrauchte Ansicht erst bei Bedarf laden (kleinerer App-Start).
  * Fehlt ein Programmteil (z. B. nach einem Update), lädt die App einmal neu (reloadAfterChunkError). Schlägt es danach
  * wieder fehl (z. B. offline ohne gespeicherte Fassung), zeigt die ErrorBoundary eine Meldung.
+ * preload() lädt den Teil schon vorher (Issue #104, z. B. beim Antippen eines Tabs). Ist er schon da, erscheint die
+ * Ansicht ohne Umweg über „Lädt …“: React übernimmt ein sofort erfülltes then synchron.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyView<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) {
-  return lazy(() =>
-    load().catch((err: unknown) => {
-      if (reloadAfterChunkError()) return new Promise<never>(() => undefined);
-      throw err;
-    }),
+  let loaded: { default: T } | undefined;
+  let running: Promise<{ default: T }> | undefined;
+  const get = () =>
+    (running ??= load().then(
+      (m) => (loaded = m),
+      (err: unknown) => {
+        running = undefined;
+        throw err;
+      },
+    ));
+  const view = lazy(() =>
+    loaded
+      ? ({ then: (resolve: (m: { default: T }) => void) => resolve(loaded!) } as Promise<{ default: T }>)
+      : get().catch((err: unknown) => {
+          if (reloadAfterChunkError()) return new Promise<never>(() => undefined);
+          throw err;
+        }),
   );
+  return Object.assign(view, { preload: () => void get().catch(() => undefined) });
 }
 
 /**
