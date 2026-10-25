@@ -19,7 +19,7 @@ use KompanieApp\Core\Port\UpdateTarget;
 final class StandaloneUpdateTarget implements UpdateTarget
 {
     /** Was zum Programm gehört und getauscht wird. */
-    public const PROGRAM = ['core', 'src', 'app', 'bin', 'index.php', 'autoload.php', '.htaccess', 'sw.js', 'kompanie.json', 'update.json', 'VERSION', 'README.md'];
+    public const PROGRAM = ['core', 'src', 'app', 'bin', 'index.php', 'autoload.php', '.htaccess', 'sw.js', 'kompanie.json', 'update.json', 'VERSION', 'README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.txt'];
 
     public function __construct(private readonly string $root, private readonly string $dataDir)
     {

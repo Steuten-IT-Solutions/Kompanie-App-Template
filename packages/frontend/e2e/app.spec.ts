@@ -2662,6 +2662,15 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await expect(item('Die App aufs Handy holen')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toHaveCount(0);
   await expect(item('Meine Punkte')).toHaveCount(0);
+  // Lizenzen (Issue #173): für alle, mit Lizenz der App, Quellcode und den Bausteinen aus dem Build samt Lizenztext
+  await page.getByRole('link', { name: 'Lizenzen' }).click();
+  await expect(page.locator('.news-headline')).toHaveText('Lizenzen');
+  await expect(page.locator('.hilfe-text')).toContainText('GPL-2.0-or-later');
+  await expect(page.locator('.hilfe-text a[href="https://github.com/Steuten-IT-Solutions/Kompanie-App-Template"]')).toBeVisible();
+  await page.locator('.lizenz-liste summary', { hasText: 'react-dom' }).click();
+  await expect(page.locator('.lizenz-liste details[open] .lizenz-text')).toContainText('Permission is hereby granted');
+  await expect(page.locator('.lizenz-liste summary', { hasText: /^sharp / })).toHaveCount(0);
+  await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
 
   // Mitglied: dazu die Seiten für Mitglieder; Bezeichnung „Kasse“ statt „Strafen“
   await login(page, 'mitglied1');
@@ -2700,6 +2709,8 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   try {
     await page.goto('/app/#/hilfe/app-installieren');
     await expect(page.locator('.news-headline')).toHaveText('Die App aufs Handy holen');
+    await page.goto('/app/#/hilfe/lizenzen');
+    await expect(page.locator('.lizenz-liste summary', { hasText: 'react' }).first()).toBeVisible();
   } finally {
     await page.context().setOffline(false);
   }
