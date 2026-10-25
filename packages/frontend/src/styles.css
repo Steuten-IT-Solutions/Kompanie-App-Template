@@ -2,8 +2,8 @@
  * (automatisch aus kompanie.json), die Überschriften-Schrift als --font-head. */
 :root {
   --radius: 12px;
-  --shadow:
-    0 1px 0 color-mix(in srgb, var(--primary-ink) 4%, transparent), 0 4px 14px color-mix(in srgb, var(--primary-ink) 7%, transparent);
+  --shadow: 0 1px 0 color-mix(in srgb, var(--primary-ink) 4%, transparent),
+    0 4px 14px color-mix(in srgb, var(--primary-ink) 7%, transparent);
   --tabbar-h: 66px;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --warn-deep: color-mix(in srgb, var(--warn-surface) 78%, black);
@@ -56,8 +56,7 @@ select {
   align-items: center;
   gap: 14px;
   padding: calc(12px + env(safe-area-inset-top)) 16px 14px;
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgb(255 255 255 / 10%), transparent 55%),
+  background: radial-gradient(120% 140% at 0% 0%, rgb(255 255 255 / 10%), transparent 55%),
     linear-gradient(180deg, var(--primary) 0%, var(--primary-deep) 100%);
   color: var(--on-primary);
   border-bottom: 3px solid var(--accent);
@@ -3934,8 +3933,7 @@ fieldset.feature-list legend {
 .spotlight {
   position: relative;
   padding: 14px 14px 16px;
-  background:
-    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
     linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
   color: var(--on-primary);
   border-bottom: 3px solid var(--accent);
