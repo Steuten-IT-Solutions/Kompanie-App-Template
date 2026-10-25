@@ -816,12 +816,8 @@ test('Konten: das eigene Konto in der Verwaltung ändern, ohne Löschen', async 
   await expect(panel).toContainText('+49 171 7654321');
 
   // Neue E-Mail-Adresse nur mit dem aktuellen Passwort; das Feld erscheint erst dann.
-  const email = await page.evaluate(async () => {
-    const cfg = window.KOMPANIE_CONFIG!;
-    const res = await fetch(`${cfg.apiBase}members/${cfg.user!.id}/account`, { credentials: 'same-origin' });
-    return ((await res.json()) as { email: string }).email;
-  });
   await panel.getByRole('button', { name: 'Angaben ändern' }).click();
+  const email = await form.getByLabel('E-Mail (optional)').inputValue();
   await form.getByLabel('E-Mail (optional)').fill('chef-neu@example.org');
   await page.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(form.locator('.form-error')).toHaveText('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
