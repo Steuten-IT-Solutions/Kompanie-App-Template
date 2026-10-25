@@ -133,7 +133,8 @@ final class ActivityService
 
     /**
      * Übersicht für Admins: Zahlen wie usage(), Tageszahlen im Zeitraum (aktive Personen und Aktionen je Tag), Nutzung je
-     * Bereich und, mit Erfassung je Person, alle Konten mit „zuletzt aktiv“ (null = nie, seit die Erfassung läuft).
+     * Bereich und, mit Erfassung je Person, alle Konten mit „zuletzt aktiv“ (null = nie, seit die Erfassung läuft) und der
+     * Zahl ihrer Einträge im Zeitraum (actions).
      *
      * @return array<string, mixed>
      */
@@ -159,7 +160,9 @@ final class ActivityService
         $members = null;
         if ($this->personal()) {
             $last = $this->repo->lastActive();
-            $members = array_map(static fn (User $u): array => ['id' => $u->id, 'name' => $u->name, 'last_active' => $last[$u->id] ?? null], $this->app->users->list(false));
+            [$start, $end] = $this->bounds($fromDay, $toDay);
+            $counts = $this->repo->countsByUser($start, $end);
+            $members = array_map(static fn (User $u): array => ['id' => $u->id, 'name' => $u->name, 'last_active' => $last[$u->id] ?? null, 'actions' => $counts[$u->id] ?? 0], $this->app->users->list(false));
         }
         return [
             'personal' => $this->personal(),
@@ -190,9 +193,7 @@ final class ActivityService
                 throw ApiError::invalid('Ungültiges Konto.');
             }
         }
-        $tz = $this->app->time()->timezone();
-        $start = (new \DateTimeImmutable($fromDay, $tz))->getTimestamp();
-        $end = (new \DateTimeImmutable($toDay, $tz))->modify('+1 day')->getTimestamp();
+        [$start, $end] = $this->bounds($fromDay, $toDay);
         $rows = $this->repo->entries($start, $end, $id, self::ENTRIES_MAX + 1);
         $truncated = count($rows) > self::ENTRIES_MAX;
         $rows = array_slice($rows, 0, self::ENTRIES_MAX);
@@ -262,6 +263,13 @@ final class ActivityService
      *
      * @return array{0: string, 1: string}
      */
+    /** @return array{int, int} Beginn von $fromDay bis Beginn des Tags nach $toDay (Zeitzone der Installation) */
+    private function bounds(string $fromDay, string $toDay): array
+    {
+        $tz = $this->app->time()->timezone();
+        return [(new \DateTimeImmutable($fromDay, $tz))->getTimestamp(), (new \DateTimeImmutable($toDay, $tz))->modify('+1 day')->getTimestamp()];
+    }
+
     private function range(mixed $from, mixed $to): array
     {
         $today = $this->app->time()->today();

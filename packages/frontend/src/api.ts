@@ -117,8 +117,8 @@ export interface ActivityOverview extends ActivityUsage {
   days: { day: string; users: number; actions: number }[];
   /** meistgenutzte zuerst; people = Personen in den letzten 30 Tagen */
   areas: { area: string; label: string; actions: number; people: number }[];
-  /** nur mit Erfassung je Person; last_active null = nicht aktiv, seit die Erfassung läuft */
-  members: { id: number; name: string; last_active: number | null }[] | null;
+  /** nur mit Erfassung je Person; last_active null = nicht aktiv, seit die Erfassung läuft; actions = Einträge im Zeitraum */
+  members: { id: number; name: string; last_active: number | null; actions: number }[] | null;
 }
 
 export type ActivityAction = 'view' | 'create' | 'update' | 'delete' | 'vote' | 'login';
