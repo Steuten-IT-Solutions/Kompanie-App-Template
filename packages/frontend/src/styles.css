@@ -3188,8 +3188,206 @@ fieldset.feature-list legend {
 .board-card .board-text {
   margin: 6px 0;
 }
-.board-counter {
-  align-self: flex-end;
+.board-banner-title {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-title {
+  margin: 6px 0 2px;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.board-card .rich-text {
+  white-space: normal;
+}
+.board-history {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.board-revisions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.board-revision {
+  padding: 6px 0;
+}
+.board-revision + .board-revision {
+  border-top: 1px dashed var(--line);
+}
+.board-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+.board-diff > div {
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface-2, color-mix(in srgb, var(--muted) 8%, transparent));
+  overflow-wrap: anywhere;
+}
+.board-diff .muted {
+  display: block;
+}
+@media (max-width: 520px) {
+  .board-diff {
+    grid-template-columns: 1fr;
+  }
+}
+.board-mail-failed {
+  color: var(--danger, #b00020);
+}
+.board-ended {
+  margin-top: 12px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Formatierte Inhalte und Editor (Issue #172)                         */
+/* ------------------------------------------------------------------ */
+
+.rich-text {
+  overflow-wrap: anywhere;
+}
+.rich-text p {
+  margin: 0 0 0.5em;
+}
+.rich-text p:last-child {
+  margin-bottom: 0;
+}
+.rich-text img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+.rich-text table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+.rich-text td,
+.rich-text th {
+  padding: 2px 6px;
+  vertical-align: top;
+}
+.rich-text a {
+  color: var(--primary-ink, var(--primary));
+  text-decoration: underline;
+}
+.rich-text hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 0.8em 0;
+}
+.rich-editor {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  overflow: hidden;
+}
+.rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--muted) 6%, transparent);
+}
+.rich-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+.rich-tool {
+  position: relative;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.rich-tool:hover,
+.rich-tool:focus-visible {
+  border-color: var(--line);
+}
+.rich-tool.active {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.rich-tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rich-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.rich-color span {
+  border-bottom: 3px solid currentColor;
+  font-weight: 700;
+}
+.rich-color .rich-highlight {
+  border-bottom: none;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.rich-color input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.rich-select {
+  min-height: 32px;
+  max-width: 9.5rem;
+  padding: 2px 4px;
+  font-size: 0.85rem;
+}
+.rich-size {
+  max-width: 5rem;
+}
+.rich-signature {
+  margin-left: auto;
+}
+.rich-editor-content {
+  min-height: 9rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  outline: none;
+}
+.rich-editor-content:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 50%, transparent);
+}
+.rich-editor-content table td,
+.rich-editor-content table th {
+  border: 1px dashed var(--line);
+  min-width: 2em;
+}
+.rich-notice {
+  margin: 6px 10px;
+}
+.signature-preview {
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
 }
 
 /* ------------------------------------------------------------------ */

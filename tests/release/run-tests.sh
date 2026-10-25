@@ -68,6 +68,14 @@ SA_LIST="$(unzip -l "$T/r1/kompanie-app-standalone.zip")"
 WP_LIST="$(unzip -l "$T/r1/kompanie-app-wordpress.zip")"
 grep -qE 'tests/|e2e/|node_modules' <<< "$SA_LIST" && fail "Paket enthält Entwicklungsdateien" || ok "Paket ohne Entwicklungsdateien"
 grep -q 'kompanie-app/core/App.php' <<< "$WP_LIST" && ok "Plugin enthält den Kern" || fail "Kern fehlt im Plugin"
+# PHPMailer (Issue #172): nur im eigenständigen Paket, mit Lizenz, unter src/ (wird auch von älteren Updatern getauscht)
+for f in PHPMailer.php SMTP.php Exception.php LICENSE; do
+  grep -q "kompanie-app/src/lib/PHPMailer/$f" <<< "$SA_LIST" || fail "PHPMailer: $f fehlt im eigenständigen Paket"
+done
+grep -qE 'PHPMailer/(PHPMailer|SMTP)\.php' <<< "$WP_LIST" && fail "Plugin bringt eine eigene PHPMailer-Kopie mit" || ok "PHPMailer mit Lizenz nur im eigenständigen Paket (WordPress nutzt die eigene Kopie)"
+grep -q 'GNU LESSER GENERAL PUBLIC LICENSE' <<< "$(unzip -p "$T/r1/kompanie-app-standalone.zip" kompanie-app/src/lib/PHPMailer/LICENSE)" || fail "Lizenztext von PHPMailer fehlt"
+MAILER="$(cd "$APP" && php -r 'require "autoload.php"; echo (new ReflectionClass(PHPMailer\PHPMailer\PHPMailer::class))->getFileName();')"
+[ "$MAILER" = "$(cd "$APP" && pwd -P)/src/lib/PHPMailer/PHPMailer.php" ] && ok "Paket lädt PHPMailer aus src/lib/PHPMailer" || fail "PHPMailer geladen aus: $MAILER"
 for zip in standalone wordpress; do
   unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/app/assets/.htaccess | grep -q 'max-age=31536000, immutable' \
     && unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/app/.htaccess | grep -q 'AddOutputFilterByType DEFLATE' \

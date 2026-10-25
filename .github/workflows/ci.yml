@@ -99,7 +99,11 @@ jobs:
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.1'
-          tools: none
+          tools: composer
+
+      # PHPMailer (Issue #172): Der Build nimmt den Lizenztext aus vendor/ in die Drittanbieter-Hinweise (Issue #173).
+      - name: PHP-Abhängigkeiten (PHPMailer)
+        run: composer install --no-dev --no-interaction --no-progress
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -145,7 +149,7 @@ jobs:
         with:
           php-version: '8.2'
           extensions: pdo_sqlite, pdo_mysql, mysqli, gd, sodium, zip, mbstring
-          tools: none
+          tools: composer
 
       - name: Test-WordPress mit MariaDB
         env:
@@ -162,6 +166,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      # PHPMailer (Issue #172): Der Build nimmt den Lizenztext aus vendor/ in die Drittanbieter-Hinweise (Issue #173).
+      - name: PHP-Abhängigkeiten (PHPMailer)
+        run: composer install --no-dev --no-interaction --no-progress
 
       - name: Frontend bauen und ins Plugin legen
         run: scripts/build-frontend.sh
@@ -214,7 +222,11 @@ jobs:
         with:
           php-version: '8.1'
           extensions: pdo_sqlite, pdo_mysql, gd, sodium, zip, mbstring, curl, openssl, simplexml
-          tools: none
+          tools: composer
+
+      # PHPMailer (Issue #172): kommt mit composer install aus composer.lock und ins Paket der eigenständigen Version.
+      - name: PHP-Abhängigkeiten (PHPMailer)
+        run: composer install --no-dev --no-interaction --no-progress
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:

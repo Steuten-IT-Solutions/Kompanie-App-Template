@@ -12,6 +12,7 @@ use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\BirthdayService;
+use KompanieApp\Core\Domain\BoardMailService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
@@ -38,6 +39,10 @@ use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\ListService;
+use KompanieApp\Core\Domain\MailService;
+use KompanieApp\Core\Domain\RichImageService;
+use KompanieApp\Core\Domain\SignatureService;
+use KompanieApp\Core\Mail\PhpMailerMailer;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
@@ -52,6 +57,7 @@ use KompanieApp\Core\Port\Environment;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\ImageResizer;
+use KompanieApp\Core\Port\Mailer;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Port\Scheduler;
 use KompanieApp\Core\Port\Settings;
@@ -89,6 +95,7 @@ final class App
         PushService::TASK_SEND => 3600,
         PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
         BoardService::TASK => 3600,
+        BoardMailService::TASK => BoardMailService::INTERVAL,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
@@ -137,6 +144,8 @@ final class App
         public readonly ?HealthChecks $healthChecks = null,
         /** @var array<string, mixed> update.json des Pakets: updatesUrl, trustedKeys, statusUrl, kompanie, support */
         public readonly array $packageConfig = [],
+        /** Mailversand; ohne Angabe PHPMailer über SMTP mit den Einstellungen (MailService). Tests setzen einen Test-Mailer. */
+        private readonly ?Mailer $customMailer = null,
     ) {
         // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
@@ -213,6 +222,8 @@ final class App
                 && ($this->features()->enabled('calendar') || $this->features()->enabled('news') || $this->features()->enabled('events')),
             // Schwarzes Brett: abgelaufene Nachrichten stündlich löschen (die API liefert sie ohnehin nicht mehr).
             BoardService::TASK => $this->features()->enabled('board'),
+            // Mails vom Brett (Issue #172): alle 15 Minuten als Rückfall, nach dem Einreihen vorgezogen; nur eingerichtet.
+            BoardMailService::TASK => $this->features()->enabled('board') && $this->mail()->configured(),
             // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
@@ -276,6 +287,8 @@ final class App
                 $this->pushTriggers()->watch();
             } elseif ($task === BoardService::TASK) {
                 $this->board()->cleanup();
+            } elseif ($task === BoardMailService::TASK) {
+                $this->boardMail()->runTask();
             } elseif ($task === PollService::TASK && $this->features()->enabled('polls')) {
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
@@ -374,9 +387,11 @@ final class App
 
     /**
      * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
-     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos. Was die Person für
-     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
-     * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
+     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos, Signatur
+     * samt Bildern, Einstellungen des Kontos und Mails vom Brett an sie (Warteschlange und Protokoll). Was die Person für
+     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett mit
+     * darin eingefügter Signatur und ihre Einträge im Verlauf des Bretts (Verfasser bzw. Bearbeiter dann „gelöschtes
+     * Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
      * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag und ihre Ausnahmen bei
      * den Rechten werden gelöscht, ebenso noch nicht versandte Fehlermeldungen mit ihrem Namen. Inventar und sein Verlauf
      * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“). Aus der Nutzungsauswertung
@@ -460,6 +475,41 @@ final class App
     public function board(): BoardService
     {
         return $this->service(BoardService::class, fn () => new BoardService($this));
+    }
+
+    /** Bilder in formatierten Inhalten (Issue #172) */
+    public function richImages(): RichImageService
+    {
+        return $this->service(RichImageService::class, fn () => new RichImageService($this));
+    }
+
+    /** Signaturen der Konten (Issue #172) */
+    public function signatures(): SignatureService
+    {
+        return $this->service(SignatureService::class, fn () => new SignatureService($this));
+    }
+
+    /** Kompanieadresse und SMTP (Issue #172) */
+    public function mail(): MailService
+    {
+        return $this->service(MailService::class, fn () => new MailService($this));
+    }
+
+    /** Mails vom Schwarzen Brett (Issue #172) */
+    public function boardMail(): BoardMailService
+    {
+        return $this->service(BoardMailService::class, fn () => new BoardMailService($this));
+    }
+
+    /** Mailer mit den aktuellen Einstellungen (jedes Mal neu: Einstellungen können sich geändert haben). */
+    public function mailer(): Mailer
+    {
+        return $this->customMailer ?? new PhpMailerMailer($this->mail()->config());
+    }
+
+    public function hasCustomMailer(): bool
+    {
+        return $this->customMailer !== null;
     }
 
     public function polls(): PollService

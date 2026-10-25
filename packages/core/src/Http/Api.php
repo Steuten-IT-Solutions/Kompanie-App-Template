@@ -9,9 +9,12 @@ use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\PersonName;
+use KompanieApp\Core\Domain\RichText;
+use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
@@ -371,6 +374,33 @@ final class Api
         }
     }
 
+    /**
+     * Konto für die Signatur: null (bzw. 403 mit $require), wenn es keine einrichten kann.
+     */
+    private function signatureUser(bool $require = false): ?User
+    {
+        $user = $this->user();
+        if (SignatureService::allowed($user)) {
+            return $user;
+        }
+        if ($require) {
+            throw ApiError::forbidden('Eine Signatur können Mitglieder und Anwärter einrichten.');
+        }
+        return null;
+    }
+
+    /** @return array{board: bool, available: bool, email: bool} Mails vom Brett: gewünscht, möglich, Adresse hinterlegt */
+    private function mailSettings(): array
+    {
+        $user = $this->user();
+        $recipient = BoardService::isRecipient($user);
+        return [
+            'board' => $recipient && $this->app->boardMail()->wants($user->id),
+            'available' => $recipient && $this->app->boardMail()->available(),
+            'email' => trim((string) ($this->app->users->profile($user->id)['email'] ?? '')) !== '',
+        ];
+    }
+
     private function user(): User
     {
         return $this->app->authContext->currentUser() ?? throw ApiError::notLoggedIn();
@@ -665,23 +695,70 @@ final class Api
             // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
             new Route('GET', '/board', [Cap::Member, Cap::Calendar, Cap::PostBoard], fn () => $a->board()->list($this->user()), 'board', $denyBoard),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
-                // push: ob Mitglieder und Anwärter benachrichtigt werden (Standard ja, Haken beim Schreiben)
+                // push: ob Mitglieder und Anwärter benachrichtigt werden; mail: ob sie eine Mail bekommen (Issue #172).
+                // Beides Standard ja (Haken beim Schreiben); ohne eingerichteten Mailversand ist mail Standard nein.
                 $push = $r->input('push') ?? true;
+                $mail = $r->input('mail') ?? $a->boardMail()->available();
                 if (!is_bool($push)) {
                     throw ApiError::invalid('push muss true oder false sein.');
                 }
-                $item = $a->board()->create($this->user(), $r->input('text'));
+                if (!is_bool($mail)) {
+                    throw ApiError::invalid('mail muss true oder false sein.');
+                }
+                if ($mail && !$a->boardMail()->available()) {
+                    throw ApiError::invalid($a->boardMail()->info($this->user())['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
+                }
+                // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
+                if ($mail && is_string($r->input('title')) && is_string($r->input('text'))) {
+                    $a->boardMail()->checkSize(Text::line($r->input('title')), RichText::sanitize($r->input('text')), $this->user());
+                }
+                $item = $a->board()->create($this->user(), $r->body);
                 $author = $this->user()->id;
                 if ($push) {
                     $this->notify(static fn () => $a->pushTriggers()->boardPosted($item, $author));
                 }
+                if ($mail) {
+                    $user = $this->user();
+                    $this->notify(static fn () => $a->boardMail()->queue((int) $item['id'], $user));
+                    $item = $a->board()->one((int) $item['id'], $user);
+                }
                 return Response::created($item);
             }, 'board', $denyRights),
-            new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($r->id(), $r->input('text')), 'board', $denyRights),
+            // Haken „E-Mail senden“: eingerichtet? Wie viele Empfänger?
+            new Route('GET', '/board/mail', Cap::PostBoard, fn () => $a->boardMail()->info($this->user()), 'board', $denyRights),
+            // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
+            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended(), 'board', $denyRights),
+            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id()), 'board', $denyRights),
+            new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($this->user(), $r->id(), $r->body), 'board', $denyRights),
             new Route('DELETE', '/board/{id}', Cap::PostBoard, function (Request $r) use ($a) {
-                $a->board()->delete($r->id());
+                $a->board()->delete($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'board', $denyRights),
+
+            // Formatierte Inhalte (Issue #172): Bilder hochladen (Entwurf des Kontos), Grenzen des Servers
+            new Route('GET', '/rich-images/limits', $L, fn () => $a->richImages()->limits()),
+            new Route('POST', '/rich-images', $L, function (Request $r) use ($a) {
+                if (!SignatureService::allowed($this->user())) {
+                    throw ApiError::forbidden('Bilder in formatierten Texten können nur Mitglieder und Anwärter hochladen.');
+                }
+                return Response::created($a->richImages()->upload($this->user(), $r->input('file')));
+            }),
+            // Signatur (Issue #172): Mitglieder und Anwärter
+            new Route('GET', '/me/signature', $L, fn () => ['signature' => $this->signatureUser() ? $a->signatures()->get($this->user()) : null]),
+            new Route('PUT', '/me/signature', $L, fn (Request $r) => ['signature' => $a->signatures()->save($this->signatureUser(true), $r->input('content'))]),
+            new Route('DELETE', '/me/signature', $L, function () use ($a) {
+                $a->signatures()->delete($this->signatureUser(true));
+                return ['signature' => null];
+            }),
+            // Mails vom Brett empfangen (Issue #172): Standard an, abschaltbar
+            new Route('GET', '/me/mail', $L, fn () => $this->mailSettings()),
+            new Route('PUT', '/me/mail', $L, function (Request $r) use ($a) {
+                if (!BoardService::isRecipient($this->user())) {
+                    throw ApiError::forbidden('Mails vom Brett bekommen nur Mitglieder und Anwärter.');
+                }
+                $a->boardMail()->setWants($this->user()->id, $r->input('board'));
+                return $this->mailSettings();
+            }),
 
             // Umfragen (Issue #4): Mitglieder lesen und antworten (nur solange die Umfrage läuft), manage_polls verwaltet;
             // nur beim Anlegen eine Benachrichtigung. Antworten anonymer Umfragen nie mit Namen oder IDs (PollService).
@@ -890,6 +967,11 @@ final class Api
                 return $a->push()->adminStatus();
             }, null, $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
+            // E-Mail (Issue #172): Kompanieadresse und SMTP, Verbindung prüfen, Testmail
+            new Route('GET', '/admin/mail', Cap::ManageSettings, fn () => $a->mail()->describe(), null, $denySettings),
+            new Route('PATCH', '/admin/mail', Cap::ManageSettings, fn (Request $r) => $a->mail()->update($r->body), null, $denySettings),
+            new Route('POST', '/admin/mail/check', Cap::ManageSettings, fn () => $a->mail()->check() + ['settings' => $a->mail()->describe()], null, $denySettings),
+            new Route('POST', '/admin/mail/test', Cap::ManageSettings, fn (Request $r) => $a->mail()->sendTest($this->user(), $r->input('to')), null, $denySettings),
             // Rollen (Issue #28): nur Admins (manage_settings lässt sich keiner anderen Rolle geben)
             new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $a->roles()->describe(), null, $denySettings),
             new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {

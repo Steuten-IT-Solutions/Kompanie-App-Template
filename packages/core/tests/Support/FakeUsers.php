@@ -59,6 +59,17 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $out;
     }
 
+    public function emails(array $ids): array
+    {
+        $out = [];
+        foreach ($ids as $id) {
+            if (isset($this->users[(int) $id])) {
+                $out[(int) $id] = $this->users[(int) $id]['email'];
+            }
+        }
+        return $out;
+    }
+
     private function user(int $id): ?User
     {
         $u = $this->users[$id] ?? null;

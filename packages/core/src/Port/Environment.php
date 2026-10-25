@@ -55,4 +55,10 @@ interface Environment
      * Die Fassung (v) wechselt mit jedem Hochladen, s ist die Größe (128 oder 480 Pixel).
      */
     public function memberPhotoUrl(int $userId, string $version, int $size): string;
+
+    /**
+     * Adresse eines Bilds in formatiertem Inhalt (Issue #172: Signaturen, Schwarzes Brett), ausgeliefert nach Prüfung
+     * der Anmeldung und der Rechte: <App>/bild/<Kennung>. Eine Kennung hat immer denselben Inhalt.
+     */
+    public function richImageUrl(string $uid): string;
 }

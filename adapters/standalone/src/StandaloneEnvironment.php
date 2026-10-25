@@ -96,4 +96,9 @@ final class StandaloneEnvironment implements Environment
         $url = $this->route('mitgliedsfoto/' . $userId);
         return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version) . '&s=' . $size;
     }
+
+    public function richImageUrl(string $uid): string
+    {
+        return $this->route('bild/' . $uid);
+    }
 }

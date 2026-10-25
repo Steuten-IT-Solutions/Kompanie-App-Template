@@ -37,6 +37,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
+ *   /bild/<kennung>          Bild in formatiertem Inhalt (index.php?r=/bild/…)
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
@@ -338,6 +339,10 @@ final class Kernel
         } elseif (preg_match('#^/mitgliedsfoto/(\d+)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendMemberPhoto((int) $m[1]);
+        } elseif (preg_match('#^/bild/([a-f0-9]{32})$#', $path, $m)) {
+            $this->beginPreview();
+            $app = $this->app();
+            $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === '/google/callback') {
             $this->sendGoogleCallback();
         } elseif ($path === '/cron') {
@@ -563,7 +568,16 @@ final class Kernel
         $app = $this->app();
         $v = is_string($_GET['v'] ?? null) ? $_GET['v'] : null;
         $s = is_string($_GET['s'] ?? null) ? $_GET['s'] : null;
-        $res = $app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s);
+        $this->sendBody($app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s));
+    }
+
+    /**
+     * Antwort mit Inhalt aus dem Kern (Fotos der Mitglieder, Bilder in formatierten Inhalten): Status, Header, Inhalt.
+     *
+     * @param array{status: int, headers: array<string, string>, body?: string} $res
+     */
+    private function sendBody(array $res): void
+    {
         $this->securityHeaders();
         http_response_code($res['status']);
         foreach ($res['headers'] as $name => $value) {

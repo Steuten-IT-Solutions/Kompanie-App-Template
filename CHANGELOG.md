@@ -17,6 +17,22 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Schwarzes Brett: Titel, Enddatum, formatierte Nachrichten**: Jede Nachricht hat jetzt einen Titel; das Banner
+  oben zeigt nur noch ihn, ein Tipp darauf öffnet die ganze Nachricht. Wie lange sie stehen bleibt, wählt man beim
+  Schreiben frei (vorgegeben 24 Stunden) und kann es später verlängern oder verkürzen. Der Text lässt sich wie in einem
+  Mailprogramm gestalten: Schrift, Größe, Farben, Ausrichtung, Einzug, Listen, Links, Bilder, Trennlinie und Tabellen.
+  Einfügen aus Word und Outlook übernimmt Formatierung, Aufzählungen und, wo möglich, Bilder. Eine Längengrenze gibt
+  es nicht mehr.
+- **Signatur**: Unter *Meins → Konto* richten Mitglieder und Anwärter eine Signatur mit Text und Bildern ein. Beim
+  Schreiben am Brett fügt **Signatur einfügen** sie ans Ende; ohne Signatur führt ein Knopf direkt zur Einrichtung und
+  wieder zurück, der begonnene Text bleibt erhalten.
+- **Schwarzes Brett: Verlauf**: Wer am Brett schreiben darf, sieht bei jeder Nachricht, wer sie wann erstellt, geändert,
+  per Mail verschickt oder gelöscht hat, bei Änderungen mit vorher und nachher. Abgelaufene und gelöschte Nachrichten
+  bleiben mit ihrem Verlauf noch 30 Tage einsehbar.
+- **Schwarzes Brett per E-Mail**: Neue Nachrichten gehen auf Wunsch (Haken **E-Mail senden**, standardmäßig an) auch als
+  Mail an alle Mitglieder und Anwärter mit hinterlegter Adresse, jede einzeln, mit dem Titel als Betreff und den Bildern
+  in der Mail. Jede Person kann das unter *Meins → Konto* abschalten. Absender ist die Kompanieadresse, die Admins
+  unter *Einstellungen → E-Mail* mit dem Mailserver (SMTP) eintragen, prüfen und mit einer Testmail ausprobieren.
 - **Lizenzen**: Unter *Hilfe → Lizenzen* steht, unter welcher Lizenz die App steht (GPL-2.0-or-later), wo es den
   vollständigen Quellcode gibt und welche Bausteine anderer Anbieter in der App enthalten sind, jeweils mit ihrer
   Lizenz. Beide Pakete enthalten dazu die Dateien `LICENSE` und `THIRD-PARTY-NOTICES.txt`.
@@ -96,6 +112,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Benachrichtigung zum Schwarzen Brett**: Sie zeigt jetzt den Titel der Nachricht statt des ganzen Texts und wird,
+  wenn die Nachricht länger steht, bis zu 28 Tage nachgeliefert (vorher höchstens einen Tag).
+- **Eigenständige Version**: Das Paket enthält jetzt PHPMailer (LGPL-2.1) für den Mailversand. Mit WordPress nutzt die
+  App die Kopie von WordPress.
 - **Statusmeldungen mit Nutzungszahlen**: Wenn ihr den Statusmeldungen zugestimmt habt, enthält das stündliche
   Lebenszeichen jetzt auch Zahlen ohne Namen: wie viele Konten es gibt, wie viele in den letzten 24 Stunden, 7 und 30
   Tagen aktiv waren und wie viele Personen welchen Bereich in den letzten 30 Tagen genutzt haben. Was genau gesendet

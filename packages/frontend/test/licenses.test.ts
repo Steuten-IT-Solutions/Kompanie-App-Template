@@ -19,17 +19,30 @@ function fakePackage(pkg: Record<string, unknown>, files: Record<string, string>
 }
 
 test('Erlaubte Lizenzen werden angenommen, GPL, AGPL und proprietäre abgelehnt', () => {
-  for (const id of ['MIT', 'ISC', '0BSD', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', 'MPL-2.0', 'OFL-1.1', 'LGPL-3.0-or-later']) {
+  for (const id of [
+    'MIT',
+    'ISC',
+    '0BSD',
+    'BSD-2-Clause',
+    'BSD-3-Clause',
+    'Apache-2.0',
+    'MPL-2.0',
+    'OFL-1.1',
+    'LGPL-3.0-or-later',
+    'LGPL-2.1-only',
+  ]) {
     assert.deepEqual(chooseLicense(id), [id]);
   }
   assert.deepEqual(chooseLicense('LGPL-2.1+'), ['LGPL-2.1-or-later']);
+  assert.deepEqual(chooseLicense('LGPL-2.1'), ['LGPL-2.1-only']);
+  assert.deepEqual(chooseLicense('LGPL-2.1-only OR LGPL-2.1-or-later'), ['LGPL-2.1-or-later']);
   for (const bad of [
     'GPL-2.0-or-later',
     'GPL-3.0-only',
     'AGPL-3.0-or-later',
     'UNLICENSED',
     'SEE LICENSE IN LICENSE.md',
-    'LGPL-2.1-only',
+    'LGPL-2.0-only',
     '',
     'MIT AND',
   ]) {
@@ -115,8 +128,14 @@ test('PHP-Bibliotheken aus composer.lock (packages) werden geprüft', () => {
   assert.equal(n.license, 'LGPL-2.1-or-later');
   lock(['GPL-2.0-or-later']);
   assert.throws(() => composerNotices(dir), /nicht erlaubt/);
-  // Im Repo: derzeit keine PHP-Bibliothek, die ausgeliefert wird
-  assert.deepEqual(composerNotices(root), []);
+  // Im Repo: PHPMailer (Issue #172), mit den Urhebern aus den Dateiköpfen statt der Platzhalter aus dem LGPL-Text
+  const repo = composerNotices(root);
+  assert.deepEqual(
+    repo.map((x) => [x.name, x.license]),
+    [['phpmailer/phpmailer', 'LGPL-2.1-only']],
+  );
+  assert.ok(repo[0].copyright.includes('@copyright 2012 - 2020 Marcus Bointon'), repo[0].copyright.join('\n'));
+  assert.ok(!repo[0].copyright.some((l) => l.includes('<year>')));
 });
 
 test('Copyright-Zeilen ohne Platzhalter und Rechtstext', () => {
@@ -128,6 +147,7 @@ test('Copyright-Zeilen ohne Platzhalter und Rechtstext', () => {
     '@license DOMPurify | (c) Cure53 and other contributors',
   ]);
   assert.deepEqual(copyrightLines('(c) You must retain, in the Source form'), []);
+  assert.deepEqual(copyrightLines('    Copyright (C) <year>  <name of author>'), []);
 });
 
 test('THIRD-PARTY-NOTICES nennt Projektlizenz, Quellcode und je Baustein den Lizenztext', () => {
