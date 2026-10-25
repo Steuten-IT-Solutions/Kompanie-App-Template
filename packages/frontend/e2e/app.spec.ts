@@ -3241,7 +3241,9 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   const dueNow = () =>
     page.evaluate(async () => {
       const c = window.KOMPANIE_CONFIG!;
-      const list = await (await fetch(c.apiBase + 'promotions', { credentials: 'same-origin' })).json();
+      const list = await (
+        await fetch(c.apiBase + 'promotions', { credentials: 'same-origin', headers: { [c.csrf.header]: c.csrf.token } })
+      ).json();
       return list.filter(
         (p: { next_rank: unknown; points_to_next: number | null }) => p.next_rank && p.points_to_next !== null && p.points_to_next <= 0,
       ).length as number;
