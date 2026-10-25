@@ -1585,8 +1585,9 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
   await expect(page.locator('.toast')).toHaveText('Liste kopiert');
-  // Abstand zwischen der letzten Liste und „Neue Liste“ (Issue #179)
-  expect(await gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
+  // Abstand zwischen der letzten Liste und „Neue Liste“ (Issue #179), erst wenn die Kopie in der Liste steht
+  await expect(page.locator('.row', { hasText: `${title} (Kopie)` }).first()).toBeVisible();
+  await expect.poll(() => gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
   await shotsNarrowAndWide(page, '40d-listen-uebersicht');
   for (const t of [`${title} (Kopie)`, title]) {
     page.once('dialog', (d) => d.accept());
