@@ -20,7 +20,7 @@ final class RolesTest extends TestCase
     {
         $app = TestApp::create(TestApp::connection(), features: false);
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ADMIN], array_keys($app->roles()->all()), 'Anwärter legt der Admin selbst an');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar], $app->roles()->capabilities(Roles::MEMBER), 'Mitgliederbereich mit Kalender');
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern], $app->roles()->capabilities(Roles::MEMBER), 'Mitgliederbereich mit Kalender');
         $this->assertSame([], $app->roles()->capabilities(Roles::ORGANIZER), 'frühere Vorlage gibt es nicht');
     }
 
@@ -33,7 +33,7 @@ final class RolesTest extends TestCase
         $this->assertSame([Roles::GUEST, Roles::MEMBER, 'points', 'penalties', Roles::ADMIN], array_keys($roles), 'Kalender braucht keine Rechte');
         $this->assertSame('Punkte verwalten', $roles['points']['label']);
         $this->assertSame('Kasse verwalten', $roles['penalties']['label'], 'mit der Bezeichnung aus kompanie.json');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ManagePenalties], $app->roles()->capabilities('penalties'));
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern, Capability::ManagePenalties], $app->roles()->capabilities('penalties'));
 
         // Ausschalten: Rolle verschwindet, wenn niemand sie hat; sonst bleibt sie.
         $users->add('kasse', 'penalties');
@@ -64,7 +64,7 @@ final class RolesTest extends TestCase
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_keys($roles));
         $this->assertSame('Spieß', $roles[Roles::MANAGER]['label']);
         $this->assertEqualsCanonicalizing(
-            [Capability::Member, Capability::Calendar, Capability::ManageEvents, Capability::ManageDocuments, Capability::ManagePoints, Capability::ManagePenalties],
+            [Capability::Member, Capability::Calendar, Capability::ViewIntern, Capability::ManageEvents, Capability::ManageDocuments, Capability::ManagePoints, Capability::ManagePenalties],
             $app->roles()->capabilities(Roles::MANAGER),
         );
         // Bestehende Installationen bekommen beim Einschalten neue Standardrollen, behalten aber ihre.
@@ -77,7 +77,7 @@ final class RolesTest extends TestCase
     {
         $settings = new MemorySettings([RoleService::SETTING => [['key' => 'r1', 'label' => 'Kasse', 'capabilities' => ['member', 'manage']]]]);
         $app = TestApp::create(TestApp::connection(), settings: $settings, features: false);
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ManagePoints, Capability::ManagePenalties], $app->roles()->capabilities('r1'));
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern, Capability::ManagePoints, Capability::ManagePenalties], $app->roles()->capabilities('r1'));
         $this->assertSame([Roles::GUEST, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($app->roles()->all()), 'feste Rollen ergänzt');
     }
 
@@ -257,6 +257,23 @@ final class RolesTest extends TestCase
         $this->assertSame(400, $call('POST', "/members/$other/promote")->status, 'nicht freigegeben');
     }
 
+    public function testInternAloneOrIncludedInMemberArea(): void
+    {
+        $app = TestApp::create(TestApp::connection(), features: false);
+        // Wie der Kalender auch ohne Mitgliederbereich (z. B. Anwärter, die „Intern“ sehen sollen)
+        $key = $app->roles()->create(['label' => 'Anwärter mit Intern', 'capabilities' => ['calendar', 'view_intern']])['key'];
+        $this->assertEqualsCanonicalizing([Capability::Calendar, Capability::ViewIntern], $app->roles()->capabilities($key));
+        $only = $app->roles()->create(['label' => 'Nur Intern', 'capabilities' => ['view_intern']])['key'];
+        $this->assertSame([Capability::ViewIntern], $app->roles()->capabilities($only));
+        // Im Mitgliederbereich enthalten, nicht doppelt gespeichert; Mitglieder haben es fest.
+        $app->roles()->update($key, ['capabilities' => ['member', 'view_intern']]);
+        $this->assertSame(['member'], $app->roles()->find($key)['capabilities']);
+        $this->assertContains(Capability::ViewIntern, $app->roles()->capabilities(Roles::MEMBER));
+        $this->assertNotContains(Capability::ViewIntern, $app->roles()->capabilities(Roles::GUEST));
+        $this->expectException(\KompanieApp\Core\Http\ApiError::class);
+        $app->roles()->update($only, ['capabilities' => ['view_intern', 'manage_documents']]);
+    }
+
     public function testCalendarAloneOrIncludedInMemberArea(): void
     {
         $app = TestApp::create(TestApp::connection(), features: false);
@@ -264,7 +281,7 @@ final class RolesTest extends TestCase
         $this->assertSame(['calendar'], $app->roles()->find($key)['capabilities']);
         $app->roles()->update($key, ['capabilities' => ['calendar', 'member']]);
         $this->assertSame(['member'], $app->roles()->find($key)['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt gespeichert');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar], $app->roles()->capabilities($key));
+        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern], $app->roles()->capabilities($key));
         $this->expectException(\KompanieApp\Core\Http\ApiError::class);
         $app->roles()->update($key, ['capabilities' => ['calendar', 'manage_events']]);
     }

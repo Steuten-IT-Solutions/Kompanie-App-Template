@@ -11,6 +11,12 @@ enum Capability: string
     case Member = 'member';
     /** Interner Kalender ohne Mitgliederbereich, z. B. für Anwärter (Issue #23). */
     case Calendar = 'calendar';
+    /**
+     * Bereich „Intern“: Mitglieder und Dokumente stehen in der Navigation gesammelt unter einem Knopf statt einzeln. Nur die
+     * Navigation; was die Person sieht, regeln die anderen Rechte (Dokumente z. B. der Mitgliederbereich). Wie der
+     * Kalender auch ohne Mitgliederbereich vergebbar und in ihm enthalten.
+     */
+    case ViewIntern = 'view_intern';
     /** Punkte vergeben und stornieren, Punktekatalog pflegen (Bereich Punkte). */
     case ManagePoints = 'manage_points';
     /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen). */
@@ -49,6 +55,16 @@ enum Capability: string
     case ViewActivity = 'view_activity';
     /** Einstellungen und Updates (WordPress: Recht manage_options; zusätzlich gibt es dort das Formular im WP-Admin). */
     case ManageSettings = 'manage_settings';
+
+    /**
+     * Rechte, die es auch ohne Mitgliederbereich gibt (z. B. für Anwärter); der Mitgliederbereich enthält sie alle.
+     *
+     * @return list<self>
+     */
+    public static function withoutMember(): array
+    {
+        return [self::Calendar, self::ViewIntern];
+    }
 
     /**
      * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade oder Titel pflegt,

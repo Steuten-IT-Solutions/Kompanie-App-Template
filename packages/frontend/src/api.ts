@@ -12,6 +12,7 @@ export type Level = string;
 export type Capability =
   | 'member'
   | 'calendar'
+  | 'view_intern'
   | 'manage_points'
   | 'manage_penalties'
   | 'manage_ranks'

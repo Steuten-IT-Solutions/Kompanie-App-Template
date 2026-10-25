@@ -132,7 +132,7 @@ export function MenuNav({
   );
 }
 
-/** Symbole der Verwaltung (24 × 24, Linien in Textfarbe). */
+/** Symbole der Verwaltung und von „Intern“ (24 × 24, Linien in Textfarbe). */
 const ADMIN_ICONS: Record<string, ReactNode> = {
   mitglieder: (
     <>
@@ -182,6 +182,12 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M9 4V3h6v1M9 13l2 2 4-4" />
     </>
   ),
+  dokumente: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </>
+  ),
   listen: (
     <>
       <rect x="4" y="3" width="16" height="18" rx="2" />
@@ -207,7 +213,7 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
   ),
 };
 
-function AdminIcon({ id }: { id: string }) {
+export function AdminIcon({ id }: { id: string }) {
   return (
     <svg
       viewBox="0 0 24 24"

@@ -9,7 +9,7 @@ Auf dieser Seite stellst du {bereich.documents} für die {rolle.member} bereit: 
 ![Die Seite {bereich.documents} verwalten mit dem Formular Dokument hochladen](bild:dokumente-pflegen)
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.documents}** und oben auf **{bereich.documents} verwalten**. Den Knopf sieht nur, wer {bereich.documents} pflegen darf (z. B. mit der Rolle „{bereich.documents} verwalten“).
+Tippe unten auf **Intern**, dann auf **{bereich.documents}** und oben auf **{bereich.documents} verwalten**. Den Knopf sieht nur, wer {bereich.documents} pflegen darf (z. B. mit der Rolle „{bereich.documents} verwalten“).
 
 ## Was du hier siehst
 - **‹ Alle {bereich.documents}**: zurück zur Liste, wie die {rolle.member} sie sehen.

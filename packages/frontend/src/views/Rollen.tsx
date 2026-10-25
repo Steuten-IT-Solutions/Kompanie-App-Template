@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
-import { CAPABILITIES } from '../capabilities';
+import { CAPABILITIES, withoutMember } from '../capabilities';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { PUBLIC_PREVIEW, startPreview } from '../preview';
@@ -235,14 +235,15 @@ function RoleForm({
   const fixed = role?.system ?? false;
 
   const toggle = (cap: Capability, on: boolean) => {
-    // Ohne Mitgliederbereich gibt es keine weiteren Rechte (die Person sähe ihre Mitglieder nicht), außer dem Kalender.
+    // Ohne Mitgliederbereich gibt es keine weiteren Rechte (die Person sähe ihre Mitglieder nicht), außer Kalender und
+    // „Intern“ (withoutMember).
     if (cap === 'member' && !on) return setCapabilities([]);
-    if (cap === 'calendar') return setCapabilities(on ? ['calendar'] : []);
+    if (withoutMember(cap)) return setCapabilities((prev) => (on ? [...prev, cap] : prev.filter((c) => c !== cap)));
     // Zum Mitglied machen gibt es nur aus Rollen ohne Mitgliederbereich.
     setPromotable(false);
-    // Der Mitgliederbereich enthält den Kalender: nicht zusätzlich speichern.
+    // Der Mitgliederbereich enthält Kalender und „Intern“: nicht zusätzlich speichern.
     setCapabilities((prev) =>
-      on ? Array.from(new Set<Capability>([...prev.filter((c) => c !== 'calendar'), 'member', cap])) : prev.filter((c) => c !== cap),
+      on ? Array.from(new Set<Capability>([...prev.filter((c) => !withoutMember(c)), 'member', cap])) : prev.filter((c) => c !== cap),
     );
   };
 
@@ -304,8 +305,8 @@ function RoleForm({
             <label key={c.key} className="toggle feature-toggle">
               <input
                 type="checkbox"
-                checked={capabilities.includes(c.key) || (c.key === 'calendar' && capabilities.includes('member'))}
-                disabled={c.key === 'calendar' && capabilities.includes('member')}
+                checked={capabilities.includes(c.key) || (withoutMember(c.key) && capabilities.includes('member'))}
+                disabled={withoutMember(c.key) && capabilities.includes('member')}
                 onChange={(e) => toggle(c.key, e.target.checked)}
               />
               <span>{c.label}</span>

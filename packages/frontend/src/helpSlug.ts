@@ -32,6 +32,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
       return id ? 'galerie-album' : 'galerie';
+    case 'intern':
+      return 'intern';
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : id ? 'dokument-ansehen' : 'dokumente';
     case 'mitglieder':

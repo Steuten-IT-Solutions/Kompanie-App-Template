@@ -45,8 +45,9 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Rollen**.
 
 ## Die Rechte
 Diese Rechte kannst du einer eigenen Rolle geben:
-- **Mitgliederbereich**: eigene {bereich.points} und {bereich.penalties}, interner Kalender, interne Bilder der {bereich.gallery}. Jedes weitere Recht setzt ihn voraus: Kreuzt du eines an, hakt die App den Mitgliederbereich mit an. Nimmst du ihn weg, entfallen alle anderen Rechte.
+- **Mitgliederbereich**: eigene {bereich.points} und {bereich.penalties}, interner Kalender, interne Bilder der {bereich.gallery}, dazu **Intern**. Jedes weitere Recht außer **Interner Kalender** und **Intern** setzt ihn voraus: Kreuzt du eines an, hakt die App den Mitgliederbereich mit an. Nimmst du ihn weg, entfallen alle anderen Rechte.
 - **Interner Kalender** (ohne Mitgliederbereich, z. B. für Anwärter). Mit dem Mitgliederbereich ist er schon enthalten.
+- **Intern**: {bereich.directory} und {bereich.documents} stehen unten gesammelt unter dem Knopf **Intern** statt einzeln (siehe [Intern](seite:intern)). Das Recht ändert nur die Leiste unten, nicht, was die Person sehen darf: {bereich.documents} sieht weiterhin nur, wer den Mitgliederbereich hat. Auch ohne Mitgliederbereich vergebbar (z. B. für Anwärter); mit ihm schon enthalten.
 - Je Bereich mit eigenen Aufgaben ein Recht, zum Beispiel **{bereich.points} vergeben, Katalog pflegen** oder **Öffentliche {bereich.events} pflegen**.
 - **Mitglieder anlegen und Startpasswörter erzeugen** und **Rollen vergeben**.
 

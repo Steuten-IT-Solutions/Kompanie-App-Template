@@ -61,6 +61,7 @@ const PATHS = [
   ['news', 'abc'],
   ['galerie'],
   ['galerie', '3'],
+  ['intern'],
   ['dokumente'],
   ['dokumente', '5'],
   ['dokumente', 'verwalten'],
@@ -169,6 +170,7 @@ test('Eine eigene Seite je Bildschirm', () => {
   const cases: [string[], string][] = [
     [['news', 'abc'], 'neuigkeiten-beitrag'],
     [['galerie', '3'], 'galerie-album'],
+    [['intern'], 'intern'],
     [['dokumente', '5'], 'dokument-ansehen'],
     [['umfragen', '4'], 'umfrage-beantworten'],
     [['inventar', 'verlauf', '4'], 'inventar-verlauf'],

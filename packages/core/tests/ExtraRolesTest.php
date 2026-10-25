@@ -53,7 +53,7 @@ final class ExtraRolesTest extends TestCase
         $res = $this->setRoles($m, ['penalties', 'events']);
         $this->assertSame(200, $res->status, json_encode($res->data) ?: '');
         $this->assertSame(['id' => $m, 'level' => Roles::MEMBER, 'extra_roles' => ['events', 'penalties']], $res->data, 'Reihenfolge der Rollen, level bleibt die Grundrolle');
-        $this->assertEqualsCanonicalizing(['member', 'calendar', 'manage_penalties', 'manage_events'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(['member', 'calendar', 'view_intern', 'manage_penalties', 'manage_events'], $this->caps($m));
 
         $list = array_column($this->call('GET', '/members')->data, null, 'id');
         $this->assertSame(['events', 'penalties'], $list[$m]['extra_roles']);
@@ -72,7 +72,7 @@ final class ExtraRolesTest extends TestCase
         // Leere Liste: keine Zusatzrollen mehr, Grundrolle unverändert.
         $this->users->current = $this->admin;
         $this->assertSame([], $this->setRoles($m, [])->data['extra_roles']);
-        $this->assertEqualsCanonicalizing(['member', 'calendar'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(['member', 'calendar', 'view_intern'], $this->caps($m));
         // Nur level wie bisher: Zusatzrollen bleiben.
         $this->setRoles($m, ['events']);
         $res = $this->call('PATCH', "/members/$m/role", ['level' => 'points']);

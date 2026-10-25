@@ -63,7 +63,7 @@ final class CapabilityOverridesTest extends TestCase
     {
         $res = $this->rights($this->m, ['manage_points']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['member', 'calendar'], $res->data['role']);
+        $this->assertSame(['member', 'calendar', 'view_intern'], $res->data['role']);
         $this->assertSame(['manage_points'], $res->data['grant']);
         $this->assertSame([], $res->data['revoke']);
         $this->assertTrue($this->can($this->m, Capability::ManagePoints));
@@ -108,9 +108,12 @@ final class CapabilityOverridesTest extends TestCase
         $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $guest = $this->users->add('gast', Roles::GUEST);
         $this->assertSame(400, $this->rights($candidate, ['manage_points'])->status, 'Verwalten braucht den Mitgliederbereich');
+        $this->assertSame(200, $this->rights($candidate, ['view_intern'])->status, '„Intern“ auch ohne Mitgliederbereich');
+        $this->assertSame([Capability::Calendar, Capability::ViewIntern], $this->users->find($candidate)?->capabilities);
         $this->assertSame(200, $this->rights($candidate, ['member', 'manage_points'])->status);
         $this->assertTrue($this->can($candidate, Capability::ManagePoints));
         $this->assertSame(400, $this->rights($this->m, [], ['calendar'])->status, 'Kalender gehört zum Mitgliederbereich');
+        $this->assertSame(400, $this->rights($this->m, [], ['view_intern'])->status, '„Intern“ gehört zum Mitgliederbereich');
         $this->assertSame(200, $this->rights($this->m, ['calendar'], ['member'])->status, 'ohne Mitgliederbereich, nur Kalender');
         $this->assertSame([Capability::Calendar], $this->users->find($this->m)?->capabilities);
         $this->assertSame(400, $this->rights($this->m, ['manage_points'], ['manage_points'])->status);
@@ -132,7 +135,7 @@ final class CapabilityOverridesTest extends TestCase
 
         $res = $this->rights($this->m, ['manage_points']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['member', 'calendar', 'manage_points'], $res->data['editable']);
+        $this->assertSame(['member', 'calendar', 'view_intern', 'manage_points'], $res->data['editable']);
         $this->assertSame(403, $this->rights($this->m, ['manage_points', 'manage_events'])->status, 'hat er selbst nicht');
         $this->assertSame(403, $this->rights($this->m, ['manage_points', 'create_users'])->status, 'bleibt den Admins vorbehalten');
         $this->assertSame(400, $this->rights($chef, [])->status, 'nicht die eigenen');
@@ -180,7 +183,7 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertSame(200, $this->rights($this->m, ['manage_penalties', 'manage_events'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => ['penalties']])->status);
         $rights = $this->call('GET', "/members/{$this->m}")->data['rights'];
-        $this->assertSame(['member', 'manage_penalties', 'calendar'], $rights['role'], 'Rechte aller Rollen');
+        $this->assertSame(['member', 'manage_penalties', 'calendar', 'view_intern'], $rights['role'], 'Rechte aller Rollen');
         $this->assertSame(['manage_events'], $rights['grant']);
 
         $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['manage_penalties'])->status);
@@ -222,7 +225,7 @@ final class CapabilityOverridesTest extends TestCase
             RoleService::SETTING => $this->app->settings->get(RoleService::SETTING),
             RoleService::OVERRIDES_SETTING => $this->app->settings->get(RoleService::OVERRIDES_SETTING),
         ]));
-        $this->assertSame([Capability::Member, Capability::ManageDocuments, Capability::Calendar], $next->roles()->capabilitiesFor($this->m, Roles::MEMBER));
-        $this->assertSame([Capability::Member, Capability::Calendar], $next->roles()->capabilitiesFor($this->admin, Roles::MEMBER), 'andere Person');
+        $this->assertSame([Capability::Member, Capability::ManageDocuments, Capability::Calendar, Capability::ViewIntern], $next->roles()->capabilitiesFor($this->m, Roles::MEMBER));
+        $this->assertSame([Capability::Member, Capability::Calendar, Capability::ViewIntern], $next->roles()->capabilitiesFor($this->admin, Roles::MEMBER), 'andere Person');
     }
 }

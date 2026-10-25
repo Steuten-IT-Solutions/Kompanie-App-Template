@@ -27,6 +27,12 @@ async function adminMenu(page: Page, name: string) {
   await tiles.getByRole('button', { name, exact: true }).click();
 }
 
+/** „Intern“ (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (Mitglieder oder Dokumente). */
+async function internMenu(page: Page, name: string) {
+  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await page.getByRole('navigation', { name: 'Intern' }).getByRole('button', { name, exact: true }).click();
+}
+
 /** Bereich unter „Meins“ wählen (Burger-Menü). */
 async function meinsMenu(page: Page, name: string) {
   const nav = page.locator('.meins-menu');
@@ -591,7 +597,7 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
 test('Mitglieder (für alle): Liegt der Finger schon auf, während die Karte noch gleitet, blättert er danach weiter', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
-  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await internMenu(page, 'Mitglieder');
   await page.getByLabel('Mitglied suchen').fill('Mitglied');
   await page
     .locator('.directory .member-row', { hasText: 'Mitglied1' })
@@ -622,7 +628,7 @@ test('Mitglieder (für alle): Liegt der Finger schon auf, während die Karte noc
 test('Mitglieder (für alle): Wischen und Pfeile blättern in der Liste, „Zurück“ führt zur Liste', async ({ page }) => {
   await login(page, 'mitglied1');
   await page.evaluate(() => localStorage.removeItem('kompanie_member_sort'));
-  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await internMenu(page, 'Mitglieder');
   await page.getByLabel('Mitglied suchen').fill('Mitglied');
   await page
     .locator('.directory .member-row', { hasText: 'Mitglied1' })
@@ -896,7 +902,7 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.getByRole('button', { name: /Foto/ })).toHaveCount(0);
 
   // In der Mitgliederliste („Mitglieder“) vergrößert auch ein Mitglied ohne Verwaltungsrechte ein Foto.
-  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await internMenu(page, 'Mitglieder');
   await page.getByLabel('Mitglied suchen').fill(id);
   await page
     .locator('.directory .member-row', { hasText: 'Fiona' })
@@ -998,9 +1004,47 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
+test('Intern: Knöpfe für Mitglieder und Dokumente, „‹ Intern“ führt zurück; ohne Anmeldung Mitglieder als eigener Tab', async ({
+  page,
+}) => {
+  await login(page, 'mitglied1');
+  const tabbar = page.locator('.tabbar');
+  await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveCount(0);
+  await expect(tabbar.getByRole('button', { name: 'Dokumente' })).toHaveCount(0);
+  await tabbar.getByRole('button', { name: 'Intern' }).click();
+  await expect(page).toHaveURL(/#\/intern$/);
+  await expect(page.locator('.topbar-title')).toHaveText('Intern');
+  const tiles = page.getByRole('navigation', { name: 'Intern' });
+  await expect(tiles.getByRole('button')).toHaveText(['Mitglieder', 'Dokumente']);
+
+  await tiles.getByRole('button', { name: 'Dokumente', exact: true }).click();
+  await expect(page).toHaveURL(/#\/dokumente$/);
+  await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: '‹ Intern' }).click();
+  await tiles.getByRole('button', { name: 'Mitglieder', exact: true }).click();
+  await expect(page).toHaveURL(/#\/mitglieder$/);
+  await expect(page.locator('.directory .member-row').first()).toBeVisible();
+  await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: '‹ Intern' }).click();
+  await expect(page).toHaveURL(/#\/intern$/);
+
+  // Ohne Anmeldung nur die Mitglieder: kein „Intern“, die Mitglieder stehen unten als eigener Tab.
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveCount(0);
+  await tabbar.getByRole('button', { name: 'Mitglieder' }).click();
+  await expect(page).toHaveURL(/#\/mitglieder$/);
+  await expect(page.locator('.directory .member-row').first()).toBeVisible();
+  await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: '‹ Intern' })).toHaveCount(0);
+  // Auch ein Link auf #/intern führt Gäste nicht auf eine leere Seite.
+  await page.goto('/app/#/intern');
+  await expect(page.locator('.admin-tiles')).toHaveCount(0);
+});
+
 test('Mitgliederliste: Mitglied sieht alle Mitglieder mit Suche, ohne Punkte oder Rollen', async ({ page }) => {
   await login(page, 'mitglied1');
-  await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+  await internMenu(page, 'Mitglieder');
   await expect(page.locator('.topbar-title')).toHaveText('Mitglieder');
   const list = page.locator('.directory .card-list');
   await expect(list.locator('.member-row', { hasText: 'Mitglied2' })).toBeVisible();
@@ -2101,7 +2145,7 @@ test.describe('Vorabladen (Issue #104)', () => {
       await expect(page.locator('.news-card').first()).toBeVisible({ timeout: 1500 });
       await tabbar.getByRole('button', { name: 'Galerie' }).click();
       await expect(page.locator('.album-card').first()).toBeVisible({ timeout: 1500 });
-      await tabbar.getByRole('button', { name: 'Dokumente' }).click();
+      await internMenu(page, 'Dokumente');
       await expect(page.locator('.doc-group, .empty').first()).toBeVisible({ timeout: 1500 });
       await expect(page.locator('.loading, .skeleton')).toHaveCount(0);
     } finally {
@@ -3450,7 +3494,7 @@ test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gem
       '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
   );
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await internMenu(page, 'Dokumente');
   await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
   await page.getByLabel('Neue Kategorie').fill(`Satzungen ${id}`);
   await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
@@ -3464,7 +3508,7 @@ test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gem
 
   await login(page, 'mitglied1');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
-  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await internMenu(page, 'Dokumente');
   const group = page.locator('.doc-group', { hasText: `Satzungen ${id}` });
   const doc = group.locator('.doc-card', { hasText: `Satzung ${id}` });
   await expect(group.getByRole('button', { name: `Satzungen ${id} (1)` })).toHaveAttribute('aria-expanded', 'false');
@@ -3496,7 +3540,7 @@ test('Dokumente: Kategorien per Ziehen am Griff umsortieren, bleibt nach dem Neu
   const id = Date.now().toString(36);
   const names = ['A', 'B', 'C'].map((n) => `Ordner ${n} ${id}`);
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await internMenu(page, 'Dokumente');
   await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
   for (const name of names) {
     await page.getByLabel('Neue Kategorie').fill(name);
@@ -3552,7 +3596,7 @@ test('PDF: Seiten erst zeichnen, wenn sie ins Bild scrollen, als JPEG', async ({
     };
   });
   await login(page, 'admin', ADMIN_PASSWORD);
-  await page.locator('.tabbar').getByRole('button', { name: 'Dokumente' }).click();
+  await internMenu(page, 'Dokumente');
   await page.getByRole('button', { name: 'Dokumente verwalten' }).click();
   await page.getByLabel('Datei').setInputFiles({ name: 'lang.pdf', mimeType: 'application/pdf', buffer: pdf });
   await page.getByLabel('Titel').fill(`Langes Dokument ${id}`);

@@ -57,6 +57,7 @@ final class Roles
     public const GRANTABLE = [
         Capability::Member,
         Capability::Calendar,
+        Capability::ViewIntern,
         Capability::ManagePoints,
         Capability::ManagePenalties,
         Capability::ManageRanks,
@@ -89,15 +90,19 @@ final class Roles
     }
 
     /**
-     * Der Mitgliederbereich schließt den internen Kalender ein.
+     * Der Mitgliederbereich schließt den internen Kalender und den Bereich „Intern“ ein (Capability::withoutMember).
      *
      * @param Capability[] $caps
      * @return Capability[]
      */
     public static function withImplied(array $caps): array
     {
-        if (in_array(Capability::Member, $caps, true) && !in_array(Capability::Calendar, $caps, true)) {
-            $caps[] = Capability::Calendar;
+        if (in_array(Capability::Member, $caps, true)) {
+            foreach (Capability::withoutMember() as $implied) {
+                if (!in_array($implied, $caps, true)) {
+                    $caps[] = $implied;
+                }
+            }
         }
         return $caps;
     }
