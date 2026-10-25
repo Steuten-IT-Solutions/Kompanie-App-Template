@@ -460,6 +460,14 @@ Der Kern enthält **eine Routentabelle**. WordPress registriert sie unter `/wp-j
 - **Push-Versand:** parallel (`ExtendedHttpClient::requestAll`), das VAPID-Token einmal je Push-Dienst und Lauf, Zustellung je Durchgang mit einem `UPDATE` vermerkt. Die App fragt beim Start nur nach dem Abo (`POST …/push/status`), wenn sich Push-Adresse oder Konto geändert haben, sonst einmal je Woche (`pushCheck.ts`).
 - **`sw.js` über PHP** (WordPress immer, eigenständig nur ohne statische Auslieferung): mit ETag, meist 304.
 
+### Lizenzen (Issue #173)
+
+Die App steht unter GPL-2.0-or-later (`LICENSE`). Beim Bauen erfasst `packages/frontend/build/licenses.ts` die
+Drittanbieter-Bausteine, die tatsächlich in der App stecken, prüft ihre Lizenz gegen die Positivliste und schreibt
+`THIRD-PARTY-NOTICES.txt` (kommt mit `LICENSE` in beide Pakete) und die Daten der Seite *Hilfe → Lizenzen*. Ein
+Baustein ohne oder mit nicht erlaubter Lizenz (GPL, AGPL, proprietär) bricht den Build ab. Einzelheiten und
+Begründung: [LIZENZEN.md](LIZENZEN.md).
+
 ### Handbuch
 
 Die Seiten stehen in `docs/handbuch/*.md`, mit Kopfbereich (Titel, Reihenfolge, Rechte, `einrecht` für Bildschirme, die man mit einem von mehreren Rechten sieht, Bereiche, Variante) und Platzhaltern für die Bezeichnungen der Kompanie (`{bereich.points}`, `{rolle.member}` …). `scripts/handbuch.php` prüft sie (`--check`), erzeugt die Daten für die Hilfe in der App (`--app`) und die statischen Seiten für GitHub Pages (`--site`). Die App zeigt nur Seiten, die zu Rechten, eingeschalteten Bereichen und Variante passen.

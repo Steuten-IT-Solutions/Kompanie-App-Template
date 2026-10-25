@@ -17,6 +17,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Lizenzen**: Unter *Hilfe → Lizenzen* steht, unter welcher Lizenz die App steht (GPL-2.0-or-later), wo es den
+  vollständigen Quellcode gibt und welche Bausteine anderer Anbieter in der App enthalten sind, jeweils mit ihrer
+  Lizenz. Beide Pakete enthalten dazu die Dateien `LICENSE` und `THIRD-PARTY-NOTICES.txt`.
 - **Benachrichtigung öffnet den Eintrag**: Wer auf eine Benachrichtigung zu einem Termin tippt, landet direkt bei
   diesem Termin. Die Terminliste scrollt dorthin, klappt ihn auf und hebt ihn kurz hervor. Das gilt auch für die
   Erinnerung an einen einzelnen Termin am nächsten Tag, für Nachrichten am Schwarzen Brett sowie für eigene Punkte und
