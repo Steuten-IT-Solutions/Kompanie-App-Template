@@ -354,7 +354,7 @@ test('Mitglied: Wischen blättert in der Liste, nicht aber in einem offenen Fens
   // keine Einträge im Verlauf an).
   await memberPenalties(page);
   await expect(page).toHaveURL(/\/strafen$/);
-  // Nach links: Nach rechts ginge Chromium hier manchmal selbst im Verlauf zurück (Wisch-Geste des Browsers, trotz
+  // Nach links: Nach rechts ginge Chromium hier manchmal selbst im Verlauf zurück (ohne Aufruf aus der App, trotz
   // overscroll-behavior-x im Fenster), und der Test wäre zufällig rot. Nach links gibt es keinen Eintrag, zu dem er vorgehen
   // könnte; blätterte die App, stünde hier Mitglied1.
   await swipe(page, -200);
