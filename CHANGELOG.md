@@ -222,6 +222,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Mitglieds in der Verwaltung beginnt das Laden schon beim Berühren. So erscheinen die Seiten meist sofort statt mit
   „Lädt …“. Vorab geladen werden nur Daten, keine Bilder oder Dokumente; im Datensparmodus des Handys, bei langsamem
   Netz, in der Vorschau „App als Rolle ansehen“ und im Wartungsmodus lädt die App nichts im Voraus.
+- **Anwesenheitsliste ohne Rollen-Abzeichen**: Hinter den Namen stehen keine Rollen (etwa Admin, Vorstand, Gast) mehr,
+  wie überall sonst in der App auch.
 
 ### Behoben
 
