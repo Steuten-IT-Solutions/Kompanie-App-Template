@@ -1283,6 +1283,26 @@ button:focus-visible {
   margin: 0;
   font-weight: 600;
 }
+.phone-row {
+  display: flex;
+  gap: 8px;
+}
+.phone-row select {
+  width: auto;
+  flex: 0 1 auto;
+  max-width: 48%;
+}
+.phone-row input {
+  flex: 1;
+  min-width: 0;
+}
+.field-note {
+  margin: 0;
+  font-size: 0.85rem;
+}
+input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
 
 .picker {
   border: 1.5px solid var(--line-strong);

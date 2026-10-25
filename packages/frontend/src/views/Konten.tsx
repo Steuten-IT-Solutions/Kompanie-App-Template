@@ -4,7 +4,9 @@ import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
-import { Loading, NameFields, trimName, useAsync } from '../ui';
+import { EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
+import { normalizeEmail } from '../email';
+import { normalizePhone } from '../phone';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 
@@ -165,7 +167,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       people.push({
         ...name,
         ...(r.username?.trim() ? { username: r.username.trim() } : {}),
-        ...(r.email?.trim() ? { email: r.email.trim() } : {}),
+        ...(r.email && normalizeEmail(r.email) ? { email: normalizeEmail(r.email) } : {}),
         ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
         ...(bday ? { birthday: birthdayString(bday) } : {}),
       });
@@ -236,10 +238,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
                 onChange={(e) => update(i, { username: e.target.value })}
               />
             </label>
-            <label className="field">
-              <span>E-Mail (optional)</span>
-              <input type="email" autoComplete="off" value={r.email} onChange={(e) => update(i, { email: e.target.value })} />
-            </label>
+            <EmailField value={r.email ?? ''} onChange={(email) => update(i, { email })} />
           </div>
           {points && (
             <label className="field">
@@ -335,8 +334,8 @@ export function AccountPanel({
       setData(
         await api.updateAccount(id, {
           ...trimName(editing),
-          email: editing.email.trim(),
-          phone: editing.phone.trim(),
+          email: normalizeEmail(editing.email),
+          phone: normalizePhone(editing.phone),
           ...(p.can_change_login ? { username: editing.login.trim() } : {}),
         }),
       );
@@ -388,19 +387,8 @@ export function AccountPanel({
           ) : (
             <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
           )}
-          <label className="field">
-            <span>E-Mail (optional)</span>
-            <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
-          </label>
-          <label className="field">
-            <span>Handynummer (optional)</span>
-            <input
-              type="tel"
-              autoComplete="off"
-              value={editing.phone}
-              onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
-            />
-          </label>
+          <EmailField value={editing.email} onChange={(email) => setEditing({ ...editing, email })} />
+          <PhoneField value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
           {formError && (
             <p className="form-error" role="alert">
               {formError}

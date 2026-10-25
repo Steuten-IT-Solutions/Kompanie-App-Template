@@ -25,6 +25,7 @@ import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
   DateRow,
   emptyName,
+  EmailField,
   Empty,
   ErrorBox,
   FoldSection,
@@ -36,6 +37,7 @@ import {
   trimName,
   useAsync,
 } from '../ui';
+import { normalizeEmail } from '../email';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import { prefetchOnTap, sources } from '../viewData';
 import { PersonName, PersonSkeleton } from '../skeleton';
@@ -1285,7 +1287,7 @@ function NewMember() {
         await api.createUser({
           ...trimName(name),
           ...(username.trim() ? { username: username.trim() } : {}),
-          ...(email.trim() ? { email: email.trim() } : {}),
+          ...(normalizeEmail(email) ? { email: normalizeEmail(email) } : {}),
           level,
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
@@ -1349,10 +1351,7 @@ function NewMember() {
           onChange={(e) => setUsername(e.target.value)}
         />
       </label>
-      <label className="field">
-        <span>E-Mail (optional)</span>
-        <input type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
-      </label>
+      <EmailField value={email} onChange={setEmail} />
       <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>

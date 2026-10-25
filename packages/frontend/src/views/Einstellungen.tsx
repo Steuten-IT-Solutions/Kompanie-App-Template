@@ -13,7 +13,8 @@ import {
   type MailSettings,
   type NewsSourceType,
 } from '../api';
-import { ErrorBox, Loading, useAsync } from '../ui';
+import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
+import { normalizeEmail } from '../email';
 import Neuerungen from './Neuerungen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
@@ -254,6 +255,7 @@ function MailForm({
       () =>
         api.updateMailSettings({
           ...rest,
+          from: normalizeEmail(rest.from),
           port: Number(port),
           batch_size: Number(batch_size),
           batch_pause: Number(batch_pause),
@@ -279,17 +281,13 @@ function MailForm({
           {settings.unavailable}
         </p>
       )}
-      <label className="field">
-        <span>Kompanieadresse (Absender)</span>
-        <input
-          type="email"
-          className="mail-from"
-          value={form.from}
-          onChange={set('from')}
-          placeholder="info@beispiel.de"
-          autoComplete="off"
-        />
-      </label>
+      <EmailField
+        label="Kompanieadresse (Absender)"
+        className="mail-from"
+        value={form.from}
+        onChange={(from) => setForm({ ...form, from })}
+        placeholder="info@beispiel.de"
+      />
       <label className="field">
         <span>Absendername</span>
         <input value={form.from_name} onChange={set('from_name')} placeholder={settings.from_name_default} />
@@ -361,17 +359,14 @@ function MailForm({
               Verbindung prüfen
             </button>
           </div>
-          <label className="field">
-            <span>Testmail an (leer: deine eigene Adresse)</span>
-            <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} />
-          </label>
+          <EmailField label="Testmail an (leer: deine eigene Adresse)" value={testTo} onChange={setTestTo} />
           <button
             type="button"
             className="btn btn-secondary mail-test"
             disabled={busy}
             onClick={() =>
               void run(
-                () => api.testMail(testTo.trim() || undefined),
+                () => api.testMail(normalizeEmail(testTo) || undefined),
                 (r) => setMessage({ ok: r.sent, text: r.message }),
               )
             }

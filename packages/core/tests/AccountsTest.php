@@ -8,7 +8,10 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\Storage\Sql\Migrations;
+use KompanieApp\Core\Storage\Sql\Migrator;
 use KompanieApp\Core\Tests\Support\FakeUsers;
+use KompanieApp\Core\Tests\Support\MemorySettings;
 use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\TestCase;
 
@@ -230,5 +233,48 @@ final class AccountsTest extends TestCase
         // Zwei gleiche Namen ohne Benutzernamen: verschiedene Benutzernamen.
         $res = $this->call('POST', '/users/bulk', ['people' => [['name' => 'Dora'], ['name' => 'Dora']]]);
         $this->assertSame(['dora', 'dora2'], array_column($res->data, 'username'));
+    }
+
+    /** Datenbankversion 34 (SQLite und MySQL): Handynummern wie +491716438655 so schreiben, wie die App sie jetzt speichert. */
+    public function testMigrationFormatsPhoneNumbers(): void
+    {
+        $cases = [
+            '' => '',
+            '+491716438655' => '+49 171 6438655',
+            '+4915123456789' => '+49 1512 3456789',
+            '+4916012345678' => '+49 160 12345678',
+            '+49284112345' => '+49 284112345',
+            '+436641234567' => '+43 6641234567',
+            '+352621123456' => '+352 621123456',
+            '+420601123456' => '+420 601123456',
+            '+31612345678' => '+31 612345678',
+            // Unbekannte Ländervorwahl, schon mit Leerzeichen oder ohne +: unverändert
+            '+12125550100' => '+12125550100',
+            '+49 171 6438655' => '+49 171 6438655',
+            '0171 1234567' => '0171 1234567',
+        ];
+        foreach (['sqlite', getenv('KOMPANIE_TEST_MYSQL') ? 'mysql' : null] as $driver) {
+            if ($driver === null) {
+                continue;
+            }
+            $db = TestApp::connection($driver);
+            try {
+                $settings = new MemorySettings();
+                (new Migrator($db, $settings, array_filter(Migrations::all(), static fn (int $v): bool => $v < 34, ARRAY_FILTER_USE_KEY)))->migrate();
+                $id = 1;
+                foreach (array_keys($cases) as $phone) {
+                    $db->insert('member_contacts', ['user_id' => $id++, 'phone' => (string) $phone, 'updated_at' => '2026-01-01 00:00:00']);
+                }
+                (new Migrator($db, $settings))->migrate();
+                $this->assertSame(Migrations::latest(), (new Migrator($db, $settings))->current(), $driver);
+                $this->assertSame(
+                    array_values($cases),
+                    array_map('strval', array_column($db->select('SELECT phone FROM {member_contacts} ORDER BY user_id'), 'phone')),
+                    $driver,
+                );
+            } finally {
+                TestApp::dropTables($db);
+            }
+        }
     }
 }

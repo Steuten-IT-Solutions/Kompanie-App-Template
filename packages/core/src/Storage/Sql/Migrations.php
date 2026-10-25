@@ -1399,7 +1399,41 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {attachments}_owner ON {attachments} (owner_type, owner_id)',
                 ],
             ],
+            // Handynummern einheitlich schreiben wie die App sie jetzt speichert (packages/frontend/src/phone.ts):
+            // +491716438655 → +49 171 6438655. Nur Nummern aus + und Ziffern; was schon Leerzeichen hat, bleibt.
+            34 => self::phoneFormat(),
         ];
+    }
+
+    /**
+     * Anweisungen für Version 34: Leerzeichen nach der Ländervorwahl (Länder der Auswahl in phone.ts), bei deutschen
+     * Handynummern auch nach der Netzvorwahl (015x vierstellig, 016x und 017x dreistellig). Dreistellige Vorwahlen zuerst;
+     * jede Nummer wird nur einmal umgeschrieben, weil danach ein Leerzeichen darin steht.
+     *
+     * @return array{mysql: string[], sqlite: string[]}
+     */
+    private static function phoneFormat(): array
+    {
+        // Nur Ziffern nach dem +
+        $mysqlOnly = "phone REGEXP '^[+][0-9]+$'";
+        $sqliteOnly = "phone GLOB '+[0-9]*' AND substr(phone, 2) NOT GLOB '*[^0-9]*'";
+        $sql = ['mysql' => [], 'sqlite' => []];
+        // Deutsche Handynummern: Netzvorwahl mit $net Stellen, danach mindestens eine Ziffer
+        foreach ([['15', 4], ['16', 3], ['17', 3]] as [$prefix, $net]) {
+            $rest = 4 + $net;
+            $sql['mysql'][] = "UPDATE {member_contacts} SET phone = CONCAT('+49 ', SUBSTRING(phone, 4, $net), ' ', SUBSTRING(phone, $rest))"
+                . " WHERE $mysqlOnly AND phone LIKE '+49$prefix%' AND CHAR_LENGTH(phone) >= $rest";
+            $sql['sqlite'][] = "UPDATE {member_contacts} SET phone = '+49 ' || substr(phone, 4, $net) || ' ' || substr(phone, $rest)"
+                . " WHERE $sqliteOnly AND phone LIKE '+49$prefix%' AND length(phone) >= $rest";
+        }
+        foreach (['352', '420', '49', '43', '41', '31', '32', '33', '45', '48', '39', '34', '44', '90'] as $code) {
+            $rest = strlen($code) + 2;
+            $sql['mysql'][] = "UPDATE {member_contacts} SET phone = CONCAT('+$code ', SUBSTRING(phone, $rest))"
+                . " WHERE $mysqlOnly AND phone LIKE '+$code%' AND CHAR_LENGTH(phone) >= $rest";
+            $sql['sqlite'][] = "UPDATE {member_contacts} SET phone = '+$code ' || substr(phone, $rest)"
+                . " WHERE $sqliteOnly AND phone LIKE '+$code%' AND length(phone) >= $rest";
+        }
+        return $sql;
     }
 
     public static function latest(): int

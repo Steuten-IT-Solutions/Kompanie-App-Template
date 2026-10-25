@@ -135,6 +135,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **E-Mail-Adressen und Handynummern einfacher eingeben**: Alle Felder dafür öffnen auf dem Handy die passende
+  Tastatur (E-Mail mit @, Handynummer als Zahlenblock) und lassen Großschreibung und Autokorrektur weg. Die App glättet
+  die Eingabe selbst: Leerzeichen, „mailto:“ oder „Name <adresse>“ aus kopiertem Text verschwinden, „GMX,de“ wird
+  „gmx.de“. Was noch nicht stimmt (z. B. fehlendes @ oder fehlende Endung), steht direkt unter dem Feld; bei vertippten
+  Anbietern wie „gmial.com“ schlägt sie die richtige Adresse zum Antippen vor. Bei der Handynummer wählt ihr die
+  Ländervorwahl (vorgegeben +49) und tippt die Nummer wie gewohnt, z. B. 0171 1234567. Gespeichert wird sie einheitlich
+  als +49 171 1234567; vorhandene Nummern wie +491716438655 schreibt das Update in diese Form um.
 - **Neuer Bereich „Intern“ mit eigenem Recht**: Mitglieder und Dokumente stehen unten nicht mehr als eigene Knöpfe,
   sondern gesammelt unter **Intern**, für alle mit dem neuen Recht **Intern**. Die Seite zeigt wie die Verwaltung je
   Bereich einen Knopf; **‹ Intern** führt zurück. Mitglieder haben das Recht immer (es gehört zum Mitgliederbereich);

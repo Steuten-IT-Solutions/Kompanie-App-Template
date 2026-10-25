@@ -643,7 +643,7 @@ ki_page('Installation', ($err !== '' ? '<div class="error">' . ki_h($err) . '</d
         . '<h2 style="margin-top:20px">Erster Admin</h2>'
         . '<label for="name">Name</label><input id="name" name="name" value="' . ki_h(ki_post('name')) . '" required autocomplete="name">'
         . '<label for="login">Benutzername</label><input id="login" name="login" value="' . ki_h(ki_post('login')) . '" required autocomplete="username" pattern="[A-Za-z0-9._@\-]{2,60}">'
-        . '<label for="email">E-Mail (optional)</label><input id="email" name="email" type="email" value="' . ki_h(ki_post('email')) . '" autocomplete="email">'
+        . '<label for="email">E-Mail (optional)</label><input id="email" name="email" type="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" value="' . ki_h(ki_post('email')) . '" autocomplete="email">'
         . '<label for="password">Passwort (mindestens 10 Zeichen)</label><input id="password" name="password" type="password" minlength="10" required autocomplete="new-password">'
         . '<label for="password2">Passwort wiederholen</label><input id="password2" name="password2" type="password" minlength="10" required autocomplete="new-password">'
         . '<details' . ($sqlite ? '' : ' open') . '><summary>Datenbank' . ($sqlite ? ' (wird automatisch angelegt)' : '') . '</summary>'
