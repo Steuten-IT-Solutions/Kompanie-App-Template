@@ -26,6 +26,8 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.points} +**. Mi
 3. Kreuze die Mitglieder an. Bei vielen Namen hilft die Suche; **Alle** kreuzt alle gefundenen an.
 4. Tippe auf **{bereich.points} vergeben**. Unten erscheint kurz, wie viele Mitglieder die {bereich.points} bekommen haben.
 
+Darfst du auch {bereich.ranks} verwalten (und die Kompanie nutzt {bereich.ranks}), prüft die App gleich danach, wer durch die Buchung neu die {bereich.points}schwelle für eine Beförderung erreicht hat. Oben in der Verwaltung steht dann je Mitglied, für welchen {begriff.rank} die Schwelle erreicht ist. Mit **Zu den Beförderungen** kommst du direkt zu **Beförderungen**, mit **Schließen** verschwindet der Hinweis.
+
 ![Formular mit Vorlage und zwei ausgewählten Mitgliedern](bild:punkte-vergeben-ausgefuellt)
 
 ### {bereich.points} abziehen

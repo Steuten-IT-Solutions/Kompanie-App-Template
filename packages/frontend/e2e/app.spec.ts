@@ -3237,22 +3237,46 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(tiles.getByRole('button', { name: 'Dienstgrade', exact: true })).toHaveCount(0);
   await expect(tiles.locator('li').nth(-2)).toHaveText('Einrichtungen');
   await expect(tiles.locator('li').last()).toHaveText('Einstellungen');
+  // Zahl im Kreis an der Kachel „Beförderungen“: wie viele schon zur Beförderung bereit sind (Testdaten).
+  const dueNow = () =>
+    page.evaluate(async () => {
+      const c = window.KOMPANIE_CONFIG!;
+      const list = await (
+        await fetch(c.apiBase + 'promotions', { credentials: 'same-origin', headers: { [c.csrf.header]: c.csrf.token } })
+      ).json();
+      return list.filter(
+        (p: { next_rank: unknown; points_to_next: number | null }) => p.next_rank && p.points_to_next !== null && p.points_to_next <= 0,
+      ).length as number;
+    });
+  const badge = tiles.getByRole('button', { name: 'Beförderungen', exact: true }).locator('.count-badge');
+  const dueBefore = await dueNow();
+  if (dueBefore) await expect(badge).toHaveText(String(dueBefore));
+  else await expect(badge).toHaveCount(0);
 
-  // Punkte für mitglied2 buchen, dann befördern.
+  // Punkte für mitglied2 im Formular vergeben: Hinweis, dass mitglied2 die Schwelle neu erreicht hat; die Zahl an der
+  // Kachel steigt um eins.
   await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   const id = Number(page.url().split('/').pop());
-  await page.evaluate(async (userId) => {
-    const c = window.KOMPANIE_CONFIG!;
-    await fetch(c.apiBase + 'points', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', [c.csrf.header]: c.csrf.token },
-      body: JSON.stringify({ user_ids: [userId], points: 12, reason: 'E2E Dienstgrad' }),
-    });
-  }, id);
-  // Aus „Beförderungen“ direkt zum Dienstgrad des Mitglieds, der nächste Dienstgrad ist vorgeschlagen.
-  await page.goto('/app/#/verwaltung/befoerderungen');
+  await page.goto(`/app/#/verwaltung/punkte/${id}`);
+  await page.getByLabel('Punkte', { exact: true }).fill('12');
+  await page.getByLabel('Grund').fill('E2E Dienstgrad');
+  await page.locator('form').getByRole('button', { name: 'Punkte vergeben' }).click();
+  await expect(page.locator('.toast')).toContainText('vergeben');
+  const notice = page.locator('.notice-card');
+  await expect(notice).toContainText('Neue Beförderungsschwelle erreicht');
+  await expect(notice).toContainText('Mitglied2: Schwelle für „Gefreiter“ erreicht');
+  await page.getByRole('button', { name: '‹ Verwaltung' }).click();
+  await expect(notice).toBeVisible();
+  await expect(badge).toHaveText(String(dueBefore + 1));
+  await shot(page, 'befoerderung-schwelle-erreicht');
+  await badge.scrollIntoViewIfNeeded();
+  await shot(page, 'befoerderung-kachel');
+
+  // Aus dem Hinweis zu „Beförderungen“, von dort direkt zum Dienstgrad des Mitglieds, der nächste Dienstgrad ist vorgeschlagen.
+  await notice.getByRole('button', { name: 'Zu den Beförderungen' }).click();
+  await expect(page).toHaveURL(/#\/verwaltung\/befoerderungen$/);
+  await expect(notice).toHaveCount(0);
   await page.locator('.promotions .row', { hasText: 'Mitglied2' }).click();
   await expect(page).toHaveURL(new RegExp(`#/verwaltung/mitglied/${id}/dienstgrad$`));
   await expect(page.getByLabel('Neuer Dienstgrad').locator('option:checked')).toHaveText('Gefreiter (ab 10)');
@@ -3262,6 +3286,8 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
   await expect(page.getByText('Beförderung: kein Dienstgrad → Gefreiter')).toBeVisible();
   await expect(page.locator('.member-rank strong')).toHaveText('Gefreiter');
+  // Befördert: an der Kachel wieder einer weniger.
+  expect(await dueNow()).toBe(dueBefore);
   // Über einen Link geöffnet: Schließen bleibt auf der Seite des Mitglieds; das Abzeichen öffnet das Fenster wieder.
   await page.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click();
   await expect(page).toHaveURL(new RegExp(`#/verwaltung/mitglied/${id}$`));
