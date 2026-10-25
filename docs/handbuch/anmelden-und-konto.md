@@ -13,12 +13,18 @@ Ohne Anmeldung siehst du alles, was öffentlich ist, z. B. die öffentlichen {be
 ## Dein Konto
 Bist du angemeldet, steht oben rechts **Konto**. Dort findest du:
 - deinen Namen und deine Rolle, z. B. {rolle.member} oder {rolle.candidate}, und dein Foto, wenn jemand eines hochgeladen hat (ändern kann es, wer Mitglieder anlegt),
+- die Karte **Kontakt** mit deiner E-Mail-Adresse und Handynummer, siehe unten,
 - als {rolle.member} die Karte **Geburtstag**, wenn die Kompanie {bereich.birthdays} nutzt,
 - **Benachrichtigungen einstellen**, siehe [Benachrichtigungen](seite:benachrichtigungen),
 - **App installieren**, solange du die App im Browser benutzt, siehe [Die App aufs Handy holen](seite:app-installieren),
 - **Passwort ändern** und **Abmelden**.
 
 Die Einstellungen der App finden {rolle.admin}s nicht hier, sondern in der **Verwaltung**.
+
+## E-Mail-Adresse und Handynummer
+Unter **Konto → Kontakt** siehst du, welche E-Mail-Adresse und Handynummer die Kompanie von dir hat. **Ändern** tippen, die neuen Angaben eintragen und **Speichern** tippen; ein leeres Feld entfernt die Angabe. Die Handynummer darf Ziffern, Leerzeichen und + ( ) / - enthalten, z. B. +49 171 1234567.
+
+Für eine neue E-Mail-Adresse fragt die App zur Sicherheit nach deinem aktuellen Passwort. Sehen können beides nur du und wer Mitglieder anlegen darf.
 
 ## Passwort ändern
 Unter **Konto → Passwort ändern** das aktuelle Passwort und zweimal das neue eingeben (mindestens 8 Zeichen, anders als das bisherige) und **Passwort ändern** tippen. Du bleibst auf diesem Gerät angemeldet, alle anderen Geräte werden abgemeldet.

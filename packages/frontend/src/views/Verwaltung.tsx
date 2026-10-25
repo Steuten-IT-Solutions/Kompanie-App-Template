@@ -10,6 +10,7 @@ import {
   type CreatedUser,
   type Level,
   type MemberSummary,
+  type OpenPenalty,
 } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, parseEuroToCents, todayYmd } from '../format';
@@ -78,6 +79,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
         <GivePoints key={path.join('/')} preselect={preselect} onToast={onToast} />
+      ) : active === 'strafe' && arg === 'offen' ? (
+        <OpenPenalties onToast={onToast} />
       ) : active === 'strafe' ? (
         <GivePenalty key={path.join('/')} preselect={preselect} onToast={onToast} />
       ) : active === 'katalog' ? (
@@ -1073,7 +1076,13 @@ function GivePenalty({
   return (
     <form className="form" onSubmit={submit}>
       {!attendance && totalOpen !== undefined && (
-        <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(totalOpen)} tone={totalOpen > 0 ? 'warn' : 'good'} />
+        <StatCard
+          label={`Offen gesamt: ${sec.penalties}`}
+          value={formatEuro(totalOpen)}
+          tone={totalOpen > 0 ? 'warn' : 'good'}
+          onClick={totalOpen > 0 ? () => navigate('verwaltung/strafe/offen') : undefined}
+          action="Alle offenen ansehen"
+        />
       )}
       <div className="field-row">
         <label className="field">
@@ -1109,6 +1118,76 @@ function GivePenalty({
         {busy ? 'Speichert …' : 'Eintragen'}
       </button>
     </form>
+  );
+}
+
+/**
+ * Alle offenen Strafen (hinter der Karte „Offen gesamt“), nach Personen gruppiert. Wie die Karte nur Mitglieder und
+ * Anwärter, ohne Gast-Konten, damit die Summen übereinstimmen.
+ */
+function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload } = useAsync(() => Promise.all([api.openPenalties(), api.members(false, true)]));
+  const [busy, setBusy] = useState(false);
+
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const [penalties, members] = data!;
+  const names = new Map(members.filter((m) => m.level !== 'guest').map((m) => [m.id, m.name]));
+  const groups = new Map<number, OpenPenalty[]>();
+  for (const p of penalties) {
+    if (names.has(p.user_id)) groups.set(p.user_id, [...(groups.get(p.user_id) ?? []), p]);
+  }
+  const people = [...groups.entries()].sort(([a], [b]) => (names.get(a) ?? '').localeCompare(names.get(b) ?? '', 'de'));
+  const sum = (list: OpenPenalty[]) => list.reduce((s, p) => s + p.amount_cents, 0);
+  const total = people.reduce((s, [, list]) => s + sum(list), 0);
+
+  async function paid(p: OpenPenalty) {
+    setBusy(true);
+    try {
+      await api.setPenaltyStatus(p.id, 'paid');
+      onToast('Als bezahlt markiert');
+      reload();
+    } catch (e) {
+      onToast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <button className="btn btn-link back" onClick={() => navigate('verwaltung/strafe')}>
+        ‹ {sec.penalties} eintragen
+      </button>
+      <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(total)} tone={total > 0 ? 'warn' : 'good'} />
+      {people.length === 0 ? (
+        <Empty>Keine offenen Einträge.</Empty>
+      ) : (
+        people.map(([id, list]) => (
+          <section key={id} className="open-penalties">
+            <h3 className="open-penalties-head">
+              <button className="btn btn-link" onClick={() => navigate(`verwaltung/mitglied/${id}/strafen`)}>
+                {names.get(id)}
+              </button>
+              <span className="neg">{formatEuro(sum(list))}</span>
+            </h3>
+            <ul className="card-list">
+              {list.map((p) => (
+                <PenaltyRow
+                  key={p.id}
+                  p={p}
+                  actions={
+                    <button className="btn btn-small" disabled={busy} onClick={() => paid(p)}>
+                      Bezahlt
+                    </button>
+                  }
+                />
+              ))}
+            </ul>
+          </section>
+        ))
+      )}
+    </div>
   );
 }
 

@@ -25,6 +25,15 @@ final class PenaltyRepository
         );
     }
 
+    /** @return array<int, array<string, mixed>> alle offenen, neueste zuerst */
+    public function open(): array
+    {
+        return $this->db->select(
+            'SELECT * FROM {penalties} WHERE status = ? AND deleted_at IS NULL ORDER BY entry_date DESC, id DESC',
+            [self::OPEN],
+        );
+    }
+
     public function openCents(int $userId): int
     {
         return (int) $this->db->scalar(

@@ -790,6 +790,25 @@ final class Migrations
 )',
                 ],
             ],
+            // Kontaktangaben, die es in den Benutzerkonten nicht gibt: die Handynummer, die jede Person unter Meins → Konto
+            // selbst pflegt. Eine Zeile je Konto; UserData::purge löscht sie mit dem Konto, die Sicherung enthält sie.
+            17 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {member_contacts} (
+  user_id bigint(20) unsigned NOT NULL,
+  phone varchar(30) NOT NULL DEFAULT \'\',
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {member_contacts} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  phone TEXT NOT NULL DEFAULT \'\',
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

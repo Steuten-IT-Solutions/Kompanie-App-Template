@@ -53,6 +53,7 @@ use KompanieApp\Core\Push\PushTriggers;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
+use KompanieApp\Core\Storage\MemberContactRepository;
 use KompanieApp\Core\Storage\MemberRoleRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
@@ -465,7 +466,7 @@ final class App
 
     public function members(): MemberService
     {
-        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache, $this->roles()));
+        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache, $this->roles(), new MemberContactRepository($this->db), $this->time()));
     }
 
     public function roles(): RoleService

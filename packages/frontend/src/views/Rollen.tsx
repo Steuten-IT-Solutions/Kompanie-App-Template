@@ -241,7 +241,7 @@ function RoleForm({
         <span>Name der Rolle</span>
         <input type="text" maxLength={30} value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
       </label>
-      {fixed ? (
+      {fixed && (
         <p className="small muted">
           {role?.key === 'admin'
             ? 'Admins dürfen alles; das lässt sich nicht ändern.'
@@ -251,22 +251,26 @@ function RoleForm({
                 ? `Sieht den internen Kalender, aber nicht den Mitgliederbereich. Wer Mitglieder anlegen darf, nimmt sie als „${levelLabel('member')}“ auf; die Rechte lassen sich nicht ändern.`
                 : 'Gäste sehen nur öffentliche Inhalte; das lässt sich nicht ändern.'}
         </p>
-      ) : (
-        <fieldset className="feature-list">
-          <legend className="field-label">Rechte</legend>
-          {CAPABILITIES.map((c) => (
-            <label key={c.key} className="toggle feature-toggle">
-              <input
-                type="checkbox"
-                checked={capabilities.includes(c.key) || (c.key === 'calendar' && capabilities.includes('member'))}
-                disabled={c.key === 'calendar' && capabilities.includes('member')}
-                onChange={(e) => toggle(c.key, e.target.checked)}
-              />
-              <span>{c.label}</span>
-            </label>
-          ))}
-        </fieldset>
       )}
+      {/* Feste Rollen: dieselben Haken zum Nachsehen, aber nicht änderbar (Admins haben alle). */}
+      <fieldset className="feature-list" disabled={fixed}>
+        <legend className="field-label">Rechte</legend>
+        {CAPABILITIES.map((c) => (
+          <label key={c.key} className="toggle feature-toggle">
+            <input
+              type="checkbox"
+              checked={
+                (fixed && role?.key === 'admin') ||
+                capabilities.includes(c.key) ||
+                (c.key === 'calendar' && capabilities.includes('member'))
+              }
+              disabled={fixed || (c.key === 'calendar' && capabilities.includes('member'))}
+              onChange={(e) => toggle(c.key, e.target.checked)}
+            />
+            <span>{c.label}</span>
+          </label>
+        ))}
+      </fieldset>
       {withFactor && (
         <label className="field">
           <span>{sec.points}faktor (z. B. 0,5 für die Hälfte)</span>

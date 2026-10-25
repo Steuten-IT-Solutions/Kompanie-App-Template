@@ -17,3 +17,6 @@ Einträge gibt es nur für Mitglieder, nicht für {rolle.candidate} oder Gäste.
 Unter **Verwaltung → Mitglieder** das Mitglied öffnen, im Menü unter dem Namen **{bereich.penalties}** wählen und beim Eintrag **Bezahlt** tippen. Versehentlich markiert? **Doch offen** setzt ihn zurück. Ein falscher Eintrag verschwindet mit **Stornieren**.
 
 Oben unter **Verwaltung → {bereich.penalties} +** steht, wie viel insgesamt offen ist; in der Mitgliederliste steht bei jedem Mitglied, wie viel bei ihm noch offen ist.
+
+## Alle offenen ansehen
+Ist etwas offen, tippst du auf die Karte **Offen gesamt**. Die Liste zeigt alle offenen Einträge nach Mitgliedern sortiert, je Mitglied mit Summe. **Bezahlt** markiert einen Eintrag direkt dort; ein Tipp auf den Namen öffnet die {bereich.penalties} des Mitglieds (dort auch **Doch offen** und **Stornieren**).

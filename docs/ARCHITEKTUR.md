@@ -204,6 +204,11 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Löschen: Port `UserDirectory::removeAccount()` beendet alle Sitzungen; Standalone löscht das Konto, WordPress entfernt nur die Rolle in der App (Entscheidung: der Benutzer der Webseite bleibt). Danach löscht `App::userDeleted()` alle eigenen Daten (Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos), auch wenn WordPress einen Benutzer im Backend löscht. Was die Person für andere eingetragen hat, bleibt; angezeigt als „gelöschtes Konto“ (`UserNames`).
 - Mehrere anlegen (`POST /users/bulk`, höchstens 50): erst alles prüfen (`MemberService::prepare`, Benutzernamen und E-Mail auch untereinander, Anfangspunkte und Dienstgrad), dann anlegen. Die Zugangsdaten enthalten den Link zur Installationsanleitung und lassen sich als Zettel je Person ausdrucken.
 
+#### Eigene E-Mail-Adresse und Handynummer
+
+- `GET`/`PATCH /me/account` (angemeldet, Meins → Konto): E-Mail-Adresse und Handynummer der Person selbst (`MemberService::ownAccount`/`updateOwnAccount`). Eine neue E-Mail-Adresse nur mit `current_password` (gleiche Begrenzung wie beim Passwortwechsel, `MemberService::checkPassword`), weil sich bei WordPress darüber das Passwort zurücksetzen lässt. Name und Benutzername ändert hier niemand.
+- Die Handynummer gibt es in WordPress und der Benutzertabelle der eigenständigen Version nicht: Tabelle `member_contacts` (Migration 17) mit `user_id`, `phone`, `updated_at`; `UserData::purge` löscht sie mit dem Konto, die Sicherung enthält sie (`Backup::CORE_TABLES`). Erlaubt sind Ziffern, Leerzeichen und `+ ( ) / -`, 5 bis 20 Ziffern, höchstens 30 Zeichen. Wer Konten verwaltet, sieht und ändert sie mit `GET`/`PATCH /members/{id}/account` (`phone`).
+
 #### Fotos der Mitglieder
 
 - Ein Foto je Konto (`MemberPhotoService`). Hochladen, ersetzen, entfernen mit `create_users` (`PUT`/`DELETE /members/{id}/photo`) und denselben Grenzen wie oben (`MemberService::guardAccount`); beim Anlegen optional `photo` in `POST /users` und je Person in `POST /users/bulk`, vor dem Anlegen geprüft (`MemberPhotoService::parse`), danach gespeichert (scheitert das, `warning` wie beim Geburtstag).

@@ -11,7 +11,7 @@ Jede Person hat genau eine **Grundrolle** und dazu beliebig viele **Zusatzrollen
 - **{rolle.member}**: die Rolle neuer Konten, mit dem Mitgliederbereich (eigene Daten, interner Kalender, interne Bilder).
 - **{rolle.admin}**: darf alles, auch Einstellungen und Updates.
 
-Diese vier lassen sich umbenennen, aber nicht löschen; ihre Rechte lassen sich nicht ändern.
+Diese vier lassen sich umbenennen, aber nicht löschen; ihre Rechte lassen sich nicht ändern. Unter **Bearbeiten** siehst du ihre Rechte als Haken, die sich nicht umschalten lassen.
 
 Mit WordPress sind die Administratoren der Webseite die {rolle.admin}s der App. Diese Rolle vergibst du im WordPress-Backend, nicht in der App. Rechte, die jemand in WordPress hat (z. B. Benutzer anlegen), gelten auch in der App.
 

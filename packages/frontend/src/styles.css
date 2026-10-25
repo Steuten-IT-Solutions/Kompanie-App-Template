@@ -463,6 +463,42 @@ select {
     inset 0 0 0 4px color-mix(in srgb, var(--accent-light) 55%, transparent),
     var(--shadow);
 }
+/* Verwaltung → Strafen → alle offenen: Kopf je Person mit Summe */
+.open-penalties-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 22px 2px 8px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.open-penalties-head .btn-link {
+  padding: 0;
+  text-align: left;
+  font: inherit;
+}
+
+/* Karte als Knopf (z. B. „Offen gesamt“ → Liste) */
+.stat-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.stat-link:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.stat-action {
+  margin-top: 10px;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+}
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -854,6 +890,7 @@ input[type='date'],
 input[type='search'],
 input[type='email'],
 input[type='password'],
+input[type='tel'],
 select {
   width: 100%;
   padding: 10px 12px;
@@ -970,6 +1007,17 @@ button:focus-visible {
 .account-card {
   padding: 16px;
   margin-bottom: 16px;
+}
+.contact-list {
+  margin: 8px 0 12px;
+}
+.contact-list dt {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.contact-list dd {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
 }
 .account-name {
   margin: 0 0 2px;

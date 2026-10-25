@@ -76,12 +76,34 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
 
-export function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'neutral' }) {
-  return (
-    <div className={`stat stat-${tone ?? 'neutral'}`}>
+export function StatCard({
+  label,
+  value,
+  tone,
+  onClick,
+  action,
+}: {
+  label: string;
+  value: string;
+  tone?: 'good' | 'warn' | 'neutral';
+  /** Karte als Knopf, z. B. zur Liste hinter der Zahl */
+  onClick?: () => void;
+  /** Text dazu, z. B. „Alle offenen ansehen“ */
+  action?: string;
+}) {
+  const content = (
+    <>
       <div className="stat-value">{value}</div>
       <div className="stat-label">{label}</div>
-    </div>
+      {onClick && action && <div className="stat-action">{action} ›</div>}
+    </>
+  );
+  return onClick ? (
+    <button type="button" className={`stat stat-${tone ?? 'neutral'} stat-link`} onClick={onClick}>
+      {content}
+    </button>
+  ) : (
+    <div className={`stat stat-${tone ?? 'neutral'}`}>{content}</div>
   );
 }
 
