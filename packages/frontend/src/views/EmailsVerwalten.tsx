@@ -434,7 +434,7 @@ function Detail({ id }: { id: number }) {
               return s && (s.roles.length > 0 || s.users.length > 0 || s.emails.length > 0);
             }).map((f) => (
               <div key={f}>
-                <dt>{FIELD_LABELS[f]}</dt>
+                <dt>{FIELD_LABELS[f]}:</dt>
                 <dd>
                   {[
                     ...data.selection[f].roles.map((r) => `${r.label} (Rolle)`),
