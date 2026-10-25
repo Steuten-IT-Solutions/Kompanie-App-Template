@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Plugin as PostcssPlugin } from 'postcss';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { thirdPartyLicenses } from './build/licenses';
 
 const require = createRequire(import.meta.url);
 
@@ -116,7 +118,13 @@ function themeOverride(): PostcssPlugin {
 // und biegen die relativen Pfade (base: './') auf ihr Verzeichnis um.
 export default defineConfig({
   base: './',
-  plugins: [react(), brandHtml(), pdfjsDecoders(), precacheList()],
+  plugins: [
+    react(),
+    brandHtml(),
+    pdfjsDecoders(),
+    precacheList(),
+    thirdPartyLicenses({ root: fileURLToPath(new URL('../..', import.meta.url)) }),
+  ],
   css: { postcss: { plugins: [themeOverride()] } },
   define: { __PDFJS_DIR__: JSON.stringify(PDFJS_DIR) },
   build: {

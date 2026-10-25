@@ -26,6 +26,7 @@ Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin
 - [Veröffentlichen und Updates](docs/RELEASE.md)
 - [Handbuch](docs/handbuch/) für Mitglieder und Admins: in der App hinter „?“ und je Kompanie auf GitHub Pages unter `/handbuch/`
 - [Statusmeldungen an das Cockpit (Format 2)](docs/STATUSMELDUNGEN.md)
+- [Lizenzen](docs/LIZENZEN.md): GPL-2.0-or-later, erlaubte Lizenzen für Abhängigkeiten, Drittanbieter-Hinweise
 - [API-Spezifikation](api/openapi.yaml)
 - [Kompanie-Konfiguration: Schema](config/kompanie.schema.json) und [Beispiel](config/kompanie.example.json)
 

@@ -1,6 +1,7 @@
 {
   "name": "@kompanie-app/frontend",
   "private": true,
+  "license": "GPL-2.0-or-later",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

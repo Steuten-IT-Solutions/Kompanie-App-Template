@@ -480,7 +480,7 @@ final class Migrations
                 ],
             ],
             // Schwarzes Brett (Issue #5): dringende Nachrichten, gültig bis expires_at (anfangs fest 24 Stunden, seit Issue #172
-            // frei wählbar; Titel, Verlauf usw. in Migration 28).
+            // frei wählbar; Titel, Verlauf usw. in Migration 29).
             10 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {board_messages} (
@@ -1059,6 +1059,76 @@ final class Migrations
                 'mysql' => ["ALTER TABLE {offices} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {offices} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
             ],
+            // Nutzungsauswertung (Issue #175, Domain\ActivityService). Keine Inhalte, keine IP-Adressen, kein User-Agent; nicht
+            // in Sicherungen. Zeiten als Unix-Zeit.
+            // - activity: wer wann welchen Bereich wie genutzt hat (nur mit Erfassung je Person, 90 Tage, mit dem Konto gelöscht);
+            // - activity_last: zuletzt aktiv, eine Zeile je Konto (nur mit Erfassung je Person, mit dem Konto gelöscht);
+            // - activity_seen: zuletzt gesehen je Pseudonym (HMAC der Benutzer-ID) und Bereich, 31 Tage, für die Zahl aktiver
+            //   Nutzer und Personen je Bereich;
+            // - activity_daily: Tageszahlen ohne Personenbezug je Bereich (Personen, Aktionen); Tag in Ortszeit JJJJ-MM-TT.
+            // In beiden steht area '_all' für irgendeinen Bereich.
+            28 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {activity} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  area varchar(20) NOT NULL,
+  action varchar(10) NOT NULL,
+  at int(11) NOT NULL,
+  PRIMARY KEY (id),
+  KEY user_at (user_id, at),
+  KEY at (at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {activity_last} (
+  user_id bigint(20) unsigned NOT NULL,
+  at int(11) NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {activity_seen} (
+  token char(32) NOT NULL,
+  area varchar(20) NOT NULL,
+  at int(11) NOT NULL,
+  PRIMARY KEY (token, area),
+  KEY area_at (area, at)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {activity_daily} (
+  day varchar(10) NOT NULL,
+  area varchar(20) NOT NULL,
+  users int(11) NOT NULL DEFAULT 0,
+  actions int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, area)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {activity} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  area TEXT NOT NULL,
+  action TEXT NOT NULL,
+  at INTEGER NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {activity}_user_at ON {activity} (user_id, at)',
+                    'CREATE INDEX IF NOT EXISTS {activity}_at ON {activity} (at)',
+                    'CREATE TABLE IF NOT EXISTS {activity_last} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  at INTEGER NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {activity_seen} (
+  token TEXT NOT NULL,
+  area TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (token, area)
+)',
+                    'CREATE INDEX IF NOT EXISTS {activity_seen}_area_at ON {activity_seen} (area, at)',
+                    'CREATE TABLE IF NOT EXISTS {activity_daily} (
+  day TEXT NOT NULL,
+  area TEXT NOT NULL,
+  users INTEGER NOT NULL DEFAULT 0,
+  actions INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, area)
+)',
+                ],
+            ],
             // Schwarzes Brett (Issue #172): Titel, formatierter Inhalt (bereinigtes HTML), vorzeitiges Löschen mit Konto und
             // Zeitpunkt (deleted_at/deleted_by; expires_at wird dabei auf den Zeitpunkt gesetzt, damit auch ältere Versionen
             // die Nachricht nicht mehr zeigen). Bestehende Nachrichten (reiner Text) werden HTML-escaped, Zeilenumbrüche zu
@@ -1070,7 +1140,7 @@ final class Migrations
             // (board_message_revisions, ohne Fremdschlüssel: überdauert das Löschen der Nachricht), Mailversand je
             // Empfänger (board_mails: Warteschlange und Protokoll) und Einstellungen je Konto (user_settings, z. B.
             // board_mail = 0 für „keine Mails vom Brett“).
-            28 => [
+            29 => [
                 'mysql' => [
                     'ALTER TABLE {board_messages} ADD COLUMN title longtext DEFAULT NULL',
                     'ALTER TABLE {board_messages} ADD COLUMN deleted_at datetime DEFAULT NULL',

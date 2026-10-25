@@ -82,6 +82,19 @@ for zip in standalone wordpress; do
     || fail "Cache-Header/Komprimierung fehlen im Paket ($zip)"
 done
 ok "Beide Pakete: App-Dateien ein Jahr im Browser-Cache, Komprimierung (app/.htaccess, app/assets/.htaccess)"
+# Lizenzen (Issue #173): LICENSE und die beim Bauen erzeugten Drittanbieter-Hinweise in beiden Paketen; Build-Werkzeuge
+# (sharp mit libvips, ajv, …) weder als Datei im Paket noch in den Hinweisen.
+for zip in standalone wordpress; do
+  LIST="$(unzip -l "$T/r1/kompanie-app-$zip.zip")"
+  unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/LICENSE | grep -q 'or (at your option) any later' \
+    && unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/THIRD-PARTY-NOTICES.txt | grep -q '^react-dom ' \
+    || fail "LICENSE oder THIRD-PARTY-NOTICES.txt fehlt im Paket ($zip)"
+  if grep -q 'kompanie-app/app/THIRD-PARTY-NOTICES.txt' <<< "$LIST"; then fail "THIRD-PARTY-NOTICES.txt doppelt (app/) im Paket ($zip)"; fi
+  if grep -qiE 'sharp|libvips|@img/|/ajv|napi-rs|node_modules' <<< "$LIST"; then fail "Build-Werkzeuge im Paket ($zip)"; fi
+  NOTICES="$(unzip -p "$T/r1/kompanie-app-$zip.zip" kompanie-app/THIRD-PARTY-NOTICES.txt)"
+  if grep -qE '^(sharp|@img/|ajv|@napi-rs/|typescript|@vitejs/|prettier) ' <<< "$NOTICES"; then fail "Build-Werkzeug in THIRD-PARTY-NOTICES.txt ($zip)"; fi
+done
+ok "Beide Pakete: LICENSE und THIRD-PARTY-NOTICES.txt, keine Build-Werkzeuge"
 
 # Veröffentlichen wie im Workflow: Build-Ergebnis gefiltert übernehmen, im Veröffentlichungs-Job selbst
 # paketieren und signieren, Release + gh-pages (mit einem Bare-Repo statt GitHub und einer Attrappe der GitHub-CLI).

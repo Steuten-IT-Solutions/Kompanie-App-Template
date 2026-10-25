@@ -41,6 +41,18 @@ final class QueryCountTest extends TestCase
         }
     }
 
+    public function testRecordingUsageCostsAFewQueriesPerRequest(): void
+    {
+        $small = $this->measure(10);
+        $large = $this->measure(40);
+        foreach ($large as $label => $counts) {
+            $this->assertLessThanOrEqual(5, $counts['activity'], "$label: Nutzung erfassen mit höchstens fünf Abfragen");
+            $this->assertSame($small[$label]['activity'], $counts['activity'], "$label: unabhängig von der Zahl der Mitglieder");
+        }
+        // Ansichten werden zusammengefasst: ein zweiter Abruf kurz danach liest nur.
+        $this->assertSame(1, $large['GET /members?all=1']['activity'], 'zweite Ansicht im selben Bereich: nur eine Abfrage');
+    }
+
     public function testBulkBookingsWriteOncePerPersonAndReadOnce(): void
     {
         $small = $this->measure(10);
@@ -64,7 +76,7 @@ final class QueryCountTest extends TestCase
     }
 
     /**
-     * @return array<string, array{total: int, inserts: array<string, int>, log: list<string>}>
+     * @return array<string, array{total: int, inserts: array<string, int>, log: list<string>, activity: int}>
      */
     private function measure(int $n): array
     {
@@ -147,12 +159,15 @@ final class QueryCountTest extends TestCase
             $users->lookups = 0;
             $call($method, $path, $body, $query);
             $inserts = [];
-            foreach ($pdo->log as $sql) {
+            // Nutzungsauswertung (Issue #175) getrennt zählen: feste Zahl je Anfrage, unabhängig von der Route.
+            $activity = array_filter($pdo->log, static fn (string $sql): bool => (bool) preg_match('/\bkompanie_activity/', $sql));
+            $log = array_values(array_diff_key($pdo->log, $activity));
+            foreach ($log as $sql) {
                 if (preg_match('/^INSERT INTO kompanie_(\w+)/', $sql, $m)) {
                     $inserts[$m[1]] = ($inserts[$m[1]] ?? 0) + 1;
                 }
             }
-            $out[$label] = ['total' => count($pdo->log) + $users->lookups, 'inserts' => $inserts, 'log' => $pdo->log];
+            $out[$label] = ['total' => count($log) + $users->lookups, 'inserts' => $inserts, 'log' => $log, 'activity' => count($activity)];
         }
         return $out;
     }

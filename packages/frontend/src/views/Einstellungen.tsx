@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
 import {
   api,
+  can,
   applyFeatures,
   newsTitle,
   refreshRoles,
@@ -16,6 +17,7 @@ import { ErrorBox, Loading, useAsync } from '../ui';
 import Neuerungen from './Neuerungen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
+import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
 import { formatBytes } from '../format';
@@ -32,6 +34,7 @@ const PAGES = [
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
   { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
+  { id: 'nutzung', title: 'Nutzung', text: 'Wer die App wann nutzt und welche Bereiche.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
   { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
@@ -61,6 +64,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
       {page.id === 'email' && <MailSection onToast={onToast} />}
+      {page.id === 'nutzung' && <Nutzung onToast={onToast} />}
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
@@ -78,7 +82,7 @@ function Overview() {
   // ein und schiebt die Zeilen darunter weg.
   const { data, loading } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
-  const pages = PAGES.filter((p) => p.id !== 'news' || !!data?.news);
+  const pages = PAGES.filter((p) => (p.id !== 'news' || !!data?.news) && (p.id !== 'nutzung' || can('view_activity')));
   return (
     <ul className="card-list settings-overview">
       {pages.map((p) => (

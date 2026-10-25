@@ -3,8 +3,11 @@ import { can, config, levelLabel, type Capability, type Feature } from '../api';
 import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
 import { navigate } from '../router';
-import { Empty } from '../ui';
+import { Empty, lazyView } from '../ui';
 import FehlerMelden, { ReportButton } from './FehlerMelden';
+
+// Lizenztexte sind groß: eigenes Teilstück, erst beim Öffnen geladen (Issue #173).
+const Lizenzen = lazyView(() => import('./Lizenzen'));
 
 interface Seite {
   slug: string;
@@ -117,6 +120,8 @@ export default function Hilfe({ slug }: { slug?: string }) {
 
   // „Fehler melden“ (Issue #64): #/hilfe/melden (keine Handbuchseite heißt so)
   if (slug === 'melden') return <FehlerMelden />;
+  // Lizenzen (Issue #173): #/hilfe/lizenzen (keine Handbuchseite heißt so)
+  if (slug === 'lizenzen') return <Lizenzen />;
 
   if (seite) {
     return (
@@ -174,6 +179,9 @@ export default function Hilfe({ slug }: { slug?: string }) {
           </a>
         </p>
       )}
+      <p className="small muted hilfe-web">
+        <a href="#/hilfe/lizenzen">Lizenzen</a> der App und der enthaltenen Bausteine anderer Anbieter
+      </p>
     </div>
   );
 }

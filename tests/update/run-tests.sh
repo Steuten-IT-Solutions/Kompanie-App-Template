@@ -125,16 +125,17 @@ php -r '
 $lines = array_map(fn ($l) => json_decode($l, true), file($argv[1], FILE_IGNORE_NEW_LINES));
 $first = json_decode($lines[0]["body"], true);
 $key = $first["key"] ?? "";
-$ok = count($lines) === 3 && $first["format"] === 2 && $first["kind"] === "heartbeat" && strlen($key) === 64;
+$ok = count($lines) === 3 && $first["format"] === 3 && $first["kind"] === "heartbeat" && strlen($key) === 64
+  && is_int($first["usage"]["users"] ?? null) && is_array($first["usage"]["active"] ?? null);
 foreach ($lines as $l) {
     $ok = $ok && hash_equals("sha256=" . hash_hmac("sha256", $l["body"], $key), $l["sig"]);
 }
 $ev = json_decode($lines[1]["body"], true);
-$ok = $ok && $ev["kind"] === "event" && $ev["event"] === "UPDATE_FAILED" && ($ev["detail"] ?? "") === "download" && !isset($ev["key"]) && ($ev["errors"]["UPDATE_FAILED"] ?? 0) === 1
+$ok = $ok && $ev["kind"] === "event" && !isset($ev["usage"]) && $ev["event"] === "UPDATE_FAILED" && ($ev["detail"] ?? "") === "download" && !isset($ev["key"]) && ($ev["errors"]["UPDATE_FAILED"] ?? 0) === 1
   && !str_contains($lines[1]["body"], "stimmt nicht");
 $red = json_decode($lines[2]["body"], true);
 $ok = $ok && $red["event"] === "CHECK_ERROR" && $red["checks"]["updates"] === "error";
-exit($ok ? 0 : 1);' "$SRV/status.log" && ok "Statusmeldung: Lebenszeichen mit Geheimnis, gescheitertes Update und rote Ampel sofort als signierte Ereignisse ohne Fehlertext" \
+exit($ok ? 0 : 1);' "$SRV/status.log" && ok "Statusmeldung: Lebenszeichen (Format 3, mit Nutzungszahlen) mit Geheimnis, gescheitertes Update und rote Ampel sofort als signierte Ereignisse ohne Fehlertext" \
   || fail "Statusmeldungen: $(php -r 'foreach (file($argv[1]) as $l) { $b = json_decode(json_decode($l, true)["body"], true); echo $b["kind"], ":", $b["event"] ?? "", " errors=", json_encode($b["errors"]), " checks=", json_encode($b["checks"]), "\n"; }' "$SRV/status.log")"
 
 # 6. Eine ältere (ebenfalls signierte) Liste wird nicht angenommen

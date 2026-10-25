@@ -9,6 +9,8 @@
  *
  * Bewusst in einfacher PHP-Syntax geschrieben, damit auch ein zu alter Server noch eine
  * verständliche Meldung zeigt statt eines Syntaxfehlers.
+ *
+ * @license GPL-2.0-or-later (Lizenztext und Quellcode: https://github.com/Steuten-IT-Solutions/Kompanie-App-Template)
  */
 
 // Wird beim Bauen je Kompanie eingesetzt (scripts/package.php).

@@ -8,6 +8,7 @@ use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\BirthdayService;
@@ -99,6 +100,7 @@ final class App
         BirthdayService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
+        ActivityService::TASK => ActivityService::INTERVAL,
     ];
 
     /**
@@ -230,6 +232,8 @@ final class App
             BugReportService::TASK => $this->bugReports()->available(),
             // Sicherung in Google Drive: täglich prüfen, wöchentlich hochladen.
             BackupUploadService::TASK => $this->backupUpload()->active(),
+            // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
+            ActivityService::TASK => true,
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -293,6 +297,8 @@ final class App
                 $this->bugReports()->runTask();
             } elseif ($task === BackupUploadService::TASK) {
                 $this->backupUpload()->runTask();
+            } elseif ($task === ActivityService::TASK) {
+                $this->activity()->prune();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -388,12 +394,18 @@ final class App
      * Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
      * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag und ihre Ausnahmen bei
      * den Rechten werden gelöscht, ebenso noch nicht versandte Fehlermeldungen mit ihrem Namen. Inventar und sein Verlauf
-     * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
+     * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“). Aus der Nutzungsauswertung
+     * (Issue #175) verschwinden ihre Einträge, „zuletzt aktiv“ und ihr Pseudonym; die Tageszahlen ohne Personenbezug bleiben.
      */
     public function userDeleted(int $userId): void
     {
         UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
         $this->roles()->forget($userId);
+        try {
+            $this->activity()->forget($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Pseudonym der Nutzungsauswertung nicht gelöscht: ' . $e->getMessage());
+        }
     }
 
     public function pushTriggers(): PushTriggers
@@ -523,6 +535,12 @@ final class App
     public function inventory(): InventoryService
     {
         return $this->service(InventoryService::class, fn () => new InventoryService($this));
+    }
+
+    /** Nutzungsauswertung (Issue #175) */
+    public function activity(): ActivityService
+    {
+        return $this->service(ActivityService::class, fn () => new ActivityService($this));
     }
 
     public function titles(): TitleService

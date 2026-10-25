@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  * Schwarzes Brett (Issue #172): Nachrichten mit Verlauf, Bilder in formatierten Inhalten (rich_images, in der Datenbank),
  * Signaturen und Einstellungen der Konten sind enthalten; Warteschlange und Protokoll der Mails (board_mails) nicht.
+ * Ebenso wenig die Nutzungsauswertung (activity*, Issue #175): Einträge je Person werden nach 90 Tagen gelöscht und sollen
+ * nicht in Sicherungen weiterleben.
  */
 final class Backup
 {
@@ -47,6 +49,8 @@ final class Backup
         'bug_reports_registered',
         // Zustand der Sicherungen in Google Drive (BackupUploadService::STATE_SETTING): letzter Lauf, Fehler.
         'backup_drive_state',
+        // Nutzungsauswertung (Issue #175): Geheimnis des Pseudonyms. Die Tabellen activity* sind keine Kerntabellen der Sicherung.
+        'activity_secret',
         // Web Push: Stand der Abgleiche gehört zu dieser Installation (Schlüssel und Abos sind in der Sicherung).
         // Mailversand (Issue #172): gemerktes Limit des Mailservers und Pause zwischen den Portionen.
         'mail_server_size', 'board_mail_next',

@@ -483,6 +483,10 @@ final class WpUsers implements UserDirectory, AuthContext
                 $caps[] = $cap;
             }
         }
+        // Wer die Einstellungen der Webseite verwaltet, ist dort Admin und sieht auch die Nutzungsauswertung (Issue #175).
+        if (in_array(Capability::ManageSettings, $caps, true) && !in_array(Capability::ViewActivity, $caps, true)) {
+            $caps[] = Capability::ViewActivity;
+        }
         [$first, $last] = self::names($u);
         return new User((int) $u->ID, (string) $u->display_name, (string) $u->user_login, $role, $caps, $first, $last);
     }

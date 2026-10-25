@@ -2701,6 +2701,15 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   await expect(item('Die App aufs Handy holen')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Für Admins' })).toHaveCount(0);
   await expect(item('Meine Punkte')).toHaveCount(0);
+  // Lizenzen (Issue #173): für alle, mit Lizenz der App, Quellcode und den Bausteinen aus dem Build samt Lizenztext
+  await page.getByRole('link', { name: 'Lizenzen' }).click();
+  await expect(page.locator('.news-headline')).toHaveText('Lizenzen');
+  await expect(page.locator('.hilfe-text')).toContainText('GPL-2.0-or-later');
+  await expect(page.locator('.hilfe-text a[href="https://github.com/Steuten-IT-Solutions/Kompanie-App-Template"]')).toBeVisible();
+  await page.locator('.lizenz-liste summary', { hasText: 'react-dom' }).click();
+  await expect(page.locator('.lizenz-liste details[open] .lizenz-text')).toContainText('Permission is hereby granted');
+  await expect(page.locator('.lizenz-liste summary', { hasText: /^sharp / })).toHaveCount(0);
+  await page.getByRole('button', { name: '‹ Alle Hilfeseiten' }).click();
 
   // Mitglied: dazu die Seiten für Mitglieder; Bezeichnung „Kasse“ statt „Strafen“
   await login(page, 'mitglied1');
@@ -2739,6 +2748,8 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   try {
     await page.goto('/app/#/hilfe/app-installieren');
     await expect(page.locator('.news-headline')).toHaveText('Die App aufs Handy holen');
+    await page.goto('/app/#/hilfe/lizenzen');
+    await expect(page.locator('.lizenz-liste summary', { hasText: 'react' }).first()).toBeVisible();
   } finally {
     await page.context().setOffline(false);
   }
@@ -4180,4 +4191,46 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   await expect(member.getByText('Vereinsabend')).toBeVisible();
   await expect(member.locator('.maintenance-page')).toHaveCount(0);
   await member.close();
+});
+
+test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf einer Person, schaltet die Erfassung je Person aus und an', async ({
+  page,
+  browser,
+}) => {
+  // Ein Mitglied nutzt die App (Termine, eigene Punkte).
+  const member = await browser.newPage();
+  await login(member, 'mitglied1');
+  await expect(member.getByText('Vereinsabend')).toBeVisible();
+  await member.close();
+
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Nutzung', { exact: true }) })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Aktive Personen je Tag' })).toBeVisible();
+  const aktiv = page.locator('.stat', { hasText: 'Aktiv (24 Std.)' }).locator('.stat-value');
+  await expect.poll(async () => Number(await aktiv.textContent())).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('.usage-bars li', { hasText: 'Allgemein' }).first()).toBeVisible();
+  await shot(page, '33-nutzung');
+
+  // Verlauf einer Person: nur Bereich, Aktion und Zeit
+  const members = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Mitglieder', exact: true }) });
+  await members.locator('.row', { hasText: 'zuletzt aktiv' }).first().click();
+  await expect(page.locator('.usage-history li').first()).toContainText(/angesehen|angelegt|geändert|gelöscht|abgestimmt|angemeldet/);
+  await page.keyboard.press('Escape');
+
+  // Ausschalten löscht die Einträge je Person; die Liste der Mitglieder verschwindet, gezählt wird weiter.
+  const schalter = page.getByLabel('Nutzung je Person erfassen (wer, wann, welcher Bereich)');
+  page.once('dialog', (d) => d.accept());
+  // Der Schalter folgt dem Server (erst nach der Antwort umgelegt): klicken, dann auf den neuen Stand warten.
+  await schalter.click();
+  await expect(schalter).not.toBeChecked();
+  await expect(page.getByText('Ausgeschaltet: Die App zählt nur noch')).toBeVisible();
+  await expect(members).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Als CSV-Datei herunterladen' })).toHaveCount(0);
+  await schalter.click();
+  await expect(schalter).toBeChecked();
+  await expect(members).toBeVisible();
 });
