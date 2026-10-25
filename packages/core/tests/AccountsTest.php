@@ -93,6 +93,15 @@ final class AccountsTest extends TestCase
         $p = $this->call('GET', "/members/{$this->m}/account")->data;
         $this->assertSame(['Mitglied', 'mitglied', '0171/1234567'], [$p['name'], $p['login'], $p['phone']]);
 
+        // Eigenes Konto in der Verwaltung: Handynummer ohne, neue E-Mail-Adresse nur mit dem aktuellen Passwort.
+        $res = $this->call('PATCH', "/members/{$this->admin}/account", ['phone' => '+49 151 7654321']);
+        $this->assertSame([200, '+49 151 7654321'], [$res->status, $res->data['phone']]);
+        $this->assertSame(400, $this->call('PATCH', "/members/{$this->admin}/account", ['email' => 'chef@example.org'])->status);
+        $this->assertSame(400, $this->call('PATCH', "/members/{$this->admin}/account", ['email' => 'chef@example.org', 'current_password' => 'falsch'])->status);
+        $res = $this->call('PATCH', "/members/{$this->admin}/account", ['email' => 'chef@example.org', 'current_password' => 'geheim123']);
+        $this->assertSame([200, 'chef@example.org'], [$res->status, $res->data['email']]);
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/account", ['email' => 'm@example.org'])->status, 'fremdes Konto ohne Passwort');
+
         // Ohne Anmeldung nicht.
         $this->users->current = null;
         $this->assertSame(401, $this->call('GET', '/me/account')->status);

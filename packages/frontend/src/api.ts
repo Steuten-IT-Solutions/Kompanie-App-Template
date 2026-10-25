@@ -1619,8 +1619,10 @@ export const api = {
   ownAccount: () => request<OwnAccount>('GET', '/me/account'),
   updateOwnAccount: (data: { email: string; phone: string; current_password?: string }) =>
     request<OwnAccount>('PATCH', '/me/account', data),
-  updateAccount: (id: number, data: Partial<PersonName> & { email?: string; phone?: string; username?: string }) =>
-    request<AccountProfile>('PATCH', `/members/${id}/account`, data),
+  updateAccount: (
+    id: number,
+    data: Partial<PersonName> & { email?: string; phone?: string; username?: string; current_password?: string },
+  ) => request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
   markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),

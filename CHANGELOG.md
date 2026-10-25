@@ -231,6 +231,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Netz, in der Vorschau „App als Rolle ansehen“ und im Wartungsmodus lädt die App nichts im Voraus.
 - **Anwesenheitsliste ohne Rollen-Abzeichen**: Hinter den Namen stehen keine Rollen (etwa Admin, Vorstand, Gast) mehr,
   wie überall sonst in der App auch.
+- **Eigenes Konto auch in der Verwaltung ändern**: Auf der eigenen Seite unter *Verwaltung → Mitglieder → Konto und
+  Rolle* gibt es jetzt auch den Bereich „Konto“ mit **Angaben ändern**, etwa für die eigene Handynummer als Admin.
+  Löschen lässt sich das eigene Konto dort nicht. Eine neue eigene E-Mail-Adresse verlangt hier wie unter *Meins →
+  Konto* das aktuelle Passwort.
+- **Mail vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit „E-Mail senden“ veröffentlicht, bekommt
+  die Mail jetzt selbst auch (sofern eine Adresse hinterlegt ist und die Mails vom Brett nicht abgeschaltet sind). Die
+  Zahl am Haken zählt ihn mit. Die Benachrichtigung aufs Handy bekommt der Verfasser weiterhin nicht.
 
 ### Behoben
 

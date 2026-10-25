@@ -527,9 +527,9 @@ final class MemberService
 
     /**
      * Vor- und Nachname, E-Mail und Benutzername ändern (Issue #24). Ein neuer Benutzername beendet alle Sitzungen des
-     * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet.
+     * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet. Die eigene E-Mail-Adresse nur mit current_password.
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), email, phone, username
+     * @param array<string, mixed> $in first_name, last_name (oder name), email, phone, username, current_password
      * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
      */
     public function updateProfile(User $actor, int $id, array $in): array
@@ -542,8 +542,13 @@ final class MemberService
         [$first, $last] = self::names($in, [$current['first_name'], $current['last_name']]);
         self::checkNames($first, $last);
         $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
+        $emailChanged = mb_strtolower($email) !== mb_strtolower($current['email']);
+        // Die eigene E-Mail-Adresse nur mit dem aktuellen Passwort, auch in der Verwaltung (siehe updateOwnAccount).
+        if ($emailChanged && $actor->id === $id) {
+            $this->checkPassword($actor, $in['current_password'] ?? null);
+        }
         // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
-        if (mb_strtolower($email) !== mb_strtolower($current['email']) && $email !== '') {
+        if ($emailChanged && $email !== '') {
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
                 throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
             }
@@ -602,12 +607,8 @@ final class MemberService
      */
     public function updateOwnAccount(User $user, array $in): array
     {
-        $current = $this->users->profile($user->id) ?? throw ApiError::notFound('Konto nicht gefunden.');
-        $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
-        if (mb_strtolower($email) !== mb_strtolower($current['email'])) {
-            $this->checkPassword($user, $in['current_password'] ?? null);
-        }
-        $this->updateProfile($user, $user->id, array_intersect_key($in, ['email' => true, 'phone' => true]));
+        // Das Passwort prüft updateProfile; Name und Benutzername ändert hier niemand.
+        $this->updateProfile($user, $user->id, array_intersect_key($in, ['email' => true, 'phone' => true, 'current_password' => true]));
         return $this->ownAccount($user);
     }
 

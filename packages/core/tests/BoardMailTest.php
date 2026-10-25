@@ -69,6 +69,12 @@ final class BoardMailTest extends TestCase
         return $this;
     }
 
+    /** Der Verfasser bekommt die Mail auch; hier abgeschaltet, damit nur Mitglied und Anwärter in der Warteschlange stehen. */
+    private function authorWithoutMail(): void
+    {
+        $this->app->boardMail()->setWants($this->admin, false);
+    }
+
     private function configure(): void
     {
         $res = $this->call('PATCH', '/admin/mail', ['from' => 'info@musterkompanie.example', 'host' => 'smtp.example.org', 'port' => 587, 'secure' => 'starttls', 'user' => 'info', 'password' => 'geheim']);
@@ -125,15 +131,15 @@ final class BoardMailTest extends TestCase
         $this->assertSame(['board' => true, 'available' => true, 'email' => false], $this->as($this->noMail)->call('GET', '/me/mail')->data, 'ohne Adresse: die App weist darauf hin');
 
         $this->as($this->admin);
-        $this->assertSame(2, $this->call('GET', '/board/mail')->data['recipients'], 'Mitglied und Anwärter; ohne Verfasser, Gäste, Konten ohne Adresse und Abgemeldete');
+        $this->assertSame(3, $this->call('GET', '/board/mail')->data['recipients'], 'Verfasser, Mitglied und Anwärter; ohne Gäste, Konten ohne Adresse und Abgemeldete');
         $item = $this->call('POST', '/board', ['title' => 'Schützenfest: Änderung', 'text' => '<p>Treffen <b>früher</b></p>', 'push' => false])->data;
-        $this->assertSame(['recipients' => 2, 'sent' => 0, 'failed' => 0, 'pending' => 2, 'cancelled' => 0], $item['mail'], 'Mail standardmäßig an, im Hintergrund');
+        $this->assertSame(['recipients' => 3, 'sent' => 0, 'failed' => 0, 'pending' => 3, 'cancelled' => 0], $item['mail'], 'Mail standardmäßig an, im Hintergrund');
         $this->assertSame([], $this->mailer->sent, 'nicht in der Anfrage verschickt');
         $this->assertContains(BoardMailService::TASK, $this->scheduler->soon, 'Versand angestoßen');
 
         $this->app->runTask(BoardMailService::TASK);
-        $this->assertSame(['anwaerter@example.org', 'mitglied@example.org'], $this->mailer->recipients(), 'jede Mail einzeln an einen Empfänger');
-        $mail = $this->mailer->sent[1];
+        $this->assertSame(['admin@example.org', 'anwaerter@example.org', 'mitglied@example.org'], $this->mailer->recipients(), 'jede Mail einzeln an einen Empfänger, auch an den Verfasser');
+        $mail = $this->mailer->sent[2];
         $this->assertSame(['Schützenfest: Änderung', 'Mitglied'], [$mail->subject, $mail->toName], 'Betreff = Titel');
         $this->assertStringContainsString('<p>Treffen <b>früher</b></p>', $mail->html);
         $this->assertStringContainsString('https://example.org/app/#/brett/' . $item['id'], $mail->html, 'Link zur App');
@@ -144,14 +150,17 @@ final class BoardMailTest extends TestCase
 
         $history = $this->call('GET', "/board/{$item['id']}/history")->data;
         $this->assertSame(['created', 'mailed'], array_column($history['revisions'], 'action'));
-        $this->assertSame(['recipients' => 2], $history['revisions'][1]['after']);
-        $this->assertSame(['sent', 'sent'], array_column($history['mail_log'], 'status'));
+        $this->assertSame(['recipients' => 3], $history['revisions'][1]['after']);
+        $this->assertSame(['sent', 'sent', 'sent'], array_column($history['mail_log'], 'status'));
         $this->assertSame(403, $this->as($this->m)->call('GET', "/board/{$item['id']}/history")->status);
 
         // Ändern verschickt keine neue Mail
         $this->as($this->admin)->call('PATCH', "/board/{$item['id']}", ['text' => '<p>anders</p>']);
         $this->app->runTask(BoardMailService::TASK);
-        $this->assertCount(2, $this->mailer->sent);
+        $this->assertCount(3, $this->mailer->sent);
+        // Abgeschaltet: auch der Verfasser nicht
+        $this->app->boardMail()->setWants($this->admin, false);
+        $this->assertSame(2, $this->call('GET', '/board/mail')->data['recipients']);
         // Ohne Haken keine Mail
         $quiet = $this->call('POST', '/board', ['title' => 'Leise', 'text' => 'x', 'push' => false, 'mail' => false])->data;
         $this->assertNull($quiet['mail']);
@@ -161,6 +170,7 @@ final class BoardMailTest extends TestCase
     public function testEmbeddedImagesAndRealMimeStructure(): void
     {
         $this->configure();
+        $this->authorWithoutMail();
         $img = imagecreatetruecolor(3, 3);
         ob_start();
         imagepng($img);
@@ -227,6 +237,7 @@ final class BoardMailTest extends TestCase
     public function testRejectionRetryAndBatching(): void
     {
         $this->configure();
+        $this->authorWithoutMail();
         $this->call('PATCH', '/admin/mail', ['batch_size' => 1, 'batch_pause' => 0]);
         // Reihenfolge der Warteschlange: nach Namen (Anwärter vor Mitglied)
         $this->mailer->results['anwaerter@example.org'] = [new MailResult(false, '552 Message size exceeds fixed maximum message size', true, 552)];
@@ -265,6 +276,7 @@ final class BoardMailTest extends TestCase
     public function testPauseBetweenBatchesAndCancelOnDelete(): void
     {
         $this->configure();
+        $this->authorWithoutMail();
         $this->call('PATCH', '/admin/mail', ['batch_size' => 1, 'batch_pause' => 30]);
         $item = $this->call('POST', '/board', ['title' => 'T', 'text' => 'x', 'push' => false])->data;
         $this->app->runTask(BoardMailService::TASK);
@@ -287,6 +299,7 @@ final class BoardMailTest extends TestCase
     public function testAccountDeletionRemovesMailRows(): void
     {
         $this->configure();
+        $this->authorWithoutMail();
         $this->call('POST', '/board', ['title' => 'T', 'text' => 'x', 'push' => false]);
         unset($this->users->users[$this->m]);
         $this->app->userDeleted($this->m);

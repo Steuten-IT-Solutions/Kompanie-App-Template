@@ -205,6 +205,7 @@ final class MailingTest extends TestCase
     public function testSharedQueueBatchingAndRetries(): void
     {
         $this->configure(['batch_size' => 2, 'batch_pause' => 30]);
+        $this->app->boardMail()->setWants($this->admin, false); // Verfasser ohne eigene Mail vom Brett
         $this->call('POST', '/board', ['title' => 'Brett', 'text' => '<p>x</p>', 'push' => false]); // 3 Empfänger: Mitglieder mit Adresse und Anwärter
         $this->call('POST', '/mails', ['subject' => 'Verwaltung', 'text' => '<p>y</p>', 'to' => ['users' => [$this->m, $this->m2]]]);
         $this->app->runTask(BoardMailService::TASK);

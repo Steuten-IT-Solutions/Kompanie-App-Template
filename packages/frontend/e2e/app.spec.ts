@@ -799,6 +799,42 @@ test('Konten: mehrere anlegen mit Zugangsdaten, Angaben ändern, Konto löschen'
   await expect(page.locator('.row', { hasText: `${id}, Jan` })).toHaveCount(0);
 });
 
+test('Konten: das eigene Konto in der Verwaltung ändern, ohne Löschen', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.evaluate(() => (location.hash = `#/verwaltung/mitglied/${window.KOMPANIE_CONFIG!.user!.id}`));
+  await memberAccount(page);
+  const panel = page.locator('.account-panel');
+  await expect(panel.getByRole('button', { name: 'Angaben ändern' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: /Konto löschen|Aus der App entfernen/ })).toHaveCount(0);
+
+  // Handynummer ohne Passwort.
+  await panel.getByRole('button', { name: 'Angaben ändern' }).click();
+  const form = page.locator('.account-edit');
+  await form.getByLabel('Handynummer (optional)').fill('0171 7654321');
+  await expect(form.getByLabel(/Aktuelles Passwort/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(panel).toContainText('+49 171 7654321');
+
+  // Neue E-Mail-Adresse nur mit dem aktuellen Passwort; das Feld erscheint erst dann.
+  await panel.getByRole('button', { name: 'Angaben ändern' }).click();
+  const email = await form.getByLabel('E-Mail (optional)').inputValue();
+  await form.getByLabel('E-Mail (optional)').fill('chef-neu@example.org');
+  await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(form.locator('.form-error')).toHaveText('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+  await form.getByLabel(/Aktuelles Passwort/).fill(ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(panel).toContainText('chef-neu@example.org');
+
+  // Wieder wie vorher, damit andere Tests die Angaben des Admins unverändert vorfinden.
+  await panel.getByRole('button', { name: 'Angaben ändern' }).click();
+  await form.getByLabel('E-Mail (optional)').fill(email);
+  await form.getByLabel('Handynummer (optional)').fill('');
+  if (email !== 'chef-neu@example.org') await form.getByLabel(/Aktuelles Passwort/).fill(ADMIN_PASSWORD);
+  await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(form).toHaveCount(0);
+  await expect(panel).not.toContainText('+49 171 7654321');
+});
+
 /** Kleines gültiges PNG (1 × 1 Pixel) zum Hochladen. */
 const PNG = {
   name: 'foto.png',

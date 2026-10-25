@@ -18,7 +18,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 - **Als {rolle.member} aufnehmen**: nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat, z. B. Anwärter (wer Mitglieder anlegen darf).
 - **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf).
 - **Ehemalig** mit **Als ehemalig eintragen …** (wer Mitglieder anlegen darf).
-- **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern** und **Konto löschen** (wer Mitglieder anlegen darf).
+- **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern** und **Konto löschen** (wer Mitglieder anlegen darf). Auf deiner eigenen Seite fehlt **Konto löschen**.
 
 ## So gehst du vor
 ### Die Rolle ändern
@@ -41,7 +41,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 2. Gib das neue Startpasswort persönlich weiter. Es steht nur jetzt da; darunter steht der Link zur Installationsanleitung.
 
 ### Angaben ändern oder das Konto löschen
-1. Tippe unter **Konto** auf **Angaben ändern**, ändere Vorname, Nachname, Benutzername, E-Mail oder Handynummer und tippe auf **Speichern**. E-Mail-Adresse und Handynummer kann die Person auch selbst unter **Meins → Konto** ändern.
+1. Tippe unter **Konto** auf **Angaben ändern**, ändere Vorname, Nachname, Benutzername, E-Mail oder Handynummer und tippe auf **Speichern**. E-Mail-Adresse und Handynummer kann die Person auch selbst unter **Meins → Konto** ändern. Änderst du deine eigene E-Mail-Adresse, gib zur Bestätigung dein **Aktuelles Passwort** ein.
 2. Zum Löschen tippe auf **Konto löschen**, tippe zur Bestätigung den Namen ein und dann **Endgültig löschen**.
 
 ![Passwort, Ehemalig und Konto](bild:rollen-vergeben-konto)

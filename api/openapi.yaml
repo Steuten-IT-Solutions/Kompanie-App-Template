@@ -1511,7 +1511,7 @@ paths:
         außer dem Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
         Verfasser“, Text = Titel, TTL bis `expires_at`, höchstens 28 Tage), sofern sie die Art für das Gerät eingeschaltet
         haben und `push` nicht false ist. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
-        Mailadresse, die den Empfang nicht abgeschaltet haben (außer dem Verfasser), im Hintergrund. Meldet der
+        Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund. Meldet der
         Mailserver eine Höchstgröße und ist die fertige Mail größer, wird nichts veröffentlicht (400 mit Erklärung).
       x-capability: post_board
       requestBody:
@@ -3502,6 +3502,7 @@ paths:
                 email: { type: string }
                 phone: { type: string, maxLength: 30, description: 'Leer entfernt sie' }
                 username: { type: string }
+                current_password: { type: string, description: 'Pflicht, wenn jemand die eigene E-Mail-Adresse ändert' }
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
         '400': { $ref: '#/components/responses/Error' }
