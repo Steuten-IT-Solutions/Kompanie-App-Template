@@ -217,7 +217,7 @@ function Members({
       <ul className="card-list usage-members">
         {shown.map((m) => (
           <li key={m.id}>
-            <button type="button" className="row clickable" onClick={() => onOpen(m)}>
+            <button type="button" className="card row clickable settings-link" onClick={() => onOpen(m)}>
               <span className="row-main">
                 <span className="row-title">{m.name}</span>
                 <span className="row-sub">
