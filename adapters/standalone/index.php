@@ -2,6 +2,8 @@
 /**
  * Kompanie-App, eigenständige Version: Einstieg für alle Anfragen.
  * Läuft mit und ohne URL-Umschreibung (dann über index.php?r=/…).
+ *
+ * @license GPL-2.0-or-later (siehe LICENSE und THIRD-PARTY-NOTICES.txt)
  */
 
 declare(strict_types=1);

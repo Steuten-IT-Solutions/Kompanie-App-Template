@@ -16,6 +16,7 @@ import { caps, formatDate, formatEventWhen, roleCount, todayYmd } from '../forma
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { prefetchOnTap, sources } from '../viewData';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
@@ -133,7 +134,12 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
       ) : (
         <ul className="card-list attendance-lists">
           {lists.map((l) => (
-            <li key={l.id} className="card row clickable" onClick={() => navigate(`verwaltung/anwesenheit/${l.id}`)}>
+            <li
+              key={l.id}
+              className="card row clickable"
+              onClick={() => navigate(`verwaltung/anwesenheit/${l.id}`)}
+              {...prefetchOnTap(sources.attendance(l.id))}
+            >
               <div className="row-main">
                 <div className="row-title">{l.title}</div>
                 <div className="row-sub">
@@ -154,7 +160,8 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 /* ------------------------------------------------------------------ */
 
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.attendance(id), [id], 'attendance');
+  const s = sources.attendance(id);
+  const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <Editor key={data!.updated_at} list={data!} onSaved={setData} onToast={onToast} />;

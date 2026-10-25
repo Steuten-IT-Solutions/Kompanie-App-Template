@@ -1,6 +1,7 @@
 {
   "name": "@kompanie-app/branding",
   "private": true,
+  "license": "GPL-2.0-or-later",
   "version": "0.1.0",
   "type": "module",
   "description": "Erzeugt aus kompanie.json und dem Logo Farben, Icons und Texte für die App.",

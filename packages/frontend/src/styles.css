@@ -2268,6 +2268,28 @@ fieldset.feature-list legend {
   margin-top: 18px;
 }
 
+/* Lizenzen (Issue #173) */
+.hilfe-text .lizenz-liste {
+  list-style: none;
+  padding-left: 0;
+}
+.lizenz-liste summary,
+.lizenzen details > summary {
+  cursor: pointer;
+}
+.lizenz-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  max-height: 24rem;
+  overflow: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+}
+
 /* Was ist neu (Changelog) */
 .changelog-text h4 {
   font-size: 0.95rem;

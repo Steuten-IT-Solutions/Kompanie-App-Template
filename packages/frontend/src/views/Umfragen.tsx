@@ -5,6 +5,7 @@ import { formatShortTime } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { prefetchOnTap, sources } from '../viewData';
 
 // Umfragen (Issue #4): #/umfragen (alle, auch beendete), #/umfragen/<id> (antworten, ändern, zurückziehen, Ergebnisse)
 // und #/umfragen/verwalten (anlegen, ändern, beenden, löschen; nur mit manage_polls). Laufende Umfragen stehen am
@@ -204,7 +205,8 @@ function PollHead({ poll }: { poll: Poll }) {
 
 /** #/umfragen/<id> */
 function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.poll(id), [id], 'poll');
+  const s = sources.poll(id);
+  const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
   if (!data && loading) return <Loading />;
   if (!data) return <ErrorBox message={error ?? 'Die Umfrage gibt es nicht (mehr).'} onRetry={reload} />;
   const poll = data;
@@ -242,7 +244,7 @@ function PollList() {
   const running = data.filter((p) => p.status === 'running');
   const ended = data.filter((p) => p.status === 'ended');
   const item = (p: Poll) => (
-    <button className="card poll-list-item" key={p.id} onClick={() => navigate(`umfragen/${p.id}`)}>
+    <button className="card poll-list-item" key={p.id} onClick={() => navigate(`umfragen/${p.id}`)} {...prefetchOnTap(sources.poll(p.id))}>
       <strong>{p.title}</strong>
       <span className="muted small">
         {endText(p)} · {p.has_voted ? 'beantwortet' : p.status === 'running' ? 'offen' : 'nicht teilgenommen'}

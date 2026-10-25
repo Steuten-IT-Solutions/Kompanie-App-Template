@@ -1,0 +1,174 @@
+// Vorabladen der wahrscheinlich nächsten Ansicht (src/prefetch.ts, Issue #104): eins nach dem anderen, Antippen vor dem
+// Leerlauf, nichts in Vorschau/Wartung bzw. im Leerlauf bei saveData oder 2G, Anfragen still im Hintergrund.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { cacheKey, dataCache, pendingPrefetch, prefetch, takeFresh } from '../src/dataCache.ts';
+import { createPrefetcher as create, idleNetworkOk, type PrefetcherOptions, type PrefetchSource } from '../src/prefetch.ts';
+
+/** Anfragen, die im Hintergrund begannen (wie api.inBackground: zählt, solange `start` synchron läuft) */
+let background = 0;
+let backgroundStarts = 0;
+function inBackground<T>(start: () => Promise<T>): Promise<T> {
+  background++;
+  try {
+    return start();
+  } finally {
+    background--;
+  }
+}
+/** wie viewData.ts, mit dem Speicher der App */
+const createPrefetcher = (o: Pick<PrefetcherOptions, 'blocked' | 'idleOk' | 'whenIdle'>) => create({ ...o, prefetch, inBackground });
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => ((resolve = res), (reject = rej)));
+  return { promise, resolve, reject };
+}
+
+/** Quelle, die mitschreibt, wann sie startet, und erst auf Zuruf antwortet. */
+function source(key: string, log: string[]) {
+  const d = deferred<unknown>();
+  const s: PrefetchSource = {
+    key,
+    deps: [],
+    load: () => {
+      log.push(key);
+      return d.promise;
+    },
+  };
+  return { s, d };
+}
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+test('Leerlauf: nicht offline, nicht bei saveData, nicht bei 2G', () => {
+  assert.equal(idleNetworkOk({ onLine: true }), true, 'ohne navigator.connection (Safari)');
+  assert.equal(idleNetworkOk({ onLine: true, connection: { effectiveType: '4g' } }), true);
+  assert.equal(idleNetworkOk({ onLine: false }), false);
+  assert.equal(idleNetworkOk({ onLine: true, connection: { saveData: true, effectiveType: '4g' } }), false);
+  assert.equal(idleNetworkOk({ onLine: true, connection: { effectiveType: '2g' } }), false);
+  assert.equal(idleNetworkOk({ onLine: true, connection: { effectiveType: 'slow-2g' } }), false);
+});
+
+test('Höchstens eine Vorab-Anfrage gleichzeitig, Antippen kommt vor dem Leerlauf', async () => {
+  dataCache.clear();
+  const log: string[] = [];
+  const a = source('a', log);
+  const b = source('b', log);
+  const c = source('c', log);
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  const done = p.idle([a.s, b.s]);
+  await tick();
+  assert.deepEqual(log, ['a'], 'b wartet, bis a fertig ist');
+  void p.tap([c.s]);
+  a.d.resolve(['A']);
+  await tick();
+  assert.deepEqual(log, ['a', 'c'], 'angetippt: vor b');
+  c.d.resolve(['C']);
+  await tick();
+  assert.deepEqual(log, ['a', 'c', 'b']);
+  b.d.resolve(['B']);
+  await done;
+  assert.deepEqual(dataCache.get(cacheKey('a', [])), ['A']);
+  assert.deepEqual(dataCache.get(cacheKey('b', [])), ['B']);
+  assert.deepEqual(dataCache.get(cacheKey('c', [])), ['C']);
+});
+
+test('Vorschau/Wartung: gar nicht; saveData/2G: im Leerlauf nicht, beim Antippen schon', async () => {
+  dataCache.clear();
+  const log: string[] = [];
+  const blocked = createPrefetcher({ blocked: () => true, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  await blocked.idle([source('x', log).s]);
+  await blocked.tap([source('y', log).s]);
+  assert.deepEqual(log, []);
+
+  const slow = createPrefetcher({ blocked: () => false, idleOk: () => false, whenIdle: () => Promise.resolve() });
+  await slow.idle([source('z', log).s]);
+  assert.deepEqual(log, []);
+  const t = source('t', log);
+  const done = slow.tap([t.s]);
+  t.d.resolve(1);
+  await done;
+  assert.deepEqual(log, ['t']);
+});
+
+test('Vorab-Anfragen beginnen im Hintergrund (still), Fehler bleiben still', async () => {
+  dataCache.clear();
+  const s: PrefetchSource = {
+    key: 'documents',
+    deps: [],
+    // wie api.ts: Die Anfrage merkt sich beim Start, ob sie im Hintergrund läuft.
+    load: () => {
+      if (background > 0) backgroundStarts++;
+      return Promise.reject(new Error('Keine Verbindung'));
+    },
+  };
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  await p.tap([s]);
+  await p.idle([{ ...s, key: 'gallery' }]);
+  assert.equal(backgroundStarts, 2);
+  assert.equal(background, 0);
+  assert.equal(dataCache.has(cacheKey('documents', [])), false);
+});
+
+test('Beim Antippen geladen gilt einmal als frisch', async () => {
+  dataCache.clear();
+  const log: string[] = [];
+  const a = source('news', log);
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  const done = p.tap([a.s]);
+  await tick();
+  const k = cacheKey('news', []);
+  a.d.resolve({ items: [] });
+  await done;
+  assert.equal(pendingPrefetch(k), undefined, 'nichts läuft mehr');
+  assert.equal(takeFresh(k), true);
+  assert.equal(takeFresh(k), false, 'nur einmal');
+});
+
+test('Wartet die Ansicht schon auf die Anfrage, gilt die Antwort danach nicht als frisch', async () => {
+  dataCache.clear();
+  const log: string[] = [];
+  const a = source('member', log);
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  const done = p.tap([a.s]);
+  await tick();
+  const k = cacheKey('member', []);
+  assert.ok(pendingPrefetch(k)); // die Ansicht öffnet, während die Anfrage noch läuft
+  a.d.resolve({ id: 2 });
+  await done;
+  assert.equal(dataCache.has(k), true);
+  assert.equal(takeFresh(k), false, 'beim nächsten Öffnen lädt sie wieder im Hintergrund neu');
+});
+
+test('Eine eigene Änderung während des Vorabladens: nichts ablegen, nicht frisch, nicht abwarten', async () => {
+  dataCache.clear();
+  const log: string[] = [];
+  const a = source('me', log);
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  const done = p.tap([a.s]);
+  await tick();
+  const k = cacheKey('me', []);
+  dataCache.clear(); // z. B. POST /points
+  assert.equal(pendingPrefetch(k), undefined, 'die Ansicht fragt selbst');
+  a.d.resolve({ id: 1 });
+  await done;
+  assert.equal(dataCache.has(k), false);
+  assert.equal(takeFresh(k), false);
+});
+
+test('Im Leerlauf geladen gilt nicht als frisch: Die Ansicht lädt im Hintergrund neu', async () => {
+  dataCache.clear();
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  await p.idle([{ key: 'offices', deps: [], load: () => Promise.resolve({ offices: [] }) }]);
+  assert.equal(dataCache.has(cacheKey('offices', [])), true);
+  assert.equal(takeFresh(cacheKey('offices', [])), false);
+});
+
+test('Frisch nur bis FRESH_MS nach dem Vorabladen', async () => {
+  dataCache.clear();
+  const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
+  await p.tap([{ key: 'galerie', deps: [], load: () => Promise.resolve({ years: [] }) }]);
+  assert.equal(takeFresh(cacheKey('galerie', []), Date.now() + 60_000), false);
+});

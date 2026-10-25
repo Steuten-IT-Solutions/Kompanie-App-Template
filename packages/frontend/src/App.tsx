@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin, newsTitle, type Capability } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
@@ -19,6 +19,8 @@ import { shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine from './views/Termine';
+import { prefetcher, tabSources } from './viewData';
+import { whenIdle } from './prefetch';
 
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
@@ -41,6 +43,15 @@ const Brett = lazyView(() => import('./views/Brett'));
 const Umfragen = lazyView(() => import('./views/Umfragen'));
 const Inventar = lazyView(() => import('./views/Inventar'));
 const Mitglieder = lazyView(() => import('./views/Mitglieder'));
+
+// Programmteile der Tabs, die erst bei Bedarf geladen werden: vorab anstoßen (Issue #104).
+const tabViews: Partial<Record<string, { preload: () => void }>> = {
+  galerie: Galerie,
+  dokumente: Dokumente,
+  mitglieder: Mitglieder,
+  meins: Meins,
+  verwaltung: Verwaltung,
+};
 
 type Tab = 'termine' | 'news' | 'galerie' | 'dokumente' | 'mitglieder' | 'meins' | 'verwaltung';
 type View =
@@ -319,6 +330,25 @@ export default function App({ notice = null }: { notice?: string | null }) {
     return () => window.removeEventListener(CONFIG_CHANGED, changed);
   }, []);
 
+  // Nach dem Start im Leerlauf die Daten der übrigen Tabs vorab laden (Issue #104), damit sie schon beim ersten Öffnen
+  // ohne „Lädt …“ erscheinen. Nur einmal, in der Reihenfolge der Tab-Leiste; Bedingungen in viewData.ts und prefetch.ts.
+  const idleStarted = useRef(false);
+  useEffect(() => {
+    if (idleStarted.current || !config) return;
+    idleStarted.current = true;
+    const others = tabs.filter((t) => t !== activeTab);
+    void prefetcher.idle(others.flatMap(tabSources));
+    // Programmteile nur, wenn der Service Worker sie schon gespeichert hat (kein zusätzlicher Download im Leerlauf).
+    if (navigator.serviceWorker?.controller) void whenIdle().then(() => others.forEach((t) => tabViews[t]?.preload()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Beim Antippen eines Tabs (pointerdown, etwa 100–300 ms vor dem click) bzw. Fokus per Tastatur.
+  const prefetchTab = (t: Tab) => {
+    if (t === activeTab || prefetcher.blocked()) return;
+    void prefetcher.tap(tabSources(t));
+    tabViews[t]?.preload();
+  };
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -505,6 +535,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
               className={activeTab === t ? 'active' : ''}
               aria-label={tabLabels()[t]}
               onClick={() => navigate(t)}
+              onPointerDown={() => prefetchTab(t)}
+              onFocus={() => prefetchTab(t)}
               aria-current={activeTab === t ? 'page' : undefined}
             >
               <Icon name={t} />

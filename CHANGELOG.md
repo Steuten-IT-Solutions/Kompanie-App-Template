@@ -17,6 +17,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Lizenzen**: Unter *Hilfe → Lizenzen* steht, unter welcher Lizenz die App steht (GPL-2.0-or-later), wo es den
+  vollständigen Quellcode gibt und welche Bausteine anderer Anbieter in der App enthalten sind, jeweils mit ihrer
+  Lizenz. Beide Pakete enthalten dazu die Dateien `LICENSE` und `THIRD-PARTY-NOTICES.txt`.
 - **Benachrichtigung öffnet den Eintrag**: Wer auf eine Benachrichtigung zu einem Termin tippt, landet direkt bei
   diesem Termin. Die Terminliste scrollt dorthin, klappt ihn auf und hebt ihn kurz hervor. Das gilt auch für die
   Erinnerung an einen einzelnen Termin am nächsten Tag, für Nachrichten am Schwarzen Brett sowie für eigene Punkte und
@@ -168,6 +171,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Beförderungen mit Abschnitt „Unter der Schwelle“**: Wer weniger Punkte hat, als sein jetziger Dienstgrad verlangt
   (Kandidaten zum Degradieren), steht jetzt ganz oben in einem eigenen, rot markierten Abschnitt, zusammen mit der
   übrigen Übersicht. Der Schalter „Nur unter der Schwelle …“ entfällt. Ist niemand darunter, fehlt der Abschnitt.
+
+- **Tabs öffnen schon beim ersten Mal ohne Warten**: Nach dem Start lädt die App, sobald nichts anderes zu tun ist, die
+  Daten der übrigen Tabs vorab, und beim Antippen eines Tabs, Albums, einer Umfrage, Anwesenheitsliste oder eines
+  Mitglieds in der Verwaltung beginnt das Laden schon beim Berühren. So erscheinen die Seiten meist sofort statt mit
+  „Lädt …“. Vorab geladen werden nur Daten, keine Bilder oder Dokumente; im Datensparmodus des Handys, bei langsamem
+  Netz, in der Vorschau „App als Rolle ansehen“ und im Wartungsmodus lädt die App nichts im Voraus.
 
 ### Behoben
 

@@ -1,9 +1,10 @@
 import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
-import { api, type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
+import { type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 import { lanes, yearRange } from '../yearGrid';
 
 const sec = brand.labels.sections;
@@ -19,7 +20,11 @@ export function termYears(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'
  * (enabled = false) keine Anfrage: Sie endete mit 403 und stünde dann unter „Fehler melden“.
  */
 export function useOffices(enabled = true) {
-  return useAsync<OfficesOverview | null>(() => (enabled ? api.offices() : Promise.resolve(null)), [], enabled ? 'offices' : undefined);
+  return useAsync<OfficesOverview | null>(
+    () => (enabled ? sources.offices.load() : Promise.resolve(null)),
+    [],
+    enabled ? sources.offices.key : undefined,
+  );
 }
 
 /** Dauer in Jahren: „18 Jahre“, laufende bis heute; leer bei einzelnen Jahren. */
