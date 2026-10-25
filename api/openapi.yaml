@@ -3808,7 +3808,7 @@ paths:
                     type: array
                     items:
                       type: object
-                      required: [id, name, album, intern, error, attempts, drive_url]
+                      required: [id, name, album, intern, error, attempts, unsupported, drive_url]
                       properties:
                         id: { type: integer }
                         name: { type: string, description: Dateiname in Google Drive }
@@ -3816,6 +3816,7 @@ paths:
                         intern: { type: boolean }
                         error: { type: string, description: Fehlermeldung der letzten Aufbereitung }
                         attempts: { type: integer }
+                        unsupported: { type: boolean, description: 'Video in einem Format, das die Galerie nicht abspielt (nur MP4 und WebM); ohne Versuche' }
                         drive_url: { type: string, description: Adresse der Datei in Google Drive }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -4956,7 +4957,8 @@ components:
       properties:
         id: { type: integer }
         title: { type: string }
-        count: { type: integer }
+        count: { type: integer, description: Bilder und Videos zusammen }
+        video_count: { type: integer, description: davon Videos }
         intern_count: { type: integer }
         cover: { type: [string, 'null'] }
 
@@ -4972,6 +4974,18 @@ components:
       type: object
       properties:
         id: { type: integer }
+        type: { type: string, enum: [image, video] }
+        video:
+          type: string
+          description: |
+            Nur bei Videos (MP4, WebM): Adresse zum Abspielen über die App (`…/foto/<id>/video`, außerhalb der API, auch
+            bei öffentlichen Videos). Der Server reicht den mit `Range` angefragten Bereich aus Google Drive durch und
+            speichert nichts: **206** mit `Content-Range`, `Accept-Ranges: bytes` und höchstens 4 MB je Antwort (ohne
+            `Range` ab dem Anfang; der Browser fordert den Rest nach). 416 mit `Content-Range: bytes */<Größe>`, wenn der
+            Bereich hinter dem Ende beginnt; interne Videos ohne Mitgliedschaft 401/403; 503 mit `Retry-After`, wenn
+            gerade zu viele Abrufe laufen; 502, wenn Google den Bereich nicht liefert.
+        mime: { type: string, description: 'Nur bei Videos: Dateityp (video/mp4 oder video/webm)' }
+        duration: { type: integer, description: 'Nur bei Videos: Dauer in Sekunden, 0 unbekannt' }
         thumb:
           type: string
           description: |
@@ -4982,11 +4996,11 @@ components:
             Seitenverhältnis des Fotos, `Cache-Control: no-store` und `Retry-After` (Sekunden); dann läuft
             die Aufbereitung im Hintergrund. Fertige Bilder: 200 mit JPEG. Interne Bilder ohne
             Mitgliedschaft: 401/403. Scheitert die Aufbereitung: 404.
-        large: { type: string, description: Adresse der Großansicht (Verhalten wie thumb) }
+        large: { type: string, description: 'Adresse der Großansicht (Verhalten wie thumb). Bei Videos das Vorschaubild aus Google Drive; leer, wenn Drive keines hat' }
         original:
           type: string
           description: |
-            Originalauflösung für die Großansicht, nach `large` nachzuladen. Erst erzeugt, wenn jemand sie abruft (aus
+            Nur bei Bildern. Originalauflösung für die Großansicht, nach `large` nachzuladen. Erst erzeugt, wenn jemand sie abruft (aus
             dem Original in Drive, als JPEG ohne Metadaten, höchstens 8192 Pixel); bis dahin über die App
             (`…/foto/<id>/original`), danach bei öffentlichen Bildern als statische Datei. 404, wenn es sie nicht gibt
             (Bild noch nicht aufbereitet, gerade kein Platz frei, Erzeugung gescheitert): dann bleibt `large`.

@@ -487,6 +487,31 @@ unset($_GET['album']);
 $c->ok(substr_count($html, 'class="ka-foto"') === 2 && !preg_match('#/app/foto/\d+/(thumb|large)#', $html), '[kompanie_galerie] zeigt Gästen keine internen Bilder');
 $c->ok(substr_count($html, 'data-ka-original="') === 2, '[kompanie_galerie] lädt in der Großansicht die Originalauflösung nach');
 
+// Videos (Issue #182): im Album mit ▶, abgespielt in Ausschnitten aus Drive (WpHttpClient mit Range).
+$videoAlbum = null;
+foreach ($overviewGuest[0]['albums'] ?? [] as $a) {
+    if ($a['title'] === 'Umzug') {
+        $videoAlbum = $a;
+    }
+}
+$c->ok(($videoAlbum['count'] ?? 0) === 2 && ($videoAlbum['video_count'] ?? 0) === 1, 'Album mit Bild und Video gezählt');
+$videoAlbum = $videoAlbum ? $gallery->album($videoAlbum['id'], false) : null;
+$video = $videoAlbum ? array_values(array_filter($videoAlbum['photos'], static fn ($p) => $p['type'] === 'video'))[0] ?? null : null;
+$c->ok($video !== null && str_contains($video['video'], '/app/foto/' . $video['id'] . '/video') && $video['mime'] === 'video/webm' && $video['duration'] === 2, 'Video im Album mit Adresse, Dateityp und Dauer');
+$videoFile = (string) file_get_contents(dirname(__DIR__) . '/fixtures/galerie-video.webm');
+$_SERVER['HTTP_RANGE'] = 'bytes=100-199';
+$videoRes = KompanieApp\WordPress\AppPage::videoResponse($app, (int) ($video['id'] ?? 0));
+$c->ok($videoRes['status'] === 206 && $videoRes['contentRange'] === 'bytes 100-199/' . strlen($videoFile) && ($videoRes['body'] ?? '') === substr($videoFile, 100, 100), 'Ausschnitt des Videos aus Drive (206, Content-Range)');
+unset($_SERVER['HTTP_RANGE']);
+$videoRes = KompanieApp\WordPress\AppPage::videoResponse($app, (int) ($video['id'] ?? 0));
+$c->ok($videoRes['status'] === 206 && ($videoRes['body'] ?? '') === $videoFile, 'Ohne Range ab dem Anfang (kleines Video ganz)');
+$_GET['album'] = (string) ($videoAlbum['id'] ?? 0);
+$html = do_shortcode('[kompanie_galerie]');
+unset($_GET['album']);
+$c->ok(substr_count($html, 'class="ka-foto ka-foto-video"') === 1 && str_contains($html, '/app/foto/' . ($video['id'] ?? 0) . '/video') && str_contains($html, 'class="ka-foto-dauer">0:02<'), '[kompanie_galerie] zeigt das Video mit ▶ und Dauer');
+$html = do_shortcode('[kompanie_galerie]');
+$c->ok(str_contains($html, '1 Bild · 1 Video'), '[kompanie_galerie] zählt Bilder und Videos');
+
 $c->section('Laufzeit-Konfiguration und App-Seite');
 wp_set_current_user($member);
 $config = $app->api()->config();

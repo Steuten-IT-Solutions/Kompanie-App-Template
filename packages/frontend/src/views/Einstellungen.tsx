@@ -769,12 +769,12 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
     try {
       // Erst abgleichen, dann so lange aufbereiten, bis nichts mehr aussteht.
       let r = await api.syncGallery(false);
-      setProgress(`${r.albums} Alben, ${r.photos} Bilder gefunden – ${r.pending} Bilder werden noch aufbereitet …`);
+      setProgress(`${r.albums} Alben, ${r.photos} Bilder und Videos gefunden – ${r.pending} werden noch aufbereitet …`);
       for (let round = 0; r.pending > 0 && r.processed > 0 && round < 50; round++) {
         r = await api.syncGallery(true);
-        setProgress(`${r.albums} Alben, ${r.photos} Bilder – noch ${r.pending} Bilder …`);
+        setProgress(`${r.albums} Alben, ${r.photos} Bilder und Videos – noch ${r.pending} …`);
       }
-      const parts = [`${r.albums} Alben, ${r.photos} Bilder.`];
+      const parts = [`${r.albums} Alben, ${r.photos} Bilder und Videos.`];
       if (r.pending > 0) parts.push(`${r.pending} Bilder werden stündlich automatisch weiter aufbereitet.`);
       if (r.failed > 0) parts.push(`${r.failed} Bilder ließen sich nicht laden (Liste unten).`);
       setProgress((r.pending > 0 || r.failed > 0 ? 'Abgeglichen: ' : 'Fertig: ') + parts.join(' '));
@@ -873,6 +873,10 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
         Vorschaubild von Google. Hier stehen Bilder, bei denen auch das nicht ging, z. B. beschädigte Dateien. Abhilfe: das Bild als JPG in
         denselben Ordner in Google Drive legen (das alte entfernen); der nächste Abgleich nimmt es neu auf.
       </p>
+      <p className="small muted">
+        Videos zeigt die Galerie als MP4 oder WebM. Andere Formate (z. B. MOV, AVI) stehen hier als „nicht unterstützt“. Abhilfe: das Video
+        als MP4 speichern und in denselben Ordner legen.
+      </p>
       {error && (
         <p className="form-error small" role="alert">
           {error}
@@ -888,7 +892,8 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
                 <span className="small muted">
                   {' '}
                   {p.album || 'ohne Album'}
-                  {p.intern && ' (intern)'} · {p.attempts === 1 ? '1 Versuch' : `${p.attempts} Versuche`}
+                  {p.intern && ' (intern)'}
+                  {!p.unsupported && ` · ${p.attempts === 1 ? '1 Versuch' : `${p.attempts} Versuche`}`}
                 </span>
                 <br />
                 <span className="small">{p.error || 'ohne Fehlermeldung'}</span>{' '}

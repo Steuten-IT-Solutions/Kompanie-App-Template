@@ -26,7 +26,7 @@ function Overview() {
                   {a.cover ? <img src={a.cover} alt="" loading="lazy" /> : <span className="album-placeholder" />}
                   <span className="album-title">{a.title}</span>
                   <span className="album-count">
-                    {a.count} {a.count === 1 ? 'Bild' : 'Bilder'}
+                    {mediaCount(a.count, a.video_count ?? 0)}
                     {a.intern_count > 0 && ` · ${a.intern_count} intern`}
                   </span>
                 </button>
@@ -37,6 +37,24 @@ function Overview() {
       ))}
     </div>
   );
+}
+
+/** „3 Bilder · 1 Video“ (wie der Shortcode auf der Webseite, Shortcodes::mediaCount). */
+export function mediaCount(count: number, videos: number): string {
+  const images = count - videos;
+  const parts: string[] = [];
+  if (images > 0 || videos === 0) parts.push(`${images} ${images === 1 ? 'Bild' : 'Bilder'}`);
+  if (videos > 0) parts.push(`${videos} ${videos === 1 ? 'Video' : 'Videos'}`);
+  return parts.join(' · ');
+}
+
+/** Dauer eines Videos „1:02“. */
+function duration(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function isVideo(p: GalleryPhoto): boolean {
+  return p.type === 'video' && !!p.video;
 }
 
 /** Noch nicht aufbereitete Bilder: so oft neu laden (alle 10 s, wie Retry-After), danach erst beim nächsten Öffnen. */
@@ -67,7 +85,9 @@ function Album({ id }: { id: number }) {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const album = data!;
-  const photos = album.photos.map((p) => (p.ready ? p : { ...p, thumb: retryUrl(p.thumb, retry), large: retryUrl(p.large, retry) }));
+  const photos = album.photos.map((p) =>
+    p.ready || !p.thumb ? p : { ...p, thumb: retryUrl(p.thumb, retry), large: p.large && retryUrl(p.large, retry) },
+  );
 
   return (
     <div>
@@ -81,12 +101,20 @@ function Album({ id }: { id: number }) {
         {photos.map((p, i) => (
           <li key={p.id}>
             <button
-              className="photo"
+              className={isVideo(p) ? 'photo photo-video' : 'photo'}
               onClick={() => setOpen(i)}
               data-intern={p.intern ? '' : undefined}
-              aria-label={`Bild ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`}
+              aria-label={`${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`}
             >
-              <img src={p.thumb} alt="" loading="lazy" />
+              {p.thumb && <img src={p.thumb} alt="" loading="lazy" />}
+              {isVideo(p) && (
+                <>
+                  <span className="photo-play" aria-hidden="true">
+                    ▶
+                  </span>
+                  {!!p.duration && <span className="photo-duration">{duration(p.duration)}</span>}
+                </>
+              )}
               {p.intern && (
                 <span className="photo-lock" aria-hidden="true">
                   🔒
@@ -118,7 +146,8 @@ function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
 /**
  * Vollbild-Ansicht mit Wischen, Pfeiltasten und Escape. Zoomen mit zwei Fingern (bis 4-fach) oder doppeltem Tippen;
  * vergrößert verschiebt ein Finger das Bild statt zu blättern. Zuerst erscheint die 1600er-Fassung, die
- * Originalauflösung wird nachgeladen und ersetzt sie, sobald sie ganz da ist.
+ * Originalauflösung wird nachgeladen und ersetzt sie, sobald sie ganz da ist. Videos spielt der Player des Browsers ab
+ * (ohne Zoom; Wischen auf dem Video bedient den Player, daneben und mit den Pfeilen wird geblättert).
  */
 function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: number; onClose: () => void }) {
   const [i, setI] = useState(start);
@@ -128,6 +157,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   const closeRef = useRef<HTMLButtonElement>(null);
   // IDs der Bilder, deren Originalauflösung schon geladen ist (dann aus dem Speicher des Browsers).
   const [originals, setOriginals] = useState<ReadonlySet<number>>(() => new Set());
+  // Video, das der Browser nicht abspielen kann (z. B. MP4 mit HEVC)
+  const [unplayable, setUnplayable] = useState<number | null>(null);
   const go = useCallback(
     (d: number) => {
       setZoom(NO_ZOOM);
@@ -137,6 +168,10 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   );
 
   function onTouchStart(e: TouchEvent) {
+    if (e.target instanceof HTMLVideoElement) {
+      gesture.current = null;
+      return;
+    }
     if (e.touches.length === 2) {
       const p = pinch(e.touches);
       gesture.current = { kind: 'pinch', x: p.cx, y: p.cy, start: zoom, dist: p.dist };
@@ -166,8 +201,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     const t = e.changedTouches[0];
     const moved = Math.hypot(t.clientX - g.x, t.clientY - g.y);
     if (g.kind === 'swipe' && Math.abs(t.clientX - g.x) > 40) return go(t.clientX < g.x ? 1 : -1);
-    // Doppeltes Tippen: zweifach vergrößern bzw. zurück
-    if (g.kind !== 'pinch' && moved < 10) {
+    // Doppeltes Tippen: zweifach vergrößern bzw. zurück (nicht bei Videos)
+    if (g.kind !== 'pinch' && moved < 10 && !isVideo(photos[i])) {
       const now = Date.now();
       if (now - lastTap.current < 300) {
         setZoom(zoom.scale > 1 ? NO_ZOOM : { scale: 2, x: 0, y: 0 });
@@ -180,6 +215,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      // Im Video (Fokus auf dem Player) spulen die Pfeile, statt zu blättern.
+      if (e.target instanceof HTMLVideoElement) return;
       if (e.key === 'ArrowLeft') go(-1);
       if (e.key === 'ArrowRight') go(1);
     };
@@ -195,13 +232,16 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   // Vorheriges und nächstes Bild schon laden, damit das Wischen ohne Wartezeit klappt.
   useEffect(() => {
     if (photos.length < 2) return;
-    for (const n of [i + 1, i - 1 + photos.length]) new Image().src = photos[n % photos.length].large;
+    for (const n of [i + 1, i - 1 + photos.length]) {
+      const large = photos[n % photos.length].large;
+      if (large) new Image().src = large;
+    }
   }, [i, photos]);
 
   // Originalauflösung des gezeigten Bildes nachladen; fehlt sie (404) oder dauert es, bleibt die 1600er stehen.
   useEffect(() => {
     const cur = photos[i];
-    if (!cur.ready || !cur.original || originals.has(cur.id)) return;
+    if (isVideo(cur) || !cur.ready || !cur.original || originals.has(cur.id)) return;
     const big = new Image();
     big.onload = () => setOriginals((s) => new Set(s).add(cur.id));
     big.src = cur.original;
@@ -222,22 +262,39 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      <img
-        key={p.id}
-        src={p.original && originals.has(p.id) ? p.original : p.large}
-        alt=""
-        className={zoom.scale > 1 ? 'zoomed' : undefined}
-        style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
-      />
+      {isVideo(p) ? (
+        unplayable === p.id ? (
+          <p className="lb-error">Dieses Video kann dein Browser nicht abspielen.</p>
+        ) : (
+          // key: Beim Blättern hält das alte Video an, das neue lädt von vorn.
+          <video
+            key={p.id}
+            src={p.video}
+            poster={p.large || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            onError={() => setUnplayable(p.id)}
+          />
+        )
+      ) : (
+        <img
+          key={p.id}
+          src={p.original && originals.has(p.id) ? p.original : p.large}
+          alt=""
+          className={zoom.scale > 1 ? 'zoomed' : undefined}
+          style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
+        />
+      )}
       <button ref={closeRef} className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
         ✕
       </button>
       {photos.length > 1 && (
         <>
-          <button className="lb-btn lb-prev" onClick={() => go(-1)} aria-label="Vorheriges Bild">
+          <button className="lb-btn lb-prev" onClick={() => go(-1)} aria-label="Vorheriges">
             ‹
           </button>
-          <button className="lb-btn lb-next" onClick={() => go(1)} aria-label="Nächstes Bild">
+          <button className="lb-btn lb-next" onClick={() => go(1)} aria-label="Nächstes">
             ›
           </button>
         </>

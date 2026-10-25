@@ -13,7 +13,7 @@ Tippe unten auf **{bereich.gallery}**.
 
 ## Was du hier siehst
 - **Jahr**: Überschrift über den Alben dieses Jahres.
-- **Album**: ein Vorschaubild, der Titel und die Anzahl der Bilder, z. B. „3 Bilder · 1 intern“. „intern“ zählt die Bilder, die nur {rolle.member} sehen.
+- **Album**: ein Vorschaubild, der Titel und die Anzahl der Bilder und Videos, z. B. „3 Bilder · 1 Video · 1 intern“. „intern“ zählt die Bilder und Videos, die nur {rolle.member} sehen.
 
 ## So gehst du vor
 ### Ein Album öffnen

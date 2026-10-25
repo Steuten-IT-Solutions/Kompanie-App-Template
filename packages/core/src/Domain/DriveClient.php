@@ -524,7 +524,7 @@ final class DriveClient
         do {
             $params = [
                 'q' => sprintf("'%s' in parents and trashed = false", str_replace("'", "\\'", $folderId)),
-                'fields' => 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,imageMediaMetadata(width,height,time))',
+                'fields' => 'nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,size,imageMediaMetadata(width,height,time),videoMediaMetadata(width,height,durationMillis))',
                 'pageSize' => 1000,
                 'orderBy' => 'name',
                 'supportsAllDrives' => 'true',
@@ -650,6 +650,29 @@ final class DriveClient
      *
      * @throws \RuntimeException wenn Google kein Vorschaubild hat oder der Abruf scheitert
      */
+    /**
+     * Ausschnitt einer Datei (Bytes $start bis $end einschließlich) per Range-Anfrage, z. B. zum Abspielen eines Videos
+     * aus Drive, ohne es zu speichern.
+     *
+     * @return array{body: string, start: int, end: int, total: int} wie Drive ihn liefert (Content-Range)
+     * @throws \RuntimeException wenn Drive den Ausschnitt nicht liefert
+     */
+    public function downloadRange(string $fileId, int $start, int $end): array
+    {
+        $url = self::FILES_URL . '/' . rawurlencode($fileId) . '?alt=media&supportsAllDrives=true';
+        $res = $this->http->request('GET', $url, ['Authorization' => 'Bearer ' . $this->accessToken(), 'Range' => 'bytes=' . $start . '-' . $end], null, 30);
+        if ($res['status'] === 206 && preg_match('#^bytes (\d+)-(\d+)/(\d+)$#', trim((string) ($res['headers']['content-range'] ?? '')), $m)) {
+            return ['body' => $res['body'], 'start' => (int) $m[1], 'end' => (int) $m[2], 'total' => (int) $m[3]];
+        }
+        if ($res['status'] === 200 && $start === 0) {
+            // Ganze Datei statt Ausschnitt (kleine Datei): nur den angefragten Teil weitergeben.
+            $total = strlen($res['body']);
+            $end = min($end, $total - 1);
+            return ['body' => substr($res['body'], 0, $end + 1), 'start' => 0, 'end' => $end, 'total' => $total];
+        }
+        throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $res['status']);
+    }
+
     public function thumbnail(string $fileId, int $maxEdge): string
     {
         $token = $this->accessToken();
@@ -703,6 +726,19 @@ final class DriveClient
     public static function isImage(array $f): bool
     {
         return str_starts_with((string) ($f['mimeType'] ?? ''), 'image/');
+    }
+
+    public static function isVideo(array $f): bool
+    {
+        return str_starts_with((string) ($f['mimeType'] ?? ''), 'video/');
+    }
+
+    /** Videos, die die Galerie abspielt; andere Formate spielen viele Browser nicht ab (Liste für Admins). */
+    public const PLAYABLE_VIDEO = ['video/mp4', 'video/webm'];
+
+    public static function isPlayableVideo(string $mime): bool
+    {
+        return in_array(strtolower($mime), self::PLAYABLE_VIDEO, true);
     }
 
     /** Ordner-ID aus einem Drive-Link oder direkt. */

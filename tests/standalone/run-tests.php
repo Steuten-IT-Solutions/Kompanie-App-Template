@@ -306,7 +306,16 @@ try {
     $c->ok($asMember[0] === 200 && ($asMember[2]['cache-control'] ?? '') === 'no-store', 'Vorschau als Mitglied: internes Foto, nicht speichern');
     $c->ok($d->send('GET', $photoUrl . '&vorschau=guest', $annaCookie, null)[0] === 403, 'Vorschau als Gast: internes Foto → 403');
     $c->ok($d->send('GET', $photoUrl, $annaCookie + ['X-Kompanie-Preview' => '@public'], null)[0] === 401, 'Vorschau ohne Anmeldung (Header): internes Foto → 401');
-    $kdb->execute('DELETE FROM {photos} WHERE id = ?', [$photoId]);
+    // Videos (Issue #182): Rechte vor dem Abruf aus Drive; ohne Google-Zugang (dieser Testserver) 502.
+    $videoId = $kdb->insert('photos', ['album_id' => $albumId, 'drive_file_id' => 'video-1', 'name' => 'film.mp4', 'is_intern' => 1, 'file_key' => 'video' . bin2hex(random_bytes(4)), 'status' => 'ready', 'media' => 'video', 'mime' => 'video/mp4', 'bytes' => 1000]);
+    $videoUrl = $base . 'index.php?r=/foto/' . $videoId . '/video';
+    $guestVideo = $d->send('GET', $videoUrl, ['Range' => 'bytes=0-'], null);
+    $c->ok($guestVideo[0] === 401 && ($guestVideo[2]['accept-ranges'] ?? '') === 'bytes' && ($guestVideo[2]['cache-control'] ?? '') === 'no-store', 'Internes Video ohne Anmeldung → 401');
+    $c->ok($d->send('GET', $videoUrl, $annaCookie + ['Range' => 'bytes=0-'], null)[0] === 502, 'Internes Video als Mitglied: Abruf aus Drive (hier ohne Zugang → 502)');
+    $tooFar = $d->send('GET', $videoUrl, $annaCookie + ['Range' => 'bytes=1000-'], null);
+    $c->ok($tooFar[0] === 416 && ($tooFar[2]['content-range'] ?? '') === 'bytes */1000', 'Bereich hinter dem Ende → 416 mit Größe');
+    $c->ok($d->send('GET', $base . 'index.php?r=/foto/' . $photoId . '/video', $annaCookie, null)[0] === 404, 'Bild als Video → 404');
+    $kdb->execute('DELETE FROM {photos} WHERE id IN (?, ?)', [$photoId, $videoId]);
     $kdb->execute('DELETE FROM {albums} WHERE id = ?', [$albumId]);
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');
