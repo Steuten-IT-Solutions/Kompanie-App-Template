@@ -26,7 +26,7 @@ für Bausteine, die in den Paketen landen, nur erlaubt:
 | MIT, ISC, 0BSD, BSD-2-Clause, BSD-3-Clause | freizügig |
 | Apache-2.0 | freizügig; eine NOTICE-Datei des Pakets wird mitgeliefert |
 | MPL-2.0 | Copyleft nur je Datei |
-| LGPL-2.1-or-later, LGPL-3.0-or-later | nur für austauschbare Bibliotheken |
+| LGPL-2.1-or-later, LGPL-3.0-or-later, LGPL-2.1-only | nur für austauschbare Bibliotheken; „-only“ schließt nur den Wechsel auf eine spätere LGPL-Version aus, die Pflichten sind dieselben (PHPMailer, Issue #172) |
 | OFL-1.1 | Schriften; dürfen nicht allein verkauft werden |
 
 **Nicht erlaubt:** GPL, AGPL, Lizenzen mit Ausnahmen (`WITH …`), proprietäre oder kostenpflichtige Erweiterungen
@@ -46,7 +46,7 @@ WordPress) nutzt das Plugin zur Laufzeit, liefert sie aber nicht mit.
    bringt sein Paket in die Liste. Darum stehen dort je Kompanie nur die gewählte Schrift und keine Build-Werkzeuge,
    und eine neue Abhängigkeit erscheint ohne weitere Pflege, sobald die App sie importiert. Dazu die Hilfsfunktionen,
    die Vite selbst in den Build schreibt (MIT), und die PHP-Bibliotheken aus `composer.lock` (`packages`, nicht
-   `packages-dev`; derzeit keine). Ein unbekanntes virtuelles Modul oder eine Datei aus `node_modules`, deren Paket
+   `packages-dev`; derzeit PHPMailer, das nur die eigenständige Version mitliefert – die Hinweise sind für beide Pakete dieselben). Ein unbekanntes virtuelles Modul oder eine Datei aus `node_modules`, deren Paket
    nicht erfasst ist, bricht den Build ab.
 2. **Prüfung:** Die Lizenzangabe des Pakets (`license` in `package.json` bzw. `composer.lock`) muss nach der
    Positivliste erlaubt sein, und eine Lizenzdatei des Pakets muss den Text genau dieser Lizenz enthalten. Sonst

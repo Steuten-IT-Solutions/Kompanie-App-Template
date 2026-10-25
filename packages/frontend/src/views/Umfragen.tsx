@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, type Poll, type PollInput, type PollResults, type PollType } from '../api';
 import { canManagePolls, pollsVisible, refreshBoard } from '../board';
-import { formatShortTime } from '../format';
+import { formatShortTime, fromLocalInput, toLocalInput } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -265,21 +265,6 @@ function PollList() {
       {ended.length === 0 ? <Empty>Noch keine beendeten Umfragen.</Empty> : ended.map(item)}
     </div>
   );
-}
-
-/** Lokale Zeit fürs Feld datetime-local („JJJJ-MM-TTTHH:MM“). */
-function toLocalInput(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/** Eingabe des Felds als Zeitpunkt mit Zeitzone (Ortszeit des Geräts); leer = ohne Ende. */
-function fromLocalInput(value: string): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toISOString();
 }
 
 /** Anlegen und Ändern; Art, Möglichkeiten, Anonymität und Sichtbarkeit sind nach der ersten Antwort fest. */

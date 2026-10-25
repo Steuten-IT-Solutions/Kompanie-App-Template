@@ -114,7 +114,7 @@ final class QueryCountTest extends TestCase
             $call('PATCH', "/members/$id/role", ['extra_roles' => $i % 2 === 0 ? ['events'] : ['events', 'documents']]);
             $call('PUT', "/members/$id/birthday", ['month' => 1 + $i % 12, 'day' => 1 + $i % 28]);
             $call('POST', '/inventory', ['title' => "Gegenstand $i", 'quantity' => 2, 'location' => 'Lager']);
-            $call('POST', '/board', ['text' => "Hallo $i"]);
+            $call('POST', '/board', ['title' => 'Titel', 'text' => "Hallo $i"]);
             $call('POST', "/offices/$office/terms", ['start_year' => 1950 + $i, 'end_year' => 1951 + $i, 'holders' => [['user_id' => $id], ['name' => "Früher $i"]]]);
             $users->current = $id;
             $call('PUT', "/polls/{$poll['id']}/vote", ['option_ids' => [$poll['options'][0]['id']]]);

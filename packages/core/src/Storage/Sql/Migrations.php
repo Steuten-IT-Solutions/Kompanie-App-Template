@@ -479,7 +479,8 @@ final class Migrations
                     "ALTER TABLE {ranks} ADD COLUMN badge_version TEXT NOT NULL DEFAULT ''",
                 ],
             ],
-            // Schwarzes Brett (Issue #5): dringende Nachrichten, je 24 Stunden gültig (expires_at), danach gelöscht.
+            // Schwarzes Brett (Issue #5): dringende Nachrichten, gültig bis expires_at (anfangs fest 24 Stunden, seit Issue #172
+            // frei wählbar; Titel, Verlauf usw. in Migration 29).
             10 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {board_messages} (
@@ -1128,9 +1129,147 @@ final class Migrations
 )',
                 ],
             ],
+            // Schwarzes Brett (Issue #172): Titel, formatierter Inhalt (bereinigtes HTML), vorzeitiges Löschen mit Konto und
+            // Zeitpunkt (deleted_at/deleted_by; expires_at wird dabei auf den Zeitpunkt gesetzt, damit auch ältere Versionen
+            // die Nachricht nicht mehr zeigen). Bestehende Nachrichten (reiner Text) werden HTML-escaped, Zeilenumbrüche zu
+            // <br>, und bekommen als Titel ihre erste Zeile (höchstens 80 Zeichen). In MySQL longtext statt text (höchstens
+            // 64 KB); SQLite hat für TEXT keine eigene Grenze. title ist NULL-fähig, damit ältere Versionen weiter schreiben
+            // können (MySQL erlaubt für longtext keinen Standardwert).
+            // Dazu: Signaturen je Konto (user_signatures), Bilder in formatierten Inhalten (rich_images, Base64 wie die Fotos
+            // der Mitglieder; owner_type signature, board oder draft für noch nicht gespeicherte), Änderungsverfolgung
+            // (board_message_revisions, ohne Fremdschlüssel: überdauert das Löschen der Nachricht), Mailversand je
+            // Empfänger (board_mails: Warteschlange und Protokoll) und Einstellungen je Konto (user_settings, z. B.
+            // board_mail = 0 für „keine Mails vom Brett“).
+            29 => [
+                'mysql' => [
+                    'ALTER TABLE {board_messages} ADD COLUMN title longtext DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_at datetime DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_by bigint(20) unsigned DEFAULT NULL',
+                    'ALTER TABLE {board_messages} MODIFY body longtext NOT NULL',
+                    "UPDATE {board_messages} SET
+  title = COALESCE(NULLIF(CASE WHEN CHAR_LENGTH(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1))) > 80
+    THEN CONCAT(LEFT(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)), 79), '…')
+    ELSE TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)) END, ''), 'Nachricht'),
+  body = CONCAT('<p>', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(body, CHAR(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), CHAR(10), '<br>'), '</p>')
+WHERE title IS NULL",
+                    'CREATE TABLE IF NOT EXISTS {user_signatures} (
+  user_id bigint(20) unsigned NOT NULL,
+  content longtext NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (user_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {rich_images} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  uid varchar(32) NOT NULL,
+  owner_type varchar(20) NOT NULL,
+  owner_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  mime varchar(20) NOT NULL,
+  width int(11) NOT NULL,
+  height int(11) NOT NULL,
+  bytes bigint(20) unsigned NOT NULL,
+  data longtext NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uid (uid),
+  KEY owner (owner_type, owner_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {board_message_revisions} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  message_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  action varchar(20) NOT NULL,
+  before_value longtext DEFAULT NULL,
+  after_value longtext DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY message_id (message_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {board_mails} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  message_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  email varchar(191) NOT NULL,
+  status varchar(10) NOT NULL,
+  attempts int(11) NOT NULL DEFAULT 0,
+  error text DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY message_id (message_id),
+  KEY status (status)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {user_settings} (
+  user_id bigint(20) unsigned NOT NULL,
+  name varchar(64) NOT NULL,
+  value text NOT NULL,
+  PRIMARY KEY (user_id, name)
+) {options}',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {board_messages} ADD COLUMN title TEXT DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_at TEXT DEFAULT NULL',
+                    'ALTER TABLE {board_messages} ADD COLUMN deleted_by INTEGER DEFAULT NULL',
+                    "UPDATE {board_messages} SET
+  title = COALESCE(NULLIF(CASE WHEN length(trim(substr(replace(body, char(13), ''), 1, instr(replace(body, char(13), '') || char(10), char(10)) - 1))) > 80
+    THEN substr(trim(substr(replace(body, char(13), ''), 1, instr(replace(body, char(13), '') || char(10), char(10)) - 1)), 1, 79) || '…'
+    ELSE trim(substr(replace(body, char(13), ''), 1, instr(replace(body, char(13), '') || char(10), char(10)) - 1)) END, ''), 'Nachricht'),
+  body = '<p>' || replace(replace(replace(replace(replace(body, char(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), char(10), '<br>') || '</p>'
+WHERE title IS NULL",
+                    'CREATE TABLE IF NOT EXISTS {user_signatures} (
+  user_id INTEGER NOT NULL PRIMARY KEY,
+  content TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {rich_images} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL,
+  owner_type TEXT NOT NULL,
+  owner_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  mime TEXT NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  bytes INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {rich_images}_uid ON {rich_images} (uid)',
+                    'CREATE INDEX IF NOT EXISTS {rich_images}_owner ON {rich_images} (owner_type, owner_id)',
+                    'CREATE TABLE IF NOT EXISTS {board_message_revisions} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  action TEXT NOT NULL,
+  before_value TEXT DEFAULT NULL,
+  after_value TEXT DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {board_message_revisions}_message_id ON {board_message_revisions} (message_id)',
+                    'CREATE TABLE IF NOT EXISTS {board_mails} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {board_mails}_message_id ON {board_mails} (message_id)',
+                    'CREATE INDEX IF NOT EXISTS {board_mails}_status ON {board_mails} (status)',
+                    'CREATE TABLE IF NOT EXISTS {user_settings} (
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (user_id, name)
+)',
+                ],
+            ],
             // Videos in der Galerie (Issue #182): media 'image' oder 'video'; bei Videos Dateityp, Größe in Bytes und Dauer aus
             // Drive. Abgespielt wird aus Drive (GalleryService::deliverVideo), gespeichert wird nur das Vorschaubild.
-            29 => [
+            30 => [
                 'mysql' => [
                     "ALTER TABLE {photos} ADD COLUMN media varchar(10) NOT NULL DEFAULT 'image'",
                     "ALTER TABLE {photos} ADD COLUMN mime varchar(100) NOT NULL DEFAULT ''",

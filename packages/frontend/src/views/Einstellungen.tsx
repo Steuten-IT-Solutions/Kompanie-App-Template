@@ -10,6 +10,7 @@ import {
   type FailedPhoto,
   type Feature,
   type FeatureInfo,
+  type MailSettings,
   type NewsSourceType,
 } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
@@ -19,6 +20,7 @@ import Wartung from './Wartung';
 import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
+import { formatBytes } from '../format';
 
 const sec = brand.labels.sections;
 
@@ -27,6 +29,7 @@ const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
+  { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
   { id: 'google', title: 'Google-Zugang', text: `Verbindung zu Google für ${sec.gallery} und Kalender.` },
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
@@ -60,6 +63,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
+      {page.id === 'email' && <MailSection onToast={onToast} />}
       {page.id === 'nutzung' && <Nutzung onToast={onToast} />}
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
@@ -193,6 +197,206 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
       </p>
     </section>
   );
+}
+
+/**
+ * E-Mail (Issue #172): Kompanieadresse (Absender) und SMTP des Mailservers, Verbindung prüfen, Testmail, Versand in
+ * Portionen. Das Passwort zeigt der Server nie an; leer lassen behält es.
+ */
+function MailSection({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.mailSettings(), [], 'admin/mail');
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  return <MailForm key={JSON.stringify(data)} settings={data!} onSaved={setData} onToast={onToast} />;
+}
+
+function MailForm({
+  settings,
+  onSaved,
+  onToast,
+}: {
+  settings: MailSettings;
+  onSaved: (s: MailSettings) => void;
+  onToast: (msg: string) => void;
+}) {
+  const [form, setForm] = useState({
+    from: settings.from,
+    from_name: settings.from_name,
+    host: settings.host,
+    port: String(settings.port || 587),
+    secure: settings.secure,
+    user: settings.user,
+    password: '',
+    batch_size: String(settings.batch_size),
+    batch_pause: String(settings.batch_pause),
+  });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testTo, setTestTo] = useState('');
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });
+
+  async function run<T>(action: () => Promise<T>, done: (r: T) => void) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      done(await action());
+    } catch (err) {
+      setMessage({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function save(e: FormEvent) {
+    e.preventDefault();
+    const { password, port, batch_size, batch_pause, ...rest } = form;
+    void run(
+      () =>
+        api.updateMailSettings({
+          ...rest,
+          port: Number(port),
+          batch_size: Number(batch_size),
+          batch_pause: Number(batch_pause),
+          ...(password !== '' ? { password } : {}),
+        }),
+      (s) => {
+        onSaved(s);
+        onToast('Gespeichert');
+      },
+    );
+  }
+
+  return (
+    <form className="card settings-section form" id="einstellungen-email" onSubmit={save}>
+      <h3>E-Mail</h3>
+      <p className="small muted">
+        Über diese Adresse verschickt die App Mails, z. B. Nachrichten aus „{sec.board}“ an die Mitglieder. Antworten und nicht zustellbare
+        Mails gehen an diese Adresse. Die Zugangsdaten stehen beim Anbieter des Postfachs (Hoster oder Mailanbieter) unter „SMTP“ oder
+        „Postausgangsserver“.
+      </p>
+      {settings.unavailable && (
+        <p className="form-error" role="alert">
+          {settings.unavailable}
+        </p>
+      )}
+      <label className="field">
+        <span>Kompanieadresse (Absender)</span>
+        <input
+          type="email"
+          className="mail-from"
+          value={form.from}
+          onChange={set('from')}
+          placeholder="info@beispiel.de"
+          autoComplete="off"
+        />
+      </label>
+      <label className="field">
+        <span>Absendername</span>
+        <input value={form.from_name} onChange={set('from_name')} placeholder={settings.from_name_default} />
+      </label>
+      <label className="field">
+        <span>Mailserver (SMTP)</span>
+        <input className="mail-host" value={form.host} onChange={set('host')} placeholder="smtp.beispiel.de" autoComplete="off" />
+      </label>
+      <div className="field-row">
+        <label className="field">
+          <span>Port</span>
+          <input type="number" min={1} max={65535} value={form.port} onChange={set('port')} />
+        </label>
+        <label className="field">
+          <span>Verschlüsselung</span>
+          <select value={form.secure} onChange={(e) => setForm({ ...form, secure: e.target.value as MailSettings['secure'] })}>
+            <option value="starttls">STARTTLS (meist Port 587)</option>
+            <option value="ssl">SSL/TLS (meist Port 465)</option>
+            <option value="none">keine</option>
+          </select>
+        </label>
+      </div>
+      <label className="field">
+        <span>Benutzername</span>
+        <input value={form.user} onChange={set('user')} autoComplete="off" />
+      </label>
+      <label className="field">
+        <span>Passwort{settings.password_set ? ' (gespeichert – leer lassen, um es zu behalten)' : ''}</span>
+        <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
+      </label>
+      <details>
+        <summary>Versand in Portionen</summary>
+        <p className="small muted">
+          Manche Hoster erlauben nur eine bestimmte Zahl Mails pro Stunde. Dann hier eine Portionsgröße und eine Pause eintragen. 0
+          bedeutet: alle auf einmal bzw. ohne Pause. Die App versucht es alle 15 Minuten; eine Pause dauert deshalb mindestens bis zum
+          nächsten Lauf.
+        </p>
+        <div className="field-row">
+          <label className="field">
+            <span>Mails je Portion</span>
+            <input type="number" min={0} value={form.batch_size} onChange={set('batch_size')} />
+          </label>
+          <label className="field">
+            <span>Pause (Minuten)</span>
+            <input type="number" min={0} value={form.batch_pause} onChange={set('batch_pause')} />
+          </label>
+        </div>
+      </details>
+      <button className="btn btn-block" type="submit" disabled={busy}>
+        Speichern
+      </button>
+      {settings.configured && (
+        <>
+          <div className="button-row">
+            <button
+              type="button"
+              className="btn btn-secondary mail-check"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => api.checkMail(),
+                  (r) => {
+                    onSaved(r.settings);
+                    setMessage({ ok: r.ok, text: r.message + (r.ok ? ` ${maxSizeText(r.size)}` : '') });
+                  },
+                )
+              }
+            >
+              Verbindung prüfen
+            </button>
+          </div>
+          <label className="field">
+            <span>Testmail an (leer: deine eigene Adresse)</span>
+            <input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="btn btn-secondary mail-test"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () => api.testMail(testTo.trim() || undefined),
+                (r) => setMessage({ ok: r.sent, text: r.message }),
+              )
+            }
+          >
+            Testmail senden
+          </button>
+        </>
+      )}
+      {message && (
+        <p className={message.ok ? 'small mail-result' : 'form-error mail-result'} role={message.ok ? 'status' : 'alert'}>
+          {message.text}
+        </p>
+      )}
+      <p className="small muted">
+        {settings.server_max_size ? maxSizeText(settings.server_max_size) : 'Der Mailserver hat noch keine Höchstgröße für Mails gemeldet.'}
+        {settings.pending > 0 && ` ${settings.pending} Mails warten auf den Versand.`}
+      </p>
+    </form>
+  );
+}
+
+function maxSizeText(size: number | null): string {
+  return size
+    ? `Der Mailserver nimmt Mails bis ${formatBytes(size)} an (Bilder eingerechnet).`
+    : 'Der Mailserver meldet keine Höchstgröße.';
 }
 
 /** Volle Stunden 00:00 bis 23:00 für die Auswahl einer Uhrzeit. */

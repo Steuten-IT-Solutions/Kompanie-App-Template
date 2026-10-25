@@ -16,7 +16,8 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 - **Name und Rolle**: dein Name und deine Rolle, z. B. {rolle.member}, und dein Foto, wenn jemand eines hochgeladen hat. Ändern kann das Foto, wer Mitglieder anlegen darf.
 - **Geburtstag** (nur für {rolle.member}, wenn die {kompanie.name} {bereich.birthdays} nutzt): dein Geburtstag und wer ihn sieht.
 - **Eintritt** (nur für {rolle.member}, wenn die {kompanie.name} die Liste {bereich.directory} nutzt): wann du eingetreten bist und wer das auf deiner Seite in der Liste sieht.
-- **Benachrichtigungen einstellen**: worüber dich die App auf diesem Gerät benachrichtigt.
+- **Benachrichtigungen einstellen**: worüber dich die App auf diesem Gerät benachrichtigt. Darunter, wenn die {kompanie.name} den Mailversand eingerichtet hat, der Schalter für Nachrichten vom Brett per E-Mail (anfangs an).
+- **Signatur**: dein Gruß für Nachrichten am Brett, mit Text und Bildern (für {rolle.member}, Anwärter und alle, die am Brett schreiben). Mehr dazu steht auf der Hilfeseite **Signatur**.
 - **Darstellung**: **Wie Gerät**, **Hell** oder **Dunkel**.
 - **App installieren**: die Anleitung, wie du die App aufs Handy holst. Die Karte fehlt, wenn du die App schon installiert geöffnet hast.
 - **Passwort ändern**: dein Passwort neu festlegen.

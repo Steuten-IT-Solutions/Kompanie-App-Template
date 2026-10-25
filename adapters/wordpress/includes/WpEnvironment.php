@@ -85,4 +85,9 @@ final class WpEnvironment implements Environment
         $url = $this->appUrl('mitgliedsfoto/' . $userId);
         return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version) . '&s=' . $size;
     }
+
+    public function richImageUrl(string $uid): string
+    {
+        return $this->appUrl('bild/' . $uid);
+    }
 }

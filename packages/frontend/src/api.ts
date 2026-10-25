@@ -721,18 +721,144 @@ export interface Rank {
   badge_push?: boolean;
 }
 
-/** Nachricht am Schwarzen Brett (Issue #5). */
+/** Stand des Mailversands einer Nachricht (Issue #172, nur mit post_board). */
+export interface BoardMailSummary {
+  recipients: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  /** nicht mehr verschickt, weil die Nachricht gelöscht wurde */
+  cancelled: number;
+}
+
+/** Nachricht am Schwarzen Brett (Issue #5, Umbau #172). */
 export interface BoardMessage {
   kind: 'message';
   id: number;
-  /** Reiner Text mit Zeilenumbrüchen, nie HTML */
+  /** Titel (reiner Text): Banner, Benachrichtigung, Betreff der Mail */
+  title: string;
+  /** Bereinigter formatierter Inhalt (HTML, Bilder mit Adresse); Anzeige über RichTextView */
   text: string;
+  /** Reiner Textauszug */
+  excerpt: string;
   /** null, wenn unbekannt; „gelöschtes Konto“, wenn das Konto gelöscht wurde */
   author_name: string | null;
   created_at: string;
+  /** wechselt, wenn sich Titel oder Inhalt ändern (nicht beim Enddatum) */
   updated_at: string;
-  /** Genau 24 Stunden nach created_at; danach blendet die App den Eintrag aus, auch offline */
+  /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+  /** nur mit post_board: wer zuletzt geändert hat */
+  last_edit?: { name: string | null; at: string } | null;
+  /** nur mit post_board: Mailversand (null: ohne Mail) */
+  mail?: BoardMailSummary | null;
+}
+
+/** Abgelaufene oder gelöschte Nachricht im Verlauf (nur post_board). */
+export interface BoardEnded {
+  id: number;
+  title: string;
+  text: string;
+  excerpt: string;
+  author_name: string | null;
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+  deleted_at: string | null;
+  deleted_by_name: string | null;
+  active: boolean;
+}
+
+export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'deleted' | 'mailed';
+
+/** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
+export interface BoardRevision {
+  id: number;
+  action: BoardRevisionAction;
+  user_name: string | null;
+  at: string;
+  before: unknown;
+  after: unknown;
+}
+
+export interface BoardMailLogEntry {
+  name: string | null;
+  email: string;
+  status: 'pending' | 'sent' | 'failed' | 'cancelled';
+  attempts: number;
+  error: string | null;
+  at: string | null;
+}
+
+export interface BoardHistory {
+  message: BoardEnded;
+  revisions: BoardRevision[];
+  mail: BoardMailSummary | null;
+  mail_log: BoardMailLogEntry[];
+}
+
+export interface BoardInput {
+  title: string;
+  /** formatierter Inhalt (HTML) */
+  text: string;
+  /** UTC (…Z); ohne Angabe 24 Stunden */
+  expires_at?: string | null;
+  push?: boolean;
+  mail?: boolean;
+}
+
+/** Haken „E-Mail senden“ */
+export interface BoardMailInfo {
+  available: boolean;
+  recipients: number;
+  reason: string | null;
+  server_max_size: number | null;
+}
+
+/** Technische Grenzen des Servers für Bilder (Bytes; null = keine). */
+export interface RichImageLimits {
+  post_max_size: number | null;
+  upload_max_filesize: number | null;
+  memory_limit: number | null;
+  max_allowed_packet: number | null;
+  max_image_bytes: number | null;
+}
+
+export interface RichImage {
+  uid: string;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface Signature {
+  content: string;
+  updated_at: string | null;
+}
+
+/** Mails vom Brett: gewünscht, möglich, Adresse hinterlegt */
+export interface MailPreference {
+  board: boolean;
+  available: boolean;
+  email: boolean;
+}
+
+/** Einstellungen → E-Mail (Kompanieadresse und SMTP) */
+export interface MailSettings {
+  from: string;
+  from_name: string;
+  from_name_default: string;
+  host: string;
+  port: number;
+  secure: 'starttls' | 'ssl' | 'none';
+  user: string;
+  password_set: boolean;
+  configured: boolean;
+  unavailable: string | null;
+  server_max_size: number | null;
+  pending: number;
+  batch_size: number;
+  batch_pause: number;
 }
 
 /** Laufende Umfrage am Schwarzen Brett (Issue #4), nur für Mitglieder. */
@@ -1461,10 +1587,22 @@ export const api = {
   deleteDocCategory: (id: number) => request<{ deleted: boolean }>('DELETE', `/document-categories/${id}`),
   reorderDocCategories: (ids: number[]) => request<DocCategory[]>('PUT', '/document-categories/order', { ids }),
 
-  // Schwarzes Brett (Issue #5)
+  // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
-  postBoard: (text: string, push = true) => request<BoardMessage>('POST', '/board', { text, push }),
-  updateBoard: (id: number, text: string) => request<BoardMessage>('PATCH', `/board/${id}`, { text }),
+  postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
+  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at'>>) =>
+    request<BoardMessage>('PATCH', `/board/${id}`, changes),
+  boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
+  boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
+  boardEnded: () => request<{ items: BoardEnded[]; keep_days: number }>('GET', '/board/history'),
+  // Formatierte Inhalte (Issue #172): Bilder, Signatur, Mails vom Brett
+  richImageLimits: () => request<RichImageLimits>('GET', '/rich-images/limits'),
+  uploadRichImage: async (file: File) => request<RichImage>('POST', '/rich-images', { file: await encodeFile(file) }),
+  signature: () => request<{ signature: Signature | null }>('GET', '/me/signature'),
+  saveSignature: (content: string) => request<{ signature: Signature | null }>('PUT', '/me/signature', { content }),
+  deleteSignature: () => request<{ signature: null }>('DELETE', '/me/signature'),
+  mailPreference: () => request<MailPreference>('GET', '/me/mail'),
+  setMailPreference: (board: boolean) => request<MailPreference>('PUT', '/me/mail', { board }),
   polls: () => request<Poll[]>('GET', '/polls'),
   poll: (id: number) => request<Poll>('GET', `/polls/${id}`),
   createPoll: (data: PollInput) => request<Poll>('POST', '/polls', data),
@@ -1600,6 +1738,15 @@ export const api = {
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
   config: () => request<AppConfig>('GET', '/config'),
   updateSettings: (data: AdminSettingsInput) => request<AdminSettings>('PATCH', '/admin/settings', data),
+  // E-Mail (Issue #172): Kompanieadresse und SMTP
+  mailSettings: () => request<MailSettings>('GET', '/admin/mail'),
+  updateMailSettings: (
+    data: Partial<
+      Omit<MailSettings, 'password_set' | 'configured' | 'unavailable' | 'server_max_size' | 'pending' | 'from_name_default'>
+    > & { password?: string },
+  ) => request<MailSettings>('PATCH', '/admin/mail', data),
+  checkMail: () => request<{ ok: boolean; message: string; size: number | null; settings: MailSettings }>('POST', '/admin/mail/check', {}),
+  testMail: (to?: string) => request<{ sent: boolean; message: string }>('POST', '/admin/mail/test', to ? { to } : {}),
   /** „Mit Google verbinden“: speichert den Client und liefert die Adresse der Anmeldung bei Google. */
   googleConnect: (clientId: string, clientSecret: string) =>
     request<{ url: string }>('POST', '/admin/google/connect', { client_id: clientId, client_secret: clientSecret }),

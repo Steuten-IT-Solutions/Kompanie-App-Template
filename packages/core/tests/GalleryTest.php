@@ -657,7 +657,7 @@ final class GalleryTest extends TestCase
             try {
                 $settings = new \KompanieApp\Core\Tests\Support\MemorySettings();
                 $all = \KompanieApp\Core\Storage\Sql\Migrations::all();
-                (new \KompanieApp\Core\Storage\Sql\Migrator($db, $settings, array_filter($all, static fn (int $v): bool => $v < 29, ARRAY_FILTER_USE_KEY)))->migrate();
+                (new \KompanieApp\Core\Storage\Sql\Migrator($db, $settings, array_filter($all, static fn (int $v): bool => $v < 30, ARRAY_FILTER_USE_KEY)))->migrate();
                 $this->assertNotContains('media', \KompanieApp\Core\Storage\Sql\Schema::columns($db, 'photos'), $driver);
                 $albumId = $db->insert('albums', ['drive_id' => 'A1', 'year' => '2026', 'title' => 'Sommerfest', 'sort_date' => '2026-06-27 18:00:00', 'synced_at' => '2026-06-28 00:00:00']);
                 $db->insert('photos', ['album_id' => $albumId, 'drive_file_id' => 'IMG1', 'name' => 'a.jpg', 'is_intern' => 0, 'width' => 1200, 'height' => 900, 'md5' => 'm1', 'file_key' => str_repeat('a', 32), 'status' => GalleryRepository::READY, 'error' => '']);

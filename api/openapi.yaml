@@ -310,6 +310,89 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /me/signature:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene Signatur (Issue #172)
+      description: Für Mitglieder, Anwärter und alle mit `post_board`; sonst `signature` null.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignatureResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Eigene Daten]
+      summary: Signatur einrichten oder ändern
+      description: |
+        Formatierter Inhalt (HTML) mit Text und Bildern (`<img data-image="uid">`, s. `POST /rich-images`), bereinigt wie
+        Nachrichten am Brett. Leerer Inhalt löscht die Signatur. Nicht mehr verwendete Bilder werden gelöscht. Bereits in
+        Nachrichten eingefügte Signaturen ändern sich nicht.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignatureResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Eigene Daten]
+      summary: Signatur löschen (samt Bildern)
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SignatureResponse' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/mail:
+    get:
+      tags: [Eigene Daten]
+      summary: Nachrichten vom Schwarzen Brett per E-Mail (Issue #172)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailPreference' }
+        '401': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Eigene Daten]
+      summary: Mails vom Brett ein- oder ausschalten (Standard an)
+      x-capability: 'member oder calendar'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [board]
+              properties:
+                board: { type: boolean }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailPreference' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /me/password:
     post:
       tags: [Eigene Daten]
@@ -1363,14 +1446,15 @@ paths:
   /board:
     get:
       tags: [Schwarzes Brett]
-      summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5)
+      summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
         Für Mitglieder und Anwärter (Recht `member` oder `calendar`) sowie für alle mit `post_board`. Nur Einträge, deren
-        `expires_at` noch nicht erreicht ist; abgelaufene löscht die Hintergrundaufgabe `board_cleanup` (kein Verlauf).
-        Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
+        `expires_at` noch nicht erreicht ist und die nicht gelöscht wurden. Abgelaufene und gelöschte Nachrichten bleiben
+        30 Tage im Verlauf (`GET /board/history`, nur `post_board`); danach löscht die Hintergrundaufgabe `board_cleanup`
+        sie endgültig. Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
         Erst die Nachrichten (`kind: message`), neueste zuerst; danach für Mitglieder (Recht `member`) mit eingeschaltetem
         Bereich Umfragen jede laufende Umfrage (`kind: poll`, Issue #4) mit `has_voted`. Später können weitere Arten
-        dazukommen – Clients überspringen unbekannte.
+        dazukommen – Clients überspringen unbekannte. Mit `post_board` zusätzlich `last_edit` und `mail`.
       x-capability: 'member, calendar oder post_board'
       responses:
         '200':
@@ -1393,9 +1477,12 @@ paths:
       tags: [Schwarzes Brett]
       summary: Nachricht ans Schwarze Brett schreiben
       description: |
-        Gültig genau 24 Stunden ab jetzt. Alle Mitglieder und Anwärter außer dem Verfasser bekommen eine Benachrichtigung
-        (Art `board`, Urgency high, TTL höchstens bis `expires_at`), sofern sie die Art für das Gerät eingeschaltet haben
-        und `push` nicht false ist.
+        Sichtbar bis `expires_at` (ohne Angabe 24 Stunden ab jetzt; keine Obergrenze). Alle Mitglieder und Anwärter
+        außer dem Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
+        Verfasser“, Text = Titel, TTL bis `expires_at`, höchstens 28 Tage), sofern sie die Art für das Gerät eingeschaltet
+        haben und `push` nicht false ist. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
+        Mailadresse, die den Empfang nicht abgeschaltet haben (außer dem Verfasser), im Hintergrund. Meldet der
+        Mailserver eine Höchstgröße und ist die fertige Mail größer, wird nichts veröffentlicht (400 mit Erklärung).
       x-capability: post_board
       requestBody:
         required: true
@@ -1412,22 +1499,102 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /board/mail:
+    get:
+      tags: [Schwarzes Brett]
+      summary: Haken „E-Mail senden“ – eingerichtet, Zahl der Empfänger (Issue #172)
+      x-capability: post_board
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available, recipients, reason]
+                properties:
+                  available: { type: boolean, description: 'Kompanieadresse und SMTP eingerichtet, PHPMailer vorhanden' }
+                  recipients: { type: integer, description: Zahl der Empfänger einer neuen Nachricht (ohne den Verfasser) }
+                  reason: { type: [string, 'null'], description: 'Warum nicht verfügbar' }
+                  server_max_size: { type: [integer, 'null'], description: 'Vom Mailserver gemeldete Höchstgröße (SIZE) in Bytes' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /board/history:
+    get:
+      tags: [Schwarzes Brett]
+      summary: Abgelaufene und gelöschte Nachrichten der letzten 30 Tage (Verlauf, Issue #172)
+      x-capability: post_board
+      responses:
+        '200':
+          description: OK, zuletzt beendete zuerst
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, keep_days]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/BoardEndedItem' } }
+                  keep_days: { type: integer, description: 'Aufbewahrung des Verlaufs in Tagen (30)' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /board/{id}/history:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Schwarzes Brett]
+      summary: Verlauf einer Nachricht (auch abgelaufen oder gelöscht, solange aufbewahrt)
+      description: |
+        Jede Erstellung, Titel-, Inhalts- und Enddatumsänderung, jeder Mailversand und das vorzeitige Löschen mit Konto
+        und Zeitpunkt, mit vorherigem und neuem Stand; dazu das Protokoll des Mailversands je Empfänger.
+      x-capability: post_board
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, revisions, mail, mail_log]
+                properties:
+                  message: { $ref: '#/components/schemas/BoardEndedItem' }
+                  revisions: { type: array, items: { $ref: '#/components/schemas/BoardRevision' } }
+                  mail: { oneOf: [{ $ref: '#/components/schemas/BoardMailSummary' }, { type: 'null' }] }
+                  mail_log:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: [string, 'null'] }
+                        email: { type: string }
+                        status: { type: string, enum: [pending, sent, failed, cancelled] }
+                        attempts: { type: integer }
+                        error: { type: [string, 'null'], description: Grund bei Fehlschlag }
+                        at: { type: [string, 'null'], format: date-time }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /board/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
     patch:
       tags: [Schwarzes Brett]
-      summary: Text einer gültigen Nachricht ändern
+      summary: Titel, Inhalt und/oder Enddatum einer gültigen Nachricht ändern
       description: |
-        Jede und jeder mit `post_board`, nicht nur der Verfasser. Ohne neue Benachrichtigung; `expires_at` bleibt.
-        `updated_at` wechselt nur, wenn sich der Text ändert (auf Geräten ausgeblendete Nachrichten erscheinen dann
-        wieder). Abgelaufene oder gelöschte Nachrichten → 404.
+        Jede und jeder mit `post_board`, nicht nur der Verfasser. Ohne neue Benachrichtigung und ohne neue Mail. Die
+        Felder einzeln oder zusammen; mindestens eins. `updated_at` wechselt nur, wenn sich Titel oder Inhalt ändern (auf
+        Geräten ausgeblendete Nachrichten erscheinen dann wieder); ein neues Enddatum allein lässt es unverändert.
+        Jede Änderung steht im Verlauf. Abgelaufene oder gelöschte Nachrichten → 404.
       x-capability: post_board
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/BoardInput' }
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
+                expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
       responses:
         '200':
           description: Geändert
@@ -1440,6 +1607,7 @@ paths:
     delete:
       tags: [Schwarzes Brett]
       summary: Nachricht vorzeitig löschen
+      description: Mit Konto und Zeitpunkt im Verlauf; noch nicht verschickte Mails gehen nicht mehr raus.
       x-capability: post_board
       responses:
         '200':
@@ -1452,6 +1620,67 @@ paths:
                   deleted: { type: boolean }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+
+  /rich-images:
+    post:
+      tags: [Eigene Daten]
+      summary: Bild für einen formatierten Inhalt hochladen (Signatur, Schwarzes Brett; Issue #172)
+      description: |
+        Für Mitglieder, Anwärter und alle mit `post_board`. JPG, PNG oder WebP; gespeichert wird eine neu kodierte Fassung
+        ohne Metadaten in Originalgröße (PNG bleibt PNG). Keine eigene Grenze für Größe oder Pixel; die technischen Grenzen
+        des Servers (`GET /rich-images/limits`) werden verständlich gemeldet. Das Bild ist zunächst ein Entwurf des Kontos;
+        im Inhalt steht es als `<img data-image="uid">`. Nie gespeicherte Entwürfe werden nach 7 Tagen gelöscht.
+      x-capability: 'member, calendar oder post_board'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: 'Dateiname mit Endung (.jpg, .jpeg, .png, .webp)' }
+                    data: { type: string, description: 'Base64, auch als data:-Adresse' }
+      responses:
+        '201':
+          description: Hochgeladen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uid, url, width, height]
+                properties:
+                  uid: { type: string, pattern: '^[a-f0-9]{32}$' }
+                  url: { type: string, description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Anmeldung und der Rechte' }
+                  width: { type: integer }
+                  height: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /rich-images/limits:
+    get:
+      tags: [Eigene Daten]
+      summary: Technische Grenzen des Servers für Bilder (Issue #172)
+      description: Werte in Bytes; null = keine Grenze bzw. nicht zutreffend (max_allowed_packet nur bei MySQL/MariaDB).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  post_max_size: { type: [integer, 'null'], description: 'Größte Anfrage (PHP); Bilder gehen als Base64 im JSON' }
+                  upload_max_filesize: { type: [integer, 'null'], description: 'Nur für Formular-Uploads; zur Information' }
+                  memory_limit: { type: [integer, 'null'], description: 'Arbeitsspeicher für die Bildverarbeitung' }
+                  max_allowed_packet: { type: [integer, 'null'], description: 'Größter Wert je Anweisung (MySQL/MariaDB)' }
+                  max_image_bytes: { type: [integer, 'null'], description: 'Größte Bilddatei, die durch Anfrage und Datenbank passt' }
+        '401': { $ref: '#/components/responses/Error' }
 
   /birthdays:
     get:
@@ -3687,6 +3916,94 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/mail:
+    get:
+      tags: [Einstellungen]
+      summary: Kompanieadresse und SMTP-Einstellungen (Issue #172)
+      description: Das SMTP-Passwort wird nie zurückgegeben, nur ob es gesetzt ist.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Kompanieadresse und SMTP ändern
+      description: Nur mitgeschickte Felder werden übernommen. Ohne `password` bleibt das Passwort, ein leerer Text löscht es.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from: { type: string, format: email, description: 'Kompanieadresse (Absender; Antworten und Rückläufer gehen dorthin)' }
+                from_name: { type: string, description: 'Absendername; leer: Name der Kompanie' }
+                host: { type: string, description: 'SMTP-Server, z. B. smtp.example.org' }
+                port: { type: integer, minimum: 1, maximum: 65535 }
+                secure: { type: string, enum: [starttls, ssl, none] }
+                user: { type: string }
+                password: { type: string }
+                batch_size: { type: integer, minimum: 0, description: 'Mails je Portion; 0 = so viele wie in einen Lauf passen' }
+                batch_pause: { type: integer, minimum: 0, description: 'Minuten Pause zwischen den Portionen; 0 = ohne Pause' }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/mail/check:
+    post:
+      tags: [Einstellungen]
+      summary: Verbindung zum Mailserver prüfen (mit dem gemeldeten Limit SIZE)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, message, size, settings]
+                properties:
+                  ok: { type: boolean }
+                  message: { type: string }
+                  size: { type: [integer, 'null'], description: 'Gemeldete Höchstgröße in Bytes; null = keine gemeldet' }
+                  settings: { $ref: '#/components/schemas/MailSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/mail/test:
+    post:
+      tags: [Einstellungen]
+      summary: Testmail senden
+      x-capability: manage_settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to: { type: string, format: email, description: 'Ohne Angabe: die eigene Adresse' }
+      responses:
+        '200':
+          description: Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sent, message]
+                properties:
+                  sent: { type: boolean }
+                  message: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/settings:
     get:
       tags: [Einstellungen]
@@ -4457,27 +4774,118 @@ components:
         created_at: { type: string, format: date-time }
     BoardInput:
       type: object
-      required: [text]
+      required: [title, text]
       properties:
+        title: { type: string, description: 'Titel (reiner Text, eine Zeile, keine Längengrenze); Banner, Benachrichtigung und Betreff der Mail. Leer → 400.' }
         text:
           type: string
-          maxLength: 500
-          description: Reiner Text, Zeilenumbrüche bleiben; HTML-Tags werden entfernt. Leer oder länger als 500 Zeichen → 400.
+          description: |
+            Formatierter Inhalt (HTML), ohne Längengrenze. Der Server lässt nur eine Allowlist stehen (Absätze, Überschriften,
+            Hervorhebungen, Listen, Links mit https:/mailto:/tel:, Bilder über data-image, Trennlinie, einfache Tabellen,
+            Inline-Styles für Schrift, Farben, Ausrichtung, Einzug). Ohne sichtbaren Inhalt → 400.
+        expires_at:
+          type: [string, 'null']
+          description: |
+            Sichtbar bis: ISO 8601 mit Zeitzone (`Z` oder `±hh:mm`) oder `JJJJ-MM-TTTHH:MM` ohne Zeitzone (Zeitzone der
+            Kompanie). Gespeichert in UTC. Muss in der Zukunft liegen, keine Obergrenze. Ohne Angabe 24 Stunden.
         push:
           type: boolean
           default: true
-          description: Nur beim Schreiben (POST); false veröffentlicht ohne Benachrichtigung. Beim Ändern ohne Wirkung.
+          description: Nur beim Schreiben (POST); false veröffentlicht ohne Benachrichtigung.
+        mail:
+          type: boolean
+          description: 'Nur beim Schreiben (POST); Standard: true, wenn der Mailversand eingerichtet ist. true ohne Einrichtung → 400.'
     BoardItem:
       type: object
-      required: [kind, id, text, author_name, created_at, updated_at, expires_at]
+      required: [kind, id, title, text, excerpt, author_name, created_at, updated_at, expires_at]
       properties:
         kind: { type: string, enum: [message], description: 'Art des Eintrags; weitere können dazukommen' }
         id: { type: integer }
-        text: { type: string, description: Reiner Text mit Zeilenumbrüchen }
+        title: { type: string }
+        text: { type: string, description: 'Bereinigter formatierter Inhalt (HTML); Bilder mit src (Adresse der App) und data-image' }
+        excerpt: { type: string, description: Reiner Textauszug (z. B. für den Text-Teil der Mail) }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
         created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel oder Inhalt ändern' }
+        expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
+        last_edit:
+          description: 'Nur mit post_board: wer zuletzt Titel, Inhalt oder Enddatum geändert hat (null: unverändert)'
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                name: { type: [string, 'null'] }
+                at: { type: string, format: date-time }
+        mail:
+          description: 'Nur mit post_board: Stand des Mailversands (null: ohne Mail)'
+          oneOf: [{ $ref: '#/components/schemas/BoardMailSummary' }, { type: 'null' }]
+    BoardMailSummary:
+      type: object
+      properties:
+        recipients: { type: integer }
+        sent: { type: integer }
+        failed: { type: integer }
+        pending: { type: integer }
+        cancelled: { type: integer, description: 'Nicht mehr verschickt, weil die Nachricht gelöscht wurde' }
+    BoardEndedItem:
+      type: object
+      description: Nachricht im Verlauf (auch abgelaufen oder gelöscht)
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        text: { type: string }
+        excerpt: { type: string }
+        author_name: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-        expires_at: { type: string, format: date-time, description: Genau 24 Stunden nach created_at }
+        expires_at: { type: string, format: date-time, description: 'Ende (bei gelöschten der Zeitpunkt des Löschens)' }
+        deleted_at: { type: [string, 'null'], format: date-time }
+        deleted_by_name: { type: [string, 'null'] }
+        active: { type: boolean, description: Noch sichtbar }
+    BoardRevision:
+      type: object
+      properties:
+        id: { type: integer }
+        action: { type: string, enum: [created, title, content, expires, deleted, mailed] }
+        user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
+        at: { type: string, format: date-time }
+        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum; bei deleted {expires_at}); null bei created und mailed' }
+        after: { description: 'Neuer Stand; bei created {title, text, expires_at}, bei mailed {recipients}, bei deleted null' }
+    SignatureResponse:
+      type: object
+      required: [signature]
+      properties:
+        signature:
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                content: { type: string, description: Formatierter Inhalt mit Bildadressen }
+                updated_at: { type: [string, 'null'], format: date-time }
+    MailPreference:
+      type: object
+      required: [board, available, email]
+      properties:
+        board: { type: boolean, description: 'Mails vom Brett gewünscht (Standard true)' }
+        available: { type: boolean, description: Mailversand eingerichtet und das Konto ist Empfänger des Bretts }
+        email: { type: boolean, description: Mailadresse hinterlegt }
+    MailSettings:
+      type: object
+      properties:
+        from: { type: string }
+        from_name: { type: string }
+        from_name_default: { type: string, description: Name der Kompanie }
+        host: { type: string }
+        port: { type: integer }
+        secure: { type: string, enum: [starttls, ssl, none] }
+        user: { type: string }
+        password_set: { type: boolean }
+        configured: { type: boolean }
+        unavailable: { type: [string, 'null'], description: 'Warum der Mailversand auf diesem Server nicht geht (PHPMailer fehlt)' }
+        server_max_size: { type: [integer, 'null'], description: 'Zuletzt gemeldete Höchstgröße (SIZE) in Bytes' }
+        pending: { type: integer, description: Wartende Mails }
+        batch_size: { type: integer }
+        batch_pause: { type: integer }
     BoardPollItem:
       type: object
       description: Laufende Umfrage am Schwarzen Brett (Issue #4), nur für Mitglieder
