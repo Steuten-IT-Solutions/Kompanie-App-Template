@@ -3774,21 +3774,21 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await page.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
   const facts = page.locator('.member-page .member-page-facts');
   await expect(facts).toHaveText(
-    new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 01\\.04\\.2005$`),
+    new RegExp(`^Geburtstag 12\\.03\\.1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 01\\.04\\.2005$`),
   );
   await shot(page, '1d-mitglied-seite');
 
   // Ohne Anmeldung nur der Geburtstag.
   await page.context().clearCookies();
   await page.reload();
-  await expect(facts).toHaveText(/^Geburtstag 12\. März 1988 \(\d+ Jahre\)$/);
+  await expect(facts).toHaveText(/^Geburtstag 12\.03\.1988 \(\d+ Jahre\)$/);
 
   // Ohne „Alter anzeigen“ nur Tag und Monat; „Nicht anzeigen“ blendet ihn aus.
   await birthday.getByLabel(/Alter anzeigen/).uncheck();
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
   await page.reload();
-  await expect(facts).toHaveText('Geburtstag 12. März');
+  await expect(facts).toHaveText('Geburtstag 12.03.');
   await birthday.getByLabel(/Auf meiner Seite/).selectOption('none');
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
