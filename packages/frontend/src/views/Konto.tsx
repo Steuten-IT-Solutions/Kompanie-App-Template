@@ -7,7 +7,9 @@ import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate, useRoute } from '../router';
 import RichTextView from '../richtext/RichTextView';
-import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
+import { EmailField, ErrorBox, lazyView, Loading, PhoneField, useAsync } from '../ui';
+import { normalizeEmail } from '../email';
+import { normalizePhone } from '../phone';
 import { MemberAvatar } from '../memberPhoto';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 
@@ -326,7 +328,7 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const account = data!;
-  const emailChanged = editing !== null && editing.email.trim().toLowerCase() !== account.email.toLowerCase();
+  const emailChanged = editing !== null && normalizeEmail(editing.email).toLowerCase() !== account.email.toLowerCase();
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -337,8 +339,8 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
     try {
       setData(
         await api.updateOwnAccount({
-          email: editing.email.trim(),
-          phone: editing.phone.trim(),
+          email: normalizeEmail(editing.email),
+          phone: normalizePhone(editing.phone),
           ...(emailChanged ? { current_password: password } : {}),
         }),
       );
@@ -361,25 +363,13 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
   return editing ? (
     <form className="form card account-card" onSubmit={save}>
       <h3>Kontakt</h3>
-      <label className="field">
-        <span>E-Mail-Adresse</span>
-        <input
-          type="email"
-          autoComplete="email"
-          value={editing.email}
-          onChange={(e) => setEditing({ ...editing, email: e.target.value })}
-        />
-      </label>
-      <label className="field">
-        <span>Handynummer</span>
-        <input
-          type="tel"
-          autoComplete="tel"
-          placeholder="z. B. +49 171 1234567"
-          value={editing.phone}
-          onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
-        />
-      </label>
+      <EmailField
+        label="E-Mail-Adresse"
+        autoComplete="email"
+        value={editing.email}
+        onChange={(email) => setEditing({ ...editing, email })}
+      />
+      <PhoneField label="Handynummer" autoComplete="tel" value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
       {emailChanged && (
         <label className="field">
           <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>

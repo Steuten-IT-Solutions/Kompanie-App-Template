@@ -1,8 +1,10 @@
-import { Component, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { Component, lazy, useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
+import { emailProblem, emailSuggestion, normalizeEmail, tidyEmail } from './email';
+import { composePhone, COUNTRIES, normalizePhone, OTHER, phoneHint, phoneProblem, splitPhone, tidyPhone } from './phone';
 
 /**
  * Lädt Daten asynchron; reload() lädt neu.
@@ -403,3 +405,172 @@ export const emptyName = (): PersonName => ({ first_name: '', last_name: '' });
 
 /** Für die API: ohne Leerzeichen am Rand. */
 export const trimName = (n: PersonName): PersonName => ({ first_name: n.first_name.trim(), last_name: n.last_name.trim() });
+
+type ContactFieldProps = {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+  /** „off“ für Angaben anderer Personen, „email“/„tel“ für die eigenen */
+  autoComplete?: string;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+};
+
+/**
+ * E-Mail-Feld mit E-Mail-Tastatur (@ und Punkt direkt), ohne Großschreibung und Autokorrektur. Glättet beim Tippen und
+ * beim Verlassen (email.ts), zeigt danach, was nicht stimmt, und schlägt vertippte Anbieter vor. Eine ungültige Adresse
+ * hält das Formular an; beim Speichern trotzdem normalizeEmail() verwenden, falls das Feld nicht verlassen wurde.
+ */
+export function EmailField({ label = 'E-Mail (optional)', ...props }: ContactFieldProps) {
+  const suggestion = emailProblem(props.value) ? null : emailSuggestion(props.value);
+  return (
+    <ContactField
+      {...props}
+      label={label}
+      type="email"
+      tidy={tidyEmail}
+      normalize={normalizeEmail}
+      problem={emailProblem}
+      note={
+        suggestion && (
+          <p className="field-note muted">
+            Meintest du{' '}
+            <button type="button" className="btn btn-link inline-link" onClick={() => props.onChange(suggestion)}>
+              {suggestion}
+            </button>
+            ?
+          </p>
+        )
+      }
+    />
+  );
+}
+
+/**
+ * Handynummer: Ländervorwahl aus einer Auswahl, daneben die Nummer mit Telefontastatur, wie man sie gewohnt ist
+ * (0171 1234567). value ist die ganze Nummer, international geschrieben (phone.ts, z. B. +49 171 1234567). Eine
+ * internationale Nummer im Feld (+31 …, 0031 …) stellt beim Verlassen die Auswahl um.
+ */
+export function PhoneField({
+  value,
+  onChange,
+  label = 'Handynummer (optional)',
+  autoComplete = 'off',
+  placeholder = 'z. B. 0171 1234567',
+  disabled,
+}: ContactFieldProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  const labelId = useId();
+  // from: die Nummer, aus der Auswahl und Feld stammen (zuletzt gemeldet oder zerlegt)
+  const [{ code, national, from }, setParts] = useState(() => ({ ...splitPhone(value), from: value }));
+  const [left, setLeft] = useState(false);
+  // Von außen geändert (z. B. zurückgesetzt): neu zerlegen.
+  if (value !== from) setParts({ ...splitPhone(value), from: value });
+  // Ältere Einträge ohne Ländervorwahl gelten mit der Auswahl.
+  const full = normalizePhone(value);
+  const problem = phoneProblem(full);
+  const hint = left ? phoneHint(full) : null;
+  useEffect(() => ref.current?.setCustomValidity(problem ?? ''), [problem]);
+  const change = (c: string, n: string) => {
+    const v = composePhone(c, n);
+    setParts({ code: c, national: n, from: v });
+    onChange(v);
+  };
+  const known = COUNTRIES.some((c) => c.code === code);
+  return (
+    <div className="field">
+      <span className="field-label" id={labelId}>
+        {label}
+      </span>
+      <div className="phone-row">
+        <select
+          aria-label="Ländervorwahl"
+          value={known ? code : OTHER}
+          disabled={disabled}
+          onChange={(e) => change(e.target.value, national)}
+        >
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.flag} +{c.code} {c.name}
+            </option>
+          ))}
+          <option value={OTHER}>anderes Land (+ …)</option>
+        </select>
+        <input
+          ref={ref}
+          type="tel"
+          inputMode="tel"
+          aria-labelledby={labelId}
+          autoComplete={autoComplete === 'tel' ? 'tel-national' : autoComplete}
+          placeholder={code === OTHER ? 'z. B. +1 212 5550100' : placeholder}
+          value={national}
+          disabled={disabled}
+          aria-invalid={left && problem !== null}
+          onChange={(e) => change(code, tidyPhone(e.target.value))}
+          onBlur={() => {
+            setLeft(true);
+            setParts({ ...splitPhone(full), from: full });
+            if (full !== value) onChange(full);
+          }}
+        />
+      </div>
+      {left && problem ? <p className="field-note form-error">{problem}</p> : hint && <p className="field-note muted">{hint}</p>}
+    </div>
+  );
+}
+
+/** Glätten beim Tippen und Verlassen, Fehler nach dem Verlassen, Sperre über setCustomValidity. */
+function ContactField({
+  value,
+  onChange,
+  label,
+  autoComplete = 'off',
+  placeholder,
+  className,
+  disabled,
+  type,
+  tidy,
+  normalize,
+  problem: check,
+  note,
+}: ContactFieldProps & {
+  type: 'email';
+  tidy: (s: string) => string;
+  normalize: (s: string) => string;
+  problem: (s: string) => string | null;
+  note?: ReactNode;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [left, setLeft] = useState(false);
+  const problem = check(value);
+  useEffect(() => ref.current?.setCustomValidity(problem ?? ''), [problem]);
+  return (
+    <div className="field">
+      <label className="field">
+        <span>{label}</span>
+        <input
+          ref={ref}
+          type={type}
+          inputMode={type}
+          autoComplete={autoComplete}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder={placeholder}
+          className={className}
+          value={value}
+          disabled={disabled}
+          aria-invalid={left && problem !== null}
+          onChange={(e) => onChange(tidy(e.target.value))}
+          onBlur={() => {
+            setLeft(true);
+            const n = normalize(value);
+            if (n !== value) onChange(n);
+          }}
+        />
+      </label>
+      {left && problem ? <p className="field-note form-error">{problem}</p> : note}
+    </div>
+  );
+}
