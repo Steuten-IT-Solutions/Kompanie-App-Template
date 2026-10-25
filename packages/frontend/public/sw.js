@@ -57,7 +57,10 @@ const DATA_MAX = 100;
 const FRESH_MS = 10000;
 /** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok }, für das Neuladen danach. */
 const announced = new Map();
-/** Laufende Abfragen im Hintergrund je Adresse: keine zweite gleichzeitig. */
+/**
+ * Laufende Abfragen im Hintergrund je Adresse: keine zweite gleichzeitig; wer währenddessen fragt, bekommt danach eine
+ * weitere ({ done, again }).
+ */
 const revalidating = new Map();
 const USER_HEADER = 'X-Kompanie-User';
 const STORED_AT_HEADER = 'X-Kompanie-Stored-At';
@@ -338,15 +341,35 @@ async function staleWhileRevalidate(request, event) {
   const recent = last && Date.now() - last.at < FRESH_MS;
   if (recent) announced.delete(key); // nur für das eine Neuladen nach der Meldung
   if (!stored || (recent && !last.ok)) return networkFirst(request, undefined, 0, event);
-  if (recent || revalidating.has(key)) return stored;
-  const running = revalidate(request, key, await stored.clone().text()).finally(() => revalidating.delete(key));
-  revalidating.set(key, running);
+  if (recent) return stored;
+  let running = revalidating.get(key);
+  if (running) {
+    // Die laufende Abfrage kann vor einer Änderung (z. B. auf einem anderen Gerät) gestellt worden sein und den Stand
+    // davor liefern (Issue #68): danach noch einmal fragen, einmal für alle Anfragen, die inzwischen kamen.
+    running.again = request;
+  } else {
+    running = { again: null };
+    running.done = revalidateUntilCurrent(request, key, stored.clone(), running).finally(() => revalidating.delete(key));
+    revalidating.set(key, running);
+  }
   try {
-    event.waitUntil(running);
+    event.waitUntil(running.done);
   } catch {
     // Ereignis schon beendet: Die Abfrage läuft trotzdem weiter.
   }
   return stored;
+}
+
+/** Im Hintergrund abfragen, bis keine Anfrage mehr wartet, die nach dem Start der letzten Abfrage kam. */
+async function revalidateUntilCurrent(request, key, stored, running) {
+  const before = await stored.text();
+  await revalidate(request, key, before);
+  while (running.again) {
+    const next = running.again;
+    running.again = null;
+    const found = await caches.match(key, MATCH);
+    await revalidate(next, key, found ? await found.text() : before);
+  }
 }
 
 async function revalidate(request, key, before) {
