@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { devices, expect, test, type Locator, type Page } from '@playwright/test';
+import { devices, expect, test, type Locator, type Page, type Request } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
@@ -2056,6 +2056,11 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
 
 test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
   await page.context().clearCookies();
+  // Laufende Abrufe der News, auch die des Service Workers (die sieht nur der Kontext, nicht die Seite).
+  const running = new Set<Request>();
+  page.context().on('request', (r) => /news/.test(r.url()) && running.add(r));
+  page.context().on('requestfinished', (r) => running.delete(r));
+  page.context().on('requestfailed', (r) => running.delete(r));
   const layouts = () =>
     page.evaluate(async () => {
       const cache = await caches.open('kompanie-ansicht-geruest-v1');
@@ -2073,13 +2078,26 @@ test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „L
   // Nur der Aufbau, kein Text
   expect((await layouts()).join('')).not.toContain('Tag der offenen Tür');
 
-  // Keine gespeicherten Daten (auch nicht beim Service Worker), News antworten sehr langsam.
-  await page.evaluate(() => caches.delete('kompanie-data-v2'));
+  // Keine gespeicherten Daten (auch nicht beim Service Worker), News antworten sehr langsam. Erst verlangsamen, dann
+  // leeren: Ein Abruf des Service Workers, der vorher begann, speichert seine Antwort sonst nach dem Löschen wieder, und
+  // die News kämen beim Neuladen sofort, ohne Gerüst. Also warten, bis er fertig ist, und prüfen, dass es leer bleibt.
   await page.context().route(/news/, async (route) => {
     await new Promise((r) => setTimeout(r, 8000));
     await route.continue().catch(() => undefined);
   });
   try {
+    const before = [...running];
+    await expect.poll(() => before.filter((r) => running.has(r)).length).toBe(0);
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          await caches.delete('kompanie-data-v2');
+          await new Promise((r) => setTimeout(r, 300));
+          const cache = await caches.open('kompanie-data-v2');
+          return (await cache.keys()).some((k) => k.url.includes('news'));
+        }),
+      )
+      .toBe(false);
     await page.goto('/app/#/news');
     await page.reload();
     await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
