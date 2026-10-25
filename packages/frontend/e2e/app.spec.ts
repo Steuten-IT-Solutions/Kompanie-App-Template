@@ -214,6 +214,45 @@ test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ 
   await shot(page, '7-verwaltung-mitglied');
 });
 
+// Nach dem Test davor: Mitglied1 hat dann Punkte.
+test('Benachrichtigung führt zum Eintrag: Termin und Punkte (Issue #190)', async ({ page }) => {
+  await login(page, 'mitglied1');
+  // Niedriges Fenster: Der letzte Termin steht unterhalb, die Liste muss dorthin scrollen.
+  await page.setViewportSize({ width: 390, height: 420 });
+  const last = page.locator('li.event', { hasText: 'Sommerfest' });
+  await expect(last).toBeAttached();
+  await expect(last).not.toBeInViewport();
+  const id = await last.getAttribute('data-focus-id');
+  expect(id).toMatch(/^[0-9a-f]{32}$/);
+
+  // Offene App (der Service Worker ändert nur die Adresse) und Kaltstart (neues Fenster mit dieser Adresse)
+  for (const open of ['offen', 'neu'] as const) {
+    if (open === 'offen') await page.goto(`/app/#/termine/termin/${id}`);
+    else await page.reload();
+    await expect(last).toBeInViewport();
+    await expect(last).toHaveClass(/\bopen\b/);
+    await expect(last).toHaveClass(/\bfocused\b/);
+    await expect(last.getByRole('button', { name: 'In meinen Kalender' })).toBeVisible();
+    await expect(last).not.toHaveClass(/\bfocused\b/, { timeout: 5000 }); // Hervorhebung nur kurz
+  }
+
+  // Unbekannter Termin (gelöscht oder vorbei): einfach die Liste
+  await page.goto('/app/#/termine/termin/gibtesnicht');
+  await expect(page.locator('li.event').first()).toBeVisible();
+  await expect(page.locator('li.event.focused, li.event.open')).toHaveCount(0);
+
+  // Punkte: meins/punkte/<id>
+  await page.setViewportSize(devices['iPhone 13'].viewport);
+  await page.goto('/app/#/meins/punkte');
+  const row = page.locator('.card-list > li.row').last();
+  await expect(row).toBeVisible();
+  const pointId = await row.getAttribute('data-focus-id');
+  expect(pointId).toMatch(/^\d+$/);
+  await page.goto(`/app/#/meins/punkte/${pointId}`);
+  await expect(row).toHaveClass(/\bfocused\b/);
+  await expect(row).toBeInViewport();
+});
+
 test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im selben Fenster', async ({ page }) => {
   await login(page, 'verwalter');
   await adminMenu(page, 'Mitglieder');
@@ -3785,21 +3824,21 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await page.locator('.member-row', { hasText: 'Mitglied2' }).locator('.member-row-open').click();
   const facts = page.locator('.member-page .member-page-facts');
   await expect(facts).toHaveText(
-    new RegExp(`^Geburtstag 12\\. März 1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 01\\.04\\.2005$`),
+    new RegExp(`^Geburtstag 12\\.03\\.1988 \\((${age - 1}|${age}|${age + 1}) Jahre\\) · Eintritt 01\\.04\\.2005$`),
   );
   await shot(page, '1d-mitglied-seite');
 
   // Ohne Anmeldung nur der Geburtstag.
   await page.context().clearCookies();
   await page.reload();
-  await expect(facts).toHaveText(/^Geburtstag 12\. März 1988 \(\d+ Jahre\)$/);
+  await expect(facts).toHaveText(/^Geburtstag 12\.03\.1988 \(\d+ Jahre\)$/);
 
   // Ohne „Alter anzeigen“ nur Tag und Monat; „Nicht anzeigen“ blendet ihn aus.
   await birthday.getByLabel(/Alter anzeigen/).uncheck();
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');
   await page.reload();
-  await expect(facts).toHaveText('Geburtstag 12. März');
+  await expect(facts).toHaveText('Geburtstag 12.03.');
   await birthday.getByLabel(/Auf meiner Seite/).selectOption('none');
   await birthday.getByRole('button', { name: 'Geburtstag speichern' }).click();
   await expect(member.locator('.toast')).toHaveText('Geburtstag gespeichert');

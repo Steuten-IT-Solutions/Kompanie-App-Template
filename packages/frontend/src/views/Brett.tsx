@@ -4,6 +4,7 @@ import { BOARD_TEXT_MAX, boardLoaded, canManagePolls, canPostBoard, pollsVisible
 import { BoardMeta, BoardText, pollEndText } from '../BoardBanner';
 import brand from '../generated/brand';
 import { navigate } from '../router';
+import { useFocusEntry } from '../focus';
 import { formatShortTime } from '../format';
 import { Empty, ErrorBox, Loading } from '../ui';
 
@@ -70,7 +71,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
-function Entry({ item, onToast }: { item: BoardMessage; onToast: (msg: string) => void }) {
+function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolean; onToast: (msg: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ function Entry({ item, onToast }: { item: BoardMessage; onToast: (msg: string) =
   }
 
   return (
-    <article className="card board-card">
+    <article className={`card board-card ${focused ? 'focused' : ''}`} data-focus-id={item.id}>
       <BoardMeta item={item} />
       {draft === null ? (
         <BoardText text={item.text} />
@@ -163,7 +164,8 @@ function PollEntry({ poll }: { poll: BoardPoll }) {
  * Seite #/brett: alle gültigen Nachrichten (auch ausgeblendete); mit post_board schreiben, ändern, löschen. Darunter für
  * Mitglieder alle laufenden Umfragen mit Status und der Weg zu den beendeten (Issue #4).
  */
-export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
+/** `focus`: Kennung einer Nachricht aus der Adresse brett/<id> (Ziel einer Benachrichtigung, Issue #190). */
+export default function Brett({ focus, onToast }: { focus?: string; onToast: (msg: string) => void }) {
   const { items } = useBoard();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,6 +180,8 @@ export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
     });
   };
   useEffect(load, []);
+  // Frisch geladen, damit eine gerade gemeldete Nachricht schon dabei ist.
+  const flash = useFocusEntry(focus, !loading && messages.some((m) => String(m.id) === focus));
 
   return (
     <div className="board-page">
@@ -192,7 +196,7 @@ export default function Brett({ onToast }: { onToast: (msg: string) => void }) {
         <>
           <h2 className="board-page-title">Aktuelle Nachrichten</h2>
           {messages.map((item) => (
-            <Entry key={`${item.id}-${item.updated_at}`} item={item} onToast={onToast} />
+            <Entry key={`${item.id}-${item.updated_at}`} item={item} focused={flash === String(item.id)} onToast={onToast} />
           ))}
         </>
       )}

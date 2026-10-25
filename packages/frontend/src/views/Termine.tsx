@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, can, config, type CalendarEvent } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
 import { downloadIcs } from '../ics';
+import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 type EventLike = CalendarEvent & { url?: string };
@@ -19,13 +20,14 @@ async function loadEvents(): Promise<EventLike[]> {
 /** Termine aus Kalender oder öffentlicher Liste – oder (nur Geburtstage an) gar keine. */
 const hasEvents = (): boolean => !!(config?.features.events || (config?.features.calendar && can('calendar')));
 
-export default function Termine() {
+/** `focus`: Kennung eines Termins aus der Adresse termine/termin/<id> (Ziel einer Benachrichtigung, Issue #190). */
+export default function Termine({ focus }: { focus?: string }) {
   // Geburtstage (Issue #1): „Anstehende Geburtstage“ oben; ohne Termine die einzige Karte.
   if (!hasEvents()) return <UpcomingBirthdays always />;
-  return <EventList />;
+  return <EventList focus={focus} />;
 }
 
-function EventList() {
+function EventList({ focus }: { focus?: string }) {
   const { data, error, loading, reload } = useAsync(loadEvents, [], 'termine');
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
@@ -47,6 +49,13 @@ function EventList() {
     }
     return Array.from(map.values());
   }, [data]);
+
+  // Der Termin aus der Benachrichtigung: hinscrollen, aufklappen und kurz hervorheben, sobald die Liste steht.
+  const ready = !!data && !error && !(showBirthdays && upcoming.loading && !upcoming.data);
+  const flash = useFocusEntry(focus, ready && groups.some((evs) => evs.some((ev) => ev.id === focus)));
+  useEffect(() => {
+    if (flash) setOpen(flash);
+  }, [flash]);
 
   const manage =
     can('manage_events') && config?.features.events ? (
@@ -87,7 +96,7 @@ function EventList() {
               const s = eventStart(ev);
               const isOpen = open === ev.id;
               return (
-                <li key={ev.id} className={`card event ${isOpen ? 'open' : ''}`}>
+                <li key={ev.id} className={`card event ${isOpen ? 'open' : ''} ${flash === ev.id ? 'focused' : ''}`} data-focus-id={ev.id}>
                   <button className="event-head" onClick={() => setOpen(isOpen ? null : ev.id)} aria-expanded={isOpen}>
                     <div className="date-badge" aria-hidden="true">
                       <span className="day">{s.getDate()}</span>
