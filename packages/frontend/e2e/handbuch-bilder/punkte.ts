@@ -1,9 +1,9 @@
 import type { Locator } from '@playwright/test';
 import type { Fotograf, Gruppe } from './fotograf';
 
-// Fotos für das Handbuch, Teil „punkte“ (siehe gruppen.ts): Meins (Übersicht, Punkte, Strafen, Dienstgrad) und die
-// Verwaltung von Punkten, Katalog, Strafen, Dienstgraden, Beförderungen und Titeln, dazu die Fenster auf der Seite eines
-// Mitglieds. Beispieldaten: tests/standalone/handbuch-daten/20-punkte.php. Formulare werden nur ausgefüllt, nie
+// Fotos für das Handbuch, Teil „punkte“ (siehe gruppen.ts): Meins (Übersicht, Punkte, Strafen, Dienstgrad), Intern
+// (Dienstgrade, Punktekatalog) und die Verwaltung von Punkten, Katalog, Strafen, Dienstgraden, Beförderungen und Titeln,
+// dazu die Fenster auf der Seite eines Mitglieds. Beispieldaten: tests/standalone/handbuch-daten/20-punkte.php. Formulare werden nur ausgefüllt, nie
 // abgeschickt, damit die Daten für die anderen Fotos gleich bleiben.
 
 /** Kennung einer Testperson über die Mitgliederliste der Verwaltung (Nachname; die Liste zeigt „Nachname, Vorname“). */
@@ -42,6 +42,11 @@ const gruppe: Gruppe = async (f) => {
   await f.foto('meine-strafen');
   await f.oeffnen('meins/dienstgrad');
   await f.foto('mein-dienstgrad');
+  // Intern: Dienstgrade und Punktekatalog zum Nachschlagen
+  await f.oeffnen('dienstgrade');
+  await f.foto('dienstgrade');
+  await f.oeffnen('punktekatalog');
+  await f.foto('punktekatalog-ansehen');
 
   // Punkte, Katalog und Strafen: Rolle „Spieß“
   await f.anmelden('verwalter');
