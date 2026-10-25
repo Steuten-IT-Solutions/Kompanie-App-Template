@@ -98,8 +98,9 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
     <section className="card account-card signature-card" id="signatur" ref={ref}>
       <h3>Signatur</h3>
       <p className="muted small">
-        Frei gestaltet wie in einem Mailprogramm, mit Text und Bildern. Beim Schreiben am {brand.labels.sections.board} fügst du sie mit
-        „Signatur einfügen“ am Ende ein; spätere Änderungen hier ändern schon geschriebene Nachrichten nicht.
+        Frei gestaltet wie in einem Mailprogramm, mit Text und Bildern. Beim Schreiben einer Nachricht (Bereich „
+        {brand.labels.sections.board}“) fügst du sie mit „Signatur einfügen“ am Ende ein; spätere Änderungen hier ändern schon geschriebene
+        Nachrichten nicht.
       </p>
       {saved === undefined && !error ? (
         <Loading />
@@ -138,7 +139,7 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
       {error && <p className="form-error small">{error}</p>}
       {back === 'brett' && draft === null && (
         <button className="btn btn-block signature-back" onClick={goBack}>
-          Zurück zum {brand.labels.sections.board}
+          ‹ Zurück zur Nachricht ({brand.labels.sections.board})
         </button>
       )}
     </section>
@@ -168,7 +169,7 @@ function BoardMailToggle({ onToast }: { onToast: (msg: string) => void }) {
             )
           }
         />
-        <span>Nachrichten vom {brand.labels.sections.board} per E-Mail</span>
+        <span>Nachrichten aus „{brand.labels.sections.board}“ per E-Mail</span>
       </label>
       {pref.board && !pref.email && (
         <p className="muted small">Für dein Konto ist keine Mailadresse hinterlegt; bitte beim Admin melden.</p>

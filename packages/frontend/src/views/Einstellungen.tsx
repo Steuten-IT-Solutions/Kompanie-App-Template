@@ -27,7 +27,7 @@ const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
-  { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten vom ${sec.board}.` },
+  { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
   { id: 'google', title: 'Google-Zugang', text: `Verbindung zu Google für ${sec.gallery} und Kalender.` },
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
@@ -266,7 +266,7 @@ function MailForm({
     <form className="card settings-section form" id="einstellungen-email" onSubmit={save}>
       <h3>E-Mail</h3>
       <p className="small muted">
-        Über diese Adresse verschickt die App Mails, z. B. Nachrichten vom {sec.board} an die Mitglieder. Antworten und nicht zustellbare
+        Über diese Adresse verschickt die App Mails, z. B. Nachrichten aus „{sec.board}“ an die Mitglieder. Antworten und nicht zustellbare
         Mails gehen an diese Adresse. Die Zugangsdaten stehen beim Anbieter des Postfachs (Hoster oder Mailanbieter) unter „SMTP“ oder
         „Postausgangsserver“.
       </p>
