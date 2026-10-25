@@ -5,9 +5,9 @@
  * - idle: nach dem Start, wenn der Browser untätig ist, eins nach dem anderen (nicht im Datensparmodus, nicht in einem
  *   langsamen Netz, nicht offline).
  * Höchstens eine Vorab-Anfrage gleichzeitig. Abgelegt wird über dataCache.prefetch: unter dem Schlüssel der Ansicht,
- * nur wenn seit dem Start nichts geändert wurde, nichts doppelt. Fehler bleiben still (auch nicht unter „Fehler melden“):
- * Die Ansicht lädt dann beim Öffnen selbst.
- * Ohne eigene Imports (dataCache und lastError gibt viewData.ts hinein), damit die Tests es direkt laden können.
+ * nur wenn seit dem Start nichts geändert wurde, nichts doppelt. Fehler bleiben still (api.inBackground: keine
+ * Weiterleitung zur Anmeldung, nichts unter „Fehler melden“): Die Ansicht lädt dann beim Öffnen selbst.
+ * Ohne eigene Imports (dataCache und api gibt viewData.ts hinein), damit die Tests es direkt laden können.
  */
 
 /** Was vorab geladen wird: wie useAsync(load, deps, key) (viewData.ts). */
@@ -46,26 +46,16 @@ export interface PrefetcherOptions {
   whenIdle?: () => Promise<void>;
   /** dataCache.prefetch */
   prefetch: (key: string, deps: unknown[], load: () => Promise<unknown>, markFresh: boolean) => Promise<void>;
-  /** lastError.forgetError: Der Fehler steht an ApiError.noted. */
-  forgetError: (noted: unknown) => void;
+  /** api.inBackground: ohne Weiterleitung zur Anmeldung und ohne Eintrag unter „Fehler melden“ */
+  inBackground: <T>(start: () => Promise<T>) => Promise<T>;
 }
 
-export function createPrefetcher({ blocked, idleOk, whenIdle: idle = whenIdle, prefetch, forgetError }: PrefetcherOptions) {
+export function createPrefetcher({ blocked, idleOk, whenIdle: idle = whenIdle, prefetch, inBackground }: PrefetcherOptions) {
   const queue: { source: PrefetchSource; idle: boolean }[] = [];
   let running = false;
 
   // Beim Antippen öffnet die Ansicht gleich: Sie fragt dann nicht noch einmal (dataCache.takeFresh).
-  const run = (s: PrefetchSource, tapped: boolean) =>
-    prefetch(
-      s.key,
-      s.deps,
-      () =>
-        s.load().catch((e: unknown) => {
-          forgetError((e as { noted?: unknown } | null)?.noted);
-          throw e;
-        }),
-      tapped,
-    );
+  const run = (s: PrefetchSource, tapped: boolean) => prefetch(s.key, s.deps, () => inBackground(s.load), tapped);
 
   async function pump(): Promise<void> {
     if (running) return;

@@ -1,13 +1,23 @@
 // Vorabladen der wahrscheinlich nächsten Ansicht (src/prefetch.ts, Issue #104): eins nach dem anderen, Antippen vor dem
-// Leerlauf, nichts in Vorschau/Wartung bzw. im Leerlauf bei saveData oder 2G, Fehler ohne Eintrag unter „Fehler melden“.
+// Leerlauf, nichts in Vorschau/Wartung bzw. im Leerlauf bei saveData oder 2G, Anfragen still im Hintergrund.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cacheKey, dataCache, pendingPrefetch, prefetch, takeFresh } from '../src/dataCache.ts';
-import { forgetError, lastError, noteError, resetLastError } from '../src/lastError.ts';
 import { createPrefetcher as create, idleNetworkOk, type PrefetcherOptions, type PrefetchSource } from '../src/prefetch.ts';
 
-/** wie viewData.ts, mit Speicher und „Fehler melden“ der App */
-const createPrefetcher = (o: Pick<PrefetcherOptions, 'blocked' | 'idleOk' | 'whenIdle'>) => create({ ...o, prefetch, forgetError });
+/** Anfragen, die im Hintergrund begannen (wie api.inBackground: zählt, solange `start` synchron läuft) */
+let background = 0;
+let backgroundStarts = 0;
+function inBackground<T>(start: () => Promise<T>): Promise<T> {
+  background++;
+  try {
+    return start();
+  } finally {
+    background--;
+  }
+}
+/** wie viewData.ts, mit dem Speicher der App */
+const createPrefetcher = (o: Pick<PrefetcherOptions, 'blocked' | 'idleOk' | 'whenIdle'>) => create({ ...o, prefetch, inBackground });
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -83,19 +93,22 @@ test('Vorschau/Wartung: gar nicht; saveData/2G: im Leerlauf nicht, beim Antippen
   assert.deepEqual(log, ['t']);
 });
 
-test('Fehler beim Vorabladen: kein Eintrag unter „Fehler melden“, eine frühere Meldung bleibt', async () => {
+test('Vorab-Anfragen beginnen im Hintergrund (still), Fehler bleiben still', async () => {
   dataCache.clear();
-  resetLastError();
-  noteError('Früher');
   const s: PrefetchSource = {
     key: 'documents',
     deps: [],
-    // wie api.ts: Fehler vermerken und am ApiError festhalten
-    load: () => Promise.reject(Object.assign(new Error('Keine Verbindung'), { noted: noteError('Keine Verbindung zum Server') })),
+    // wie api.ts: Die Anfrage merkt sich beim Start, ob sie im Hintergrund läuft.
+    load: () => {
+      if (background > 0) backgroundStarts++;
+      return Promise.reject(new Error('Keine Verbindung'));
+    },
   };
   const p = createPrefetcher({ blocked: () => false, idleOk: () => true, whenIdle: () => Promise.resolve() });
   await p.tap([s]);
-  assert.equal(lastError()?.message, 'Früher');
+  await p.idle([{ ...s, key: 'gallery' }]);
+  assert.equal(backgroundStarts, 2);
+  assert.equal(background, 0);
   assert.equal(dataCache.has(cacheKey('documents', [])), false);
 });
 

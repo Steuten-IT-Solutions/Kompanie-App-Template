@@ -1,6 +1,5 @@
-import { api, can, config, isMember, type CalendarEvent } from './api';
+import { api, can, config, inBackground, isMember, type CalendarEvent } from './api';
 import { prefetch } from './dataCache';
-import { forgetError } from './lastError';
 import { createPrefetcher, idleNetworkOk, type NetworkInfo } from './prefetch';
 import { previewRole } from './preview';
 
@@ -120,7 +119,7 @@ export const prefetcher = createPrefetcher({
   blocked: () => !!previewRole() || !!config?.preview || !!config?.maintenance?.on,
   idleOk: () => idleNetworkOk(navigator as NetworkInfo),
   prefetch,
-  forgetError,
+  inBackground,
 });
 
 /** Handler für einen Eintrag, der eine Ansicht öffnet: beim Antippen (bzw. Fokus per Tastatur) ihre Daten laden. */

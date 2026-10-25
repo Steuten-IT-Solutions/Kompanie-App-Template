@@ -1140,8 +1140,6 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
-  /** Für „Fehler melden“ vermerkt (lastError.ts); Vorabladen vergisst ihn wieder. */
-  noted: ReturnType<typeof noteError> = null;
 }
 
 let csrfToken = config?.csrf.token ?? '';
@@ -1189,6 +1187,23 @@ function url(path: string, query?: Record<string, string>): string {
 }
 
 const CSRF_ERRORS = ['csrf_invalid', 'rest_cookie_invalid_nonce'];
+
+/** Zähler für inBackground: Anfragen, die beginnen, solange er über 0 steht, laufen still. */
+let background = 0;
+
+/**
+ * Vorabladen (Issue #104): Die Anfragen, die `start` sofort beginnt, laufen still im Hintergrund – ohne Weiterleitung
+ * zur Anmeldung (abgelaufene Sitzung, CSRF) und ohne Eintrag unter „Fehler melden“. Öffnet die Person die Ansicht,
+ * fragt diese selbst und meldet, was dann noch schiefgeht. Gilt nur für Anfragen, die `start` vor dem ersten await stellt.
+ */
+export function inBackground<T>(start: () => Promise<T>): Promise<T> {
+  background++;
+  try {
+    return start();
+  } finally {
+    background--;
+  }
+}
 /** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
 const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
 const USER_HEADER = 'X-Kompanie-User';
@@ -1201,7 +1216,10 @@ async function requestFull<T>(
   retry = true,
   /** 401 nur melden, nicht zur Anmeldung weiterleiten (z. B. beim Abmelden) */
   quiet = false,
+  /** im Hintergrund (inBackground): wie quiet, dazu ohne Eintrag unter „Fehler melden“ */
+  silent = background > 0,
 ): Promise<{ data: T; headers: Headers }> {
+  quiet ||= silent;
   if (!config) {
     throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
   }
@@ -1227,9 +1245,8 @@ async function requestFull<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    const err = new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
-    if (!path.startsWith('/reports')) err.noted = noteError('Keine Verbindung zum Server');
-    throw err;
+    if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
+    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
   // Ausnahme: die Abfrage des Push-Status beim Start, ein POST ohne Änderung an den angezeigten Daten.
@@ -1239,7 +1256,7 @@ async function requestFull<T>(
 
   if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
     await refreshCsrf(quiet);
-    return requestFull<T>(method, path, body, query, false, quiet);
+    return requestFull<T>(method, path, body, query, false, quiet, silent);
   }
   if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
@@ -1251,9 +1268,8 @@ async function requestFull<T>(
   if (!res.ok) {
     const message: string = data?.message ?? `Fehler ${res.status}`;
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
-    const err = new ApiError(message, res.status, data?.code ?? '');
-    if (!path.startsWith('/reports')) err.noted = noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
-    throw err;
+    if (!path.startsWith('/reports') && !silent) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
+    throw new ApiError(message, res.status, data?.code ?? '');
   }
   return { data: data as T, headers: res.headers };
 }

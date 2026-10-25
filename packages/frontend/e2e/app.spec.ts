@@ -2064,6 +2064,18 @@ test.describe('Vorabladen (Issue #104)', () => {
     }
   });
 
+  test('Sitzung endet, während im Hintergrund vorab geladen wird: keine Weiterleitung zur Anmeldung', async ({ page }) => {
+    const api = watchApi(page);
+    await login(page, 'mitglied1');
+    await expect(page.getByText('Vereinsabend')).toBeVisible();
+    // Abgemeldet (z. B. Sitzung abgelaufen), bevor die App im Leerlauf vorab lädt: /me antwortet dann mit 401.
+    await page.context().clearCookies();
+    await expect.poll(() => api.count('/me')).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+    await expect(page).not.toHaveURL(/#\/anmelden|wp-login\.php/);
+    await expect(page.getByText('Vereinsabend')).toBeVisible();
+  });
+
   test('Antippen: Die Anfrage startet bei pointerdown, vor dem Wechsel der Ansicht; ebenso ein Album', async ({ page }) => {
     // Im Datensparmodus lädt die App im Leerlauf nichts vorab: So zählt hier nur das Antippen.
     await saveData(page);
