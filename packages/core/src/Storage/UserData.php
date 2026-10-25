@@ -37,6 +37,10 @@ final class UserData
         'former_members' => 'user_id',
         // Fehlermeldungen (Issue #64) mit Namen, die noch nicht versandt sind; ohne Namen steht dort 0.
         'bug_reports' => 'user_id',
+        // Schwarzes Brett (Issue #172): Signatur, Einstellungen des Kontos, Mails an sie (mit Adresse)
+        'user_signatures' => 'user_id',
+        'user_settings' => 'user_id',
+        'board_mails' => 'user_id',
     ];
 
     /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */
@@ -59,6 +63,12 @@ final class UserData
         try {
             $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
             $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+        } catch (\RuntimeException) {
+            $ok = false;
+        }
+        try {
+            // Bilder der Signatur und nie gespeicherte Entwürfe; Bilder in Nachrichten gehören der Nachricht.
+            $db->execute("DELETE FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?", [$userId]);
         } catch (\RuntimeException) {
             $ok = false;
         }

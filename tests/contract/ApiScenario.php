@@ -532,7 +532,7 @@ final class ApiScenario
         $docs = array_column((array) ($this->req('GET', '/documents')[1]['documents'] ?? []), 'url', 'title');
         $c->ok(isset($docs["Kptest Vorschau Alle $sfx"]) && !isset($docs["Kptest Vorschau Vorstand $sfx"]), 'Vorschau: Dokumente wie die Rolle');
         $c->ok(str_contains((string) ($docs["Kptest Vorschau Alle $sfx"] ?? ''), 'vorschau=member'), 'Vorschau: Adressen der Dateien tragen die Vorschau');
-        [$s, $err] = $this->req('POST', '/board', ['text' => 'Kptest Vorschau', 'push' => false]);
+        [$s, $err] = $this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest Vorschau', 'push' => false]);
         $c->ok($s === 403 && ($err['code'] ?? '') === 'preview_readonly', 'Vorschau: Ändern → 403 preview_readonly');
         $c->ok(($this->req('PUT', '/me/birthday', ['month' => 5, 'day' => 4])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: eigener Geburtstag nicht änderbar');
         $c->ok(($this->req('POST', '/me/push/status', [])[1]['code'] ?? '') === 'preview_readonly', 'Vorschau: Benachrichtigungen nicht änderbar');
@@ -557,7 +557,7 @@ final class ApiScenario
         $this->d->preview('gibtesnicht');
         [, $d] = $this->req('GET', '/config');
         $c->ok($d['preview'] === null && ($d['user']['level'] ?? '') === 'admin', 'Unbekannte Rolle: ignoriert');
-        $c->ok(($this->req('POST', '/board', ['text' => 'Kptest Vorschau', 'push' => false])[1]['code'] ?? '') === 'preview_readonly', 'Ungültige Vorschau bleibt trotzdem nur lesend');
+        $c->ok(($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest Vorschau', 'push' => false])[1]['code'] ?? '') === 'preview_readonly', 'Ungültige Vorschau bleibt trotzdem nur lesend');
 
         $this->d->actAs($m);
         $this->d->preview('member');
@@ -898,23 +898,42 @@ final class ApiScenario
         $this->d->actAs($guest);
         $c->ok($this->req('GET', '/board')[0] === 403, 'Gast-Konto: GET /board → 403');
         $this->d->actAs($m);
-        $c->ok($this->req('POST', '/board', ['text' => 'Kptest'])[0] === 403, 'Mitglied ohne Recht schreibt nicht → 403');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 403, 'Mitglied ohne Recht schreibt nicht → 403');
+        $c->ok($this->req('GET', '/board/history')[0] === 403, 'Mitglied ohne Recht sieht keinen Verlauf → 403');
         $this->d->actAs($admin);
-        $c->ok($this->req('POST', '/board', ['text' => '  '])[0] === 400, 'Leerer Text → 400');
-        $c->ok($this->req('POST', '/board', ['text' => str_repeat('x', 501)])[0] === 400, 'Mehr als 500 Zeichen → 400');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => '<p> </p>'])[0] === 400, 'Leerer Text → 400');
+        $c->ok($this->req('POST', '/board', ['title' => ' ', 'text' => 'x'])[0] === 400, 'Ohne Titel → 400');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'expires_at' => '2000-01-01T00:00:00Z'])[0] === 400, 'Enddatum in der Vergangenheit → 400');
         $sfx = substr(bin2hex(random_bytes(3)), 0, 6);
-        [$s, $item] = $this->req('POST', '/board', ['text' => "Kptest Brett $sfx\nzweite Zeile"]);
+        $long = str_repeat('Lang ', 20000);
+        [$s, $item] = $this->req('POST', '/board', ['title' => "Kptest Brett $sfx", 'text' => "<p>Kptest <b>fett</b><script>x</script></p><p>$long</p>", 'push' => false]);
         $id = (int) ($item['id'] ?? 0);
-        $c->ok($s === 201 && ($item['kind'] ?? '') === 'message' && ($item['text'] ?? '') === "Kptest Brett $sfx\nzweite Zeile" && is_string($item['expires_at'] ?? null), 'Nachricht schreiben (Zeilenumbruch bleibt)');
-        $c->ok(((int) strtotime((string) ($item['expires_at'] ?? ''))) - ((int) strtotime((string) ($item['created_at'] ?? ''))) === 86400, 'Gültig genau 24 Stunden');
+        $c->ok($s === 201 && ($item['kind'] ?? '') === 'message' && ($item['title'] ?? '') === "Kptest Brett $sfx" && str_starts_with((string) ($item['text'] ?? ''), '<p>Kptest <b>fett</b></p>') && is_string($item['expires_at'] ?? null), 'Nachricht mit Titel und formatiertem Inhalt (bereinigt)');
+        $c->ok(strlen((string) ($item['text'] ?? '')) > 65535, 'Keine Längengrenze (mehr als 64 KB)');
+        $c->ok(str_starts_with((string) ($item['excerpt'] ?? ''), 'Kptest fett'), 'Textauszug');
+        $c->ok(((int) strtotime((string) ($item['expires_at'] ?? ''))) - ((int) strtotime((string) ($item['created_at'] ?? ''))) === 86400, 'Standard: 24 Stunden');
         foreach ([$m => 'Mitglied', $cand => 'Anwärter'] as $who => $label) {
             $this->d->actAs($who);
             [$s, $d] = $this->req('GET', '/board');
             $c->ok($s === 200 && in_array($id, array_column((array) ($d['items'] ?? []), 'id'), true), "$label sieht die Nachricht");
         }
         $this->d->actAs($admin);
-        [$s, $edited] = $this->req('PATCH', "/board/$id", ['text' => "Kptest Brett $sfx geändert"]);
-        $c->ok($s === 200 && ($edited['expires_at'] ?? null) === ($item['expires_at'] ?? '') && ($edited['text'] ?? '') === "Kptest Brett $sfx geändert", 'Ändern: Ablaufzeit bleibt');
+        $future = gmdate('Y-m-d\TH:i:s\Z', time() + 40 * 86400);
+        [$s, $edited] = $this->req('PATCH', "/board/$id", ['expires_at' => $future]);
+        $c->ok($s === 200 && strtotime((string) ($edited['expires_at'] ?? '')) === strtotime($future) && ($edited['updated_at'] ?? null) === ($item['updated_at'] ?? ''), 'Enddatum verlängert (ohne Obergrenze), updated_at bleibt');
+        [$s, $edited] = $this->req('PATCH', "/board/$id", ['title' => "Kptest Brett $sfx geändert", 'text' => '<p>geändert</p>']);
+        $c->ok($s === 200 && ($edited['title'] ?? '') === "Kptest Brett $sfx geändert" && ($edited['text'] ?? '') === '<p>geändert</p>', 'Titel und Inhalt geändert');
+        [$s, $h] = $this->req('GET', "/board/$id/history");
+        $c->ok($s === 200 && array_column((array) ($h['revisions'] ?? []), 'action') === ['created', 'expires', 'title', 'content'], 'Verlauf mit allen Änderungen');
+        [$s, $mail] = $this->req('GET', '/board/mail');
+        $c->ok($s === 200 && isset($mail['available'], $mail['recipients']), 'Haken „E-Mail senden“: Stand des Mailversands');
+        [$s, $sig] = $this->req('PUT', '/me/signature', ['content' => "<p>Gruß $sfx</p>"]);
+        $c->ok($s === 200 && ($sig['signature']['content'] ?? '') === "<p>Gruß $sfx</p>", 'Signatur einrichten');
+        [$s, $d] = $this->req('DELETE', '/me/signature');
+        $c->ok($s === 200 && array_key_exists('signature', (array) $d) && $d['signature'] === null, 'Signatur löschen');
+        $this->d->actAs($cand);
+        $c->ok($this->req('GET', '/me/signature')[0] === 200 && $this->req('GET', '/me/mail')[0] === 200, 'Anwärter: Signatur und Mail-Einstellung');
+        $this->d->actAs($admin);
         // Umfragen brauchen das Schwarze Brett: beide zusammen aus- und wieder einschalten.
         $c->ok($this->req('PUT', '/admin/features', ['board' => false])[0] === 400, 'Brett aus, solange Umfragen an sind → 400');
         $this->req('PUT', '/admin/features', ['board' => false, 'polls' => false]);
@@ -923,6 +942,9 @@ final class ApiScenario
         $this->req('PUT', '/admin/features', ['board' => true, 'polls' => true]);
         $c->ok($this->req('DELETE', "/board/$id")[0] === 200, 'Vorzeitig löschen');
         $c->ok($this->req('DELETE', "/board/$id")[0] === 404, 'Gelöschte Nachricht → 404');
+        [$s, $ended] = $this->req('GET', '/board/history');
+        $byId = array_column((array) ($ended['items'] ?? []), null, 'id');
+        $c->ok($s === 200 && is_string($byId[$id]['deleted_at'] ?? null) && is_string($byId[$id]['deleted_by_name'] ?? null), 'Gelöschte Nachricht im Verlauf (wer, wann)');
     }
 
     /**

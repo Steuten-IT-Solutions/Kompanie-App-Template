@@ -98,6 +98,23 @@ final class WpUsers implements UserDirectory, AuthContext
         return $out;
     }
 
+    public function emails(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        cache_users($ids);
+        $out = [];
+        foreach ($ids as $id) {
+            $user = get_userdata($id);
+            if ($user instanceof \WP_User) {
+                $out[$id] = (string) $user->user_email;
+            }
+        }
+        return $out;
+    }
+
     public function list(bool $includeGuests): array
     {
         // all_with_meta: WordPress lädt die Benutzer-Optionen aller Treffer vorab (cache_users), statt beim Lesen

@@ -107,16 +107,16 @@ final class PreviewTest extends TestCase
 
     public function testReadOnlyOnServerExceptLogout(): void
     {
-        foreach ([['POST', '/board', ['text' => 'Hallo', 'push' => false]], ['PUT', '/me/birthday', ['month' => 1, 'day' => 2]], ['POST', '/me/push/test', []], ['POST', '/auth/login', ['username' => 'admin', 'password' => 'x']], ['PATCH', '/admin/settings', []], ['DELETE', "/members/{$this->m}", []]] as [$method, $path, $body]) {
+        foreach ([['POST', '/board', ['title' => 'Titel', 'text' => 'Hallo', 'push' => false]], ['PUT', '/me/birthday', ['month' => 1, 'day' => 2]], ['POST', '/me/push/test', []], ['POST', '/auth/login', ['username' => 'admin', 'password' => 'x']], ['PATCH', '/admin/settings', []], ['DELETE', "/members/{$this->m}", []]] as [$method, $path, $body]) {
             $res = $this->call($method, $path, $body, 'member');
             $this->assertSame([403, 'preview_readonly', 'In der Vorschau kannst du nichts ändern.'], [$res->status, $res->data['code'] ?? null, $res->data['message'] ?? null], "$method $path");
         }
-        $this->assertSame(403, $this->call('POST', '/board', ['text' => 'Hallo'], null, [Preview::QUERY => 'member'])->status, 'auch über den Parameter');
-        $this->assertSame('preview_readonly', $this->call('POST', '/board', ['text' => 'Hallo'], 'gibtsnicht')->data['code'] ?? null, 'auch ungültig');
+        $this->assertSame(403, $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo'], null, [Preview::QUERY => 'member'])->status, 'auch über den Parameter');
+        $this->assertSame('preview_readonly', $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo'], 'gibtsnicht')->data['code'] ?? null, 'auch ungültig');
         $this->assertSame(200, $this->call('POST', '/auth/logout', [], 'member')->status, 'Abmelden geht');
         $this->assertFalse($this->app->preview()->requested(), 'nach der Anfrage keine Vorschau mehr');
         $this->users->current = $this->admin;
-        $this->assertSame(201, $this->call('POST', '/board', ['text' => 'Hallo', 'push' => false])->status, 'ohne Vorschau wieder möglich');
+        $this->assertSame(201, $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo', 'push' => false])->status, 'ohne Vorschau wieder möglich');
     }
 
     public function testConfigReflectsPreview(): void

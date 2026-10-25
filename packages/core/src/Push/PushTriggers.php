@@ -73,14 +73,18 @@ final class PushTriggers
     }
 
     /**
-     * @param array{id: int, text: string, author_name: string|null, expires_at: string|null} $item neue Nachricht (BoardService::create)
+     * Neue Nachricht am Brett (Issue #172): Überschrift „<Brett>: <Verfasser>“, Text = Titel der Nachricht. Zustellbar
+     * bis zum Enddatum, höchstens PushService::MAX_TTL (Obergrenze der Push-Dienste): Das begrenzt nur, wie lange ein
+     * ausgeschaltetes Gerät die Benachrichtigung nachgeliefert bekommt, nicht, wie lange die Nachricht sichtbar ist.
+     *
+     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null} $item neue Nachricht (BoardService::create)
      */
     public function boardPosted(array $item, int $authorId): int
     {
         $expires = $item['expires_at'] !== null ? (int) strtotime($item['expires_at']) : 0;
-        $ttl = $expires - $this->app->time()->timestamp();
+        $ttl = min($expires - $this->app->time()->timestamp(), PushService::MAX_TTL);
         $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
-        return $this->push->notifyBoard(PushService::message($title, $item['text'], 'brett', 'brett-' . $item['id']), $authorId, $ttl);
+        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett', 'brett-' . $item['id']), $authorId, $ttl);
     }
 
     /**

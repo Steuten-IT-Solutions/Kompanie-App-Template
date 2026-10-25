@@ -441,7 +441,7 @@ final class PollServiceTest extends TestCase
     public function testBoardItemsForMembers(): void
     {
         $this->setUpApp();
-        $this->as($this->admin)->call('POST', '/board', ['text' => 'Dringend']);
+        $this->as($this->admin)->call('POST', '/board', ['title' => 'Titel', 'text' => 'Dringend']);
         $poll = $this->create(['ends_at' => '2026-10-25T12:00']);
         $closed = $this->create(['title' => 'Schon zu']);
         $this->call('POST', "/polls/{$closed['id']}/close");

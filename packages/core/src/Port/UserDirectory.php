@@ -35,6 +35,14 @@ interface UserDirectory
     public function list(bool $includeGuests): array;
 
     /**
+     * Hinterlegte Mailadressen (Issue #172, Mailversand); Konten ohne Adresse fehlen oder haben ''.
+     *
+     * @param int[] $ids
+     * @return array<int, string> ID => Adresse
+     */
+    public function emails(array $ids): array;
+
+    /**
      * Legt ein Konto als Mitglied oder als Anwärter (Auth\Roles) an und gibt seine ID zurück. Anzeigename ist
      * „Vorname Nachname“ (Domain\PersonName::join).
      */
