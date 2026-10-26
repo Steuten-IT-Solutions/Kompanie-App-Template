@@ -293,7 +293,11 @@ final class App
             } elseif ($task === PushService::TASK_SEND) {
                 $this->push()->processQueue();
             } elseif ($task === PushService::TASK_WATCH) {
-                $this->pushTriggers()->watch();
+                // Eingereihtes gleich verschicken, nicht erst im nächsten Lauf von push_send: Mit WP-Cron oder dem
+                // Pseudo-Cron käme das sonst erst mit dem nächsten Cron-Aufruf bzw. Seitenaufruf.
+                if ($this->pushTriggers()->watch() > 0) {
+                    $this->push()->processQueue();
+                }
             } elseif ($task === BoardService::TASK) {
                 $this->board()->cleanup();
             } elseif ($task === BoardMailService::TASK) {

@@ -291,6 +291,42 @@ final class CalendarTest extends TestCase
         $this->assertCount(4, $http->calls, 'Sperre: nur ein Abruf gleichzeitig');
     }
 
+    public function testLatestFetchesDespiteFreshCopy(): void
+    {
+        $down = false;
+        $http = new FakeHttpClient(function () use (&$down): array {
+            if ($down) {
+                throw new \RuntimeException('Zeitüberschreitung');
+            }
+            return ['status' => 200, 'body' => $this->ics()];
+        });
+        $clock = new FixedClock(new \DateTimeImmutable());
+        $settings = new MemorySettings(['calendar_ics_url' => 'https://example.org/k.ics', 'calendar_cache_minutes' => 60]);
+        $cal = TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings, $clock)->calendar();
+
+        $this->assertCount(2, $cal->latest(), 'ohne Kopie: abrufen');
+        $this->assertCount(1, $http->calls);
+        $this->assertCount(2, $cal->latest());
+        $this->assertCount(1, $http->calls, 'gerade erst abgerufen (höchstens eine Minute): Kopie');
+
+        $clock->at = $clock->now()->modify('+2 minutes');
+        $cal->latest();
+        $this->assertCount(2, $http->calls, 'noch frisch (60 Minuten), aber älter als eine Minute: neu abrufen');
+        $cal->events();
+        $this->assertCount(2, $http->calls, 'die Terminansicht nimmt weiter die frische Kopie');
+
+        // Störung (eigene Instanz: Die Sperre gilt 30 Sekunden echter Zeit): alte Fassung, Fehler gemerkt.
+        $cal = TestApp::create(TestApp::connection(), new FakeUsers(), [], $http, null, $settings, $clock)->calendar();
+        $cal->latest();
+        $this->assertCount(3, $http->calls);
+        $clock->at = $clock->now()->modify('+2 minutes');
+        $down = true;
+        $this->assertCount(2, $cal->latest(), 'Störung: alte Fassung');
+        $this->assertCount(4, $http->calls);
+        $cal->latest();
+        $this->assertCount(4, $http->calls, 'gemerkter Fehler: kein neuer Abruf');
+    }
+
     public function testCalendarTaskIsScheduledOnlyWhenConfigured(): void
     {
         $app = TestApp::create(TestApp::connection(), new FakeUsers(), [], null, null, new MemorySettings());

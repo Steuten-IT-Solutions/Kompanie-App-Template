@@ -480,6 +480,27 @@ final class PushServiceTest extends TestCase
         $this->assertSame(['termine/termin/' . $ids['Fest'], 'termine/termin/' . $ids['Probe umbenannt']], array_column($msgs, 'route'));
     }
 
+    public function testWatchFetchesCalendarAndSendsInTheSameRun(): void
+    {
+        $this->settings->set('calendar_cache_minutes', 60);
+        $app = $this->app();
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $d = self::device('m');
+        $app->push()->subscribe($m, $d['endpoint'], $d['keys'], ['events'], null, '');
+
+        $this->ics(self::vevent('a', '20261101', 'Probe', 'Halle'));
+        $app->runTask(PushService::TASK_WATCH);
+        $this->assertSame([], $this->pushes(), 'erster Lauf: nur merken');
+
+        // Kopie noch frisch (60 Minuten), Termin inzwischen verlegt: Der Abgleich ruft trotzdem ab und verschickt gleich.
+        $this->clock->at = $this->clock->now()->modify('+15 minutes');
+        $this->ics(self::vevent('a', '20261101', 'Probe', 'Sporthalle'));
+        $app->runTask(PushService::TASK_WATCH);
+        $pushes = $this->pushes();
+        $this->assertCount(1, $pushes, 'im selben Lauf verschickt, nicht erst mit push_send');
+        $this->assertSame('Probe – Ort: Halle → Sporthalle', self::decrypt((string) $pushes[0]['body'], $d)['body']);
+    }
+
     public function testPublicEventsGoToGuestsAndAccountsWithoutCalendar(): void
     {
         $app = $this->app();

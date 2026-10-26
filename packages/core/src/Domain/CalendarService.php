@@ -26,7 +26,8 @@ use KompanieApp\Core\Port\Settings;
  * „frisch bis“-Zeitpunkt (Einstellung calendar_cache_minutes). Ist sie veraltet, erneuert sie
  * höchstens eine Anfrage je LOCK_SECONDS (Sperre); alle anderen bekommen sofort die alte Fassung,
  * bei einer Störung auch diese. Ein Fehler wird ERROR_SECONDS gemerkt, damit bei einer Störung nicht jede Anfrage
- * bis zum Timeout wartet. Im Hintergrund erneuert die Aufgabe TASK den Kalender stündlich.
+ * bis zum Timeout wartet. Im Hintergrund erneuert die Aufgabe TASK den Kalender stündlich; der Abgleich für
+ * Benachrichtigungen (alle 15 Minuten) holt ihn unabhängig vom „frisch bis“ neu (latest()).
  */
 final class CalendarService
 {
@@ -114,6 +115,31 @@ final class CalendarService
             throw ApiError::upstream($error);
         }
         return $this->refresh();
+    }
+
+    /**
+     * Für den Abgleich der Benachrichtigungen (PushTriggers::checkCalendar): ruft den Kalender ab, auch wenn die
+     * Kopie noch als frisch gilt, damit Änderungen nicht bis zu calendar_cache_minutes liegen bleiben. Ist die Kopie
+     * höchstens $maxAgeSeconds alt (z. B. gerade von calendar_refresh im selben Lauf geholt), gilt sie. Bei einer
+     * Störung (auch einer gemerkten) oder wenn gerade jemand anderes abruft: die alte Fassung, ohne sie: Fehler.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function latest(int $maxAgeSeconds = 60): array
+    {
+        $copy = $this->copy();
+        if ($copy === null) {
+            return $this->events();
+        }
+        if ($copy['fetched_at'] > $this->time->timestamp() - $maxAgeSeconds || $this->cache->get(self::ERROR_KEY) !== null || !$this->lock()) {
+            return $copy['events'];
+        }
+        try {
+            return $this->refresh();
+        } catch (ApiError $e) {
+            error_log('Kompanie-App: Kalender nicht erneuert, alte Fassung verwendet: ' . $e->getMessage());
+            return $copy['events'];
+        }
     }
 
     /**
