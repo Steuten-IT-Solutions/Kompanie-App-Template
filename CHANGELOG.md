@@ -23,6 +23,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Rollen wie Spieß, ohne Anwärter) und **Alle Konten** (alle außer Gästen). Bisher erreichte eine Mail an die Rolle
   „Mitglied“ keine Admins und Spieße. Ehemalige bekommen nie eine Mail, auch wenn sie noch in einer Gruppe stehen.
 
+### Geändert
+
+- **Ämter nach Jahren auch auf dem Handy**: Den Schalter „Chronik | Jahre“ im Tab Ämter gibt es jetzt auf jedem
+  Bildschirm. Auf dem Handy ist die Übersicht schmaler; quer gedreht nutzt sie die ganze Breite, sodass mehr Ämter
+  nebeneinander passen. Beim Scrollen bleiben oben die Ämter und links die Jahre stehen. Ein Tipp auf einen Balken
+  zeigt unten Jahre, Personen und Zusatz.
+
 ## [0.3.0] – 2026-10-26
 
 ### Neu
