@@ -5,12 +5,14 @@ import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
+import { rememberRoute } from './share';
 
-/** Schlüssel einer Rolle: guest, candidate, member, organizer, manager, admin oder vom Admin angelegt (r1, r2, …). */
+/** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
 export type Capability =
   | 'member'
   | 'calendar'
+  | 'view_intern'
   | 'manage_points'
   | 'manage_penalties'
   | 'manage_ranks'
@@ -21,8 +23,12 @@ export type Capability =
   | 'post_board'
   | 'manage_polls'
   | 'manage_inventory'
+  | 'manage_offices'
+  | 'manage_lists'
+  | 'send_mail'
   | 'create_users'
   | 'promote_users'
+  | 'view_activity'
   | 'manage_settings';
 export type Feature =
   | 'events'
@@ -38,7 +44,11 @@ export type Feature =
   | 'board'
   | 'polls'
   | 'birthdays'
-  | 'inventory';
+  | 'inventory'
+  | 'directory'
+  | 'offices'
+  | 'lists'
+  | 'mail';
 
 export interface AppUser {
   id: number;
@@ -74,6 +84,8 @@ export interface AppConfig {
   user: AppUser | null;
   /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
   setupPending?: boolean;
+  /** Nur für Admins: Datensicherung als Datei herunterladen (Stück für Stück erzeugt); fehlt bei älteren Servern */
+  backupUrl?: string | null;
   /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
   maintenance?: MaintenanceInfo;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
@@ -88,6 +100,36 @@ export interface MaintenanceInfo {
 
 export interface MaintenanceState extends MaintenanceInfo {
   log: { at: number; by: number; by_name: string; on: boolean; reason: string }[];
+}
+
+/** Nutzungsauswertung (Issue #175): Zahlen ohne Personenbezug, immer d1 ≤ d7 ≤ d30 ≤ users */
+export interface ActivityUsage {
+  users: number;
+  active: { d1: number; d7: number; d30: number };
+}
+
+export interface ActivityOverview extends ActivityUsage {
+  /** Erfassung je Person an */
+  personal: boolean;
+  keep_days: number;
+  from: string;
+  to: string;
+  days: { day: string; users: number; actions: number }[];
+  /** meistgenutzte zuerst; people = Personen in den letzten 30 Tagen */
+  areas: { area: string; label: string; actions: number; people: number }[];
+  /** nur mit Erfassung je Person; last_active null = nicht aktiv, seit die Erfassung läuft; actions = Einträge im Zeitraum */
+  members: { id: number; name: string; last_active: number | null; actions: number }[] | null;
+}
+
+export type ActivityAction = 'view' | 'create' | 'update' | 'delete' | 'vote' | 'login';
+
+export interface ActivityEntry {
+  user_id: number;
+  name: string;
+  area: string;
+  label: string;
+  action: ActivityAction;
+  at: number;
 }
 
 declare global {
@@ -134,8 +176,12 @@ export interface RoleInfo {
   key: Level;
   label: string;
   points_factor: number;
-  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Anwärter, Mitglied, Admin; Issue #66) */
+  /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Mitglied, Admin; Issue #66) */
   extra?: boolean;
+  /** Beim Anlegen von Konten wählbar (Mitglied immer, eigene Rollen nach Einstellung) */
+  new_accounts?: boolean;
+  /** Wer Mitglieder anlegen darf, macht Personen dieser Rolle zum Mitglied (z. B. Anwärter) */
+  promotable?: boolean;
 }
 
 /** Für Einstellungen → Rollen (nur Admins). */
@@ -149,9 +195,18 @@ export interface RoleAdmin extends RoleInfo {
   deletable: boolean;
 }
 
-export type RoleInput = { label?: string; capabilities?: Capability[]; points_factor?: number | string };
+export type RoleInput = {
+  label?: string;
+  capabilities?: Capability[];
+  points_factor?: number | string;
+  new_accounts?: boolean;
+  promotable?: boolean;
+};
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
+
+/** Rollen, die neue Konten bekommen können (Mitglied und freigegebene eigene Rollen), in der Reihenfolge der Rollen. */
+export const newAccountRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
 
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
@@ -184,7 +239,14 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor, system }) => ({ key, label, points_factor, extra: !system }));
+  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable }) => ({
+    key,
+    label,
+    points_factor,
+    extra: !system,
+    new_accounts,
+    promotable,
+  }));
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -228,6 +290,17 @@ export interface Penalty {
   status: 'open' | 'paid';
   paid_at: string | null;
   created_by_name: string | null;
+}
+
+/** Offene Strafe für die Liste aller offenen (Verwaltung) */
+export interface OpenPenalty extends Penalty {
+  user_name: string | null;
+}
+
+/** Eigene Kontaktangaben (Meins → Konto) */
+export interface OwnAccount {
+  email: string;
+  phone: string;
 }
 
 export interface CalendarEvent {
@@ -281,7 +354,10 @@ export interface NewsItem {
 export interface GalleryAlbumSummary {
   id: number;
   title: string;
+  /** Bilder und Videos zusammen */
   count: number;
+  /** davon Videos; fehlt bei älteren Servern */
+  video_count?: number;
   intern_count: number;
   cover: string | null;
 }
@@ -293,8 +369,17 @@ export interface GalleryYear {
 
 export interface GalleryPhoto {
   id: number;
+  /** fehlt bei älteren Servern (dann ein Bild) */
+  type?: 'image' | 'video';
+  /** Vorschaubild; bei Videos '' ohne Vorschaubild */
   thumb: string;
   large: string;
+  /** Video: Adresse zum Abspielen (Ausschnitte aus Drive), Dateityp und Dauer in Sekunden (0 unbekannt) */
+  video?: string;
+  mime?: string;
+  duration?: number;
+  /** Originalauflösung für die Großansicht: wird nach large nachgeladen; 404, wenn es sie nicht gibt (large bleibt) */
+  original?: string;
   width: number;
   height: number;
   intern: boolean;
@@ -323,7 +408,9 @@ export interface MemberSummary {
   extra_roles?: Level[];
   /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
-  /** Dienstgrad (nur mit Bereich und Recht „Dienstgrade verwalten“) */
+  /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
+  group?: Level | null;
+  /** Dienstgrad (nur mit Bereich Dienstgrade) */
   rank_title?: string | null;
   /** Abzeichen des Dienstgrads (wie rank_title) */
   rank_badge_url?: string | null;
@@ -334,6 +421,62 @@ export interface MemberSummary {
   /** null: Punkte bzw. Strafen sieht nur, wer sie vergeben darf */
   points: number | null;
   open_cents: number | null;
+  /** Eintritt als JJJJ-MM-TT oder JJJJ (nur für create_users; leer ohne Eintrag, fehlt bei älteren Servern) */
+  joined_on?: string;
+}
+
+/** Eintrag der Mitgliederliste (Bereich directory, öffentlich): nur Name, Foto, Dienstgrad, Titel. */
+export interface DirectoryEntry {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  /** Rolle, solange die Person noch als Mitglied aufzunehmen ist (z. B. Anwärter); fehlt bei Ehemaligen und älteren Servern */
+  candidate_role?: string | null;
+  /** Foto (128 Pixel), null ohne */
+  photo_url: string | null;
+  /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */
+  rank_title?: string | null;
+  rank_badge_url?: string | null;
+  /** Titel (fehlen ohne Bereich Titel) */
+  titles?: TitleRef[];
+  /** Geburtstag, soweit die Person ihn dem Betrachter zeigt (fehlt ohne Bereich Geburtstage und bei Ehemaligen) */
+  birthday?: DirectoryBirthday | null;
+  /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
+  join_year?: number | null;
+  /** Eintritt wie eingetragen (JJJJ-MM-TT oder JJJJ), soweit gezeigt; fehlt bei Ehemaligen und älteren Servern */
+  join_date?: string | null;
+}
+
+/** Geburtstag auf der Seite einer Person: Jahr und Alter nur mit „Alter anzeigen“ und eingetragenem Jahr. */
+export interface DirectoryBirthday {
+  month: number;
+  day: number;
+  year: number | null;
+  /** heutiges Alter */
+  age: number | null;
+}
+
+/** Wem eine Angabe auf der eigenen Seite in der Mitgliederliste erscheint: nicht, nur Mitgliedern, allen. */
+export type ProfileVisibility = 'none' | 'members' | 'public';
+
+/** Eintritt eines aktiven Mitglieds mit der Anzeige auf seiner Seite (dort steht er, wie er eingetragen ist). */
+export interface JoinYear {
+  year: number;
+  /** JJJJ-MM-TT oder nur das Jahr JJJJ; fehlt bei älteren Servern (nur year) */
+  date?: string;
+  profile: ProfileVisibility;
+}
+
+/** Ehemalige in der öffentlichen Mitgliederliste: wie DirectoryEntry, dazu nur Gründungsmitglied, Eintritt und Ausscheiden. */
+export interface DirectoryFormerEntry extends DirectoryEntry {
+  founder: boolean;
+  /** Jahre (JJJJ oder leer) */
+  joined_year: string;
+  left_year: string;
+  /** wie eingetragen (JJJJ-MM-TT, JJJJ oder leer); fehlen bei älteren Servern */
+  joined_on?: string;
+  left_on?: string;
 }
 
 export interface MemberDetail extends MemberSummary {
@@ -344,10 +487,138 @@ export interface MemberDetail extends MemberSummary {
   rank_history?: RankHistoryEntry[];
   /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** Eintritt mit Anzeige (nur für create_users; null ohne Eintrag) */
+  join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
   rights?: MemberRights | null;
   /** Ob man das Foto hochladen, ersetzen und entfernen darf (create_users und dieses Konto verwalten) */
   photo_editable?: boolean;
+  /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
+  former?: FormerInfo | null;
+}
+
+/** Grund des Ausscheidens */
+export type FormerReason = 'left' | 'deceased' | 'other';
+
+/** Angaben zu einem ehemaligen Mitglied. Daten als JJJJ-MM-TT, nur das Jahr (JJJJ) oder leer. */
+export interface FormerInfo {
+  reason: FormerReason;
+  joined_on: string;
+  /** Gründungsmitglied */
+  founder: boolean;
+  left_on: string;
+  /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
+  previous_level: Level;
+}
+
+/** Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181). */
+export interface FormerOfficesPreview {
+  end_year: number;
+  terms: {
+    office: string;
+    start_year: number;
+    end_year: number;
+    /** Austritt vor dem Beginn: Das Ende ist der Beginn */
+    clamped: boolean;
+    /** Gemeinsam mit anderen, die weiterlaufen */
+    shared: boolean;
+  }[];
+}
+
+/** Eintrag der Liste „Ehemalige“ (create_users). */
+export interface FormerMember extends FormerInfo {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+  /** null: nur wer Punkte bzw. Strafen vergibt */
+  points: number | null;
+  open_cents: number | null;
+}
+
+export interface FormerInput {
+  reason: FormerReason;
+  joined_on: string;
+  founder: boolean;
+  left_on: string;
+}
+
+/** Neu angelegte ehemalige Person (POST /members/former) */
+export interface CreatedFormer extends FormerInfo {
+  id: number;
+  name: string;
+  /** Einträge in Amtszeiten (nur freier Name), die mit dem Konto verknüpft wurden */
+  offices_linked: number;
+  /** Person angelegt, aber Geburtstag bzw. Foto nicht übernommen */
+  warning?: string;
+  photo_url?: string | null;
+}
+
+/** Zeile der Vorschau beim Import der Ehemaligen */
+export interface FormerImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  reason?: FormerReason;
+  joined_on?: string;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface FormerImportResult {
+  rows: FormerImportRow[];
+  new: number;
+  existing: number;
+  /** Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden */
+  offices_linked?: number;
+  applied: boolean;
+}
+
+/** Zeile der Vorschau beim Import der Mitglieder (POST /members/import) */
+export interface MemberImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  status?: 'active' | 'former';
+  /** Rolle des neuen Kontos (null bei Ehemaligen) */
+  level?: Level | null;
+  /** leer bei Ehemaligen (sie melden sich nicht an) */
+  username?: string;
+  email?: string;
+  /** JJJJ-MM-TT oder MM-TT */
+  birthday?: string;
+  /** JJJJ-MM-TT oder JJJJ */
+  joined_on?: string;
+  points?: number;
+  rank?: string;
+  titles?: string[];
+  /** nur Ehemalige */
+  reason?: FormerReason;
+  founder?: boolean;
+  left_on?: string;
+  /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
+  existing?: { id: number; name: string; former: boolean };
+  error?: string;
+}
+
+export interface MemberImportResult {
+  columns: { used: string[]; ignored: { column: string; reason: string }[] };
+  rows: MemberImportRow[];
+  /** Vorschau: was angelegt würde; nach dem Übernehmen: was angelegt wurde */
+  new: { active: number; former: number };
+  existing: number;
+  offices_linked: number;
+  applied: boolean;
+  /** Zugangsdaten der neuen Mitglieder und Anwärter (nur nach dem Übernehmen) */
+  created: CreatedUser[];
+  /** Abbruch mittendrin: die schon angelegten stehen in created */
+  error?: string;
 }
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
@@ -371,6 +642,8 @@ export interface Birthday {
   visible: boolean;
   /** Alter anzeigen */
   show_age: boolean;
+  /** Auf der eigenen Seite in der Mitgliederliste (fehlt bei älteren Servern) */
+  profile?: ProfileVisibility;
 }
 
 /** Eintrag im Inventar (Issue #6): ein Ort je Eintrag. */
@@ -444,6 +717,7 @@ export interface BirthdayInput {
   year: number | null;
   visible?: boolean;
   show_age?: boolean;
+  profile?: ProfileVisibility;
 }
 
 export interface Rank {
@@ -463,18 +737,212 @@ export interface Rank {
   badge_push?: boolean;
 }
 
-/** Nachricht am Schwarzen Brett (Issue #5). */
+/** Stand des Mailversands einer Nachricht (Issue #172, nur mit post_board). */
+export interface BoardMailSummary {
+  recipients: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  /** nicht mehr verschickt, weil die Nachricht gelöscht wurde */
+  cancelled: number;
+}
+
+/** Nachricht am Schwarzen Brett (Issue #5, Umbau #172). */
 export interface BoardMessage {
   kind: 'message';
   id: number;
-  /** Reiner Text mit Zeilenumbrüchen, nie HTML */
+  /** Titel (reiner Text): Banner, Benachrichtigung, Betreff der Mail */
+  title: string;
+  /** Bereinigter formatierter Inhalt (HTML, Bilder mit Adresse); Anzeige über RichTextView */
   text: string;
+  /** Reiner Textauszug */
+  excerpt: string;
   /** null, wenn unbekannt; „gelöschtes Konto“, wenn das Konto gelöscht wurde */
   author_name: string | null;
   created_at: string;
+  /** wechselt, wenn sich Titel oder Inhalt ändern (nicht beim Enddatum) */
   updated_at: string;
-  /** Genau 24 Stunden nach created_at; danach blendet die App den Eintrag aus, auch offline */
+  /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+  /** Dateianhänge (fehlt bei älteren Servern) */
+  attachments?: Attachment[];
+  /** nur mit post_board: wer zuletzt geändert hat */
+  last_edit?: { name: string | null; at: string } | null;
+  /** nur mit post_board: Mailversand (null: ohne Mail) */
+  mail?: BoardMailSummary | null;
+}
+
+/** Abgelaufene oder gelöschte Nachricht im Verlauf (nur post_board). */
+export interface BoardEnded {
+  id: number;
+  title: string;
+  text: string;
+  excerpt: string;
+  author_name: string | null;
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+  deleted_at: string | null;
+  deleted_by_name: string | null;
+  active: boolean;
+  attachments?: Attachment[];
+}
+
+export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'attachments' | 'deleted' | 'mailed';
+
+/** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
+export interface BoardRevision {
+  id: number;
+  action: BoardRevisionAction;
+  user_name: string | null;
+  at: string;
+  before: unknown;
+  after: unknown;
+}
+
+export interface BoardMailLogEntry {
+  name: string | null;
+  email: string;
+  status: 'pending' | 'sent' | 'failed' | 'cancelled';
+  attempts: number;
+  error: string | null;
+  at: string | null;
+}
+
+export interface BoardHistory {
+  message: BoardEnded;
+  revisions: BoardRevision[];
+  mail: BoardMailSummary | null;
+  mail_log: BoardMailLogEntry[];
+}
+
+export interface BoardInput {
+  title: string;
+  /** formatierter Inhalt (HTML) */
+  text: string;
+  /** UTC (…Z); ohne Angabe 24 Stunden */
+  expires_at?: string | null;
+  push?: boolean;
+  mail?: boolean;
+  /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
+  attachments?: string[];
+}
+
+/** Dateianhang (Schwarzes Brett, E-Mails): Download über url nach Anmeldung */
+export interface Attachment {
+  uid: string;
+  name: string;
+  size: number;
+  mime: string;
+  url: string;
+}
+
+/** Haken „E-Mail senden“ */
+export interface BoardMailInfo {
+  available: boolean;
+  recipients: number;
+  reason: string | null;
+  server_max_size: number | null;
+}
+
+/** E-Mails aus der Verwaltung: Felder für Empfänger */
+export type MailField = 'to' | 'cc' | 'bcc';
+
+/** Empfänger eines Felds: Rollen, Konten und freie Adressen */
+export interface MailSelection {
+  roles: Level[];
+  users: number[];
+  emails: string[];
+}
+
+/** Formular „E-Mail schreiben“: eingerichtet? Absender, wählbare Rollen und Mitglieder (ohne Adressen) */
+export interface MailOptions {
+  available: boolean;
+  reason: string | null;
+  from: string;
+  from_name: string;
+  roles: { key: Level; label: string; members: number; with_email: number }[];
+  members: { id: number; name: string; roles: Level[]; email: boolean }[];
+  server_max_size: number | null;
+}
+
+/** Wer die Mail bekäme (Bestätigung vor dem Senden) */
+export interface MailPreview {
+  recipients: number;
+  to: number;
+  cc: number;
+  bcc: number;
+  /** ausgewählte Konten ohne gültige Adresse */
+  skipped: string[];
+}
+
+export interface MailListItem {
+  id: number;
+  subject: string;
+  author_name: string | null;
+  created_at: string;
+  mail: BoardMailSummary;
+}
+
+export interface MailDetail extends MailListItem {
+  text: string;
+  attachments: Attachment[];
+  selection: Record<MailField, { roles: { key: Level; label: string }[]; users: { id: number; name: string | null }[]; emails: string[] }>;
+  log: {
+    field: MailField;
+    name: string | null;
+    email: string;
+    status: 'pending' | 'sent' | 'failed' | 'cancelled';
+    attempts: number;
+    error: string | null;
+    at: string | null;
+  }[];
+}
+
+/** Technische Grenzen des Servers für Bilder (Bytes; null = keine). */
+export interface RichImageLimits {
+  post_max_size: number | null;
+  upload_max_filesize: number | null;
+  memory_limit: number | null;
+  max_allowed_packet: number | null;
+  max_image_bytes: number | null;
+}
+
+export interface RichImage {
+  uid: string;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface Signature {
+  content: string;
+  updated_at: string | null;
+}
+
+/** Mails vom Brett: gewünscht, möglich, Adresse hinterlegt */
+export interface MailPreference {
+  board: boolean;
+  available: boolean;
+  email: boolean;
+}
+
+/** Einstellungen → E-Mail (Kompanieadresse und SMTP) */
+export interface MailSettings {
+  from: string;
+  from_name: string;
+  from_name_default: string;
+  host: string;
+  port: number;
+  secure: 'starttls' | 'ssl' | 'none';
+  user: string;
+  password_set: boolean;
+  configured: boolean;
+  unavailable: string | null;
+  server_max_size: number | null;
+  pending: number;
+  batch_size: number;
+  batch_pause: number;
 }
 
 /** Laufende Umfrage am Schwarzen Brett (Issue #4), nur für Mitglieder. */
@@ -666,11 +1134,172 @@ export interface Title {
   active: boolean;
   /** Wie vielen Mitgliedern zugewiesen */
   assigned: number;
+  /** Amt, das den Titel über die laufenden Amtszeiten vergibt (Issue #112); null ohne, fehlt bei älteren Servern */
+  office?: { id: number; title: string } | null;
 }
 
 export interface TitleRef {
   id: number;
   title: string;
+}
+
+/** Ämter (Issue #112): Gruppe der Anzeige */
+export interface OfficeGroup {
+  id: number;
+  title: string;
+}
+
+/** Inhaber einer Amtszeit: user_id und Foto nur bei Personen der Mitgliederliste (bzw. für die Pflege) */
+export interface OfficeHolder {
+  name: string;
+  user_id?: number | null;
+  photo_url?: string | null;
+}
+
+export type OfficeTermKind = 'period' | 'point';
+
+export interface OfficeTerm {
+  id: number;
+  /** period: Zeitraum (ohne Ende bis heute), point: ein einzelnes Jahr */
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  /** Haken „Ehrung“ (bei jeder Art): Stern und Abzeichen im Zeitstrahl */
+  honor: boolean;
+  /** Zeitraum ohne Ende */
+  current: boolean;
+  holders: OfficeHolder[];
+}
+
+export interface Office {
+  id: number;
+  group_id: number | null;
+  title: string;
+  /** Eigene Einzahl („Kapitän“ zu „Kapitäne“), leer ohne */
+  singular?: string;
+  /** Einzahl für den Zeitstrahl einer Person: eigene Einzahl, sonst Name des verknüpften Titels (nur mit Bereich Titel); nur in GET /offices */
+  holder_title?: string | null;
+  /** Laufende zuerst, dann nach Beginn absteigend */
+  terms: OfficeTerm[];
+  /** Nur für die Pflege: verknüpfter Titel */
+  title_id?: number | null;
+  linked_title?: string | null;
+}
+
+export interface OfficesOverview {
+  groups: OfficeGroup[];
+  offices: Office[];
+}
+
+export interface OfficeTermInput {
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  honor: boolean;
+  holders: ({ user_id: number } | { name: string })[];
+}
+
+export interface OfficeImportRow {
+  line: number;
+  group?: string;
+  office?: string;
+  kind?: OfficeTermKind;
+  start_year?: number;
+  end_year?: number | null;
+  note?: string;
+  honor?: boolean;
+  holders?: { name: string; user_id: number | null }[];
+  duplicate?: boolean;
+  error?: string;
+}
+
+export interface OfficeImportResult {
+  rows: OfficeImportRow[];
+  groups_new: number;
+  offices_new: number;
+  terms_new: number;
+  applied: boolean;
+}
+
+/** Listen (Issue #121): Datenspalten; nr zählt die Zeilen. */
+export type ListField = 'nr' | 'name' | 'first_name' | 'last_name' | 'role' | 'rank' | 'titles' | 'birthday' | 'points' | 'penalties';
+export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
+
+export interface ListColumn {
+  /** field: Wert aus der App, blank: leer zum Ausfüllen auf Papier */
+  kind: 'field' | 'blank';
+  field: ListField | null;
+  /** Überschrift; leer: Standardbezeichnung der Datenspalte */
+  label: string;
+  width: ListColumnWidth;
+  /** Kästchen zum Abhaken (nur leere Spalten) */
+  checkbox: boolean;
+  /** Nur in Antworten: Die Person sieht die Werte (leere Spalten immer). */
+  available?: boolean;
+}
+
+/** Werte der sichtbaren Datenspalten eines Mitglieds. */
+export interface ListValues {
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  rank?: string | null;
+  titles?: string[];
+  /** „TT.MM.“ oder null (nicht freigegeben) */
+  birthday?: string | null;
+  points?: number;
+  /** Offene Strafen in Cent */
+  penalties?: number;
+}
+
+export type ListRow =
+  | { kind: 'member'; user_id: number | null; name: string; first_name?: string; last_name?: string; deleted: boolean; values: ListValues }
+  | { kind: 'free'; name: string };
+
+export interface PrintListSummary {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  date: string | null;
+  rows: number;
+  updated_by_name: string | null;
+  updated_at: string;
+}
+
+export interface PrintList {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  date: string | null;
+  orientation: 'portrait' | 'landscape';
+  created_by_name: string | null;
+  created_at: string;
+  updated_by_name: string | null;
+  updated_at: string;
+  columns: ListColumn[];
+  rows: ListRow[];
+  fields: { key: ListField; available: boolean }[];
+}
+
+export interface PrintListInput {
+  title: string;
+  subtitle?: string;
+  date?: string | null;
+  orientation?: 'portrait' | 'landscape';
+  columns?: Omit<ListColumn, 'available'>[];
+  rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
+  /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */
+  updated_at?: string;
+}
+
+export interface ListSyncResult {
+  added: { user_id: number; name: string }[];
+  removed: { user_id: number | null; name: string | null }[];
+  applied: boolean;
+  list: PrintList | null;
 }
 
 export interface RankRef {
@@ -750,6 +1379,8 @@ export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
+  /** Handynummer oder '' */
+  phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
 }
@@ -768,6 +1399,8 @@ let csrfToken = config?.csrf.token ?? '';
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
+  // Nach der Anmeldung zurück auf diese Seite (z. B. aus einem geteilten Link), siehe main.tsx.
+  rememberRoute(window.location.hash);
   if (config?.auth.mode === 'redirect' && config.auth.loginUrl) {
     window.location.href = config.auth.loginUrl;
   } else {
@@ -808,6 +1441,26 @@ function url(path: string, query?: Record<string, string>): string {
 
 const CSRF_ERRORS = ['csrf_invalid', 'rest_cookie_invalid_nonce'];
 
+/** Zähler für inBackground: Anfragen, die beginnen, solange er über 0 steht, laufen still. */
+let background = 0;
+
+/**
+ * Vorabladen (Issue #104): Die Anfragen, die `start` sofort beginnt, laufen still im Hintergrund – ohne Weiterleitung
+ * zur Anmeldung (abgelaufene Sitzung, CSRF) und ohne Eintrag unter „Fehler melden“. Öffnet die Person die Ansicht,
+ * fragt diese selbst und meldet, was dann noch schiefgeht. Gilt nur für Anfragen, die `start` vor dem ersten await stellt.
+ */
+export function inBackground<T>(start: () => Promise<T>): Promise<T> {
+  background++;
+  try {
+    return start();
+  } finally {
+    background--;
+  }
+}
+/** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
+const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
+const USER_HEADER = 'X-Kompanie-User';
+
 async function requestFull<T>(
   method: string,
   path: string,
@@ -816,17 +1469,27 @@ async function requestFull<T>(
   retry = true,
   /** 401 nur melden, nicht zur Anmeldung weiterleiten (z. B. beim Abmelden) */
   quiet = false,
+  /** im Hintergrund (inBackground): wie quiet, dazu ohne Eintrag unter „Fehler melden“ */
+  silent = background > 0,
 ): Promise<{ data: T; headers: Headers }> {
+  quiet ||= silent;
   if (!config) {
     throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
   }
   let res: Response;
+  // Service Worker (Issue #108): gespeicherte Antwort sofort, die aus dem Netz kommt im Hintergrund nach. Was vor der
+  // letzten eigenen Änderung gespeichert wurde, holt er zuerst aus dem Netz (public/sw.js). Nicht /config: Damit prüft
+  // die App den aktuellen Stand (z. B. „Erneut versuchen“ auf der Wartungsseite).
+  const staleOk = method === 'GET' && !previewRole() && path !== '/config';
   try {
     res = await fetch(url(path, query), {
       method,
       credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
+        // Für wen die Antwort gilt: Nur dieselbe Person bekommt sie später sofort aus dem Speicher.
+        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) } : {}),
+        ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
@@ -835,7 +1498,7 @@ async function requestFull<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    if (!path.startsWith('/reports')) noteError('Keine Verbindung zum Server');
+    if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
@@ -846,7 +1509,7 @@ async function requestFull<T>(
 
   if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
     await refreshCsrf(quiet);
-    return requestFull<T>(method, path, body, query, false, quiet);
+    return requestFull<T>(method, path, body, query, false, quiet, silent);
   }
   if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
@@ -858,7 +1521,7 @@ async function requestFull<T>(
   if (!res.ok) {
     const message: string = data?.message ?? `Fehler ${res.status}`;
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
-    if (!path.startsWith('/reports')) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
+    if (!path.startsWith('/reports') && !silent) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
     throw new ApiError(message, res.status, data?.code ?? '');
   }
   return { data: data as T, headers: res.headers };
@@ -921,13 +1584,20 @@ export const api = {
   createCatalogItem: (title: string, points: number) => request<CatalogItem>('POST', '/catalog', { title, points }),
   updateCatalogItem: (id: number, data: Partial<Pick<CatalogItem, 'title' | 'points' | 'active' | 'sort'>>) =>
     request<CatalogItem>('PATCH', `/catalog/${id}`, data),
+  /** Reihenfolge des ganzen Katalogs (alle IDs, auch inaktive); Antwort: der Katalog mit inaktiven (Issue #176) */
+  reorderCatalog: (ids: number[]) => request<CatalogItem[]>('PUT', '/catalog/order', { ids }),
 
+  directory: () => request<DirectoryEntry[]>('GET', '/directory'),
+  /** Anzahl je Gruppe in dieser Liste (wie in der Anwesenheit), nur die Summen; fehlt bei älteren Servern (404). */
+  directoryCounts: () => request<{ group: Level; count: number }[]>('GET', '/directory/counts'),
+  /** Ehemalige für den Tab neben den Ämtern (öffentlich wie die Liste) */
+  directoryFormer: () => request<DirectoryFormerEntry[]>('GET', '/directory/former'),
   members: (all = false, candidates = false) =>
     request<MemberSummary[]>('GET', '/members', undefined, {
       ...(all ? { all: '1' } : {}),
       ...(candidates ? { candidates: '1' } : {}),
     }),
-  /** Anwärter zum Mitglied machen (wer Mitglieder anlegen darf). */
+  /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
@@ -943,16 +1613,32 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUsers: (level: 'member' | 'candidate', people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  updateAccount: (id: number, data: Partial<PersonName> & { email?: string; username?: string }) =>
-    request<AccountProfile>('PATCH', `/members/${id}/account`, data),
+  /** Eigene E-Mail-Adresse und Handynummer; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+  ownAccount: () => request<OwnAccount>('GET', '/me/account'),
+  updateOwnAccount: (data: { email: string; phone: string; current_password?: string }) =>
+    request<OwnAccount>('PATCH', '/me/account', data),
+  updateAccount: (
+    id: number,
+    data: Partial<PersonName> & { email?: string; phone?: string; username?: string; current_password?: string },
+  ) => request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
+  formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
+  markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
+  formerOfficesPreview: (id: number, leftOn: string) =>
+    request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),
+  updateFormer: (id: number, data: FormerInput) => request<FormerInfo>('PATCH', `/members/${id}/former`, data),
+  reactivate: (id: number) => request<{ id: number; level: Level; extra_roles: Level[] }>('DELETE', `/members/${id}/former`),
+  createFormer: (data: PersonName & FormerInput & { birthday?: string; photo?: EncodedFile }) =>
+    request<CreatedFormer>('POST', '/members/former', data),
+  importFormer: (csv: string, apply: boolean) => request<FormerImportResult>('POST', '/members/former/import', { csv, apply }),
+  importMembers: (csv: string, apply: boolean) => request<MemberImportResult>('POST', '/members/import', { csv, apply }),
   createUser: (
     data: PersonName & {
       username?: string;
       email?: string;
-      level?: 'member' | 'candidate';
+      level?: Level;
       initial_points?: number;
       initial_points_date?: string;
       rank_id?: number;
@@ -993,10 +1679,32 @@ export const api = {
   deleteDocCategory: (id: number) => request<{ deleted: boolean }>('DELETE', `/document-categories/${id}`),
   reorderDocCategories: (ids: number[]) => request<DocCategory[]>('PUT', '/document-categories/order', { ids }),
 
-  // Schwarzes Brett (Issue #5)
+  // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
-  postBoard: (text: string, push = true) => request<BoardMessage>('POST', '/board', { text, push }),
-  updateBoard: (id: number, text: string) => request<BoardMessage>('PATCH', `/board/${id}`, { text }),
+  postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
+  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'attachments'>>) =>
+    request<BoardMessage>('PATCH', `/board/${id}`, changes),
+  boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
+  boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
+  boardEnded: () => request<{ items: BoardEnded[]; keep_days: number }>('GET', '/board/history'),
+  // E-Mails aus der Verwaltung (send_mail)
+  mailOptions: () => request<MailOptions>('GET', '/mails/options'),
+  mailPreview: (selection: Record<MailField, MailSelection>) => request<MailPreview>('POST', '/mails/preview', selection),
+  sendMail: (input: { subject: string; text: string; attachments: string[] } & Record<MailField, MailSelection>) =>
+    request<MailDetail>('POST', '/mails', input),
+  // Dateianhänge (Schwarzes Brett, E-Mails)
+  attachmentLimits: () => request<{ max_bytes: number }>('GET', '/attachments/limits'),
+  uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
+  mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
+  mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
+  // Formatierte Inhalte (Issue #172): Bilder, Signatur, Mails vom Brett
+  richImageLimits: () => request<RichImageLimits>('GET', '/rich-images/limits'),
+  uploadRichImage: async (file: File) => request<RichImage>('POST', '/rich-images', { file: await encodeFile(file) }),
+  signature: () => request<{ signature: Signature | null }>('GET', '/me/signature'),
+  saveSignature: (content: string) => request<{ signature: Signature | null }>('PUT', '/me/signature', { content }),
+  deleteSignature: () => request<{ signature: null }>('DELETE', '/me/signature'),
+  mailPreference: () => request<MailPreference>('GET', '/me/mail'),
+  setMailPreference: (board: boolean) => request<MailPreference>('PUT', '/me/mail', { board }),
   polls: () => request<Poll[]>('GET', '/polls'),
   poll: (id: number) => request<Poll>('GET', `/polls/${id}`),
   createPoll: (data: PollInput) => request<Poll>('POST', '/polls', data),
@@ -1016,6 +1724,12 @@ export const api = {
   setMemberBirthday: (id: number, data: { month: number; day: number; year: number | null }) =>
     request<{ birthday: Birthday | null }>('PUT', `/members/${id}/birthday`, data),
   deleteMemberBirthday: (id: number) => request<{ birthday: null }>('DELETE', `/members/${id}/birthday`),
+  myJoinYear: () => request<{ join_year: JoinYear | null }>('GET', '/me/join-year'),
+  saveMyJoinYear: (data: { date: string; profile?: ProfileVisibility }) =>
+    request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
+  deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
+  setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
+  deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 
   // Inventar (Issue #6)
   inventory: () => request<InventoryItem[]>('GET', '/inventory'),
@@ -1052,8 +1766,42 @@ export const api = {
   reorderTitles: (ids: number[]) => request<Title[]>('PUT', '/titles/order', { ids }),
   setMemberTitles: (id: number, title_ids: number[]) => request<{ titles: TitleRef[] }>('PUT', `/members/${id}/titles`, { title_ids }),
 
+  // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
+  offices: () => request<OfficesOverview>('GET', '/offices'),
+  createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
+  updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
+  reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
+  createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),
+  updateOffice: (id: number, data: { title?: string; singular?: string; group_id?: number | null; title_id?: number | null }) =>
+    request<Office>('PATCH', `/offices/${id}`, data),
+  deleteOffice: (id: number) => request<{ deleted: boolean }>('DELETE', `/offices/${id}`),
+  reorderOffices: (ids: number[]) => request<Office[]>('PUT', '/offices/order', { ids }),
+  officeTitlePreview: (id: number, titleId: number | null) =>
+    request<{ add: { name: string; title: string }[]; remove: { name: string; title: string }[] }>(
+      'GET',
+      `/offices/${id}/title-preview`,
+      undefined,
+      titleId === null ? {} : { title_id: String(titleId) },
+    ),
+  createOfficeTerm: (officeId: number, data: OfficeTermInput) => request<OfficeTerm>('POST', `/offices/${officeId}/terms`, data),
+  updateOfficeTerm: (id: number, data: OfficeTermInput) => request<OfficeTerm>('PATCH', `/office-terms/${id}`, data),
+  deleteOfficeTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-terms/${id}`),
+  importOffices: (csv: string, apply: boolean, link = true) => request<OfficeImportResult>('POST', '/offices/import', { csv, apply, link }),
+
+  // Listen (Issue #121): nur mit manage_lists
+  lists: () => request<PrintListSummary[]>('GET', '/lists'),
+  list: (id: number) => request<PrintList>('GET', `/lists/${id}`),
+  createList: (data: PrintListInput) => request<PrintList>('POST', '/lists', data),
+  saveList: (id: number, data: PrintListInput) => request<PrintList>('PUT', `/lists/${id}`, data),
+  copyList: (id: number) => request<PrintList>('POST', `/lists/${id}/copy`),
+  deleteList: (id: number) => request<{ deleted: boolean }>('DELETE', `/lists/${id}`),
+  syncListMembers: (id: number, apply: boolean) => request<ListSyncResult>('POST', `/lists/${id}/sync-members`, { apply }),
+
   roles: () => request<RoleAdmin[]>('GET', '/admin/roles'),
   createRole: (data: RoleInput) => request<RoleAdmin[]>('POST', '/admin/roles', data),
+  /** Reihenfolge der eigenen Rollen (alle Schlüssel ohne Gast, Mitglied, Admin) */
+  reorderRoles: (keys: Level[]) => request<RoleAdmin[]>('PUT', '/admin/roles/order', { keys }),
   updateRole: (key: Level, data: RoleInput) => request<RoleAdmin[]>('PATCH', `/admin/roles/${encodeURIComponent(key)}`, data),
   deleteRole: (key: Level, replacement?: Level) =>
     request<RoleAdmin[]>('DELETE', `/admin/roles/${encodeURIComponent(key)}`, undefined, replacement ? { replacement } : undefined),
@@ -1071,18 +1819,37 @@ export const api = {
 
   givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string }) =>
     request<Penalty[]>('POST', '/penalties', data),
+  openPenalties: () => request<OpenPenalty[]>('GET', '/penalties/open'),
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),
   deletePenalty: (id: number) => request<{ deleted: boolean }>('DELETE', `/penalties/${id}`),
 
   features: () => request<FeatureInfo[]>('GET', '/admin/features'),
   setFeatures: (data: Partial<Record<Feature, boolean>>) => request<FeatureInfo[]>('PUT', '/admin/features', data),
   settings: () => request<AdminSettings>('GET', '/admin/settings'),
+  activity: (from?: string, to?: string) =>
+    request<ActivityOverview>('GET', '/admin/activity', undefined, { ...(from ? { from } : {}), ...(to ? { to } : {}) }),
+  activityEntries: (from: string, to: string, userId?: number) =>
+    request<{ from: string; to: string; entries: ActivityEntry[]; truncated: boolean }>('GET', '/admin/activity/entries', undefined, {
+      from,
+      to,
+      ...(userId ? { user_id: String(userId) } : {}),
+    }),
+  setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
   config: () => request<AppConfig>('GET', '/config'),
   updateSettings: (data: AdminSettingsInput) => request<AdminSettings>('PATCH', '/admin/settings', data),
+  // E-Mail (Issue #172): Kompanieadresse und SMTP
+  mailSettings: () => request<MailSettings>('GET', '/admin/mail'),
+  updateMailSettings: (
+    data: Partial<
+      Omit<MailSettings, 'password_set' | 'configured' | 'unavailable' | 'server_max_size' | 'pending' | 'from_name_default'>
+    > & { password?: string },
+  ) => request<MailSettings>('PATCH', '/admin/mail', data),
+  checkMail: () => request<{ ok: boolean; message: string; size: number | null; settings: MailSettings }>('POST', '/admin/mail/check', {}),
+  testMail: (to?: string) => request<{ sent: boolean; message: string }>('POST', '/admin/mail/test', to ? { to } : {}),
   /** „Mit Google verbinden“: speichert den Client und liefert die Adresse der Anmeldung bei Google. */
   googleConnect: (clientId: string, clientSecret: string) =>
     request<{ url: string }>('POST', '/admin/google/connect', { client_id: clientId, client_secret: clientSecret }),
@@ -1106,6 +1873,9 @@ export const api = {
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
   restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
+  setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
+  uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
   clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
@@ -1205,6 +1975,22 @@ const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push
 const guestAuth = (device: PushDevice): string | undefined => (config?.user ? undefined : device.keys.auth);
 
 export type StatusLevel = 'ok' | 'warn' | 'error' | 'off';
+
+/** Sicherungen in Google Drive (Einstellungen → Datensicherung). */
+export interface BackupDriveStatus {
+  /** Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden */
+  available: boolean;
+  /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
+  access: boolean;
+  enabled: boolean;
+  email: string;
+  folder_url: string | null;
+  last_ok: number | null;
+  last_try: number | null;
+  error: string | null;
+  every_days: number;
+  keep: number;
+}
 
 export interface UpdateStatus {
   configured: boolean;
@@ -1306,6 +2092,8 @@ export interface FailedPhoto {
   intern: boolean;
   error: string;
   attempts: number;
+  /** Video in einem Format, das die Galerie nicht abspielt (nur MP4 und WebM); fehlt bei älteren Servern */
+  unsupported?: boolean;
   drive_url: string;
 }
 

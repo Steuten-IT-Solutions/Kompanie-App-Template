@@ -3,7 +3,9 @@
  * Legt die Testinstallation für die E2E-Tests frisch an (Daten wie in der WordPress-Testinstanz):
  *   KOMPANIE_DATA_DIR=/tmp/… KOMPANIE_BASE_URL=http://localhost:8891/app/ php tests/standalone/e2e-setup.php
  * Benutzer: admin/admin, verwalter, mitglied1, mitglied2 (Passwort test1234).
- * Mit KOMPANIE_DEMO=1 zusätzlich Beispieldaten für Bildschirmfotos (Termine, Punkte, Strafen).
+ * Mit KOMPANIE_DEMO=1 zusätzlich Beispieldaten für Bildschirmfotos (Termine, Punkte, Strafen), mit
+ * KOMPANIE_HANDBUCH_BILDER=1 dazu die aus handbuch-daten/*.php (Fotos fürs Handbuch; dort stehen $app, $users, $admin,
+ * $manager, $m1, $m2 und $day zur Verfügung).
  */
 
 declare(strict_types=1);
@@ -68,5 +70,11 @@ if ($demo) {
     $scores->givePoints(['user_ids' => [$m1, $m2], 'catalog_id' => $fest['id'], 'date' => $day(-20)], $manager);
     $scores->givePoints(['user_ids' => [$m1], 'points' => 3, 'reason' => 'Aufbauhilfe', 'date' => $day(-6)], $manager);
     $scores->givePenalty(['user_ids' => [$m1], 'amount_cents' => 250, 'reason' => 'Zu spät gekommen', 'date' => $day(-3)], $manager);
+}
+// Für die Bildschirmfotos des Handbuchs (scripts/handbuch-bilder.sh): mehr Beispieldaten, damit kein Bildschirm leer ist.
+if ($demo && getenv('KOMPANIE_HANDBUCH_BILDER') === '1') {
+    foreach (glob(__DIR__ . '/handbuch-daten/*.php') ?: [] as $file) {
+        require $file;
+    }
 }
 echo "Testinstallation angelegt: $base\n";

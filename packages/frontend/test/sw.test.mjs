@@ -67,9 +67,12 @@ function response(body, type = 'application/javascript', status = 200) {
  * Lädt sw.js mit eingesetzter Liste (wie der Build) und gibt Hilfen zum Auslösen der Ereignisse zurück.
  * `net` beantwortet fetch(): Adresse → Antwort; fehlt sie, gibt es einen Netzfehler.
  */
-function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheStorage() } = {}) {
+function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheStorage(), now = () => 0 } = {}) {
   const listeners = {};
   const fetched = [];
+  /** Optionen des letzten fetch() je Adresse (z. B. cache). */
+  const fetchOptions = {};
+  const messages = [];
   const source = SOURCE.replace("const BUILD = 'dev';", `const BUILD = '${build}';`).replace(
     'const PRECACHE = [];',
     `const PRECACHE = ${JSON.stringify(precache)};`,
@@ -78,7 +81,7 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   const self = {
     location: { href: `${ORIGIN}/app/sw.js?api=${encodeURIComponent(API)}&assets=${encodeURIComponent(ASSETS)}`, origin: ORIGIN },
     registration: { scope: SCOPE },
-    clients: { claim: async () => undefined },
+    clients: { claim: async () => undefined, matchAll: async () => [{ postMessage: (m) => messages.push(m) }] },
     skipWaiting: async () => undefined,
     addEventListener: (type, fn) => (listeners[type] = fn),
   };
@@ -91,10 +94,18 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
     Headers,
     Promise,
     setTimeout,
+    // Uhr zum Vorstellen (FRESH_MS); die übrigen Teile von Date wie gewohnt.
+    Date: Object.assign(
+      function (...a) {
+        return new Date(...a);
+      },
+      { now: () => now() },
+    ),
     decodeURIComponent,
-    fetch: async (req) => {
+    fetch: async (req, init) => {
       const u = url(req);
       fetched.push(u);
+      fetchOptions[u] = init;
       const make = net[u];
       if (!make) throw new TypeError('Netzfehler');
       return make();
@@ -110,11 +121,11 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   }
 
   /** fetch-Ereignis; gibt die Antwort des Service Workers zurück (undefined: durchgereicht). */
-  async function request(u, mode = 'cors', headers = {}) {
+  async function request(u, mode = 'cors', headers = {}, method = 'GET') {
     let answer;
     const waits = [];
     listeners.fetch({
-      request: { url: u, method: 'GET', mode, headers: new Headers(headers) },
+      request: { url: u, method, mode, headers: new Headers(headers) },
       respondWith: (p) => (answer = p),
       waitUntil: (p) => waits.push(p),
     });
@@ -123,7 +134,7 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
     return res;
   }
 
-  return { storage, fetched, lifecycle, request };
+  return { storage, fetched, fetchOptions, messages, lifecycle, request };
 }
 
 test('Installieren: Programmdateien, Icons und App-Seite vorab gespeichert, unveränderte Dateien übernommen', async () => {
@@ -144,6 +155,9 @@ test('Installieren: Programmdateien, Icons und App-Seite vorab gespeichert, unve
   const files = (await (await storage.open('kompanie-static-b2')).keys()).map((r) => r.url.slice(ASSETS.length)).sort();
   assert.deepEqual(files, [...precache].sort());
   assert.ok(!sw.fetched.includes(ASSETS + 'assets/Viewer-a.js'), 'unveränderte Datei nicht erneut geladen');
+  // Icons (feste Namen) beim Server nachfragen, nicht aus dem Zwischenspeicher des Browsers; Hash-Dateien dürfen daraus.
+  assert.equal(sw.fetchOptions[ASSETS + 'icons/icon-192.png']?.cache, 'no-cache');
+  assert.equal(sw.fetchOptions[ASSETS + 'assets/index-n.js']?.cache, undefined);
   const page = await (await storage.open('kompanie-data-v2')).match(SCOPE);
   assert.equal(await page.text(), '<html>neu</html>', 'App-Seite der neuen Version gespeichert');
 
@@ -224,6 +238,22 @@ test('Rückkehr von Google wird nie aus dem Speicher beantwortet', async () => {
   assert.ok(await sw.request(`${SCOPE}google?x=1`, 'navigate'), 'andere Adressen wie bisher');
 });
 
+test('Dateianhänge und Datensicherung werden immer durchgereicht, auch als Navigation (nie als App-Seite gespeichert)', async () => {
+  const uid = 'a'.repeat(32);
+  const net = { [SCOPE]: () => response('<html>app</html>', 'text/html') };
+  const sw = load({ net });
+  await sw.request(SCOPE, 'navigate'); // App-Seite gespeichert
+  assert.equal(await sw.request(`${SCOPE}anhang/${uid}`, 'navigate'), undefined);
+  assert.equal(await sw.request(`${SCOPE}anhang/${uid}`), undefined);
+  assert.equal(await sw.request(`${ORIGIN}/index.php?r=/anhang/${uid}`, 'navigate'), undefined);
+  assert.equal(await sw.request(`${ORIGIN}/?kompanie_app=anhang/${uid}`, 'navigate'), undefined);
+  assert.equal(await sw.request(`${SCOPE}sicherung`, 'navigate'), undefined, 'Datensicherung');
+  assert.equal(await sw.request(`${ORIGIN}/index.php?r=/sicherung`, 'navigate'), undefined);
+  const pages = (await sw.storage.keys()).length;
+  assert.ok(pages >= 1);
+  assert.ok(await sw.request(`${SCOPE}anhang/kein-anhang`, 'navigate'), 'andere Adressen wie bisher');
+});
+
 test('Vorschau „App als Rolle ansehen“ (Issue #63): weder gespeichert noch aus dem Speicher', async () => {
   const doc = `${SCOPE}dokument/7?v=abc`;
   const badge = `${SCOPE}abzeichen/2?v=x&s=128`;
@@ -245,4 +275,154 @@ test('Vorschau „App als Rolle ansehen“ (Issue #63): weder gespeichert noch a
   const docs = (await (await sw.storage.open('kompanie-docs-v1')).keys()).map((r) => r.url);
   assert.deepEqual(docs, [doc], 'gespeichertes Dokument des Admins bleibt, keine Vorschau-Fassung');
   assert.equal((await (await sw.storage.open('kompanie-badges-v1')).keys()).length, 0);
+});
+
+const STALE_OK = { 'X-Kompanie-Stale-Ok': '1', 'X-Kompanie-User': '5' };
+const json =
+  (body, status = 200) =>
+  () =>
+    response(body, 'application/json', status);
+
+test('Mit X-Kompanie-Stale-Ok (Issue #108): gespeicherte Antwort sofort, aus dem Netz im Hintergrund, Meldung bei Änderung', async () => {
+  let t = 0;
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net, now: () => t });
+  // Noch nichts gespeichert: aus dem Netz (und gespeichert).
+  assert.equal(await (await sw.request(`${API}members`, 'cors', STALE_OK)).text(), '[1]');
+  assert.equal(sw.fetched.length, 1);
+
+  // Neue Daten auf dem Server; nach FRESH_MS: zuerst der gespeicherte Stand, im Hintergrund der neue, dann die Meldung.
+  net[`${API}members`] = json('[1,2]');
+  t = 20_000;
+  assert.equal(await (await sw.request(`${API}members`, 'cors', STALE_OK)).text(), '[1]');
+  assert.equal(sw.fetched.length, 2, 'im Hintergrund aus dem Netz');
+  assert.equal(JSON.stringify(sw.messages), JSON.stringify([{ type: 'kompanie-data', url: `${API}members` }]));
+
+  // Neu laden nach der Meldung: frisch aus dem Speicher, ohne zweite Anfrage.
+  assert.equal(await (await sw.request(`${API}members`, 'cors', STALE_OK)).text(), '[1,2]');
+  assert.equal(sw.fetched.length, 2);
+
+  // Unverändert: keine weitere Meldung.
+  t = 40_000;
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+  assert.equal(sw.fetched.length, 3);
+  assert.equal(sw.messages.length, 1);
+});
+
+test('Mit X-Kompanie-Stale-Ok: Läuft die Abfrage im Hintergrund schon, fragt er danach noch einmal (Issue #68)', async () => {
+  let t = 0;
+  const net = { [`${API}board`]: json('["alt"]') };
+  const sw = load({ net, now: () => t });
+  await sw.request(`${API}board`, 'cors', STALE_OK);
+
+  // Die Abfrage im Hintergrund ist schon unterwegs (Server antwortet noch mit dem alten Stand), da ändert jemand die
+  // Nachricht auf einem anderen Gerät, und die App fragt erneut (z. B. nach dem Neuladen).
+  let release;
+  net[`${API}board`] = () => new Promise((resolve) => (release = () => resolve(response('["alt"]', 'application/json'))));
+  t = 20_000;
+  const first = sw.request(`${API}board`, 'cors', STALE_OK);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(sw.fetched.length, 2, 'im Hintergrund unterwegs');
+  const second = sw.request(`${API}board`, 'cors', STALE_OK);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(sw.fetched.length, 2, 'keine zweite Abfrage gleichzeitig');
+  net[`${API}board`] = json('["neu"]');
+  release();
+  assert.equal(await (await first).text(), '["alt"]');
+  assert.equal(await (await second).text(), '["alt"]');
+
+  // Die laufende Abfrage kam mit dem alten Stand zurück; die zweite Anfrage bekommt trotzdem den neuen, samt Meldung.
+  assert.equal(sw.fetched.length, 3, 'danach noch einmal aus dem Netz');
+  assert.equal(JSON.stringify(sw.messages), JSON.stringify([{ type: 'kompanie-data', url: `${API}board` }]));
+  assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK)).text(), '["neu"]');
+});
+
+test('Mit X-Kompanie-Stale-Ok: Fehler im Hintergrund wird gemeldet, dann aus dem Netz; ohne Netz bleibt der Stand', async () => {
+  let t = 0;
+  const net = { [`${API}events`]: json('["a"]') };
+  const sw = load({ net, now: () => t });
+  await sw.request(`${API}events`, 'cors', STALE_OK);
+
+  // Wartungsmodus: gespeicherter Stand sofort, die Meldung führt zur Anfrage ans Netz, die den Fehler zeigt.
+  net[`${API}events`] = json('{"code":"maintenance"}', 503);
+  t = 20_000;
+  assert.equal(await (await sw.request(`${API}events`, 'cors', STALE_OK)).text(), '["a"]');
+  assert.equal(sw.messages.length, 1);
+  assert.equal((await sw.request(`${API}events`, 'cors', STALE_OK)).status, 503);
+  const stored = await (await sw.storage.open('kompanie-data-v2')).match(`${API}events`);
+  assert.equal(await stored.text(), '["a"]', 'Fehler überschreibt den Speicher nicht');
+
+  // Ohne Netz: gespeicherter Stand, keine Meldung.
+  delete net[`${API}events`];
+  t = 40_000;
+  assert.equal(await (await sw.request(`${API}events`, 'cors', STALE_OK)).text(), '["a"]');
+  assert.equal(sw.messages.length, 1);
+});
+
+test('Ohne X-Kompanie-Stale-Ok wie bisher zuerst aus dem Netz (z. B. nach einer eigenen Änderung, CSRF-Token)', async () => {
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net });
+  await sw.request(`${API}members`);
+  net[`${API}members`] = json('[1,2]');
+  assert.equal(await (await sw.request(`${API}members`)).text(), '[1,2]');
+  assert.equal(sw.messages.length, 0);
+  // Verwaltung auch mit dem Header nie aus dem Speicher.
+  assert.equal(await sw.request(`${API}admin/settings`, 'cors', STALE_OK), undefined);
+});
+
+test('Mit X-Kompanie-Stale-Ok: nur für dieselbe Person aus dem Speicher', async () => {
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net, now: () => 1 });
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+
+  // Andere Person (Konto gewechselt): nicht die gespeicherten Daten der Person davor, sondern aus dem Netz.
+  net[`${API}members`] = json('[2]');
+  assert.equal(await (await sw.request(`${API}members`, 'cors', { ...STALE_OK, 'X-Kompanie-User': '6' })).text(), '[2]');
+  // Ohne Angabe der Person (direkter Aufruf, z. B. CSRF-Token) ebenso.
+  net[`${API}members`] = json('[3]');
+  assert.equal(await (await sw.request(`${API}members`, 'cors', { 'X-Kompanie-Stale-Ok': '1' })).text(), '[3]');
+});
+
+test('Nach einer eigenen Änderung: vorher Gespeichertes erst aus dem Netz, auch nach einem Neustart des Service Workers', async () => {
+  let t = 1000;
+  const storage = new FakeCacheStorage();
+  const net = { [`${API}titles`]: json('["A","B"]'), [`${API}members`]: json('[1]') };
+  const sw = load({ net, storage, now: () => t });
+  await sw.request(`${API}titles`, 'cors', STALE_OK);
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+
+  // Reihenfolge geändert (PUT). Der Push-Status beim Start zählt nicht als Änderung.
+  t = 2000;
+  await sw.request(`${API}push/status`, 'cors', {}, 'POST');
+  t = 3000;
+  assert.equal(await sw.request(`${API}titles/order`, 'cors', {}, 'PUT'), undefined, 'Änderung durchgereicht');
+  net[`${API}titles`] = json('["B","A"]');
+
+  // Neustart (z. B. Seite neu geladen, Service Worker beendet): Der Zeitpunkt der Änderung ist gespeichert.
+  t = 30_000;
+  const again = load({ net, storage, now: () => t });
+  const before = again.fetched.length;
+  assert.equal(await (await again.request(`${API}titles`, 'cors', STALE_OK)).text(), '["B","A"]', 'nicht der Stand vor der Änderung');
+  assert.equal(again.fetched.length, before + 1);
+  assert.equal(again.messages.length, 0);
+
+  // Danach frisch gespeichert: wieder sofort aus dem Speicher (im Hintergrund aufgefrischt).
+  t = 60_000;
+  assert.equal(await (await again.request(`${API}titles`, 'cors', STALE_OK)).text(), '["B","A"]');
+  assert.equal(again.fetched.length, before + 2, 'im Hintergrund aus dem Netz');
+});
+
+test('Kurz nach einer Änderung (z. B. Anmeldung) kommt die App-Seite aus dem Netz, nicht nach dem Zeitlimit aus dem Speicher', async () => {
+  let release;
+  const net = { [SCOPE]: () => response('<html>alt</html>', 'text/html') };
+  const sw = load({ net });
+  await sw.request(SCOPE, 'navigate');
+  net[SCOPE] = () => new Promise((resolve) => (release = () => resolve(response('<html>neu</html>', 'text/html'))));
+  // Ohne Änderung: nach dem Zeitlimit die gespeicherte Seite (schlechtes Netz).
+  assert.equal(await (await sw.request(SCOPE, 'navigate')).text(), '<html>alt</html>');
+  await sw.request(`${API}auth/login`, 'cors', {}, 'POST');
+  const page = sw.request(SCOPE, 'navigate');
+  await new Promise((r) => setTimeout(r, 2700)); // länger als NAVIGATION_TIMEOUT_MS
+  release();
+  assert.equal(await (await page).text(), '<html>neu</html>');
 });

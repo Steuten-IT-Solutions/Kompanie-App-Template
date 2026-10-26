@@ -11,9 +11,9 @@ use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\Sql\Migrator;
 
 /**
- * Datensicherung der eigenständigen Version: Daten des Kerns, Benutzer (mit Passwort-Hashes)
- * und Einstellungen. Sitzungen, Zwischenspeicher und Anmeldeversuche gehören nicht dazu;
- * nach dem Wiederherstellen melden sich alle neu an.
+ * Datensicherung der eigenständigen Version: Daten des Kerns mit den Dateien der Dokumente und Abzeichen
+ * (Backup::dumpFiles), Benutzer (mit Passwort-Hashes) und Einstellungen. Sitzungen, Zwischenspeicher und
+ * Anmeldeversuche gehören nicht dazu; nach dem Wiederherstellen melden sich alle neu an.
  */
 final class StandaloneBackup implements BackupProvider
 {
@@ -29,12 +29,19 @@ final class StandaloneBackup implements BackupProvider
     public function export(): array
     {
         $app = $this->kernel->app();
-        $settings = [];
-        foreach ($this->kernel->db()->select('SELECT name, value FROM {settings} ORDER BY name') as $r) {
-            if (!in_array($r['name'], self::SKIP_SETTINGS, true)) {
-                $settings[(string) $r['name']] = json_decode((string) $r['value'], true);
-            }
-        }
+        $tables = (new Backup($this->kernel->db()))->dump(self::TABLES);
+        return [...$this->head(), 'tables' => $tables, 'files' => Backup::dumpFiles($app->files, $tables), ...$this->tail()];
+    }
+
+    public function exportTo($out): void
+    {
+        (new Backup($this->kernel->db()))->write($out, self::TABLES, $this->kernel->app()->files, $this->head(), $this->tail());
+    }
+
+    /** @return array<string, mixed> Felder vor tables */
+    private function head(): array
+    {
+        $app = $this->kernel->app();
         return [
             'format' => Backup::FORMAT,
             'formatVersion' => Backup::FORMAT_VERSION,
@@ -46,9 +53,19 @@ final class StandaloneBackup implements BackupProvider
                 'core' => (int) $app->settings->get(Migrator::SETTING, 0),
                 'standalone' => (int) $app->settings->get(Migrations::SETTING, 0),
             ],
-            'tables' => (new Backup($this->kernel->db()))->dump(self::TABLES),
-            'settings' => $settings,
         ];
+    }
+
+    /** @return array<string, mixed> Felder nach files */
+    private function tail(): array
+    {
+        $settings = [];
+        foreach ($this->kernel->db()->select('SELECT name, value FROM {settings} ORDER BY name') as $r) {
+            if (!in_array($r['name'], self::SKIP_SETTINGS, true)) {
+                $settings[(string) $r['name']] = json_decode((string) $r['value'], true);
+            }
+        }
+        return ['settings' => $settings];
     }
 
     public function canImport(): bool
@@ -66,6 +83,7 @@ final class StandaloneBackup implements BackupProvider
         if (empty($data['tables']['users']) || !in_array('admin', array_column($data['tables']['users'], 'level'), true)) {
             throw new \RuntimeException('Die Sicherung enthält keinen Admin; danach könnte sich niemand mehr anmelden.');
         }
+        $files = Backup::parseFiles($data['files'] ?? null);
         $db = $this->kernel->db();
         $db->transaction(function () use ($db, $data): void {
             (new Backup($db))->restore($data['tables'], self::TABLES);
@@ -82,5 +100,6 @@ final class StandaloneBackup implements BackupProvider
             // Andere Bereiche oder eine andere Galerie: beim nächsten Aufruf neu einplanen (App::upgrade).
             $db->execute('DELETE FROM {settings} WHERE name = ?', [App::PLAN_SETTING]);
         });
+        Backup::restoreFiles($this->kernel->app()->files, $files);
     }
 }

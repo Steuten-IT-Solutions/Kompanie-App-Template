@@ -6,9 +6,13 @@ namespace KompanieApp\Core;
 
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\PreviewEnvironment;
+use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\AttendanceService;
+use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\BirthdayService;
+use KompanieApp\Core\Domain\BoardMailService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
@@ -16,8 +20,11 @@ use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GoogleConnect;
+use KompanieApp\Core\Domain\JoinYearService;
+use KompanieApp\Core\Domain\MemberImportService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
@@ -30,6 +37,15 @@ use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
+use KompanieApp\Core\Domain\OfficeService;
+use KompanieApp\Core\Domain\ListService;
+use KompanieApp\Core\Domain\MailingService;
+use KompanieApp\Core\Domain\AttachmentService;
+use KompanieApp\Core\Domain\BackupDownload;
+use KompanieApp\Core\Domain\MailService;
+use KompanieApp\Core\Domain\RichImageService;
+use KompanieApp\Core\Domain\SignatureService;
+use KompanieApp\Core\Mail\PhpMailerMailer;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
@@ -44,6 +60,7 @@ use KompanieApp\Core\Port\Environment;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\ImageResizer;
+use KompanieApp\Core\Port\Mailer;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Port\Scheduler;
 use KompanieApp\Core\Port\Settings;
@@ -53,6 +70,7 @@ use KompanieApp\Core\Push\PushTriggers;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
+use KompanieApp\Core\Storage\MemberContactRepository;
 use KompanieApp\Core\Storage\MemberRoleRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
@@ -81,9 +99,13 @@ final class App
         PushService::TASK_SEND => 3600,
         PushService::TASK_WATCH => PushService::WATCH_INTERVAL,
         BoardService::TASK => 3600,
+        BoardMailService::TASK => BoardMailService::INTERVAL,
+        MailingService::CLEANUP_TASK => 86400,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
+        BackupUploadService::TASK => BackupUploadService::INTERVAL,
+        ActivityService::TASK => ActivityService::INTERVAL,
     ];
 
     /**
@@ -127,6 +149,8 @@ final class App
         public readonly ?HealthChecks $healthChecks = null,
         /** @var array<string, mixed> update.json des Pakets: updatesUrl, trustedKeys, statusUrl, kompanie, support */
         public readonly array $packageConfig = [],
+        /** Mailversand; ohne Angabe PHPMailer über SMTP mit den Einstellungen (MailService). Tests setzen einen Test-Mailer. */
+        private readonly ?Mailer $customMailer = null,
     ) {
         // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
@@ -203,12 +227,21 @@ final class App
                 && ($this->features()->enabled('calendar') || $this->features()->enabled('news') || $this->features()->enabled('events')),
             // Schwarzes Brett: abgelaufene Nachrichten stündlich löschen (die API liefert sie ohnehin nicht mehr).
             BoardService::TASK => $this->features()->enabled('board'),
+            // Mails vom Brett (Issue #172): alle 15 Minuten als Rückfall, nach dem Einreihen vorgezogen; nur eingerichtet.
+            // Dieselbe Aufgabe versendet die E-Mails aus der Verwaltung (MailService::runQueue).
+            BoardMailService::TASK => ($this->features()->enabled('board') || $this->features()->enabled(MailingService::FEATURE)) && $this->mail()->configured(),
+            // E-Mails aus der Verwaltung: täglich die nach einem Jahr löschen (auch bei ausgeschaltetem Bereich).
+            MailingService::CLEANUP_TASK => true,
             // Umfragen: stündlich prüfen, ob eine in höchstens 24 Stunden endet (Erinnerung, einmal je Umfrage).
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
             // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Einreihen vorgezogen; nur mit Empfänger.
             BugReportService::TASK => $this->bugReports()->available(),
+            // Sicherung in Google Drive: täglich prüfen, wöchentlich hochladen.
+            BackupUploadService::TASK => $this->backupUpload()->active(),
+            // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
+            ActivityService::TASK => true,
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -262,12 +295,20 @@ final class App
                 $this->pushTriggers()->watch();
             } elseif ($task === BoardService::TASK) {
                 $this->board()->cleanup();
+            } elseif ($task === BoardMailService::TASK) {
+                $this->mail()->runQueue();
+            } elseif ($task === MailingService::CLEANUP_TASK) {
+                $this->mailings()->cleanup();
             } elseif ($task === PollService::TASK && $this->features()->enabled('polls')) {
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
                 $this->birthdays()->notifyToday();
             } elseif ($task === BugReportService::TASK) {
                 $this->bugReports()->runTask();
+            } elseif ($task === BackupUploadService::TASK) {
+                $this->backupUpload()->runTask();
+            } elseif ($task === ActivityService::TASK) {
+                $this->activity()->prune();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -356,17 +397,31 @@ final class App
 
     /**
      * Ein Konto wurde gelöscht (in der App oder bei WordPress im Backend): alle eigenen Daten entfernen (Issue #24,
-     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos. Was die Person für
-     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett
-     * (höchstens 24 Stunden, Verfasser dann „gelöschtes Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
+     * Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos, Signatur
+     * samt Bildern, Einstellungen des Kontos und Mails vom Brett an sie (Warteschlange und Protokoll). Was die Person für
+     * andere eingetragen hat, bleibt („eingetragen von: gelöschtes Konto“), ebenso ihre Nachrichten am Schwarzen Brett mit
+     * darin eingefügter Signatur und ihre Einträge im Verlauf des Bretts (Verfasser bzw. Bearbeiter dann „gelöschtes
+     * Konto“). Bei Umfragen verschwinden Teilnahme und Antworten, auch
      * anonyme (über das Pseudonym); die Umfragen, die sie angelegt hat, bleiben. Ihr Geburtstag und ihre Ausnahmen bei
      * den Rechten werden gelöscht, ebenso noch nicht versandte Fehlermeldungen mit ihrem Namen. Inventar und sein Verlauf
-     * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“).
+     * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“). Aus der Nutzungsauswertung
+     * (Issue #175) verschwinden ihre Einträge, „zuletzt aktiv“ und ihr Pseudonym; die Tageszahlen ohne Personenbezug bleiben.
      */
     public function userDeleted(int $userId): void
     {
         UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
+        // Noch nicht gespeicherte Dateianhänge samt Dateien (Anhänge gespeicherter Nachrichten und Mails bleiben bei ihnen).
+        try {
+            $this->attachments()->deleteDraftsOf($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Entwürfe von Anhängen nicht gelöscht: ' . $e->getMessage());
+        }
         $this->roles()->forget($userId);
+        try {
+            $this->activity()->forget($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Pseudonym der Nutzungsauswertung nicht gelöscht: ' . $e->getMessage());
+        }
     }
 
     public function pushTriggers(): PushTriggers
@@ -438,6 +493,59 @@ final class App
         return $this->service(BoardService::class, fn () => new BoardService($this));
     }
 
+    /** Bilder in formatierten Inhalten (Issue #172) */
+    public function richImages(): RichImageService
+    {
+        return $this->service(RichImageService::class, fn () => new RichImageService($this));
+    }
+
+    /** Signaturen der Konten (Issue #172) */
+    public function signatures(): SignatureService
+    {
+        return $this->service(SignatureService::class, fn () => new SignatureService($this));
+    }
+
+    /** Kompanieadresse und SMTP (Issue #172) */
+    public function mail(): MailService
+    {
+        return $this->service(MailService::class, fn () => new MailService($this));
+    }
+
+    /** Mails vom Schwarzen Brett (Issue #172) */
+    public function boardMail(): BoardMailService
+    {
+        return $this->service(BoardMailService::class, fn () => new BoardMailService($this));
+    }
+
+    /** Datensicherung als Datei herunterladen (<App>/sicherung) */
+    public function backupDownload(): BackupDownload
+    {
+        return $this->service(BackupDownload::class, fn () => new BackupDownload($this));
+    }
+
+    /** Dateianhänge (Schwarzes Brett, E-Mails aus der Verwaltung) */
+    public function attachments(): AttachmentService
+    {
+        return $this->service(AttachmentService::class, fn () => new AttachmentService($this));
+    }
+
+    /** E-Mails aus der Verwaltung (Bereich mail) */
+    public function mailings(): MailingService
+    {
+        return $this->service(MailingService::class, fn () => new MailingService($this));
+    }
+
+    /** Mailer mit den aktuellen Einstellungen (jedes Mal neu: Einstellungen können sich geändert haben). */
+    public function mailer(): Mailer
+    {
+        return $this->customMailer ?? new PhpMailerMailer($this->mail()->config());
+    }
+
+    public function hasCustomMailer(): bool
+    {
+        return $this->customMailer !== null;
+    }
+
     public function polls(): PollService
     {
         return $this->service(PollService::class, fn () => new PollService($this));
@@ -446,6 +554,11 @@ final class App
     public function birthdays(): BirthdayService
     {
         return $this->service(BirthdayService::class, fn () => new BirthdayService($this));
+    }
+
+    public function joinYears(): JoinYearService
+    {
+        return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
     }
 
     public function memberPhotos(): MemberPhotoService
@@ -458,14 +571,49 @@ final class App
         return $this->service(InventoryService::class, fn () => new InventoryService($this));
     }
 
+    /** Nutzungsauswertung (Issue #175) */
+    public function activity(): ActivityService
+    {
+        return $this->service(ActivityService::class, fn () => new ActivityService($this));
+    }
+
     public function titles(): TitleService
     {
         return $this->service(TitleService::class, fn () => new TitleService($this));
     }
 
+    public function offices(): OfficeService
+    {
+        return $this->service(OfficeService::class, fn () => new OfficeService($this));
+    }
+
+    public function lists(): ListService
+    {
+        return $this->service(ListService::class, fn () => new ListService($this));
+    }
+
     public function members(): MemberService
     {
-        return $this->service(MemberService::class, fn () => new MemberService($this->users, $this->scores(), $this->authenticator, $this->cache, $this->roles()));
+        return $this->service(MemberService::class, fn () => new MemberService(
+            $this->users,
+            $this->scores(),
+            $this->authenticator,
+            $this->cache,
+            $this->roles(),
+            fn (User $user): ?string => $this->formerMembers()->previousRole($user),
+            new MemberContactRepository($this->db),
+            $this->time(),
+        ));
+    }
+
+    public function formerMembers(): FormerMemberService
+    {
+        return $this->service(FormerMemberService::class, fn () => new FormerMemberService($this));
+    }
+
+    public function memberImport(): MemberImportService
+    {
+        return $this->service(MemberImportService::class, fn () => new MemberImportService($this));
     }
 
     public function roles(): RoleService
@@ -512,6 +660,12 @@ final class App
             $this->packageConfig,
             $this->telemetry(),
         ));
+    }
+
+    /** Sicherungen automatisch in Google Drive */
+    public function backupUpload(): BackupUploadService
+    {
+        return $this->service(BackupUploadService::class, fn () => new BackupUploadService($this));
     }
 
     public function status(): StatusService

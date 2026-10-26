@@ -53,9 +53,14 @@ final class WpUsers implements UserDirectory, AuthContext
      * @param (\Closure(string, int): array<int, Capability>)|null $capabilities Rechte je Grundrolle und Benutzer-ID, mit den
      *        Zusatzrollen aus der Tabelle des Kerns (Domain\RoleService::capabilitiesFor; keine eigenen WP-Rollen dafür)
      * @param (\Closure(string): bool)|null $known Gibt es die Rolle in der App? (für frühere WP-Rollen)
+     * @param (\Closure(string): bool)|null $promotable Lässt sich die Rolle mit „Mitglieder anlegen“ zum Mitglied machen?
+     *        (Domain\RoleService::promotable)
      */
-    public function __construct(private readonly ?\Closure $capabilities = null, private readonly ?\Closure $known = null)
-    {
+    public function __construct(
+        private readonly ?\Closure $capabilities = null,
+        private readonly ?\Closure $known = null,
+        private readonly ?\Closure $promotable = null,
+    ) {
     }
 
     public function currentUser(): ?User
@@ -88,6 +93,23 @@ final class WpUsers implements UserDirectory, AuthContext
             $user = $this->find($id);
             if ($user !== null) {
                 $out[$id] = $user;
+            }
+        }
+        return $out;
+    }
+
+    public function emails(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        cache_users($ids);
+        $out = [];
+        foreach ($ids as $id) {
+            $user = get_userdata($id);
+            if ($user instanceof \WP_User) {
+                $out[$id] = (string) $user->user_email;
             }
         }
         return $out;
@@ -127,7 +149,7 @@ final class WpUsers implements UserDirectory, AuthContext
             'nickname' => $name,
             'first_name' => $firstName,
             'last_name' => $lastName,
-            // Die frühere WP-Rolle nur für Mitglieder (Rückfall bei einem Zurückrollen); Anwärter sind Abonnenten.
+            // Die frühere WP-Rolle nur für Mitglieder (Rückfall bei einem Zurückrollen); andere Rollen sind Abonnenten.
             'role' => $role === AppRoles::MEMBER ? Roles::ROLE_MEMBER : 'subscriber',
         ]);
         if (is_wp_error($id)) {
@@ -154,8 +176,10 @@ final class WpUsers implements UserDirectory, AuthContext
         }
         // Wer handelt, braucht das Recht in WordPress oder über seine Rolle in der App (der Kern hat die
         // Regeln der App schon geprüft). Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
-        // Anwärter zum Mitglied machen darf auch, wer Konten anlegen darf (Issue #23).
-        $promotion = $role === AppRoles::MEMBER && $this->find($id)?->role === AppRoles::CANDIDATE && $this->currentUser()?->can(Capability::CreateUsers);
+        // Zum Mitglied machen (z. B. Anwärter) darf auch, wer Konten anlegen darf, wenn die Rolle dafür freigegeben ist (Issue #23).
+        $from = $this->find($id)?->role;
+        $promotion = $role === AppRoles::MEMBER && $from !== null && $this->promotable !== null && ($this->promotable)($from)
+            && $this->currentUser()?->can(Capability::CreateUsers);
         if (!$promotion && !$this->actorMay('promote_user', $id, Capability::PromoteUsers)) {
             throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
         }
@@ -313,6 +337,51 @@ final class WpUsers implements UserDirectory, AuthContext
     }
 
     /**
+     * Ehemaliges Mitglied: Rolle Gast in der App, frühere WP-Rollen der App entfernen, alle Sitzungen beenden. Anders als
+     * removeAccount() bleibt die Konto-Markierung: Das Konto gehört weiter zur Kompanie, wieder aufnehmen darf deshalb
+     * auch, wer nur „Mitglieder anlegen“ aus der App hat. Die Anmeldung an der Webseite sperrt WordPress nicht; in der App
+     * sieht die Person nur, was Gäste sehen.
+     */
+    public function deactivate(int $id): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
+            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        update_user_option($id, self::ROLE_META, AppRoles::GUEST, false);
+        $user->remove_role(Roles::ROLE_MANAGER);
+        $user->remove_role(Roles::ROLE_ORGANIZER);
+        $user->remove_role(Roles::ROLE_MEMBER);
+        if (empty($user->roles)) {
+            $user->add_role('subscriber');
+        }
+        \WP_Session_Tokens::get_instance($id)->destroy_all();
+        clean_user_cache($id);
+    }
+
+    /** Wieder aufnehmen: Rolle in der App (und für Mitglieder die frühere WP-Rolle) setzen, geprüft wie deactivate(). */
+    public function reactivate(int $id, string $role): void
+    {
+        $user = get_userdata($id);
+        if (!$user || $this->find($id) === null) {
+            throw new \DomainException('Benutzer nicht gefunden.');
+        }
+        if ($role === AppRoles::ADMIN) {
+            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+        }
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        update_user_option($id, self::ROLE_META, $role, false);
+        if (isset(self::LEGACY_WP_ROLES[$role])) {
+            $user->add_role(self::LEGACY_WP_ROLES[$role]);
+        }
+        clean_user_cache($id);
+    }
+
+    /**
      * Braucht das Ändern dieses Kontos das Recht aus WordPress (statt „Mitglieder anlegen“ aus der App)? Ja für Benutzer
      * der Webseite (Redakteure, Administratoren, eigene WP-Rollen), für Konten, die nicht von der Kompanie sind
      * (ACCOUNT_META), und bei Multisite für Konten, die auch zu anderen Seiten des Netzwerks gehören: Dort könnten sie
@@ -413,6 +482,10 @@ final class WpUsers implements UserDirectory, AuthContext
             if (!in_array($cap, $caps, true) && user_can($u, $wpCap)) {
                 $caps[] = $cap;
             }
+        }
+        // Wer die Einstellungen der Webseite verwaltet, ist dort Admin und sieht auch die Nutzungsauswertung (Issue #175).
+        if (in_array(Capability::ManageSettings, $caps, true) && !in_array(Capability::ViewActivity, $caps, true)) {
+            $caps[] = Capability::ViewActivity;
         }
         [$first, $last] = self::names($u);
         return new User((int) $u->ID, (string) $u->display_name, (string) $u->user_login, $role, $caps, $first, $last);

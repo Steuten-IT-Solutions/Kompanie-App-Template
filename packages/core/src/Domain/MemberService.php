@@ -11,12 +11,15 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\Authenticator;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\UserDirectory;
+use KompanieApp\Core\Storage\MemberContactRepository;
 
 /** Mitglieder, Rollen und Passwörter. */
 final class MemberService
 {
     /** WordPress speichert höchstens 100 Zeichen (user_email); vorab prüfen, damit Mehrere-Anlegen nicht mittendrin scheitert. */
     public const EMAIL_MAX = 100;
+    /** Handynummer: so lang wie die Spalte in member_contacts */
+    public const PHONE_MAX = 30;
 
     public function __construct(
         private readonly UserDirectory $users,
@@ -24,7 +27,24 @@ final class MemberService
         private readonly Authenticator $auth,
         private readonly ?Cache $cache = null,
         private readonly ?RoleService $roles = null,
+        /** @var (\Closure(User): ?string)|null Grundrolle vor dem Ausscheiden, wenn die Person ehemalig ist (FormerMemberService) */
+        private readonly ?\Closure $formerRole = null,
+        private readonly ?MemberContactRepository $contacts = null,
+        private readonly ?Time $time = null,
     ) {
+    }
+
+    /** Grundrolle vor dem Ausscheiden, wenn die Person ehemalig ist; sonst null. */
+    private function formerRole(User $user): ?string
+    {
+        return $this->formerRole !== null ? ($this->formerRole)($user) : null;
+    }
+
+    private function denyFormer(User $user): void
+    {
+        if ($this->formerRole($user) !== null) {
+            throw ApiError::invalid('Diese Person ist ehemalig. Bitte zuerst wieder aufnehmen.');
+        }
     }
 
     /** Versuche beim Passwortwechsel (Prüfung des aktuellen Passworts): höchstens so viele in 15 Minuten. */
@@ -83,6 +103,62 @@ final class MemberService
             ];
         }
         return $out;
+    }
+
+    /**
+     * Mitgliederliste für Mitglieder und Anwärter (Bereich directory): alle mit Mitgliederbereich oder internem
+     * Kalender, ohne Gäste und ohne Punkte oder Strafen. Von der Rolle nur ihr Name, solange die Person noch als Mitglied
+     * aufzunehmen ist (candidate_role, Rolle mit „Als Mitglied aufnehmen“, z. B. Anwärter), sonst null.
+     * Foto, Dienstgrad und Titel ergänzt die API.
+     * Mit $membersOnly nur Mitglieder, ohne Anwärter (Shortcode [kompanie_mitglieder] der Webseite).
+     *
+     * @return list<array{id: int, name: string, first_name: string, last_name: string, candidate_role: string|null}>
+     */
+    public function directory(bool $membersOnly = false): array
+    {
+        $out = [];
+        foreach ($this->users->list(false) as $u) {
+            if ($membersOnly ? $u->isMember() : self::inDirectory($u)) {
+                $role = $this->roles?->find($u->role);
+                $out[] = [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'first_name' => $u->firstName,
+                    'last_name' => $u->lastName,
+                    'candidate_role' => ($role['promotable'] ?? false) ? $role['label'] : null,
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Zähler über der Mitgliederliste für Mitglieder und Anwärter: Anzahl je Gruppe wie in der Anwesenheit
+     * (Einstellungen → Rollen), nur die Summen, keine Rolle je Person.
+     *
+     * @param array<string, string> $groups Rolle => Gruppe (AttendanceService::groupMap)
+     * @return list<array{group: string, count: int}>
+     */
+    public function directoryCounts(array $groups): array
+    {
+        $n = [];
+        foreach ($this->users->list(false) as $u) {
+            $group = $groups[$u->role] ?? null;
+            if ($group !== null && self::inDirectory($u)) {
+                $n[$group] = ($n[$group] ?? 0) + 1;
+            }
+        }
+        $out = [];
+        foreach ($n as $group => $count) {
+            $out[] = ['group' => (string) $group, 'count' => $count];
+        }
+        return $out;
+    }
+
+    /** Steht in der Mitgliederliste für Mitglieder und Anwärter (und darf sie sehen): Mitglied oder nur Kalender. */
+    public static function inDirectory(User $u): bool
+    {
+        return $u->isMember() || self::calendarOnly($u);
     }
 
     /** @return array<string, mixed> */
@@ -145,6 +221,7 @@ final class MemberService
         if (!$target) {
             throw ApiError::notFound('Benutzer nicht gefunden.');
         }
+        $this->denyFormer($target);
         if ($level === null && $extraRoles === null) {
             throw ApiError::invalid('Bitte eine Rolle angeben.');
         }
@@ -235,8 +312,8 @@ final class MemberService
     }
 
     /**
-     * Anwärter zum Mitglied machen (Issue #23): wer Konten anlegen darf, aber nur von Anwärter zu Mitglied.
-     * Andere Rollenwechsel bleiben bei „Rollen vergeben“.
+     * Zum Mitglied machen (Issue #23, z. B. Anwärter): wer Konten anlegen darf, aber nur aus einer Rolle, die der Admin
+     * dafür freigegeben hat (RoleService::promotable). Andere Rollenwechsel bleiben bei „Rollen vergeben“.
      *
      * @return array{id: int, level: string}
      */
@@ -249,8 +326,9 @@ final class MemberService
         if ($actor->id === $id) {
             throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
         }
-        if ($target->role !== Roles::CANDIDATE) {
-            throw ApiError::invalid('Nur Anwärter können so zum Mitglied gemacht werden.');
+        $this->denyFormer($target);
+        if (!($this->roles?->promotable($target->role) ?? false)) {
+            throw ApiError::invalid(sprintf('Aus der Rolle „%s“ lässt sich niemand so zum Mitglied machen.', $this->roles?->label($target->role) ?? $target->role));
         }
         try {
             $this->users->setRole($id, Roles::MEMBER);
@@ -262,16 +340,17 @@ final class MemberService
     }
 
     /**
-     * Legt ein Konto mit zufälligem Startpasswort an, als Mitglied oder als Anwärter. Das Passwort steht nur
-     * in dieser Antwort; es wird keine E-Mail verschickt.
+     * Legt ein Konto mit zufälligem Startpasswort an, als Mitglied oder mit einer Rolle für neue Konten (z. B. Anwärter).
+     * Das Passwort steht nur in dieser Antwort; es wird keine E-Mail verschickt.
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (member oder candidate)
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (Rolle)
+     * @param User|null $actor wer anlegt (null: intern, z. B. Einrichtung)
      * @return array<string, mixed>
      */
-    public function create(array $in): array
+    public function create(array $in, ?User $actor = null): array
     {
         $taken = [];
-        return $this->insert($this->prepare($in, $taken));
+        return $this->insert($this->prepare($in, $taken, $actor));
     }
 
     /**
@@ -280,15 +359,22 @@ final class MemberService
      *
      * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level
      * @param array<string, true> $taken
+     * @param User|null $actor wer anlegt (null: intern); bestimmt, welche Rollen neue Konten bekommen dürfen
      * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string}
      */
-    public function prepare(array $in, array &$taken): array
+    public function prepare(array $in, array &$taken, ?User $actor = null): array
     {
         [$first, $last] = self::names($in, ['', '']);
         $name = self::checkNames($first, $last);
         $level = $in['level'] ?? Roles::MEMBER;
-        if ($level !== Roles::MEMBER && $level !== Roles::CANDIDATE) {
-            throw ApiError::invalid('Neue Konten sind Mitglieder oder Anwärter; andere Rollen danach vergeben.');
+        if ($level !== Roles::MEMBER) {
+            $role = is_string($level) ? $this->roles?->find($level) : null;
+            if ($role === null || !$role['new_accounts']) {
+                throw ApiError::invalid('Diese Rolle lässt sich beim Anlegen nicht wählen; andere Rollen danach vergeben.');
+            }
+            if ($actor !== null && !$this->roles?->canCreateAs($actor, $level)) {
+                throw ApiError::forbidden(sprintf('Konten mit der Rolle „%s“ darfst du nicht anlegen.', $role['label']));
+            }
         }
 
         $login = trim(is_string($in['username'] ?? null) ? $in['username'] : '');
@@ -376,13 +462,16 @@ final class MemberService
     public function resetPassword(User $actor, int $id): array
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Das eigene Passwort änderst du unter Konto → Passwort ändern.');
+            throw ApiError::invalid('Das eigene Passwort änderst du unter Meins → Konto → Passwort ändern.');
         }
         $target = $this->users->find($id);
         if (!$target) {
             throw ApiError::notFound('Mitglied nicht gefunden.');
         }
         $this->guardAccount($actor, $target, 'Das Passwort dieser Person darfst du nicht zurücksetzen.');
+        if ($this->formerRole($target) !== null) {
+            throw ApiError::invalid('Ehemalige können sich nicht anmelden. Wer wieder aufgenommen wird, bekommt hier ein neues Startpasswort.');
+        }
         $password = Passwords::readable(12);
         try {
             $this->users->setPassword($id, $password);
@@ -396,11 +485,20 @@ final class MemberService
      * Wer Konten verwalten darf (Passwort zurücksetzen, Angaben ändern, löschen): Admins alle; sonst nur Konten mit
      * Mitgliederbereich bzw. nur Kalender und ohne mehr Rechte als man selbst. Sonst könnte, wer Konten anlegen darf,
      * das Konto einer Person mit mehr Rechten übernehmen, oder (bei WordPress) das Konto einer Person, die gar nicht zur
-     * Kompanie gehört (Gast). Anwärter legt an, wer Konten anlegen darf; ihr Konto darf er deshalb auch verwalten.
-     * Gilt auch für das Foto (MemberPhotoService).
+     * Kompanie gehört (Gast). Personen nur mit dem Kalender (z. B. Anwärter) legt an, wer Konten anlegen darf; ihr Konto
+     * darf er deshalb auch verwalten.
+     * Gilt auch für das Foto (MemberPhotoService). Ehemalige (Rolle Gast) gelten mit ihrer Grundrolle von vorher: Wer sie
+     * als ehemalig eingetragen durfte, darf ihr Konto weiter verwalten.
      */
     public function guardAccount(User $actor, User $target, string $message): void
     {
+        $previous = $this->formerRole($target);
+        if ($previous !== null) {
+            if (!$actor->isAdmin() && ($previous === Roles::ADMIN || $this->roles === null || !$this->roles->canHandle($actor, $previous))) {
+                throw ApiError::forbidden($previous === Roles::ADMIN ? 'Konten von Admins verwalten nur Admins.' : $message);
+            }
+            return;
+        }
         if ($target->isAdmin() && !$actor->isAdmin()) {
             throw ApiError::forbidden('Konten von Admins verwalten nur Admins.');
         }
@@ -415,7 +513,7 @@ final class MemberService
     /**
      * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt).
      *
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
      */
     public function profile(int $id, ?User $actor = null): array
     {
@@ -424,15 +522,15 @@ final class MemberService
             $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht sehen.');
         }
         $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        return $p + ['can_change_login' => $this->users->canChangeLogin()];
+        return $p + ['phone' => $this->contacts?->phone($id) ?? '', 'can_change_login' => $this->users->canChangeLogin()];
     }
 
     /**
      * Vor- und Nachname, E-Mail und Benutzername ändern (Issue #24). Ein neuer Benutzername beendet alle Sitzungen des
-     * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet.
+     * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet. Die eigene E-Mail-Adresse nur mit current_password.
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), email, username
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, can_change_login: bool}
+     * @param array<string, mixed> $in first_name, last_name (oder name), email, phone, username, current_password
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
      */
     public function updateProfile(User $actor, int $id, array $in): array
     {
@@ -444,8 +542,13 @@ final class MemberService
         [$first, $last] = self::names($in, [$current['first_name'], $current['last_name']]);
         self::checkNames($first, $last);
         $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
+        $emailChanged = mb_strtolower($email) !== mb_strtolower($current['email']);
+        // Die eigene E-Mail-Adresse nur mit dem aktuellen Passwort, auch in der Verwaltung (siehe updateOwnAccount).
+        if ($emailChanged && $actor->id === $id) {
+            $this->checkPassword($actor, $in['current_password'] ?? null);
+        }
         // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
-        if (mb_strtolower($email) !== mb_strtolower($current['email']) && $email !== '') {
+        if ($emailChanged && $email !== '') {
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
                 throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
             }
@@ -453,6 +556,7 @@ final class MemberService
                 throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
             }
         }
+        $phone = array_key_exists('phone', $in) ? self::phone($in['phone']) : null;
         $login = null;
         if (array_key_exists('username', $in)) {
             $wanted = trim(is_string($in['username']) ? $in['username'] : '');
@@ -474,10 +578,52 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }
+        if ($phone !== null && $this->contacts !== null) {
+            $this->contacts->setPhone($id, $phone, $this->time?->nowUtc() ?? gmdate('Y-m-d H:i:s'));
+        }
         if ($login !== null && $actor->id === $id) {
             $this->auth->afterPasswordChange($id);
         }
         return $this->profile($id);
+    }
+
+    /**
+     * Eigene E-Mail-Adresse und Handynummer (Meins → Konto).
+     *
+     * @return array{email: string, phone: string}
+     */
+    public function ownAccount(User $user): array
+    {
+        $p = $this->profile($user->id);
+        return ['email' => $p['email'], 'phone' => $p['phone']];
+    }
+
+    /**
+     * Eigene E-Mail-Adresse und Handynummer ändern. Eine neue E-Mail-Adresse nur mit dem aktuellen Passwort: Über sie
+     * lässt sich (bei WordPress) das Passwort zurücksetzen, eine fremde Sitzung soll so nicht das Konto übernehmen.
+     *
+     * @param array<string, mixed> $in email, phone, current_password
+     * @return array{email: string, phone: string}
+     */
+    public function updateOwnAccount(User $user, array $in): array
+    {
+        // Das Passwort prüft updateProfile; Name und Benutzername ändert hier niemand.
+        $this->updateProfile($user, $user->id, array_intersect_key($in, ['email' => true, 'phone' => true, 'current_password' => true]));
+        return $this->ownAccount($user);
+    }
+
+    /** Handynummer prüfen und vereinheitlichen; leer heißt „keine“. */
+    private static function phone(mixed $raw): string
+    {
+        $phone = Text::line(is_string($raw) ? $raw : '');
+        if ($phone === '') {
+            return '';
+        }
+        $digits = strlen((string) preg_replace('/\D/', '', $phone));
+        if (mb_strlen($phone) > self::PHONE_MAX || preg_match('#^\+?[0-9 ()/-]+$#', $phone) !== 1 || $digits < 5 || $digits > 20) {
+            throw ApiError::invalid('Die Handynummer ist ungültig. Erlaubt sind Ziffern, Leerzeichen und + ( ) / -, z. B. +49 171 1234567.');
+        }
+        return $phone;
     }
 
     /**
@@ -505,15 +651,7 @@ final class MemberService
     {
         $current = is_string($current) ? $current : '';
         $new = is_string($new) ? $new : '';
-        // Wer nur eine fremde Sitzung hat (z. B. ein nicht abgemeldetes Gerät), soll das Passwort
-        // nicht unbegrenzt raten und so das Konto übernehmen können.
-        // Jeder Versuch wird vor der Prüfung atomar gezählt (auch bei gleichzeitigen Anfragen).
-        if ($this->cache !== null && $this->cache->increment('pwchange_' . $user->id, 900) > self::PASSWORD_ATTEMPTS) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
-        }
-        if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
-            throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
-        }
+        $this->checkPassword($user, $current);
         if (mb_strlen($new) < Passwords::MIN_LENGTH) {
             throw ApiError::invalid(sprintf('Das neue Passwort muss mindestens %d Zeichen lang sein.', Passwords::MIN_LENGTH));
         }
@@ -529,5 +667,21 @@ final class MemberService
             throw ApiError::forbidden($e->getMessage());
         }
         $this->auth->afterPasswordChange($user->id);
+    }
+
+    /**
+     * Aktuelles Passwort prüfen (Passwort oder E-Mail-Adresse ändern). Wer nur eine fremde Sitzung hat (z. B. ein nicht
+     * abgemeldetes Gerät), soll das Passwort nicht unbegrenzt raten und so das Konto übernehmen können. Jeder Versuch
+     * wird vor der Prüfung atomar gezählt (auch bei gleichzeitigen Anfragen).
+     */
+    private function checkPassword(User $user, mixed $current): void
+    {
+        $current = is_string($current) ? $current : '';
+        if ($this->cache !== null && $this->cache->increment('pwchange_' . $user->id, 900) > self::PASSWORD_ATTEMPTS) {
+            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
+        }
+        if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
+            throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
+        }
     }
 }

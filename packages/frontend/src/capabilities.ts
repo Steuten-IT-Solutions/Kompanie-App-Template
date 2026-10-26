@@ -10,6 +10,7 @@ const sec = brand.labels.sections;
 export const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'member', label: `Mitgliederbereich: eigene ${sec.points} und ${sec.penalties}, interner Kalender, interne ${sec.gallery}` },
   { key: 'calendar', label: 'Interner Kalender (ohne Mitgliederbereich, z. B. für Anwärter)' },
+  { key: 'view_intern', label: `Intern: ${sec.directory} und ${sec.documents} unten gesammelt unter einem Knopf` },
   { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen` },
   { key: 'manage_penalties', label: `${sec.penalties} vergeben und als bezahlt markieren` },
   { key: 'manage_ranks', label: `${sec.ranks} pflegen, befördern und degradieren` },
@@ -20,6 +21,14 @@ export const CAPABILITIES: { key: Capability; label: string }[] = [
   { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben` },
   { key: 'manage_polls', label: `${sec.polls}: anlegen, beenden und alle Ergebnisse sehen` },
   { key: 'manage_inventory', label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf` },
+  { key: 'manage_offices', label: `${sec.offices}: Gruppen, Ämter und Amtszeiten pflegen, auch frühere` },
+  { key: 'manage_lists', label: `${sec.lists}: zum Drucken und als CSV anlegen und bearbeiten` },
+  { key: 'send_mail', label: `${sec.mail}: an Rollen, Mitglieder und beliebige Adressen schreiben und versenden, Verlauf` },
   { key: 'create_users', label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)' },
   { key: 'promote_users', label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)' },
 ];
+
+/** Rechte, die es auch ohne Mitgliederbereich gibt (z. B. für Anwärter); der Mitgliederbereich enthält sie (wie im Kern). */
+export const WITHOUT_MEMBER: Capability[] = ['calendar', 'view_intern'];
+
+export const withoutMember = (c: Capability): boolean => WITHOUT_MEMBER.includes(c);

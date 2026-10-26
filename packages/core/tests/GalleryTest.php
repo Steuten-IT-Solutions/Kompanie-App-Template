@@ -112,7 +112,7 @@ final class GalleryTest extends TestCase
         $this->assertTrue($this->drive->jwtValid, 'Token per signiertem JWT geholt');
         $this->assertSame(1, $this->drive->tokens);
         $this->assertTrue($this->drive->paged, 'Paging von files.list wird verfolgt');
-        $this->assertSame(['albums' => 3, 'photos' => 5, 'new' => 5, 'pending' => 5], $stats, 'Lose Datei und Video ignoriert');
+        $this->assertSame(['albums' => 3, 'photos' => 5, 'new' => 5, 'pending' => 5], $stats, 'Lose Datei ignoriert');
 
         $guest = $this->titles(false);
         $member = $this->titles(true);
@@ -212,6 +212,7 @@ final class GalleryTest extends TestCase
             'intern' => true,
             'error' => 'Datei ist kein unterstütztes Bild',
             'attempts' => 5,
+            'unsupported' => false,
             'drive_url' => 'https://drive.google.com/file/d/' . $row['drive_file_id'] . '/view',
         ]], $res->data['photos']);
         $this->assertSame(1, $this->app->settingsService()->get()['gallery']['status']['failed']);
@@ -423,6 +424,50 @@ final class GalleryTest extends TestCase
         $this->assertSame(7, $this->drive->downloads);
     }
 
+    public function testOriginalResolutionIsGeneratedWhenOpened(): void
+    {
+        $gallery = $this->app->gallery();
+        $gallery->waitSeconds = 0;
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $this->drive->contents['IMG1'] = JpegMetadataTest::jpegWithMetadata(3000, 2000);
+        $gallery->sync();
+        $gallery->processPending(60);
+        $downloads = $this->drive->downloads;
+        $id = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE drive_file_id = 'IMG1'");
+        $album = (int) $this->app->db->scalar("SELECT album_id FROM {photos} WHERE id = ?", [$id]);
+        $photo = fn (): array => array_values(array_filter($gallery->album($album, false)['photos'], static fn (array $p): bool => $p['id'] === $id))[0];
+
+        // Noch nicht erzeugt: Adresse über die App, die Großansicht zeigt bis dahin large.
+        $this->assertSame('https://example.org/app/foto/' . $id . '/original', $photo()['original']);
+        $res = $gallery->photoForDelivery($id, 'original', false, false);
+        $this->assertSame(200, $res['status']);
+        $this->assertSame([3000, 2000], array_slice((array) getimagesize((string) $res['file']), 0, 2), 'volle Auflösung, nicht 1600');
+        $this->assertStringNotContainsString('GPSLatitude', (string) file_get_contents((string) $res['file']), 'ohne Metadaten');
+        $this->assertSame($downloads + 1, $this->drive->downloads, 'Original einmal aus Drive geladen');
+        $this->assertSame(200, $gallery->photoForDelivery($id, 'original', false, false)['status']);
+        $this->assertSame($downloads + 1, $this->drive->downloads, 'danach aus der Datei');
+        $this->assertStringEndsWith('-original.jpg', $photo()['original'], 'öffentlich: jetzt direkt als Datei');
+
+        // Interne Bilder: Rechte wie bei den anderen Größen.
+        $intern = (int) $this->app->db->scalar("SELECT id FROM {photos} WHERE drive_file_id = 'IMG3'");
+        $this->assertSame(401, $gallery->photoForDelivery($intern, 'original', false, false)['status']);
+
+        // Scheitert das Original (z. B. Störung bei Google): 404, und nicht bei jedem Klick erneut aus Drive laden.
+        $this->drive->downloadFails = true;
+        $before = $this->drive->downloads;
+        $this->assertSame(404, $gallery->photoForDelivery($intern, 'original', true, true)['status']);
+        $this->assertSame(404, $gallery->photoForDelivery($intern, 'original', true, true)['status']);
+        $this->assertSame($before + 1, $this->drive->downloads, 'Merker verhindert weitere Downloads');
+        $this->drive->downloadFails = false;
+
+        // Neuer Inhalt in Drive: alle Fassungen samt Original verschwinden.
+        $file = (string) $res['file'];
+        $row = (array) $this->app->db->selectOne('SELECT * FROM {photos} WHERE id = ?', [$id]);
+        $gallery->deleteFiles($row);
+        $this->assertFileDoesNotExist($file);
+    }
+
     public function testBackgroundTaskContinuesWhilePhotosArePending(): void
     {
         $gallery = $this->app->gallery();
@@ -462,6 +507,189 @@ final class GalleryTest extends TestCase
         $this->assertSame(GalleryRepository::FAILED, $db->scalar('SELECT status FROM {photos} WHERE id = ?', [$first]));
         $this->assertSame(0, $gallery->countPending());
         $this->assertSame(0, (int) $db->scalar("SELECT COUNT(*) FROM {photos} WHERE status = 'ready' AND attempts <> 0"), 'fertige Bilder ohne offene Versuche');
+    }
+
+    /**
+     * Nachgebaute RAW-Datei (wie NEF): IFD0 mit Ausrichtung und kleinem Vorschaubild, SubIFD mit großem JPEG.
+     */
+    private static function raw(int $orientation): string
+    {
+        $small = DriveMock::jpeg(160, 120);
+        $large = DriveMock::jpeg(1200, 900);
+        $entry = static fn (int $tag, int $type, int $value): string => pack('vvV', $tag, $type, 1) . ($type === 3 ? pack('vv', $value, 0) : pack('V', $value));
+        $sub = 8 + 2 + 4 * 12 + 4;
+        $data = $sub + 2 + 2 * 12 + 4;
+        $ifd0 = pack('v', 4) . $entry(0x0112, 3, $orientation) . $entry(0x014A, 4, $sub)
+            . $entry(0x0201, 4, $data) . $entry(0x0202, 4, strlen($small)) . pack('V', 0);
+        $ifd1 = pack('v', 2) . $entry(0x0201, 4, $data + strlen($small)) . $entry(0x0202, 4, strlen($large)) . pack('V', 0);
+        return "II*\x00" . pack('V', 8) . $ifd0 . $ifd1 . $small . $large . str_repeat("\x00", 4096);
+    }
+
+    public function testUnreadableFormatsUseRawPreviewOrGoogleThumbnail(): void
+    {
+        $gallery = $this->app->gallery();
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $this->drive->contents = [
+            'IMG1' => self::raw(6), // RAW hochkant: eingebettetes JPEG, gedreht
+            'IMG2' => "II*\x00" . pack('V', 0) . str_repeat("\x00", 64), // z. B. TIFF ohne JPEG: Vorschaubild von Google
+            'IMG3' => 'kaputt', // weder noch: fehlgeschlagen
+        ];
+        $this->drive->thumbnails = ['IMG2'];
+        $gallery->sync();
+        $gallery->processPending(60);
+        $db = $this->app->db;
+        $row = static fn (string $id): array => $db->selectOne('SELECT * FROM {photos} WHERE drive_file_id = ?', [$id]);
+
+        $raw = $row('IMG1');
+        $this->assertSame(GalleryRepository::READY, $raw['status']);
+        $this->assertSame([900, 1200], [(int) $raw['width'], (int) $raw['height']], 'großes JPEG statt Daumennagel, nach der Ausrichtung der RAW-Datei gedreht');
+        $this->assertSame([300, 400], array_slice(getimagesize($gallery->path($raw, 'thumb')), 0, 2));
+
+        $tiff = $row('IMG2');
+        $this->assertSame(GalleryRepository::READY, $tiff['status']);
+        $this->assertSame([1600, 1200], [(int) $tiff['width'], (int) $tiff['height']]);
+        $this->assertSame(['https://lh3.googleusercontent.com/drive-storage/IMG2=s1600'], $this->drive->thumbnailRequests);
+
+        $broken = $row('IMG3');
+        $this->assertSame(GalleryRepository::FAILED, $broken['status']);
+        $this->assertSame('Das Bild kann nicht gelesen werden.', $broken['error'], 'Meldung des Originals, nicht der Ausweichwege');
+
+        // Stürzt PHP am Original immer wieder ab, kommt das Bild nach MAX_ATTEMPTS aus Googles Vorschaubild.
+        $this->drive->thumbnails[] = 'IMG3';
+        $db->update('photos', ['status' => GalleryRepository::PENDING, 'attempts' => GalleryService::MAX_ATTEMPTS], ['id' => (int) $broken['id']]);
+        $downloads = $this->drive->downloads;
+        $gallery->processPending(60);
+        $this->assertSame(GalleryRepository::READY, $row('IMG3')['status']);
+        $this->assertSame($downloads, $this->drive->downloads, 'das Original wird nicht noch einmal geladen');
+    }
+
+    /** Videos (Issue #182): MP4/WebM im Album, abgespielt in Ausschnitten aus Drive; andere Formate in der Liste für Admins. */
+    public function testVideosAreListedAndStreamedFromDrive(): void
+    {
+        $gallery = $this->app->gallery();
+        $gallery->waitSeconds = 0;
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $film = str_repeat('0123456789', 900000); // 9 MB
+        $this->drive->tree['A3'][] = ['id' => 'VID1', 'name' => 'film.mp4', 'mimeType' => 'video/mp4', 'md5Checksum' => 'v1', 'size' => (string) strlen($film), 'videoMediaMetadata' => ['width' => 1920, 'height' => 1080, 'durationMillis' => '61500']];
+        $this->drive->tree['A3'][] = ['id' => 'VID3', 'name' => 'alt.mov', 'mimeType' => 'video/quicktime', 'md5Checksum' => 'v3', 'size' => '100'];
+        $this->drive->tree['A3'][] = ['id' => 'I3', 'name' => 'intern', 'mimeType' => \KompanieApp\Core\Domain\DriveClient::FOLDER_MIME];
+        $this->drive->tree['I3'] = [['id' => 'VID2', 'name' => 'clip.webm', 'mimeType' => 'video/webm', 'md5Checksum' => 'v2', 'size' => '5000']];
+        $this->drive->contents = ['VID1' => $film, 'VID2' => str_repeat('x', 5000)];
+        $this->drive->thumbnails = ['VID1']; // für VID2 hat Drive (noch) kein Vorschaubild
+
+        $this->assertSame(8, $gallery->sync()['photos']);
+        $failed = $gallery->failedPhotos();
+        $this->assertSame(['alt.mov'], array_column($failed, 'name'), 'nicht unterstütztes Format für Admins');
+        $this->assertSame([GalleryService::UNSUPPORTED_VIDEO, true], [$failed[0]['error'], $failed[0]['unsupported']]);
+        $gallery->sync();
+        $this->assertSame(1, $gallery->countFailed(), 'wird beim Abgleich nicht erneut versucht');
+        $this->assertSame(7, $gallery->countPending());
+
+        $guest = $this->titles(false)['Maifest'];
+        $member = $this->titles(true)['Maifest'];
+        $this->assertSame([2, 1], [$guest['count'], $guest['video_count']]);
+        $this->assertSame([3, 2, 1], [$member['count'], $member['video_count'], $member['intern_count']]);
+
+        // Aufbereiten: nur die Vorschaubilder, die Videos selbst werden nicht geladen.
+        $gallery->processPending(60);
+        $this->assertSame(5, $this->drive->downloads, 'nur die Bilder');
+        $db = $this->app->db;
+        $row = static fn (string $id): array => $db->selectOne('SELECT * FROM {photos} WHERE drive_file_id = ?', [$id]);
+        $this->assertSame(GalleryRepository::READY, $row('VID1')['status']);
+        $this->assertSame([1920, 1080], [(int) $row('VID1')['width'], (int) $row('VID1')['height']], 'Maße des Videos');
+        $this->assertFileExists($gallery->path($row('VID1'), 'thumb'));
+        $this->assertSame([GalleryRepository::PENDING, 1], [$row('VID2')['status'], (int) $row('VID2')['attempts']], 'ohne Vorschaubild ausstehend, ein Versuch je Lauf');
+        for ($i = 1; $i < GalleryService::MAX_ATTEMPTS; $i++) {
+            $gallery->processPending(60);
+        }
+        $this->assertSame(GalleryRepository::READY, $row('VID2')['status'], 'nach den Versuchen ohne Vorschaubild fertig');
+
+        $album = $gallery->album($guest['id'], true);
+        $videos = array_values(array_filter($album['photos'], static fn (array $p): bool => $p['type'] === 'video'));
+        $this->assertSame(['clip.webm', 'film.mp4'], array_column($videos, 'name'), 'ohne Aufnahmezeit nach den Bildern, nach Namen');
+        [$v2, $v1] = $videos;
+        $this->assertSame(['video/mp4', 62, true], [$v1['mime'], $v1['duration'], $v1['ready']]);
+        $this->assertStringEndsWith('/foto/' . $v1['id'] . '/video', $v1['video']);
+        $this->assertStringStartsWith('https://example.org/media/', $v1['thumb'], 'öffentliches Vorschaubild als Datei');
+        $this->assertArrayNotHasKey('original', $v1);
+        $this->assertSame(['', ''], [$v2['thumb'], $v2['large']], 'ohne Vorschaubild');
+        $this->assertSame(404, $gallery->photoForDelivery($v2['id'], 'thumb', true, true)['status']);
+        $this->assertSame(404, $gallery->photoForDelivery($v1['id'], GalleryService::ORIGINAL, true, true)['status']);
+
+        // Abspielen: Ausschnitte aus Drive, höchstens VIDEO_CHUNK Bytes je Anfrage.
+        $guestAccess = static fn (): array => [false, false];
+        $res = $gallery->deliverVideo($v1['id'], 'bytes=0-1', $guestAccess);
+        $this->assertSame([206, '01', 'bytes 0-1/9000000', 'video/mp4'], [$res['status'], $res['body'], $res['contentRange'], $res['mime']]);
+        $this->assertSame('bytes=0-1', end($this->drive->ranges), 'Range an Drive weitergereicht');
+        $res = $gallery->deliverVideo($v1['id'], 'bytes=100-', $guestAccess);
+        $this->assertSame('bytes 100-' . (100 + GalleryService::VIDEO_CHUNK - 1) . '/9000000', $res['contentRange'], 'gekappt');
+        $this->assertSame(GalleryService::VIDEO_CHUNK, strlen($res['body']));
+        $this->assertSame('bytes 0-' . (GalleryService::VIDEO_CHUNK - 1) . '/9000000', $gallery->deliverVideo($v1['id'], null, $guestAccess)['contentRange'], 'ohne Range ab dem Anfang');
+        $res = $gallery->deliverVideo($v1['id'], 'bytes=-10', $guestAccess);
+        $this->assertSame(['bytes 8999990-8999999/9000000', '0123456789'], [$res['contentRange'], $res['body']]);
+        $this->assertSame(['status' => 416, 'contentRange' => 'bytes */9000000'], $gallery->deliverVideo($v1['id'], 'bytes=9000000-', $guestAccess));
+
+        // Interne Videos nur für Mitglieder; Bilder und nicht unterstützte Formate gibt es hier nicht.
+        $this->assertSame(401, $gallery->deliverVideo($v2['id'], 'bytes=0-', $guestAccess)['status']);
+        $this->assertSame(403, $gallery->deliverVideo($v2['id'], 'bytes=0-', static fn (): array => [false, true])['status']);
+        $res = $gallery->deliverVideo($v2['id'], 'bytes=0-', static fn (): array => [true, true]);
+        $this->assertSame([206, 'bytes 0-4999/5000', true], [$res['status'], $res['contentRange'], $res['intern']]);
+        $image = array_values(array_filter($album['photos'], static fn (array $p): bool => $p['type'] === 'image'))[0];
+        $this->assertSame(404, $gallery->deliverVideo($image['id'], null, $guestAccess)['status']);
+        $this->assertSame(404, $gallery->deliverVideo((int) $row('VID3')['id'], null, $guestAccess)['status']);
+
+        // „Erneut versuchen“: das nicht unterstützte Format bleibt in der Liste.
+        $gallery->retryFailedNow();
+        $gallery->processPending(60);
+        $this->assertSame([GalleryRepository::FAILED, GalleryService::UNSUPPORTED_VIDEO], [$row('VID3')['status'], $row('VID3')['error']]);
+    }
+
+    /** Update einer bestehenden Datenbank (SQLite und MySQL): vorhandene Bilder bleiben Bilder, Videos kommen dazu. */
+    public function testMigrationAddsVideoColumnsToExistingPhotos(): void
+    {
+        foreach (['sqlite', getenv('KOMPANIE_TEST_MYSQL') ? 'mysql' : null] as $driver) {
+            if ($driver === null) {
+                continue;
+            }
+            $db = TestApp::connection($driver);
+            try {
+                $settings = new \KompanieApp\Core\Tests\Support\MemorySettings();
+                $all = \KompanieApp\Core\Storage\Sql\Migrations::all();
+                (new \KompanieApp\Core\Storage\Sql\Migrator($db, $settings, array_filter($all, static fn (int $v): bool => $v < 30, ARRAY_FILTER_USE_KEY)))->migrate();
+                $this->assertNotContains('media', \KompanieApp\Core\Storage\Sql\Schema::columns($db, 'photos'), $driver);
+                $albumId = $db->insert('albums', ['drive_id' => 'A1', 'year' => '2026', 'title' => 'Sommerfest', 'sort_date' => '2026-06-27 18:00:00', 'synced_at' => '2026-06-28 00:00:00']);
+                $db->insert('photos', ['album_id' => $albumId, 'drive_file_id' => 'IMG1', 'name' => 'a.jpg', 'is_intern' => 0, 'width' => 1200, 'height' => 900, 'md5' => 'm1', 'file_key' => str_repeat('a', 32), 'status' => GalleryRepository::READY, 'error' => '']);
+
+                $app = TestApp::create($db, new FakeUsers(), [], $this->drive->http(), $this->dir, $settings);
+                $this->assertSame(\KompanieApp\Core\Storage\Sql\Migrations::latest(), (new \KompanieApp\Core\Storage\Sql\Migrator($db, $settings))->current(), $driver);
+                $row = $db->selectOne('SELECT media, mime, bytes, duration_ms, status FROM {photos} WHERE drive_file_id = ?', ['IMG1']);
+                $this->assertSame(['image', '', 0, 0, GalleryRepository::READY], [$row['media'], $row['mime'], (int) $row['bytes'], (int) $row['duration_ms'], $row['status']], $driver);
+
+                // Danach ein Video mit großer Datei (über 4 GB, bigint) und Dauer.
+                $db->insert('photos', ['album_id' => $albumId, 'drive_file_id' => 'VID1', 'name' => 'film.mp4', 'md5' => 'v1', 'file_key' => str_repeat('b', 32), 'status' => GalleryRepository::PENDING, 'error' => '', 'media' => 'video', 'mime' => 'video/mp4', 'bytes' => 5000000000, 'duration_ms' => 3600000]);
+                $video = $db->selectOne('SELECT bytes, duration_ms FROM {photos} WHERE drive_file_id = ?', ['VID1']);
+                $this->assertSame([5000000000, 3600000], [(int) $video['bytes'], (int) $video['duration_ms']], $driver);
+                $this->assertSame([2, 1], [(int) $app->gallery()->overview(false)[0]['albums'][0]['count'], $app->gallery()->overview(false)[0]['albums'][0]['video_count']], $driver);
+            } finally {
+                TestApp::dropTables($db);
+            }
+        }
+    }
+
+    public function testByteRange(): void
+    {
+        $this->assertSame([0, 99], GalleryService::byteRange(null, 100));
+        $this->assertSame([0, 99], GalleryService::byteRange('unsinn', 100));
+        $this->assertSame([10, 20], GalleryService::byteRange('bytes=10-20', 100));
+        $this->assertSame([10, 99], GalleryService::byteRange('bytes=10-500', 100), 'Ende auf die Größe begrenzt');
+        $this->assertSame([10, 20], GalleryService::byteRange('bytes=10-20, 30-40', 100), 'erster Bereich');
+        $this->assertSame([90, 99], GalleryService::byteRange('bytes=-10', 100));
+        $this->assertSame([0, 99], GalleryService::byteRange('bytes=-500', 100));
+        $this->assertNull(GalleryService::byteRange('bytes=100-', 100));
+        $this->assertNull(GalleryService::byteRange('bytes=20-10', 100));
+        $this->assertSame([5, PHP_INT_MAX], GalleryService::byteRange('bytes=5-', 0), 'Größe unbekannt');
     }
 
     public function testSameDriveFileTwiceInAlbumIsSyncedOnce(): void

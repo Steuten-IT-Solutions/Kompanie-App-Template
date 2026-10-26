@@ -273,7 +273,7 @@ final class DocumentService
     }
 
     /** 20 MB oder was post_max_size zulässt (Base64 macht die Datei um ein Drittel größer). */
-    private static function requestLimit(): int
+    public static function requestLimit(): int
     {
         $post = self::iniBytes((string) ini_get('post_max_size'));
         return $post > 0 ? min(self::MAX_BYTES, (int) floor(max(0, $post - 64 * 1024) * 3 / 4)) : self::MAX_BYTES;
@@ -423,7 +423,7 @@ final class DocumentService
         return $base === '' ? 'Dokument' : $base;
     }
 
-    private static function formatBytes(int $bytes): string
+    public static function formatBytes(int $bytes): string
     {
         return $bytes >= 1024 * 1024
             ? str_replace('.', ',', (string) round($bytes / 1024 / 1024, 1)) . ' MB'

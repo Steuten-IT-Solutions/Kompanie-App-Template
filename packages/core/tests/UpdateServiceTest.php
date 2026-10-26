@@ -38,6 +38,8 @@ final class UpdateServiceTest extends TestCase
     public bool $failInstall = false;
     public bool $autoAllowed = true;
     public array $backups = [];
+    /** Meldung, mit der die Sicherung vor dem Update abbricht (null: klappt) */
+    public ?string $backupFails = null;
     private string $dir = '';
 
     protected function setUp(): void
@@ -121,6 +123,16 @@ final class UpdateServiceTest extends TestCase
             {
                 $this->t->backups[] = 1;
                 return ['format' => 'kompanie-app-backup'];
+            }
+
+            public function exportTo($out): void
+            {
+                $this->t->backups[] = 1;
+                if ($this->t->backupFails !== null) {
+                    fwrite($out, '{"format":"kompanie-app-backup","tables":{');
+                    throw new \RuntimeException($this->t->backupFails);
+                }
+                fwrite($out, (string) json_encode(['format' => 'kompanie-app-backup']));
             }
 
             public function import(string $json): void
@@ -279,6 +291,26 @@ final class UpdateServiceTest extends TestCase
         $this->assertSame([], $this->backups, 'gleiche Datenbank: keine Sicherung nötig');
         $s->install('1.0.0.3');
         $this->assertCount(1, $this->backups, 'neue Migration: vorher sichern');
+    }
+
+    public function testFailedBackupStopsTheUpdateAndLeavesNoPartialFile(): void
+    {
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2'], [], ['1.0.0.2' => ['schema' => 3]]);
+        @mkdir($this->dir . '/i/sicherungen', 0777, true);
+        file_put_contents($this->dir . '/i/sicherungen/vor-update-000001-20260101-000000-1.0.0.0-abc.json.tmp', '{"halb');
+        $this->backupFails = 'Die Sicherung ließ sich nicht schreiben (Speicherplatz?).';
+        $s = $this->service('1.0.0.1');
+        $this->assertThrows(fn () => $s->install('1.0.0.2'), 'Sicherung vor dem Update: Die Sicherung ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');
+        $this->assertSame([], $this->installed, 'nicht eingespielt');
+        $this->assertSame([], glob($this->dir . '/i/sicherungen/vor-update-*') ?: [], 'keine halbe Sicherung, alte Reste entfernt');
+
+        $this->backupFails = null;
+        $s->install('1.0.0.2');
+        $files = glob($this->dir . '/i/sicherungen/vor-update-*') ?: [];
+        $this->assertCount(1, $files);
+        $this->assertStringEndsWith('.json', $files[0]);
+        $this->assertSame(['format' => 'kompanie-app-backup'], json_decode((string) file_get_contents($files[0]), true), 'Stück für Stück geschrieben (exportTo)');
+        $this->assertSame('600', substr(sprintf('%o', fileperms($files[0])), -3));
     }
 
     public function testBackupsKeepTheNewest(): void

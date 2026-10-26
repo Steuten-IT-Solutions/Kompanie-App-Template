@@ -9,9 +9,13 @@ use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\AttachmentService;
+use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\PersonName;
+use KompanieApp\Core\Domain\RichText;
+use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
@@ -37,6 +41,11 @@ final class Api
     private const MAINTENANCE_OPEN = ['/config', '/auth/login', '/auth/logout', '/auth/csrf'];
     /** In der Vorschau (Issue #63) trotz „nur ansehen“ erlaubt: Abmelden (die App beendet dabei auch die Vorschau). */
     public const PREVIEW_OPEN = ['/auth/logout'];
+    /**
+     * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
+     * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
+     */
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/key', '/push/status', '/me/push/status', '/reports/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -100,7 +109,11 @@ final class Api
             }
             $this->authorize($route);
             $result = ($route->handler)($request);
-            return $result instanceof Response ? $result : new Response($result);
+            $response = $result instanceof Response ? $result : new Response($result);
+            if ($response->status < 400 && !in_array($route->path, self::NOT_TRACKED, true)) {
+                $this->app->activity()->record($this->app->authContext->currentUser(), $route->feature ?? 'app', self::action($route));
+            }
+            return $response;
         } catch (ApiError $e) {
             return Response::error($e);
         } catch (\Throwable $e) {
@@ -111,6 +124,20 @@ final class Api
             $this->app->telemetry()->record($db ? Code::DbError : Code::ServerError, Detail::of($kind, $route->method, $route->path), Detail::describe($e));
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
+    }
+
+    /** Art der Nutzung einer Route für die Nutzungsauswertung (Domain\ActivityService::ACTIONS). */
+    private static function action(Route $route): string
+    {
+        if (str_ends_with($route->path, '/vote')) {
+            return 'vote';
+        }
+        return match ($route->method) {
+            'POST' => 'create',
+            'PUT', 'PATCH' => 'update',
+            'DELETE' => 'delete',
+            default => 'view',
+        };
     }
 
     /**
@@ -178,7 +205,7 @@ final class Api
         foreach (array_values($people) as $i => $p) {
             $p = is_array($p) ? $p : [];
             try {
-                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken);
+                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken, $this->user());
                 $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
@@ -276,7 +303,52 @@ final class Api
         }
     }
 
-    /** Dienstgrade in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    /**
+     * Dienstgrad in den Mitgliedsdetails: Bezeichnung und Abzeichen wie in der Mitgliederliste für alle mit Zugang;
+     * Stand und Verlauf nur, wer Dienstgrade verwaltet.
+     *
+     * @return array<string, mixed>
+     */
+    private function memberRank(int $userId): array
+    {
+        if (!$this->app->features()->enabled('ranks')) {
+            return [];
+        }
+        $status = $this->showRanks() ? $this->app->ranks()->status($userId) : null;
+        $rank = $status !== null ? $status['rank'] : $this->app->ranks()->current($userId);
+        return ['rank_title' => $rank['title'] ?? null, 'rank_badge_url' => $rank['badge_url'] ?? null]
+            + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
+    }
+
+    /**
+     * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
+     * Dienstgrad (mit Abzeichen) und Titel, bei Anwärtern der Name ihrer Rolle (candidate_role). Sonst keine Rollen,
+     * Punkte, Strafen oder Kontodaten. Geburtstag (mit dem Bereich Geburtstage) und Eintritt (join_year, join_date) nur,
+     * soweit die Person sie dem Betrachter zeigt (ProfileVisibility), sonst null. Mit $entries dieselben Angaben zu anderen Personen (Ehemalige, ohne Geburtstag und Eintritt: Sie haben
+     * ihre eigenen Daten).
+     * Öffentlich, damit der Shortcode [kompanie_mitglieder] dieselbe Liste zeigt.
+     *
+     * @param list<array<string, mixed>>|null $entries
+     * @return list<array<string, mixed>>
+     */
+    public function directory(?array $entries = null): array
+    {
+        $a = $this->app;
+        $photos = $a->memberPhotos()->urls();
+        $ranks = $a->features()->enabled('ranks') ? $a->ranks()->assigned() : null;
+        $titles = $a->features()->enabled('titles') ? $a->titles()->byUser() : null;
+        $viewer = $a->authContext->currentUser();
+        $birthdays = $entries === null && $a->features()->enabled('birthdays') ? $a->birthdays()->shownTo($viewer) : null;
+        $joined = $entries === null ? $a->joinYears()->shownTo($viewer) : null;
+        return array_map(static fn (array $m): array => $m
+            + ['photo_url' => $photos[$m['id']] ?? null]
+            + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
+            + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
+            + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
+            + ($joined !== null ? ['join_year' => $joined[$m['id']]['year'] ?? null, 'join_date' => $joined[$m['id']]['date'] ?? null] : []), $entries ?? $a->members()->directory());
+    }
+
+    /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showRanks(): bool
     {
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
@@ -301,6 +373,33 @@ final class Api
         if ($needed !== [] && !array_filter($needed, static fn (Cap $c): bool => $user->can($c))) {
             throw ApiError::forbidden($route->denyMessage);
         }
+    }
+
+    /**
+     * Konto für die Signatur: null (bzw. 403 mit $require), wenn es keine einrichten kann.
+     */
+    private function signatureUser(bool $require = false): ?User
+    {
+        $user = $this->user();
+        if (SignatureService::allowed($user)) {
+            return $user;
+        }
+        if ($require) {
+            throw ApiError::forbidden('Eine Signatur können Mitglieder und Anwärter einrichten.');
+        }
+        return null;
+    }
+
+    /** @return array{board: bool, available: bool, email: bool} Mails vom Brett: gewünscht, möglich, Adresse hinterlegt */
+    private function mailSettings(): array
+    {
+        $user = $this->user();
+        $recipient = BoardService::isRecipient($user);
+        return [
+            'board' => $recipient && $this->app->boardMail()->wants($user->id),
+            'available' => $recipient && $this->app->boardMail()->available(),
+            'email' => trim((string) ($this->app->users->profile($user->id)['email'] ?? '')) !== '',
+        ];
     }
 
     private function user(): User
@@ -353,6 +452,8 @@ final class Api
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
+            // Datensicherung als Datei herunterladen (Domain\BackupDownload); nur für Admins, nicht in der Vorschau
+            'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
             // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
             'preview' => $a->preview()->info(),
         ];
@@ -380,18 +481,18 @@ final class Api
         $P = Route::PUBLIC;
         $L = Route::LOGIN;
         $denyMember = 'Dieser Bereich ist nur für Mitglieder.';
-        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Anwärter.';
+        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
         $denyManage = 'Dafür fehlen dir die Rechte.';
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
-        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Anwärter.';
+        $denyBoard = 'Das Schwarze Brett ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
         $denyPolls = 'Umfragen sind nur für Mitglieder.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
-        $manage = [Cap::ManagePoints, Cap::ManagePenalties, Cap::ManageRanks, Cap::ManageTitles, Cap::CreateUsers, Cap::PromoteUsers];
+        $manage = Cap::memberList();
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
 
         return [
@@ -399,11 +500,12 @@ final class Api
             new Route('GET', '/config', $P, fn () => $this->config()),
             new Route('GET', '/auth/csrf', $L, fn () => ['token' => $a->authenticator->csrfToken()]),
             new Route('POST', '/auth/login', $P, function (Request $r) use ($a) {
-                $a->authenticator->login(
+                $user = $a->authenticator->login(
                     is_string($r->input('username')) ? trim($r->input('username')) : '',
                     is_string($r->input('password')) ? $r->input('password') : '',
                     $r->input('remember') === null ? true : Input::bool($r->input('remember')),
                 );
+                $a->activity()->record($user, 'login', 'login');
                 return $this->config();
             }),
             new Route('POST', '/auth/logout', $L, function () use ($a) {
@@ -430,6 +532,16 @@ final class Api
                 $a->birthdays()->remove($this->user()->id);
                 return ['birthday' => null];
             }, 'birthdays', $denyBirthdays),
+            // Eigene E-Mail-Adresse und Handynummer (Meins → Konto); eine neue E-Mail-Adresse nur mit dem aktuellen Passwort.
+            new Route('GET', '/me/account', $L, fn () => $a->members()->ownAccount($this->user())),
+            new Route('PATCH', '/me/account', $L, fn (Request $r) => $a->members()->updateOwnAccount($this->user(), $r->body)),
+            // Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
+            new Route('GET', '/me/join-year', Cap::Member, fn () => ['join_year' => $a->joinYears()->of($this->user()->id)], null, $denyMember),
+            new Route('PUT', '/me/join-year', Cap::Member, fn (Request $r) => ['join_year' => $a->joinYears()->saveOwn($this->user(), $r->body)], null, $denyMember),
+            new Route('DELETE', '/me/join-year', Cap::Member, function () use ($a) {
+                $a->joinYears()->remove($this->user()->id);
+                return ['join_year' => null];
+            }, null, $denyMember),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
                 return ['changed' => true];
@@ -496,6 +608,7 @@ final class Api
             // Punktekatalog
             new Route('GET', '/catalog', $L, fn (Request $r) => $a->scores()->catalog($r->queryFlag('all') && $this->can(Cap::ManagePoints)), 'points'),
             new Route('POST', '/catalog', Cap::ManagePoints, fn (Request $r) => Response::created($a->scores()->createCatalogItem($r->body)), 'points', $denyManage),
+            new Route('PUT', '/catalog/order', Cap::ManagePoints, fn (Request $r) => $a->scores()->reorderCatalog($r->input('ids')), 'points', $denyManage),
             new Route('PATCH', '/catalog/{id}', Cap::ManagePoints, fn (Request $r) => $a->scores()->updateCatalogItem($r->id(), $r->body), 'points', $denyManage),
 
             // Dienstgrade: Liste für Mitglieder, Pflege, Befördern und Degradieren, Beförderungsübersicht
@@ -524,6 +637,49 @@ final class Api
             }, 'titles', $denyRights),
             new Route('PUT', '/members/{id}/titles', Cap::ManageTitles, fn (Request $r) => ['titles' => $a->titles()->assign($r->id(), $r->input('title_ids'))], 'titles', $denyRights),
 
+            // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
+            new Route('GET', '/offices', $P, fn () => $a->offices()->overview($a->authContext->currentUser()), 'offices'),
+            new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->input('title'))), 'offices', $denyRights),
+            new Route('PUT', '/office-groups/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderGroups($r->input('ids')), 'offices', $denyRights),
+            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->input('title')), 'offices', $denyRights),
+            new Route('DELETE', '/office-groups/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteGroup($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+            new Route('POST', '/offices', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createOffice($r->body)), 'offices', $denyRights),
+            new Route('PUT', '/offices/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderOffices($r->input('ids')), 'offices', $denyRights),
+            // Import (Ersterfassung): ohne apply nur die Vorschau
+            new Route('POST', '/offices/import', Cap::ManageOffices, fn (Request $r) => $a->offices()->import(
+                $r->input('csv'),
+                $r->input('link') === null ? true : Input::bool($r->input('link')),
+                Input::bool($r->input('apply')),
+            ), 'offices', $denyRights),
+            new Route('PATCH', '/offices/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateOffice($r->id(), $r->body), 'offices', $denyRights),
+            new Route('DELETE', '/offices/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteOffice($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+            new Route('GET', '/offices/{id}/title-preview', Cap::ManageOffices, fn (Request $r) => $a->offices()->linkPreview($r->id(), $r->query['title_id'] ?? null), 'offices', $denyRights),
+            new Route('POST', '/offices/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createTerm($r->id(), $r->body)), 'offices', $denyRights),
+            new Route('PATCH', '/office-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateTerm($r->id(), $r->body), 'offices', $denyRights),
+            new Route('DELETE', '/office-terms/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteTerm($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
+
+            // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
+            new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
+            new Route('POST', '/lists', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->create($this->user(), $r->body)), 'lists', $denyRights),
+            new Route('GET', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->detail($this->user(), $r->id()), 'lists', $denyRights),
+            new Route('PUT', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->save($this->user(), $r->id(), $r->body), 'lists', $denyRights),
+            new Route('DELETE', '/lists/{id}', Cap::ManageLists, function (Request $r) use ($a) {
+                $a->lists()->delete($r->id());
+                return ['deleted' => true];
+            }, 'lists', $denyRights),
+            new Route('POST', '/lists/{id}/copy', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->copy($this->user(), $r->id())), 'lists', $denyRights),
+            // „Mitglieder aktualisieren“: ohne apply nur die Übersicht, was sich ändert
+            new Route('POST', '/lists/{id}/sync-members', Cap::ManageLists, fn (Request $r) => $a->lists()->syncMembers($this->user(), $r->id(), Input::bool($r->input('apply'))), 'lists', $denyRights),
+
             // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
             new Route('GET', '/documents', Cap::Member, fn () => $a->documents()->list($this->user()), 'documents', $denyMember),
             new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),
@@ -545,23 +701,83 @@ final class Api
             // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
             new Route('GET', '/board', [Cap::Member, Cap::Calendar, Cap::PostBoard], fn () => $a->board()->list($this->user()), 'board', $denyBoard),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
-                // push: ob Mitglieder und Anwärter benachrichtigt werden (Standard ja, Haken beim Schreiben)
+                // push: ob Mitglieder und Anwärter benachrichtigt werden; mail: ob sie eine Mail bekommen (Issue #172).
+                // Beides Standard ja (Haken beim Schreiben); ohne eingerichteten Mailversand ist mail Standard nein.
                 $push = $r->input('push') ?? true;
+                $mail = $r->input('mail') ?? $a->boardMail()->available();
                 if (!is_bool($push)) {
                     throw ApiError::invalid('push muss true oder false sein.');
                 }
-                $item = $a->board()->create($this->user(), $r->input('text'));
+                if (!is_bool($mail)) {
+                    throw ApiError::invalid('mail muss true oder false sein.');
+                }
+                if ($mail && !$a->boardMail()->available()) {
+                    throw ApiError::invalid($a->boardMail()->info()['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
+                }
+                // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
+                if ($mail && is_string($r->input('title')) && is_string($r->input('text'))) {
+                    $files = $a->attachments()->resolve($this->user(), $r->input('attachments'), AttachmentService::OWNER_BOARD);
+                    $a->boardMail()->checkSize(Text::line($r->input('title')), RichText::sanitize($r->input('text')), $this->user(), $files);
+                }
+                $item = $a->board()->create($this->user(), $r->body);
                 $author = $this->user()->id;
                 if ($push) {
                     $this->notify(static fn () => $a->pushTriggers()->boardPosted($item, $author));
                 }
+                if ($mail) {
+                    $user = $this->user();
+                    $this->notify(static fn () => $a->boardMail()->queue((int) $item['id'], $user));
+                    $item = $a->board()->one((int) $item['id'], $user);
+                }
                 return Response::created($item);
             }, 'board', $denyRights),
-            new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($r->id(), $r->input('text')), 'board', $denyRights),
+            // Haken „E-Mail senden“: eingerichtet? Wie viele Empfänger?
+            new Route('GET', '/board/mail', Cap::PostBoard, fn () => $a->boardMail()->info(), 'board', $denyRights),
+            // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
+            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended(), 'board', $denyRights),
+            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id()), 'board', $denyRights),
+            new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($this->user(), $r->id(), $r->body), 'board', $denyRights),
             new Route('DELETE', '/board/{id}', Cap::PostBoard, function (Request $r) use ($a) {
-                $a->board()->delete($r->id());
+                $a->board()->delete($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'board', $denyRights),
+
+            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): Empfänger wählen (Rollen, Mitglieder, freie
+            // Adressen je An, Cc und Bcc), Vorschau der Empfänger, senden (Versand im Hintergrund), Verlauf mit Protokoll
+            new Route('GET', '/mails/options', Cap::SendMail, fn () => $a->mailings()->options(), 'mail', $denyRights),
+            new Route('POST', '/mails/preview', Cap::SendMail, fn (Request $r) => $a->mailings()->preview($r->body), 'mail', $denyRights),
+            new Route('GET', '/mails', Cap::SendMail, fn () => $a->mailings()->list(), 'mail', $denyRights),
+            new Route('POST', '/mails', Cap::SendMail, fn (Request $r) => Response::created($a->mailings()->send($this->user(), $r->body)), 'mail', $denyRights),
+            new Route('GET', '/mails/{id}', Cap::SendMail, fn (Request $r) => $a->mailings()->detail($r->id()), 'mail', $denyRights),
+
+            // Dateianhänge (Schwarzes Brett, E-Mails): hochladen als Entwurf des Kontos, Höchstgröße je Datei
+            new Route('GET', '/attachments/limits', [Cap::PostBoard, Cap::SendMail], fn () => ['max_bytes' => AttachmentService::maxBytes()]),
+            new Route('POST', '/attachments', [Cap::PostBoard, Cap::SendMail], fn (Request $r) => Response::created($a->attachments()->upload($this->user(), $r->input('file')))),
+
+            // Formatierte Inhalte (Issue #172): Bilder hochladen (Entwurf des Kontos), Grenzen des Servers
+            new Route('GET', '/rich-images/limits', $L, fn () => $a->richImages()->limits()),
+            new Route('POST', '/rich-images', $L, function (Request $r) use ($a) {
+                if (!SignatureService::allowed($this->user())) {
+                    throw ApiError::forbidden('Bilder in formatierten Texten können nur Mitglieder und Anwärter hochladen.');
+                }
+                return Response::created($a->richImages()->upload($this->user(), $r->input('file')));
+            }),
+            // Signatur (Issue #172): Mitglieder und Anwärter
+            new Route('GET', '/me/signature', $L, fn () => ['signature' => $this->signatureUser() ? $a->signatures()->get($this->user()) : null]),
+            new Route('PUT', '/me/signature', $L, fn (Request $r) => ['signature' => $a->signatures()->save($this->signatureUser(true), $r->input('content'))]),
+            new Route('DELETE', '/me/signature', $L, function () use ($a) {
+                $a->signatures()->delete($this->signatureUser(true));
+                return ['signature' => null];
+            }),
+            // Mails vom Brett empfangen (Issue #172): Standard an, abschaltbar
+            new Route('GET', '/me/mail', $L, fn () => $this->mailSettings()),
+            new Route('PUT', '/me/mail', $L, function (Request $r) use ($a) {
+                if (!BoardService::isRecipient($this->user())) {
+                    throw ApiError::forbidden('Mails vom Brett bekommen nur Mitglieder und Anwärter.');
+                }
+                $a->boardMail()->setWants($this->user()->id, $r->input('board'));
+                return $this->mailSettings();
+            }),
 
             // Umfragen (Issue #4): Mitglieder lesen und antworten (nur solange die Umfrage läuft), manage_polls verwaltet;
             // nur beim Anlegen eine Benachrichtigung. Antworten anonymer Umfragen nie mit Namen oder IDs (PollService).
@@ -599,6 +815,11 @@ final class Api
                 $a->birthdays()->removeFor($r->id());
                 return ['birthday' => null];
             }, 'birthdays', $denyRights),
+            new Route('PUT', '/members/{id}/join-year', Cap::CreateUsers, fn (Request $r) => ['join_year' => $a->joinYears()->saveFor($this->user(), $r->id(), $r->body)], null, $denyRights),
+            new Route('DELETE', '/members/{id}/join-year', Cap::CreateUsers, function (Request $r) use ($a) {
+                $a->joinYears()->removeFor($r->id());
+                return ['join_year' => null];
+            }, null, $denyRights),
 
             // Inventar (Issue #6): nur mit manage_inventory (Mitglieder ohne das Recht sehen es nicht); optional reason bei
             // allen Änderungen. Genau ein Verlaufseintrag je Änderung und betroffenem Eintrag (InventoryService).
@@ -629,6 +850,13 @@ final class Api
                 return ['deleted' => true];
             }, 'attendance', $denyRights),
 
+            // Mitgliederliste (Bereich directory, Issue #112: öffentlich, auch ohne Anmeldung): nur Namen, Fotos, Dienstgrade und
+            // Titel, dazu Geburtstag und Eintritt, soweit die Person sie dem Betrachter zeigt
+            new Route('GET', '/directory', $P, fn () => $this->directory(), 'directory'),
+            new Route('GET', '/directory/counts', $P, fn () => $a->members()->directoryCounts($a->attendance()->groupMap()), 'directory'),
+            // Ehemalige (Tab neben den Ämtern): wie die Liste, dazu nur Gründungsmitglied, Eintritt und Ausscheiden, kein Grund
+            new Route('GET', '/directory/former', $P, fn () => $this->directory($a->formerMembers()->directory()), 'directory'),
+
             // Mitglieder
             new Route('GET', '/members', $manage, function (Request $r) use ($a) {
                 // Wer Dienstgrade bzw. Titel verwaltet, sieht auch frühere Mitglieder, die noch welche haben.
@@ -636,10 +864,16 @@ final class Api
                     $this->showRanks() ? array_keys($a->ranks()->repository()->assignments()) : [],
                     $this->showTitles() ? array_keys($a->titles()->repository()->assignments()) : [],
                 );
+                // Ehemalige stehen in ihrer eigenen Liste (GET /members/former), auch wenn sie noch Dienstgrad oder Titel haben.
+                $holders = array_values(array_diff($holders, $a->formerMembers()->ids()));
                 $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
+                // Gruppe für den Zähler über der Liste, wie in der Anwesenheit (Einstellungen → Rollen); Gäste ohne.
+                $groups = $a->attendance()->groupMap();
+                $list = array_map(static fn (array $m): array => $m + ['group' => $groups[$m['level']] ?? null], $list);
                 $photos = $a->memberPhotos()->urls();
                 $list = array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $list);
-                if ($this->showRanks()) {
+                // Dienstgrad mit Abzeichen sieht jede Person mit Zugang zur Liste, nicht nur wer Dienstgrade verwaltet.
+                if ($a->features()->enabled('ranks')) {
                     $ranks = $a->ranks()->assigned();
                     $list = array_map(static fn (array $m): array => $m + [
                         'rank_title' => $ranks[$m['id']]['title'] ?? null,
@@ -650,16 +884,49 @@ final class Api
                     $titles = $a->titles()->byUser();
                     $list = array_map(static fn (array $m): array => $m + ['titles' => $titles[$m['id']] ?? []], $list);
                 }
+                // Eintritt (zum Sortieren), wie in den Mitgliedsdetails nur für create_users
+                if ($this->user()->can(Cap::CreateUsers)) {
+                    $joined = $a->joinYears()->repository()->all();
+                    $list = array_map(static fn (array $m): array => $m + ['joined_on' => isset($joined[$m['id']]) ? (string) $joined[$m['id']] : ''], $list);
+                }
                 return $list;
             }, null, $denyManage),
             new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
                 // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
                 + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
-                + ($this->showRanks() ? ['rank' => $a->ranks()->status($r->id()), 'rank_history' => $a->ranks()->history($r->id())] : [])
+                + $this->memberRank($r->id())
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
                 // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
                 // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : []), null, $denyManage),
+                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
+                // Eintrittsjahr mit Anzeige, ebenso nur für create_users
+                + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
+                // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
+                + ['former' => $a->formerMembers()->of($r->id())], null, $denyManage),
+            // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
+            new Route('GET', '/members/former', Cap::CreateUsers, function () use ($a) {
+                $photos = $a->memberPhotos()->urls();
+                return array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $a->formerMembers()->list($this->user()));
+            }, null, $denyUsers),
+            // Eine ehemalige Person neu anlegen (Konto ohne Anmeldung), wie beim Mitglied mit Geburtstag und Foto
+            new Route('POST', '/members/former', Cap::CreateUsers, function (Request $r) use ($a) {
+                $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
+                $photo = $this->photoInput($r->body['photo'] ?? null);
+                $created = $a->formerMembers()->create($this->user(), $r->body);
+                $this->storeBirthday($created['id'], $birthday, $created);
+                $this->storePhoto($created['id'], $photo, $created);
+                return Response::created($created);
+            }, null, $denyUsers),
+            // Import (Ersterfassung, z. B. aus einer Chronik): ohne apply nur die Vorschau
+            new Route('POST', '/members/former/import', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            // Mitglieder aus einer Tabelle (CSV, in der App auch aus Excel gelesen), mit Anwärtern und Ehemaligen: ohne apply
+            // nur die Vorschau; mit apply stehen die Startpasswörter der neuen aktiven Konten in der Antwort
+            new Route('POST', '/members/import', Cap::CreateUsers, fn (Request $r) => $a->memberImport()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            // Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181)
+            new Route('GET', '/members/{id}/former/offices', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->officesPreview($this->user(), $r->id(), $r->query['left_on'] ?? ''), null, $denyUsers),
+            new Route('PUT', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('PATCH', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('DELETE', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyUsers),
             // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
             // Rechte einzelner Personen zusätzlich zu ihren Rollen geben oder entziehen
@@ -685,7 +952,7 @@ final class Api
                 }
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
                 $photo = $this->photoInput($r->body['photo'] ?? null);
-                $created = $a->members()->create($r->body);
+                $created = $a->members()->create($r->body, $this->user());
                 try {
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
                 } catch (\Throwable $e) {
@@ -700,6 +967,10 @@ final class Api
             new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
 
             // Einstellungen (Admins)
+            // Nutzungsauswertung (Issue #175): nur Admins (view_activity); Erfassung je Person schalten mit den Einstellungen.
+            new Route('GET', '/admin/activity', Cap::ViewActivity, fn (Request $r) => $a->activity()->overview($r->query['from'] ?? null, $r->query['to'] ?? null), null, $denySettings),
+            new Route('GET', '/admin/activity/entries', Cap::ViewActivity, fn (Request $r) => $a->activity()->entries($r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null), null, $denySettings),
+            new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
@@ -715,11 +986,21 @@ final class Api
                 return $a->push()->adminStatus();
             }, null, $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
+            // E-Mail (Issue #172): Kompanieadresse und SMTP, Verbindung prüfen, Testmail
+            new Route('GET', '/admin/mail', Cap::ManageSettings, fn () => $a->mail()->describe(), null, $denySettings),
+            new Route('PATCH', '/admin/mail', Cap::ManageSettings, fn (Request $r) => $a->mail()->update($r->body), null, $denySettings),
+            new Route('POST', '/admin/mail/check', Cap::ManageSettings, fn () => $a->mail()->check() + ['settings' => $a->mail()->describe()], null, $denySettings),
+            new Route('POST', '/admin/mail/test', Cap::ManageSettings, fn (Request $r) => $a->mail()->sendTest($this->user(), $r->input('to')), null, $denySettings),
             // Rollen (Issue #28): nur Admins (manage_settings lässt sich keiner anderen Rolle geben)
             new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $a->roles()->describe(), null, $denySettings),
             new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->create($r->body);
                 return Response::created($a->roles()->describe());
+            }, null, $denySettings),
+            // Reihenfolge der eigenen Rollen (Einstellungen → Rollen, per Ziehen)
+            new Route('PUT', '/admin/roles/order', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->roles()->reorder($r->input('keys'));
+                return $a->roles()->describe();
             }, null, $denySettings),
             new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->update((string) $r->params['key'], $r->body);
@@ -812,6 +1093,19 @@ final class Api
                 }
                 return ['restored' => true];
             }, null, $denySettings),
+            new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
+                $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));
+                $a->scheduleTasks();
+                return $status;
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/drive/upload', Cap::ManageSettings, function () use ($a) {
+                try {
+                    return $a->backupUpload()->upload();
+                } catch (\RuntimeException $e) {
+                    throw $e instanceof ApiError ? $e : new ApiError(502, 'upload_failed', $e->getMessage());
+                }
+            }, null, $denySettings),
             new Route('POST', '/admin/setup/done', Cap::ManageSettings, function () use ($a) {
                 $a->settings->set(self::SETUP_SETTING, true);
                 return ['done' => true];
@@ -837,6 +1131,8 @@ final class Api
                 $this->notify(static fn () => $a->pushTriggers()->penaltiesAdded($rows));
                 return Response::created($rows);
             }, 'penalties', $denyManage),
+            // Alle offenen Strafen (Verwaltung → Strafen: Karte „Offen gesamt“), mit Namen
+            new Route('GET', '/penalties/open', Cap::ManagePenalties, fn () => $a->scores()->openPenalties(), 'penalties', $denyManage),
             new Route('PATCH', '/penalties/{id}', Cap::ManagePenalties, fn (Request $r) => $a->scores()->setPenaltyStatus($r->id(), $r->input('status'), $this->user()->id), 'penalties', $denyManage),
             new Route('DELETE', '/penalties/{id}', Cap::ManagePenalties, function (Request $r) use ($a) {
                 $a->scores()->cancelPenalty($r->id(), $this->user()->id);

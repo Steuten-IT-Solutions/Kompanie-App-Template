@@ -49,7 +49,7 @@
       "additionalProperties": false,
       "properties": {
         "roles": {
-          "description": "Namen der festen Rollen (Gast, Anwärter, Mitglied, Admin) bei der Ersteinrichtung. Danach benennt und verwaltet der Admin die Rollen in der App (Einstellungen → Rollen); spätere Änderungen hier wirken nicht mehr. organizer und manager gelten nur für Installationen, die diese früheren Rollen schon hatten.",
+          "description": "Namen der festen Rollen (Gast, Mitglied, Admin) bei der Ersteinrichtung. Danach benennt und verwaltet der Admin die Rollen in der App (Einstellungen → Rollen); spätere Änderungen hier wirken nicht mehr. organizer, manager und candidate (Anwärter) gelten nur für Installationen, die diese früheren festen Rollen schon hatten; neue Installationen legen Anwärter als eigene Rolle an.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -189,6 +189,34 @@
             "inventory": {
               "type": "string",
               "default": "Inventar",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "directory": {
+              "type": "string",
+              "default": "Mitglieder",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "offices": {
+              "type": "string",
+              "default": "Ämter",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "lists": {
+              "type": "string",
+              "default": "Listen",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "mail": {
+              "type": "string",
+              "default": "E-Mails",
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"

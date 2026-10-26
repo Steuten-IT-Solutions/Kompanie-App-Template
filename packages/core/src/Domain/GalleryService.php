@@ -16,8 +16,13 @@ use KompanieApp\Core\Storage\GalleryRepository;
 /**
  * Galerie aus Google Drive.
  *
- * Ordnerstruktur:  Galerie → Jahr → Album → Bilder
- *                                          └ intern → Bilder nur für Mitglieder
+ * Ordnerstruktur:  Galerie → Jahr → Album → Bilder und Videos
+ *                                          └ intern → Bilder und Videos nur für Mitglieder
+ *
+ * Videos (MP4 und WebM, Issue #182) werden nicht kopiert: Die App reicht sie beim Abspielen in Ausschnitten aus Drive
+ * durch (deliverVideo, Range), interne erst nach Prüfung der Mitgliedschaft. Der Ordner in Drive bleibt privat.
+ * Aufbereitet wird nur ihr Vorschaubild (Drives thumbnailLink). Andere Videoformate stehen für Admins in der Liste der
+ * fehlgeschlagenen Bilder („nicht unterstützt“).
  *
  * Ein Abgleich (stündlich oder per Knopf) aktualisiert den Index. Danach wird
  * jedes Bild einmalig heruntergeladen und in zwei Größen auf dem eigenen Server
@@ -52,6 +57,24 @@ final class GalleryService
     private const IMAGE_LOCKS = 64;
     public const INTERN_FOLDER = 'intern';
     public const SIZES = ['thumb' => 400, 'large' => 1600];
+    /**
+     * Originalauflösung für die Großansicht (die 1600er erscheint sofort, diese wird nachgeladen). Erst erzeugt, wenn
+     * jemand das Bild öffnet: aus dem Original in Drive, neu als JPEG ohne Metadaten (kein GPS-Ort), höchstens
+     * ORIGINAL_EDGE Pixel. So belegen nur angesehene Bilder Platz, und der Abgleich bleibt so schnell wie bisher.
+     */
+    public const ORIGINAL = 'original';
+    public const ORIGINAL_EDGE = 8192;
+    public const ORIGINAL_QUALITY = 90;
+    /** Merker „Original wird erzeugt oder ist gescheitert“; erst nach so vielen Sekunden wieder versuchen. */
+    public const ORIGINAL_RETRY = 86400;
+    /** Adresse zum Abspielen eines Videos (über die App, auch bei öffentlichen). */
+    public const VIDEO = 'video';
+    /** Höchstens so viele Bytes je Anfrage aus Drive: Jede Anfrage bleibt kurz, der Browser fordert den Rest nach. */
+    public const VIDEO_CHUNK = 4 * 1024 * 1024;
+    /** Höchstens so viele Ausschnitte gleichzeitig aus Drive; weitere warten kurz (VIDEO_WAIT Sekunden). */
+    public const VIDEO_SLOTS = 6;
+    public const VIDEO_WAIT = 5;
+    public const UNSUPPORTED_VIDEO = 'Videoformat nicht unterstützt (nur MP4 und WebM).';
     /** So oft wird ein Bild aufbereitet, bevor es als dauerhaft fehlerhaft gilt. */
     public const MAX_ATTEMPTS = 5;
     /** Höchstens so viele fehlgeschlagene Bilder zeigt Einstellungen → Galerie. */
@@ -154,10 +177,10 @@ final class GalleryService
                 foreach (array_filter($this->drive->listChildren($year['id']), [DriveClient::class, 'isFolder']) as $album) {
                     $images = [];
                     foreach ($this->drive->listChildren($album['id']) as $f) {
-                        if (DriveClient::isImage($f)) {
+                        if (self::isMedia($f)) {
                             $images[] = [$f, 0];
                         } elseif (DriveClient::isFolder($f) && mb_strtolower(trim((string) $f['name'])) === self::INTERN_FOLDER) {
-                            foreach (array_filter($this->drive->listChildren($f['id']), [DriveClient::class, 'isImage']) as $img) {
+                            foreach (array_filter($this->drive->listChildren($f['id']), [self::class, 'isMedia']) as $img) {
                                 $images[] = [$img, 1];
                             }
                         }
@@ -230,6 +253,12 @@ final class GalleryService
         return $stats;
     }
 
+    /** Bild oder Video (auch nicht abspielbare: die kommen in die Liste für Admins). */
+    public static function isMedia(array $f): bool
+    {
+        return DriveClient::isImage($f) || DriveClient::isVideo($f);
+    }
+
     private function fail(string $message): \RuntimeException
     {
         $status = $this->status();
@@ -293,22 +322,36 @@ final class GalleryService
                 'is_intern' => $intern,
                 'taken_at' => self::driveTime($meta['time'] ?? ''),
             ];
+            $video = DriveClient::isVideo($f);
+            if ($video) {
+                $meta = $f['videoMediaMetadata'] ?? [];
+                $data += [
+                    'media' => 'video',
+                    'mime' => mb_substr((string) $f['mimeType'], 0, 100),
+                    'bytes' => max(0, (int) ($f['size'] ?? 0)),
+                    'duration_ms' => max(0, (int) ($meta['durationMillis'] ?? 0)),
+                ];
+            } else {
+                $data['media'] = 'image';
+            }
+            // Nicht abspielbare Videos: gleich als fehlgeschlagen (Liste für Admins), ohne weitere Versuche.
+            $state = $video && !DriveClient::isPlayableVideo((string) $f['mimeType'])
+                ? ['status' => GalleryRepository::FAILED, 'error' => self::UNSUPPORTED_VIDEO, 'attempts' => self::MAX_ATTEMPTS]
+                : ['status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
             // Maße aus Drive nur für neue oder geänderte Bilder (bzw. solange keine bekannt sind):
             // Nach dem Aufbereiten stehen dort die Maße der Großansicht.
             $size = ['width' => (int) ($meta['width'] ?? 0), 'height' => (int) ($meta['height'] ?? 0)];
             if (!$row) {
-                $plans[] = ['row' => null, 'renew' => false, 'data' => $data + $size + [
+                $plans[] = ['row' => null, 'renew' => false, 'data' => $data + $size + $state + [
                     'drive_file_id' => (string) $f['id'],
                     'md5' => $md5,
-                    'status' => GalleryRepository::PENDING,
-                    'error' => '',
                 ]];
                 continue;
             }
             // Neuer Inhalt oder zwischen „intern“ und öffentlich bzw. in ein anderes Album verschoben: neu erzeugen.
             $renew = $row['md5'] !== $md5 || (int) $row['is_intern'] !== $intern || (int) $row['album_id'] !== $albumId;
             if ($renew) {
-                $data += $size + ['md5' => $md5, 'status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
+                $data += $size + ['md5' => $md5] + $state;
             } elseif ((int) $row['width'] === 0 && $size['width'] > 0) {
                 $data += $size;
             }
@@ -356,9 +399,10 @@ final class GalleryService
 
     /**
      * Bilder, die sich nicht laden ließen, für Admins: Dateiname, Album, Fehlermeldung und Versuche, dazu die Adresse
-     * der Datei in Google Drive (dort lässt sie sich prüfen oder ersetzen).
+     * der Datei in Google Drive (dort lässt sie sich prüfen oder ersetzen). unsupported: Video in einem Format, das die
+     * Galerie nicht abspielt (ohne Versuche).
      *
-     * @return list<array{id: int, name: string, album: string, intern: bool, error: string, attempts: int, drive_url: string}>
+     * @return list<array{id: int, name: string, album: string, intern: bool, error: string, attempts: int, unsupported: bool, drive_url: string}>
      */
     public function failedPhotos(int $limit = self::FAILED_LIST_MAX): array
     {
@@ -369,6 +413,7 @@ final class GalleryService
             'intern' => (bool) (int) $p['is_intern'],
             'error' => (string) $p['error'],
             'attempts' => (int) $p['attempts'],
+            'unsupported' => (string) $p['error'] === self::UNSUPPORTED_VIDEO,
             'drive_url' => 'https://drive.google.com/file/d/' . rawurlencode((string) $p['drive_file_id']) . '/view',
         ], $this->repo->failedPhotos($limit)));
     }
@@ -409,8 +454,10 @@ final class GalleryService
         try {
             $start = microtime(true);
             $done = 0;
+            // Videos, deren Vorschaubild Drive noch nicht hat, bleiben ausstehend: in diesem Lauf nicht noch einmal.
+            $tried = [];
             while (microtime(true) - $start < $budgetSeconds) {
-                $row = $this->repo->nextPending();
+                $row = $this->repo->nextPending($tried);
                 if (!$row) {
                     break;
                 }
@@ -423,6 +470,7 @@ final class GalleryService
                     $row = $this->repo->photo((int) $row['id']);
                     if ($row && $row['status'] === GalleryRepository::PENDING) {
                         $this->generate($row);
+                        $tried[] = (int) $row['id'];
                         $done++;
                     }
                 } finally {
@@ -446,9 +494,16 @@ final class GalleryService
 
     public function generate(array $photo): bool
     {
+        if (self::isVideoRow($photo)) {
+            return $this->generateVideo($photo);
+        }
         $attempts = (int) ($photo['attempts'] ?? 0);
         if ($attempts >= self::MAX_ATTEMPTS) {
-            return $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+            // Das Original bringt PHP jedes Mal zum Abbruch (Speicher, Zeitlimit); Googles kleineres Vorschaubild geht oft noch.
+            // Vorher als fehlgeschlagen vermerken: Bricht auch das ab, wird es nicht bei jedem Lauf wieder versucht.
+            $this->markFailed($photo, 'Die Aufbereitung ist mehrfach abgebrochen (Bild zu groß für den Speicher des Servers?).');
+            $size = $this->fromDriveThumbnail($photo);
+            return $size !== null && $this->markReady($photo, $size);
         }
         // Den Versuch vorab vermerken: Bricht PHP mittendrin ab (Speicher, Zeitlimit), kommt das Bild
         // beim nächsten Lauf nach den anderen dran (nextPending) und hält sie nicht auf.
@@ -459,16 +514,95 @@ final class GalleryService
             return $this->markFailed($photo, $e->getMessage());
         }
         try {
-            $size = null;
-            foreach (self::SIZES as $name => $max) {
-                $size = $this->images->resizeToJpeg($tmp, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
-            }
+            $size = $this->render($photo, $tmp);
         } catch (\Throwable $e) {
-            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException
-            return $this->markFailed($photo, $e->getMessage());
+            // auch Fehler von GD (z. B. ValueError), nicht nur RuntimeException.
+            // Formate, die der Server nicht lesen kann (RAW, TIFF, oft auch HEIC): erst das eingebettete JPEG
+            // einer RAW-Datei, dann das Vorschaubild von Google.
+            $size = $this->fromRawPreview($photo, $tmp) ?? $this->fromDriveThumbnail($photo);
+            if ($size === null) {
+                return $this->markFailed($photo, $e->getMessage());
+            }
         } finally {
             @unlink($tmp);
         }
+        return $this->markReady($photo, $size);
+    }
+
+    /** @param array<string, mixed> $photo */
+    private static function isVideoRow(array $photo): bool
+    {
+        return ($photo['media'] ?? 'image') === 'video';
+    }
+
+    /**
+     * Video: nur das Vorschaubild (beide Größen aus Drives thumbnailLink), das Video selbst bleibt in Drive. Hat Drive
+     * noch keines (gerade hochgeladen), bleibt es ausstehend; nach MAX_ATTEMPTS Versuchen gilt es ohne Vorschaubild als
+     * fertig (die App zeigt dann eine Kachel mit ▶).
+     */
+    private function generateVideo(array $photo): bool
+    {
+        if (!DriveClient::isPlayableVideo((string) ($photo['mime'] ?? ''))) {
+            $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::FAILED, 'error' => self::UNSUPPORTED_VIDEO, 'attempts' => self::MAX_ATTEMPTS]);
+            return false;
+        }
+        $attempts = (int) ($photo['attempts'] ?? 0) + 1;
+        $this->repo->updatePhoto((int) $photo['id'], ['attempts' => $attempts]);
+        $size = $this->fromDriveThumbnail($photo);
+        if ($size === null && $attempts < self::MAX_ATTEMPTS) {
+            return false;
+        }
+        // Maße des Videos aus Drive behalten; nur ohne sie die des Vorschaubilds.
+        return $this->markReady($photo, (int) $photo['width'] > 0 ? null : $size);
+    }
+
+    /**
+     * Beide Größen aus einer Bilddatei.
+     *
+     * @return array{width: int, height: int}|null Größe der Großansicht
+     */
+    private function render(array $photo, string $file): ?array
+    {
+        $size = null;
+        foreach (self::SIZES as $name => $max) {
+            $size = $this->images->resizeToJpeg($file, $this->path($photo, $name), $max, $name === 'thumb' ? 78 : 84);
+        }
+        return $size;
+    }
+
+    /** @return array{width: int, height: int}|null */
+    private function fromRawPreview(array $photo, string $file): ?array
+    {
+        $preview = $this->files->tempFile();
+        try {
+            return RawPreview::extract($file, $preview, self::SIZES['thumb']) ? $this->render($photo, $preview) : null;
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            @unlink($preview);
+        }
+    }
+
+    /** @return array{width: int, height: int}|null */
+    private function fromDriveThumbnail(array $photo): ?array
+    {
+        try {
+            $thumb = $this->drive->thumbnail((string) $photo['drive_file_id'], self::SIZES['large']);
+        } catch (\RuntimeException) {
+            return null;
+        }
+        try {
+            return $this->render($photo, $thumb);
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            @unlink($thumb);
+        }
+    }
+
+    /** @param array{width: int, height: int}|null $size */
+    private function markReady(array $photo, ?array $size): bool
+    {
         $this->repo->updatePhoto((int) $photo['id'], [
             'status' => GalleryRepository::READY,
             'error' => '',
@@ -503,15 +637,23 @@ final class GalleryService
 
     public function deleteFiles(array $photo): void
     {
-        foreach (array_keys(self::SIZES) as $size) {
+        foreach ([...array_keys(self::SIZES), self::ORIGINAL] as $size) {
             $this->files->delete(self::relativePath($photo, $size), !(int) $photo['is_intern']);
         }
+        $this->files->delete(self::markerPath($photo), false);
     }
 
-    /** Öffentliche fertige Bilder direkt als Datei, sonst über die App. */
+    /** Merker für die Originalauflösung, immer im geschützten Verzeichnis (nie öffentlich abrufbar). */
+    private static function markerPath(array $photo): string
+    {
+        return '.original-' . $photo['file_key'] . '.merker';
+    }
+
+    /** Öffentliche fertige Bilder direkt als Datei, sonst über die App (das Original erst, wenn es erzeugt ist). */
     public function url(array $photo, string $size): string
     {
-        if (!(int) $photo['is_intern'] && $photo['status'] === GalleryRepository::READY) {
+        if (!(int) $photo['is_intern'] && $photo['status'] === GalleryRepository::READY
+            && ($size !== self::ORIGINAL || is_file($this->path($photo, $size)))) {
             return $this->files->publicUrl(self::relativePath($photo, $size));
         }
         return $this->env->photoUrl((int) $photo['id'], $size);
@@ -542,7 +684,7 @@ final class GalleryService
      */
     public function deliverPhoto(int $id, string $size, \Closure $access): array
     {
-        if (!isset(self::SIZES[$size])) {
+        if (!isset(self::SIZES[$size]) && $size !== self::ORIGINAL) {
             return ['status' => 404];
         }
         $photo = $this->repo->photo($id);
@@ -563,6 +705,16 @@ final class GalleryService
         if ($photo['status'] === GalleryRepository::FAILED) {
             return ['status' => 404];
         }
+        $video = self::isVideoRow($photo);
+        if ($video && ($size === self::ORIGINAL || ($photo['status'] === GalleryRepository::READY && !is_file($file)))) {
+            return ['status' => 404]; // Video: kein Original; fertig ohne Vorschaubild (Drive hatte keines)
+        }
+        if ($size === self::ORIGINAL) {
+            // Ohne Original zeigt die Großansicht einfach die 1600er weiter (404 statt Platzhalter).
+            $file = $photo['status'] === GalleryRepository::READY ? $this->original($photo) : null;
+            return $file === null ? ['status' => 404]
+                : ['status' => 200, 'file' => $file, 'etag' => FileCache::etag(self::relativePath($photo, $size), $file), 'intern' => $intern];
+        }
         if ($photo['status'] === GalleryRepository::READY && !is_file($file)) {
             // Datei fehlt (z. B. gelöscht): neu aufbereiten.
             $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::PENDING, 'attempts' => 0]);
@@ -571,7 +723,7 @@ final class GalleryService
         }
         if ($photo['status'] !== GalleryRepository::READY) {
             $now = $this->generateNow($photo);
-            if ($now === null) {
+            if ($now === null || $now['status'] === GalleryRepository::PENDING) {
                 $this->nudge();
                 return ['status' => 202, 'placeholder' => self::placeholder((int) $photo['width'], (int) $photo['height']), 'retryAfter' => self::RETRY_AFTER, 'intern' => $intern];
             }
@@ -582,6 +734,167 @@ final class GalleryService
             $file = $this->path($photo, $size);
         }
         return ['status' => 200, 'file' => $file, 'etag' => FileCache::etag(self::relativePath($photo, $size), $file), 'intern' => $intern];
+    }
+
+    /**
+     * Ein Ausschnitt eines Videos zum Abspielen, aus Drive durchgereicht (nichts wird gespeichert). Interne Videos nur für
+     * Mitglieder, Rechte wie bei deliverPhoto. Antwort immer 206 mit höchstens VIDEO_CHUNK Bytes (auch ohne Range: dann
+     * ab dem Anfang); der Browser fordert den Rest mit Range nach. 416, wenn der Ausschnitt hinter dem Ende beginnt.
+     *
+     * @param string|null $range Wert der Kopfzeile Range („bytes=0-“)
+     * @param \Closure(): array{0: bool, 1: bool} $access [Mitglied, angemeldet]
+     * @return array{status: int, body?: string, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     */
+    public function deliverVideo(int $id, ?string $range, \Closure $access): array
+    {
+        $photo = $this->repo->photo($id);
+        if (!$photo || !self::isVideoRow($photo) || $photo['status'] === GalleryRepository::FAILED) {
+            return ['status' => 404];
+        }
+        $intern = (bool) (int) $photo['is_intern'];
+        if ($intern) {
+            [$member, $loggedIn] = $access();
+            if (!$member) {
+                return ['status' => $loggedIn ? 403 : 401];
+            }
+        }
+        $total = (int) $photo['bytes'];
+        $span = self::byteRange($range, $total);
+        if ($span === null) {
+            return ['status' => 416, 'contentRange' => 'bytes */' . $total];
+        }
+        [$start, $end] = $span;
+        $end = min($end, $start + self::VIDEO_CHUNK - 1);
+        $slot = $this->videoSlot();
+        if ($slot === null) {
+            return ['status' => 503, 'retryAfter' => 1];
+        }
+        try {
+            $part = $this->drive->downloadRange((string) $photo['drive_file_id'], $start, $end);
+        } catch (\RuntimeException) {
+            return ['status' => 502];
+        } finally {
+            self::unlock($slot);
+        }
+        return [
+            'status' => 206,
+            'body' => $part['body'],
+            'contentRange' => 'bytes ' . $part['start'] . '-' . $part['end'] . '/' . $part['total'],
+            'mime' => (string) $photo['mime'],
+            'etag' => '"v' . md5((string) $photo['md5']) . '"',
+            'intern' => $intern,
+        ];
+    }
+
+    /**
+     * Erster Bereich aus „bytes=a-b“, „bytes=a-“ oder „bytes=-n“ (die letzten n Bytes); ohne oder mit unlesbarer Angabe
+     * ab dem Anfang. $total 0: Größe unbekannt (dann ohne „-n“).
+     *
+     * @return array{0: int, 1: int}|null Anfang und Ende (einschließlich); null, wenn der Anfang hinter dem Ende liegt
+     */
+    public static function byteRange(?string $header, int $total): ?array
+    {
+        $last = $total > 0 ? $total - 1 : PHP_INT_MAX;
+        if ($header === null || !preg_match('/^\s*bytes\s*=\s*(\d*)\s*-\s*(\d*)\s*(?:,|$)/i', $header, $m) || ($m[1] === '' && $m[2] === '')) {
+            return [0, $last];
+        }
+        if ($m[1] === '') {
+            // Die letzten n Bytes
+            return $total > 0 && (int) $m[2] > 0 ? [max(0, $total - (int) $m[2]), $last] : [0, $last];
+        }
+        $start = (int) $m[1];
+        $end = $m[2] === '' ? $last : min((int) $m[2], $last);
+        if (($total > 0 && $start >= $total) || $end < $start) {
+            return null;
+        }
+        return [$start, $end];
+    }
+
+    /** @return resource|false|null einer der VIDEO_SLOTS Plätze; wartet höchstens VIDEO_WAIT Sekunden (false: ohne Sperre) */
+    private function videoSlot()
+    {
+        $until = microtime(true) + ($this->waitSeconds > 0 ? self::VIDEO_WAIT : 0);
+        do {
+            for ($i = 0; $i < self::VIDEO_SLOTS; $i++) {
+                $slot = $this->lockFile('.video-' . $i . '.lock', 0);
+                if ($slot !== null) {
+                    return $slot;
+                }
+            }
+            usleep(100000);
+        } while (microtime(true) < $until);
+        return null;
+    }
+
+    /**
+     * Pfad der Fassung in Originalauflösung; erzeugt sie bei Bedarf (Sperre je Bild, höchstens REQUEST_SLOTS
+     * gleichzeitig). null, wenn es sie nicht gibt: gerade kein Platz frei, oder der letzte Versuch ist keinen Tag her
+     * und gescheitert (Format, Speicher, Zeitlimit). Der Merker wird vor dem Versuch geschrieben und erst nach Erfolg
+     * gelöscht: Bricht PHP mittendrin ab, lädt nicht jeder weitere Klick das Original erneut aus Drive.
+     */
+    private function original(array $photo): ?string
+    {
+        $file = $this->path($photo, self::ORIGINAL);
+        $marker = $this->files->path(self::markerPath($photo), false);
+        if (is_file($file)) {
+            return $file;
+        }
+        if (is_file($marker) && (int) @filemtime($marker) > $this->time->timestamp() - self::ORIGINAL_RETRY) {
+            return null;
+        }
+        $imageLock = $this->lockFile(self::imageLockName((int) $photo['id']), $this->waitSeconds);
+        if (!is_resource($imageLock)) {
+            return null;
+        }
+        try {
+            if (is_file($file)) {
+                return $file; // inzwischen von einem anderen Prozess erzeugt
+            }
+            $slot = $this->requestSlot();
+            if ($slot === null) {
+                return null;
+            }
+            try {
+                @file_put_contents($marker, (string) $this->time->timestamp());
+                @touch($marker, $this->time->timestamp());
+                if (!$this->renderOriginal($photo, $file)) {
+                    return null;
+                }
+                @unlink($marker);
+                return $file;
+            } finally {
+                self::unlock($slot);
+            }
+        } finally {
+            self::unlock($imageLock);
+        }
+    }
+
+    private function renderOriginal(array $photo, string $target): bool
+    {
+        try {
+            $tmp = $this->drive->download((string) $photo['drive_file_id']);
+        } catch (\RuntimeException) {
+            return false;
+        }
+        try {
+            $this->images->resizeToJpeg($tmp, $target, self::ORIGINAL_EDGE, self::ORIGINAL_QUALITY);
+            return true;
+        } catch (\Throwable) {
+            // RAW: das eingebettete JPEG der Kamera, meist in voller Größe (kleiner als die 1600er lohnt nicht).
+            $preview = $this->files->tempFile();
+            try {
+                return RawPreview::extract($tmp, $preview, self::SIZES['large'] + 1)
+                    && $this->images->resizeToJpeg($preview, $target, self::ORIGINAL_EDGE, self::ORIGINAL_QUALITY) !== [];
+            } catch (\Throwable) {
+                @unlink($target);
+                return false;
+            } finally {
+                @unlink($preview);
+            }
+        } finally {
+            @unlink($tmp);
+        }
     }
 
     /**
@@ -702,14 +1015,16 @@ final class GalleryService
         // Eine Abfrage für alle Alben samt Titelbild (keine je Album).
         foreach ($this->repo->albumSummaries($member) as $r) {
             $cover = $r['cover_id'] !== null
-                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status']]
+                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media']]
                 : null;
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],
                 'title' => (string) $r['title'],
+                // Bilder und Videos zusammen; davon Videos
                 'count' => (int) $r['cnt'],
+                'video_count' => (int) $r['video_cnt'],
                 'intern_count' => $member ? (int) $r['intern_cnt'] : 0,
-                'cover' => $cover ? $this->url($cover, 'thumb') : null,
+                'cover' => $cover ? $this->thumbUrl($cover) : null,
             ];
         }
         $out = [];
@@ -720,7 +1035,16 @@ final class GalleryService
         return $out;
     }
 
-    /** @return array<string, mixed>|null Album mit sichtbaren Bildern */
+    /** Vorschaubild; null bei einem fertigen Video ohne Vorschaubild (Drive hatte keines). */
+    private function thumbUrl(array $photo, string $size = 'thumb'): ?string
+    {
+        if (self::isVideoRow($photo) && $photo['status'] === GalleryRepository::READY && !is_file($this->path($photo, $size))) {
+            return null;
+        }
+        return $this->url($photo, $size);
+    }
+
+    /** @return array<string, mixed>|null Album mit sichtbaren Bildern und Videos */
     public function album(int $id, bool $member): ?array
     {
         $album = $this->repo->album($id);
@@ -735,10 +1059,28 @@ final class GalleryService
             'id' => (int) $album['id'],
             'title' => (string) $album['title'],
             'year' => (string) $album['year'],
-            'photos' => array_map(fn (array $ph): array => [
+            'photos' => array_map(fn (array $ph): array => self::isVideoRow($ph) ? [
                 'id' => (int) $ph['id'],
+                'type' => 'video',
+                // Vorschaubild; '' ohne (dann eine Kachel mit ▶)
+                'thumb' => (string) $this->thumbUrl($ph),
+                'large' => (string) $this->thumbUrl($ph, 'large'),
+                // Abspielen über die App, in Ausschnitten aus Drive (Range)
+                'video' => $this->env->photoUrl((int) $ph['id'], self::VIDEO),
+                'mime' => (string) $ph['mime'],
+                'duration' => (int) round((int) $ph['duration_ms'] / 1000),
+                'width' => (int) $ph['width'],
+                'height' => (int) $ph['height'],
+                'intern' => (bool) (int) $ph['is_intern'],
+                'name' => (string) $ph['name'],
+                'ready' => $ph['status'] === GalleryRepository::READY,
+            ] : [
+                'id' => (int) $ph['id'],
+                'type' => 'image',
                 'thumb' => $this->url($ph, 'thumb'),
                 'large' => $this->url($ph, 'large'),
+                // Großansicht: erst large, dann diese nachladen (404, wenn es kein Original gibt: large bleibt)
+                'original' => $this->url($ph, self::ORIGINAL),
                 'width' => (int) $ph['width'],
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],

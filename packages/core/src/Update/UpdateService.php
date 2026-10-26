@@ -384,17 +384,35 @@ final class UpdateService
         if (!is_file(dirname($path) . '/index.html')) {
             @file_put_contents(dirname($path) . '/index.html', '');
         }
-        try {
-            $json = json_encode($this->backup->export(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht erstellen (' . $e->getMessage() . '). Das Update wurde nicht eingespielt.');
+        // Stück für Stück in die Datei (BackupProvider::exportTo): Mit Fotos, Dokumenten und Anhängen ist die Sicherung
+        // schnell größer, als memory_limit erlaubt, wenn sie erst ganz im Speicher entsteht. Erst unter vorläufigem
+        // Namen, damit nie eine halbe Sicherung als fertig gilt.
+        $tmp = $path . '.tmp';
+        // Reste abgebrochener Läufe (z. B. Abbruch durch PHP) entfernen.
+        foreach (glob($dir . '/vor-update-*.json.tmp') ?: [] as $stale) {
+            @unlink($stale);
         }
-        $written = file_put_contents($path, $json);
-        if ($written === false || $written < strlen($json)) {
-            @unlink($path);
+        $out = @fopen($tmp, 'wb');
+        if ($out === false) {
+            throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Schreibrechte?). Das Update wurde nicht eingespielt.');
+        }
+        @chmod($tmp, 0600);
+        try {
+            $this->backup->exportTo($out);
+            if (!fflush($out)) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+            }
+        } catch (\Throwable $e) {
+            fclose($out);
+            @unlink($tmp);
+            $reason = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen (' . $e->getMessage() . ').' : rtrim($e->getMessage(), '.') . '.';
+            throw new \RuntimeException('Sicherung vor dem Update: ' . $reason . ' Das Update wurde nicht eingespielt.', 0, $e);
+        }
+        fclose($out);
+        if (!@rename($tmp, $path)) {
+            @unlink($tmp);
             throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');
         }
-        @chmod($path, 0600);
         $numbered = glob($dir . '/vor-update-[0-9][0-9][0-9][0-9][0-9][0-9]-*.json') ?: [];
         sort($numbered);
         $all = [...array_values(array_diff(glob($dir . '/vor-update-*.json') ?: [], $numbered)), ...$numbered];

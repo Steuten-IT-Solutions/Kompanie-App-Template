@@ -45,7 +45,7 @@ final class BoardServiceTest extends TestCase
         $this->app->scheduleTasks();
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER);
-        $this->cand = $this->users->add('anwaerter', Roles::CANDIDATE);
+        $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
         $this->users->current = $this->admin;
     }
@@ -62,9 +62,9 @@ final class BoardServiceTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function post(string $text): array
+    private function post(string $text, string $title = 'Titel', array $extra = []): array
     {
-        $res = $this->call('POST', '/board', ['text' => $text]);
+        $res = $this->call('POST', '/board', ['title' => $title, 'text' => $text] + $extra);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
         return $res->data;
     }
@@ -79,11 +79,11 @@ final class BoardServiceTest extends TestCase
         $this->setUpApp();
         $this->assertSame(401, $this->as(null)->call('GET', '/board')->status, 'nicht angemeldet');
         $this->assertSame(403, $this->as($this->guest)->call('GET', '/board')->status, 'Gast-Konto');
-        $this->assertSame(403, $this->call('POST', '/board', ['text' => 'x'])->status);
+        $this->assertSame(403, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status);
         $this->assertSame(200, $this->as($this->m)->call('GET', '/board')->status, 'Mitglied liest');
-        $this->assertSame(403, $this->call('POST', '/board', ['text' => 'x'])->status, 'Mitglied ohne Recht schreibt nicht');
+        $this->assertSame(403, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status, 'Mitglied ohne Recht schreibt nicht');
         $this->assertSame(200, $this->as($this->cand)->call('GET', '/board')->status, 'Anwärter liest');
-        $this->assertSame(403, $this->call('POST', '/board', ['text' => 'x'])->status);
+        $this->assertSame(403, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status);
 
         // Standardrolle des Bereichs („Schwarzes Brett verwalten“: member + post_board)
         $roles = array_column($this->app->roles()->describe(), 'capabilities', 'key');
@@ -116,23 +116,37 @@ final class BoardServiceTest extends TestCase
     public function testValidation(): void
     {
         $this->setUpApp();
-        foreach (['leer' => '', 'nur Leerraum' => " \n ", 'zu lang' => str_repeat('x', 501), 'kein Text' => ['x']] as $name => $text) {
-            $this->assertSame(400, $this->call('POST', '/board', ['text' => $text])->status, $name);
+        foreach (['leer' => '', 'nur Leerraum' => " \n ", 'leere Absätze' => '<p></p><p><br></p>', 'nur Skript' => '<script>x</script>', 'kein Text' => ['x']] as $name => $text) {
+            $this->assertSame(400, $this->call('POST', '/board', ['title' => 'T', 'text' => $text])->status, $name);
+        }
+        foreach (['ohne' => null, 'leer' => '', 'nur Leerraum' => "  \t ", 'kein Text' => ['x']] as $name => $title) {
+            $res = $this->call('POST', '/board', ['title' => $title, 'text' => 'x']);
+            $this->assertSame([400, 'Bitte einen Titel eingeben.'], [$res->status, $res->data['message']], "Titel $name");
         }
         $this->assertSame(400, $this->call('POST', '/board')->status, 'ohne Text');
-        $this->assertSame(500, mb_strlen($this->post(str_repeat('ä', 500))['text']), '500 Zeichen gehen');
-        $item = $this->post("Zeile 1\r\n\r\nZeile <b>2</b> <script>x</script>\n  https://example.org  ");
-        $this->assertSame("Zeile 1\n\nZeile 2 x\nhttps://example.org", $item['text'], 'Zeilenumbrüche bleiben, kein HTML');
+        // Keine Längengrenze (Issue #172): weder für den Titel noch für den Inhalt.
+        $long = $this->post('<p>' . str_repeat('ä', 70000) . '</p>', str_repeat('T', 1000));
+        $this->assertSame(70007, mb_strlen($long['text']), 'mehr als 64 KB Inhalt');
+        $this->assertSame(1000, mb_strlen($long['title']));
+        $this->assertSame('<p>' . str_repeat('ä', 70000) . '</p>', $this->app->db->scalar('SELECT body FROM {board_messages} WHERE id = ?', [$long['id']]), 'vollständig gespeichert (longtext)');
+
+        // Formatierter Inhalt: bereinigt nach Allowlist, mit Textauszug.
+        $item = $this->post('<p style="color: red; position: fixed">Zeile <b onclick="x()">2</b></p><script>alert(1)</script><p><a href="javascript:alert(1)">böse</a> <a href="https://example.org">gut</a></p><img src="https://evil.example/x.png">', "Titel <b>fett</b>\nzweite Zeile");
+        $this->assertSame('<p style="color: red">Zeile <b>2</b></p><p>böse <a href="https://example.org" target="_blank" rel="noopener noreferrer">gut</a></p>', $item['text']);
+        $this->assertSame("Zeile 2\n\nböse gut (https://example.org)", $item['excerpt']);
+        $this->assertSame('Titel fett zweite Zeile', $item['title'], 'Titel ist reiner Text in einer Zeile');
         $this->assertSame(400, $this->call('PATCH', "/board/{$item['id']}", ['text' => ''])->status);
+        $this->assertSame(400, $this->call('PATCH', "/board/{$item['id']}", ['title' => ' '])->status);
+        $this->assertSame(400, $this->call('PATCH', "/board/{$item['id']}", [])->status, 'nichts zu ändern');
         $this->assertSame(404, $this->call('PATCH', '/board/999', ['text' => 'x'])->status);
     }
 
     public function testValidFor24HoursAndCleanup(): void
     {
         $this->setUpApp();
-        $a = $this->post('Erste');
+        $a = $this->post('Erste', 'A');
         $this->move('+1 hour');
-        $b = $this->post('Zweite');
+        $b = $this->post('Zweite', 'B');
         $this->assertSame('2026-10-20T10:00:00+00:00', $a['created_at']);
         $this->assertSame('2026-10-21T10:00:00+00:00', $a['expires_at'], 'genau 24 Stunden');
         $items = $this->as($this->cand)->call('GET', '/board')->data['items'];
@@ -154,18 +168,26 @@ final class BoardServiceTest extends TestCase
         $this->move('+1 minute');
         $this->assertSame('2026-10-20T11:32:00+00:00', $this->call('PATCH', "/board/{$a['id']}", ['text' => 'Erste (wieder)'])->data['updated_at'], 'danach wieder die Uhrzeit');
 
-        // Nach 24 Stunden: nicht mehr geliefert, nicht mehr änderbar; die Aufgabe löscht sie.
+        // Nach 24 Stunden: nicht mehr geliefert, nicht mehr änderbar; der Verlauf bleibt 30 Tage, dann löscht die Aufgabe.
         $this->clock->at = new \DateTimeImmutable('2026-10-21 12:00:00', new \DateTimeZone('Europe/Berlin'));
         $this->assertSame(['Zweite'], array_column($this->call('GET', '/board')->data['items'], 'text'));
         $this->assertSame(404, $this->call('PATCH', "/board/{$a['id']}", ['text' => 'zu spät'])->status);
         $this->assertSame(404, $this->call('DELETE', "/board/{$a['id']}")->status);
-        $this->assertSame(2, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_messages}'), 'noch in der Tabelle');
         $this->assertSame(3600, $this->scheduler->scheduled[BoardService::TASK] ?? null, 'Aufgabe eingeplant');
         $this->app->runTask(BoardService::TASK);
-        $this->assertSame([$b['id']], array_map('intval', array_column($this->app->db->select('SELECT id FROM {board_messages}'), 'id')), 'Abgelaufene gelöscht, kein Verlauf');
+        $this->assertSame(2, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_messages}'), 'noch im Verlauf');
+        $this->assertSame(['A'], array_column($this->call('GET', '/board/history')->data['items'], 'title'));
+        $this->clock->at = new \DateTimeImmutable('2026-11-20 09:59:59', new \DateTimeZone('UTC'));
+        $this->app->runTask(BoardService::TASK);
+        $this->assertSame(2, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_messages}'), 'genau 30 Tage nach dem Ende noch da');
+        $this->move('+2 seconds');
+        $this->app->runTask(BoardService::TASK);
+        $this->assertSame([$b['id']], array_map('intval', array_column($this->app->db->select('SELECT id FROM {board_messages}'), 'id')), '30 Tage nach Ablauf endgültig gelöscht');
+        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_message_revisions} WHERE message_id = ?', [$a['id']]), 'samt Verlauf');
         $this->move('+2 hours');
         $this->app->runTask(BoardService::TASK);
         $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_messages}'));
+        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {board_message_revisions}'));
     }
 
     public function testDeletedAuthorAndBackup(): void
@@ -223,7 +245,7 @@ final class BoardServiceTest extends TestCase
         $this->assertNotContains('board', $this->app->push()->availableTypes($this->users->find($this->guest)));
         $this->assertNotContains('board', $this->app->push()->availableTypes(null));
 
-        $item = $this->as($this->admin)->post("Heute kein Training!\nHalle gesperrt.");
+        $item = $this->as($this->admin)->post("<p>Heute kein Training!<br>Halle gesperrt.</p>", 'Kein Training');
         $queue = $this->app->db->select('SELECT q.urgency, q.ttl, s.endpoint FROM {push_queue} q JOIN {push_subscriptions} s ON s.id = q.subscription_id ORDER BY q.id');
         $this->assertSame(
             ['https://fcm.googleapis.com/fcm/send/m-handy', 'https://fcm.googleapis.com/fcm/send/m-tablet', 'https://fcm.googleapis.com/fcm/send/anwaerter'],
@@ -244,9 +266,9 @@ final class BoardServiceTest extends TestCase
 
         // Ohne Haken „Benachrichtigung senden“: veröffentlicht, aber kein Push; push nur als true/false.
         $queued = $this->app->push()->repository()->counts()['queued'];
-        $this->assertSame(201, $this->call('POST', '/board', ['text' => 'Leise Nachricht', 'push' => false])->status);
+        $this->assertSame(201, $this->call('POST', '/board', ['title' => 'Leise', 'text' => 'Leise Nachricht', 'push' => false])->status);
         $this->assertSame($queued, $this->app->push()->repository()->counts()['queued'], 'kein Push mit push=false');
-        $this->assertSame(400, $this->call('POST', '/board', ['text' => 'x', 'push' => 'nein'])->status);
+        $this->assertSame(400, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x', 'push' => 'nein'])->status);
 
         // Ändern verschickt nichts.
         $this->http->calls = [];
@@ -276,9 +298,10 @@ final class BoardServiceTest extends TestCase
             $this->markTestSkipped('ohne Push-Unterstützung');
         }
         $this->subscribe($this->m, 'm');
-        $this->assertSame(1, $this->app->pushTriggers()->boardPosted(['id' => 1, 'text' => 'x', 'author_name' => 'A', 'expires_at' => $this->clock->now()->modify('+2 hours')->format('c')], $this->admin));
+        $this->assertSame(1, $this->app->pushTriggers()->boardPosted(['id' => 1, 'title' => 'x', 'author_name' => 'A', 'expires_at' => $this->clock->now()->modify('+2 hours')->format('c')], $this->admin));
         $this->assertSame(7200, (int) $this->app->db->scalar('SELECT ttl FROM {push_queue}'));
-        $this->assertSame(0, $this->app->pushTriggers()->boardPosted(['id' => 2, 'text' => 'x', 'author_name' => 'A', 'expires_at' => $this->clock->now()->modify('-1 minute')->format('c')], $this->admin), 'abgelaufen: nichts');
+        $this->assertSame('brett/1', json_decode((string) $this->app->db->scalar('SELECT payload FROM {push_queue}'), true)['route'], 'führt zur Nachricht (Issue #190)');
+        $this->assertSame(0, $this->app->pushTriggers()->boardPosted(['id' => 2, 'title' => 'x', 'author_name' => 'A', 'expires_at' => $this->clock->now()->modify('-1 minute')->format('c')], $this->admin), 'abgelaufen: nichts');
         $this->app->push()->processQueue();
         $msg = $this->pushes()[0];
         $this->assertSame('7200', $msg['headers']['TTL']);

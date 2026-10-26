@@ -67,8 +67,10 @@ final class RestBridge
         foreach ($res->headers as $name => $value) {
             $out->header($name, $value);
         }
-        // Persönliche Daten nicht in Caches oder CDNs ablegen.
+        // Persönliche Daten nicht in Caches oder CDNs ablegen, Daten der App (auch öffentliche wie Mitgliederliste und
+        // Ämter, Issue #112) nicht in Suchmaschinen.
         $out->header('Cache-Control', 'no-store, private');
+        $out->header('X-Robots-Tag', 'noindex');
         return $out;
     }
 }

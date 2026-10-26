@@ -18,7 +18,7 @@ use KompanieApp\Core\Port\UserDirectory;
  */
 final class FakeUsers implements UserDirectory, AuthContext, Authenticator
 {
-    /** @var array<int, array{name: string, first?: string, last?: string, login: string, email: string, level: string, password: string}> Ohne first/last: aus name geteilt (wie Konten von früher) */
+    /** @var array<int, array{name: string, first?: string, last?: string, login: string, email: string, level: string, password: string, disabled?: bool}> Ohne first/last: aus name geteilt (wie Konten von früher); disabled: stillgelegt (deactivate) */
     public array $users = [];
     public ?int $current = null;
     public int $passwordChanges = 0;
@@ -59,6 +59,17 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $out;
     }
 
+    public function emails(array $ids): array
+    {
+        $out = [];
+        foreach ($ids as $id) {
+            if (isset($this->users[(int) $id])) {
+                $out[(int) $id] = $this->users[(int) $id]['email'];
+            }
+        }
+        return $out;
+    }
+
     private function user(int $id): ?User
     {
         $u = $this->users[$id] ?? null;
@@ -77,13 +88,16 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return isset($u['first'], $u['last']) ? [$u['first'], $u['last']] : PersonName::split($u['name']);
     }
 
+    /** Wie WordPress: list(false) liefert auch Konten mit gespeicherter Rolle „guest“ (der Kern muss selbst prüfen). */
+    public bool $listGuests = false;
+
     public function list(bool $includeGuests): array
     {
         $this->lookups++;
         $out = [];
         foreach (array_keys($this->users) as $id) {
             $u = $this->user($id);
-            if ($includeGuests || $u->role !== Roles::GUEST) {
+            if ($includeGuests || $this->listGuests || $u->role !== Roles::GUEST) {
                 $out[] = $u;
             }
         }
@@ -192,7 +206,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
     public function login(string $username, string $password, bool $remember): User
     {
         foreach ($this->users as $id => $u) {
-            if ($u['login'] === $username && $this->verifyPassword($id, $password)) {
+            if ($u['login'] === $username && $this->verifyPassword($id, $password) && empty($u['disabled'])) {
                 $this->current = $id;
                 return $this->user($id);
             }
@@ -242,5 +256,21 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         if ($this->current === $id) {
             $this->current = null;
         }
+    }
+
+    /** Wie Standalone: Rolle Gast, Anmeldung gesperrt, abgemeldet. */
+    public function deactivate(int $id): void
+    {
+        $this->users[$id]['level'] = Roles::GUEST;
+        $this->users[$id]['disabled'] = true;
+        if ($this->current === $id) {
+            $this->current = null;
+        }
+    }
+
+    public function reactivate(int $id, string $role): void
+    {
+        $this->users[$id]['level'] = $role;
+        unset($this->users[$id]['disabled']);
     }
 }

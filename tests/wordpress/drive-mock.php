@@ -36,11 +36,39 @@ add_filter(
 		if ( 0 === strpos( $url, 'https://www.googleapis.com/drive/v3/about' ) ) {
 			return $ok( array( 'user' => array( 'emailAddress' => 'kompanie@example.org' ) ) );
 		}
+		if ( 0 === strpos( $url, 'https://lh3.googleusercontent.com/drive-storage/' ) ) {
+			// Vorschaubild eines Videos (thumbnailLink)
+			$im = imagecreatetruecolor( 1600, 900 );
+			imagefill( $im, 0, 0, imagecolorallocate( $im, 160, 60, 40 ) );
+			ob_start();
+			imagejpeg( $im, null, 80 );
+			return $ok( ob_get_clean() );
+		}
 		if ( 0 !== strpos( $url, 'https://www.googleapis.com/drive/v3/files' ) ) {
 			return $pre;
 		}
 		if ( ! empty( $GLOBALS['kompanie_drive_mock_off'] ) ) {
 			return $pre;
+		}
+		// Kleines Video (WebM, 2 Sekunden) für die Galerie (Issue #182); die Datei liegt im Repository (Link als MU-Plugin).
+		$video_file = dirname( (string) realpath( __FILE__ ), 2 ) . '/fixtures/galerie-video.webm';
+		if ( false !== strpos( $url, '/files/VID1?' ) ) {
+			if ( false !== strpos( $url, 'fields=thumbnailLink' ) ) {
+				return $ok( array( 'thumbnailLink' => 'https://lh3.googleusercontent.com/drive-storage/VID1=s220' ) );
+			}
+			$video = (string) file_get_contents( $video_file );
+			$range = isset( $args['headers']['Range'] ) ? (string) $args['headers']['Range'] : '';
+			if ( preg_match( '/^bytes=(\d+)-(\d+)$/', $range, $r ) ) {
+				$end = min( (int) $r[2], strlen( $video ) - 1 );
+				return array(
+					'headers'  => array( 'content-type' => 'video/webm', 'content-range' => 'bytes ' . $r[1] . '-' . $end . '/' . strlen( $video ) ),
+					'body'     => substr( $video, (int) $r[1], $end - (int) $r[1] + 1 ),
+					'response' => array( 'code' => 206, 'message' => 'Partial Content' ),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			}
+			return $ok( $video );
 		}
 		if ( preg_match( '#/files/([^/?]+)\?alt=media#', $url, $m ) ) {
 			// Je Bild eine andere Farbe, damit man sie unterscheiden kann.
@@ -58,6 +86,11 @@ add_filter(
 			'Y'        => array(
 				array( 'id' => 'A1', 'name' => 'Sommerfest', 'mimeType' => $folder, 'createdTime' => gmdate( 'Y' ) . '-06-28T00:00:00Z' ),
 				array( 'id' => 'A2', 'name' => 'Vereinsabend', 'mimeType' => $folder, 'createdTime' => gmdate( 'Y' ) . '-03-01T00:00:00Z' ),
+				array( 'id' => 'A3', 'name' => 'Umzug', 'mimeType' => $folder, 'createdTime' => gmdate( 'Y' ) . '-05-01T00:00:00Z' ),
+			),
+			'A3'       => array(
+				array( 'id' => 'IMG5', 'name' => '5.jpg', 'mimeType' => 'image/jpeg', 'md5Checksum' => '5' ),
+				array( 'id' => 'VID1', 'name' => 'umzug.webm', 'mimeType' => 'video/webm', 'md5Checksum' => 'v1', 'size' => (string) filesize( $video_file ), 'videoMediaMetadata' => array( 'width' => 160, 'height' => 90, 'durationMillis' => '2000' ) ),
 			),
 			'A1'       => array(
 				array( 'id' => 'IMG1', 'name' => '1.jpg', 'mimeType' => 'image/jpeg', 'md5Checksum' => '1' ),

@@ -2,8 +2,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Plugin as PostcssPlugin } from 'postcss';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { thirdPartyLicenses } from './build/licenses';
 
 const require = createRequire(import.meta.url);
 
@@ -84,11 +87,45 @@ function pdfjsDecoders(): Plugin {
   };
 }
 
+// Darstellung hell oder dunkel unabhängig vom Gerät (Konto → Darstellung, src/theme.ts): Jede Regel in
+// @media (prefers-color-scheme: dark) gilt nur noch ohne data-theme="light" an <html>, und eine Kopie ohne @media gilt
+// mit data-theme="dark". :where() hält die Spezifität gleich, damit die Regeln wie bisher wirken. generated/theme.css
+// bleibt dabei unverändert (Download-Seite und Handbuch nutzen es ohne Umschalter).
+function themeOverride(): PostcssPlugin {
+  const scoped = (selector: string, attr: string) =>
+    /^(:root|html)(?![\w-])/.test(selector) ? selector.replace(/^(:root|html)/, `$1:where(${attr})`) : `:where(:root${attr}) ${selector}`;
+  const done = new WeakSet<object>();
+  return {
+    postcssPlugin: 'kompanie-theme-override',
+    AtRule: {
+      media(at) {
+        if (done.has(at) || at.params.replace(/\s+/g, '') !== '(prefers-color-scheme:dark)') return;
+        done.add(at);
+        const copy = at.clone();
+        copy.walkRules((rule) => {
+          rule.selectors = rule.selectors.map((s) => scoped(s, "[data-theme='dark']"));
+        });
+        at.walkRules((rule) => {
+          rule.selectors = rule.selectors.map((s) => scoped(s, ":not([data-theme='light'])"));
+        });
+        at.after(copy.nodes);
+      },
+    },
+  };
+}
+
 // Der Build landet in dist/. Die Adapter liefern index.html unter der Adresse der App aus
 // und biegen die relativen Pfade (base: './') auf ihr Verzeichnis um.
 export default defineConfig({
   base: './',
-  plugins: [react(), brandHtml(), pdfjsDecoders(), precacheList()],
+  plugins: [
+    react(),
+    brandHtml(),
+    pdfjsDecoders(),
+    precacheList(),
+    thirdPartyLicenses({ root: fileURLToPath(new URL('../..', import.meta.url)) }),
+  ],
+  css: { postcss: { plugins: [themeOverride()] } },
   define: { __PDFJS_DIR__: JSON.stringify(PDFJS_DIR) },
   build: {
     outDir: 'dist',

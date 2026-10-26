@@ -42,6 +42,18 @@ final class PdoUsers implements UserDirectory
         return $out;
     }
 
+    public function emails(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        $out = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            foreach ($this->db->select('SELECT id, email FROM {users} WHERE id IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ')', $chunk) as $row) {
+                $out[(int) $row['id']] = (string) $row['email'];
+            }
+        }
+        return $out;
+    }
+
     /** @return array<string, mixed>|null Zeile für die Anmeldung (Benutzername oder E-Mail). */
     public function findForLogin(string $loginOrEmail): ?array
     {
@@ -171,6 +183,29 @@ final class PdoUsers implements UserDirectory
     {
         $this->sessions?->destroyAllFor($id);
         $this->db->execute('DELETE FROM {users} WHERE id = ?', [$id]);
+    }
+
+    /** Rolle Gast, Anmeldung gesperrt, alle Sitzungen beendet; alle Daten bleiben (ehemaliges Mitglied). */
+    public function deactivate(int $id): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        $this->db->update('users', ['level' => Roles::GUEST, 'disabled_at' => $now, 'updated_at' => $now], ['id' => $id]);
+        $this->sessions?->destroyAllFor($id);
+    }
+
+    public function reactivate(int $id, string $role): void
+    {
+        $this->db->update('users', ['level' => $role, 'disabled_at' => null, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+    }
+
+    /**
+     * Stillgelegt (deactivate)? Dann ist die Anmeldung gesperrt.
+     *
+     * @param array<string, mixed> $row Zeile aus findForLogin()
+     */
+    public static function isDisabled(array $row): bool
+    {
+        return ($row['disabled_at'] ?? null) !== null && $row['disabled_at'] !== '';
     }
 
     /** @param array<string, mixed> $row */

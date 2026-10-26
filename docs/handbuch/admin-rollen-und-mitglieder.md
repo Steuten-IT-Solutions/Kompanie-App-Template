@@ -1,59 +1,71 @@
 ---
-titel: Rollen und Mitglieder
-reihenfolge: 120
+titel: Rollen
+reihenfolge: 114
 rechte: [manage_settings]
 ---
-Jede Person hat genau eine **Grundrolle** und dazu beliebig viele **Zusatzrollen**; sie hat dann die Rechte aller ihrer Rollen zusammen. Welche Rollen es gibt und was sie dürfen, legst du unter **Verwaltung → Einstellungen → Rollen** fest. Dort siehst du je Rolle, wie viele Personen sie haben (davon als Zusatzrolle) und welche Rechte sie hat.
+Hier legst du fest, welche Rollen es gibt und was jede Rolle in der App darf. Wer welche Rolle bekommt, wählst du bei der Person in der Verwaltung (siehe [Konto und Rolle](seite:rollen-vergeben)).
 
-## Feste Rollen
-- **{rolle.guest}**: sieht nur öffentliche Inhalte.
-- **{rolle.candidate}**: vor der Aufnahme; sieht den internen Kalender, aber nicht den Mitgliederbereich. Wer Mitglieder anlegen darf, nimmt {rolle.candidate} als {rolle.member} auf.
-- **{rolle.member}**: die Rolle neuer Konten, mit dem Mitgliederbereich (eigene Daten, interner Kalender, interne Bilder).
-- **{rolle.admin}**: darf alles, auch Einstellungen und Updates.
+![Die Seite Rollen mit der Liste aller Rollen](bild:admin-rollen-und-mitglieder)
 
-Diese vier lassen sich umbenennen, aber nicht löschen; ihre Rechte lassen sich nicht ändern.
+## So öffnest du die Seite
+Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Rollen**.
 
-Mit WordPress sind die Administratoren der Webseite die {rolle.admin}s der App. Diese Rolle vergibst du im WordPress-Backend, nicht in der App. Rechte, die jemand in WordPress hat (z. B. Benutzer anlegen), gelten auch in der App.
+## Was du hier siehst
+- **Liste der Rollen**: je Rolle der Name, wie viele Personen sie haben (davon als Zusatzrolle) und ihre Rechte. Bei eigenen Rollen steht außerdem **für neue Konten** oder **aufnehmen als {rolle.member}**, wenn das eingestellt ist. Weicht der {bereich.points}faktor von 1 ab, steht er als Abzeichen neben dem Namen, z. B. „×0,5“.
+- **Griff** links neben jeder Rolle: zum Ändern der Reihenfolge.
+- **Ansehen**: zeigt die App so, wie diese Rolle sie sieht (siehe [App als Rolle ansehen](seite:admin-vorschau)). Bei {rolle.admin} fehlt der Knopf.
+- **Bearbeiten**: öffnet die Rolle zum Ändern.
+- **+ Neue Rolle**: legt eine weitere Rolle an.
+- **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen.
+- **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle in den Anwesenheitslisten zählt.
 
-## Standardrollen der Bereiche
-Schaltest du unter **Bereiche** einen Bereich mit eigenen Aufgaben ein, kommt seine Rolle dazu. Sie heißt wie der Bereich mit „verwalten“ dahinter und hat den Mitgliederbereich und die Rechte des Bereichs:
+## So gehst du vor
+### Eine Rolle anlegen
+1. Tippe auf **+ Neue Rolle**.
+2. Trage den **Name der Rolle** ein (höchstens 30 Zeichen).
+3. Setze unter **Rechte** die Häkchen für alles, was die Rolle darf.
+4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist und ob, wer Mitglieder anlegen darf, Personen mit dieser Rolle als {rolle.member} aufnimmt.
+5. Nutzt ihr {bereich.points} und hat die Rolle den Mitgliederbereich, trage den **{bereich.points}faktor** ein (z. B. 0,5 für die Hälfte).
+6. Tippe auf **Anlegen**.
 
-- „{bereich.events} verwalten“
-- „{bereich.points} verwalten“
-- „{bereich.penalties} verwalten“
-- „{bereich.ranks} verwalten“
-- „{bereich.titles} verwalten“
-- „{bereich.attendance} verwalten“
-- „{bereich.documents} verwalten“
-- „{bereich.board} verwalten“
-- „{bereich.polls} verwalten“
-- „{bereich.inventory} verwalten“
+![Eine neue Rolle „Anwärter“ mit dem internen Kalender, noch nicht angelegt](bild:admin-rollen-und-mitglieder-neu)
 
-Gibt es schon eine Rolle mit diesem Namen, legt die App keine zweite an. Schaltest du den Bereich aus und niemand hat die Rolle, verschwindet sie wieder. {bereich.calendar}, {bereich.news}, {bereich.gallery} und {bereich.birthdays} bringen keine eigene Rolle mit; die Geburtstage anderer pflegt, wer Mitglieder anlegen darf.
+### Eine Rolle ändern oder löschen
+1. Tippe bei der Rolle auf **Bearbeiten**.
+2. Ändere Name, Rechte, Konten oder {bereich.points}faktor und tippe auf **Speichern**. Mit **Abbrechen** verwirfst du die Änderungen.
+3. Zum Löschen einer eigenen Rolle tippst du stattdessen auf **Löschen**. Haben noch Personen die Rolle, wählst du vorher bei **Beim Löschen bekommen die … Personen die Rolle**, welche Rolle sie stattdessen bekommen. Bestätige die Rückfrage.
 
-## Eigene Rollen
-Mit **+ Neue Rolle** legst du weitere Rollen an (zusammen höchstens 30), z. B. eine Leitung, die {bereich.points}, {bereich.penalties} und {bereich.events} verwaltet. Du gibst einen Namen ein (höchstens 30 Zeichen) und wählst die Rechte, z. B. nur den internen Kalender ohne Mitgliederbereich. Jedes andere Recht setzt den Mitgliederbereich voraus: Kreuzt du eines an, hakt die App den Mitgliederbereich mit an; nimmst du den Mitgliederbereich weg, entfallen auch die übrigen Rechte. Falls ihr {bereich.points} nutzt und die Rolle den Mitgliederbereich hat, legst du einen **{bereich.points}faktor** fest (z. B. 0,5 für junge Mitglieder); er gilt für neue Buchungen, alte bleiben, wie sie sind. Den {bereich.points}faktor kannst du auch bei {rolle.member} ändern. {rolle.guest}, {rolle.candidate} und Rollen ohne Mitgliederbereich haben keinen, weil sie keine {bereich.points} bekommen; {rolle.admin}s zählen immer voll.
+### Die Reihenfolge ändern
+1. Halte eine Rolle am Griff links fest und ziehe sie nach oben oder unten. Am Computer geht das am Griff auch mit den Pfeiltasten.
+2. Lass los. Die App speichert die neue Reihenfolge sofort.
 
-Mit **Bearbeiten** änderst du eine Rolle, mit **Löschen** entfernst du eine eigene Rolle. Haben noch Personen die Rolle, wählst du vorher, welche Rolle sie stattdessen bekommen.
+### Festlegen, wie Rollen in der {bereich.attendance} zählen
+1. Wähle unter **{bereich.attendance}: Gruppen im Zähler** je Rolle **Eigene Gruppe** oder **zählt als …** eine andere Rolle.
+2. Tippe auf **Gruppen speichern**.
 
-Nutzt ihr {bereich.attendance}, legst du darunter unter **{bereich.attendance}: Gruppen im Zähler** fest, als was jede Rolle in den Anwesenheitslisten zählt.
+## Die Rechte
+Diese Rechte kannst du einer eigenen Rolle geben:
+- **Mitgliederbereich**: eigene {bereich.points} und {bereich.penalties}, interner Kalender, interne Bilder der {bereich.gallery}, dazu **Intern**. Jedes weitere Recht außer **Interner Kalender** und **Intern** setzt ihn voraus: Kreuzt du eines an, hakt die App den Mitgliederbereich mit an. Nimmst du ihn weg, entfallen alle anderen Rechte.
+- **Interner Kalender** (ohne Mitgliederbereich, z. B. für Anwärter). Mit dem Mitgliederbereich ist er schon enthalten.
+- **Intern**: {bereich.directory} und {bereich.documents} stehen unten gesammelt unter dem Knopf **Intern** statt einzeln (siehe [Intern](seite:intern)). Das Recht ändert nur die Leiste unten, nicht, was die Person sehen darf: {bereich.documents} sieht weiterhin nur, wer den Mitgliederbereich hat. Auch ohne Mitgliederbereich vergebbar (z. B. für Anwärter); mit ihm schon enthalten.
+- Je Bereich mit eigenen Aufgaben ein Recht, zum Beispiel **{bereich.points} vergeben, Katalog pflegen** oder **Öffentliche {bereich.events} pflegen**.
+- **Mitglieder anlegen und Startpasswörter erzeugen** und **Rollen vergeben**.
 
-> Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbehalten. Wer Rollen vergeben darf, ohne {rolle.admin} zu sein, vergibt nur Rollen, deren Rechte er selbst hat – nie {rolle.admin} und nie Rollen mit „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die nicht mehr Rechte haben als er.
+Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbehalten; dieses Recht kannst du keiner anderen Rolle geben.
 
-## Grundrolle und Zusatzrollen
-Die Grundrolle sagt, wer jemand in der Kompanie ist: {rolle.guest}, {rolle.candidate}, {rolle.member}, {rolle.admin} oder eine eigene Rolle. Zusatzrollen sind Aufgaben obendrauf, z. B. „{bereich.points} verwalten“ und eine eigene Rolle „Kassenwart“. So brauchst du keine eigene Rolle für jede Kombination.
+## Gut zu wissen
+- **Feste Rollen:** {rolle.guest} sieht nur öffentliche Inhalte. {rolle.member} ist die Rolle neuer Konten, mit dem Mitgliederbereich. {rolle.admin} darf alles. Diese drei kannst du umbenennen, aber nicht löschen, und ihre Rechte lassen sich nicht ändern. Unter **Bearbeiten** siehst du ihre Rechte als Haken, die sich nicht umschalten lassen. Den {bereich.points}faktor kannst du bei {rolle.member} und {rolle.admin} ändern.
+- **Rollen der Bereiche:** Schaltest du einen Bereich mit eigenen Aufgaben ein, kommt eine Rolle dazu, die wie der Bereich mit „verwalten“ dahinter heißt, z. B. „{bereich.points} verwalten“. Sie hat den Mitgliederbereich und das Recht des Bereichs (siehe [Bereiche](seite:admin-bereiche)).
+- **Grundrolle und Zusatzrollen:** Jede Person hat genau eine Grundrolle und dazu auf Wunsch Zusatzrollen; sie hat die Rechte aller ihrer Rollen zusammen. Zusatzrollen können nur eigene Rollen und Rollen der Bereiche sein. Sie gibt es nur zu einer Grundrolle mit Mitgliederbereich.
+- **{bereich.points}faktor:** Er gilt beim Buchen, für neue Buchungen; alte bleiben, wie sie sind. Hat jemand mehrere Rollen, gilt der kleinste Faktor. {rolle.guest} und Rollen ohne Mitgliederbereich haben keinen, weil sie keine {bereich.points} bekommen.
+- **Reihenfolge:** Sie gilt überall, wo Rollen stehen: in Auswahllisten, bei den Zusatzrollen und in den Zählern der Mitgliederliste und der {bereich.attendance}.
+- **Löschen:** Hat jemand die gelöschte Rolle als Zusatzrolle, bekommt er die gewählte Ersatzrolle als Zusatzrolle, wenn das eine eigene Rolle ist; sonst fällt sie weg.
+- Insgesamt gibt es höchstens 30 Rollen.
+- Mit WordPress sind die Administratoren der Webseite die {rolle.admin}s der App. Diese Rolle vergibst du im WordPress-Backend, nicht in der App.
 
-- Zusatzrollen können nur eigene Rollen und Standardrollen der Bereiche sein, nicht die vier festen Rollen.
-- Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich; {rolle.admin} braucht keine, er darf ohnehin alles. Bekommt jemand eine Grundrolle ohne Mitgliederbereich (z. B. {rolle.guest} oder {rolle.candidate}), fallen seine Zusatzrollen weg.
-- Was nach der Rolle geht und nicht nach den Rechten, richtet sich nur nach der Grundrolle: die Gruppe in den Zählern der Anwesenheit, **Als {rolle.member} aufnehmen** und mit WordPress die Administratoren.
-- Was jemand sieht und welche Benachrichtigungen er bekommt, richtet sich nach seinen Rechten, also nach allen Rollen zusammen.
-- **Punktefaktor:** Bei mehreren Rollen gilt der kleinste, z. B. ×0,5, wenn eine der Rollen ×0,5 hat.
-- Neben jeder Rolle steht, wie viele Personen sie haben, als Grund- oder als Zusatzrolle. Löschst du eine Rolle, die jemand als Zusatzrolle hat, bekommt er stattdessen die gewählte Ersatzrolle als Zusatzrolle, wenn das eine eigene Rolle ist; sonst fällt sie einfach weg.
+> **Beispiel Anwärter:** Lege eine Rolle „Anwärter“ an, nur mit **Interner Kalender**, ohne Mitgliederbereich, mit **Beim Anlegen neuer Konten wählbar** und dem Häkchen zum Aufnehmen als {rolle.member}. Anwärter sehen dann den internen Kalender und das {bereich.board} und stehen in der Mitgliederliste und der {bereich.attendance}, bekommen aber keine {bereich.points} oder {bereich.penalties}. Der Name der Rolle steht in beiden Mitgliederlisten wie ein Titel neben dem Namen, auch in der öffentlichen unter **{bereich.directory}**. Später nimmt sie auf, wer Mitglieder anlegen darf.
 
-## Rollen ausprobieren
-Was eine Rolle in der App sieht, zeigt dir **Ansehen** neben der Rolle, ohne anderes Konto; siehe [App als Rolle ansehen](seite:admin-vorschau).
-
-## Mitglieder und ihre Rollen
-Wie du Mitglieder anlegst, Startpasswörter erzeugst und Rollen vergibst, steht unter [Mitglieder anlegen](seite:mitglieder-anlegen) und [Rollen vergeben](seite:rollen-vergeben). Sieht jemand etwas nicht, hilft [Häufige Probleme](seite:haeufige-probleme).
-
-Braucht nur eine einzelne Person ein Recht mehr oder weniger als ihre Rollen, legst du dafür keine eigene Rolle an: Du gibst oder entziehst es direkt bei der Person (unter „Rollen vergeben“, Abschnitt „Einzelne Rechte geben oder entziehen“).
+## Siehe auch
+- [App als Rolle ansehen](seite:admin-vorschau)
+- [Konto und Rolle](seite:rollen-vergeben)
+- [Mitglied anlegen](seite:mitglieder-anlegen)

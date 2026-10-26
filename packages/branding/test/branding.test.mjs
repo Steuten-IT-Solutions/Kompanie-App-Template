@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import sharp from 'sharp';
 import { contrast, ensureContrast, mix } from '../color.mjs';
 import { deriveTheme } from '../theme.mjs';
-import { BrandError, build, initialsSvg, loadConfig } from '../brand.mjs';
+import { BrandError, build, enclosingCircle, initialsSvg, loadConfig } from '../brand.mjs';
 
 function tmp(config, files = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'brand-'));
@@ -133,6 +133,56 @@ test('Build erzeugt Icons aus einem rechteckigen JPG-Logo', async () => {
   assert.equal(brand.name, 'Schützen Musterdorf');
   assert.match(readFileSync(join(out, 'fonts.ts'), 'utf8'), /@fontsource\/oswald/);
   assert.match(readFileSync(join(out, 'theme.css'), 'utf8'), /--primary: #2e6b3f/);
+});
+
+test('Kleinster Kreis um Punkte', () => {
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  const square = enclosingCircle([
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 0, y: 10 },
+    { x: 10, y: 10 },
+    { x: 5, y: 5 },
+  ]);
+  assert.ok(near(square.x, 5) && near(square.y, 5) && near(square.r, Math.sqrt(50)), JSON.stringify(square));
+  const two = enclosingCircle([
+    { x: 0, y: 0 },
+    { x: 4, y: 0 },
+  ]);
+  assert.ok(near(two.x, 2) && near(two.y, 0) && near(two.r, 2), JSON.stringify(two));
+});
+
+test('Logo oben eckig, unten rund: Ecken und Spitze gleich weit von der Mitte des Icons', async () => {
+  // 300 × 400, oben gerade, unten ein Halbkreis; außerhalb durchsichtig.
+  const shield = await sharp(
+    Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><path d="M0 0 H300 V250 A150 150 0 0 1 0 250 Z" fill="#123499"/></svg>',
+    ),
+  )
+    .png()
+    .toBuffer();
+  const dir = tmp({ name: 'W', colors: { primary: '#2e6b3f' } }, { 'logo.png': shield });
+  await build({ config: join(dir, 'kompanie.json'), assets: join(dir, 'assets'), out: join(dir, 'o'), publicDir: join(dir, 'o') });
+  const { data, info } = await sharp(join(dir, 'o', 'icons', 'icon-maskable-512.png'))
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let top = info.height;
+  let bottom = -1;
+  let left = info.width;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * info.channels] < 128) {
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+        left = Math.min(left, x);
+      }
+    }
+  }
+  const c = info.width / 2;
+  const corner = Math.hypot(left - c, top - c);
+  const tip = bottom + 1 - c;
+  assert.ok(Math.abs(corner - tip) <= 3, `Ecke ${corner.toFixed(1)}, Spitze ${tip.toFixed(1)}`);
+  assert.ok(top - 0 > info.height - 1 - bottom, 'oben mehr Rand als unten (Logo nach unten gerückt)');
 });
 
 test('Zu kleines Logo wird abgelehnt, kein Logo ergibt Initialen', async () => {

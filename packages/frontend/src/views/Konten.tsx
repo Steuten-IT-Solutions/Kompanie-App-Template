@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, levelLabel, type AccountProfile, type BulkResult, type CreatedUser, type Level, type NewPerson } from '../api';
+import { api, config, newAccountRoles, type AccountProfile, type BulkResult, type CreatedUser, type Level, type NewPerson } from '../api';
 import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
-import { Loading, NameFields, trimName, useAsync } from '../ui';
+import { EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
+import { normalizeEmail } from '../email';
+import { normalizePhone } from '../phone';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 
@@ -15,12 +17,20 @@ export function credentialsText(c: { name: string; username: string; password: s
     `App installieren: ${installUrl()}`,
     `Benutzername: ${c.username}`,
     `Passwort: ${c.password}`,
-    'Bitte nach der ersten Anmeldung unter „Konto“ ein eigenes Passwort setzen.',
+    'Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.',
   ].join('\n');
 }
 
 /** Zugangsdaten anzeigen, kopieren, teilen und als Zettel ausdrucken. */
-export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?: () => void }) {
+export function Credentials({
+  people,
+  onDone,
+  doneLabel = '‹ Zur Mitgliederliste',
+}: {
+  people: CreatedUser[];
+  onDone?: () => void;
+  doneLabel?: string;
+}) {
   const [copied, setCopied] = useState(false);
   // Ohne Zugriff auf die Zwischenablage (z. B. ohne HTTPS): Text zum Markieren zeigen (mehrzeilig, anders als prompt()).
   const [showText, setShowText] = useState(false);
@@ -62,7 +72,7 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
               <dt>Passwort</dt>
               <dd data-testid="new-password">{c.password}</dd>
             </dl>
-            <p className="small print-only">Bitte nach der ersten Anmeldung unter „Konto“ ein eigenes Passwort setzen.</p>
+            <p className="small print-only">Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.</p>
           </section>
         ))}
       </div>
@@ -94,7 +104,7 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
       )}
       {onDone && (
         <button className="btn btn-link no-print" onClick={onDone}>
-          ‹ Zur Mitgliederliste
+          {doneLabel}
         </button>
       )}
     </div>
@@ -102,6 +112,27 @@ export function Credentials({ people, onDone }: { people: CreatedUser[]; onDone?
 }
 
 type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null };
+
+/**
+ * Rolle neuer Konten: Mitglied oder eine eigene Rolle, die der Admin dafür freigegeben hat (Einstellungen → Rollen,
+ * z. B. Anwärter). Ohne freigegebene Rollen keine Auswahl: Neue Konten sind dann Mitglieder.
+ */
+export function NewAccountRole({ label, value, onChange }: { label: string; value: Level; onChange: (level: Level) => void }) {
+  const roles = newAccountRoles();
+  if (roles.length < 2) return null;
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {roles.map((r) => (
+          <option key={r.key} value={r.key}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', email: '', points: '', bday: emptyBirthday(), picture: null });
 
@@ -112,7 +143,7 @@ const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', emai
  */
 export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   const [rows, setRows] = useState([emptyRow(), emptyRow(), emptyRow()]);
-  const [level, setLevel] = useState<'member' | 'candidate'>('member');
+  const [level, setLevel] = useState<Level>('member');
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -136,7 +167,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       people.push({
         ...name,
         ...(r.username?.trim() ? { username: r.username.trim() } : {}),
-        ...(r.email?.trim() ? { email: r.email.trim() } : {}),
+        ...(r.email && normalizeEmail(r.email) ? { email: normalizeEmail(r.email) } : {}),
         ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
         ...(bday ? { birthday: birthdayString(bday) } : {}),
       });
@@ -191,13 +222,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
         ‹ Einzeln anlegen
       </button>
-      <label className="field">
-        <span>Rolle für alle</span>
-        <select value={level} onChange={(e) => setLevel(e.target.value as 'member' | 'candidate')}>
-          <option value="member">{levelLabel('member')}</option>
-          <option value="candidate">{levelLabel('candidate')} (nur interner Kalender)</option>
-        </select>
-      </label>
+      <NewAccountRole label="Rolle für alle" value={level} onChange={setLevel} />
       {rows.map((r, i) => (
         <fieldset key={i} className="fieldset bulk-row">
           <legend>Person {i + 1}</legend>
@@ -213,10 +238,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
                 onChange={(e) => update(i, { username: e.target.value })}
               />
             </label>
-            <label className="field">
-              <span>E-Mail (optional)</span>
-              <input type="email" autoComplete="off" value={r.email} onChange={(e) => update(i, { email: e.target.value })} />
-            </label>
+            <EmailField value={r.email ?? ''} onChange={(email) => update(i, { email })} />
           </div>
           {points && (
             <label className="field">
@@ -275,22 +297,32 @@ function plainName(s: string): string {
   return t.value;
 }
 
-/** Mitgliedsdetails: Vor- und Nachname, Benutzername und E-Mail ändern, Konto löschen (Issue #24). */
+/**
+ * Mitgliedsdetails: Vor- und Nachname, Benutzername, E-Mail und Handynummer ändern, Konto löschen (Issue #24). Das
+ * eigene Konto ohne Löschen; eine neue eigene E-Mail-Adresse nur mit dem aktuellen Passwort (wie unter Meins → Konto).
+ */
 export function AccountPanel({
   id,
   level,
+  former = false,
+  self = false,
   onChanged,
   onToast,
 }: {
   id: number;
   level: Level;
+  /** ehemalig: Der Hinweis auf „Als ehemalig eintragen“ entfällt */
+  former?: boolean;
+  /** das eigene Konto */
+  self?: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
-  const { data, error, loading, setData } = useAsync(() => api.account(id), [id]);
+  const { data, error, loading, setData } = useAsync(() => api.account(id), [id], 'account');
   const [editing, setEditing] = useState<AccountProfile | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const wordpress = config?.variant === 'wordpress';
@@ -299,21 +331,26 @@ export function AccountPanel({
   // Keine Rechte für dieses Konto (z. B. ein Admin): kein Bereich „Konto“.
   if (error) return null;
   const p = data!;
+  const ownEmailChanged = self && editing !== null && normalizeEmail(editing.email).toLowerCase() !== p.email.toLowerCase();
 
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!editing) return;
-    setBusy(true);
     setFormError(null);
+    if (ownEmailChanged && !password) return setFormError('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+    setBusy(true);
     try {
       setData(
         await api.updateAccount(id, {
           ...trimName(editing),
-          email: editing.email.trim(),
+          email: normalizeEmail(editing.email),
+          phone: normalizePhone(editing.phone),
           ...(p.can_change_login ? { username: editing.login.trim() } : {}),
+          ...(ownEmailChanged ? { current_password: password } : {}),
         }),
       );
       setEditing(null);
+      setPassword('');
       onToast('Gespeichert');
       onChanged();
     } catch (err) {
@@ -357,14 +394,22 @@ export function AccountPanel({
             />
           </label>
           {p.can_change_login ? (
-            <p className="muted small">Ein neuer Benutzername meldet die Person auf allen Geräten ab.</p>
+            <p className="muted small">
+              {self
+                ? 'Ein neuer Benutzername meldet dich auf deinen anderen Geräten ab.'
+                : 'Ein neuer Benutzername meldet die Person auf allen Geräten ab.'}
+            </p>
           ) : (
             <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
           )}
-          <label className="field">
-            <span>E-Mail (optional)</span>
-            <input type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
-          </label>
+          <EmailField value={editing.email} onChange={(email) => setEditing({ ...editing, email })} />
+          <PhoneField value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
+          {ownEmailChanged && (
+            <label className="field">
+              <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
+              <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+          )}
           {formError && (
             <p className="form-error" role="alert">
               {formError}
@@ -374,7 +419,15 @@ export function AccountPanel({
             <button className="btn" type="submit" disabled={busy}>
               Speichern
             </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setPassword('');
+                setFormError(null);
+              }}
+            >
               Abbrechen
             </button>
           </div>
@@ -388,12 +441,17 @@ export function AccountPanel({
                 {' · '}E-Mail: {p.email}
               </>
             )}
+            {p.phone && (
+              <>
+                {' · '}Handy: <a href={`tel:${p.phone.replace(/[^\d+]/g, '')}`}>{p.phone}</a>
+              </>
+            )}
           </p>
           <div className="button-row">
             <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(p)}>
               Angaben ändern
             </button>
-            {level !== 'admin' && (
+            {level !== 'admin' && !self && (
               <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
                 {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
               </button>
@@ -407,6 +465,8 @@ export function AccountPanel({
                 Person werden gelöscht
                 {wordpress ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App).' : ', das Konto auch.'} Das lässt sich nicht
                 rückgängig machen.
+                {!former &&
+                  ' Wer nur ausgetreten oder verstorben ist, lässt sich stattdessen als ehemalig eintragen; dann bleiben die Daten.'}
               </p>
               <label className="field">
                 <span>Zur Bestätigung den Namen eintippen</span>

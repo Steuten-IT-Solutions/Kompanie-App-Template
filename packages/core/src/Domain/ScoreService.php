@@ -136,6 +136,18 @@ final class ScoreService
     }
 
     /**
+     * Alle offenen Strafen, neueste zuerst, mit dem Namen der Person (user_name; UserNames::DELETED ohne Konto).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function openPenalties(): array
+    {
+        $rows = $this->penalties->open();
+        $this->names->prime([...array_column($rows, 'created_by'), ...array_column($rows, 'user_id')]);
+        return array_map(fn (array $r): array => $this->formatPenalty($r) + ['user_name' => $this->names->name((int) $r['user_id'])], $rows);
+    }
+
+    /**
      * @param array<string, mixed> $in user_ids, amount_cents, reason, date
      * @return array<int, array<string, mixed>>
      */
@@ -210,7 +222,9 @@ final class ScoreService
             throw ApiError::invalid('Bitte einen Titel angeben.');
         }
         $points = self::parsePoints($in['points'] ?? null);
-        $id = $this->catalog->insert($title, $points, self::sort($in['sort'] ?? 0));
+        // Ohne Angabe ans Ende (Issue #176: die Reihenfolge lässt sich per Ziehen ändern).
+        $sort = ($in['sort'] ?? null) !== null ? self::sort($in['sort']) : self::sort($this->catalog->maxSort() + 10);
+        $id = $this->catalog->insert($title, $points, $sort);
         return self::formatCatalog((array) $this->catalog->find($id));
     }
 
@@ -238,6 +252,36 @@ final class ScoreService
         }
         $this->catalog->update($id, $data);
         return self::formatCatalog((array) $this->catalog->find($id));
+    }
+
+    /**
+     * Reihenfolge des ganzen Katalogs (PUT /catalog/order, Issue #176), auch der deaktivierten Einträge; wie bei Titeln
+     * alle IDs genau einmal, sonst 400.
+     *
+     * @return array<int, array<string, mixed>> der Katalog in der neuen Reihenfolge (mit deaktivierten)
+     */
+    public function reorderCatalog(mixed $ids): array
+    {
+        $items = [];
+        foreach ($this->catalog->all(false) as $item) {
+            $items[(int) $item['id']] = (int) $item['sort'];
+        }
+        $order = is_array($ids) ? array_map(static fn (mixed $v): ?int => Input::integer($v), array_values($ids)) : [];
+        $given = $order;
+        sort($given);
+        $known = array_keys($items);
+        sort($known);
+        if ($given !== $known) {
+            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+        }
+        $changed = [];
+        foreach ($order as $i => $id) {
+            if ($items[(int) $id] !== ($i + 1) * 10) {
+                $changed[(int) $id] = ($i + 1) * 10;
+            }
+        }
+        $this->catalog->reorder($changed);
+        return $this->catalog(true);
     }
 
     /* ---------------------------------------------------------------- */

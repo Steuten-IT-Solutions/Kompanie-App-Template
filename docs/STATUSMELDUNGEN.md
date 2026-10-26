@@ -1,9 +1,14 @@
-# Statusmeldungen (Format 2)
+# Statusmeldungen (Format 3)
 
 Die App meldet dem **Steuten IT Solutions Cockpit** (Repo `Steuten-IT-Solutions/project-cockpit`), ob eine
 Installation läuft, aber nur, wenn ein Admin zugestimmt hat (Einrichtungsassistent bzw.
 *Einstellungen → Zustand und Updates*). Ohne Zustimmung wird nichts gesendet und nichts gezählt. Issue #20, Gegenseite
 im Cockpit: project-cockpit#12.
+
+**Format 3** (Issue #175, Gegenseite im Cockpit: project-cockpit#20) ist Format 2 mit den Nutzungszahlen `usage` im
+Lebenszeichen. Das Cockpit lehnt bis project-cockpit#20 alles außer Format 1 und 2 mit `400` ab; es muss Format 3
+deshalb **vor** der ersten App-Version mit Format 3 annehmen. Format 2 nimmt es weiter an, bis alle Installationen
+aktualisiert sind.
 
 Fehlermeldungen aus der App (Issue #64) gehen über denselben Weg (gleiche Installations-ID und Signatur, eigener
 Empfänger), brauchen aber keine Zustimmung zu den Statusmeldungen: [FEHLERMELDUNGEN.md](FEHLERMELDUNGEN.md).
@@ -34,7 +39,7 @@ durch das ausbleibende Lebenszeichen auf.
 
 ```json
 {
-  "format": 2,
+  "format": 3,
   "installation": "9f3c0a…(32 Hex-Zeichen)",
   "kompanie": "steuten-it-solutions/kompanie-musterstadt",
   "version": "1.4.0.3",
@@ -47,6 +52,7 @@ durch das ausbleibende Lebenszeichen auf.
   "details": { "CALENDAR_FETCH": { "ics_http_404": 2, "ics_timeout": 1 }, "UPDATE_FAILED": { "download_http_503": 1 } },
   "cron": { "kind": "real", "last": 1790000000 },
   "features": ["events", "calendar", "points"],
+  "usage": { "users": 42, "active": { "d1": 12, "d7": 30, "d30": 38 }, "areas": { "app": 20, "events": 35, "login": 31, "points": 18 } },
   "update": { "ok": false, "at": 1790000000, "to": "1.4.0.4" },
   "updateCheckOk": true,
   "gallery": { "ok": false, "at": 1789990000 },
@@ -92,8 +98,21 @@ durch das ausbleibende Lebenszeichen auf.
   nur bei Seitenaufrufen). `cron.last`: letzter Lauf einer Hintergrundaufgabe.
 - `update`, `updateCheckOk`, `gallery`, `sent`: wie in Format 1.
 - `maintenance`: ob der Wartungsmodus an ist (Issue #42), ohne Begründung. Das Cockpit zeigt die Installation dann als „in Wartung“, nicht als Fehler.
+- `usage` (Issue #175, nur bei `kind = heartbeat`, in jedem Lebenszeichen): Nutzungszahlen als Summen, ganze Zahlen ≥ 0,
+  genau (vergröbert wird für die Anzeige im Cockpit, project-cockpit#20). Grundlage ist die Nutzungsauswertung der
+  Installation (`Domain\ActivityService`), auch wenn dort die Erfassung je Person ausgeschaltet ist.
+  - `users`: Konten mit einer Rolle in der App (ohne Gäste und Ehemalige).
+  - `active.d1`, `active.d7`, `active.d30`: Konten mit mindestens einer Nutzung in den letzten 24 Stunden bzw. 7 und 30
+    Tagen (je ab dem Zeitpunkt der Meldung zurück). Immer `d1 ≤ d7 ≤ d30 ≤ users`.
+  - `areas`: je Bereich die Zahl der **Personen**, die ihn in den letzten 30 Tagen genutzt haben (nicht die Aufrufe).
+    Schlüssel nach `^[a-z]{1,20}$`: die Bereiche aus `features` (auch neue), dazu `app` (Allgemeines wie Verwaltung,
+    Konto, Einstellungen) und `login` (Anmeldung). Bereiche ohne Nutzung fehlen; ohne jede Nutzung ist es `{}`.
+    Höchstens so viele Einträge wie Bereiche (heute 19).
+  - Gezählt wird an den API-Routen für angemeldete Konten mit einer Rolle in der App, nicht in der Vorschau „App als
+    Rolle ansehen“ und nicht für Aufrufe, die die App von selbst macht (`/config`, Abgleich der Benachrichtigungen).
+    Was offline aus dem Zwischenspeicher kommt, erreicht den Server nicht und zählt nicht.
 
-**Keine** Namen, keine Mitgliederzahlen, keine Inhalte, keine Fehlertexte. Was genau gesendet wird, sehen
+**Keine** Namen, keine Benutzer-IDs, keine Inhalte, keine Fehlertexte. Nutzungszahlen nur als Summen (`usage`). Was genau gesendet wird, sehen
 Admins unter *Einstellungen → Zustand und Updates* (Beispiel eines Lebenszeichens, ohne `key`), dazu den Zeitpunkt der
 letzten Meldung.
 
@@ -131,5 +150,5 @@ Admins können es kopieren und bei Bedarf an uns schicken.
 
 Das Lebenszeichen wird in jedem Fall beim nächsten Lauf neu erzeugt.
 
-Format 1 (täglich, ohne Signatur) nimmt das Cockpit übergangsweise weiter an, bis alle Installationen
-aktualisiert sind.
+Format 1 (täglich, ohne Signatur) und Format 2 (wie Format 3, ohne `usage`) nimmt das Cockpit übergangsweise weiter
+an, bis alle Installationen aktualisiert sind.
