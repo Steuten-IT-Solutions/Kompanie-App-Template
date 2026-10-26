@@ -261,6 +261,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   übernimmt neue Icons nur, wenn sich ihre Adresse im Manifest ändert. Die Adressen enthalten jetzt eine Kennung, die
   sich mit dem Bild ändert; Chrome übernimmt das neue Symbol dann beim nächsten Abgleich, bei größeren Änderungen erst
   nach einer Bestätigung. Auf dem iPhone bleibt das Symbol, das beim Hinzufügen gespeichert wurde.
+- **Altes Icon nach einem Update**: Hatte das Handy das Icon am Tag vor einem Update schon geladen, speicherte die App
+  beim Update manchmal das alte Icon (z. B. für Benachrichtigungen) und zeigte es bis zum nächsten Update. Jetzt fragt
+  sie dafür immer beim Server nach.
 - **Doppelpunkt bei den Empfängern einer E-Mail**: In der Ansicht einer gesendeten E-Mail (*Verwaltung → E-Mails*)
   steht jetzt „An:“, „Cc:“ und „Bcc:“ statt „An“, „Cc“ und „Bcc“.
 
