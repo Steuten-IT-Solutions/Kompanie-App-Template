@@ -62,6 +62,7 @@ Unter **Verwaltung** → **Einstellungen** → **Zustand und Updates** steht unt
 - **Automatische Updates sind gesperrt** (mit WordPress z. B. in den Einstellungen der Webseite): Spiel neue Versionen dort von Hand ein.
 - **Zu wenig Speicherplatz**: Die Zeile **Server** wird gelb, wenn weniger als 200 MB frei sind. Schaffe Platz oder erweitere das Paket beim Hoster.
 - **Zu alte PHP- oder WordPress-Version**: PHP lässt sich meist im Kundenmenü des Hosters umstellen; WordPress zuerst aktualisieren.
+- **Die Sicherung in Google Drive hat nicht geklappt** (z. B. Speicher voll, Verbindung zu Google getrennt): Automatische Updates warten dann auf deine Entscheidung. Behebe den Grund unter **Datensicherung** bzw. **Google-Zugang** oder tippe unter **Updates** auf **Trotzdem aktualisieren**.
 
 > **Für Fortgeschrittene:** Fragt WordPress nach FTP-Zugangsdaten, darf es die Plugin-Dateien nicht selbst schreiben; der Hoster muss die Dateirechte anpassen, oder du lädst das Update von Hand hoch. Ohne WordPress: Darf PHP die Programmdateien nicht ändern, prüfe beim Hoster die Dateirechte oder lade `install.php` erneut hoch und wähle **Aktualisieren / Reparieren**.
 

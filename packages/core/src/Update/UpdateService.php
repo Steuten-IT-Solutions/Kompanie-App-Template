@@ -20,6 +20,11 @@ use KompanieApp\Core\Telemetry\Telemetry;
  * Updates der Installation: Update-Liste prüfen, passende Version wählen, Paket laden und
  * prüfen (Signatur der Liste, SHA-256 und Größe des Pakets), vorher sichern, einspielen.
  *
+ * Gesichert wird vor jedem Update auf dem Server und, wenn eingeschaltet, zusätzlich in Google Drive (OffsiteBackup).
+ * Scheitert nur Google Drive, wird nicht eingespielt, sondern nachgefragt: von Hand mit 409 drive_backup_failed (die App
+ * fragt „Trotzdem aktualisieren?“), automatisch zurückgestellt (status()['held']), bis ein Admin entscheidet oder es
+ * am nächsten Tag klappt.
+ *
  * - Automatisch (täglich): neue Versionen derselben Hauptversion im eingestellten Kanal.
  * - Zurückgezogene Version: automatisch zurück auf die Version des Kanals.
  * - Von Hand: „Jetzt aktualisieren“, eine ältere Version wählen (Zurückrollen; diese Version
@@ -34,6 +39,9 @@ final class UpdateService
     private const AUTO = 'update_auto';
     private const SKIP = 'update_skip';
     private const CHANNEL = 'update_channel';
+    /** Zurückgestelltes automatisches Update: {version, kind, at, error} */
+    public const HELD = 'update_held';
+    public const DRIVE_FAILED = 'drive_backup_failed';
     private const MAX_BACKUPS = 5;
 
     /**
@@ -50,6 +58,7 @@ final class UpdateService
         private readonly array $config,
         /** Fehlercodes für die Statusmeldungen (Issue #20), nur mit Zustimmung */
         private readonly ?Telemetry $telemetry = null,
+        private readonly ?OffsiteBackup $offsite = null,
     ) {
     }
 
@@ -156,6 +165,7 @@ final class UpdateService
             'problems' => [],
             'versions' => [],
             'last' => $this->settings->get(self::LAST),
+            'held' => $this->held(),
         ];
         if (!is_array($state['list'] ?? null) || !$this->configured()) {
             return $out;
@@ -221,8 +231,10 @@ final class UpdateService
      *
      * @param string $kind auto, manual, rollback, withdrawn
      * @param bool $allowMajor neue Hauptversion nur ausdrücklich
+     * @param bool $withoutDrive auch einspielen, wenn die Sicherung in Google Drive scheitert (nach Rückfrage)
+     * @throws ApiError 409 DRIVE_FAILED, wenn nur die Sicherung in Google Drive scheitert
      */
-    public function install(string $version, string $kind = 'manual', bool $allowMajor = false): void
+    public function install(string $version, string $kind = 'manual', bool $allowMajor = false, bool $withoutDrive = false): void
     {
         $this->requireConfigured();
         $state = (array) $this->settings->get(self::STATE, []);
@@ -280,7 +292,11 @@ final class UpdateService
             $zip = $this->download($file);
             try {
                 $step = 'backup';
-                $this->backupBefore($entry, Version::major($version) > Version::major($this->currentVersion));
+                $local = $this->backupBefore();
+                if ($local !== null && !$withoutDrive && $this->offsite?->active()) {
+                    $step = 'drive';
+                    $this->backupOffsite($local);
+                }
                 $step = 'install';
                 // Danach neu einplanen (App::upgrade). Auch beim Zurückrollen auf eine ältere Version, die
                 // diese Einstellung nicht kennt: Kommt später wieder diese Version, plant sie neu ein.
@@ -293,12 +309,17 @@ final class UpdateService
             $lock && flock($lock, LOCK_UN);
             $record['error'] = $e->getMessage();
             $this->settings->set(self::LAST, $record);
+            if ($step === 'drive' && ($kind === 'auto' || $kind === 'withdrawn')) {
+                // Niemand kann gerade nachfragen: zurückstellen, ein Admin entscheidet (installHeld, dismissHeld).
+                $this->settings->set(self::HELD, ['version' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'error' => $e->getMessage()]);
+            }
             $this->telemetry?->record(Code::UpdateFailed, Detail::of($step, Detail::fromMessage($e->getMessage())), $this->currentVersion . ' → ' . $version . ': ' . $e->getMessage());
             throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
         }
         $lock && flock($lock, LOCK_UN);
         $record['ok'] = true;
         $this->settings->set(self::LAST, $record);
+        $this->settings->delete(self::HELD);
         if ($kind === 'rollback' || $kind === 'withdrawn') {
             $this->telemetry?->record(Code::Rollback, $kind, $this->currentVersion . ' → ' . $version);
         }
@@ -310,12 +331,40 @@ final class UpdateService
     }
 
     /** Zurück auf eine ältere Version derselben Hauptversion; die jetzige wird danach übersprungen. */
-    public function rollback(string $version): void
+    public function rollback(string $version, bool $withoutDrive = false): void
     {
         if (!Version::valid($version) || Version::compare($version, $this->currentVersion) >= 0) {
             throw ApiError::invalid('Bitte eine ältere Version wählen.');
         }
-        $this->install($version, 'rollback');
+        $this->install($version, 'rollback', false, $withoutDrive);
+    }
+
+    /** Zurückgestelltes Update trotz fehlender Sicherung in Google Drive einspielen (die auf dem Server ist da). */
+    public function installHeld(): void
+    {
+        $held = $this->held();
+        if ($held === null) {
+            throw ApiError::invalid('Es gibt kein zurückgestelltes Update.');
+        }
+        $this->install($held['version'], $held['kind'], false, true);
+    }
+
+    /** Zurückgestelltes Update nicht einspielen; der nächste tägliche Abgleich versucht es wieder mit Google Drive. */
+    public function dismissHeld(): void
+    {
+        $this->settings->delete(self::HELD);
+    }
+
+    /** @return array{version: string, kind: string, at: int, error: string}|null */
+    private function held(): ?array
+    {
+        $h = $this->settings->get(self::HELD);
+        // Schon auf dieser Version (z. B. von Hand eingespielt): nichts mehr zurückgestellt.
+        if (!is_array($h) || !is_string($h['version'] ?? null) || $h['version'] === $this->currentVersion
+            || !in_array($h['kind'] ?? null, ['auto', 'withdrawn'], true)) {
+            return null;
+        }
+        return ['version' => $h['version'], 'kind' => $h['kind'], 'at' => (int) ($h['at'] ?? 0), 'error' => (string) ($h['error'] ?? '')];
     }
 
     /** @return string[] Gründe, warum eine Version hier nicht läuft (in Alltagssprache) */
@@ -355,19 +404,14 @@ final class UpdateService
     }
 
     /**
-     * Vor Updates mit Datenbank-Änderungen und vor einer neuen Hauptversion automatisch sichern
-     * (geschützter Bereich, die letzten 5).
+     * Vor jedem Update automatisch sichern (geschützter Bereich, die letzten 5).
+     *
+     * @return string|null Pfad der Sicherung (null: keine Datensicherung hier)
      */
-    private function backupBefore(array $entry, bool $newMajor): void
+    private function backupBefore(): ?string
     {
         if ($this->backup === null) {
-            return;
-        }
-        $schema = (array) ($entry['schema'] ?? []);
-        $changes = $newMajor || (int) ($schema['core'] ?? 0) > (int) $this->settings->get('schema_version', 0)
-            || ($this->target->variant() === 'standalone' && (int) ($schema['standalone'] ?? 0) > (int) $this->settings->get('standalone_schema_version', 0));
-        if (!$changes) {
-            return;
+            return null;
         }
         // Fortlaufende Nummer vorn (sortiert richtig, auch bei Versionen wie 1.4.0.10 und 1.4.0.9 und
         // mehreren Updates in derselben Sekunde); zufälliger Teil, weil unter WordPress auf nginx der
@@ -418,6 +462,22 @@ final class UpdateService
         $all = [...array_values(array_diff(glob($dir . '/vor-update-*.json') ?: [], $numbered)), ...$numbered];
         foreach (array_slice($all, 0, max(0, count($all) - self::MAX_BACKUPS)) as $old) {
             @unlink($old);
+        }
+        return $path;
+    }
+
+    /** Die Sicherung vom Server zusätzlich in Google Drive. @throws ApiError 409 DRIVE_FAILED */
+    private function backupOffsite(string $path): void
+    {
+        // Hochladen großer Sicherungen dauert: Zeitlimit neu beginnen.
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+        try {
+            $this->offsite?->storeBeforeUpdate($path, $this->currentVersion);
+        } catch (\RuntimeException $e) {
+            throw new ApiError(409, self::DRIVE_FAILED, 'Die Sicherung in Google Drive vor dem Update hat nicht geklappt: ' . rtrim($e->getMessage(), '.')
+                . '. Das Update wurde nicht eingespielt; die Sicherung auf dem Server ist da.');
         }
     }
 

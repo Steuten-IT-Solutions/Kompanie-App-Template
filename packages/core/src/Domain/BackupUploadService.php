@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Update\OffsiteBackup;
 
 /**
  * Sicherungen automatisch in Google Drive ablegen, damit nach dem Verlust des Servers eine aktuelle Sicherung außerhalb
@@ -14,8 +15,11 @@ use KompanieApp\Core\Http\ApiError;
  * Braucht eine Verbindung über „Mit Google verbinden“ mit der Berechtigung drive.file: Die App legt in „Meine Ablage“
  * des verbundenen Google-Kontos einen eigenen Ordner an, lädt einmal pro Woche eine Sicherung hoch und behält die
  * letzten KEEP. Geprüft wird täglich (TASK); scheitert das Hochladen, versucht sie es am nächsten Tag wieder.
+ *
+ * Vor jedem Update kommt die Sicherung vom Server zusätzlich in denselben Ordner (storeBeforeUpdate, die letzten
+ * KEEP_BEFORE_UPDATE); scheitert das, fragt UpdateService nach, ob trotzdem aktualisiert werden soll.
  */
-final class BackupUploadService
+final class BackupUploadService implements OffsiteBackup
 {
     public const TASK = 'backup_upload';
     public const INTERVAL = 86400;
@@ -23,11 +27,14 @@ final class BackupUploadService
     public const EVERY_DAYS = 7;
     /** So viele Sicherungen bleiben im Ordner (ältere löscht die App). */
     public const KEEP = 8;
+    /** So viele Sicherungen vor Updates bleiben im Ordner (wie auf dem Server). */
+    public const KEEP_BEFORE_UPDATE = 5;
     /** Einstellung (gehört zu den Daten): {enabled: bool, folder_id: string} */
     public const SETTING = 'backup_drive';
     /** Zustand dieser Installation (nicht in Sicherungen): {last_ok: int, last_try: int, error: string} */
     public const STATE_SETTING = 'backup_drive_state';
     private const PREFIX = 'sicherung-';
+    private const PREFIX_UPDATE = 'vor-update-';
 
     public function __construct(private readonly App $app)
     {
@@ -123,13 +130,7 @@ final class BackupUploadService
             } finally {
                 fclose($out);
             }
-            $drive = $this->app->drive();
-            $folder = $this->folder();
-            $name = self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . '.json';
-            $drive->uploadFile($folder, $name, $tmp, 'application/json');
-            $this->prune($folder);
-            $state['last_ok'] = $now;
-            $state['error'] = '';
+            $this->store($tmp, self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . '.json', self::PREFIX, self::KEEP, $state);
         } catch (\Throwable $e) {
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
@@ -138,6 +139,43 @@ final class BackupUploadService
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
         return $this->status();
+    }
+
+    /**
+     * Sicherung vor einem Update (schon auf dem Server geschrieben) hochladen. Zählt wie die wöchentliche: Sie ist eine
+     * vollständige Sicherung außerhalb des Servers.
+     */
+    public function storeBeforeUpdate(string $path, string $version): void
+    {
+        if (!$this->active()) {
+            throw new \RuntimeException('Sicherungen in Google Drive sind nicht eingeschaltet.');
+        }
+        $now = $this->app->time()->timestamp();
+        $state = $this->state();
+        $state['last_try'] = $now;
+        try {
+            $name = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His') . '-' . $version . '.json';
+            $this->store($path, $name, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state);
+        } catch (\RuntimeException $e) {
+            $state['error'] = $e->getMessage();
+            throw $e;
+        } finally {
+            $this->app->settings->set(self::STATE_SETTING, $state);
+        }
+    }
+
+    /**
+     * Datei in den Ordner hochladen, ältere mit demselben Anfang über $keep hinaus löschen.
+     *
+     * @param array{last_ok: int, last_try: int, error: string} $state
+     */
+    private function store(string $path, string $name, string $prefix, int $keep, array &$state): void
+    {
+        $folder = $this->folder();
+        $this->app->drive()->uploadFile($folder, $name, $path, 'application/json');
+        $this->prune($folder, $prefix, $keep);
+        $state['last_ok'] = $state['last_try'];
+        $state['error'] = '';
     }
 
     /** Ordner der Sicherungen; legt ihn (neu) an, wenn es ihn nicht gibt (z. B. gelöscht oder anderes Google-Konto). */
@@ -153,19 +191,19 @@ final class BackupUploadService
         return $id;
     }
 
-    /** Ältere Sicherungen über KEEP hinaus löschen (der Name enthält Datum und Uhrzeit). Fehler hier sind nicht schlimm. */
-    private function prune(string $folder): void
+    /** Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit). Fehler hier sind nicht schlimm. */
+    private function prune(string $folder, string $prefix, int $keep): void
     {
         try {
             $names = [];
             foreach ($this->app->drive()->listChildren($folder) as $f) {
                 $name = (string) ($f['name'] ?? '');
-                if (str_starts_with($name, self::PREFIX) && str_ends_with($name, '.json') && !DriveClient::isFolder($f)) {
+                if (str_starts_with($name, $prefix) && str_ends_with($name, '.json') && !DriveClient::isFolder($f)) {
                     $names[(string) $f['id']] = $name;
                 }
             }
             arsort($names);
-            foreach (array_slice(array_keys($names), self::KEEP) as $id) {
+            foreach (array_slice(array_keys($names), $keep) as $id) {
                 $this->app->drive()->deleteFile((string) $id);
             }
         } catch (\RuntimeException $e) {

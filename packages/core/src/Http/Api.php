@@ -1068,11 +1068,21 @@ final class Api
                 return $a->updates()->status();
             }, null, $denySettings),
             new Route('POST', '/admin/update/install', Cap::ManageSettings, function (Request $r) use ($a) {
-                $a->updates()->install(is_string($r->input('version')) ? $r->input('version') : '', 'manual', Input::bool($r->input('major')));
+                $a->updates()->install(is_string($r->input('version')) ? $r->input('version') : '', 'manual', Input::bool($r->input('major')), Input::bool($r->input('without_drive')));
                 return ['installed' => $r->input('version')];
             }, null, $denySettings),
+            // Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte: trotzdem einspielen oder verwerfen.
+            new Route('POST', '/admin/update/held', Cap::ManageSettings, function () use ($a) {
+                $version = (string) ($a->updates()->status()['held']['version'] ?? '');
+                $a->updates()->installHeld();
+                return ['installed' => $version];
+            }, null, $denySettings),
+            new Route('DELETE', '/admin/update/held', Cap::ManageSettings, function () use ($a) {
+                $a->updates()->dismissHeld();
+                return $a->updates()->status();
+            }, null, $denySettings),
             new Route('POST', '/admin/update/rollback', Cap::ManageSettings, function (Request $r) use ($a) {
-                $a->updates()->rollback(is_string($r->input('version')) ? $r->input('version') : '');
+                $a->updates()->rollback(is_string($r->input('version')) ? $r->input('version') : '', Input::bool($r->input('without_drive')));
                 return ['installed' => $r->input('version')];
             }, null, $denySettings),
             new Route('PATCH', '/admin/update', Cap::ManageSettings, function (Request $r) use ($a) {
