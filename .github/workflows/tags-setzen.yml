@@ -1,0 +1,74 @@
+# Tags zum Release setzen: v<VERSION> (z. B. v0.3.0) und v1 (die Kompanie-Repos rufen preview-kompanie.yml@v1 auf).
+# Läuft bei jedem Push auf main (Release aus develop) und von Hand. v<VERSION> wird nur angelegt, wenn es ihn noch
+# nicht gibt (ein gesetzter Versions-Tag wird nie verschoben); v1 folgt immer dem freigegebenen Stand von main.
+# Die Commits von „Kernversion freigeben“ (STABLE_CORE) tragen [skip ci] und starten diesen Workflow nicht.
+# Als GitHub App (KOMPANIE_APP_ID): Das GITHUB_TOKEN darf keine Refs auf Stände mit geänderten Workflows setzen.
+# Hinter der Environment „veroeffentlichen“; starten dürfen nur Personen mit Schreibrecht auf das Kern-Repo.
+name: Tags setzen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tags-setzen
+  cancel-in-progress: false
+
+jobs:
+  tags:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: veroeffentlichen
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Zugang zum Kern-Repo (GitHub App)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.KOMPANIE_APP_ID }}
+          private-key: ${{ secrets.KOMPANIE_APP_KEY }}
+          owner: Steuten-IT-Solutions
+          repositories: Kompanie-App-Template
+          permission-contents: write
+          permission-workflows: write
+
+      - name: v<VERSION> anlegen und v1 verschieben
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          [[ "$VERSION" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]] || { echo "::error::Ungültige Kern-Version in VERSION: $VERSION"; exit 1; }
+          # SHA des Commits, auf den ein Tag zeigt (leer, wenn es ihn nicht gibt). Schlägt die Abfrage aus einem anderen
+          # Grund fehl, scheitert danach das Anlegen (422), statt einen bestehenden Tag zu überschreiben.
+          tag_sha() {
+            local out
+            if out="$(gh api "repos/$REPO/git/ref/tags/$1" --jq '.object.sha' 2>/dev/null)"; then
+              printf '%s' "$out"
+            fi
+          }
+
+          EXISTING="$(tag_sha "v$VERSION")"
+          if [ -z "$EXISTING" ]; then
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$SHA" > /dev/null
+            echo "v$VERSION angelegt: $SHA"
+          elif [ "$EXISTING" = "$SHA" ]; then
+            echo "v$VERSION zeigt schon auf $SHA"
+          else
+            echo "v$VERSION gibt es schon (auf $EXISTING); bleibt, wie er ist."
+          fi
+
+          if [ -z "$(tag_sha v1)" ]; then
+            gh api -X POST "repos/$REPO/git/refs" -f ref=refs/tags/v1 -f sha="$SHA" > /dev/null
+          else
+            gh api -X PATCH "repos/$REPO/git/refs/tags/v1" -f sha="$SHA" -F force=true > /dev/null
+          fi
+          echo "v1 zeigt auf $SHA"
