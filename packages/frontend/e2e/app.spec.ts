@@ -1499,7 +1499,7 @@ test('Ämter: Einzahl auf der Seite einer Person, Hinweis mit Link bei Titeln, d
   expect(status.every((s) => s < 300)).toBe(true);
 });
 
-test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gemerkt (Issue #112)', async ({ page }) => {
+test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const office = `Fähnriche ${id}`;
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -1526,16 +1526,29 @@ test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gem
     { id, office },
   );
 
-  // Schmal: keine Umschaltung
+  // Handy hochkant: „Jahre“ zeigt das schmale Raster mit dem Tipp zum Drehen; nur das Raster scrollt seitlich
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-card', { hasText: office })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Ansicht' })).toHaveCount(0);
-
-  // Breit: „Jahre“ zeigt das Raster; die Seite selbst scrollt nicht seitlich
-  await page.setViewportSize({ width: 1200, height: 900 });
   await page.getByRole('group', { name: 'Ansicht' }).getByRole('button', { name: 'Jahre' }).click();
   const grid = page.locator('.year-grid');
+  await expect(grid.locator('.yg-office', { hasText: office })).toBeAttached();
+  await expect(page.locator('.yg-rotate-hint')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Ein Tipp auf einen Balken zeigt Jahre und Personen
+  await grid.locator('.yg-bar', { hasText: `Carl Clau ${id}` }).scrollIntoViewIfNeeded();
+  await grid.locator('.yg-bar', { hasText: `Carl Clau ${id}` }).click();
+  await expect(page.locator('.yg-detail')).toContainText(`${office}: 1990–2006 · Carl Clau ${id}`);
+  await page.locator('.yg-detail').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page.locator('.yg-detail')).toHaveCount(0);
+
+  // Quer: ohne Tipp, die Seite scrollt weiter nicht seitlich
+  await page.setViewportSize({ width: 740, height: 360 });
+  await expect(page.locator('.yg-rotate-hint')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Breit: dasselbe Raster
+  await page.setViewportSize({ width: 1200, height: 900 });
   await expect(grid).toBeVisible();
   await expect(grid.locator('.yg-office', { hasText: office })).toBeVisible();
   const bar = (name: string) => grid.locator('.yg-bar', { hasText: name });

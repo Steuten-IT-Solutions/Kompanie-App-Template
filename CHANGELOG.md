@@ -15,6 +15,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Ämter nach Jahren auch auf dem Handy**: Den Schalter „Chronik | Jahre“ im Tab Ämter gibt es jetzt auf jedem
+  Bildschirm. Auf dem Handy ist die Übersicht schmaler; quer gedreht nutzt sie die ganze Breite, sodass mehr Ämter
+  nebeneinander passen. Beim Scrollen bleiben oben die Ämter und links die Jahre stehen. Ein Tipp auf einen Balken
+  zeigt unten Jahre, Personen und Zusatz.
+
 ## [0.3.0] – 2026-10-26
 
 ### Neu
