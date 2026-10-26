@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\ActivityRepository;
@@ -78,7 +79,8 @@ final class ActivityService
      */
     public function record(?User $user, string $area, string $action): void
     {
-        if ($user === null || $user->preview || $user->capabilities === [] || !in_array($area, self::areas(), true) || !in_array($action, self::ACTIONS, true)) {
+        // Gäste (und Konten ohne Rechte) zählen nicht: Ihre Rolle gilt auch ohne Anmeldung.
+        if ($user === null || $user->preview || $user->role === Roles::GUEST || $user->capabilities === [] || !in_array($area, self::areas(), true) || !in_array($action, self::ACTIONS, true)) {
             return;
         }
         try {

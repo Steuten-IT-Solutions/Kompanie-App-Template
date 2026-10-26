@@ -30,7 +30,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe auf die Perso
 ## Gut zu wissen
 - Erlaubt sind nur echte Daten: der 29. Februar nur in einem Schaltjahr (oder ohne Jahr), Jahre ab 1900 und nichts in der Zukunft.
 - Ein neu eingetragener Geburtstag ist für andere {rolle.member} sichtbar, ohne Alter. Auf der Seite der Person unter **{bereich.directory}** sehen ihn angemeldete {rolle.member}, bis sie selbst etwas anderes wählt.
-- Geburtstage sehen nur {rolle.member}. Von Personen ohne Mitgliederbereich (z. B. Anwärtern) kannst du schon einen eintragen; er erscheint, sobald die Person als {rolle.member} aufgenommen ist.
+- Geburtstage sieht, wessen Rolle das Recht dazu hat, anfangs die {rolle.member}. Von Personen, die noch nicht zur Kompanie gehören (z. B. Anwärtern), kannst du schon einen eintragen; er erscheint, sobald die Person als {rolle.member} aufgenommen ist.
 - Beim Anlegen neuer Mitglieder kannst du den Geburtstag gleich mit eintragen.
 - Wird ein Konto gelöscht, ist auch der Geburtstag weg.
 

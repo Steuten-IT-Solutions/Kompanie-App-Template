@@ -160,6 +160,27 @@ final class App
         $this->env = new PreviewEnvironment($env, $this->preview);
     }
 
+    /**
+     * Wer die Anfrage stellt; ohne Anmeldung ein Gast ohne Konto (ID 0) mit den Rechten der Rolle Gast, die auch ohne
+     * Anmeldung gilt. Nur zum Lesen von Bereichen, die Gast sehen kann, nie für Eigenes oder Änderungen.
+     */
+    public function viewer(): User
+    {
+        return $this->authContext->currentUser() ?? $this->anonymous();
+    }
+
+    /** Besucher ohne Anmeldung: Gast ohne Konto (ID 0) mit den Rechten der Rolle Gast. */
+    public function anonymous(): User
+    {
+        return new User(0, '', '', \KompanieApp\Core\Auth\Roles::GUEST, $this->roles()->guestCapabilities());
+    }
+
+    /** Hat, wer die Anfrage stellt, dieses Recht? Ohne Anmeldung zählen die Rechte von Gast (viewer). */
+    public function can(\KompanieApp\Core\Auth\Capability $capability): bool
+    {
+        return $this->viewer()->can($capability);
+    }
+
     /** Vorschau „App als Rolle ansehen“ der laufenden Anfrage (Issue #63). */
     public function preview(): Preview
     {

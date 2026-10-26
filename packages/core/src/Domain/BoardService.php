@@ -62,13 +62,12 @@ final class BoardService
     }
 
     /**
-     * Wer das Brett sieht und Benachrichtigungen dazu bekommt: Mitglieder und Anwärter, also alle mit Mitgliederbereich
-     * oder internem Kalender (wie GET /calendar). Die einzige Stelle für diese Regel (API, Push, Mail, Typen der
-     * Benachrichtigungen).
+     * Wer das Brett sieht und Benachrichtigungen dazu bekommt: alle mit view_board und einem Konto (anfangs Mitglieder
+     * und Anwärter). Die einzige Stelle für diese Regel (API, Push, Mail, Typen der Benachrichtigungen).
      */
     public static function isRecipient(?User $user): bool
     {
-        return $user !== null && ($user->isMember() || $user->can(Capability::Calendar));
+        return $user !== null && $user->id > 0 && $user->can(Capability::ViewBoard);
     }
 
     /**

@@ -47,12 +47,12 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 2. Bestätige die Frage.
 
 ## Gut zu wissen
-- In der Liste stehen auch Personen, deren Rolle keinen Mitgliederbereich hat (z. B. Anwärter). {bereich.points} und {bereich.penalties} bekommen aber nur Personen mit Mitgliederbereich.
+- In der Liste stehen auch Personen, deren Rolle nicht zur Kompanie gehört (z. B. Anwärter). {bereich.points} und {bereich.penalties} bekommen aber nur Personen, die zur Kompanie gehören.
 - Wer für diese Liste schon {bereich.points} hat, bekommt sie kein zweites Mal. Haben alle Anwesenden schon welche, steht dort „{bereich.points} für alle Anwesenden bereits gebucht.“
 - Bei {bereich.penalties} merkt sich die Liste nicht, wer schon einen Eintrag hat. Lege ihn also nicht zweimal an.
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.
 - Unten steht, wer die Liste zuletzt gespeichert hat.
-- Was im Zähler als eigene Gruppe erscheint, legt ein {rolle.admin} unter **Einstellungen** → **Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** fest. Ohne Einstellung zählen alle Rollen mit Mitgliederbereich als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
+- Was im Zähler als eigene Gruppe erscheint, legt ein {rolle.admin} unter **Einstellungen** → **Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** fest. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
 - Jede Person sieht ihre eigenen Einträge unter **Meins** → **{bereich.attendance}**.
 
 ## Siehe auch

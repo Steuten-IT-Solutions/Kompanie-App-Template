@@ -1,4 +1,4 @@
-import { config, isMember, roleLabels, type Me } from '../api';
+import { can, config, isMember, roleLabels, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
@@ -11,7 +11,7 @@ import { TitleBadges } from '../TitleBadges';
 import { MenuNav } from '../adminNav';
 import { ZoomableAvatar } from '../memberPhoto';
 import { RankBadge } from '../RankBadge';
-import { birthdaysVisible, formatBirthday } from '../birthdays';
+import { formatBirthday, ownBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
 import { sources } from '../viewData';
@@ -42,10 +42,10 @@ export default function Meins({
   const dataParts = (
     [
       ['uebersicht', 'Übersicht', true],
-      ['punkte', sec.points, config?.features.points],
-      ['strafen', sec.penalties, config?.features.penalties],
-      ['dienstgrad', brand.labels.rank, config?.features.ranks],
-      ['anwesenheit', sec.attendance, config?.features.attendance],
+      ['punkte', sec.points, config?.features.points && can('view_own_points')],
+      ['strafen', sec.penalties, config?.features.penalties && can('view_own_penalties')],
+      ['dienstgrad', brand.labels.rank, config?.features.ranks && can('view_own_rank')],
+      ['anwesenheit', sec.attendance, config?.features.attendance && can('view_own_attendance')],
     ] as const
   )
     .filter(([, , on]) => member && on)
@@ -94,7 +94,7 @@ function Uebersicht({ me }: { me: Me }) {
   // Foto: hochladen und ändern nur, wer Mitglieder anlegt (in der Verwaltung), wie unter „Konto“.
   const photo = config?.user?.id === me.id ? config.user.photo_url : null;
   const member = isMember();
-  const birthdayOn = birthdaysVisible();
+  const birthdayOn = ownBirthday();
   const birthday = useAsync(() => (birthdayOn ? sources.myBirthday.load() : Promise.resolve(null)), [], sources.myBirthday.key);
   const joinYear = useAsync(() => (member ? sources.myJoinYear.load() : Promise.resolve(null)), [], sources.myJoinYear.key);
   // Ändern lassen sich beide unter „Konto“; den Eintritt gibt es dort nur mit der Mitgliederliste.
@@ -118,12 +118,12 @@ function Uebersicht({ me }: { me: Me }) {
       <p className="muted small member-level">
         {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
       </p>
-      {(f?.points || f?.penalties) && (
+      {((f?.points && can('view_own_points')) || (f?.penalties && can('view_own_penalties'))) && (
         <div className="stats member-stats">
-          {f.points && (
+          {f.points && can('view_own_points') && (
             <StatCard label={sec.points} value={me.points.toLocaleString('de-DE')} tone="good" onClick={() => navigate('meins/punkte')} />
           )}
-          {f.penalties && (
+          {f.penalties && can('view_own_penalties') && (
             <StatCard
               label="Offen"
               value={formatEuro(me.open_cents)}

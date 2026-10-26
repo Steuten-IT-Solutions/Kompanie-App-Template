@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.points}katalog"
 reihenfolge: 39
-rechte: [member]
+rechte: [view_catalog]
 bereiche: [points]
 ---
 Im {bereich.points}katalog steht, wofür es bei der {kompanie.name} wie viele {bereich.points} gibt, z. B. „Arbeitsdienst +4“. Die Seite ist nur zum Nachschlagen.

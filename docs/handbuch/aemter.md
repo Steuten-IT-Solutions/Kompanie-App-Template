@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.offices}"
 reihenfolge: 40
-rechte: []
+rechte: [view_offices]
 bereiche: [offices]
 ---
 Unter **{bereich.offices}** siehst du, wer welches Amt gerade hat und wer es früher hatte – als Zeitstrahl, der weit zurückreichen kann. Sehen kann ihn jeder, auch ohne Anmeldung.

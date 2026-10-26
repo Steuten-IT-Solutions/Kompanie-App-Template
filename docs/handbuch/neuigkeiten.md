@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.news}"
 reihenfolge: 36
-rechte: []
+rechte: [view_news]
 bereiche: [news]
 ---
 Unter **{bereich.news}** liest du die Beiträge der {kompanie.name}, die neuesten oben. Lesen kann sie jeder, auch ohne Anmeldung.

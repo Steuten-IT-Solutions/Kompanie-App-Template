@@ -2,6 +2,7 @@
 titel: "{bereich.gallery}"
 reihenfolge: 38
 rechte: []
+einrecht: [view_gallery, view_gallery_internal]
 bereiche: [gallery]
 ---
 Die **{bereich.gallery}** zeigt die Fotoalben der {kompanie.name}, nach Jahren geordnet, das neueste Jahr oben. Von hier öffnest du ein Album und siehst dir die Bilder an.

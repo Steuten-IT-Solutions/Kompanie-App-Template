@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Domain\MemberPhotoService;
 
 /**
@@ -36,6 +37,12 @@ final class Shortcodes
      * Abstände der Listen mit !important: Themes rücken Listen im Inhalt mit spezifischeren Regeln ein (Astra:
      * .entry-content ul{padding-left:20px}); die Galerie stünde sonst nicht mittig.
      */
+    /** Die Webseite zeigt nur, was Gast (auch ohne Anmeldung) sieht. */
+    private static function guestCan(App $app, Capability $capability): bool
+    {
+        return in_array($capability, $app->roles()->guestCapabilities(), true);
+    }
+
     private static function styles(App $app): string
     {
         $primary = $app->config->primaryColor();
@@ -126,7 +133,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
 
     private static function events(App $app, array $atts): string
     {
-        if (!$app->features()->enabled('events')) {
+        if (!$app->features()->enabled('events') || !self::guestCan($app, Capability::ViewEvents)) {
             return '';
         }
         $limit = max(1, min(100, (int) ($atts['anzahl'] ?? 10)));
@@ -182,10 +189,10 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
 
     private static function gallery(App $app): string
     {
-        if (!$app->features()->enabled('gallery')) {
+        $member = $app->can(Capability::ViewGalleryInternal);
+        if (!$app->features()->enabled('gallery') || !($member || $app->can(Capability::ViewGallery))) {
             return '';
         }
-        $member = (bool) $app->authContext->currentUser()?->isMember();
         $albumId = isset($_GET['album']) ? absint($_GET['album']) : 0; // phpcs:ignore WordPress.Security.NonceVerification -- reine Navigation
         $html = self::styles($app);
         if ($albumId) {
@@ -257,7 +264,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
 
     private static function offices(App $app, array $atts): string
     {
-        if (!$app->features()->enabled('offices')) {
+        if (!$app->features()->enabled('offices') || !self::guestCan($app, Capability::ViewOffices)) {
             return '';
         }
         // Immer die Sicht eines Gastes: Fotos nur von Personen, die auch in der öffentlichen Mitgliederliste stehen.
@@ -370,7 +377,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
     /** Wie eine Bildergalerie: Fotos im Hochformat mit dem Namen als Balken, Großansicht beim Antippen. */
     private static function members(App $app): string
     {
-        if (!$app->features()->enabled('directory')) {
+        if (!$app->features()->enabled('directory') || !self::guestCan($app, Capability::ViewDirectory)) {
             return '';
         }
         // Nur Mitglieder: Anwärter (nur interner Kalender) stehen in der App, aber nicht auf der Webseite.

@@ -46,13 +46,19 @@ export const sources = {
   member: (id: number) => source('member', () => api.member(id), [id]),
 };
 
-/** Wer Geburtstage sieht und seinen eintragen kann: Bereich an, Mitglieder (wie BirthdayService::isMember im Kern). */
+/** Wer die Geburtstage anderer sieht: Bereich an und Recht view_birthdays (wie BirthdayService::canSee im Kern). */
 export function birthdaysVisible(): boolean {
+  return !!config?.features.birthdays && can('view_birthdays');
+}
+
+/** Wer seinen eigenen Geburtstag einträgt: Bereich an, Mitglieder (wie BirthdayService::isMember im Kern). */
+export function ownBirthday(): boolean {
   return !!config?.features.birthdays && can('member');
 }
 
 /** Termine aus Kalender oder öffentlicher Liste – oder (nur Geburtstage an) gar keine. */
-export const hasEvents = (): boolean => !!(config?.features.events || (config?.features.calendar && can('calendar')));
+export const hasEvents = (): boolean =>
+  !!((config?.features.events && can('view_events')) || (config?.features.calendar && can('calendar')));
 
 const SECTION_KEY = 'kompanie-members-section';
 
@@ -104,16 +110,19 @@ export function tabSources(tab: TabId): Source[] {
     case 'mitglieder': {
       // wie Mitglieder.tsx ohne Unterseite: der zuletzt gewählte Abschnitt, sonst die Liste
       const stored = storedMembersSection();
-      if (!f?.directory || (f.offices && stored === 'aemter')) return f?.offices ? [sources.offices] : [];
-      if (stored === 'ehemalige') return [sources.directoryFormer];
-      return [sources.directory, sources.directoryCounts];
+      const list = !!f?.directory && can('view_directory');
+      const former = !!f?.directory && can('view_former');
+      const offices = !!f?.offices && can('view_offices');
+      if (offices && (stored === 'aemter' || (!list && !(former && stored === 'ehemalige')))) return [sources.offices];
+      if (former && (stored === 'ehemalige' || !list)) return [sources.directoryFormer];
+      return list ? [sources.directory, sources.directoryCounts] : [];
     }
     case 'brett':
       // Das Brett lädt board.ts beim Start und bei jeder Rückkehr in die App.
       return [];
     case 'dienstgrade':
       // wie Dienstgrade.tsx: die Liste und /me für den eigenen Dienstgrad
-      return [sources.ranks, sources.me];
+      return [sources.ranks, ...(config?.user ? [sources.me] : [])];
     case 'punktekatalog':
       return [sources.catalog];
     case 'meins': {
@@ -121,7 +130,7 @@ export function tabSources(tab: TabId): Source[] {
       if (!isMember()) return [];
       return [
         sources.me,
-        ...(birthdaysVisible() ? [sources.myBirthday] : []),
+        ...(ownBirthday() ? [sources.myBirthday] : []),
         sources.myJoinYear,
         ...(f?.offices && config?.user ? [sources.offices] : []),
       ];

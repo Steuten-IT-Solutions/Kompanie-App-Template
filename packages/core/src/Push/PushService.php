@@ -149,23 +149,22 @@ final class PushService
     /* ---------------------------------------------------------------- */
 
     /**
-     * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: members = nur
-     * Mitglieder, board = Empfänger des Schwarzen Bretts (Mitglieder und Anwärter, BoardService::isRecipient),
-     * all = alle einschließlich Gästen.
+     * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: Konten mit diesem
+     * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen.
      *
-     * @return array<string, array{label: string, features: list<string>, audience: 'members'|'board'|'all'}>
+     * @return array<string, array{label: string, features: list<string>, audience: string}>
      */
     public function types(): array
     {
         $c = $this->app->config;
         return [
-            self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'board'],
-            self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'members'],
-            self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'members'],
-            self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'members'],
-            self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'members'],
-            self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'members'],
-            self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'audience' => 'members'],
+            self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'view_board'],
+            self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'vote_polls'],
+            self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
+            self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
+            self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
+            self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],
+            self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'audience' => 'view_own_rank'],
             self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'audience' => 'all'],
             self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'audience' => 'all'],
             self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'audience' => 'all'],
@@ -175,10 +174,9 @@ final class PushService
     /** @return list<string> Typen, die dieses Konto (null = Gast) abonnieren kann */
     public function availableTypes(?User $user): array
     {
-        $allowed = ['all' => true, 'members' => $user !== null && $user->isMember(), 'board' => BoardService::isRecipient($user)];
         $out = [];
         foreach ($this->types() as $key => $type) {
-            if (!$allowed[$type['audience']] || !$this->anyEnabled($type['features'])) {
+            if (!$this->inAudience($type['audience'], $user) || !$this->anyEnabled($type['features'])) {
                 continue;
             }
             // Termine und Erinnerungen: Mitglieder mit Kalender bekommen sie aus dem Kalender, alle anderen aus
@@ -581,14 +579,10 @@ final class PushService
         return $this->enqueue($items, $urgency, min($maxTtl, self::MAX_TTL, $ttl));
     }
 
-    /** @param 'members'|'board'|'all' $audience */
+    /** @param string $audience all oder der Wert des Rechts, das die Empfänger brauchen (types()) */
     private function inAudience(string $audience, ?User $user): bool
     {
-        return match ($audience) {
-            'members' => $user !== null && $user->isMember(),
-            'board' => BoardService::isRecipient($user),
-            'all' => true,
-        };
+        return $audience === 'all' || ($user !== null && $user->id > 0 && $user->can(Capability::from($audience)));
     }
 
     /**

@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.directory}"
 reihenfolge: 39
-rechte: []
+rechte: [view_directory]
 bereiche: [directory]
 ---
 Unter **{bereich.directory}** siehst du, wer zur Kompanie gehört: alle {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter), mit Foto, {bereich.titles} und {begriff.rank}. Die Liste sieht jeder, auch ohne Anmeldung.

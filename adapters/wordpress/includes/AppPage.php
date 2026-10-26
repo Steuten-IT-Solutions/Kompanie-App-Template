@@ -243,7 +243,7 @@ final class AppPage
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
         return $app->gallery()->deliverVideo($id, $range, static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
     }
 
@@ -256,7 +256,7 @@ final class AppPage
     {
         return $app->gallery()->deliverPhoto($id, $size, static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
     }
 

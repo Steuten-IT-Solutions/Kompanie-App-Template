@@ -24,7 +24,7 @@ Mehr dazu unter [Zustand und Updates](seite:admin-zustand). Wo welche Einstellun
 2. Klappe ganz unten **Konto und Rolle** auf und prüfe ihre Rolle.
 3. Prüfe unter **Einstellungen** → **Rollen**, welche Rechte diese Rolle hat.
 
-Rechte wirken nur in eingeschalteten Bereichen. Eine Rolle nur mit dem internen Kalender (z. B. Anwärter) sieht zum Beispiel den internen Kalender, aber nicht den Mitgliederbereich. Mehr dazu unter [Rollen](seite:admin-rollen-und-mitglieder).
+Rechte wirken nur in eingeschalteten Bereichen. Außerdem sieht jede Rolle nur, wofür sie ein Recht hat: Eine Rolle mit dem internen Kalender, aber ohne **{bereich.documents}** (z. B. Anwärter), sieht den Kalender, aber keine {bereich.documents}. Was welche Rolle sieht, zeigt **Wer sieht was** unter *Einstellungen → Rollen*. Mehr dazu unter [Rollen](seite:admin-rollen-und-mitglieder).
 
 ## Jemand hat sein Passwort vergessen
 1. Öffne unter **Verwaltung** → **Mitglieder** die Person.

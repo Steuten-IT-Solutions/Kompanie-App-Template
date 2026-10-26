@@ -147,7 +147,7 @@ paths:
     get:
       tags: [Eigene Daten]
       summary: Eigene Anwesenheit (jüngste Termine zuerst) mit Summen
-      x-capability: member
+      x-capability: view_own_attendance
       responses:
         '200':
           description: OK
@@ -172,7 +172,7 @@ paths:
     get:
       tags: [Eigene Daten]
       summary: Eigene Punkte
-      x-capability: member
+      x-capability: view_own_points
       responses:
         '200':
           description: OK
@@ -188,7 +188,7 @@ paths:
     get:
       tags: [Eigene Daten]
       summary: Eigene Strafen
-      x-capability: member
+      x-capability: view_own_penalties
       responses:
         '200':
           description: OK
@@ -374,7 +374,7 @@ paths:
     put:
       tags: [Eigene Daten]
       summary: Mails vom Brett ein- oder ausschalten (Standard an)
-      x-capability: 'member oder calendar'
+      x-capability: view_board
       requestBody:
         required: true
         content:
@@ -758,6 +758,7 @@ paths:
     get:
       tags: [Termine]
       summary: Kommende öffentliche Termine
+      x-capability: 'view_events (ohne Anmeldung die Rechte der Rolle guest)'
       security: []
       responses:
         '200':
@@ -819,6 +820,7 @@ paths:
     get:
       tags: [News]
       summary: Neuigkeiten, seitenweise
+      x-capability: 'view_news (ohne Anmeldung die Rechte der Rolle guest)'
       security: []
       parameters:
         - name: page
@@ -859,6 +861,7 @@ paths:
     get:
       tags: [Galerie]
       summary: Alben nach Jahr. Gäste sehen nur öffentliche Bilder.
+      x-capability: 'view_gallery oder view_gallery_internal (interne Bilder nur damit); ohne Anmeldung die Rechte der Rolle guest'
       security: []
       responses:
         '200':
@@ -879,6 +882,7 @@ paths:
     get:
       tags: [Galerie]
       summary: Album mit Bildern. Mitglieder bekommen die Bilder aus „intern“ dazu.
+      x-capability: 'view_gallery oder view_gallery_internal'
       security: []
       responses:
         '200':
@@ -893,7 +897,7 @@ paths:
       tags: [Eigene Daten]
       summary: Eigener Dienstgrad, Liste und Verlauf (Bereich Dienstgrade)
       description: Mit dem Bereich Punkte zusätzlich Schwellen, nächster Dienstgrad und fehlende Punkte. Nur der eigene Verlauf.
-      x-capability: member
+      x-capability: view_own_rank
       responses:
         '200':
           description: OK
@@ -917,7 +921,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Dienstgrade (aktive, vom niedrigsten zum höchsten)
-      x-capability: member
+      x-capability: 'view_ranks oder manage_ranks'
       parameters:
         - name: all
           in: query
@@ -1290,7 +1294,7 @@ paths:
       tags: [Verwaltung]
       summary: Sichtbare Dokumente (nach Titel) und alle Kategorien (Issue #2)
       description: Dokumente mit Sichtbarkeit `managers` nur für wer `manage_documents` hat; für sie auch `max_bytes`.
-      x-capability: member
+      x-capability: 'view_documents oder manage_documents'
       responses:
         '200':
           description: OK
@@ -1485,7 +1489,7 @@ paths:
         Erst die Nachrichten (`kind: message`), neueste zuerst; danach für Mitglieder (Recht `member`) mit eingeschaltetem
         Bereich Umfragen jede laufende Umfrage (`kind: poll`, Issue #4) mit `has_voted`. Später können weitere Arten
         dazukommen – Clients überspringen unbekannte. Mit `post_board` zusätzlich `last_edit` und `mail`.
-      x-capability: 'member, calendar oder post_board'
+      x-capability: 'view_board oder post_board'
       responses:
         '200':
           description: OK
@@ -2002,7 +2006,7 @@ paths:
         „Anderen Mitgliedern zeigen“ eingeschaltet haben. Sortiert nach `days_until` (heute = 0, „heute“ in der Zeitzone
         der Kompanie), dann Name. Das Geburtsjahr steht nie in der Antwort; `age` nur mit Jahr und „Alter anzeigen“.
         Der 29.02. gilt in Jahren ohne Schalttag am 28.02.
-      x-capability: member
+      x-capability: view_birthdays
       parameters:
         - name: days
           in: query
@@ -2031,7 +2035,7 @@ paths:
         `after_vote` – wer geantwortet hat, nach dem Ende alle Mitglieder; `after_end` – alle Mitglieder nach dem Ende;
         `managers` – nur `manage_polls`. Wer `manage_polls` hat, sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
         Freitext nur bei namentlichen Umfragen; bei anonymen nie Namen oder Benutzer-IDs (Freitexte alphabetisch).
-      x-capability: 'member oder manage_polls'
+      x-capability: 'vote_polls oder manage_polls'
       responses:
         '200':
           description: OK
@@ -2070,7 +2074,7 @@ paths:
     get:
       tags: [Umfragen]
       summary: Eine Umfrage (wie in der Liste)
-      x-capability: 'member oder manage_polls'
+      x-capability: 'vote_polls oder manage_polls'
       responses:
         '200':
           description: OK
@@ -2148,7 +2152,7 @@ paths:
         Nur solange die Umfrage läuft (sonst 400). Einfachauswahl: `option_ids` mit genau einer ID; Mehrfachauswahl:
         mindestens eine; Freitext: `text` (1–1000 Zeichen). Möglichkeiten einer anderen Umfrage → 400. Bei anonymen
         Umfragen liegt die Antwort unter einem Pseudonym und wird niemandem mit Namen gezeigt.
-      x-capability: member
+      x-capability: vote_polls
       requestBody:
         required: true
         content:
@@ -2168,7 +2172,7 @@ paths:
       tags: [Umfragen]
       summary: Eigene Antwort zurückziehen
       description: Nur solange die Umfrage läuft (sonst 400).
-      x-capability: member
+      x-capability: vote_polls
       responses:
         '200':
           description: Zurückgezogen
@@ -2655,6 +2659,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Punktekatalog
+      x-capability: 'view_catalog oder manage_points'
       parameters:
         - name: all
           in: query
@@ -2751,6 +2756,7 @@ paths:
     get:
       tags: [Mitgliederliste]
       summary: Mitgliederliste (Bereich directory), öffentlich
+      x-capability: 'view_directory (ohne Anmeldung die Rechte der Rolle guest)'
       description: |
         Für alle, auch Gäste und ohne Anmeldung (Issue #112). Enthält alle Mitglieder und Anwärter (auch Personen mit
         eigenen Rollen nur mit dem internen Kalender), keine Gast-Konten. Nur Namen und Foto, mit Bereich Dienstgrade auch
@@ -2772,6 +2778,7 @@ paths:
     get:
       tags: [Mitgliederliste]
       summary: Zähler über der Mitgliederliste (Anzahl je Gruppe)
+      x-capability: view_directory
       description: |
         Gleiche Rechte wie `GET /directory` (öffentlich, Issue #112). Anzahl der Personen dieser Liste je Gruppe wie im
         Zähler der Anwesenheit (Einstellungen → Rollen, `GET /attendance/groups`), ohne Gäste. Nur die Summen, keine Rolle
@@ -2797,6 +2804,7 @@ paths:
     get:
       tags: [Mitgliederliste]
       summary: Ehemalige in der Mitgliederliste (Tab „Ehemalige“), öffentlich
+      x-capability: view_former
       description: |
         Gleiche Rechte wie `GET /directory` (öffentlich, mit dem Bereich directory). Alle als ehemalig eingetragenen
         Personen (`GET /members/former`) mit denselben Angaben wie in der Mitgliederliste, dazu nur Gründungsmitglied,
@@ -2818,6 +2826,7 @@ paths:
     get:
       tags: [Ämter]
       summary: Alle Gruppen, Ämter und Amtszeiten für den Zeitstrahl (Issue #112), öffentlich
+      x-capability: 'view_offices (ohne Anmeldung die Rechte der Rolle guest)'
       description: |
         Für alle, auch ohne Anmeldung. Ämter in der Reihenfolge ihrer Gruppen (ohne Gruppe zuletzt); Amtszeiten laufende
         zuerst, dann nach Beginn absteigend. Inhaber mit `user_id` und `photo_url` nur, wenn sie in der Mitgliederliste
@@ -5671,11 +5680,11 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users, view_activity, manage_settings] }
-              description: 'Ausdrücklich gegebene Rechte (member schließt calendar ein und wird ohne es angezeigt); bei admin alle; vergebbar sind alle außer manage_settings. Ohne member nur calendar.'
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users, view_activity, manage_settings] }
+              description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
-            system: { type: boolean, description: 'guest, member und admin: Rechte fest, nicht löschbar' }
+            system: { type: boolean, description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine' }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
 
     RoleInput:
@@ -5684,8 +5693,8 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users] }
-          description: 'Verwaltungsrechte nur zusammen mit member; calendar geht auch allein (wie bei Anwärtern).'
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users] }
+          description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
@@ -5833,6 +5842,10 @@ components:
             - $ref: '#/components/schemas/AppUser'
             - type: 'null'
           description: null = Gast ohne Anmeldung
+        guestCapabilities:
+          type: array
+          items: { type: string }
+          description: 'Rechte ohne Anmeldung: die der Rolle guest (Einstellungen → Rollen)'
 
     Me:
       type: object

@@ -258,14 +258,19 @@ final class RankService
         if ($this->app->maintenance()->blocks($user)) {
             return $deny(503);
         }
-        $public = $this->app->features()->enabled('directory');
-        if (!$public && $user === null) {
-            return $deny(401);
+        // Abzeichen stehen in der Mitgliederliste, bei den Dienstgraden und beim eigenen Dienstgrad; ohne Anmeldung mit
+        // den Rechten von Gast (App::anonymous).
+        $viewer = $user ?? $this->app->anonymous();
+        $viewers = [Capability::ViewRanks, Capability::ViewOwnRank, ...Capability::memberList()];
+        if ($this->app->features()->enabled('directory')) {
+            $viewers[] = Capability::ViewDirectory;
         }
-        $viewers = [Capability::Member, Capability::Calendar, ...Capability::memberList()];
-        if (!$public && array_filter($viewers, static fn (Capability $c): bool => $user?->can($c) ?? false) === []) {
-            return $deny(403);
+        $sees = static fn (User $u): bool => array_filter($viewers, static fn (Capability $c): bool => $u->can($c)) !== [];
+        if (!$sees($viewer)) {
+            return $deny($user === null ? 401 : 403);
         }
+        // Sehen sie auch Besucher ohne Anmeldung, darf jeder Zwischenspeicher sie behalten.
+        $public = $sees($this->app->anonymous());
         $rank = $this->repository()->find($rankId);
         if ($rank === null || ($path = $this->badgePath($rank, Input::integer($size) ?? self::BADGE_DEFAULT_SIZE)) === null) {
             return $deny(404);

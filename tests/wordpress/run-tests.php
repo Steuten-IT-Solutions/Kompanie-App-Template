@@ -41,15 +41,20 @@ $organizer = $d->createUser('kpwp_verwalter', 'events'); // Standardrolle „Ter
 $manager = $d->createUser('kpwp_leitung', 'points');      // Standardrolle „Punkte verwalten“
 $admin = $d->createUser('kpwp_admin', 'admin');
 $caps = static fn (int $id): array => array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, $app->users->find($id)?->capabilities ?? []);
-$c->ok($caps($member) === ['member', 'calendar', 'view_intern'], 'Mitglied: nur Mitgliederbereich (mit Kalender und „Intern“)');
-$c->ok($caps($organizer) === ['member', 'manage_events', 'calendar', 'view_intern'], 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
+// Rechte, wie sie früher gemeint waren (member schloss das Sehen ein), in der gespeicherten Reihenfolge.
+$legacyCaps = static fn (array $l): array => array_values(array_filter(
+    array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, KompanieApp\Core\Auth\Roles::GRANTABLE),
+    static fn (string $v): bool => in_array($v, KompanieApp\Core\Auth\Roles::expandLegacy($l), true),
+));
+$c->ok($caps($member) === $legacyCaps(['member']), 'Mitglied: Mitgliedschaft und Rechte zum Sehen');
+$c->ok($caps($organizer) === $legacyCaps(['member', 'manage_events']), 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
 $c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
-$c->ok($caps($manager) === ['member', 'manage_points', 'calendar', 'view_intern'], 'Punkte verwalten: Punkte und Mitglied');
+$c->ok($caps($manager) === $legacyCaps(['member', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
 $c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
 // Eigene Rolle aus der App wirkt auch in WordPress.
-$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => ['member', 'manage_penalties']]);
+$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'manage_penalties'])]);
 $kasseKey = (string) array_search('Kpwp Kasse', array_column($app->roles()->all(), 'label', 'key'), true);
 $app->users->setRole($member, $kasseKey);
 clean_user_cache($member);
@@ -61,8 +66,8 @@ $app->roles()->delete($kasseKey, null);
 // nur diesen Schritt und nur aus Rollen, die das erlauben.
 $c->section('Anwärter');
 $candKey = (string) (array_search('Kpwp Anwärter', array_column($app->roles()->all(), 'label', 'key'), true)
-    ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true])['key']);
-$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => ['member', 'create_users']]);
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => $legacyCaps(['calendar']), 'new_accounts' => true, 'promotable' => true])['key']);
+$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
 $aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
 $holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
 $existingCand = get_user_by('login', 'kpwp.anwaerter');
@@ -74,7 +79,7 @@ $created = $app->members()->create(['name' => 'Kpwp Anwärter', 'username' => 'k
 $cand = (int) $created['id'];
 clean_user_cache($cand);
 $c->ok(get_userdata($cand)->roles === ['subscriber'] && get_user_meta($cand, KompanieApp\WordPress\WpUsers::metaKey(), true) === $candKey, 'Anwärter: WP-Abonnent, Rolle in der Benutzer-Option');
-$c->ok($caps($cand) === ['calendar'], 'Anwärter: nur interner Kalender');
+$c->ok($caps($cand) === $legacyCaps(['calendar']), 'Anwärter: interner Kalender, Brett und das Öffentliche');
 try {
     $app->users->setRole($cand, 'events');
     $c->ok(false, 'Wer nur Konten anlegt, vergibt keine anderen Rollen');
@@ -129,7 +134,7 @@ remove_role('kpwp_vorstand');
 
 // Wer in der App Konten anlegen darf, setzt keine Passwörter von Benutzerverwaltern der Webseite zurück.
 add_role('kpwp_userpflege', 'Benutzerpflege', ['read' => true, 'list_users' => true, 'edit_users' => true]);
-$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => ['member', 'create_users']]);
+$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
 $pflegeKey = $pflegeRole['key'];
 $pfleger = $d->createUser('kpwp_pfleger', 'member');
 $app->users->setRole($pfleger, $pflegeKey);
@@ -190,7 +195,7 @@ wp_delete_user($manual);
 wp_set_current_user($pfleger);
 // Konto der Webseite (z. B. Kunde, Forum), das erst über die App zum Mitglied gemacht wird: nicht übernehmbar.
 wp_set_current_user(0);
-$app->roles()->update($pflegeKey, ['capabilities' => ['member', 'create_users', 'promote_users']]);
+$app->roles()->update($pflegeKey, ['capabilities' => $legacyCaps(['member', 'create_users', 'promote_users'])]);
 $fremd = wp_insert_user(['user_login' => 'kpwp_fremd', 'user_pass' => wp_generate_password(), 'role' => 'subscriber']);
 wp_set_current_user($pfleger);
 $app->users->setRole($fremd, 'member');
@@ -268,7 +273,7 @@ $d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.dritter']);
 clean_user_cache($rid);
 $c->ok(get_userdata($rid)->user_login === 'kpwp.dritter' && get_userdata($rid)->user_nicename === 'kpwp-eigen', 'Eigener Name in Adressen bleibt');
 // Benutzer der Webseite (z. B. Redakteur): nur mit dem Recht aus WordPress, nicht über „Mitglieder anlegen“ der App.
-$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => ['member', 'create_users']]);
+$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
 $kontenpfleger = $d->createUser('kpwp_kontenpfleger', 'member');
 $app->users->setRole($kontenpfleger, $umbenenner['key']);
 $redakteur = wp_insert_user(['user_login' => 'kpwp_red', 'user_pass' => wp_generate_password(), 'role' => 'editor']);
@@ -839,7 +844,7 @@ wp_set_current_user($admin);
 $app->features()->update(['offices' => true, 'directory' => true]);
 $guestHolder = $d->createUser('kpwp_gast_amt', 'guest');
 $galleryCandKey = (string) (array_search('Kpwp Anwärter Galerie', array_column($app->roles()->all(), 'label', 'key'), true)
-    ?: $app->roles()->create(['label' => 'Kpwp Anwärter Galerie', 'capabilities' => ['calendar']])['key']);
+    ?: $app->roles()->create(['label' => 'Kpwp Anwärter Galerie', 'capabilities' => $legacyCaps(['calendar'])])['key']);
 $galleryCand = $d->createUser('kpwp_anwaerter_galerie', $galleryCandKey);
 $memberName = (string) $app->users->find($member)?->name;
 $offices = $app->offices();

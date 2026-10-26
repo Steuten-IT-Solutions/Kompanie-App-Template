@@ -69,6 +69,34 @@ function countOrderSaves(page: Page, path: string) {
   });
   return () => n;
 }
+/**
+ * Rechte im Formular einer Rolle (Gruppen zum Ein- und Ausklappen, rightsTree.tsx): alle Gruppen aufklappen und genau die
+ * Rechte anhaken, deren Beschriftung zu einem der Muster passt; gesperrte bleiben.
+ */
+async function chooseRights(scope: Locator, keep: RegExp[]) {
+  const open = scope.getByRole('button', { name: 'Alle aufklappen' });
+  if (await open.count()) await open.click();
+  const labels = scope.locator('.rights-group-body label');
+  for (let i = 0; i < (await labels.count()); i++) {
+    const label = labels.nth(i);
+    const box = label.locator('input');
+    if (await box.isDisabled()) continue;
+    const text = (await label.innerText()).trim();
+    await box.setChecked(keep.some((k) => k.test(text)));
+  }
+}
+/** Anwärter: interner Kalender und das Brett, dazu das Öffentliche (wie Roles::CANDIDATE_DEFAULTS im Kern). */
+const CANDIDATE_RIGHTS = [
+  /^Öffentliche Termine$/,
+  /^News$/,
+  /: öffentliche Alben$/,
+  /^Interner Kalender$/,
+  /^Mitglieder$/,
+  /^Ämter$/,
+  /^Ehemalige$/,
+  /^Schwarzes Brett lesen$/,
+];
+
 /** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
 const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
@@ -969,8 +997,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   if ((await rollen.locator('.row-title', { hasText: /^Anwärter$/ }).count()) === 0) {
     await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
     await rollen.getByLabel('Name der Rolle').fill('Anwärter');
-    await rollen.getByLabel(/^Mitgliederbereich/).uncheck();
-    await rollen.getByLabel(/^Interner Kalender/).check();
+    await chooseRights(rollen, CANDIDATE_RIGHTS);
+    await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).not.toBeChecked();
     await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
     await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
     await rollen.getByRole('button', { name: 'Anlegen' }).click();
@@ -2421,7 +2449,8 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberAccount(page);
   const rechte = page.locator('.member-rights');
-  await expect(rechte.getByLabel(/^Mitgliederbereich/)).toBeChecked();
+  await rechte.getByRole('button', { name: 'Alle aufklappen' }).click();
+  await expect(rechte.getByLabel(/^Gehört zur Kompanie/)).toBeChecked();
   await rechte.getByLabel('Öffentliche Termine pflegen').check();
   await expect(rechte.locator('.badge-override')).toHaveText('zusätzlich');
   await rechte.getByRole('button', { name: 'Rechte speichern' }).click();
@@ -2458,6 +2487,7 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
   await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
   await rollen.getByLabel('Name der Rolle').fill('Kassenwart');
+  await rollen.getByRole('button', { name: /^Kompanie verwalten/ }).click();
   await rollen.getByLabel(/^Kasse vergeben/).check();
   await rollen.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
@@ -2485,6 +2515,54 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await rollen.getByRole('button', { name: 'Löschen' }).click();
   await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
+});
+
+test('Wer sieht was: Gruppen einklappbar, Mitglied ohne Punktekatalog sieht den Knopf unter „Intern“ nicht', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  const rollen = page.locator('#einstellungen-rollen');
+  // Im Formular der Rolle: Gruppen zu Beginn zu, aufklappen zeigt die Haken; Haken der Gruppe für alle.
+  await rollen.getByRole('button', { name: 'Mitglied bearbeiten' }).click();
+  const intern = rollen.locator('.rights-group-toggle', { hasText: /^Intern/ });
+  await expect(intern).toHaveAttribute('aria-expanded', 'false');
+  await expect(rollen.getByLabel('Punktekatalog', { exact: true })).toBeHidden();
+  await intern.click();
+  await expect(intern).toHaveAttribute('aria-expanded', 'true');
+  await expect(rollen.getByLabel('Punktekatalog', { exact: true })).toBeChecked();
+  await expect(rollen.getByLabel('Intern: alle')).toBeChecked();
+  await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).toBeDisabled();
+  await rollen.getByRole('button', { name: 'Abbrechen' }).click();
+
+  // Übersicht: Punktekatalog für Mitglied abhaken, speichern.
+  await rollen.getByRole('button', { name: 'Wer sieht was' }).click();
+  await rollen.locator('.rights-matrix-toggle', { hasText: /^Intern/ }).click();
+  await rollen.getByLabel('Punktekatalog für Mitglied').uncheck();
+  await expect(rollen.getByLabel('Intern für Mitglied')).not.toBeChecked();
+  await shot(page, '20c-wer-sieht-was');
+  await rollen.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Rechte gespeichert');
+
+  await login(page, 'mitglied1');
+  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await expect(page.getByRole('button', { name: 'Dienstgrade' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Punktekatalog' })).toHaveCount(0);
+
+  // Wieder wie vorher.
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  await rollen.getByRole('button', { name: 'Wer sieht was' }).click();
+  await rollen.locator('.rights-matrix-toggle', { hasText: /^Intern/ }).click();
+  await rollen.getByLabel('Punktekatalog für Mitglied').check();
+  await rollen.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Rechte gespeichert');
 });
 
 test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Filter findet sie', async ({ page }) => {

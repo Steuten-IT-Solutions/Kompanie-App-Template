@@ -127,7 +127,7 @@ final class AttendanceServiceTest extends TestCase
         $list = $this->createForEvent();
         $other = $this->users->add('anna', Roles::MEMBER);
         $this->call('PUT', '/attendance', ['id' => $list['id'], 'entries' => [$this->m => 'present', $other => 'present']]);
-        $role = $this->call('POST', '/admin/roles', ['label' => 'Jung', 'capabilities' => ['member'], 'points_factor' => 0.5]);
+        $role = $this->call('POST', '/admin/roles', ['label' => 'Jung', 'capabilities' => TestApp::caps(['member']), 'points_factor' => 0.5]);
         $this->assertSame(201, $role->status);
         $this->users->setRole($other, (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Jung']);
 

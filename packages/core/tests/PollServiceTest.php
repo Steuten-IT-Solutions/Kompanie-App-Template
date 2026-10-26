@@ -117,7 +117,7 @@ final class PollServiceTest extends TestCase
         $this->assertSame(403, $this->call('POST', '/polls', ['title' => 'x', 'type' => 'text'])->status, 'Mitglied legt nicht an');
 
         $roles = array_column($this->app->roles()->describe(), 'capabilities', 'key');
-        $this->assertSame(['member', 'manage_polls'], $roles['polls'] ?? null, 'Standardrolle „Umfragen verwalten“');
+        $this->assertSame(TestApp::caps(['member', 'manage_polls']), $roles['polls'] ?? null, 'Standardrolle „Umfragen verwalten“');
         $poll = $this->as($this->manager)->create();
         $this->assertEquals(['status' => 'running', 'type' => 'single', 'anonymous' => false, 'results' => 'after_vote', 'created_by_name' => 'Umfrager'], array_intersect_key($poll, array_flip(['status', 'type', 'anonymous', 'results', 'created_by_name'])));
         $id = $poll['id'];

@@ -1,7 +1,7 @@
 ---
 titel: "Umfrage beantworten"
 reihenfolge: 34
-rechte: [member]
+rechte: [vote_polls]
 bereiche: [polls]
 ---
 Auf der Seite einer Umfrage gibst du deine Antwort ab, änderst sie oder ziehst sie zurück. Außerdem siehst du hier, ob die Umfrage namentlich oder anonym ist, und die Ergebnisse, sobald du sie sehen darfst.

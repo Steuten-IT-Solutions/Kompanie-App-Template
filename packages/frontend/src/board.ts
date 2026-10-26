@@ -18,9 +18,9 @@ let items: BoardItem[] | null = null;
 /** Zuletzt gestartete Ladeanfrage: Eine ältere, die später ankommt, überschreibt keinen neueren Stand. */
 let latestRequest = 0;
 
-/** Wer das Brett sieht: Bereich an, Mitglieder und Anwärter (wie BoardService::isRecipient im Kern). */
+/** Wer das Brett sieht: Bereich an und Recht view_board (wie BoardService::isRecipient im Kern). */
 export function boardVisible(): boolean {
-  return !!config?.features.board && (can('member') || can('calendar'));
+  return !!config?.features.board && can('view_board');
 }
 
 /** Schreiben, ändern und löschen. */
@@ -28,9 +28,9 @@ export function canPostBoard(): boolean {
   return !!config?.features.board && can('post_board');
 }
 
-/** Umfragen (Issue #4): Mitglieder nehmen teil (wie PollService::isParticipant im Kern). */
+/** Umfragen (Issue #4): wer das Recht vote_polls und ein Konto hat, nimmt teil (wie PollService::isParticipant im Kern). */
 export function pollsVisible(): boolean {
-  return !!config?.features.polls && can('member');
+  return !!config?.features.polls && !!config.user && can('vote_polls');
 }
 
 /** Umfragen anlegen, ändern, beenden, löschen. */

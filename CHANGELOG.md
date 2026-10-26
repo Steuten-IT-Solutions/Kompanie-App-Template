@@ -17,9 +17,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Wer sieht was, je Knopf einstellbar**: Für jeden Knopf unter **Intern** (Mitglieder, Ämter, Ehemalige,
+  Dokumente, Schwarzes Brett, Dienstgrade, Punktekatalog), für die Tabs unten (Termine, News, Galerie, Intern) und für
+  jeden Teil des Mitgliederbereichs (eigene Punkte, Strafen, Dienstgrad und Anwesenheit, interner Kalender, interne
+  Bilder, Geburtstage, Umfragen) gibt es jetzt ein eigenes Recht. Der Server prüft es: Wer es nicht hat, sieht den
+  Knopf nicht und kommt auch über einen Link nicht an die Daten.
+- **Übersicht „Wer sieht was“**: Unter *Einstellungen → Rollen* zeigt eine Tabelle alle Rechte für alle Rollen auf
+  einen Blick. Die Haken lassen sich dort direkt setzen und gemeinsam speichern.
+- **Gast und Mitglied einstellbar**: Bei den festen Rollen **Gast** und **Mitglied** lässt sich jetzt einstellen, was
+  sie sehen. **Gast** gilt auch für alle, die die App ohne Anmeldung öffnen, und für die Shortcodes auf der Webseite.
 - **E-Mails: Mailgruppen**: Unter *Verwaltung → E-Mails → Mailgruppen verwalten* lassen sich Empfängergruppen aus
   Rollen, einzelnen Mitgliedern und freien Adressen anlegen (z. B. Vorstand) und beim Schreiben wie eine Rolle auswählen.
-  Zwei Standardgruppen pflegt die App selbst: **Alle Mitglieder** (alle mit Mitgliederbereich, auch Admins und eigene
+  Zwei Standardgruppen pflegt die App selbst: **Alle Mitglieder** (alle, die zur Kompanie gehören, auch Admins und eigene
   Rollen wie Spieß, ohne Anwärter) und **Alle Konten** (alle außer Gästen). Bisher erreichte eine Mail an die Rolle
   „Mitglied“ keine Admins und Spieße. Ehemalige bekommen nie eine Mail, auch wenn sie noch in einer Gruppe stehen.
 - **Querformat**: Die App dreht sich mit dem Handy, auch als installierte App. Quer steht die Leiste mit den Bereichen
@@ -30,6 +39,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Rechte in Gruppen**: Die Rechte einer Rolle und einer einzelnen Person stehen jetzt in Gruppen (Tabs und
+  Navigation, Mitgliederbereich, Intern, Inhalte verwalten, Kompanie verwalten, Mitglieder und Rollen). Jede Gruppe lässt
+  sich auf- und zuklappen; ein Haken vor der Gruppe setzt oder entfernt alle ihre Rechte auf einmal, ein Zähler zeigt,
+  wie viele davon gesetzt sind.
+- **Mitgliederbereich aufgeteilt**: Das frühere Recht *Mitgliederbereich* heißt jetzt **Gehört zur Kompanie** und
+  bedeutet nur noch, dass die Person Punkte, Strafen, Dienstgrade und Titel bekommt und in Listen steht. Was sie sieht,
+  regeln die einzelnen Rechte. Beim Update bekommt jede Rolle und jede Ausnahme genau die Rechte, mit denen alle dasselbe
+  sehen wie vorher.
 - **Ämter nach Jahren auch auf dem Handy**: Den Schalter „Chronik | Jahre“ im Tab Ämter gibt es jetzt auf jedem
   Bildschirm. Auf dem Handy ist die Übersicht schmaler; quer gedreht nutzt sie die ganze Breite, sodass mehr Ämter
   nebeneinander passen. Beim Scrollen bleiben oben die Ämter und links die Jahre stehen, und der Schalter bleibt über

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { api, type Capability, type MemberRights } from '../api';
-import { CAPABILITIES, WITHOUT_MEMBER, withoutMember } from '../capabilities';
+import { requires, toggleMany } from '../capabilities';
+import { RightsTree } from '../rightsTree';
 
-/** Rechte nach den Rollen und Ausnahmen; der Mitgliederbereich schließt Kalender und „Intern“ ein. */
+/** Rechte nach den Rollen und Ausnahmen; was seine Voraussetzung nicht hat, fällt weg (wie RoleService::effective). */
 function effective(r: MemberRights): Set<Capability> {
   const out = new Set<Capability>([...r.role, ...r.grant].filter((c) => !r.revoke.includes(c)));
-  if (out.has('member')) WITHOUT_MEMBER.forEach((c) => out.add(c));
-  return out;
+  return new Set([...out].filter((c) => !requires(c) || out.has(requires(c)!)));
 }
 
 export const hasOverrides = (r: MemberRights | null | undefined): boolean => !!r && (r.grant.length > 0 || r.revoke.length > 0);
@@ -36,25 +36,17 @@ export function MemberRightsPanel({
 }) {
   const [checked, setChecked] = useState<Set<Capability>>(() => effective(rights));
   const [busy, setBusy] = useState(false);
-  const fromRole = effective({ ...rights, grant: [], revoke: [] });
-  const member = checked.has('member');
-  const isOn = (c: Capability) => checked.has(c) || (withoutMember(c) && member);
+  const fromRole = new Set(rights.role);
 
-  // Was von den Rollen abweicht; Kalender und „Intern“ zählen neben dem Mitgliederbereich nicht extra.
-  const grant = [...checked].filter((c) => !fromRole.has(c) && !(withoutMember(c) && member));
-  const revoke = [...fromRole].filter((c) => !isOn(c));
+  // Was von den Rollen abweicht. Was wegfällt, weil seine Voraussetzung entzogen ist, entzieht der Server mit.
+  const grant = [...checked].filter((c) => !fromRole.has(c));
+  const revoke = [...fromRole].filter((c) => !checked.has(c) && !(requires(c) && !checked.has(requires(c)!)));
   const dirty =
     grant.length !== rights.grant.length ||
     revoke.length !== rights.revoke.length ||
     grant.some((c) => !rights.grant.includes(c)) ||
     revoke.some((c) => !rights.revoke.includes(c));
-
-  function toggle(c: Capability, on: boolean) {
-    const next = new Set(checked);
-    if (on) next.add(c);
-    else next.delete(c);
-    setChecked(next);
-  }
+  const overridden = new Set([...rights.grant, ...rights.revoke]);
 
   async function save(g: Capability[], r: Capability[], msg: string) {
     setBusy(true);
@@ -78,27 +70,17 @@ export function MemberRightsPanel({
           {plural ? `Grundlage sind die Rollen „${roles}“.` : `Grundlage ist die Rolle „${roles}“.`} Hier kannst du {name} einzelne Rechte
           zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.
         </p>
-        <fieldset className="feature-list" disabled={busy}>
-          <legend className="field-label">Rechte von {name}</legend>
-          {CAPABILITIES.map((c) => {
-            const on = isOn(c.key);
-            const changed = !(withoutMember(c.key) && member) && on !== fromRole.has(c.key);
-            return (
-              <label key={c.key} className="toggle feature-toggle">
-                <input
-                  type="checkbox"
-                  checked={on}
-                  disabled={!rights.editable.includes(c.key) || (withoutMember(c.key) && member)}
-                  onChange={(e) => toggle(c.key, e.target.checked)}
-                />
-                <span>
-                  {c.label}
-                  {changed && <span className="badge badge-override">{on ? 'zusätzlich' : 'entzogen'}</span>}
-                </span>
-              </label>
-            );
-          })}
-        </fieldset>
+        <RightsTree
+          legend={`Rechte von ${name}`}
+          disabled={busy}
+          isOn={(c) => checked.has(c)}
+          isDisabled={(c) => !rights.editable.includes(c)}
+          onToggle={(keys, on) => setChecked((prev) => toggleMany(prev, keys, on))}
+          badge={(c) =>
+            checked.has(c) !== fromRole.has(c) && <span className="badge badge-override">{checked.has(c) ? 'zusätzlich' : 'entzogen'}</span>
+          }
+          initiallyOpen={(g) => g.items.some((i) => overridden.has(i.key))}
+        />
         <div className="button-row">
           <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, 'Rechte gespeichert')}>
             Rechte speichern

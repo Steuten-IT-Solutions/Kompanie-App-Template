@@ -30,7 +30,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/markdown.php';
 
-const CAPABILITIES = ['member', 'calendar', 'view_intern', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
+const CAPABILITIES = ['member', 'calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
+/** Wie Roles::PUBLIC_DEFAULTS, CANDIDATE_DEFAULTS und MEMBER_DEFAULTS im Kern (Gast, Anwärter, Mitglied anfangs). */
+const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former'];
+const CANDIDATE_DEFAULTS = ['calendar', 'view_board'];
+const MEMBER_DEFAULTS = ['member', 'calendar', 'view_intern', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents', 'view_board', 'view_ranks', 'view_catalog'];
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
 const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists', 'mail' => 'send_mail'];
@@ -167,10 +171,14 @@ function reachable(array $from, array $to): bool
 {
     $admin = in_array('manage_settings', $from['rechte'], true);
     $held = $admin ? CAPABILITIES : $from['rechte'];
-    // Der Mitgliederbereich schließt den internen Kalender ein.
-    if (in_array('member', $held, true)) {
-        $held[] = 'calendar';
+    // Wer die Seite sieht, wie anfangs eingerichtet (Roles im Kern; jede Rolle lässt sich enger stellen, für Verweise
+    // zählt der Anfang): Das Öffentliche sieht jeder, Anwärter dazu Kalender und Brett, wer mehr braucht, ist Mitglied.
+    if (array_diff($held, [...PUBLIC_DEFAULTS, ...CANDIDATE_DEFAULTS]) !== []) {
+        $held = [...$held, ...MEMBER_DEFAULTS];
+    } elseif (array_intersect($held, CANDIDATE_DEFAULTS) !== []) {
+        $held = [...$held, ...CANDIDATE_DEFAULTS];
     }
+    $held = [...$held, ...PUBLIC_DEFAULTS];
     $features = $from['bereiche'];
     foreach ($from['bereiche'] as $f) {
         $features = [...$features, ...(FEATURE_REQUIRES[$f] ?? [])];
@@ -187,11 +195,14 @@ function reachable(array $from, array $to): bool
 function group(array $page): string
 {
     $r = $page['rechte'];
+    // Rechte zum Sehen: wie anfangs eingerichtet für alle (das Öffentliche) bzw. für Mitglieder.
+    $public = static fn (array $caps): bool => array_diff($caps, PUBLIC_DEFAULTS) === [];
+    $view = static fn (array $caps): bool => array_diff($caps, [...PUBLIC_DEFAULTS, ...CANDIDATE_DEFAULTS, ...MEMBER_DEFAULTS]) === [];
     return match (true) {
-        $r === [] && $page['einrecht'] !== [] => 'Für Aufgaben in der Verwaltung',
-        $r === [] => 'Für alle',
+        $r === [] && $page['einrecht'] !== [] && !$view($page['einrecht']) => 'Für Aufgaben in der Verwaltung',
+        $public($r) => 'Für alle',
         in_array('manage_settings', $r, true) => 'Für Admins',
-        $r === ['member'], $r === ['calendar'] => 'Für Mitglieder',
+        $view($r) => 'Für Mitglieder',
         default => 'Für Aufgaben in der Verwaltung',
     };
 }
