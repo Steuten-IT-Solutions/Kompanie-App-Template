@@ -57,6 +57,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Änderungen am Manifest kamen verzögert bei installierten Apps an**: Neues Logo, Startbildschirm und die freie
+  Drehung des Bildschirms übernimmt Chrome in eine installierte App erst, wenn es beim Abgleich das neue Manifest
+  bekommt. Bisher durfte das Manifest einen Tag zwischengespeichert werden; jetzt prüft der Browser es jedes Mal beim
+  Server nach (meist nur eine kurze Antwort „unverändert“). Wann Chrome die installierte App danach aktualisiert,
+  entscheidet weiterhin Chrome (höchstens einmal am Tag).
 - **Ämter einer Person: Mitinhaber anklickbar**: Hatte jemand ein Amt gemeinsam mit einer anderen Person inne, steht
   diese im Zeitstrahl unter „mit“. Hat sie ein Konto, führt ein Tipp auf sie jetzt zu ihrer Seite, wie im Zeitstrahl
   aller Ämter: auf der Seite einer Person, unter „Meins“ und in der Verwaltung. Aus der Verwaltung geöffnet, landet man
