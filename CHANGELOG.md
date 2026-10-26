@@ -15,6 +15,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.3.0] – 2026-10-26
+
 ### Neu
 
 - **Schwarzes Brett, Dienstgrade und Punktekatalog unter „Intern“**: Unter **Intern** gibt es drei neue Knöpfe.
