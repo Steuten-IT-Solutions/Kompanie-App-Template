@@ -2396,6 +2396,8 @@ fieldset.rights-tree legend {
 /* Übersicht „Wer sieht was“ (RechteMatrix.tsx): waagerecht scrollbar, erste Spalte bleibt stehen */
 .rights-matrix-scroll {
   overflow-x: auto;
+  /* Beim Hinscrollen zu einer Zelle (Tastatur, Fokus) bleibt sie neben der stehenden ersten Spalte sichtbar. */
+  scroll-padding-left: calc(10rem + 24px);
   margin: 8px 0 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2423,8 +2425,10 @@ fieldset.rights-tree legend {
   background: var(--card);
   text-align: left;
   font-weight: 400;
-  min-width: 11rem;
-  max-width: 16rem;
+  box-sizing: border-box;
+  width: calc(10rem + 16px);
+  min-width: calc(10rem + 16px);
+  max-width: calc(10rem + 16px);
 }
 .rights-matrix thead th:first-child {
   position: sticky;

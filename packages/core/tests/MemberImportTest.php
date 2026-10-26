@@ -139,7 +139,7 @@ final class MemberImportTest extends TestCase
         $res = $this->import($csv);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $rows = array_column($res->data['rows'], null, 'line');
-        $expect = [2 => 'Vorname', 4 => 'Benutzername', 6 => 'E-Mail', 7 => 'Zeile 3', 8 => 'Vorstand', 9 => 'gibt es nicht', 10 => 'TT.MM.JJJJ', 11 => 'Zukunft', 12 => 'Mitgliederbereich', 13 => 'Major', 14 => 'Unbekannt', 15 => 'nur bei Ehemaligen', 16 => 'Gründer', 17 => 'Grund', 18 => 'Anfangspunkte'];
+        $expect = [2 => 'Vorname', 4 => 'Benutzername', 6 => 'E-Mail', 7 => 'Zeile 3', 8 => 'Vorstand', 9 => 'gibt es nicht', 10 => 'TT.MM.JJJJ', 11 => 'Zukunft', 12 => 'die zur Kompanie gehören', 13 => 'Major', 14 => 'Unbekannt', 15 => 'nur bei Ehemaligen', 16 => 'Gründer', 17 => 'Grund', 18 => 'Anfangspunkte'];
         foreach ($expect as $line => $text) {
             $this->assertStringContainsString($text, $rows[$line]['error'] ?? '', "Zeile $line");
         }
