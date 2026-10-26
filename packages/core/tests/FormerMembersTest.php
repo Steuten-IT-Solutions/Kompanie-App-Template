@@ -89,7 +89,7 @@ final class FormerMembersTest extends TestCase
 
     public function testReactivateRestoresRoles(): void
     {
-        $this->call('POST', '/admin/roles', ['label' => 'Kasse', 'capabilities' => ['member', 'manage_penalties']]);
+        $this->call('POST', '/admin/roles', ['label' => 'Kasse', 'capabilities' => TestApp::caps(['member', 'manage_penalties'])]);
         $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => ['r1', 'events']]);
         $this->call('PUT', "/members/{$this->m}/rights", ['grant' => ['manage_points'], 'revoke' => []]);
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'other'])->status);
@@ -109,7 +109,7 @@ final class FormerMembersTest extends TestCase
 
     public function testLimitsForNonAdmins(): void
     {
-        $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => ['member', 'create_users']]);
+        $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
         $clerk = $this->users->add('schrift', 'r1');
         $admin2 = $this->users->add('admin2', Roles::ADMIN);
         $this->users->current = $clerk;

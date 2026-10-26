@@ -188,7 +188,7 @@ final class RankServiceTest extends TestCase
         $this->setUpApp(['ranks' => true, 'points' => true]);
         $r = $this->ranks([['Gefreiter', null]]);
         // Konten anlegen ohne Dienstgrade/Punkte verwalten: keine Anfangswerte.
-        $key = $this->app->roles()->create(['label' => 'Konten', 'capabilities' => ['member', 'create_users']])['key'];
+        $key = $this->app->roles()->create(['label' => 'Konten', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key'];
         $this->users->current = $this->users->add('konten', $key);
         $this->assertSame(403, $this->call('POST', '/users', ['name' => 'X', 'rank_id' => $r['Gefreiter']])->status);
         $this->assertSame(403, $this->call('POST', '/users', ['name' => 'X', 'initial_points' => 5])->status);

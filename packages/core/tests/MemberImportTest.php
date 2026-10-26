@@ -174,7 +174,7 @@ final class MemberImportTest extends TestCase
         $this->assertSame(['Geburtstag', 'Punkte'], $ignored);
 
         // Wer nur Konten anlegt, vergibt beim Import keine Dienstgrade.
-        $creator = $this->users->add('anleger', $this->app->roles()->create(['label' => 'Anleger', 'capabilities' => ['member', 'create_users']])['key']);
+        $creator = $this->users->add('anleger', $this->app->roles()->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key']);
         $this->users->current = $creator;
         $res = $this->import($csv);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));

@@ -484,7 +484,7 @@ final class Kernel
         }
         $res = $app->gallery()->deliverPhoto($id, $size, static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
         if (isset($res['placeholder'])) {
             // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
@@ -522,7 +522,7 @@ final class Kernel
         }
         $res = $app->gallery()->deliverVideo($id, $this->http->header('Range'), static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
         http_response_code($res['status']);
         header('Accept-Ranges: bytes');

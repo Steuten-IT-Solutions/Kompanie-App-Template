@@ -172,7 +172,7 @@ final class AccountsTest extends TestCase
     public function testGuards(): void
     {
         $creator = $this->users->add('anleger', Roles::MEMBER);
-        $role = $this->call('POST', '/admin/roles', ['label' => 'Anleger', 'capabilities' => ['member', 'create_users']]);
+        $role = $this->call('POST', '/admin/roles', ['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
         $this->assertSame(201, $role->status);
         $this->users->setRole($creator, (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Anleger']);
         $guest = $this->users->add('gast', Roles::GUEST);

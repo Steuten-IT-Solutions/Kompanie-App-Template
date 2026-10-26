@@ -280,7 +280,7 @@ final class ListService
             'rank' => $f->enabled('ranks') && ($directory || $viewer->can(Capability::ManageRanks)),
             'titles' => $f->enabled('titles') && ($directory || $viewer->can(Capability::ManageTitles)),
             // Geburtstage sehen nur Mitglieder, und nur die, die die Person freigegeben hat (Issue #1).
-            'birthday' => $f->enabled('birthdays') && BirthdayService::isMember($viewer),
+            'birthday' => $f->enabled('birthdays') && BirthdayService::canSee($viewer),
             'points' => $f->enabled('points') && $viewer->can(Capability::ManagePoints),
             'penalties' => $f->enabled('penalties') && $viewer->can(Capability::ManagePenalties),
         ];

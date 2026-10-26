@@ -20,7 +20,8 @@ final class RolesTest extends TestCase
     {
         $app = TestApp::create(TestApp::connection(), features: false);
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ADMIN], array_keys($app->roles()->all()), 'Anwärter legt der Admin selbst an');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern], $app->roles()->capabilities(Roles::MEMBER), 'Mitgliederbereich mit Kalender');
+        $this->assertSame(TestApp::capabilities(['member']), $app->roles()->capabilities(Roles::MEMBER), 'Mitglied sieht, was der frühere Mitgliederbereich einschloss');
+        $this->assertSame(Roles::from(Roles::PUBLIC_DEFAULTS), $app->roles()->capabilities(Roles::GUEST), 'Gast sieht das Öffentliche');
         $this->assertSame([], $app->roles()->capabilities(Roles::ORGANIZER), 'frühere Vorlage gibt es nicht');
     }
 
@@ -33,7 +34,7 @@ final class RolesTest extends TestCase
         $this->assertSame([Roles::GUEST, Roles::MEMBER, 'points', 'penalties', Roles::ADMIN], array_keys($roles), 'Kalender braucht keine Rechte');
         $this->assertSame('Punkte verwalten', $roles['points']['label']);
         $this->assertSame('Kasse verwalten', $roles['penalties']['label'], 'mit der Bezeichnung aus kompanie.json');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern, Capability::ManagePenalties], $app->roles()->capabilities('penalties'));
+        $this->assertSame(TestApp::capabilities(['member', 'manage_penalties']), $app->roles()->capabilities('penalties'), 'sieht, was Mitglieder sehen');
 
         // Ausschalten: Rolle verschwindet, wenn niemand sie hat; sonst bleibt sie.
         $users->add('kasse', 'penalties');
@@ -63,10 +64,7 @@ final class RolesTest extends TestCase
         $roles = $app->roles()->all();
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_keys($roles));
         $this->assertSame('Spieß', $roles[Roles::MANAGER]['label']);
-        $this->assertEqualsCanonicalizing(
-            [Capability::Member, Capability::Calendar, Capability::ViewIntern, Capability::ManageEvents, Capability::ManageDocuments, Capability::ManagePoints, Capability::ManagePenalties],
-            $app->roles()->capabilities(Roles::MANAGER),
-        );
+        $this->assertSame(TestApp::capabilities(['member', 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties']), $app->roles()->capabilities(Roles::MANAGER));
         // Bestehende Installationen bekommen beim Einschalten neue Standardrollen, behalten aber ihre.
         $app->features()->update(['points' => true]);
         $this->assertArrayHasKey('points', $app->roles()->all());
@@ -77,7 +75,7 @@ final class RolesTest extends TestCase
     {
         $settings = new MemorySettings([RoleService::SETTING => [['key' => 'r1', 'label' => 'Kasse', 'capabilities' => ['member', 'manage']]]]);
         $app = TestApp::create(TestApp::connection(), settings: $settings, features: false);
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern, Capability::ManagePoints, Capability::ManagePenalties], $app->roles()->capabilities('r1'));
+        $this->assertSame(TestApp::capabilities(['member', 'manage_points', 'manage_penalties']), $app->roles()->capabilities('r1'));
         $this->assertSame([Roles::GUEST, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($app->roles()->all()), 'feste Rollen ergänzt');
     }
 
@@ -97,7 +95,7 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => ['member', 'promote_users', 'create_users', 'manage_points']]);
+        $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'create_users', 'manage_points'])]);
         $schrift = $users->add('schrift', 'r1');
         $kasse = $users->add('kasse', 'penalties');
         $m = $users->add('m', Roles::MEMBER);
@@ -125,10 +123,10 @@ final class RolesTest extends TestCase
         $app = TestApp::create(TestApp::connection(), $users, settings: $settings, features: false);
         $roles = $app->roles()->all();
         $this->assertSame([Roles::GUEST, Roles::CANDIDATE, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($roles), 'eigene Rolle vor Mitglied: in den Zählern (von unten nach oben) wie bisher nach den Mitgliedern');
-        $this->assertSame(['key' => 'candidate', 'label' => 'Rekrut', 'capabilities' => ['calendar'], 'points_factor' => 1.0, 'new_accounts' => true, 'promotable' => true], $roles[Roles::CANDIDATE]);
+        $this->assertSame(['key' => 'candidate', 'label' => 'Rekrut', 'capabilities' => TestApp::caps(['calendar']), 'points_factor' => 1.0, 'new_accounts' => true, 'promotable' => true], $roles[Roles::CANDIDATE]);
         $this->assertTrue($settings->get(RoleService::CANDIDATE_SETTING));
         $cand = $users->add('anwaerter', Roles::CANDIDATE);
-        $this->assertSame([Capability::Calendar], $users->find($cand)?->capabilities, 'niemand verliert Rechte');
+        $this->assertSame(TestApp::capabilities(['calendar']), $users->find($cand)?->capabilities, 'niemand verliert Rechte: Kalender, Brett und das Öffentliche');
         $described = array_column($app->roles()->describe(), null, 'key')[Roles::CANDIDATE];
         $this->assertSame([false, true], [$described['system'], $described['deletable']], 'jetzt änderbar und löschbar');
 
@@ -155,8 +153,8 @@ final class RolesTest extends TestCase
         $app = TestApp::create(TestApp::connection(), $users, settings: $settings, features: false);
         $role = $app->roles()->find(Roles::CANDIDATE);
         $this->assertSame('Anwärter (fest)', $role['label'] ?? null, 'eigene Rolle gleichen Namens: anderer Name');
-        $this->assertSame([['calendar'], true, true], [$role['capabilities'], $role['new_accounts'], $role['promotable']]);
-        $this->assertSame([Capability::Calendar], $users->find($cand)?->capabilities);
+        $this->assertSame([TestApp::caps(['calendar']), true, true], [$role['capabilities'], $role['new_accounts'], $role['promotable']]);
+        $this->assertSame(TestApp::capabilities(['calendar']), $users->find($cand)?->capabilities);
         // Rechte der eigenen Rolle lassen sich weiter ändern, auch mit unverändertem Namen.
         $app->roles()->update('r1', ['label' => 'Anwärter', 'capabilities' => ['calendar']]);
         $this->assertSame([Capability::Calendar], $app->roles()->capabilities('r1'));
@@ -188,7 +186,7 @@ final class RolesTest extends TestCase
         $this->assertSame([Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a], array_column($app->api()->config()['roles'], 'key'));
         $c = $app->roles()->create(['label' => 'C', 'capabilities' => []])['key'];
         $this->assertSame($c, array_key_last($app->roles()->all()), 'Admin steht nicht am Ende: neue Rolle ganz hinten');
-        $again = TestApp::create(TestApp::connection(), settings: new MemorySettings([RoleService::SETTING => $app->settings->get(RoleService::SETTING), RoleService::CANDIDATE_SETTING => true]), features: false);
+        $again = TestApp::create(TestApp::connection(), settings: new MemorySettings([RoleService::SETTING => $app->settings->get(RoleService::SETTING), RoleService::CANDIDATE_SETTING => true, RoleService::VIEW_SETTING => true]), features: false);
         $this->assertSame([Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a, $c], array_keys($again->roles()->all()), 'gespeicherte Reihenfolge bleibt');
         $all = [Roles::GUEST, $b, Roles::MEMBER, Roles::ADMIN, $a, $c];
         foreach ([[$a, $b, $c], [...$all, $a], [...array_slice($all, 1), 'r99'], 'r1', [...array_slice($all, 1), 3]] as $bad) {
@@ -228,14 +226,14 @@ final class RolesTest extends TestCase
         $this->assertSame(400, $call('PATCH', "/admin/roles/$friend", ['promotable' => true, 'capabilities' => ['member']])->status);
 
         $this->assertSame(200, $call('PATCH', "/admin/roles/$friend", ['new_accounts' => true, 'promotable' => true])->status);
-        $leader = $app->roles()->create(['label' => 'Leitung', 'capabilities' => ['member', 'manage_events'], 'new_accounts' => true])['key'];
+        $leader = $app->roles()->create(['label' => 'Leitung', 'capabilities' => TestApp::caps(['member', 'manage_events']), 'new_accounts' => true])['key'];
         $config = array_column($app->api()->config()['roles'], null, 'key');
         $this->assertSame([true, true, false], [$config[Roles::MEMBER]['new_accounts'], $config[$friend]['new_accounts'], $config[Roles::GUEST]['new_accounts']]);
         $this->assertSame([true, false], [$config[$friend]['promotable'], $config[$leader]['promotable']]);
 
         // Wer nur Mitglieder anlegen darf: freigegebene Rollen mit höchstens Mitgliederbereich bzw. Kalender, sonst nur
         // Rollen mit Rechten, die er weitergeben darf.
-        $clerk = $users->add('schrift', $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => ['member', 'create_users']])['key']);
+        $clerk = $users->add('schrift', $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key']);
         $users->current = $clerk;
         $res = $call('POST', '/users', ['name' => 'Fritz', 'level' => $friend]);
         $this->assertSame([201, $friend], [$res->status, $res->data['level'] ?? null], (string) json_encode($res->data));
@@ -257,33 +255,49 @@ final class RolesTest extends TestCase
         $this->assertSame(400, $call('POST', "/members/$other/promote")->status, 'nicht freigegeben');
     }
 
-    public function testInternAloneOrIncludedInMemberArea(): void
+    public function testEachRightOnItsOwn(): void
     {
         $app = TestApp::create(TestApp::connection(), features: false);
-        // Wie der Kalender auch ohne Mitgliederbereich (z. B. Anwärter, die „Intern“ sehen sollen)
-        $key = $app->roles()->create(['label' => 'Anwärter mit Intern', 'capabilities' => ['calendar', 'view_intern']])['key'];
-        $this->assertEqualsCanonicalizing([Capability::Calendar, Capability::ViewIntern], $app->roles()->capabilities($key));
-        $only = $app->roles()->create(['label' => 'Nur Intern', 'capabilities' => ['view_intern']])['key'];
-        $this->assertSame([Capability::ViewIntern], $app->roles()->capabilities($only));
-        // Im Mitgliederbereich enthalten, nicht doppelt gespeichert; Mitglieder haben es fest.
-        $app->roles()->update($key, ['capabilities' => ['member', 'view_intern']]);
-        $this->assertSame(['member'], $app->roles()->find($key)['capabilities']);
-        $this->assertContains(Capability::ViewIntern, $app->roles()->capabilities(Roles::MEMBER));
+        // Rechte zum Sehen auch ohne Mitgliedschaft (z. B. Anwärter, die „Intern“ und die Dienstgrade sehen sollen)
+        $key = $app->roles()->create(['label' => 'Anwärter mit Intern', 'capabilities' => ['calendar', 'view_ranks', 'view_intern']])['key'];
+        $this->assertSame([Capability::ViewIntern, Capability::Calendar, Capability::ViewRanks], $app->roles()->capabilities($key), 'in der Reihenfolge der Gruppen');
+        // Nichts schließt etwas ein: Mitgliedschaft allein sieht nichts.
+        $app->roles()->update($key, ['capabilities' => ['member']]);
+        $this->assertSame([Capability::Member], $app->roles()->capabilities($key));
         $this->assertNotContains(Capability::ViewIntern, $app->roles()->capabilities(Roles::GUEST));
-        $this->expectException(\KompanieApp\Core\Http\ApiError::class);
-        $app->roles()->update($only, ['capabilities' => ['view_intern', 'manage_documents']]);
+        foreach ([['view_own_points'], ['calendar', 'manage_events'], ['view_intern', 'manage_documents']] as $bad) {
+            try {
+                $app->roles()->update($key, ['capabilities' => $bad]);
+                $this->fail('ohne Mitgliedschaft: ' . implode(', ', $bad));
+            } catch (\KompanieApp\Core\Http\ApiError $e) {
+                $this->assertSame(400, $e->status);
+            }
+        }
     }
 
-    public function testCalendarAloneOrIncludedInMemberArea(): void
+    public function testGuestAndMemberOnlyChangeRightsToSee(): void
     {
-        $app = TestApp::create(TestApp::connection(), features: false);
-        $key = $app->roles()->create(['label' => 'Nur Kalender', 'capabilities' => ['calendar']])['key'];
-        $this->assertSame(['calendar'], $app->roles()->find($key)['capabilities']);
-        $app->roles()->update($key, ['capabilities' => ['calendar', 'member']]);
-        $this->assertSame(['member'], $app->roles()->find($key)['capabilities'], 'Kalender im Mitgliederbereich enthalten, nicht doppelt gespeichert');
-        $this->assertEqualsCanonicalizing([Capability::Member, Capability::Calendar, Capability::ViewIntern], $app->roles()->capabilities($key));
-        $this->expectException(\KompanieApp\Core\Http\ApiError::class);
-        $app->roles()->update($key, ['capabilities' => ['calendar', 'manage_events']]);
+        $users = new FakeUsers();
+        $app = TestApp::create(TestApp::connection(), $users, features: false);
+        $users->current = $users->add('admin', Roles::ADMIN);
+        $patch = static fn (string $key, array $body) => $app->api()->handle(new Request('PATCH', "/admin/roles/$key", [], $body));
+        $this->assertSame(200, $patch(Roles::MEMBER, ['capabilities' => ['member', 'view_events', 'view_ranks']])->status);
+        $this->assertSame([Capability::ViewEvents, Capability::Member, Capability::ViewRanks], $app->roles()->capabilities(Roles::MEMBER));
+        $this->assertSame(200, $patch(Roles::GUEST, ['capabilities' => ['view_news', 'view_documents']])->status);
+        $this->assertSame([Capability::ViewNews, Capability::ViewDocuments], $app->roles()->capabilities(Roles::GUEST));
+        $admin = $users->current;
+        $app->features()->update(['documents' => true]);
+        $users->current = null;
+        $this->assertSame([Capability::ViewNews, Capability::ViewDocuments], $app->viewer()->capabilities, 'gilt auch ohne Anmeldung');
+        $this->assertSame(200, $app->api()->handle(new Request('GET', '/documents'))->status);
+        $users->current = $admin;
+        $this->assertSame(400, $patch(Roles::MEMBER, ['capabilities' => ['view_events']])->status, 'Mitglied gehört immer zur Kompanie');
+        $this->assertSame(400, $patch(Roles::MEMBER, ['capabilities' => ['member', 'manage_points']])->status, 'nur Rechte zum Sehen');
+        $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['member']])->status, 'Gast gehört nicht zur Kompanie');
+        $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['view_own_points']])->status, 'eigene Punkte nur für Mitglieder');
+        $this->assertSame(400, $patch(Roles::ADMIN, ['capabilities' => []])->status, 'Admin hat alle');
+        $again = TestApp::create(TestApp::connection(), settings: $app->settings, features: false);
+        $this->assertSame([Capability::ViewNews, Capability::ViewDocuments], $again->roles()->capabilities(Roles::GUEST), 'gespeichert');
     }
 
     public function testCalendarOnlyRolesAreListedAndHandledLikeCandidates(): void

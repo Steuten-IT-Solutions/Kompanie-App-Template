@@ -45,7 +45,7 @@ final class ListServiceTest extends TestCase
         $this->lister = $this->users->create('Lena', 'Listig', 'lena', 'lena@example.org', 'geheim123');
         $lister = $this->lister;
         $this->users->capabilities = static fn (string $level, int $id): array => $id === $lister
-            ? [Capability::Member, Capability::Calendar, Capability::ManageLists]
+            ? [...TestApp::capabilities(['member']), Capability::ManageLists]
             : Roles::templateCapabilities($level);
         $this->users->current = $this->admin;
     }

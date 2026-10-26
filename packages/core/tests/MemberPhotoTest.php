@@ -61,7 +61,7 @@ final class MemberPhotoTest extends TestCase
 
     private function roleWith(string $label, array $caps): string
     {
-        $res = $this->call('POST', '/admin/roles', ['label' => $label, 'capabilities' => $caps]);
+        $res = $this->call('POST', '/admin/roles', ['label' => $label, 'capabilities' => TestApp::caps($caps)]);
         $this->assertLessThan(300, $res->status, (string) json_encode($res->data));
         return (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')[$label];
     }

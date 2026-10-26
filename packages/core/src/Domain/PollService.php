@@ -59,10 +59,10 @@ final class PollService
         return $this->repo ??= new PollRepository($this->app->db);
     }
 
-    /** Wer an Umfragen teilnimmt, sie sieht und Benachrichtigungen dazu bekommt: alle mit Mitgliederbereich. */
+    /** Wer an Umfragen teilnimmt, sie sieht und Benachrichtigungen dazu bekommt: alle mit vote_polls und einem Konto. */
     public static function isParticipant(?User $user): bool
     {
-        return $user !== null && $user->isMember();
+        return $user !== null && $user->id > 0 && $user->can(Capability::VotePolls);
     }
 
     public static function canManage(?User $user): bool
@@ -126,7 +126,7 @@ final class PollService
     }
 
     /**
-     * Laufende Umfragen als Einträge fürs Schwarze Brett (nur für Mitglieder, nur mit eingeschaltetem Bereich).
+     * Laufende Umfragen als Einträge fürs Schwarze Brett (nur für Teilnehmer, nur mit eingeschaltetem Bereich).
      *
      * @return list<array{kind: string, id: int, title: string, type: string, ends_at: string|null, expires_at: string|null, has_voted: bool, created_at: string|null, updated_at: string|null}>
      */
