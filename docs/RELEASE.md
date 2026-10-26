@@ -148,11 +148,13 @@ keine neue Version, sie kommt mit der nächsten.
 1. `VERSION` erhöhen und im selben Pull Request nach `develop` in `CHANGELOG.md` aus `[Unveröffentlicht]` den Abschnitt
    `## [x.y.z] – JJJJ-MM-TT` machen (darüber ein neues, leeres `[Unveröffentlicht]`). Ohne diesen Abschnitt macht der
    Check **Changelog zur Version** den Release-PR rot (`php scripts/changelog.php --check --require-version`).
-   Für das Release Tags setzen:
-   `git tag v1.4.0 && git tag -f v1 && git push origin v1.4.0 && git push -f origin v1`.
 2. Jeder Merge nach `develop` baut für jede Kompanie eine neue Version im Kanal `early`.
 3. Auf einer Installation mit **Vorabversionen erhalten** testen.
-4. Release: Pull Request `develop → main` zusammenführen. „Kernversion freigeben“ läuft dann von selbst (siehe oben).
+4. Release: Pull Request `develop → main` zusammenführen. „Kernversion freigeben“ läuft dann von selbst (siehe oben),
+   ebenso „Tags setzen“ ([`tags-setzen.yml`](../.github/workflows/tags-setzen.yml)): Es legt `v<VERSION>` (z. B. `v1.4.0`)
+   an, falls es den Tag noch nicht gibt, und verschiebt `v1` auf den Release-Commit. Das läuft als GitHub App
+   (`KOMPANIE_APP_ID`, Environment `veroeffentlichen`); gilt für Tags im Kern-Repo ein Ruleset, gehört die App dort in
+   die **Bypass list**. Von Hand: *Actions → Tags setzen → Run workflow* (setzt die Tags auf den Stand von `main`).
    Als Notfall-Knopf: *Actions → Kernversion freigeben → Run workflow* (gibt den Stand von `main` frei). Lässt der
    Branch-Schutz das Eintragen von `STABLE_CORE` nicht zu, meldet die Action es als Warnung; dann per Pull Request.
    Einzelne Kompanie oder bestimmte Version: *Actions → Versionen steuern* (`promote`, `withdraw`,
