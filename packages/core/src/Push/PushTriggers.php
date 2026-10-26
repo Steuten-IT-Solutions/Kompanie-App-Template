@@ -188,20 +188,26 @@ final class PushTriggers
         return $this->push->notifyAll(PushService::TYPE_EVENTS, $message, false);
     }
 
-    /** Alle 15 Minuten (Aufgabe push_watch). */
-    public function watch(?\DateTimeImmutable $now = null): void
+    /**
+     * Alle 15 Minuten (Aufgabe push_watch).
+     *
+     * @return int Zahl der eingereihten Nachrichten (App::runTask verschickt sie dann gleich im selben Lauf)
+     */
+    public function watch(?\DateTimeImmutable $now = null): int
     {
         if (!$this->push->supported()) {
-            return;
+            return 0;
         }
+        $count = 0;
         if ($this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured()) {
-            $this->checkCalendar();
+            $count += $this->checkCalendar();
         }
         if ($this->app->features()->enabled('news')) {
-            $this->checkNews();
+            $count += $this->checkNews();
         }
-        $this->sendReminders($now);
+        $count += $this->sendReminders($now);
         $this->push->expireGuests();
+        return $count;
     }
 
     /**
@@ -234,11 +240,15 @@ final class PushTriggers
         return ['new' => $new, 'changed' => $changed, 'seen' => $next];
     }
 
-    /** Neue und geänderte Kalendertermine; beim ersten Lauf nur merken, bei einem Abruffehler unverändert lassen. */
+    /**
+     * Neue und geänderte Kalendertermine; beim ersten Lauf nur merken, bei einem Abruffehler unverändert lassen.
+     * Der Kalender wird dafür jedes Mal frisch abgerufen (CalendarService::latest), nicht erst nach Ablauf des
+     * Zwischenspeichers.
+     */
     public function checkCalendar(): int
     {
         try {
-            $events = $this->app->calendar()->events();
+            $events = $this->app->calendar()->latest();
         } catch (\RuntimeException) {
             return 0;
         }

@@ -20,8 +20,9 @@ use KompanieApp\Core\Storage\PushRepository;
  *   löscht sein Abo nur mit dem auth-Geheimnis des Geräts; neue Gast-Abos sind begrenzt.
  * - Versand im Hintergrund über die Warteschlange (Aufgabe push_send, nach dem Einreihen vorgezogen), parallel,
  *   wenn der HTTP-Client das kann; 404/410 löscht das Abo, 429/5xx wird begrenzt wiederholt.
- * - Abgleich alle 15 Minuten (push_watch): interner Kalender und Neuigkeiten gegen den letzten Stand (beim ersten
- *   Lauf nur merken), Erinnerung an die Termine von morgen ab der eingestellten Uhrzeit, einmal am Tag.
+ * - Abgleich alle 15 Minuten (push_watch): interner Kalender (jedes Mal frisch abgerufen) und Neuigkeiten gegen den
+ *   letzten Stand (beim ersten Lauf nur merken), Erinnerung an die Termine von morgen ab der eingestellten Uhrzeit,
+ *   einmal am Tag. Was er einreiht, geht im selben Lauf raus (App::runTask).
  *
  * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit Urgency high und einer TTL höchstens bis zum
  *   Ablauf der Nachricht.

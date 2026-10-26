@@ -33,6 +33,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Nachricht nur, was sich geändert hat, mit vorher und jetzt, z. B. „Probe – Uhrzeit: 19:00 Uhr → 20:00 Uhr“ oder
   „Ort: Halle → Sporthalle“. Das gilt für öffentliche Termine und für den internen Kalender.
 
+### Behoben
+
+- **Benachrichtigungen über geänderte Kalendertermine kamen spät**: Ob sich im Google Kalender etwas geändert hat,
+  prüft die App alle 15 Minuten. Dabei nahm sie bisher die zwischengespeicherten Termine, solange sie nach
+  **Aktualisieren alle … Minuten** noch als aktuell galten, und verschickte die Nachricht erst im nächsten Lauf der
+  Hintergrundaufgaben. Mit einer langen Aktualisierungszeit oder ohne häufige Seitenaufrufe konnte eine Nachricht so
+  weit über eine Stunde brauchen. Jetzt fragt die App bei jeder Prüfung bei Google nach und verschickt die Nachricht
+  gleich im selben Lauf.
+
 ## [0.3.0] – 2026-10-26
 
 ### Neu
