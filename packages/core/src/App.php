@@ -39,6 +39,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\ListService;
+use KompanieApp\Core\Domain\MailGroupService;
 use KompanieApp\Core\Domain\MailingService;
 use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BackupDownload;
@@ -533,6 +534,12 @@ final class App
     public function mailings(): MailingService
     {
         return $this->service(MailingService::class, fn () => new MailingService($this));
+    }
+
+    /** Mailgruppen für die E-Mails aus der Verwaltung (Standardgruppen und eigene) */
+    public function mailGroups(): MailGroupService
+    {
+        return $this->service(MailGroupService::class, fn () => new MailGroupService($this));
     }
 
     /** Mailer mit den aktuellen Einstellungen (jedes Mal neu: Einstellungen können sich geändert haben). */

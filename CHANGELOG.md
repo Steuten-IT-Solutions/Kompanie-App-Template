@@ -15,6 +15,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **E-Mails: Mailgruppen**: Unter *Verwaltung → E-Mails → Mailgruppen verwalten* lassen sich Empfängergruppen aus
+  Rollen, einzelnen Mitgliedern und freien Adressen anlegen (z. B. Vorstand) und beim Schreiben wie eine Rolle auswählen.
+  Zwei Standardgruppen pflegt die App selbst: **Alle Mitglieder** (alle mit Mitgliederbereich, auch Admins und eigene
+  Rollen wie Spieß, ohne Anwärter) und **Alle Konten** (alle außer Gästen). Bisher erreichte eine Mail an die Rolle
+  „Mitglied“ keine Admins und Spieße. Ehemalige bekommen nie eine Mail, auch wenn sie noch in einer Gruppe stehen.
+
 ### Geändert
 
 - **Ämter nach Jahren auch auf dem Handy**: Den Schalter „Chronik | Jahre“ im Tab Ämter gibt es jetzt auf jedem
