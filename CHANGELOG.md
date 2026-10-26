@@ -57,6 +57,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Mitgliederliste für die Anwesenheit**: Wer nur die Anwesenheit führt, sah in der Verwaltung den Knopf
+  **Mitglieder**, bekam beim Öffnen aber eine Fehlermeldung. Jetzt öffnet sich die Liste mit Namen, Rollen, Fotos und
+  Dienstgraden, ohne Punkte und Strafen.
 - **Ämter einer Person: Mitinhaber anklickbar**: Hatte jemand ein Amt gemeinsam mit einer anderen Person inne, steht
   diese im Zeitstrahl unter „mit“. Hat sie ein Konto, führt ein Tipp auf sie jetzt zu ihrer Seite, wie im Zeitstrahl
   aller Ämter: auf der Seite einer Person, unter „Meins“ und in der Verwaltung. Aus der Verwaltung geöffnet, landet man
