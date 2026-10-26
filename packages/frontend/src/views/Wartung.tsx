@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { api, config, type AdminStatus, type BackupDriveStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
+import { api, ApiError, config, type AdminStatus, type BackupDriveStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -94,9 +94,27 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
     setTimeout(() => window.location.reload(), 1500);
   }
 
+  /**
+   * Scheitert nur die Sicherung in Google Drive vor dem Update (die auf dem Server ist da), fragt die App nach:
+   * trotzdem einspielen oder abbrechen.
+   */
+  async function askWithoutDrive(fn: (withoutDrive: boolean) => Promise<unknown>) {
+    try {
+      await fn(false);
+    } catch (err) {
+      if (
+        !(err instanceof ApiError && err.code === 'drive_backup_failed') ||
+        !window.confirm(`${err.message}\n\nTrotzdem aktualisieren?`)
+      ) {
+        throw err;
+      }
+      await fn(true);
+    }
+  }
+
   const install = (version: string, major = false) =>
     run('install', async () => {
-      await api.installUpdate(version, major);
+      await askWithoutDrive((withoutDrive) => api.installUpdate(version, major, withoutDrive));
       reloadApp(version);
     });
 
@@ -136,8 +154,42 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 melden.
               </p>
             ))}
+          {u.held && (
+            <div className="small" role="alert">
+              <p className="form-error">
+                Das automatische Update auf {u.held.version} wurde zurückgestellt ({date(u.held.at)}). {u.held.error}
+              </p>
+              <p className="muted">
+                Trotzdem aktualisieren: Die Sicherung auf dem Server reicht. Abbrechen: Die App versucht es beim nächsten täglichen Abgleich
+                wieder, mit Sicherung in Google Drive.
+              </p>
+              <div className="button-row">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!!busy}
+                  onClick={() =>
+                    run('held', async () => {
+                      await api.installHeldUpdate();
+                      reloadApp(u.held!.version);
+                    })
+                  }
+                >
+                  {busy === 'held' ? 'Wird eingespielt …' : 'Trotzdem aktualisieren'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={!!busy}
+                  onClick={() => run('dismiss', async () => setU(await api.dismissHeldUpdate()))}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
           {u.error && <p className="form-error small">Letzte Prüfung: {u.error}</p>}
-          {u.last && !u.last.ok && (
+          {u.last && !u.last.ok && u.last.to !== u.held?.version && (
             <p className="form-error small">
               Letztes Update auf {u.last.to} hat nicht geklappt: {u.last.error}
             </p>
@@ -154,7 +206,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 </p>
               ))}
               <button type="button" className="btn btn-block" disabled={!!busy || u.problems.length > 0} onClick={() => install(u.latest!)}>
-                {busy === 'install' ? 'Wird eingespielt … (bis zu 2 Minuten)' : `Jetzt auf ${u.latest} aktualisieren`}
+                {busy === 'install' ? 'Wird eingespielt … (einige Minuten)' : `Jetzt auf ${u.latest} aktualisieren`}
               </button>
             </>
           ) : (
@@ -251,7 +303,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 onClick={() =>
                   window.confirm(`Auf Version ${older} zurückgehen?`) &&
                   run('rollback', async () => {
-                    await api.rollback(older);
+                    await askWithoutDrive((withoutDrive) => api.rollback(older, withoutDrive));
                     reloadApp(older);
                   })
                 }
@@ -494,7 +546,8 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       <p className="muted small">
         Enthält Termine, Punkte, Kasse, Galerie-Verzeichnis, Dokumente, Abzeichen und Einstellungen, die Konten (Passwörter als Prüfwerte,
         aus denen sich einfache Passwörter erraten lassen) und Zugangsschlüssel. Die Datei bitte wie ein Passwort behandeln und nicht nur
-        auf dem Server aufbewahren. Vor Updates mit Datenbank-Änderungen sichert die App automatisch, aber auf demselben Server.
+        auf dem Server aufbewahren. Vor jedem Update sichert die App automatisch auf dem Server und, wenn die Sicherungen in Google Drive
+        eingeschaltet sind, auch dort.
       </p>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>

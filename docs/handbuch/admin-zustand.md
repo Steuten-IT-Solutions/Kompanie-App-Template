@@ -26,6 +26,7 @@ Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erl
 ### Updates
 - **Installiert: …** mit dem Zeitpunkt der letzten Prüfung und dem Verweis **Was ist neu**.
 - **✓ Die App ist auf dem neuesten Stand.** oder **Neue Version: …** mit dem Knopf **Jetzt auf … aktualisieren**.
+- **Das automatische Update auf … wurde zurückgestellt**: nur, wenn vor einem automatischen Update die Sicherung in Google Drive nicht geklappt hat, mit den Knöpfen **Trotzdem aktualisieren** und **Abbrechen**.
 - **Nach Updates suchen** und **Zustand neu laden**.
 - **Updates automatisch einspielen (empfohlen)** und **Vorabversionen erhalten (zum Testen)**.
 - **Auf eine ältere Version zurück**: zum Aufklappen, wenn es frühere Versionen gibt.
@@ -42,8 +43,17 @@ Die Fehler der letzten 14 Tage (höchstens 50) mit Zeitpunkt, Art des Fehlers un
 
 ### Eine neue Version einspielen
 1. Tippe auf **Nach Updates suchen**. Die App sucht ohnehin einmal am Tag selbst.
-2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert bis zu zwei Minuten.
+2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert einige Minuten, mit Sicherung in Google Drive auch länger.
 3. Danach lädt die App neu.
+
+Klappt die Sicherung in Google Drive vor dem Update nicht (z. B. weil der Speicher voll ist), fragt die App nach: Bestätigst du, spielt sie das Update trotzdem ein; die Sicherung auf dem Server ist dann da. Brichst du ab, bleibt die bisherige Version.
+
+### Ein zurückgestelltes Update entscheiden
+Vor einem automatischen Update kann niemand nachgefragt werden. Klappt dann die Sicherung in Google Drive nicht, spielt die App das Update nicht ein und zeigt unter **Updates** den Grund.
+1. Tippe auf **Trotzdem aktualisieren**, um es mit der Sicherung auf dem Server einzuspielen, oder
+2. auf **Abbrechen**: Dann versucht es die App beim nächsten täglichen Abgleich wieder, mit Sicherung in Google Drive.
+
+Entscheidest du nichts, versucht es die App ebenfalls am nächsten Tag wieder; klappt es dann, verschwindet der Hinweis.
 
 Kann die neue Version auf eurem Server nicht laufen (z. B. zu alte PHP- oder WordPress-Version, fehlende Schreibrechte), steht der Grund darüber und der Knopf ist gesperrt. Das muss zuerst behoben werden.
 
@@ -67,7 +77,7 @@ Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein
 
 ## Gut zu wissen
 - **Automatische Updates:** Solange **Updates automatisch einspielen (empfohlen)** an ist, spielt die App neue Versionen derselben Hauptversion selbst ein. Sie sucht dafür einmal am Tag und spielt eine passende Version dabei gleich ein; eine feste Uhrzeit gibt es nicht. Ohne Cronjob beim Hoster passiert das nur, wenn jemand die App (mit WordPress: die Webseite) aufruft; wird sie selten aufgerufen, kommen Updates entsprechend später (siehe **Für Fortgeschrittene** unten). Mit WordPress kann die Webseite automatische Updates sperren; dann steht das hier, und du spielst neue Versionen von Hand ein.
-- **Vorsorge:** Vor Updates mit Änderungen an der Datenbank und vor einer neuen Hauptversion sichert die App die Daten automatisch auf dem Server; die letzten fünf dieser Sicherungen bleiben. Schlägt ein Update fehl, läuft die bisherige Version weiter und der Grund steht hier.
+- **Vorsorge:** Vor jedem Update (auch beim Zurückrollen) sichert die App die Daten automatisch auf dem Server; die letzten fünf dieser Sicherungen bleiben. Sind die [Sicherungen in Google Drive](seite:admin-updates-und-sicherung) eingeschaltet, kommt dieselbe Sicherung auch dorthin; auch dort bleiben die letzten fünf. Klappt die Sicherung auf dem Server nicht, wird nicht aktualisiert. Klappt nur Google Drive nicht, fragt die App nach (siehe oben). Schlägt ein Update fehl, läuft die bisherige Version weiter und der Grund steht hier.
 - **Zurückgezogene Version:** Wird eine fehlerhafte Version zurückgezogen, wechselt die App von selbst auf eine geprüfte Version (außer automatische Updates sind gesperrt); mit **Jetzt auf … wechseln** geht das sofort. Gibt es noch keine geprüfte Version, meldest du dich bei den Betreuern der App.
 - **Vorabversionen:** Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist, noch bevor sie für alle freigegeben wird. Das ist für eine Testseite gedacht. Schaltest du es aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
 - **Statusmeldungen:** Wenn du zustimmst, schickt die App den Betreuern stündlich ein kurzes Lebenszeichen (u. a. Version, Farbe der Ampel je Zeile, Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“, und Nutzungszahlen ohne Namen: wie viele Konten es gibt, wie viele davon in den letzten 24 Stunden, 7 und 30 Tagen aktiv waren und wie viele Personen welchen Bereich genutzt haben) und meldet schwere Fehler sofort. Namen, Inhalte und Fehlertexte werden nie gesendet. Was genau gesendet wird, zeigt **Was genau gesendet wird (Beispiel: Lebenszeichen)**; darüber steht, wann die letzte Meldung ging. Nimmst du die Zustimmung zurück, werden auch die gezählten Fehler gelöscht.

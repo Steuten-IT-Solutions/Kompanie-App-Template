@@ -691,6 +691,7 @@ final class App
             $this->backup,
             $this->packageConfig,
             $this->telemetry(),
+            $this->backupUpload(),
         ));
     }
 
