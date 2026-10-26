@@ -271,54 +271,54 @@ function loadView(): 'chronik' | 'jahre' {
 }
 
 /**
- * Höhe der Jahresübersicht: Schalter „Chronik | Jahre“ und Raster passen zusammen zwischen die feste Kopfleiste und die
- * Tab-Leiste unten. Ist die Seite ganz nach unten gescrollt, steht der Schalter also oben im Bild und das Raster füllt den
- * Rest; so bleibt der Schalter immer erreichbar, gescrollt wird im Raster. Setzt --yg-avail, neu bei Drehung,
- * Größenänderung und wenn sich auf der Seite etwas ändert (z. B. ein Banner geschlossen wird).
+ * Kopf der Jahresübersicht (Gruppen, Ämter): ein eigener Streifen, der unter der festen Kopfleiste stehen bleibt
+ * (sticky, --yg-head-top) und seitlich mit dem Raster mitläuft. Senkrecht scrollt so nur die Seite, nie das Raster;
+ * wer auf dem Kopf oder im Raster nach oben oder unten wischt, bewegt die Seite. Seitlich lassen sich Kopf und Raster
+ * beide schieben, der andere folgt.
  */
-function useAvailableHeight(shown: boolean) {
-  const ref = useRef<HTMLDivElement>(null);
+function useStickyHead(shown: boolean) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let last = '';
+    const el = wrap.current;
+    const h = head.current;
+    const b = body.current;
+    if (!el || !h || !b) return;
+    const follow = (from: HTMLElement, to: HTMLElement) => () => {
+      if (to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+    };
+    const fromBody = follow(b, h);
+    const fromHead = follow(h, b);
+    b.addEventListener('scroll', fromBody, { passive: true });
+    h.addEventListener('scroll', fromHead, { passive: true });
+    // Unter der Kopfleiste stehen bleiben, solange sie fest ist (quer scrollt sie mit weg, styles.css)
+    const bar = document.querySelector('.topbar');
+    const fixed = bar?.closest('.preview-sticky') ?? bar;
     const measure = () => {
-      const bar = document.querySelector('.topbar');
-      const head = bar?.closest('.preview-sticky') ?? bar;
-      // Quer scrollt die Kopfleiste mit weg (styles.css) und verdeckt nichts
-      const above = head && getComputedStyle(head).position === 'sticky' ? head.getBoundingClientRect().height : 0;
-      const tools = el.closest('.offices')?.querySelector('.offices-tools') ?? el;
-      const offset = el.getBoundingClientRect().top - tools.getBoundingClientRect().top;
-      const tabbar = document.querySelector('.tabbar')?.getBoundingClientRect();
-      // Quer steht die Tab-Leiste links und nimmt unten keinen Platz
-      const below = tabbar && tabbar.width >= window.innerWidth / 2 ? tabbar.height : 0;
-      const content = el.closest('.content');
-      const pad = content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0;
-      const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kompanie-zoom')) || 1;
-      const value = `${Math.floor((window.innerHeight - above - offset - below - pad) / zoom)}px`;
-      if (value !== last) {
-        last = value;
-        el.style.setProperty('--yg-avail', value);
-      }
+      const top = fixed && getComputedStyle(fixed).position === 'sticky' ? fixed.getBoundingClientRect().height : 0;
+      el.style.setProperty('--yg-head-top', `${Math.round(top)}px`);
     };
     measure();
     window.addEventListener('resize', measure);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    const app = el.closest('.app');
-    if (observer && app) observer.observe(app);
+    const observer = typeof ResizeObserver === 'undefined' || !fixed ? null : new ResizeObserver(measure);
+    if (observer && fixed) observer.observe(fixed);
     return () => {
+      b.removeEventListener('scroll', fromBody);
+      h.removeEventListener('scroll', fromHead);
       window.removeEventListener('resize', measure);
       observer?.disconnect();
     };
   }, [shown]);
-  return ref;
+  return { wrap, head, body };
 }
 
 /**
  * Jahresübersicht (Issue #112, R14): eine Spalte je Amt, nach Gruppen, eine Zeile je Jahr (neueste oben). Jede Amtszeit
  * ist ein Balken über ihre Jahre; gleichzeitige Amtszeiten eines Amts stehen nebeneinander. Laufende sind hervorgehoben,
- * Ehrungen tragen einen Stern. Nur das Raster scrollt; Kopfzeilen und Jahre bleiben dabei stehen. Auf dem Handy schmaler
- * (styles.css), quer über die ganze Breite; ein Tipp auf einen Balken zeigt Jahre, Personen und Zusatz unten im Bild.
+ * Ehrungen tragen einen Stern. Seitlich scrollt nur das Raster, senkrecht die Seite; Kopf (Gruppen, Ämter) und Jahre
+ * bleiben dabei stehen. Auf dem Handy schmaler (styles.css), quer über die ganze Breite; ein Tipp auf einen Balken zeigt
+ * Jahre, Personen und Zusatz unten im Bild.
  */
 export function YearGrid({
   groups,
@@ -334,23 +334,23 @@ export function YearGrid({
     offices.flatMap((o) => o.terms),
     thisYear,
   );
-  const scroll = useAvailableHeight(years.length > 0);
+  const { wrap, head, body } = useStickyHead(years.length > 0);
   if (years.length === 0) return <Empty>Noch keine Einträge.</Empty>;
   const top = years[0];
-  const firstRow = 3; // Zeile 1: Gruppen, Zeile 2: Ämter
-  const row = (year: number) => firstRow + (top - year);
+  const row = (year: number) => 1 + (top - year);
   const ordered = [
     ...groups.map((g) => ({ key: `g${g.id}`, title: g.title, offices: offices.filter((o) => o.group_id === g.id) })),
     { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null) },
   ].filter((s) => s.offices.length > 0);
   const grouped = ordered.some((s) => s.title);
+  const heads: ReactElement[] = []; // Kopf: Zeile 1 Gruppen, Zeile 2 Ämter
   const cells: ReactElement[] = [];
   let column = 2; // Spalte 1: Jahre
   for (const section of ordered) {
     const sectionStart = column;
     for (const o of section.offices) {
       const { bars, count } = lanes(o.terms, thisYear);
-      cells.push(
+      heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
           {o.title}
         </div>,
@@ -380,7 +380,7 @@ export function YearGrid({
     }
     // Ämter ohne Gruppe bekommen eine leere Zelle, damit beim Scrollen nichts durch die Kopfzeile scheint
     if (grouped) {
-      cells.push(
+      heads.push(
         <div
           key={`h${section.key}`}
           className={`yg-group${section.title ? '' : ' empty'}`}
@@ -391,41 +391,49 @@ export function YearGrid({
       );
     }
   }
+  // Kopf und Raster mit denselben Spalten, damit sie genau übereinanderstehen; Breiten aus styles.css (Handy schmaler)
+  const columns = `var(--yg-years) repeat(${column - 2}, minmax(var(--yg-col), 1fr))`;
   return (
     <>
       <p className="yg-rotate-hint muted small">Tipp: Dreh das Handy quer, dann passen mehr {sec.offices} nebeneinander.</p>
-      <div className="year-grid-scroll" ref={scroll}>
-        <div
-          className={`year-grid${grouped ? ' grouped' : ''}`}
-          role="list"
-          aria-label={`${sec.offices} nach Jahren`}
-          style={{
-            // Breiten und Zeilenhöhe aus styles.css (auf dem Handy schmaler)
-            gridTemplateColumns: `var(--yg-years) repeat(${column - 2}, minmax(var(--yg-col), 1fr))`,
-            gridTemplateRows: `${grouped ? 'auto' : '0'} auto repeat(${years.length}, var(--yg-row))`,
-          }}
-        >
-          {/* Ecke über den Jahren: deckt beim seitlichen Scrollen die Kopfzeilen ab */}
-          <div className="yg-corner" style={{ gridRow: '1 / 3', gridColumn: 1 }} aria-hidden="true" />
-          {years.map((y) => (
-            <div
-              key={y}
-              className={`yg-year${y % 10 === 0 ? ' decade' : ''}`}
-              style={{ gridRow: row(y), gridColumn: `1 / ${column}` }}
-              aria-hidden="true"
-            />
-          ))}
-          {years.map((y) => (
-            <div
-              key={`l${y}`}
-              className={`yg-year-label${y % 10 === 0 ? ' decade' : ''}`}
-              style={{ gridRow: row(y), gridColumn: 1 }}
-              aria-hidden="true"
-            >
-              {y}
-            </div>
-          ))}
-          {cells}
+      <div className="year-grid-wrap" ref={wrap}>
+        <div className="year-grid-head" ref={head} aria-hidden="true">
+          <div
+            className={`year-grid-header${grouped ? ' grouped' : ''}`}
+            style={{ gridTemplateColumns: columns, gridTemplateRows: `${grouped ? 'auto' : '0'} auto` }}
+          >
+            {/* Ecke über den Jahren: deckt beim seitlichen Scrollen die Kopfzeilen ab */}
+            <div className="yg-corner" style={{ gridRow: '1 / 3', gridColumn: 1 }} />
+            {heads}
+          </div>
+        </div>
+        <div className="year-grid-scroll" ref={body}>
+          <div
+            className="year-grid"
+            role="list"
+            aria-label={`${sec.offices} nach Jahren`}
+            style={{ gridTemplateColumns: columns, gridTemplateRows: `repeat(${years.length}, var(--yg-row))` }}
+          >
+            {years.map((y) => (
+              <div
+                key={y}
+                className={`yg-year${y % 10 === 0 ? ' decade' : ''}`}
+                style={{ gridRow: row(y), gridColumn: `1 / ${column}` }}
+                aria-hidden="true"
+              />
+            ))}
+            {years.map((y) => (
+              <div
+                key={`l${y}`}
+                className={`yg-year-label${y % 10 === 0 ? ' decade' : ''}`}
+                style={{ gridRow: row(y), gridColumn: 1 }}
+                aria-hidden="true"
+              >
+                {y}
+              </div>
+            ))}
+            {cells}
+          </div>
         </div>
       </div>
       {picked && (
