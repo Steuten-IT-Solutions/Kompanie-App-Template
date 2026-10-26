@@ -41,6 +41,7 @@ Die App der {kompanie.name} läuft im Browser und lässt sich wie jede andere Ap
 - In anderen Browsern auf dem iPhone (z. B. Chrome) fehlt **Zum Home-Bildschirm** oft. Die App zeigt dann einen Hinweis; kopiere die Adresse und öffne sie in Safari.
 - Bitte nicht im Samsung-Browser installieren: Dort blockiert Google Play Protect die App fälschlich als „Unsichere App“. Die App bietet dann **In Chrome öffnen** an.
 - Ist die Adresse in Facebook, Instagram o. Ä. geöffnet, klappt die Installation nicht. Die App zeigt dann **Adresse kopieren**; öffne die Adresse in Safari bzw. Chrome.
+- Bekommt die App ein neues Logo, übernimmt Chrome auf Android das neue Symbol nach einiger Zeit von selbst; bei einer größeren Änderung fragt Chrome vorher nach. Auf dem iPhone bleibt das Symbol, das beim Hinzufügen gespeichert wurde.
 - Benutzt du die App schon installiert, steht hier „Alles erledigt“.
 - Was du zuletzt geladen hast, bleibt auch ohne Internet sichtbar. Oben steht dann „Offline – angezeigt werden die zuletzt geladenen Daten.“
 - Auf dem iPhone und iPad gibt es Benachrichtigungen nur in der installierten App, siehe [Benachrichtigungen](seite:benachrichtigungen).

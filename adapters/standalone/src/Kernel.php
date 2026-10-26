@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\FileCache;
+use KompanieApp\Core\Http\ManifestIcons;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
 use KompanieApp\Core\Infra\CurlHttpClient;
@@ -448,11 +449,7 @@ final class Kernel
             'orientation' => 'portrait',
             'background_color' => '#ffffff',
             'theme_color' => $c->primaryColor(),
-            'icons' => [
-                ['src' => $icons . 'icon-192.png', 'sizes' => '192x192', 'type' => 'image/png'],
-                ['src' => $icons . 'icon-512.png', 'sizes' => '512x512', 'type' => 'image/png'],
-                ['src' => $icons . 'icon-maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
-            ],
+            'icons' => ManifestIcons::entries($icons, $this->appDir() . '/icons'),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 

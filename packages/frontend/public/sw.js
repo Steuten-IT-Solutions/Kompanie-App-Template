@@ -96,7 +96,9 @@ async function precache() {
       if (await cache.match(url)) return;
       const previous = path.startsWith('assets/') ? await caches.match(url) : undefined;
       if (previous) return cache.put(url, previous);
-      const res = await fetch(url);
+      // Icons haben feste Namen: beim Server nachfragen, sonst landet ein Icon der vorigen Version aus dem Zwischenspeicher
+      // des Browsers (ein Tag, app/.htaccess) im Speicher dieses Builds und bliebe bis zum nächsten Update.
+      const res = await fetch(url, path.startsWith('assets/') ? undefined : { cache: 'no-cache' });
       if (cacheable(res)) await cache.put(url, res);
     }),
   );

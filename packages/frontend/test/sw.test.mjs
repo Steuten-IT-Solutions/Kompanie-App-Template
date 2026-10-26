@@ -70,6 +70,8 @@ function response(body, type = 'application/javascript', status = 200) {
 function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheStorage(), now = () => 0 } = {}) {
   const listeners = {};
   const fetched = [];
+  /** Optionen des letzten fetch() je Adresse (z. B. cache). */
+  const fetchOptions = {};
   const messages = [];
   const source = SOURCE.replace("const BUILD = 'dev';", `const BUILD = '${build}';`).replace(
     'const PRECACHE = [];',
@@ -100,9 +102,10 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
       { now: () => now() },
     ),
     decodeURIComponent,
-    fetch: async (req) => {
+    fetch: async (req, init) => {
       const u = url(req);
       fetched.push(u);
+      fetchOptions[u] = init;
       const make = net[u];
       if (!make) throw new TypeError('Netzfehler');
       return make();
@@ -131,7 +134,7 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
     return res;
   }
 
-  return { storage, fetched, messages, lifecycle, request };
+  return { storage, fetched, fetchOptions, messages, lifecycle, request };
 }
 
 test('Installieren: Programmdateien, Icons und App-Seite vorab gespeichert, unveränderte Dateien übernommen', async () => {
@@ -152,6 +155,9 @@ test('Installieren: Programmdateien, Icons und App-Seite vorab gespeichert, unve
   const files = (await (await storage.open('kompanie-static-b2')).keys()).map((r) => r.url.slice(ASSETS.length)).sort();
   assert.deepEqual(files, [...precache].sort());
   assert.ok(!sw.fetched.includes(ASSETS + 'assets/Viewer-a.js'), 'unveränderte Datei nicht erneut geladen');
+  // Icons (feste Namen) beim Server nachfragen, nicht aus dem Zwischenspeicher des Browsers; Hash-Dateien dürfen daraus.
+  assert.equal(sw.fetchOptions[ASSETS + 'icons/icon-192.png']?.cache, 'no-cache');
+  assert.equal(sw.fetchOptions[ASSETS + 'assets/index-n.js']?.cache, undefined);
   const page = await (await storage.open('kompanie-data-v2')).match(SCOPE);
   assert.equal(await page.text(), '<html>neu</html>', 'App-Seite der neuen Version gespeichert');
 
