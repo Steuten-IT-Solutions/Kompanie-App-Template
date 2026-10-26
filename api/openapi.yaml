@@ -1671,12 +1671,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [available, reason, from, from_name, roles, members]
+                required: [available, reason, from, from_name, groups, roles, members]
                 properties:
                   available: { type: boolean, description: 'Kompanieadresse und SMTP eingerichtet, PHPMailer vorhanden' }
                   reason: { type: [string, 'null'], description: 'Warum nicht verfügbar' }
                   from: { type: string, description: Kompanieadresse (Absender) }
                   from_name: { type: string, description: Absendername }
+                  groups: { type: array, items: { $ref: '#/components/schemas/MailGroup' }, description: 'Mailgruppen (wie `GET /mails/groups`)' }
                   roles:
                     type: array
                     items:
@@ -1767,7 +1768,7 @@ paths:
         alle Empfänger aus An und Cc, Bcc-Empfänger nie (nur Bcc: „undisclosed-recipients:;“). Versand im Hintergrund
         (Aufgabe `board_mail`, gemeinsam mit den Mails vom Schwarzen Brett, in Portionen), vorübergehende Fehler werden
         erneut versucht. Bilder im Inhalt werden eingebettet. Ohne erreichbaren Empfänger, ohne Betreff oder Text, mit
-        ungültiger Adresse, unbekannter Rolle oder Gast → 400; meldet der Mailserver eine Höchstgröße und ist die Mail
+        ungültiger Adresse, unbekannter Gruppe oder Rolle oder Gast → 400; meldet der Mailserver eine Höchstgröße und ist die Mail
         größer → 400, nichts wird gespeichert.
       x-capability: send_mail
       requestBody:
@@ -1791,6 +1792,79 @@ paths:
               schema: { $ref: '#/components/schemas/MailDetail' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+
+  /mails/groups:
+    get:
+      tags: [E-Mails]
+      summary: Mailgruppen mit Zahl der erreichbaren Konten
+      description: |
+        Zuerst die Standardgruppen `members` („Alle Mitglieder“: alle Konten, deren Grundrolle den Mitgliederbereich hat,
+        auch Admins und eigene Rollen; ohne Anwärter) und `all` („Alle Konten“: alle außer Gästen), dann die eigenen nach
+        Bezeichnung. Wer dazugehört, ermittelt die App beim Senden; Ehemalige (Rolle Gast) gehören nie dazu und fallen auch
+        aus dem Inhalt eigener Gruppen. Gespeichert als Einstellung `mail_groups` (in der Datensicherung).
+      x-capability: send_mail
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MailGroup' } }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [E-Mails]
+      summary: Eigene Mailgruppe anlegen
+      description: Bezeichnung (eindeutig, auch gegenüber den Standardgruppen) und Inhalt wie ein Empfängerfeld, ohne Gruppen. Höchstens 100 Gruppen.
+      x-capability: send_mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MailGroupInput' }
+      responses:
+        '201':
+          description: Angelegt; Antwort ist die neue Liste
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MailGroup' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /mails/groups/{key}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'members, all oder Kennung einer eigenen Gruppe' }
+    patch:
+      tags: [E-Mails]
+      summary: Mailgruppe ändern
+      description: Standardgruppen nur umbenennen (`label`; Inhalt → 400). Bei eigenen bleibt, was nicht mitkommt.
+      x-capability: send_mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MailGroupInput' }
+      responses:
+        '200':
+          description: Antwort ist die neue Liste
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MailGroup' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [E-Mails]
+      summary: Eigene Mailgruppe löschen
+      description: Standardgruppen lassen sich nicht löschen (400). Versendete Mails zeigen sie danach als „Gelöschte Gruppe“.
+      x-capability: send_mail
+      responses:
+        '200':
+          description: Antwort ist die neue Liste
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MailGroup' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /mails/{id}:
     parameters:
@@ -5114,6 +5188,7 @@ components:
       type: object
       description: Empfänger eines Felds (An, Cc oder Bcc)
       properties:
+        groups: { type: array, items: { type: string }, description: 'Mailgruppen (`members`, `all` oder eigene); fehlt = keine' }
         roles: { type: array, items: { type: string }, description: Schlüssel von Rollen (ohne guest); Grund- und Zusatzrollen zählen }
         users: { type: array, items: { type: integer }, description: Konten (ohne Gäste) }
         emails: { type: array, items: { type: string, format: email }, maxItems: 500, description: Freie Adressen }
@@ -5126,9 +5201,29 @@ components:
     MailSelectionDescribed:
       type: object
       properties:
+        groups: { type: array, items: { type: object, properties: { key: { type: string }, label: { type: string, description: 'Aktuelle Bezeichnung, „Gelöschte Gruppe“ wenn es sie nicht mehr gibt' } } } }
         roles: { type: array, items: { type: object, properties: { key: { type: string }, label: { type: string } } } }
         users: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: [string, 'null'] } } } }
         emails: { type: array, items: { type: string } }
+    MailGroup:
+      type: object
+      required: [key, label, standard, roles, users, emails, members, with_email]
+      properties:
+        key: { type: string, description: 'members, all oder Kennung einer eigenen Gruppe' }
+        label: { type: string }
+        standard: { type: boolean, description: 'Standardgruppe: Inhalt bestimmt die App, nur umbenennbar, nicht löschbar' }
+        roles: { type: array, items: { type: string }, description: 'Rollen (nur eigene Gruppen; nur noch bestehende)' }
+        users: { type: array, items: { type: integer }, description: 'Konten (nur eigene Gruppen; ohne Ehemalige und Gelöschte)' }
+        emails: { type: array, items: { type: string, format: email }, description: 'Freie Adressen (nur eigene Gruppen)' }
+        members: { type: integer, description: Erreichbare Konten }
+        with_email: { type: integer, description: Davon mit gültiger Adresse }
+    MailGroupInput:
+      type: object
+      properties:
+        label: { type: string, maxLength: 60 }
+        roles: { type: array, items: { type: string } }
+        users: { type: array, items: { type: integer } }
+        emails: { type: array, items: { type: string, format: email }, maxItems: 500 }
     MailDetail:
       type: object
       required: [id, subject, text, author_name, created_at, selection, mail, log]

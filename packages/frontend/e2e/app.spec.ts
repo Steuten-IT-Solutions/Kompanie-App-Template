@@ -4206,6 +4206,44 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await page.getByRole('button', { name: '‹ E-Mails' }).click();
   await expect(page.locator('.mail-form')).toBeVisible();
 
+  // Mailgruppen: Standardgruppen nur umbenennen, eigene Gruppe anlegen und beim Schreiben wählen
+  await page.getByRole('button', { name: /Mailgruppen verwalten/ }).click();
+  const groups = page.locator('.mail-groups');
+  await expect(groups.locator('.mail-group-item').first()).toContainText('Alle Mitglieder');
+  await expect(groups.locator('.mail-group-item', { hasText: 'Alle Konten' })).toContainText('Standardgruppe');
+  await expect(groups.locator('.mail-group-item', { hasText: 'Alle Mitglieder' }).getByRole('button', { name: 'Löschen' })).toHaveCount(0);
+  await groups.getByRole('button', { name: 'Neue Mailgruppe' }).click();
+  const groupForm = groups.locator('.mail-group-form');
+  await groupForm.getByLabel('Bezeichnung').fill(`Vorstand ${id}`);
+  await groupForm.locator('.mail-recipient-input').fill('Mitglied1');
+  await groupForm.locator('.mail-recipient-input').press('Enter');
+  await groupForm.locator('.mail-recipient-input').fill(`vorstand-${id}@example.net`);
+  await groupForm.locator('.mail-recipient-input').press('Enter');
+  await groupForm.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  await expect(groups.locator('.mail-group-item', { hasText: `Vorstand ${id}` })).toContainText('+ 1 Adresse');
+  await shot(page, '33h-email-gruppen');
+  await page.getByRole('button', { name: '‹ E-Mails' }).click();
+  // Erst das Gerüst, dann das Formular: auf das echte Eingabefeld warten (das Gerüst trägt dieselbe Klasse)
+  const to2 = page.locator('.mail-form input.mail-to-input');
+  await to2.fill('Alle Mitg');
+  await page
+    .locator('.mail-suggestions')
+    .getByRole('button', { name: /Alle Mitglieder.*Gruppe/ })
+    .click();
+  await to2.fill(`Vorstand ${id}`);
+  await to2.press('Enter');
+  await expect(page.locator('.mail-form .mail-chip-group')).toHaveCount(2);
+  // Entwurf verwerfen: Gruppe wieder löschen und Formular leeren
+  await page.getByRole('button', { name: /Mailgruppen verwalten/ }).click();
+  await groups
+    .locator('.mail-group-item', { hasText: `Vorstand ${id}` })
+    .getByRole('button', { name: 'Löschen' })
+    .click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  await expect(groups.locator('.mail-group-item')).toHaveCount(2);
+  await page.evaluate(() => localStorage.removeItem('kompanie-mail-draft'));
+
   // Aufräumen: Mailversand wieder aus (andere Tests erwarten den Haken „E-Mail senden“ deaktiviert)
   await page.goto('/app/#/einstellungen/email');
   await section.getByLabel('Mailserver (SMTP)').fill('');
