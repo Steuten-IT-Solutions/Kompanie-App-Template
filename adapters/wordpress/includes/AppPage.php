@@ -112,8 +112,10 @@ final class AppPage
         $c = $app->config;
         $icons = KOMPANIE_APP_URL . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
-        header('Cache-Control: public, max-age=86400');
-        echo wp_json_encode([
+        // Immer neu prüfen (mit ETag meist 304): Chrome übernimmt Änderungen (Icons, Ausrichtung) in installierte Apps
+        // nur, wenn es beim Abgleich das neue Manifest bekommt.
+        header('Cache-Control: no-cache');
+        $body = (string) wp_json_encode([
             'name' => $c->name(),
             'short_name' => $c->shortName(),
             'description' => $c->description(),
@@ -126,6 +128,10 @@ final class AppPage
             'theme_color' => $c->primaryColor(),
             'icons' => ManifestIcons::entries($icons, self::distDir() . 'icons'),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (self::notModified(FileCache::contentEtag($body))) {
+            return;
+        }
+        echo $body;
     }
 
     private static function sendServiceWorker(App $app): void

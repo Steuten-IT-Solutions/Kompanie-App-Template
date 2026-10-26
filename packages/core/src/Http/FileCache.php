@@ -22,6 +22,12 @@ final class FileCache
         return '"' . substr(hash('sha256', $key . '|' . $size . '|' . $mtime), 0, 32) . '"';
     }
 
+    /** Starker ETag aus dem Inhalt einer Antwort, die erst beim Abruf entsteht (z. B. das Manifest). */
+    public static function contentEtag(string $body): string
+    {
+        return '"' . substr(hash('sha256', $body), 0, 32) . '"';
+    }
+
     /** Passt der ETag zu If-None-Match (Liste, schwache Vergleiche mit W/, oder *)? */
     public static function matches(?string $etag, ?string $ifNoneMatch): bool
     {

@@ -64,6 +64,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Änderungen am Manifest kamen verzögert bei installierten Apps an**: Neues Logo, Startbildschirm und die freie
+  Drehung des Bildschirms übernimmt Chrome in eine installierte App erst, wenn es beim Abgleich das neue Manifest
+  bekommt. Bisher durfte das Manifest einen Tag zwischengespeichert werden; jetzt prüft der Browser es jedes Mal beim
+  Server nach (meist nur eine kurze Antwort „unverändert“). Wann Chrome die installierte App danach aktualisiert,
+  entscheidet weiterhin Chrome (höchstens einmal am Tag).
 - **Mitgliederliste für die Anwesenheit**: Wer nur die Anwesenheit führt, sah in der Verwaltung den Knopf
   **Mitglieder**, bekam beim Öffnen aber eine Fehlermeldung. Jetzt öffnet sich die Liste mit Namen, Rollen, Fotos und
   Dienstgraden, ohne Punkte und Strafen.
