@@ -4,6 +4,7 @@ import {
   type BoardMailSummary,
   type MailDetail,
   type MailField,
+  type MailGroup,
   type MailListItem,
   type MailOptions,
   type MailSelection,
@@ -31,7 +32,7 @@ interface Draft extends Record<MailField, MailSelection> {
   attachments: Attachment[];
 }
 
-const emptySelection = (): MailSelection => ({ roles: [], users: [], emails: [] });
+const emptySelection = (): MailSelection => ({ groups: [], roles: [], users: [], emails: [] });
 const emptyDraft = (): Draft => ({
   subject: '',
   text: '',
@@ -41,7 +42,7 @@ const emptyDraft = (): Draft => ({
   copies: false,
   attachments: [],
 });
-const isEmpty = (s: MailSelection) => s.roles.length === 0 && s.users.length === 0 && s.emails.length === 0;
+const isEmpty = (s: MailSelection) => s.groups.length === 0 && s.roles.length === 0 && s.users.length === 0 && s.emails.length === 0;
 
 function readDraft(): Draft | null {
   try {
@@ -50,6 +51,7 @@ function readDraft(): Draft | null {
     const sel = (v: unknown): MailSelection => {
       const o = (v && typeof v === 'object' ? v : {}) as Partial<MailSelection>;
       return {
+        groups: Array.isArray(o.groups) ? o.groups.filter((x) => typeof x === 'string') : [],
         roles: Array.isArray(o.roles) ? o.roles.filter((x) => typeof x === 'string') : [],
         users: Array.isArray(o.users) ? o.users.filter((x) => typeof x === 'number') : [],
         emails: Array.isArray(o.emails) ? o.emails.filter((x) => typeof x === 'string') : [],
@@ -92,23 +94,38 @@ export function mailSummaryText(mail: BoardMailSummary): string {
   return parts.join(', ');
 }
 
-type Suggestion = { kind: 'role'; key: string; label: string; hint: string } | { kind: 'user'; id: number; label: string; hint: string };
+type Suggestion =
+  | { kind: 'group'; key: string; label: string; hint: string }
+  | { kind: 'role'; key: string; label: string; hint: string }
+  | { kind: 'user'; id: number; label: string; hint: string };
+
+/** Erreichbare Empfänger einer Gruppe, z. B. „12 von 14 mit Adresse + 2 Adressen“. */
+function groupCount(g: MailGroup): string {
+  const extra = g.emails.length > 0 ? ` + ${g.emails.length} ${g.emails.length === 1 ? 'Adresse' : 'Adressen'}` : '';
+  return `${g.with_email} von ${g.members} mit Adresse${extra}`;
+}
 
 /**
- * Empfänger eines Felds wie in einem Mailprogramm: ausgewählte Rollen, Mitglieder und Adressen als Kärtchen; Eingabe sucht
- * Rollen und Mitglieder, eine Adresse übernimmt Enter, Komma oder Verlassen des Felds (auch mehrere eingefügte auf einmal).
+ * Empfänger eines Felds wie in einem Mailprogramm: ausgewählte Gruppen, Rollen, Mitglieder und Adressen als Kärtchen;
+ * Eingabe sucht Gruppen, Rollen und Mitglieder, eine Adresse übernimmt Enter, Komma oder Verlassen des Felds (auch mehrere
+ * eingefügte auf einmal). Im Inhalt einer Mailgruppe (withGroups false) keine Gruppen: Gruppen enthalten keine Gruppen.
  */
 function RecipientField({
   field,
   value,
   options,
   onChange,
+  label,
+  withGroups = true,
 }: {
   field: MailField;
   value: MailSelection;
   options: MailOptions;
   onChange: (value: MailSelection) => void;
+  label?: string;
+  withGroups?: boolean;
 }) {
+  const fieldLabel = label ?? FIELD_LABELS[field];
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState(0);
@@ -119,17 +136,23 @@ function RecipientField({
   const suggestions = useMemo<Suggestion[]>(() => {
     const q = query.trim().toLowerCase();
     if (q === '' || q.includes('@')) return [];
+    const groups: Suggestion[] = withGroups
+      ? options.groups
+          .filter((g) => !value.groups.includes(g.key) && g.label.toLowerCase().includes(q))
+          .map((g) => ({ kind: 'group', key: g.key, label: g.label, hint: `Gruppe · ${groupCount(g)}` }))
+      : [];
     const roles: Suggestion[] = options.roles
       .filter((r) => !value.roles.includes(r.key) && r.label.toLowerCase().includes(q))
       .map((r) => ({ kind: 'role', key: r.key, label: r.label, hint: `Rolle · ${r.with_email} von ${r.members} mit Adresse` }));
     const users: Suggestion[] = options.members
       .filter((m) => !value.users.includes(m.id) && m.name.toLowerCase().includes(q))
       .map((m) => ({ kind: 'user', id: m.id, label: m.name, hint: m.email ? 'Mitglied' : 'ohne Mailadresse' }));
-    return [...roles, ...users].slice(0, 8);
-  }, [query, options, value]);
+    return [...groups, ...roles, ...users].slice(0, 8);
+  }, [query, options, value, withGroups]);
 
   const pick = (s: Suggestion) => {
-    if (s.kind === 'role') onChange({ ...value, roles: [...value.roles, s.key] });
+    if (s.kind === 'group') onChange({ ...value, groups: [...value.groups, s.key] });
+    else if (s.kind === 'role') onChange({ ...value, roles: [...value.roles, s.key] });
     else onChange({ ...value, users: [...value.users, s.id] });
     setQuery('');
     setActive(0);
@@ -165,22 +188,39 @@ function RecipientField({
       e.preventDefault();
       if (suggestions.length > 0) pick(suggestions[Math.min(active, suggestions.length - 1)]);
       else if (query.includes('@')) takeEmails();
-      else setError('Keine Rolle und kein Mitglied gefunden. Oder eine Mailadresse eingeben.');
+      else setError(`Keine ${withGroups ? 'Gruppe, keine ' : ''}Rolle und kein Mitglied gefunden. Oder eine Mailadresse eingeben.`);
     } else if (e.key === 'Backspace' && query === '') {
       if (value.emails.length > 0) onChange({ ...value, emails: value.emails.slice(0, -1) });
       else if (value.users.length > 0) onChange({ ...value, users: value.users.slice(0, -1) });
       else if (value.roles.length > 0) onChange({ ...value, roles: value.roles.slice(0, -1) });
+      else if (value.groups.length > 0) onChange({ ...value, groups: value.groups.slice(0, -1) });
     }
   };
 
+  const group = (key: string) => options.groups.find((g) => g.key === key);
   const role = (key: string) => options.roles.find((r) => r.key === key);
   const member = (uid: number) => options.members.find((m) => m.id === uid);
 
   return (
     <div className="field mail-recipients">
-      <span id={`${id}-label`}>{FIELD_LABELS[field]}</span>
+      <span id={`${id}-label`}>{fieldLabel}</span>
       <div className="mail-recipient-box" onClick={() => inputRef.current?.focus()}>
         <ul className="mail-chips" aria-labelledby={`${id}-label`}>
+          {value.groups.map((key) => (
+            <li key={`g-${key}`} className="mail-chip mail-chip-role mail-chip-group">
+              <span>
+                {group(key)?.label ?? 'Gelöschte Gruppe'}
+                <span className="mail-chip-note"> · Gruppe ({group(key)?.with_email ?? 0})</span>
+              </span>
+              <button
+                type="button"
+                aria-label={`${group(key)?.label ?? 'Gruppe'} entfernen`}
+                onClick={() => onChange({ ...value, groups: value.groups.filter((g) => g !== key) })}
+              >
+                ×
+              </button>
+            </li>
+          ))}
           {value.roles.map((key) => (
             <li key={`r-${key}`} className="mail-chip mail-chip-role">
               <span>
@@ -230,8 +270,8 @@ function RecipientField({
           type="text"
           className={`mail-recipient-input mail-${field}-input`}
           value={query}
-          placeholder={isEmpty(value) ? 'Rolle, Mitglied oder Adresse …' : ''}
-          aria-label={`${FIELD_LABELS[field]}: Rolle, Mitglied oder Adresse`}
+          placeholder={isEmpty(value) ? (withGroups ? 'Gruppe, Rolle, Mitglied oder Adresse …' : 'Rolle, Mitglied oder Adresse …') : ''}
+          aria-label={`${fieldLabel}: ${withGroups ? 'Gruppe, ' : ''}Rolle, Mitglied oder Adresse`}
           aria-autocomplete="list"
           aria-controls={listId}
           aria-expanded={suggestions.length > 0}
@@ -264,7 +304,7 @@ function RecipientField({
       {suggestions.length > 0 && (
         <ul id={listId} className="card mail-suggestions" role="listbox">
           {suggestions.map((s, i) => (
-            <li key={s.kind === 'role' ? `r-${s.key}` : `u-${s.id}`} role="option" aria-selected={i === active}>
+            <li key={s.kind === 'user' ? `u-${s.id}` : `${s.kind[0]}-${s.key}`} role="option" aria-selected={i === active}>
               <button
                 type="button"
                 className={i === active ? 'active' : ''}
@@ -431,12 +471,13 @@ function Detail({ id }: { id: number }) {
           <dl className="mail-selection">
             {FIELDS.filter((f) => {
               const s = data.selection[f];
-              return s && (s.roles.length > 0 || s.users.length > 0 || s.emails.length > 0);
+              return s && ((s.groups ?? []).length > 0 || s.roles.length > 0 || s.users.length > 0 || s.emails.length > 0);
             }).map((f) => (
               <div key={f}>
                 <dt>{FIELD_LABELS[f]}:</dt>
                 <dd>
                   {[
+                    ...(data.selection[f].groups ?? []).map((g) => `${g.label} (Gruppe)`),
                     ...data.selection[f].roles.map((r) => `${r.label} (Rolle)`),
                     ...data.selection[f].users.map((u) => u.name ?? 'gelöschtes Konto'),
                     ...data.selection[f].emails,
@@ -496,12 +537,197 @@ function History({ items, keepDays }: { items: MailListItem[]; keepDays: number 
   );
 }
 
+/** Wer zu einer Standardgruppe gehört (die App bestimmt es beim Senden). */
+const STANDARD_HINTS: Record<string, string> = {
+  members: 'Alle, deren Rolle den Mitgliederbereich hat, auch Admins und eigene Rollen wie Spieß; ohne Anwärter.',
+  all: 'Alle Konten außer Gästen, auch Anwärter.',
+};
+
+interface GroupDraft {
+  /** null: neue Gruppe */
+  key: string | null;
+  standard: boolean;
+  label: string;
+  content: MailSelection;
+}
+
 /**
- * Verwaltung → E-Mails (Recht send_mail): E-Mail schreiben an Rollen, Mitglieder und beliebige Adressen (An, Cc, Bcc) mit
- * demselben Editor wie am Schwarzen Brett, darunter der Verlauf; verwaltung/mail/<id> zeigt eine versendete E-Mail.
+ * Mailgruppen (verwaltung/mail/gruppen): Standardgruppen nur umbenennen, eigene aus Rollen, Konten und freien Adressen
+ * anlegen, bearbeiten, löschen. Aufgelöst wird beim Senden; Ehemalige bekommen nie eine Mail.
+ */
+function Groups({ onToast }: { onToast: (msg: string) => void }) {
+  const [options, setOptions] = useState<MailOptions | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [edit, setEdit] = useState<GroupDraft | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const load = () => {
+    setError(null);
+    api.mailOptions().then(setOptions, (err: Error) => setError(err.message));
+  };
+  useEffect(load, []);
+
+  const run = async (action: () => Promise<MailGroup[]>, done: string) => {
+    setBusy(true);
+    setFormError(null);
+    try {
+      const groups = await action();
+      setOptions((o) => (o ? { ...o, groups } : o));
+      setEdit(null);
+      onToast(done);
+    } catch (err) {
+      setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = (e: FormEvent) => {
+    e.preventDefault();
+    if (!edit) return;
+    const content = { roles: edit.content.roles, users: edit.content.users, emails: edit.content.emails };
+    if (edit.key === null) void run(() => api.createMailGroup({ label: edit.label, ...content }), 'Gruppe angelegt');
+    else if (edit.standard) void run(() => api.updateMailGroup(edit.key!, { label: edit.label }), 'Gespeichert');
+    else void run(() => api.updateMailGroup(edit.key!, { label: edit.label, ...content }), 'Gespeichert');
+  };
+
+  const back = (
+    <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mail')}>
+      ‹ E-Mails
+    </button>
+  );
+  if (error)
+    return (
+      <div>
+        {back}
+        <ErrorBox message={error} onRetry={load} />
+      </div>
+    );
+  if (!options) return <Loading />;
+  const describe = (g: MailGroup): string => {
+    if (g.standard) return STANDARD_HINTS[g.key] ?? '';
+    const roles = g.roles.map((k) => options.roles.find((r) => r.key === k)?.label ?? k);
+    const users = g.users.map((id) => options.members.find((m) => m.id === id)?.name ?? 'Unbekannt');
+    return [...roles.map((r) => `${r} (Rolle)`), ...users, ...g.emails].join(', ') || 'leer';
+  };
+
+  return (
+    <div className="mail-groups">
+      {back}
+      <h2 className="board-page-title">Mailgruppen</h2>
+      <p className="muted small">
+        Gruppen lassen sich beim Schreiben wie Rollen auswählen. Wer dazugehört, ermittelt die App erst beim Senden; ausgeschiedene
+        Mitglieder (Ehemalige) bekommen nie eine Mail.
+      </p>
+      <ul className="card-list">
+        {options.groups.map((g) => (
+          <li key={g.key} className="card row mail-group-item">
+            <div className="row-main">
+              <div className="row-title">
+                {g.label}
+                {g.standard && <span className="muted small"> · Standardgruppe</span>}
+              </div>
+              <div className="row-sub">{describe(g)}</div>
+              <div className="row-sub">{groupCount(g)}</div>
+              <div className="row-actions">
+                <button
+                  className="btn btn-small btn-secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    setFormError(null);
+                    setEdit({
+                      key: g.key,
+                      standard: g.standard,
+                      label: g.label,
+                      content: { ...emptySelection(), roles: g.roles, users: g.users, emails: g.emails },
+                    });
+                  }}
+                >
+                  {g.standard ? 'Umbenennen' : 'Bearbeiten'}
+                </button>
+                {!g.standard && (
+                  <button
+                    className="btn btn-small btn-danger"
+                    disabled={busy}
+                    onClick={() =>
+                      window.confirm(`Mailgruppe „${g.label}“ löschen?`) && void run(() => api.deleteMailGroup(g.key), 'Gelöscht')
+                    }
+                  >
+                    Löschen
+                  </button>
+                )}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {formError && !edit && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
+      {edit ? (
+        <form className="form card mail-group-form" onSubmit={save}>
+          <h3>{edit.key === null ? 'Neue Mailgruppe' : edit.standard ? 'Standardgruppe umbenennen' : 'Mailgruppe bearbeiten'}</h3>
+          <label className="field">
+            <span>Bezeichnung</span>
+            <input
+              type="text"
+              className="mail-group-label"
+              maxLength={60}
+              value={edit.label}
+              onChange={(e) => setEdit({ ...edit, label: e.target.value })}
+              placeholder="z. B. Vorstand"
+              required
+            />
+          </label>
+          {edit.standard ? (
+            <p className="muted small">{STANDARD_HINTS[edit.key ?? ''] ?? ''}</p>
+          ) : (
+            <RecipientField
+              field="to"
+              label="Mitglieder der Gruppe"
+              withGroups={false}
+              value={edit.content}
+              options={options}
+              onChange={(content) => setEdit({ ...edit, content })}
+            />
+          )}
+          {formError && <p className="form-error small">{formError}</p>}
+          <div className="row-actions">
+            <button className="btn" type="submit" disabled={busy || edit.label.trim() === ''}>
+              Speichern
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setEdit(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-block mail-group-new"
+          onClick={() => {
+            setFormError(null);
+            setEdit({ key: null, standard: false, label: '', content: emptySelection() });
+          }}
+        >
+          Neue Mailgruppe
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Verwaltung → E-Mails (Recht send_mail): E-Mail schreiben an Mailgruppen, Rollen, Mitglieder und beliebige Adressen (An,
+ * Cc, Bcc) mit demselben Editor wie am Schwarzen Brett, darunter der Verlauf; verwaltung/mail/<id> zeigt eine versendete
+ * E-Mail, verwaltung/mail/gruppen die Mailgruppen.
  */
 export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   const detail = path[0] && /^\d+$/.test(path[0]) ? Number(path[0]) : null;
+  const groups = path[0] === 'gruppen';
   const [options, setOptions] = useState<MailOptions | null>(null);
   const [history, setHistory] = useState<{ items: MailListItem[]; keep_days: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -517,10 +743,11 @@ export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: st
     );
   };
   useEffect(() => {
-    if (detail === null) load();
-  }, [detail]);
+    if (detail === null && !groups) load();
+  }, [detail, groups]);
 
   if (detail !== null) return <Detail id={detail} />;
+  if (groups) return <Groups onToast={onToast} />;
   if (error) return <ErrorBox message={error} onRetry={load} />;
   if (!options || !history) return <Loading />;
   return (
@@ -532,6 +759,9 @@ export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: st
           <p>{options.reason ?? 'Der Mailversand ist noch nicht eingerichtet.'}</p>
         </div>
       )}
+      <button type="button" className="btn btn-link mail-groups-link" onClick={() => navigate('verwaltung/mail/gruppen')}>
+        Mailgruppen verwalten ({options.groups.length})
+      </button>
       <History items={history.items} keepDays={history.keep_days} />
     </div>
   );

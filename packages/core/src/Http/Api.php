@@ -750,13 +750,27 @@ final class Api
                 return ['deleted' => true];
             }, 'board', $denyRights),
 
-            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): Empfänger wählen (Rollen, Mitglieder, freie
-            // Adressen je An, Cc und Bcc), Vorschau der Empfänger, senden (Versand im Hintergrund), Verlauf mit Protokoll
+            // E-Mails aus der Verwaltung (Bereich mail, Recht send_mail): Empfänger wählen (Mailgruppen, Rollen, Mitglieder,
+            // freie Adressen je An, Cc und Bcc), Vorschau der Empfänger, senden (Versand im Hintergrund), Verlauf mit Protokoll
             new Route('GET', '/mails/options', Cap::SendMail, fn () => $a->mailings()->options(), 'mail', $denyRights),
             new Route('POST', '/mails/preview', Cap::SendMail, fn (Request $r) => $a->mailings()->preview($r->body), 'mail', $denyRights),
             new Route('GET', '/mails', Cap::SendMail, fn () => $a->mailings()->list(), 'mail', $denyRights),
             new Route('POST', '/mails', Cap::SendMail, fn (Request $r) => Response::created($a->mailings()->send($this->user(), $r->body)), 'mail', $denyRights),
             new Route('GET', '/mails/{id}', Cap::SendMail, fn (Request $r) => $a->mailings()->detail($r->id()), 'mail', $denyRights),
+            // Mailgruppen (Standardgruppen nur umbenennen, eigene aus Rollen, Konten und Adressen): Antwort ist die neue Liste
+            new Route('GET', '/mails/groups', Cap::SendMail, fn () => $a->mailings()->groups(), 'mail', $denyRights),
+            new Route('POST', '/mails/groups', Cap::SendMail, function (Request $r) use ($a) {
+                $a->mailGroups()->create($r->body);
+                return Response::created($a->mailings()->groups());
+            }, 'mail', $denyRights),
+            new Route('PATCH', '/mails/groups/{key}', Cap::SendMail, function (Request $r) use ($a) {
+                $a->mailGroups()->update((string) $r->params['key'], $r->body);
+                return $a->mailings()->groups();
+            }, 'mail', $denyRights),
+            new Route('DELETE', '/mails/groups/{key}', Cap::SendMail, function (Request $r) use ($a) {
+                $a->mailGroups()->delete((string) $r->params['key']);
+                return $a->mailings()->groups();
+            }, 'mail', $denyRights),
 
             // Dateianhänge (Schwarzes Brett, E-Mails): hochladen als Entwurf des Kontos, Höchstgröße je Datei
             new Route('GET', '/attachments/limits', [Cap::PostBoard, Cap::SendMail], fn () => ['max_bytes' => AttachmentService::maxBytes()]),

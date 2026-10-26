@@ -4114,9 +4114,19 @@ fieldset.rights-tree legend {
 .offices-tools .segmented {
   margin: 0 auto 0 0;
 }
-/* Jahresübersicht der Ämter (nur auf breiten Bildschirmen): waagerecht scrollt nur das Raster, nie die Seite */
+/* Jahresübersicht der Ämter: Nur das Raster scrollt, nie die Seite. Es ist höchstens so hoch wie der Platz zwischen
+   Kopfleiste und Tab-Leiste, damit Gruppen und Ämter oben und die Jahre links beim Scrollen stehen bleiben. */
 .year-grid-scroll {
-  overflow-x: auto;
+  --yg-years: 3.5rem;
+  --yg-col: 6.5rem;
+  --yg-row: 1.6rem;
+  /* Platz für die Kopfleiste (ungefähr) und etwas Luft */
+  --yg-top: 104px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  max-height: calc(100vh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top));
+  max-height: calc(100dvh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top));
+  min-height: 14rem;
   margin-top: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -4126,11 +4136,13 @@ fieldset.rights-tree legend {
   display: grid;
   column-gap: 3px;
   min-width: min-content;
-  padding: 8px 8px 12px 0;
+  padding: 0 8px 12px 0;
   font-size: 0.72rem;
 }
 .yg-group,
 .yg-office {
+  position: sticky;
+  z-index: 2;
   padding: 4px 6px;
   background: var(--card);
   /* Bezeichnungen nach den Regeln der Sprache trennen, nicht mitten im Wort abschneiden */
@@ -4138,6 +4150,10 @@ fieldset.rights-tree legend {
   overflow-wrap: break-word;
 }
 .yg-group {
+  top: 0;
+  height: var(--yg-group-h, 1.9rem);
+  padding-top: 8px;
+  white-space: nowrap;
   font-family: var(--font-head);
   font-weight: 600;
   text-transform: uppercase;
@@ -4145,35 +4161,60 @@ fieldset.rights-tree legend {
   border-bottom: 2px solid var(--accent);
 }
 .yg-office {
+  top: 0;
   font-weight: 600;
   color: var(--ink-2);
-  align-self: end;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
   border-bottom: 1px solid var(--line);
 }
+.yg-group.empty {
+  border-bottom-color: transparent;
+}
+/* Der Name der Gruppe bleibt beim seitlichen Scrollen neben den Jahren sichtbar */
+.yg-group span {
+  position: sticky;
+  left: calc(var(--yg-years) + 6px);
+}
+.year-grid.grouped .yg-office {
+  top: var(--yg-group-h, 1.9rem);
+}
+.yg-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  background: var(--card);
+}
 .yg-year {
-  display: flex;
-  align-items: center;
   border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
-  color: var(--ink-2);
   z-index: 0;
 }
 .yg-year.decade {
   border-top-color: var(--line-strong);
 }
-.yg-year span {
+.yg-year-label {
   position: sticky;
   left: 0;
-  width: 3.5rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  /* dieselbe Linie wie die Zeile, sonst schiene darüber ein Balken durch */
+  border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
   padding-left: 8px;
   background: var(--card);
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
-.yg-year.decade span {
+.yg-year-label.decade {
+  border-top-color: var(--line-strong);
   font-weight: 700;
   color: var(--ink);
 }
 .yg-bar {
   z-index: 1;
+  cursor: pointer;
   margin: 1px 0;
   padding: 2px 5px;
   overflow: hidden;
@@ -4196,6 +4237,96 @@ fieldset.rights-tree legend {
   -webkit-line-clamp: 3;
   overflow: hidden;
   overflow-wrap: anywhere;
+}
+/* Tipp auf einen Balken: alles zur Amtszeit unten über der Tab-Leiste (auf dem Handy gibt es keinen Tooltip) */
+.yg-detail {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px);
+  z-index: 9;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(608px, calc(100% - 32px));
+  transform: translateX(-50%);
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--primary-text);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary-ink) 22%, transparent);
+  font-size: 0.9rem;
+}
+.yg-detail span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.yg-detail-close {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.yg-rotate-hint {
+  display: none;
+  margin: 8px 0 0;
+}
+/* Handy und schmale Fenster: schmalere Spalten und Zeilen, damit mehr aufs Bild passt */
+@media (max-width: 999px) {
+  .year-grid-scroll {
+    --yg-years: 2.9rem;
+    --yg-col: 4.75rem;
+    --yg-row: 1.35rem;
+    --yg-group-h: 1.6rem;
+  }
+  .year-grid {
+    column-gap: 2px;
+    padding-right: 4px;
+    font-size: 0.66rem;
+  }
+  .yg-group,
+  .yg-office {
+    padding: 3px 4px;
+  }
+  .yg-group {
+    padding-top: 6px;
+  }
+  .yg-year-label {
+    padding-left: 6px;
+  }
+  .yg-bar {
+    padding: 1px 4px;
+    border-radius: 4px;
+    line-height: 1.2;
+  }
+}
+/* Hochkant auf dem Handy: Hinweis aufs Drehen */
+@media (max-width: 999px) and (orientation: portrait) and (pointer: coarse) {
+  .yg-rotate-hint {
+    display: block;
+  }
+}
+/* Quer: die ganze Breite statt der schmalen Inhaltsspalte; auf niedrigen Bildschirmen scrollt die Kopfleiste mit weg,
+   damit für das Raster mehr Höhe bleibt. */
+@media (max-width: 999px) and (orientation: landscape) {
+  .content:has(.year-grid) {
+    max-width: none;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .app:has(.year-grid) .topbar {
+    position: static;
+  }
+  .year-grid-scroll {
+    --yg-top: 12px;
+  }
 }
 .office-group .section-title {
   margin-top: 18px;

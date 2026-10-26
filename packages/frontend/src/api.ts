@@ -871,19 +871,38 @@ export interface BoardMailInfo {
 /** E-Mails aus der Verwaltung: Felder für Empfänger */
 export type MailField = 'to' | 'cc' | 'bcc';
 
-/** Empfänger eines Felds: Rollen, Konten und freie Adressen */
+/** Empfänger eines Felds: Mailgruppen, Rollen, Konten und freie Adressen */
 export interface MailSelection {
+  groups: string[];
   roles: Level[];
   users: number[];
   emails: string[];
 }
 
-/** Formular „E-Mail schreiben“: eingerichtet? Absender, wählbare Rollen und Mitglieder (ohne Adressen) */
+/**
+ * Mailgruppe: Standardgruppen („Alle Mitglieder“, „Alle Konten“) berechnet die App und lassen sich nur umbenennen; eigene
+ * bestehen aus Rollen, Konten und freien Adressen. members/with_email: erreichbare Konten (ohne Ehemalige und Gäste).
+ */
+export interface MailGroup {
+  key: string;
+  label: string;
+  standard: boolean;
+  roles: Level[];
+  users: number[];
+  emails: string[];
+  members: number;
+  with_email: number;
+}
+
+export type MailGroupInput = { label?: string } & Partial<Pick<MailGroup, 'roles' | 'users' | 'emails'>>;
+
+/** Formular „E-Mail schreiben“: eingerichtet? Absender, wählbare Gruppen, Rollen und Mitglieder (ohne Adressen) */
 export interface MailOptions {
   available: boolean;
   reason: string | null;
   from: string;
   from_name: string;
+  groups: MailGroup[];
   roles: { key: Level; label: string; members: number; with_email: number }[];
   members: { id: number; name: string; roles: Level[]; email: boolean }[];
   server_max_size: number | null;
@@ -910,7 +929,15 @@ export interface MailListItem {
 export interface MailDetail extends MailListItem {
   text: string;
   attachments: Attachment[];
-  selection: Record<MailField, { roles: { key: Level; label: string }[]; users: { id: number; name: string | null }[]; emails: string[] }>;
+  selection: Record<
+    MailField,
+    {
+      groups?: { key: string; label: string }[];
+      roles: { key: Level; label: string }[];
+      users: { id: number; name: string | null }[];
+      emails: string[];
+    }
+  >;
   log: {
     field: MailField;
     name: string | null;
@@ -1720,6 +1747,10 @@ export const api = {
   uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
+  mailGroups: () => request<MailGroup[]>('GET', '/mails/groups'),
+  createMailGroup: (input: MailGroupInput) => request<MailGroup[]>('POST', '/mails/groups', input),
+  updateMailGroup: (key: string, input: MailGroupInput) => request<MailGroup[]>('PATCH', `/mails/groups/${encodeURIComponent(key)}`, input),
+  deleteMailGroup: (key: string) => request<MailGroup[]>('DELETE', `/mails/groups/${encodeURIComponent(key)}`),
   // Formatierte Inhalte (Issue #172): Bilder, Signatur, Mails vom Brett
   richImageLimits: () => request<RichImageLimits>('GET', '/rich-images/limits'),
   uploadRichImage: async (file: File) => request<RichImage>('POST', '/rich-images', { file: await encodeFile(file) }),

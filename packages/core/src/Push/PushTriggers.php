@@ -15,6 +15,7 @@ use KompanieApp\Core\Domain\RankService;
  * - öffentlicher Termin neu oder Datum, Uhrzeit oder Ort geändert: an Gäste und Konten ohne Kalender;
  * - interner Kalender neu oder geändert (Abgleich mit dem letzten Stand; beim ersten Lauf nur merken): an
  *   Mitglieder mit Kalender, damit nichts doppelt kommt;
+ * - bei geänderten Terminen steht in der Nachricht nur, was sich geändert hat (vorher → jetzt), nicht der ganze Termin;
  * - neue Neuigkeiten (Abgleich mit dem letzten Stand): an alle Abonnenten;
  * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
  * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied;
@@ -181,8 +182,10 @@ final class PushTriggers
         if (!$this->isUpcoming($event) || ($before !== null && self::signature($before) === self::signature($event))) {
             return 0;
         }
-        $title = $before !== null ? 'Termin geändert' : 'Neuer Termin';
-        return $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($title, $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']), false);
+        $message = $before !== null
+            ? PushService::message('Termin geändert', $this->changeBody($before, $event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
+            : PushService::message('Neuer Termin', $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']);
+        return $this->push->notifyAll(PushService::TYPE_EVENTS, $message, false);
     }
 
     /** Alle 15 Minuten (Aufgabe push_watch). */
@@ -206,7 +209,7 @@ final class PushTriggers
      *
      * @param array<string, mixed> $seen id → Signatur
      * @param array<int, array<string, mixed>> $events
-     * @return array{new: list<array<string, mixed>>, changed: list<array<string, mixed>>, seen: array<string, mixed>}
+     * @return array{new: list<array<string, mixed>>, changed: list<array{event: array<string, mixed>, before: mixed}>, seen: array<string, mixed>}
      */
     public function calendarChanges(array $seen, array $events, int $now): array
     {
@@ -225,7 +228,7 @@ final class PushTriggers
                     $new[] = $ev;
                 }
             } elseif ($seen[$id] !== $sig) {
-                $changed[] = $ev;
+                $changed[] = ['event' => $ev, 'before' => $seen[$id]];
             }
         }
         return ['new' => $new, 'changed' => $changed, 'seen' => $next];
@@ -256,8 +259,13 @@ final class PushTriggers
                 $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neuer Termin', $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
             }
         }
-        foreach ($diff['changed'] as $ev) {
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Termin geändert', $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+        foreach ($diff['changed'] as ['event' => $ev, 'before' => $sig]) {
+            // Gemerkt ist nur die Signatur (Beginn, Ende, Ort); ganztägig ist ein Beginn ohne Uhrzeit.
+            $before = is_array($sig) && count($sig) === 3 && is_string($sig[0] ?? null)
+                ? ['start' => $sig[0], 'end' => (string) $sig[1], 'location' => (string) $sig[2], 'all_day' => strlen($sig[0]) === 10]
+                : null;
+            $body = $before !== null ? $this->changeBody($before, $ev) : $this->eventBody($ev);
+            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Termin geändert', $body, self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
         }
         return $count;
     }
@@ -417,6 +425,64 @@ final class PushTriggers
     {
         $location = trim((string) ($ev['location'] ?? ''));
         return (string) $ev['title'] . ' – ' . $this->when($ev) . ($location !== '' ? ' – ' . $location : '');
+    }
+
+    /**
+     * Nur die Änderung, z. B. „Probe – Uhrzeit: 19:00 Uhr → 20:00 Uhr · Ort: Halle → Sporthalle“. Datum und Beginn
+     * zusammen; das Ende nur, wenn sich die Dauer geändert hat (nicht, wenn der Termin nur verschoben wurde). Bleibt
+     * nichts übrig (etwa nur anders geschriebene Zeitangaben), der ganze Termin wie bei neuen Terminen.
+     *
+     * @param array<string, mixed> $before start, end, location, all_day des alten Stands
+     * @param array<string, mixed> $ev
+     */
+    private function changeBody(array $before, array $ev): string
+    {
+        $parts = [];
+        $timed = empty($before['all_day']) && empty($ev['all_day']);
+        if ($this->when($before) !== $this->when($ev)) {
+            if ($timed && $this->start($before)->format('Y-m-d') === $this->start($ev)->format('Y-m-d')) {
+                $parts[] = self::change('Uhrzeit', $this->start($before)->format('H:i') . ' Uhr', $this->start($ev)->format('H:i') . ' Uhr');
+            } else {
+                $parts[] = self::change('Datum', $this->when($before), $this->when($ev));
+            }
+        }
+        if ($timed && $this->duration($before) !== $this->duration($ev)) {
+            $parts[] = self::change('Ende', $this->endTime($before), $this->endTime($ev));
+        }
+        $old = trim((string) ($before['location'] ?? ''));
+        $new = trim((string) ($ev['location'] ?? ''));
+        if ($old !== $new) {
+            $parts[] = self::change('Ort', $old, $new);
+        }
+        return $parts !== [] ? (string) $ev['title'] . ' – ' . implode(' · ', $parts) : $this->eventBody($ev);
+    }
+
+    /** „Ort: Halle → Sporthalle“, „Ort: Halle“ (vorher keiner) bzw. „Ort: entfällt (vorher Halle)“ */
+    private static function change(string $label, string $old, string $new): string
+    {
+        if ($old === '') {
+            return $label . ': ' . $new;
+        }
+        return $new === '' ? $label . ': entfällt (vorher ' . $old . ')' : $label . ': ' . $old . ' → ' . $new;
+    }
+
+    /** @param array<string, mixed> $ev */
+    private function duration(array $ev): int
+    {
+        return (new \DateTimeImmutable((string) $ev['end'], $this->app->time()->timezone()))->getTimestamp() - $this->start($ev)->getTimestamp();
+    }
+
+    /** „21:00 Uhr“, an einem anderen Tag als dem Beginn mit Datum; leer ohne Ende (Ende gleich Beginn). */
+    private function endTime(array $ev): string
+    {
+        if ($this->duration($ev) <= 0) {
+            return '';
+        }
+        $tz = $this->app->time()->timezone();
+        $end = (new \DateTimeImmutable((string) $ev['end'], $tz))->setTimezone($tz);
+        $days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        $date = $end->format('Y-m-d') !== $this->start($ev)->format('Y-m-d') ? $days[(int) $end->format('w')] . ' ' . $end->format('d.m.Y') . ', ' : '';
+        return $date . $end->format('H:i') . ' Uhr';
     }
 
     /**
