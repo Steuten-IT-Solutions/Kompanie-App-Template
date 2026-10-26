@@ -143,6 +143,8 @@ test('Gestaltung kommt aus kompanie.json, ohne fremde Motive', async ({ page }) 
   const manifest = await (await page.request.get('/app/manifest.webmanifest')).json();
   expect(manifest.short_name).toBe('Musterkompanie');
   expect(manifest.theme_color).toBe('#2e6b3f');
+  // Drehbar: installierte Apps folgen dem Handy ins Querformat
+  expect(manifest.orientation).toBe('any');
   const html = await page.content();
   expect(html).not.toMatch(/marine|anker|ahoi|wappen/i);
   await shot(page, '0-start-gast');
@@ -1499,6 +1501,43 @@ test('Ämter: Einzahl auf der Seite einer Person, Hinweis mit Link bei Titeln, d
   expect(status.every((s) => s < 300)).toBe(true);
 });
 
+test('Querformat: Navigation links, Listen und Formulare zweispaltig, nichts scrollt seitlich', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Handy quer (iPhone 13): niedrig, daher Leiste links statt unten
+  await page.setViewportSize({ width: 844, height: 390 });
+  const noSideScroll = () => expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.goto('/app/#/verwaltung/mitglieder');
+  await expect
+    .poll(async () => {
+      const bar = await page.locator('.tabbar').boundingBox();
+      return !!bar && bar.x === 0 && bar.width < 120 && bar.height > 300;
+    })
+    .toBe(true);
+  // Mitgliederliste in zwei Spalten
+  const rows = page.locator('.card-list .member-row');
+  await expect(rows.nth(1)).toBeVisible();
+  const [a, b] = [await rows.nth(0).boundingBox(), await rows.nth(1).boundingBox()];
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+  expect(b!.x).toBeGreaterThan(a!.x + a!.width);
+  await noSideScroll();
+  // Formular: zwei Felder nebeneinander
+  await page.goto('/app/#/verwaltung/neu');
+  const user = await page.getByLabel('Benutzername (optional)').boundingBox();
+  const mail = await page.getByLabel('E-Mail (optional)').boundingBox();
+  expect(Math.abs(user!.y - mail!.y)).toBeLessThan(2);
+  expect(mail!.x).toBeGreaterThan(user!.x + user!.width);
+  await noSideScroll();
+  await shot(page, '1e-querformat');
+  // Wieder hochkant: Tab-Leiste unten über die ganze Breite
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(async () => {
+      const bar = await page.locator('.tabbar').boundingBox();
+      return !!bar && bar.width === 390 && bar.y > 700;
+    })
+    .toBe(true);
+});
+
 test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const office = `Fähnriche ${id}`;
@@ -1541,6 +1580,18 @@ test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt 
   await expect(page.locator('.yg-detail')).toContainText(`${office}: 1990–2006 · Carl Clau ${id}`);
   await page.locator('.yg-detail').getByRole('button', { name: 'Schließen' }).click();
   await expect(page.locator('.yg-detail')).toHaveCount(0);
+  // Ganz nach unten gescrollt: Der Schalter steht direkt unter der Kopfleiste, das Raster füllt den Rest; man kommt also
+  // immer zurück zur Chronik (gemeldet: nach dem Scrollen nur noch das Raster, kein Weg nach oben)
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const view = page.getByRole('group', { name: 'Ansicht' });
+  await expect(view).toBeInViewport();
+  await expect
+    .poll(async () => {
+      const tools = await view.boundingBox();
+      const bar = await page.locator('.topbar').boundingBox();
+      return !!tools && !!bar && tools.y >= bar.y + bar.height - 1;
+    })
+    .toBe(true);
 
   // Quer: ohne Tipp, die Seite scrollt weiter nicht seitlich
   await page.setViewportSize({ width: 740, height: 360 });

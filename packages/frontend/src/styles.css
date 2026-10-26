@@ -3969,18 +3969,19 @@ fieldset.feature-list legend {
 .offices-tools .segmented {
   margin: 0 auto 0 0;
 }
-/* Jahresübersicht der Ämter: Nur das Raster scrollt, nie die Seite. Es ist höchstens so hoch wie der Platz zwischen
-   Kopfleiste und Tab-Leiste, damit Gruppen und Ämter oben und die Jahre links beim Scrollen stehen bleiben. */
+/* Jahresübersicht der Ämter: Nur das Raster scrollt, nie die Seite seitlich. Es ist höchstens so hoch wie der freie Platz
+   unter dem Schalter „Chronik | Jahre“ (misst YearGrid, --yg-avail), damit Gruppen und Ämter oben und die Jahre links
+   beim Scrollen stehen bleiben und die Seite drumherum nicht scrollen muss. Am oberen und unteren Ende des Rasters geht
+   das Wischen an die Seite weiter (kein overscroll-behavior: contain), sonst käme man nicht mehr zum Schalter. */
 .year-grid-scroll {
   --yg-years: 3.5rem;
   --yg-col: 6.5rem;
   --yg-row: 1.6rem;
-  /* Platz für die Kopfleiste (ungefähr) und etwas Luft */
+  /* Platz für die Kopfleiste (ungefähr) und etwas Luft, falls YearGrid den freien Platz noch nicht gemessen hat */
   --yg-top: 104px;
   overflow: auto;
-  overscroll-behavior: contain;
   max-height: calc(100vh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top));
-  max-height: calc(100dvh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top));
+  max-height: var(--yg-avail, calc(100dvh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top)));
   min-height: 14rem;
   margin-top: 12px;
   border: 1px solid var(--line);
@@ -4164,23 +4165,6 @@ fieldset.feature-list legend {
 @media (max-width: 999px) and (orientation: portrait) and (pointer: coarse) {
   .yg-rotate-hint {
     display: block;
-  }
-}
-/* Quer: die ganze Breite statt der schmalen Inhaltsspalte; auf niedrigen Bildschirmen scrollt die Kopfleiste mit weg,
-   damit für das Raster mehr Höhe bleibt. */
-@media (max-width: 999px) and (orientation: landscape) {
-  .content:has(.year-grid) {
-    max-width: none;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-  }
-}
-@media (max-height: 520px) and (orientation: landscape) {
-  .app:has(.year-grid) .topbar {
-    position: static;
-  }
-  .year-grid-scroll {
-    --yg-top: 12px;
   }
 }
 .office-group .section-title {
@@ -5167,4 +5151,255 @@ button.spotlight-person:focus-visible {
 .attachment-add.disabled {
   opacity: 0.6;
   pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Handy quer: Navigation als Leiste links, flache Kopfleiste und      */
+/* Banner, Inhalt über die ganze Breite (Listen und Formulare zwei-    */
+/* spaltig, Lesetexte begrenzt). Tablets und Computer sind höher und   */
+/* bleiben, wie sie sind.                                              */
+/* ------------------------------------------------------------------ */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    /* Die Tab-Leiste steht links; unten braucht nichts mehr Platz (.app, .toast, .list-save, Jahresübersicht). */
+    --tabbar-h: 0px;
+    --rail-w: 76px;
+    --content-pad-r: max(16px, env(safe-area-inset-right));
+  }
+  .app {
+    padding-left: calc(var(--rail-w) + env(safe-area-inset-left));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar {
+    top: 0;
+    right: auto;
+    flex-direction: column;
+    justify-content: space-around;
+    width: calc(var(--rail-w) + env(safe-area-inset-left));
+    height: auto;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: linear-gradient(90deg, var(--bar-top), var(--bar-bottom));
+    border-top: 0;
+    border-right: 3px solid var(--accent);
+  }
+  .tabbar button,
+  .tabbar button:first-child:nth-last-child(n + 6),
+  .tabbar button:first-child:nth-last-child(n + 6) ~ button,
+  .tabbar button:first-child:nth-last-child(n + 7),
+  .tabbar button:first-child:nth-last-child(n + 7) ~ button {
+    flex: 1 1 0;
+    min-height: 44px;
+    gap: 2px;
+    padding: 0 3px;
+    font-size: 0.58rem;
+    letter-spacing: 0.02em;
+  }
+  .tabbar button svg {
+    width: 22px;
+    height: 22px;
+  }
+  /* Markierung des aktiven Tabs am rechten Rand statt oben */
+  .tabbar button.active::before {
+    top: 22%;
+    bottom: 22%;
+    left: auto;
+    right: 0;
+    width: 3px;
+    height: auto;
+    border-radius: 3px 0 0 3px;
+  }
+  /* Kopfleiste einzeilig und nicht fest: Sie scrollt mit weg, der Inhalt bekommt die Höhe. */
+  .topbar {
+    /* relative statt sticky: scrollt mit weg, die Zierlinie (::after) bleibt an der Leiste */
+    position: relative;
+    gap: 10px;
+    padding: calc(6px + env(safe-area-inset-top)) var(--content-pad-r) 8px 16px;
+  }
+  .topbar .logo {
+    height: 32px;
+  }
+  .topbar-text {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .topbar-title {
+    flex: none;
+    max-width: 60%;
+    font-size: 1.1rem;
+  }
+  .topbar-sub {
+    min-width: 0;
+  }
+  /* Banner einzeilig: Titel und Weg zum Brett nebeneinander, das × rechts */
+  .board-banner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+    align-items: center;
+    padding: 2px var(--content-pad-r) 2px 16px;
+  }
+  .board-banner > .board-entry {
+    grid-column: 1;
+    align-items: center;
+    padding: 0;
+  }
+  .board-entry + .board-entry {
+    padding-top: 2px;
+  }
+  .board-entry-body {
+    display: flex;
+    align-items: center;
+    gap: 4px 12px;
+  }
+  .board-entry-head {
+    flex: none;
+    flex-wrap: nowrap;
+  }
+  .board-entry-body > .board-banner-title,
+  .board-entry-body > .board-text {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .board-poll-open {
+    flex: none;
+  }
+  /* Auf kleinen Handys hat der Titel Vorrang vor Name und Uhrzeit */
+  @media (max-width: 760px) {
+    .board-banner .board-entry-head .board-meta {
+      display: none;
+    }
+  }
+  .board-dismiss {
+    min-height: 32px;
+  }
+  .board-banner-foot {
+    grid-column: 2;
+    grid-row: 1 / span 20;
+    flex-wrap: nowrap;
+  }
+  .board-banner-collapsed {
+    padding-right: var(--content-pad-r);
+  }
+  .install-hint {
+    padding: 4px var(--content-pad-r) 4px 16px;
+  }
+  .install-hint-logo {
+    width: 28px;
+    height: 28px;
+  }
+  .install-hint-text span {
+    display: none;
+  }
+  .offline {
+    padding: 6px var(--content-pad-r) 6px 16px;
+  }
+  /* Fest positionierte Hinweise mittig über dem Inhalt, nicht über der Leiste */
+  .toast,
+  .yg-detail {
+    left: calc(50% + (var(--rail-w) + env(safe-area-inset-left)) / 2);
+  }
+  .yg-detail {
+    width: min(760px, calc(100% - var(--rail-w) - env(safe-area-inset-left) - 32px));
+  }
+  /* Fenster (Sheet): ganz auf den niedrigen Bildschirm */
+  .sheet-backdrop {
+    padding: 8px;
+  }
+  .sheet {
+    max-height: calc(100vh / var(--kompanie-zoom, 1) - 16px);
+    max-height: calc(100dvh / var(--kompanie-zoom, 1) - 16px);
+  }
+
+  /* Inhalt über die ganze Breite */
+  .content {
+    max-width: none;
+    padding: 14px var(--content-pad-r) 20px 16px;
+  }
+  .member-detail,
+  .member-page {
+    margin-right: calc(-1 * var(--content-pad-r));
+    padding-right: var(--content-pad-r);
+  }
+
+  /* Kartenlisten in Spalten (bei 844 px zwei). Aufgeklappte Karten nehmen die ganze Zeile. Sortierbare Listen (Ziehen
+     nach oben und unten) bleiben einspaltig. */
+  .card-list,
+  .poll-list,
+  .install-steps,
+  .status-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+    align-items: start;
+    gap: 10px 12px;
+  }
+  .card-list:has(.drag-handle),
+  .card-list.list-rows,
+  .card-list.list-columns,
+  .office-import-rows {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .poll-list > :not(.poll-list-item),
+  .card-list > .list-divider,
+  .card-list > .event.open,
+  .card-list > .inventory-group:has(> .inventory-group-head[aria-expanded='true']) {
+    grid-column: 1 / -1;
+  }
+  .office-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+    align-items: start;
+    column-gap: 12px;
+  }
+  .office-group > .section-title,
+  .office-group > .office-card.open {
+    grid-column: 1 / -1;
+  }
+  .admin-tiles {
+    /* so viele Spalten, wie lange Wörter („Beförderungen“) ungebrochen passen; bei 844 px vier */
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+  .album-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .photo-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  /* Formulare: je zwei Felder nebeneinander; Gruppen, Textfelder, Hinweise und Knöpfe über die ganze Breite */
+  .form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
+    align-items: start;
+  }
+  .form > * {
+    grid-column: 1 / -1;
+  }
+  .form > .field:not(fieldset):not(:has(textarea, .rich-editor, .mail-recipient-box, .picker)) {
+    grid-column: auto;
+  }
+  .form.login {
+    display: flex;
+    width: 100%;
+    max-width: 420px;
+    margin-inline: auto;
+  }
+
+  /* Lesetexte: Zeilen nicht länger als gut lesbar */
+  .news-article,
+  .hilfe-text,
+  .lizenz-text,
+  .changelog-text {
+    max-width: 760px;
+    margin-inline: auto;
+  }
 }

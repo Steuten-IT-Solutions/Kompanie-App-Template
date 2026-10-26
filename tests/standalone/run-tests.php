@@ -231,6 +231,8 @@ try {
     $c->ok(($headers['x-content-type-options'] ?? '') === 'nosniff' && ($headers['x-frame-options'] ?? '') === 'SAMEORIGIN', 'Sicherheits-Header');
     $man = json_decode((string) file_get_contents($base . 'index.php?r=/manifest.webmanifest'), true);
     $c->ok(($man['start_url'] ?? '') === $base && str_starts_with($man['icons'][0]['src'] ?? '', $base . 'app/icons/icon-192.png'), 'Manifest mit Start-Adresse und Icons');
+    // Drehbar (Querformat), nicht auf hochkant festgelegt
+    $c->ok(($man['orientation'] ?? '') === 'any', 'Manifest: Ausrichtung frei');
     $sw = $d->send('GET', $base . 'sw.js', [], null);
     $c->ok($sw[0] === 200 && str_contains((string) ($sw[2]['content-type'] ?? ''), 'javascript'), 'sw.js liegt neben index.php (Bereich: ganze App)');
     // Ohne statische Auslieferung (Weg über index.php): ETag, bei passendem If-None-Match 304 (Issue #18).

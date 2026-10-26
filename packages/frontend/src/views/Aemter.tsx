@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactElement } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
@@ -271,6 +271,50 @@ function loadView(): 'chronik' | 'jahre' {
 }
 
 /**
+ * Höhe der Jahresübersicht: Schalter „Chronik | Jahre“ und Raster passen zusammen zwischen die feste Kopfleiste und die
+ * Tab-Leiste unten. Ist die Seite ganz nach unten gescrollt, steht der Schalter also oben im Bild und das Raster füllt den
+ * Rest; so bleibt der Schalter immer erreichbar, gescrollt wird im Raster. Setzt --yg-avail, neu bei Drehung,
+ * Größenänderung und wenn sich auf der Seite etwas ändert (z. B. ein Banner geschlossen wird).
+ */
+function useAvailableHeight(shown: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let last = '';
+    const measure = () => {
+      const bar = document.querySelector('.topbar');
+      const head = bar?.closest('.preview-sticky') ?? bar;
+      // Quer scrollt die Kopfleiste mit weg (styles.css) und verdeckt nichts
+      const above = head && getComputedStyle(head).position === 'sticky' ? head.getBoundingClientRect().height : 0;
+      const tools = el.closest('.offices')?.querySelector('.offices-tools') ?? el;
+      const offset = el.getBoundingClientRect().top - tools.getBoundingClientRect().top;
+      const tabbar = document.querySelector('.tabbar')?.getBoundingClientRect();
+      // Quer steht die Tab-Leiste links und nimmt unten keinen Platz
+      const below = tabbar && tabbar.width >= window.innerWidth / 2 ? tabbar.height : 0;
+      const content = el.closest('.content');
+      const pad = content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0;
+      const zoom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kompanie-zoom')) || 1;
+      const value = `${Math.floor((window.innerHeight - above - offset - below - pad) / zoom)}px`;
+      if (value !== last) {
+        last = value;
+        el.style.setProperty('--yg-avail', value);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    const app = el.closest('.app');
+    if (observer && app) observer.observe(app);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer?.disconnect();
+    };
+  }, [shown]);
+  return ref;
+}
+
+/**
  * Jahresübersicht (Issue #112, R14): eine Spalte je Amt, nach Gruppen, eine Zeile je Jahr (neueste oben). Jede Amtszeit
  * ist ein Balken über ihre Jahre; gleichzeitige Amtszeiten eines Amts stehen nebeneinander. Laufende sind hervorgehoben,
  * Ehrungen tragen einen Stern. Nur das Raster scrollt; Kopfzeilen und Jahre bleiben dabei stehen. Auf dem Handy schmaler
@@ -290,6 +334,7 @@ export function YearGrid({
     offices.flatMap((o) => o.terms),
     thisYear,
   );
+  const scroll = useAvailableHeight(years.length > 0);
   if (years.length === 0) return <Empty>Noch keine Einträge.</Empty>;
   const top = years[0];
   const firstRow = 3; // Zeile 1: Gruppen, Zeile 2: Ämter
@@ -349,7 +394,7 @@ export function YearGrid({
   return (
     <>
       <p className="yg-rotate-hint muted small">Tipp: Dreh das Handy quer, dann passen mehr {sec.offices} nebeneinander.</p>
-      <div className="year-grid-scroll">
+      <div className="year-grid-scroll" ref={scroll}>
         <div
           className={`year-grid${grouped ? ' grouped' : ''}`}
           role="list"

@@ -22,13 +22,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Zwei Standardgruppen pflegt die App selbst: **Alle Mitglieder** (alle mit Mitgliederbereich, auch Admins und eigene
   Rollen wie Spieß, ohne Anwärter) und **Alle Konten** (alle außer Gästen). Bisher erreichte eine Mail an die Rolle
   „Mitglied“ keine Admins und Spieße. Ehemalige bekommen nie eine Mail, auch wenn sie noch in einer Gruppe stehen.
+- **Querformat**: Die App dreht sich mit dem Handy, auch als installierte App. Quer steht die Leiste mit den Bereichen
+  links, Kopfleiste und Hinweise oben sind flacher, und die Inhalte nutzen die ganze Breite: Listen stehen in zwei
+  Spalten, in Formularen je zwei Felder nebeneinander, die Kacheln der Verwaltung in vier Spalten. Längere Texte (News,
+  Hilfe) bleiben gut lesbar schmal. Hochkant, auf Tablets und am Computer ändert sich nichts. Eine schon installierte
+  App übernimmt die Drehung, sobald das Handy die App-Angaben neu einliest (beim Öffnen, spätestens nach einem Tag).
 
 ### Geändert
 
 - **Ämter nach Jahren auch auf dem Handy**: Den Schalter „Chronik | Jahre“ im Tab Ämter gibt es jetzt auf jedem
   Bildschirm. Auf dem Handy ist die Übersicht schmaler; quer gedreht nutzt sie die ganze Breite, sodass mehr Ämter
-  nebeneinander passen. Beim Scrollen bleiben oben die Ämter und links die Jahre stehen. Ein Tipp auf einen Balken
-  zeigt unten Jahre, Personen und Zusatz.
+  nebeneinander passen. Beim Scrollen bleiben oben die Ämter und links die Jahre stehen, und der Schalter bleibt über
+  der Übersicht immer zu sehen. Ein Tipp auf einen Balken zeigt unten Jahre, Personen und Zusatz.
 - **Benachrichtigung „Termin geändert“ zeigt die Änderung**: Statt noch einmal aller Angaben zum Termin steht in der
   Nachricht nur, was sich geändert hat, mit vorher und jetzt, z. B. „Probe – Uhrzeit: 19:00 Uhr → 20:00 Uhr“ oder
   „Ort: Halle → Sporthalle“. Das gilt für öffentliche Termine und für den internen Kalender.

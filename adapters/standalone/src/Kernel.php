@@ -446,7 +446,7 @@ final class Kernel
             'start_url' => $app->env->appUrl(),
             'scope' => $app->env->appUrl(),
             'display' => 'standalone',
-            'orientation' => 'portrait',
+            'orientation' => 'any',
             'background_color' => '#ffffff',
             'theme_color' => $c->primaryColor(),
             'icons' => ManifestIcons::entries($icons, $this->appDir() . '/icons'),
