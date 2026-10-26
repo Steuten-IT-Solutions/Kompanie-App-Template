@@ -256,6 +256,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   App danach noch einmal nach und zeigt den neuen Stand.
 - **Shortcodes mittig**: Manche Themes (z. B. Astra) rückten `[kompanie_mitglieder]`, `[kompanie_termine]` und die
   Inhaber in `[kompanie_aemter]` nach rechts ein; links war mehr Platz als rechts. Die Listen stehen jetzt bündig.
+- **Neues Logo erreicht auch bereits installierte Apps**: Wer die App schon auf dem Android-Handy installiert hatte,
+  sah nach einer Änderung am Logo (z. B. der neuen Lage im Startbildschirm) weiter das alte Symbol, denn Chrome
+  übernimmt neue Icons nur, wenn sich ihre Adresse im Manifest ändert. Die Adressen enthalten jetzt eine Kennung, die
+  sich mit dem Bild ändert; Chrome übernimmt das neue Symbol dann beim nächsten Abgleich, bei größeren Änderungen erst
+  nach einer Bestätigung. Auf dem iPhone bleibt das Symbol, das beim Hinzufügen gespeichert wurde.
 - **Doppelpunkt bei den Empfängern einer E-Mail**: In der Ansicht einer gesendeten E-Mail (*Verwaltung → E-Mails*)
   steht jetzt „An:“, „Cc:“ und „Bcc:“ statt „An“, „Cc“ und „Bcc“.
 
