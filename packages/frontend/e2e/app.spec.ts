@@ -1571,7 +1571,7 @@ test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt 
   await expect(page.locator('.office-card', { hasText: office })).toBeVisible();
   await page.getByRole('group', { name: 'Ansicht' }).getByRole('button', { name: 'Jahre' }).click();
   const grid = page.locator('.year-grid');
-  await expect(grid.locator('.yg-office', { hasText: office })).toBeAttached();
+  await expect(page.locator('.year-grid-head .yg-office', { hasText: office })).toBeAttached();
   await expect(page.locator('.yg-rotate-hint')).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   // Ein Tipp auf einen Balken zeigt Jahre und Personen
@@ -1580,18 +1580,27 @@ test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt 
   await expect(page.locator('.yg-detail')).toContainText(`${office}: 1990–2006 · Carl Clau ${id}`);
   await page.locator('.yg-detail').getByRole('button', { name: 'Schließen' }).click();
   await expect(page.locator('.yg-detail')).toHaveCount(0);
-  // Ganz nach unten gescrollt: Der Schalter steht direkt unter der Kopfleiste, das Raster füllt den Rest; man kommt also
-  // immer zurück zur Chronik (gemeldet: nach dem Scrollen nur noch das Raster, kein Weg nach oben)
+  // Senkrecht scrollt nur die Seite, nie das Raster (gemeldet: Wischen auf dem Kopf bewegte das Raster statt der Seite,
+  // man kam nicht mehr nach oben zum Schalter). Der Kopf mit den Ämtern bleibt beim Scrollen unter der Kopfleiste stehen.
+  const body = page.locator('.year-grid-scroll');
+  expect(await body.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const view = page.getByRole('group', { name: 'Ansicht' });
-  await expect(view).toBeInViewport();
   await expect
     .poll(async () => {
-      const tools = await view.boundingBox();
+      const head = await page.locator('.year-grid-head').boundingBox();
       const bar = await page.locator('.topbar').boundingBox();
-      return !!tools && !!bar && tools.y >= bar.y + bar.height - 1;
+      return !!head && !!bar && Math.abs(head.y - (bar.y + bar.height)) <= 1;
     })
     .toBe(true);
+  // Seitlich laufen Kopf und Raster zusammen (so weit das Raster breiter ist als der Bildschirm)
+  const left = await body.evaluate((el) => {
+    el.scrollLeft = 120;
+    return el.scrollLeft;
+  });
+  await expect.poll(() => page.locator('.year-grid-head').evaluate((el) => el.scrollLeft)).toBe(left);
+  const view = page.getByRole('group', { name: 'Ansicht' });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(view).toBeInViewport();
 
   // Quer: ohne Tipp, die Seite scrollt weiter nicht seitlich
   await page.setViewportSize({ width: 740, height: 360 });
@@ -1601,7 +1610,7 @@ test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt 
   // Breit: dasselbe Raster
   await page.setViewportSize({ width: 1200, height: 900 });
   await expect(grid).toBeVisible();
-  await expect(grid.locator('.yg-office', { hasText: office })).toBeVisible();
+  await expect(page.locator('.year-grid-head .yg-office', { hasText: office })).toBeVisible();
   const bar = (name: string) => grid.locator('.yg-bar', { hasText: name });
   await expect(bar(`Anna Alt ${id}`)).toHaveClass(/current/);
   await expect(bar(`Bert Bunt ${id}`)).toHaveClass(/current/);

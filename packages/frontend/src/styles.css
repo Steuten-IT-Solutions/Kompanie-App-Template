@@ -3969,36 +3969,53 @@ fieldset.feature-list legend {
 .offices-tools .segmented {
   margin: 0 auto 0 0;
 }
-/* Jahresübersicht der Ämter: Nur das Raster scrollt, nie die Seite seitlich. Es ist höchstens so hoch wie der freie Platz
-   unter dem Schalter „Chronik | Jahre“ (misst YearGrid, --yg-avail), damit Gruppen und Ämter oben und die Jahre links
-   beim Scrollen stehen bleiben und die Seite drumherum nicht scrollen muss. Am oberen und unteren Ende des Rasters geht
-   das Wischen an die Seite weiter (kein overscroll-behavior: contain), sonst käme man nicht mehr zum Schalter. */
-.year-grid-scroll {
+/* Jahresübersicht der Ämter: Seitlich scrollt nur das Raster, nie die Seite; senkrecht scrollt nur die Seite, nie das
+   Raster (ein Scrollbereich im anderen war auf dem Handy kaum zu bedienen: Wischen bewegte das Raster statt der Seite).
+   Der Kopf (Gruppen, Ämter) ist ein eigener Streifen, der unter der festen Kopfleiste stehen bleibt (--yg-head-top, misst
+   YearGrid) und seitlich mitläuft; die Jahre bleiben links stehen. Kopf und Raster haben dieselben Spalten. */
+.year-grid-wrap {
   --yg-years: 3.5rem;
   --yg-col: 6.5rem;
   --yg-row: 1.6rem;
-  /* Platz für die Kopfleiste (ungefähr) und etwas Luft, falls YearGrid den freien Platz noch nicht gemessen hat */
-  --yg-top: 104px;
-  overflow: auto;
-  max-height: calc(100vh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top));
-  max-height: var(--yg-avail, calc(100dvh / var(--kompanie-zoom, 1) - var(--tabbar-h) - env(safe-area-inset-bottom) - var(--yg-top)));
-  min-height: 14rem;
   margin-top: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
 }
-.year-grid {
+.year-grid-head {
+  position: sticky;
+  top: var(--yg-head-top, 0);
+  z-index: 3;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  border-radius: 12px 12px 0 0;
+  background: var(--card);
+}
+.year-grid-head::-webkit-scrollbar {
+  display: none;
+}
+.year-grid-scroll {
+  /* eigener Stapel: Jahre und Balken (z-index darin) laufen unter dem festen Kopf durch, nicht darüber */
+  position: relative;
+  z-index: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 0 0 12px 12px;
+}
+.year-grid,
+.year-grid-header {
   display: grid;
   column-gap: 3px;
   min-width: min-content;
-  padding: 0 8px 12px 0;
+  padding: 0 8px 0 0;
   font-size: 0.72rem;
+}
+.year-grid {
+  padding-bottom: 12px;
 }
 .yg-group,
 .yg-office {
-  position: sticky;
-  z-index: 2;
   padding: 4px 6px;
   background: var(--card);
   /* Bezeichnungen nach den Regeln der Sprache trennen, nicht mitten im Wort abschneiden */
@@ -4006,7 +4023,6 @@ fieldset.feature-list legend {
   overflow-wrap: break-word;
 }
 .yg-group {
-  top: 0;
   height: var(--yg-group-h, 1.9rem);
   padding-top: 8px;
   white-space: nowrap;
@@ -4017,7 +4033,6 @@ fieldset.feature-list legend {
   border-bottom: 2px solid var(--accent);
 }
 .yg-office {
-  top: 0;
   font-weight: 600;
   color: var(--ink-2);
   align-self: stretch;
@@ -4033,15 +4048,13 @@ fieldset.feature-list legend {
   position: sticky;
   left: calc(var(--yg-years) + 6px);
 }
-.year-grid.grouped .yg-office {
-  top: var(--yg-group-h, 1.9rem);
-}
 .yg-corner {
   position: sticky;
-  top: 0;
   left: 0;
   z-index: 4;
   background: var(--card);
+  /* auch den Spaltenabstand daneben abdecken, sonst schaut dort beim seitlichen Scrollen ein Stück durch */
+  box-shadow: 3px 0 0 var(--card);
 }
 .yg-year {
   border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
@@ -4060,6 +4073,7 @@ fieldset.feature-list legend {
   border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
   padding-left: 8px;
   background: var(--card);
+  box-shadow: 3px 0 0 var(--card);
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
@@ -4134,13 +4148,14 @@ fieldset.feature-list legend {
 }
 /* Handy und schmale Fenster: schmalere Spalten und Zeilen, damit mehr aufs Bild passt */
 @media (max-width: 999px) {
-  .year-grid-scroll {
+  .year-grid-wrap {
     --yg-years: 2.9rem;
     --yg-col: 4.75rem;
     --yg-row: 1.35rem;
     --yg-group-h: 1.6rem;
   }
-  .year-grid {
+  .year-grid,
+  .year-grid-header {
     column-gap: 2px;
     padding-right: 4px;
     font-size: 0.66rem;
