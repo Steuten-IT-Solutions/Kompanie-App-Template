@@ -35,14 +35,18 @@ export function termDuration(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_ye
   return years === 1 ? '1 Jahr' : `${years} Jahre`;
 }
 
-/** Personen als Chips mit Foto bzw. Anfangsbuchstaben; Personen der Mitgliederliste führen zu ihren Ämtern. */
-function Holders({ holders, link }: { holders: OfficeHolder[]; link: boolean }) {
+/** Seite einer Person, zu der ein Name im Zeitstrahl führt: die öffentliche, in der Verwaltung die dortige. */
+export type PersonPath = (userId: number) => string;
+const memberPath: PersonPath = (userId) => `mitglieder/${userId}`;
+
+/** Personen als Chips mit Foto bzw. Anfangsbuchstaben; Personen mit Konto führen zu ihrer Seite (to). */
+function Holders({ holders, to }: { holders: OfficeHolder[]; to: PersonPath }) {
   return (
     <ul className="timeline-holders">
       {holders.map((h, i) => (
         <li key={i}>
-          {link && h.user_id ? (
-            <button type="button" className="holder-chip holder-chip-link" onClick={() => navigate(`mitglieder/${h.user_id}`)}>
+          {h.user_id ? (
+            <button type="button" className="holder-chip holder-chip-link" onClick={() => navigate(to(h.user_id!))}>
               <MemberAvatar url={h.photo_url} name={h.name} />
               <span>{h.name}</span>
             </button>
@@ -78,12 +82,12 @@ function When({ term }: { term: OfficeTerm }) {
  */
 export function Timeline({
   entries,
-  link = true,
+  to = memberPath,
   label,
   self,
 }: {
   entries: TimelineEntry[];
-  link?: boolean;
+  to?: PersonPath;
   label: string;
   /** Seite einer Person: sie selbst nicht auf jeder Karte, nur wer das Amt mit ihr teilte */
   self?: number;
@@ -125,11 +129,11 @@ export function Timeline({
             return (
               shown.length > 0 &&
               (self === undefined ? (
-                <Holders holders={shown} link={link} />
+                <Holders holders={shown} to={to} />
               ) : (
                 <div className="tl-with">
                   <span className="tl-with-label">mit</span>
-                  <Holders holders={shown} link={link} />
+                  <Holders holders={shown} to={to} />
                 </div>
               ))
             );
@@ -542,12 +546,15 @@ export function personEntries(data: OfficesOverview | null | undefined, userId: 
   );
 }
 
-/** Kleiner Zeitstrahl „Ämter von …“ (Mitgliederliste, Meins, Mitgliedsdetails). */
-export function PersonOffices({ userId, empty }: { userId: number; empty: string }) {
+/**
+ * Kleiner Zeitstrahl „Ämter von …“ (Mitgliederliste, Meins, Mitgliedsdetails); wer das Amt mit der Person teilte, führt
+ * zu seiner Seite (to, ohne Angabe die öffentliche).
+ */
+export function PersonOffices({ userId, empty, to }: { userId: number; empty: string; to?: PersonPath }) {
   const { data, error, loading, reload } = useOffices();
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const entries = personEntries(data, userId);
   if (entries.length === 0) return <Empty>{empty}</Empty>;
-  return <Timeline label={sec.offices} entries={entries} link={false} self={userId} />;
+  return <Timeline label={sec.offices} entries={entries} self={userId} to={to} />;
 }

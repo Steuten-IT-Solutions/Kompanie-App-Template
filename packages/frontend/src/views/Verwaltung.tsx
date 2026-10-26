@@ -906,7 +906,7 @@ function MemberDetailView({
       {officesOn && (
         <section className="member-offices">
           <h3 className="section-title">{sec.offices}</h3>
-          <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} />
+          <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} to={(other) => `verwaltung/mitglied/${other}`} />
         </section>
       )}
 
