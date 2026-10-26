@@ -32,7 +32,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, auf **+ Mitglied anlege
 - Nötig ist nur die Spalte **Vorname**. Die App kennt außerdem: **Nachname** (auch „Name“), **Status** (auch „Rolle“), **Benutzername**, **E-Mail**, **Geburtstag**, **Eintritt**, **Punkte**, **Dienstgrad**, **Titel** sowie bei Ehemaligen **Ausgeschieden** und **Grund**. Reihenfolge der Spalten sowie Groß- und Kleinschreibung sind egal.
 - **Status**: leer oder {rolle.member}, eine andere Rolle, die sich beim Anlegen wählen lässt (z. B. Anwärter), oder **ehemalig**.
 - **Geburtstag** als TT.MM.JJJJ oder ohne Jahr TT.MM. (nur mit {bereich.birthdays}); **Eintritt** als TT.MM.JJJJ oder nur das Jahr, bei Ehemaligen auch „Gründer“; **Grund**: ausgetreten, verstorben oder sonstiges.
-- **Punkte**, **Dienstgrad** und **Titel** (mehrere mit Komma getrennt) übernimmt die App nur für Rollen mit Mitgliederbereich und nur, wenn du sie vergeben darfst. {begriff.rank} und {bereich.titles} müssen in der App schon angelegt sein.
+- **Punkte**, **Dienstgrad** und **Titel** (mehrere mit Komma getrennt) übernimmt die App nur für Rollen, die zur Kompanie gehören, und nur, wenn du sie vergeben darfst. {begriff.rank} und {bereich.titles} müssen in der App schon angelegt sein.
 - Andere Spalten (z. B. Telefon) übergeht die App und nennt sie in der Vorschau, ebenso Spalten zu Bereichen, die die Kompanie nicht nutzt.
 - Ältere Excel-Dateien (.xls) speicherst du vorher als .xlsx; die App liest das erste Tabellenblatt.
 - Wer schon ein Konto mit genau diesem Vor- und Nachnamen hat, wird übersprungen; ein zweiter Import derselben Datei legt also niemanden doppelt an. Zwei Personen mit gleichem Namen in der Datei sind ein Fehler: Mach sie unterscheidbar, z. B. mit „I“ und „II“ am Nachnamen.

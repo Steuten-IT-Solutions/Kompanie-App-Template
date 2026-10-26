@@ -2,6 +2,7 @@
 titel: Ein Album ansehen
 reihenfolge: 39
 rechte: []
+einrecht: [view_gallery, view_gallery_internal]
 bereiche: [gallery]
 ---
 In einem Album der {bereich.gallery} siehst du alle Bilder als kleine Vorschau. Tippst du ein Bild an, öffnet es sich groß; dort blätterst du und vergrößerst Ausschnitte.

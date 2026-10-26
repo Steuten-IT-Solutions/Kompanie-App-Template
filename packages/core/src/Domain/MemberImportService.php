@@ -306,7 +306,7 @@ final class MemberImportService
         $titles = $get('titles');
         $memberArea = $status === self::STATUS_ACTIVE && in_array(Capability::Member->value, $this->app->roles()->find($level)['capabilities'] ?? [], true);
         if (!$memberArea && ($points !== '' || $rank !== '' || $titles !== '')) {
-            throw ApiError::invalid('Punkte, Dienstgrad und Titel gibt es beim Import nur für Rollen mit Mitgliederbereich, nicht für Ehemalige.');
+            throw ApiError::invalid('Punkte, Dienstgrad und Titel gibt es beim Import nur für Rollen, die zur Kompanie gehören, nicht für Ehemalige.');
         }
         if ($points !== '' || $rank !== '') {
             $rankId = null;

@@ -13,6 +13,23 @@ export type Capability =
   | 'member'
   | 'calendar'
   | 'view_intern'
+  | 'view_events'
+  | 'view_news'
+  | 'view_gallery'
+  | 'view_gallery_internal'
+  | 'view_own_points'
+  | 'view_own_penalties'
+  | 'view_own_rank'
+  | 'view_own_attendance'
+  | 'view_birthdays'
+  | 'vote_polls'
+  | 'view_directory'
+  | 'view_offices'
+  | 'view_former'
+  | 'view_documents'
+  | 'view_board'
+  | 'view_ranks'
+  | 'view_catalog'
   | 'manage_points'
   | 'manage_penalties'
   | 'manage_ranks'
@@ -82,6 +99,8 @@ export interface AppConfig {
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
   user: AppUser | null;
+  /** Rechte ohne Anmeldung: die der Rolle Gast (fehlt bei älteren Servern: das damals Öffentliche) */
+  guestCapabilities?: Capability[];
   /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
   setupPending?: boolean;
   /** Nur für Admins: Datensicherung als Datei herunterladen (Stück für Stück erzeugt); fehlt bei älteren Servern */
@@ -250,8 +269,12 @@ export function applyRoles(list: RoleAdmin[]): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
-/** Darf der angemeldete Benutzer das? */
-export const can = (cap: Capability): boolean => !!config?.user?.capabilities.includes(cap);
+/** Darf der angemeldete Benutzer das? Ohne Anmeldung gelten die Rechte der Rolle Gast (guestCapabilities). */
+export const can = (cap: Capability): boolean =>
+  !!(config?.user ? config.user.capabilities.includes(cap) : (config?.guestCapabilities ?? FORMER_PUBLIC).includes(cap));
+
+/** Was ohne Anmeldung zu sehen war, bevor es sich einstellen ließ (wie Roles::PUBLIC_DEFAULTS im Kern). */
+const FORMER_PUBLIC: Capability[] = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former'];
 
 export const isMember = (): boolean => can('member');
 
@@ -623,7 +646,7 @@ export interface MemberImportResult {
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
 export interface MemberRights {
-  /** Rechte der Rolle (mit dem im Mitgliederbereich enthaltenen Kalender) */
+  /** Rechte der Rollen (jedes für sich) */
   role: Capability[];
   /** zusätzlich zur Rolle gegeben */
   grant: Capability[];

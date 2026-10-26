@@ -1205,7 +1205,7 @@ function RoleControl({
         </fieldset>
       )}
       {!member && extra.length === 0 && level !== 'admin' && level !== 'guest' && (
-        <p className="muted small">Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich.</p>
+        <p className="muted small">Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört.</p>
       )}
     </>
   );

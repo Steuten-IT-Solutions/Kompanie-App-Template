@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.board}"
 reihenfolge: 32
-rechte: [calendar]
+rechte: [view_board]
 bereiche: [board]
 ---
 Am **{bereich.board}** stehen dringende Nachrichten, z. B. „Training fällt heute aus“ oder „Treffpunkt geändert“, und für {rolle.member} die laufenden {bereich.polls}. Der Titel neuer Einträge erscheint als farbiges Banner oben auf jeder Seite der App; auf dieser Seite liest du die Nachrichten vollständig nach.

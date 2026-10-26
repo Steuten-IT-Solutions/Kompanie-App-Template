@@ -1,7 +1,7 @@
 ---
 titel: "Meine {bereich.penalties}"
 reihenfolge: 45
-rechte: [member]
+rechte: [view_own_penalties]
 bereiche: [penalties]
 ---
 Hier siehst du, wie viel du bei den {bereich.penalties} noch zahlen musst und welche Einträge schon bezahlt sind. Die Seite ist nur zum Ansehen; andere Mitglieder sehen deine Einträge nicht.

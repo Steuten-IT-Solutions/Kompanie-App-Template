@@ -56,7 +56,7 @@ Zeilen verschiebst du am Griff links. **✕** entfernt eine Zeile. **Nach Namen 
 ![Die Ausgabe mit Druckknöpfen und Vorschau](bild:liste-bearbeiten-ausgabe)
 
 ## Gut zu wissen
-- **Mitglieder aktualisieren** legt für jedes {rolle.member} eine Zeile an, das noch keine hat. Es löscht die Zeilen von Konten, die es nicht mehr gibt oder die kein {rolle.member} mehr sind. {rolle.guest}, Ehemalige und Rollen ohne Mitgliederbereich (z. B. Anwärter) kommen nicht in die Liste. Neue Mitglieder ordnet die App nach dem Nachnamen zwischen die vorhandenen ein.
+- **Mitglieder aktualisieren** legt für jedes {rolle.member} eine Zeile an, das noch keine hat. Es löscht die Zeilen von Konten, die es nicht mehr gibt oder die kein {rolle.member} mehr sind. {rolle.guest}, Ehemalige und Rollen, die nicht zur Kompanie gehören (z. B. Anwärter), kommen nicht in die Liste. Neue Mitglieder ordnet die App nach dem Nachnamen zwischen die vorhandenen ein.
 - Eigene Zeilen bleiben beim Aktualisieren stehen. Entfernst du die Zeile eines Mitglieds, legt das nächste **Mitglieder aktualisieren** sie wieder an.
 - Wird ein Konto gelöscht, bleibt seine Zeile ohne Namen stehen, bis du die Liste aktualisierst. Die App weist darauf hin.
 - Zur Auswahl stehen nur Datenspalten, deren Bereich eingeschaltet ist und deren Angaben du in der App ohnehin sehen darfst. Die Rolle siehst du z. B. nur, wenn du die Mitgliederliste der Verwaltung siehst, {bereich.points} nur, wenn du sie vergeben darfst. Geburtstage stehen nur in der Liste, wenn die Person sie für andere freigegeben hat, und nur mit Tag und Monat.

@@ -1,7 +1,7 @@
 ---
 titel: "Dokument ansehen"
 reihenfolge: 39
-rechte: [member]
+rechte: [view_documents]
 bereiche: [documents]
 ---
 Hier liest du ein Dokument direkt in der App, ohne es herunterzuladen. Das geht bei PDFs und Bildern (JPG, PNG).

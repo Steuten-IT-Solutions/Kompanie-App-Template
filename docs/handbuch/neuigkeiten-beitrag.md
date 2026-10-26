@@ -1,7 +1,7 @@
 ---
 titel: Einen Beitrag lesen
 reihenfolge: 37
-rechte: []
+rechte: [view_news]
 bereiche: [news]
 ---
 Hier liest du einen Beitrag aus den {bereich.news} der {kompanie.name} ganz. Von hier kommst du auch zur Webseite, von der er stammt.

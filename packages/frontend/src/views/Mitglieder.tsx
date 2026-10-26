@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
+import { can, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import { formatBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { formatYearOrDate, groupCounts } from '../format';
@@ -82,28 +82,40 @@ export function personFacts(m: { birthday?: DirectoryBirthday | null; join_year?
  * Ämtern als Zeitstrahl (ältere Adresse mitglieder/aemter/<id>).
  */
 export default function Mitglieder({ path = [] }: { path?: string[] }) {
-  const directory = !!config?.features.directory;
-  const offices = !!config?.features.offices;
+  // Jeder Abschnitt mit eigenem Recht (wie /directory, /directory/former und /offices im Kern).
+  const directory = !!config?.features.directory && can('view_directory');
+  const formerOn = !!config?.features.directory && can('view_former');
+  const offices = !!config?.features.offices && can('view_offices');
+  const available = (
+    [
+      ['liste', directory],
+      ['aemter', offices],
+      ['ehemalige', formerOn],
+    ] as const
+  )
+    .filter(([, on]) => on)
+    .map(([key]) => key as Section);
   const id = /^\d+$/.test(path[0] ?? '') ? path[0] : path[0] === 'aemter' && /^\d+$/.test(path[1] ?? '') ? path[1] : null;
   const person = id !== null ? Number(id) : null;
   const wanted = ['liste', 'aemter', 'ehemalige'].includes(path[0] ?? '') ? path[0] : storedMembersSection();
   // Auf der Seite einer ehemaligen Person ist „Ehemalige“ markiert, nicht die Mitgliederliste. Die Seite der Person
   // nutzt dieselben Daten mit (meist schon aus der Liste geladen). Ein anderer Pfad baut die Ansicht neu auf (viewKey).
-  const showsFormer = directory && person !== null;
+  const showsFormer = formerOn && person !== null;
   const former = useAsync<DirectoryFormerEntry[] | null>(
     () => (showsFormer ? sources.directoryFormer.load() : Promise.resolve(null)),
     [],
     showsFormer ? sources.directoryFormer.key : undefined,
   );
-  const section: Section = !directory
-    ? 'aemter'
-    : person !== null
+  const section: Section =
+    person !== null
       ? former.data?.some((e) => e.id === person)
         ? 'ehemalige'
-        : 'liste'
-      : (offices && wanted === 'aemter') || wanted === 'ehemalige'
+        : directory
+          ? 'liste'
+          : (available[0] ?? 'liste')
+      : available.includes(wanted as Section)
         ? (wanted as Section)
-        : 'liste';
+        : (available[0] ?? 'liste');
   const open = (next: Section) => {
     storeMembersSection(next);
     navigate(`mitglieder/${next}`);
@@ -115,11 +127,11 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
   );
   return (
     <div>
-      {directory && (
+      {available.length > 1 && (
         <nav className="segmented members-switch" aria-label="Abschnitt">
-          {tab('liste', sec.directory)}
+          {directory && tab('liste', sec.directory)}
           {offices && tab('aemter', sec.offices)}
-          {tab('ehemalige', 'Ehemalige')}
+          {formerOn && tab('ehemalige', 'Ehemalige')}
         </nav>
       )}
       {person !== null ? (

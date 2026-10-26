@@ -705,7 +705,7 @@ final class Api
                 return ['deleted' => true];
             }, 'documents', $denyRights),
 
-            // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen (BoardService::isRecipient), post_board schreibt,
+            // Schwarzes Brett (Issue #5): view_board liest (BoardService::isRecipient), post_board schreibt,
             // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
             new Route('GET', '/board', [Cap::ViewBoard, Cap::PostBoard], fn () => $a->board()->list($a->viewer()), 'board', $denyBoard),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {

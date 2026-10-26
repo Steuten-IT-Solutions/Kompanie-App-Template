@@ -1235,7 +1235,7 @@ final class RoleService
     private static function checkPromotable(array $role): void
     {
         if ($role['promotable'] && in_array(Capability::Member->value, $role['capabilities'], true)) {
-            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle ohne Mitgliederbereich.');
+            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle, die nicht zur Kompanie gehört.');
         }
     }
 }

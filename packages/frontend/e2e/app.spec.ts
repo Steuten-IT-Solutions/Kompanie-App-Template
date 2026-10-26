@@ -69,6 +69,34 @@ function countOrderSaves(page: Page, path: string) {
   });
   return () => n;
 }
+/**
+ * Rechte im Formular einer Rolle (Gruppen zum Ein- und Ausklappen, rightsTree.tsx): alle Gruppen aufklappen und genau die
+ * Rechte anhaken, deren Beschriftung zu einem der Muster passt; gesperrte bleiben.
+ */
+async function chooseRights(scope: Locator, keep: RegExp[]) {
+  const open = scope.getByRole('button', { name: 'Alle aufklappen' });
+  if (await open.count()) await open.click();
+  const labels = scope.locator('.rights-group-body label');
+  for (let i = 0; i < (await labels.count()); i++) {
+    const label = labels.nth(i);
+    const box = label.locator('input');
+    if (await box.isDisabled()) continue;
+    const text = (await label.innerText()).trim();
+    await box.setChecked(keep.some((k) => k.test(text)));
+  }
+}
+/** Anwärter: interner Kalender und das Brett, dazu das Öffentliche (wie Roles::CANDIDATE_DEFAULTS im Kern). */
+const CANDIDATE_RIGHTS = [
+  /^Öffentliche Termine$/,
+  /^News$/,
+  /: öffentliche Alben$/,
+  /^Interner Kalender$/,
+  /^Mitglieder$/,
+  /^Ämter$/,
+  /^Ehemalige$/,
+  /^Schwarzes Brett lesen$/,
+];
+
 /** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
 const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
@@ -967,8 +995,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   if ((await rollen.locator('.row-title', { hasText: /^Anwärter$/ }).count()) === 0) {
     await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
     await rollen.getByLabel('Name der Rolle').fill('Anwärter');
-    await rollen.getByLabel(/^Mitgliederbereich/).uncheck();
-    await rollen.getByLabel(/^Interner Kalender/).check();
+    await chooseRights(rollen, CANDIDATE_RIGHTS);
+    await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).not.toBeChecked();
     await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
     await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
     await rollen.getByRole('button', { name: 'Anlegen' }).click();
@@ -2357,7 +2385,8 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberAccount(page);
   const rechte = page.locator('.member-rights');
-  await expect(rechte.getByLabel(/^Mitgliederbereich/)).toBeChecked();
+  await rechte.getByRole('button', { name: 'Alle aufklappen' }).click();
+  await expect(rechte.getByLabel(/^Gehört zur Kompanie/)).toBeChecked();
   await rechte.getByLabel('Öffentliche Termine pflegen').check();
   await expect(rechte.locator('.badge-override')).toHaveText('zusätzlich');
   await rechte.getByRole('button', { name: 'Rechte speichern' }).click();

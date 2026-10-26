@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.birthdays}"
 reihenfolge: 34
-rechte: [member]
+rechte: [view_birthdays]
 bereiche: [birthdays]
 ---
 Unter **Alle {bereich.birthdays}** siehst du, wann die {rolle.member} der {kompanie.name} Geburtstag haben, der nächste zuerst. Deinen eigenen Geburtstag trägst du in deinem Konto ein und legst dort fest, wer ihn sieht.
@@ -35,7 +35,7 @@ Tippe unten auf **{bereich.events}**. Oben steht die Karte **Anstehende {bereich
 - Am Anfang ist **Anderen Mitgliedern zeigen** eingeschaltet, **Alter anzeigen** ausgeschaltet und auf deiner Seite unter {bereich.directory} **Mitgliedern anzeigen** gewählt.
 - Mit **Alter anzeigen** und Jahr steht auf deiner Seite unter {bereich.directory} das ganze Datum mit deinem Alter, sonst nur Tag und Monat. Diese Auswahl gilt nur für deine Seite; die {bereich.birthdays} und die Benachrichtigung richten sich nach **Anderen Mitgliedern zeigen**.
 - Wer am 29. Februar Geburtstag hat, steht in Jahren ohne Schalttag am 28. Februar in der Liste. Einen 29. Februar mit Jahr kannst du nur in einem Schaltjahr eintragen.
-- Nur {rolle.member} sehen Geburtstage und erscheinen darin. Gäste und Personen ohne Mitgliederbereich (z. B. Anwärter) sehen keine, und ihre erscheinen nirgends.
+- Geburtstage sieht, wessen Rolle das Recht **{bereich.birthdays} der anderen sehen** hat, anfangs die {rolle.member}. Darin erscheinen nur {rolle.member}: Gäste und Personen, die nicht zur Kompanie gehören (z. B. Anwärter), erscheinen nirgends.
 - Wer Mitglieder anlegen darf, kann das Datum für dich eintragen oder korrigieren. Die Schalter stellst nur du selbst ein.
 - Am Geburtstag bekommen die anderen {rolle.member} eine Benachrichtigung wie „Heute hat Max Muster Geburtstag (wird 45)“ – das Alter nur, wenn es freigegeben ist. Sie kommt ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 7 Uhr); er kann sie auch ganz ausschalten. Empfangen kann sie, wer die Art **{bereich.birthdays}: am Tag selbst** eingeschaltet hat.
 

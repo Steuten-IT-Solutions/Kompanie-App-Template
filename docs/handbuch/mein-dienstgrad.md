@@ -1,7 +1,7 @@
 ---
 titel: "Mein {begriff.rank}"
 reihenfolge: 47
-rechte: [member]
+rechte: [view_own_rank]
 bereiche: [ranks]
 ---
 Hier siehst du deinen {begriff.rank}, alle {bereich.ranks} der Reihe nach und wann sich dein {begriff.rank} geändert hat. Gibt es bei euch auch {bereich.points}, zeigt die Seite, wie viele dir bis zum nächsten {begriff.rank} fehlen.

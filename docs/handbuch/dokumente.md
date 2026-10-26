@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.documents}"
 reihenfolge: 38
-rechte: [member]
+rechte: [view_documents]
 bereiche: [documents]
 ---
 Unter **{bereich.documents}** findest du Dateien der {kompanie.name} wie Satzung, Protokolle oder Formulare. Hier suchst du ein Dokument, öffnest es oder lädst es auf dein Gerät.

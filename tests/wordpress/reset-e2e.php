@@ -22,7 +22,7 @@ foreach (get_users(['search' => 'neue.testperson*', 'search_columns' => ['user_l
 $roles = KompanieApp\WordPress\Plugin::app()->roles();
 $spiess = array_search('Spieß', array_column($roles->all(), 'label', 'key'), true);
 if ($spiess === false) {
-    $spiess = $roles->create(['label' => 'Spieß', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']])['key'];
+    $spiess = $roles->create(['label' => 'Spieß', 'capabilities' => KompanieApp\Core\Auth\Roles::expandLegacy(['member', 'manage_points', 'manage_penalties', 'manage_events'])])['key'];
 }
 foreach (['verwalter' => (string) $spiess, 'mitglied1' => 'member', 'mitglied2' => 'member'] as $login => $level) {
     $u = get_user_by('login', $login);

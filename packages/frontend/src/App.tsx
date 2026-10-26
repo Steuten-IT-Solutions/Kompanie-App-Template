@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, can, config, CONFIG_CHANGED, isMember, toLogin, newsTitle, type Capability } from './api';
+import { api, ApiError, can, config, CONFIG_CHANGED, toLogin, newsTitle, type Capability } from './api';
 import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -20,7 +20,7 @@ import { shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine from './views/Termine';
-import { prefetcher, tabSources } from './viewData';
+import { hasEvents, prefetcher, tabSources } from './viewData';
 import { whenIdle } from './prefetch';
 
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
@@ -313,31 +313,35 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const rawPath = useRoute();
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
-  const docsAllowed = isMember() && !!features?.documents;
-  // Mitgliederliste und Ämter (Issue #112): für alle, auch ohne Anmeldung.
-  const membersAllowed = !!(features?.directory || features?.offices);
-  // Dienstgrade und Punktekatalog zum Nachschlagen: für Mitglieder (wie /ranks; den Katalog brauchen nur sie).
-  const ranksAllowed = isMember() && !!features?.ranks;
-  const catalogAllowed = isMember() && !!features?.points;
+  // Jeder Knopf mit eigenem Recht (wie die Routen im Kern); ohne Anmeldung die Rechte von Gast (can).
+  const docsAllowed = !!features?.documents && (can('view_documents') || can('manage_documents'));
+  // Mitgliederliste, Ehemalige und Ämter (Issue #112) unter einem Knopf.
+  const membersAllowed = !!(
+    (features?.directory && (can('view_directory') || can('view_former'))) ||
+    (features?.offices && can('view_offices'))
+  );
+  // Dienstgrade und Punktekatalog zum Nachschlagen.
+  const ranksAllowed = !!features?.ranks && can('view_ranks');
+  const catalogAllowed = !!features?.points && can('view_catalog');
   const allowed: Record<View, boolean> = {
-    // Geburtstage (Issue #1) stehen bei den Terminen: für Mitglieder auch, wenn es sonst keine Termine gibt.
-    termine: !!(features?.events || (features?.calendar && can('calendar'))) || birthdaysVisible(),
-    news: !!features?.news,
-    galerie: !!features?.gallery,
+    // Geburtstage (Issue #1) stehen bei den Terminen: für alle, die sie sehen, auch wenn es sonst keine Termine gibt.
+    termine: hasEvents() || birthdaysVisible(),
+    news: !!features?.news && can('view_news'),
+    galerie: !!features?.gallery && (can('view_gallery') || can('view_gallery_internal')),
     dokumente: docsAllowed,
     mitglieder: membersAllowed,
     dienstgrade: ranksAllowed,
     punktekatalog: catalogAllowed,
     // Intern: Startseite mit je einem Knopf für Mitglieder, Dokumente, Brett, Dienstgrade und Punktekatalog, mit dem Recht
-    // view_intern (Mitglieder haben es)
+    // view_intern
     intern: can('view_intern') && (docsAllowed || membersAllowed || boardVisible() || ranksAllowed || catalogAllowed),
     // Eigene Daten (Mitglieder) und das Konto (alle Angemeldeten)
     meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
     verwaltung: adminTabs().length > 0,
-    // Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, wer das Recht hat, schreibt.
+    // Schwarzes Brett (Issue #5): mit view_board lesen, mit post_board schreiben.
     brett: boardVisible() || canPostBoard(),
-    // Umfragen (Issue #4): Mitglieder antworten, manage_polls verwaltet; laufende stehen am Brett.
+    // Umfragen (Issue #4): mit vote_polls antworten, manage_polls verwaltet; laufende stehen am Brett.
     umfragen: pollsVisible() || canManagePolls(),
     // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('manage_inventory'),
@@ -348,7 +352,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     einrichtung: can('manage_settings'),
     hilfe: true,
   };
-  // Das Brett zum Lesen (Mitglieder und Anwärter); wer schreibt, hat es außerdem in der Verwaltung.
+  // Das Brett zum Lesen (view_board); wer schreibt, hat es außerdem in der Verwaltung.
   const internTabs: InternTab[] = INTERN.filter((v) => (v === 'brett' ? boardVisible() : allowed[v])).map((v) => ({
     id: v,
     label: internLabels()[v],

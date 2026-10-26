@@ -1,7 +1,7 @@
 ---
 titel: "Meine {bereich.attendance}"
 reihenfolge: 49
-rechte: [member]
+rechte: [view_own_attendance]
 bereiche: [attendance]
 ---
 Hier siehst du, bei welchen Terminen du als anwesend, entschuldigt oder fehlend eingetragen bist.
