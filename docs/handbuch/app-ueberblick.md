@@ -16,7 +16,7 @@ Hier lernst du den Aufbau der App kennen: die Kopfleiste oben, die Leiste mit de
 - **?**: öffnet die Hilfe passend zum aktuellen Bildschirm.
 - **Mond bzw. Sonne**: wechselt zwischen dunkler und heller Darstellung.
 - **Login** (oben rechts, nur ohne Anmeldung): führt zur Anmeldung, siehe [Anmelden](seite:anmelden).
-- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben.
+- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer, steht die Leiste links.
 
 Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt und ob du angemeldet bist:
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
@@ -45,6 +45,13 @@ Die Hilfe zeigt dir nur die Seiten, die zu deinen Aufgaben und zu den Bereichen 
 3. Auf dem Handy öffnet sich das Teilen-Menü, z. B. für WhatsApp oder E-Mail. Am Computer kopiert die App den Link; es erscheint „Link kopiert“.
 
 Wer den Link öffnet, landet direkt auf diesem Bildschirm. Ist er nur für Angemeldete, bittet die App zuerst um die Anmeldung und öffnet ihn danach. Jede Person sieht dabei nur, was sie sehen darf; sonst öffnet die App ihre Startseite. Ein aufgeklappter Termin oder eine gewählte Sortierung gehört nicht zum Link.
+
+### Das Handy quer halten
+1. Dreh das Handy. Die App dreht sich mit, sofern die automatische Drehung des Handys eingeschaltet ist.
+2. Quer steht die Leiste mit den Bereichen links, die Kopfleiste ist flacher und scrollt mit weg. Listen stehen in zwei Spalten, in Formularen stehen je zwei Felder nebeneinander.
+3. Dreh das Handy zurück, und alles steht wieder wie gewohnt.
+
+Hast du die App schon länger installiert und sie bleibt hochkant, öffne sie einmal neu; es kann bis zu einem Tag dauern, bis das Handy die Änderung übernimmt.
 
 ### Zwischen hell und dunkel wechseln
 1. Tippe oben auf den Mond, um die dunkle Darstellung einzuschalten, oder auf die Sonne für die helle.
