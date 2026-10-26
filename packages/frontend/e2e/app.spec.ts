@@ -4224,7 +4224,8 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await expect(groups.locator('.mail-group-item', { hasText: `Vorstand ${id}` })).toContainText('+ 1 Adresse');
   await shot(page, '33h-email-gruppen');
   await page.getByRole('button', { name: '‹ E-Mails' }).click();
-  const to2 = page.locator('.mail-form .mail-to-input');
+  // Erst das Gerüst, dann das Formular: auf das echte Eingabefeld warten (das Gerüst trägt dieselbe Klasse)
+  const to2 = page.locator('.mail-form input.mail-to-input');
   await to2.fill('Alle Mitg');
   await page
     .locator('.mail-suggestions')
