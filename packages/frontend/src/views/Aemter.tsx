@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
+import { useState, type CSSProperties, type ReactElement } from 'react';
 import { type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
@@ -260,21 +260,7 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
   );
 }
 
-/** Ab dieser Breite gibt es die Jahresübersicht (eine Spalte je Amt braucht Platz). */
-const WIDE = '(min-width: 1000px)';
 const VIEW_KEY = 'kompanie.offices.view';
-
-function useWide(): boolean {
-  const [wide, setWide] = useState(() => window.matchMedia?.(WIDE).matches ?? false);
-  useEffect(() => {
-    const media = window.matchMedia?.(WIDE);
-    if (!media) return;
-    const update = () => setWide(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-  return wide;
-}
 
 function loadView(): 'chronik' | 'jahre' {
   try {
@@ -285,9 +271,10 @@ function loadView(): 'chronik' | 'jahre' {
 }
 
 /**
- * Jahresübersicht (Issue #112, R14, nur auf breiten Bildschirmen): eine Spalte je Amt, nach Gruppen, eine Zeile je Jahr
- * (neueste oben). Jede Amtszeit ist ein Balken über ihre Jahre; gleichzeitige Amtszeiten eines Amts stehen
- * nebeneinander. Laufende sind hervorgehoben, Ehrungen tragen einen Stern. Waagerecht scrollt nur das Raster.
+ * Jahresübersicht (Issue #112, R14): eine Spalte je Amt, nach Gruppen, eine Zeile je Jahr (neueste oben). Jede Amtszeit
+ * ist ein Balken über ihre Jahre; gleichzeitige Amtszeiten eines Amts stehen nebeneinander. Laufende sind hervorgehoben,
+ * Ehrungen tragen einen Stern. Nur das Raster scrollt; Kopfzeilen und Jahre bleiben dabei stehen. Auf dem Handy schmaler
+ * (styles.css), quer über die ganze Breite; ein Tipp auf einen Balken zeigt Jahre, Personen und Zusatz unten im Bild.
  */
 export function YearGrid({
   groups,
@@ -298,6 +285,7 @@ export function YearGrid({
   offices: Office[];
   thisYear?: number;
 }) {
+  const [picked, setPicked] = useState<{ id: number; label: string } | null>(null);
   const years = yearRange(
     offices.flatMap((o) => o.terms),
     thisYear,
@@ -310,6 +298,7 @@ export function YearGrid({
     ...groups.map((g) => ({ key: `g${g.id}`, title: g.title, offices: offices.filter((o) => o.group_id === g.id) })),
     { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null) },
   ].filter((s) => s.offices.length > 0);
+  const grouped = ordered.some((s) => s.title);
   const cells: ReactElement[] = [];
   let column = 2; // Spalte 1: Jahre
   for (const section of ordered) {
@@ -333,6 +322,7 @@ export function YearGrid({
             title={label}
             role="listitem"
             aria-label={label}
+            onClick={() => setPicked((p) => (p?.id === term.id ? null : { id: term.id, label }))}
           >
             <span className="yg-name">
               {term.honor ? '★ ' : ''}
@@ -343,46 +333,72 @@ export function YearGrid({
       }
       column += count;
     }
-    if (section.title) {
+    // Ämter ohne Gruppe bekommen eine leere Zelle, damit beim Scrollen nichts durch die Kopfzeile scheint
+    if (grouped) {
       cells.push(
-        <div key={`h${section.key}`} className="yg-group" style={{ gridColumn: `${sectionStart} / ${column}`, gridRow: 1 }}>
-          {section.title}
+        <div
+          key={`h${section.key}`}
+          className={`yg-group${section.title ? '' : ' empty'}`}
+          style={{ gridColumn: `${sectionStart} / ${column}`, gridRow: 1 }}
+        >
+          <span>{section.title}</span>
         </div>,
       );
     }
   }
   return (
-    <div className="year-grid-scroll">
-      <div
-        className="year-grid"
-        role="list"
-        aria-label={`${sec.offices} nach Jahren`}
-        style={{
-          gridTemplateColumns: `3.5rem repeat(${column - 2}, minmax(6.5rem, 1fr))`,
-          gridTemplateRows: `auto auto repeat(${years.length}, 1.6rem)`,
-        }}
-      >
-        {years.map((y) => (
-          <div
-            key={y}
-            className={`yg-year${y % 10 === 0 ? ' decade' : ''}`}
-            style={{ gridRow: row(y), gridColumn: `1 / ${column}` }}
-            aria-hidden="true"
-          >
-            <span>{y}</span>
-          </div>
-        ))}
-        {cells}
+    <>
+      <p className="yg-rotate-hint muted small">Tipp: Dreh das Handy quer, dann passen mehr {sec.offices} nebeneinander.</p>
+      <div className="year-grid-scroll">
+        <div
+          className={`year-grid${grouped ? ' grouped' : ''}`}
+          role="list"
+          aria-label={`${sec.offices} nach Jahren`}
+          style={{
+            // Breiten und Zeilenhöhe aus styles.css (auf dem Handy schmaler)
+            gridTemplateColumns: `var(--yg-years) repeat(${column - 2}, minmax(var(--yg-col), 1fr))`,
+            gridTemplateRows: `${grouped ? 'auto' : '0'} auto repeat(${years.length}, var(--yg-row))`,
+          }}
+        >
+          {/* Ecke über den Jahren: deckt beim seitlichen Scrollen die Kopfzeilen ab */}
+          <div className="yg-corner" style={{ gridRow: '1 / 3', gridColumn: 1 }} aria-hidden="true" />
+          {years.map((y) => (
+            <div
+              key={y}
+              className={`yg-year${y % 10 === 0 ? ' decade' : ''}`}
+              style={{ gridRow: row(y), gridColumn: `1 / ${column}` }}
+              aria-hidden="true"
+            />
+          ))}
+          {years.map((y) => (
+            <div
+              key={`l${y}`}
+              className={`yg-year-label${y % 10 === 0 ? ' decade' : ''}`}
+              style={{ gridRow: row(y), gridColumn: 1 }}
+              aria-hidden="true"
+            >
+              {y}
+            </div>
+          ))}
+          {cells}
+        </div>
       </div>
-    </div>
+      {picked && (
+        <div className="yg-detail" role="status">
+          <span>{picked.label}</span>
+          <button type="button" className="yg-detail-close" aria-label="Schließen" onClick={() => setPicked(null)}>
+            ×
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
-/** Alle Ämter nach Gruppen; je Amt eine aufklappbare Karte mit dem Zeitstrahl, auf breiten Bildschirmen auch nach Jahren. */
+/** Alle Ämter nach Gruppen; je Amt eine aufklappbare Karte mit dem Zeitstrahl, umschaltbar auf die Übersicht nach Jahren. */
 export function OfficesView() {
   const { data, error, loading, reload } = useOffices();
   const [open, setOpen] = useState<Set<number>>(new Set());
-  const wide = useWide();
   const [view, setView] = useState(loadView);
 
   if (loading && !data) return <Loading />;
@@ -403,7 +419,7 @@ export function OfficesView() {
   ].filter((s) => s.offices.length > 0);
   const all = offices.every((o) => open.has(o.id));
 
-  const years = wide && view === 'jahre';
+  const years = view === 'jahre';
   const choose = (next: 'chronik' | 'jahre') => {
     setView(next);
     try {
@@ -416,16 +432,14 @@ export function OfficesView() {
   return (
     <div className="offices">
       <div className="button-row offices-tools">
-        {wide && (
-          <div className="segmented" role="group" aria-label="Ansicht">
-            <button type="button" className={!years ? 'active' : ''} aria-pressed={!years} onClick={() => choose('chronik')}>
-              Chronik
-            </button>
-            <button type="button" className={years ? 'active' : ''} aria-pressed={years} onClick={() => choose('jahre')}>
-              Jahre
-            </button>
-          </div>
-        )}
+        <div className="segmented" role="group" aria-label="Ansicht">
+          <button type="button" className={!years ? 'active' : ''} aria-pressed={!years} onClick={() => choose('chronik')}>
+            Chronik
+          </button>
+          <button type="button" className={years ? 'active' : ''} aria-pressed={years} onClick={() => choose('jahre')}>
+            Jahre
+          </button>
+        </div>
         {!years && (
           <button
             type="button"

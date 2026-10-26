@@ -266,6 +266,100 @@ final class MailingTest extends TestCase
      * Mit PHPMailer über einen kleinen SMTP-Server auf localhost: zugestellt (RCPT TO) wird nur an den einen Empfänger,
      * die Kopfzeilen zeigen An und Cc, nie Bcc.
      */
+    public function testStandardGroupsReachAdminsAndOwnRolesButNotCandidatesOrGuests(): void
+    {
+        $this->configure();
+        // Eigene Grundrolle mit Mitgliederbereich (z. B. Spieß): von der Rolle „Mitglied“ nicht erfasst
+        $this->assertSame(201, $this->call('POST', '/admin/roles', ['label' => 'Spieß', 'capabilities' => ['member']])->status);
+        $spiess = $this->user('spiess', (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Spieß'], 'spiess@example.org', 'Sepp Spieß');
+
+        $groups = array_column($this->call('GET', '/mails/options')->data['groups'], null, 'key');
+        $this->assertSame(['members', 'all'], array_keys($groups), 'Standardgruppen zuerst');
+        $this->assertSame(['Alle Mitglieder', true, 5, 4], [$groups['members']['label'], $groups['members']['standard'], $groups['members']['members'], $groups['members']['with_email']], 'Admin, zwei Mitglieder, ohne Adresse, Spieß');
+        $this->assertSame([6, 5], [$groups['all']['members'], $groups['all']['with_email']], 'dazu der Anwärter, keine Gäste');
+
+        $preview = $this->call('POST', '/mails/preview', ['to' => ['groups' => ['members']]])->data;
+        $this->assertSame([4, ['Otto Ohneadresse']], [$preview['recipients'], $preview['skipped']]);
+        $this->assertSame(5, $this->call('POST', '/mails/preview', ['bcc' => ['groups' => ['all']]])->data['recipients']);
+        $this->assertSame(2, $this->call('POST', '/mails/preview', ['to' => ['roles' => [Roles::MEMBER]]])->data['recipients'], 'Rolle allein: nur Grundrolle Mitglied');
+
+        $res = $this->call('POST', '/mails', ['subject' => 'An alle', 'text' => '<p>x</p>', 'to' => ['groups' => ['members']]]);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $this->assertSame([['key' => 'members', 'label' => 'Alle Mitglieder']], $res->data['selection']['to']['groups']);
+        $emails = array_column($res->data['log'], 'email');
+        $this->assertContains('admin@example.org', $emails);
+        $this->assertContains('spiess@example.org', $emails);
+        $this->assertNotContains('anwaerter@example.org', $emails);
+        $this->assertNotContains('gast@example.org', $emails);
+        unset($spiess);
+
+        // Validierung: unbekannte Gruppe; Auswahl ohne groups geht weiter
+        $this->assertSame(400, $this->call('POST', '/mails/preview', ['to' => ['groups' => ['gibtsnicht']]])->status);
+        $this->assertSame(200, $this->call('POST', '/mails/preview', ['to' => ['users' => [$this->m]]])->status);
+    }
+
+    public function testOwnGroupsCanBeManagedAndStandardGroupsOnlyRenamed(): void
+    {
+        $this->configure();
+        $this->assertSame(403, $this->as($this->m)->call('GET', '/mails/groups')->status, 'nur mit send_mail');
+        $this->as($this->admin);
+
+        $res = $this->call('POST', '/mails/groups', ['label' => 'Vorstand', 'users' => [$this->m], 'roles' => [TestApp::candidateRole($this->app)], 'emails' => ['extern@example.net']]);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $own = array_values(array_filter($res->data, static fn (array $g): bool => !$g['standard']))[0];
+        $this->assertSame(['Vorstand', [$this->m], ['extern@example.net'], 2, 2], [$own['label'], $own['users'], $own['emails'], $own['members'], $own['with_email']]);
+
+        $this->assertSame(400, $this->call('POST', '/mails/groups', ['label' => 'vorstand'])->status, 'Bezeichnung eindeutig');
+        $this->assertSame(400, $this->call('POST', '/mails/groups', ['label' => 'Alle Konten'])->status, 'auch gegenüber Standardgruppen');
+        $this->assertSame(400, $this->call('POST', '/mails/groups', ['label' => ''])->status);
+        $this->assertSame(400, $this->call('POST', '/mails/groups', ['label' => 'Gäste', 'users' => [$this->guest]])->status, 'keine Gäste');
+
+        // Auflösung: Konto, Rolle und freie Adresse; Doppelte nur einmal, An vor Cc
+        $preview = $this->call('POST', '/mails/preview', ['to' => ['users' => [$this->m]], 'cc' => ['groups' => [$own['key']]]])->data;
+        $this->assertSame(['recipients' => 3, 'to' => 1, 'cc' => 2, 'bcc' => 0, 'skipped' => []], $preview);
+
+        // Umbenennen und Inhalt ändern; Standardgruppe nur umbenennen, nicht löschen
+        $this->assertSame(200, $this->call('PATCH', '/mails/groups/' . $own['key'], ['label' => 'Vorstand neu', 'emails' => []])->status);
+        $group = array_column($this->call('GET', '/mails/groups')->data, null, 'key')[$own['key']];
+        $this->assertSame(['Vorstand neu', [$this->m], []], [$group['label'], $group['users'], $group['emails']], 'nicht Mitgeschicktes bleibt');
+        $this->assertSame(400, $this->call('PATCH', '/mails/groups/members', ['users' => [$this->m]])->status);
+        $this->assertSame(200, $this->call('PATCH', '/mails/groups/members', ['label' => 'Ganze Kompanie'])->status);
+        $this->assertSame('Ganze Kompanie', array_column($this->call('GET', '/mails/options')->data['groups'], 'label', 'key')['members']);
+        $this->assertSame(400, $this->call('DELETE', '/mails/groups/all')->status);
+
+        // Gesendete Mail mit gelöschter Gruppe
+        $sent = $this->call('POST', '/mails', ['subject' => 'Vorstand', 'text' => '<p>x</p>', 'to' => ['groups' => [$own['key']]]])->data;
+        $this->assertSame(200, $this->call('DELETE', '/mails/groups/' . $own['key'])->status);
+        $this->assertSame(404, $this->call('DELETE', '/mails/groups/' . $own['key'])->status);
+        $this->assertSame('Gelöschte Gruppe', $this->call('GET', '/mails/' . $sent['id'])->data['selection']['to']['groups'][0]['label']);
+        $this->assertSame(400, $this->call('POST', '/mails/preview', ['to' => ['groups' => [$own['key']]]])->status, 'gelöschte Gruppe nicht mehr wählbar');
+
+        // In der Datensicherung (Einstellung)
+        $this->assertIsArray($this->app->settings->get('mail_groups'));
+    }
+
+    public function testFormerMembersNeverGetMailsThroughGroups(): void
+    {
+        $this->configure();
+        $res = $this->call('POST', '/mails/groups', ['label' => 'Festausschuss', 'users' => [$this->m, $this->m2]]);
+        $key = array_values(array_filter($res->data, static fn (array $g): bool => !$g['standard']))[0]['key'];
+
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left'])->status);
+
+        $groups = array_column($this->call('GET', '/mails/groups')->data, null, 'key');
+        $this->assertSame([$this->m2], $groups[$key]['users'], 'Ehemalige fallen aus dem Inhalt');
+        $this->assertSame([3, 2], [$groups['members']['members'], $groups['members']['with_email']], 'Admin, zweites Mitglied, ohne Adresse');
+        $this->assertSame(4, $groups['all']['members']);
+        foreach ([['groups' => [$key]], ['groups' => ['members']], ['groups' => ['all']], ['roles' => [Roles::MEMBER]]] as $sel) {
+            $res = $this->call('POST', '/mails', ['subject' => 'Test', 'text' => '<p>x</p>', 'to' => $sel]);
+            $this->assertSame(201, $res->status, (string) json_encode($res->data));
+            $this->assertNotContains('mitglied@example.org', array_column($res->data['log'], 'email'), (string) json_encode($sel));
+        }
+
+        // Gruppe mit eingetragenem Ehemaligen lässt sich weiter bearbeiten
+        $this->assertSame(200, $this->call('PATCH', '/mails/groups/' . $key, ['label' => 'Festausschuss 2027'])->status);
+    }
+
     public function testPhpMailerDeliversToOneRecipientWithVisibleHeaders(): void
     {
         $log = tempnam(sys_get_temp_dir(), 'smtp');

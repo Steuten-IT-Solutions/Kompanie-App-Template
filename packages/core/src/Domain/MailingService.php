@@ -17,9 +17,11 @@ use KompanieApp\Core\Port\Mailer;
  *
  * - Geschrieben wird wie am Schwarzen Brett: Betreff und formatierter Inhalt (RichText, Bilder über RichImageService,
  *   eingebettet als cid:), die eigene Signatur lässt sich einfügen; dazu beliebige Dateianhänge (AttachmentService).
- * - Empfänger je An, Cc und Bcc: Rollen (Grund- und Zusatzrollen, ohne Gäste), einzelne Konten und freie Adressen. Jede
- *   Adresse bekommt die Mail einmal; steht sie in mehreren Feldern, gilt An vor Cc vor Bcc. Konten ohne gültige Adresse
- *   werden übersprungen (die Vorschau nennt sie). Wer schreibt, bekommt die Mail nur, wenn er sich selbst auswählt.
+ * - Empfänger je An, Cc und Bcc: Mailgruppen (MailGroupService, z. B. „Alle Mitglieder“ mit Admins und Spieß), Rollen
+ *   (Grund- und Zusatzrollen, ohne Gäste), einzelne Konten und freie Adressen. Jede Adresse bekommt die Mail einmal;
+ *   steht sie in mehreren Feldern, gilt An vor Cc vor Bcc. Konten ohne gültige Adresse werden übersprungen (die Vorschau
+ *   nennt sie). Ehemalige (Rolle Gast) bekommen nie eine Mail. Wer schreibt, bekommt die Mail nur, wenn er sich selbst
+ *   auswählt (oder in einer gewählten Gruppe ist).
  * - Zugestellt wird jede Mail einzeln an einen Empfänger, die Kopfzeilen zeigen aber wie in einem Mailprogramm alle
  *   Empfänger in An und Cc (Bcc nie, Mail::headerTo). So gibt es einen Stand je Empfänger, erneute Versuche und den
  *   Versand in Portionen wie bei den Mails vom Brett (gemeinsame Warteschlange, MailService::runQueue).
@@ -49,8 +51,8 @@ final class MailingService
     }
 
     /**
-     * Für das Formular: eingerichtet? Absender, Rollen mit Zahl der erreichbaren Personen, Konten (ohne Gäste) mit ihren
-     * Rollen und ob eine Adresse hinterlegt ist. Adressen selbst liefert die App nicht aus.
+     * Für das Formular: eingerichtet? Absender, Mailgruppen und Rollen mit Zahl der erreichbaren Personen, Konten (ohne
+     * Gäste) mit ihren Rollen und ob eine Adresse hinterlegt ist. Adressen der Konten liefert die App nicht aus.
      *
      * @return array<string, mixed>
      */
@@ -84,6 +86,7 @@ final class MailingService
             'reason' => $available ? null : ($this->app->mail()->unavailable() ?? 'Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).'),
             'from' => $config['from'],
             'from_name' => $config['from_name'],
+            'groups' => $this->groups(),
             'roles' => $roles,
             'members' => $members,
             'server_max_size' => $this->app->mail()->serverMaxSize(),
@@ -193,6 +196,7 @@ final class MailingService
             $userIds = array_values(array_filter((array) ($s['users'] ?? []), 'is_int'));
             $names->prime($userIds);
             $described[$field] = [
+                'groups' => array_map(fn (string $k): array => ['key' => $k, 'label' => $this->app->mailGroups()->find($k)['label'] ?? 'Gelöschte Gruppe'], array_values(array_filter((array) ($s['groups'] ?? []), 'is_string'))),
                 'roles' => array_map(static fn (string $k): array => ['key' => $k, 'label' => $roles[$k]['label'] ?? $k], array_values(array_filter((array) ($s['roles'] ?? []), 'is_string'))),
                 'users' => array_map(static fn (int $u): array => ['id' => $u, 'name' => $names->name($u)], $userIds),
                 'emails' => array_values(array_filter((array) ($s['emails'] ?? []), 'is_string')),
@@ -332,71 +336,132 @@ final class MailingService
     }
 
     /**
-     * Auswahl prüfen und vereinheitlichen: je Feld Rollen (bestehende, ohne Gäste), Konten (ohne Gäste) und gültige
-     * Adressen, ohne Doppelte.
+     * Auswahl prüfen und vereinheitlichen: je Feld Mailgruppen, Rollen (bestehende, ohne Gäste), Konten (ohne Gäste) und
+     * gültige Adressen, ohne Doppelte.
      *
-     * @return array<string, array{roles: list<string>, users: list<int>, emails: list<string>}>
+     * @return array<string, array{groups: list<string>, roles: list<string>, users: list<int>, emails: list<string>}>
      */
     public function validSelection(mixed $in): array
     {
         if (!is_array($in)) {
             throw ApiError::invalid('Bitte Empfänger angeben (to, cc, bcc).');
         }
-        $roles = $this->app->roles()->all();
         $out = [];
-        $userIds = [];
         foreach (self::FIELDS as $field) {
-            $f = $in[$field] ?? null;
-            if ($f === null) {
-                $f = [];
-            }
-            if (!is_array($f)) {
-                throw ApiError::invalid($field . ': Rollen, Mitglieder und Adressen erwartet.');
-            }
-            $sel = ['roles' => [], 'users' => [], 'emails' => []];
-            foreach ((array) ($f['roles'] ?? []) as $key) {
-                if (!is_string($key) || !isset($roles[$key]) || $key === Roles::GUEST) {
-                    throw ApiError::invalid('Unbekannte Rolle: ' . (is_scalar($key) ? (string) $key : '?') . '.');
-                }
-                $sel['roles'][] = $key;
-            }
-            foreach ((array) ($f['users'] ?? []) as $id) {
-                $id = Input::integer($id);
-                if ($id === null || $id < 1) {
-                    throw ApiError::invalid('Ungültiges Mitglied in ' . $field . '.');
-                }
-                $sel['users'][] = $id;
-                $userIds[] = $id;
-            }
-            $emails = (array) ($f['emails'] ?? []);
-            if (count($emails) > self::EMAILS_MAX) {
-                throw ApiError::invalid(sprintf('Höchstens %d Adressen je Feld.', self::EMAILS_MAX));
-            }
-            foreach ($emails as $email) {
-                $email = is_string($email) ? trim($email) : '';
-                if ($email === '' || strlen($email) > 191 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                    throw ApiError::invalid('Ungültige Adresse: „' . $email . '“.');
-                }
-                $sel['emails'][] = $email;
-            }
-            $sel['roles'] = array_values(array_unique($sel['roles']));
-            $sel['users'] = array_values(array_unique($sel['users']));
-            $sel['emails'] = array_values(array_unique($sel['emails']));
-            $out[$field] = $sel;
-        }
-        $found = $this->app->users->findMany(array_values(array_unique($userIds)));
-        foreach (array_unique($userIds) as $id) {
-            if (!isset($found[$id]) || $found[$id]->role === Roles::GUEST) {
-                throw ApiError::invalid('Dieses Mitglied gibt es nicht (mehr).');
-            }
+            $out[$field] = $this->validField($field, $in[$field] ?? null, true);
         }
         return $out;
     }
 
     /**
+     * Ein Empfängerfeld oder der Inhalt einer Mailgruppe prüfen: Rollen, Konten, Adressen und (nur in Feldern) Gruppen.
+     *
+     * @return ($withGroups is true ? array{groups: list<string>, roles: list<string>, users: list<int>, emails: list<string>} : array{roles: list<string>, users: list<int>, emails: list<string>})
+     */
+    public function validField(string $field, mixed $f, bool $withGroups): array
+    {
+        if ($f === null) {
+            $f = [];
+        }
+        if (!is_array($f)) {
+            throw ApiError::invalid($field . ': Rollen, Mitglieder und Adressen erwartet.');
+        }
+        $roles = $this->app->roles()->all();
+        $sel = ['roles' => [], 'users' => [], 'emails' => []];
+        if ($withGroups) {
+            $groups = [];
+            foreach ((array) ($f['groups'] ?? []) as $key) {
+                if (!is_string($key) || $this->app->mailGroups()->find($key) === null) {
+                    throw ApiError::invalid('Unbekannte Mailgruppe: ' . (is_scalar($key) ? (string) $key : '?') . '.');
+                }
+                $groups[] = $key;
+            }
+            $sel = ['groups' => array_values(array_unique($groups))] + $sel;
+        }
+        foreach ((array) ($f['roles'] ?? []) as $key) {
+            if (!is_string($key) || !isset($roles[$key]) || $key === Roles::GUEST) {
+                throw ApiError::invalid('Unbekannte Rolle: ' . (is_scalar($key) ? (string) $key : '?') . '.');
+            }
+            $sel['roles'][] = $key;
+        }
+        foreach ((array) ($f['users'] ?? []) as $id) {
+            $id = Input::integer($id);
+            if ($id === null || $id < 1) {
+                throw ApiError::invalid('Ungültiges Mitglied in ' . $field . '.');
+            }
+            $sel['users'][] = $id;
+        }
+        $emails = (array) ($f['emails'] ?? []);
+        if (count($emails) > self::EMAILS_MAX) {
+            throw ApiError::invalid(sprintf('Höchstens %d Adressen je Feld.', self::EMAILS_MAX));
+        }
+        foreach ($emails as $email) {
+            $email = is_string($email) ? trim($email) : '';
+            if ($email === '' || strlen($email) > 191 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                throw ApiError::invalid('Ungültige Adresse: „' . $email . '“.');
+            }
+            $sel['emails'][] = $email;
+        }
+        $sel['roles'] = array_values(array_unique($sel['roles']));
+        $sel['users'] = array_values(array_unique($sel['users']));
+        $sel['emails'] = array_values(array_unique($sel['emails']));
+        $found = $this->app->users->findMany($sel['users']);
+        foreach ($sel['users'] as $id) {
+            if (!isset($found[$id]) || $found[$id]->role === Roles::GUEST) {
+                throw ApiError::invalid('Dieses Mitglied gibt es nicht (mehr).');
+            }
+        }
+        return $sel;
+    }
+
+    /**
+     * Mailgruppen für Formular und Verwaltung, mit Zahl der erreichbaren Konten (members, with_email) und freien Adressen.
+     * Inhalte eigener Gruppen nur mit Rollen und Konten, die es noch gibt (Ehemalige und Gelöschte fallen weg).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function groups(): array
+    {
+        $users = $this->accounts();
+        $emails = $this->emailsOf($users);
+        $roles = $this->app->roles()->all();
+        $ids = array_map(static fn (User $u): int => $u->id, $users);
+        $out = [];
+        foreach ($this->app->mailGroups()->all() as $g) {
+            $g['roles'] = array_values(array_filter($g['roles'], static fn (string $k): bool => isset($roles[$k]) && $k !== Roles::GUEST));
+            $g['users'] = array_values(array_intersect($g['users'], $ids));
+            $members = 0;
+            $withEmail = 0;
+            foreach ($users as $u) {
+                if ($this->inGroup($u, $g)) {
+                    $members++;
+                    $withEmail += isset($emails[$u->id]) ? 1 : 0;
+                }
+            }
+            $out[] = $g + ['members' => $members, 'with_email' => $withEmail];
+        }
+        return $out;
+    }
+
+    /**
+     * Gehört das Konto zur Gruppe? „Alle Mitglieder“: Grundrolle mit Mitgliederbereich (Admin hat alle Rechte), „Alle
+     * Konten“: jedes wählbare Konto, eigene Gruppen: über Rolle oder Konto.
+     *
+     * @param array{key: string, roles: list<string>, users: list<int>} $group
+     */
+    private function inGroup(User $u, array $group): bool
+    {
+        return match ($group['key']) {
+            MailGroupService::MEMBERS => in_array(Capability::Member, $this->app->roles()->capabilities($u->role), true),
+            MailGroupService::ALL => true,
+            default => in_array($u->id, $group['users'], true) || array_intersect($this->rolesOf($u), $group['roles']) !== [],
+        };
+    }
+
+    /**
      * Empfänger aus der Auswahl: je Adresse einmal, An vor Cc vor Bcc; Konten ohne gültige Adresse als skipped.
      *
-     * @param array<string, array{roles: list<string>, users: list<int>, emails: list<string>}> $selection
+     * @param array<string, array{groups?: list<string>, roles: list<string>, users: list<int>, emails: list<string>}> $selection
      * @return array{recipients: list<array{user_id: int, name: string, email: string, field: string}>, skipped: list<string>}
      */
     public function resolve(array $selection): array
@@ -411,9 +476,11 @@ final class MailingService
         $skipped = [];
         foreach (self::FIELDS as $field) {
             $sel = $selection[$field];
+            $groups = array_values(array_filter(array_map(fn (string $k): ?array => $this->app->mailGroups()->find($k), $sel['groups'] ?? [])));
             $accounts = [];
             foreach ($users as $u) {
-                if (in_array($u->id, $sel['users'], true) || array_intersect($this->rolesOf($u), $sel['roles']) !== []) {
+                if (in_array($u->id, $sel['users'], true) || array_intersect($this->rolesOf($u), $sel['roles']) !== []
+                    || array_filter($groups, fn (array $g): bool => $this->inGroup($u, $g)) !== []) {
                     $accounts[] = $u;
                 }
             }
@@ -429,7 +496,7 @@ final class MailingService
                     $recipients[] = ['user_id' => $u->id, 'name' => $u->name, 'email' => $email, 'field' => $field];
                 }
             }
-            foreach ($sel['emails'] as $email) {
+            foreach (array_merge($sel['emails'], ...array_column($groups, 'emails')) as $email) {
                 $key = strtolower($email);
                 if (!isset($seen[$key])) {
                     $seen[$key] = true;
@@ -489,8 +556,9 @@ final class MailingService
     }
 
     /**
-     * Wählbare Konten: alle mit einer Rolle außer Gast. list(false) lässt Gäste je nach Adapter noch durch (WordPress:
-     * Konten mit gespeicherter Rolle „guest“), deshalb hier ausdrücklich.
+     * Wählbare Konten: alle mit einer Rolle außer Gast, also auch nie Ehemalige (sie haben die Rolle Gast,
+     * FormerMemberService). list(false) lässt Gäste je nach Adapter noch durch (WordPress: Konten mit gespeicherter
+     * Rolle „guest“), deshalb hier ausdrücklich.
      *
      * @return list<User>
      */

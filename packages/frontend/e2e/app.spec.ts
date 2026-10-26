@@ -1499,7 +1499,7 @@ test('Ämter: Einzahl auf der Seite einer Person, Hinweis mit Link bei Titeln, d
   expect(status.every((s) => s < 300)).toBe(true);
 });
 
-test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gemerkt (Issue #112)', async ({ page }) => {
+test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const office = `Fähnriche ${id}`;
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -1526,16 +1526,29 @@ test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gem
     { id, office },
   );
 
-  // Schmal: keine Umschaltung
+  // Handy hochkant: „Jahre“ zeigt das schmale Raster mit dem Tipp zum Drehen; nur das Raster scrollt seitlich
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-card', { hasText: office })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Ansicht' })).toHaveCount(0);
-
-  // Breit: „Jahre“ zeigt das Raster; die Seite selbst scrollt nicht seitlich
-  await page.setViewportSize({ width: 1200, height: 900 });
   await page.getByRole('group', { name: 'Ansicht' }).getByRole('button', { name: 'Jahre' }).click();
   const grid = page.locator('.year-grid');
+  await expect(grid.locator('.yg-office', { hasText: office })).toBeAttached();
+  await expect(page.locator('.yg-rotate-hint')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Ein Tipp auf einen Balken zeigt Jahre und Personen
+  await grid.locator('.yg-bar', { hasText: `Carl Clau ${id}` }).scrollIntoViewIfNeeded();
+  await grid.locator('.yg-bar', { hasText: `Carl Clau ${id}` }).click();
+  await expect(page.locator('.yg-detail')).toContainText(`${office}: 1990–2006 · Carl Clau ${id}`);
+  await page.locator('.yg-detail').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page.locator('.yg-detail')).toHaveCount(0);
+
+  // Quer: ohne Tipp, die Seite scrollt weiter nicht seitlich
+  await page.setViewportSize({ width: 740, height: 360 });
+  await expect(page.locator('.yg-rotate-hint')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Breit: dasselbe Raster
+  await page.setViewportSize({ width: 1200, height: 900 });
   await expect(grid).toBeVisible();
   await expect(grid.locator('.yg-office', { hasText: office })).toBeVisible();
   const bar = (name: string) => grid.locator('.yg-bar', { hasText: name });
@@ -4205,6 +4218,44 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await shot(page, '33f-email-verlauf');
   await page.getByRole('button', { name: '‹ E-Mails' }).click();
   await expect(page.locator('.mail-form')).toBeVisible();
+
+  // Mailgruppen: Standardgruppen nur umbenennen, eigene Gruppe anlegen und beim Schreiben wählen
+  await page.getByRole('button', { name: /Mailgruppen verwalten/ }).click();
+  const groups = page.locator('.mail-groups');
+  await expect(groups.locator('.mail-group-item').first()).toContainText('Alle Mitglieder');
+  await expect(groups.locator('.mail-group-item', { hasText: 'Alle Konten' })).toContainText('Standardgruppe');
+  await expect(groups.locator('.mail-group-item', { hasText: 'Alle Mitglieder' }).getByRole('button', { name: 'Löschen' })).toHaveCount(0);
+  await groups.getByRole('button', { name: 'Neue Mailgruppe' }).click();
+  const groupForm = groups.locator('.mail-group-form');
+  await groupForm.getByLabel('Bezeichnung').fill(`Vorstand ${id}`);
+  await groupForm.locator('.mail-recipient-input').fill('Mitglied1');
+  await groupForm.locator('.mail-recipient-input').press('Enter');
+  await groupForm.locator('.mail-recipient-input').fill(`vorstand-${id}@example.net`);
+  await groupForm.locator('.mail-recipient-input').press('Enter');
+  await groupForm.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  await expect(groups.locator('.mail-group-item', { hasText: `Vorstand ${id}` })).toContainText('+ 1 Adresse');
+  await shot(page, '33h-email-gruppen');
+  await page.getByRole('button', { name: '‹ E-Mails' }).click();
+  // Erst das Gerüst, dann das Formular: auf das echte Eingabefeld warten (das Gerüst trägt dieselbe Klasse)
+  const to2 = page.locator('.mail-form input.mail-to-input');
+  await to2.fill('Alle Mitg');
+  await page
+    .locator('.mail-suggestions')
+    .getByRole('button', { name: /Alle Mitglieder.*Gruppe/ })
+    .click();
+  await to2.fill(`Vorstand ${id}`);
+  await to2.press('Enter');
+  await expect(page.locator('.mail-form .mail-chip-group')).toHaveCount(2);
+  // Entwurf verwerfen: Gruppe wieder löschen und Formular leeren
+  await page.getByRole('button', { name: /Mailgruppen verwalten/ }).click();
+  await groups
+    .locator('.mail-group-item', { hasText: `Vorstand ${id}` })
+    .getByRole('button', { name: 'Löschen' })
+    .click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  await expect(groups.locator('.mail-group-item')).toHaveCount(2);
+  await page.evaluate(() => localStorage.removeItem('kompanie-mail-draft'));
 
   // Aufräumen: Mailversand wieder aus (andere Tests erwarten den Haken „E-Mail senden“ deaktiviert)
   await page.goto('/app/#/einstellungen/email');
