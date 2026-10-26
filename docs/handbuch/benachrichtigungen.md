@@ -41,7 +41,7 @@ Mindestens eine Art bleibt angehakt. Ganz aus geht es mit **Benachrichtigungen a
 Welche Arten du siehst, hängt davon ab, welche Bereiche die {kompanie.name} nutzt und ob du angemeldet bist.
 
 Für alle, auch ohne Konto:
-- **{bereich.events}: neue und geänderte**: wenn ein Termin dazukommt oder sich Beginn, Ende oder Ort ändern. Kommen viele neue Termine auf einmal, gibt es eine Sammelnachricht.
+- **{bereich.events}: neue und geänderte**: wenn ein Termin dazukommt oder sich Beginn, Ende oder Ort ändern. Bei einer Änderung steht in der Nachricht nur, was sich geändert hat, z. B. „Uhrzeit: 19:00 Uhr → 20:00 Uhr“. Kommen viele neue Termine auf einmal, gibt es eine Sammelnachricht.
 - **Erinnerung am Vortag**: eine Nachricht mit allen Terminen von morgen, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 18 Uhr).
 - **{bereich.news}: neue Beiträge**: wenn ein neuer Beitrag erscheint.
 

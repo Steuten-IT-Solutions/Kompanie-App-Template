@@ -29,6 +29,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Bildschirm. Auf dem Handy ist die Übersicht schmaler; quer gedreht nutzt sie die ganze Breite, sodass mehr Ämter
   nebeneinander passen. Beim Scrollen bleiben oben die Ämter und links die Jahre stehen. Ein Tipp auf einen Balken
   zeigt unten Jahre, Personen und Zusatz.
+- **Benachrichtigung „Termin geändert“ zeigt die Änderung**: Statt noch einmal aller Angaben zum Termin steht in der
+  Nachricht nur, was sich geändert hat, mit vorher und jetzt, z. B. „Probe – Uhrzeit: 19:00 Uhr → 20:00 Uhr“ oder
+  „Ort: Halle → Sporthalle“. Das gilt für öffentliche Termine und für den internen Kalender.
 
 ## [0.3.0] – 2026-10-26
 
