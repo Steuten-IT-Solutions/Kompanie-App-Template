@@ -133,13 +133,14 @@ enum Capability: string
     }
 
     /**
-     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade oder Titel pflegt,
-     * Mitglieder anlegt oder Rollen vergibt.
+     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
+     * Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in adminNav.tsx). Punkte und
+     * Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht (MemberService::visibleParts).
      *
      * @return list<self>
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::CreateUsers, self::PromoteUsers];
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::CreateUsers, self::PromoteUsers];
     }
 }

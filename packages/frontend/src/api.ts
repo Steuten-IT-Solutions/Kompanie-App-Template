@@ -1921,8 +1921,12 @@ export const api = {
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
-  installUpdate: (version: string, major = false) => request<{ installed: string }>('POST', '/admin/update/install', { version, major }),
-  rollback: (version: string) => request<{ installed: string }>('POST', '/admin/update/rollback', { version }),
+  installUpdate: (version: string, major = false, withoutDrive = false) =>
+    request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
+  installHeldUpdate: () => request<{ installed: string }>('POST', '/admin/update/held', {}),
+  dismissHeldUpdate: () => request<UpdateStatus>('DELETE', '/admin/update/held'),
+  rollback: (version: string, withoutDrive = false) =>
+    request<{ installed: string }>('POST', '/admin/update/rollback', { version, without_drive: withoutDrive }),
   updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
@@ -2067,6 +2071,8 @@ export interface UpdateStatus {
   problems: string[];
   versions: { version: string; published: string }[];
   last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;
+  /** Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte. */
+  held: { version: string; kind: 'auto' | 'withdrawn'; at: number; error: string } | null;
 }
 
 export interface AdminStatus {

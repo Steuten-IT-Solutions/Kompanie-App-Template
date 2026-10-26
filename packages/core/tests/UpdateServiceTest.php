@@ -15,6 +15,7 @@ use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FixedClock;
 use KompanieApp\Core\Tests\Support\MemorySettings;
 use KompanieApp\Core\Tests\Support\NullScheduler;
+use KompanieApp\Core\Update\OffsiteBackup;
 use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateList;
@@ -40,6 +41,12 @@ final class UpdateServiceTest extends TestCase
     public array $backups = [];
     /** Meldung, mit der die Sicherung vor dem Update abbricht (null: klappt) */
     public ?string $backupFails = null;
+    /** Sicherungen in Google Drive eingeschaltet? */
+    public bool $offsiteActive = false;
+    /** Meldung, mit der das Hochladen nach Google Drive scheitert (null: klappt) */
+    public ?string $offsiteFails = null;
+    /** @var array<int, array{0: string, 1: string}> nach Google Drive: Inhalt der Sicherung, Version davor */
+    public array $offsiteStored = [];
     private string $dir = '';
 
     protected function setUp(): void
@@ -144,9 +151,27 @@ final class UpdateServiceTest extends TestCase
                 return true;
             }
         };
+        $offsite = new class ($test) implements OffsiteBackup {
+            public function __construct(private readonly UpdateServiceTest $t)
+            {
+            }
+
+            public function active(): bool
+            {
+                return $this->t->offsiteActive;
+            }
+
+            public function storeBeforeUpdate(string $path, string $version): void
+            {
+                if ($this->t->offsiteFails !== null) {
+                    throw new \RuntimeException($this->t->offsiteFails);
+                }
+                $this->t->offsiteStored[] = [(string) file_get_contents($path), $version];
+            }
+        };
         $dir = $this->dir;
         return new UpdateService($this->settings, $this->http, new LocalFileStorage("$dir/p", 'https://x/', "$dir/i", ''), new Time(new FixedClock()), $current, $target, $backup,
-            ['updatesUrl' => 'https://org.github.io/k/updates.json', 'trustedKeys' => $this->trusted, 'kompanie' => 'org/k'], $telemetry);
+            ['updatesUrl' => 'https://org.github.io/k/updates.json', 'trustedKeys' => $this->trusted, 'kompanie' => 'org/k'], $telemetry, $offsite);
     }
 
     /** Statusmeldungen (Issue #20): gescheitertes Update, Zurückrollen und Fehler der Liste als Codes. */
@@ -283,19 +308,125 @@ final class UpdateServiceTest extends TestCase
         $this->assertStringContainsString('PHP 99.0', implode(' ', $s->status()['problems']));
     }
 
-    public function testBackupOnlyBeforeSchemaChanges(): void
+    public function testBackupBeforeEveryUpdate(): void
     {
-        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.2', '1.0.0.3'], [], ['1.0.0.3' => ['schema' => 3]]);
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.1', '1.0.0.2', '1.0.0.3'], [], ['1.0.0.3' => ['schema' => 3]]);
         $s = $this->service('1.0.0.1');
         $s->install('1.0.0.2');
-        $this->assertSame([], $this->backups, 'gleiche Datenbank: keine Sicherung nötig');
+        $this->assertCount(1, $this->backups, 'auch ohne Änderung an der Datenbank');
         $s->install('1.0.0.3');
-        $this->assertCount(1, $this->backups, 'neue Migration: vorher sichern');
+        $this->assertCount(2, $this->backups, 'neue Migration');
+        $this->service('1.0.0.3')->rollback('1.0.0.2');
+        $this->assertCount(3, $this->backups, 'auch vor dem Zurückrollen');
+        $this->assertSame([], $this->offsiteStored, 'Google Drive aus: nur auf dem Server');
+    }
+
+    public function testBackupAlsoGoesToGoogleDrive(): void
+    {
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $this->offsiteActive = true;
+        $this->service('1.0.0.1')->install('1.0.0.2');
+        $this->assertSame([[(string) json_encode(['format' => 'kompanie-app-backup']), '1.0.0.1']], $this->offsiteStored, 'dieselbe Sicherung wie auf dem Server');
+        $this->assertSame('1.0.0.2', $this->installed[0][0]);
+        $this->assertCount(1, glob($this->dir . '/i/sicherungen/vor-update-*.json') ?: []);
+    }
+
+    /** Von Hand: Scheitert nur Google Drive, wird nachgefragt (409), mit without_drive dann trotzdem eingespielt. */
+    public function testFailedDriveBackupAsksBeforeManualUpdate(): void
+    {
+        $scheduler = new NullScheduler();
+        $t = new Telemetry($this->settings, $scheduler, new Time(new FixedClock()), static fn (): bool => true, StatusReporter::TASK);
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.1', '1.0.0.2']);
+        $this->offsiteActive = true;
+        $this->offsiteFails = 'Google Drive: Das Hochladen ist fehlgeschlagen: Speicher voll.';
+        $s = $this->service('1.0.0.1', $t);
+        try {
+            $s->install('1.0.0.2');
+            $this->fail('Rückfrage erwartet');
+        } catch (ApiError $e) {
+            $this->assertSame(409, $e->status);
+            $this->assertSame(UpdateService::DRIVE_FAILED, $e->errorCode);
+            $this->assertStringContainsString('Speicher voll. Das Update wurde nicht eingespielt; die Sicherung auf dem Server ist da.', $e->getMessage());
+        }
+        $this->assertSame([], $this->installed, 'nicht eingespielt');
+        $this->assertCount(1, glob($this->dir . '/i/sicherungen/vor-update-*.json') ?: [], 'Sicherung auf dem Server bleibt');
+        $this->assertNull($s->status()['held'], 'von Hand: nichts zurückgestellt');
+        $this->assertSame(['UPDATE_FAILED' => 'drive'], $t->pendingDetails());
+
+        $s->install('1.0.0.2', 'manual', false, true);
+        $this->assertSame('1.0.0.2', $this->installed[0][0]);
+        $this->assertSame([], $this->offsiteStored);
+        $this->assertCount(2, $this->backups, 'auf dem Server wieder gesichert');
+        $this->assertTrue($this->settings->get('update_last')['ok']);
+
+        // Zurückrollen ebenso
+        $s2 = $this->service('1.0.0.2');
+        $this->assertThrows(fn () => $s2->rollback('1.0.0.1'), 'Sicherung in Google Drive');
+        $this->assertCount(1, $this->installed);
+        $s2->rollback('1.0.0.1', true);
+        $this->assertSame('1.0.0.1', end($this->installed)[0]);
+    }
+
+    /** Automatisch: niemand kann gefragt werden, das Update wartet auf einen Admin oder den nächsten Tag. */
+    public function testFailedDriveBackupHoldsAutomaticUpdate(): void
+    {
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $this->offsiteActive = true;
+        $this->offsiteFails = 'Speicher voll.';
+        $s = $this->service('1.0.0.1');
+        $this->assertThrows(fn () => $s->runTask(), 'Sicherung in Google Drive');
+        $this->assertSame([], $this->installed, 'zurückgestellt');
+        $held = $s->status()['held'];
+        $this->assertSame(['1.0.0.2', 'auto'], [$held['version'], $held['kind']]);
+        $this->assertStringContainsString('Speicher voll', $held['error']);
+
+        // Abbrechen: der Hinweis geht, am nächsten Tag ein neuer Versuch (mit Google Drive)
+        $s->dismissHeld();
+        $this->assertNull($s->status()['held']);
+        $this->assertThrows(fn () => $s->runTask(), 'Sicherung in Google Drive');
+        $this->assertNotNull($s->status()['held'], 'wieder zurückgestellt');
+
+        // Trotzdem aktualisieren: ohne Google Drive
+        $s->installHeld();
+        $this->assertSame([['1.0.0.2', 'ZIP-1.0.0.2']], $this->installed);
+        $this->assertSame('auto', $this->settings->get('update_last')['kind']);
+        $this->assertNull($s->status()['held'], 'erledigt');
+        $this->assertThrows(fn () => $s->installHeld(), 'kein zurückgestelltes Update');
+
+        // Klappt es am nächsten Tag, verschwindet der Hinweis ebenso.
+        $this->installed = [];
+        $this->publish(['1.0.0.2', '1.0.0.3'], ['1.0.0.3']);
+        $s3 = $this->service('1.0.0.2');
+        $this->assertThrows(fn () => $s3->runTask(), 'Sicherung in Google Drive');
+        $this->offsiteFails = null;
+        $s3->runTask();
+        $this->assertSame('1.0.0.3', $this->installed[0][0]);
+        $this->assertNull($s3->status()['held']);
+        $this->assertCount(1, $this->offsiteStored);
+
+        // Inzwischen anders eingespielt (z. B. von Hand hochgeladen): kein Hinweis mehr
+        $this->settings->set(UpdateService::HELD, ['version' => '1.0.0.3', 'kind' => 'auto', 'at' => 1, 'error' => 'x']);
+        $this->assertNull($this->service('1.0.0.3')->status()['held']);
+    }
+
+    public function testWithdrawnVersionIsHeldToo(): void
+    {
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $this->offsiteActive = true;
+        $this->offsiteFails = 'Speicher voll.';
+        $s = $this->service('1.0.0.2');
+        $this->assertThrows(fn () => $s->runTask(), 'Sicherung in Google Drive');
+        $this->assertSame([], $this->installed);
+        $this->assertSame('withdrawn', $s->status()['held']['kind']);
+        $s->installHeld();
+        $this->assertSame('1.0.0.1', $this->installed[0][0]);
+        $this->assertSame('withdrawn', $this->settings->get('update_last')['kind']);
     }
 
     public function testFailedBackupStopsTheUpdateAndLeavesNoPartialFile(): void
     {
-        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2'], [], ['1.0.0.2' => ['schema' => 3]]);
+        $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
+        $this->offsiteActive = true;
         @mkdir($this->dir . '/i/sicherungen', 0777, true);
         file_put_contents($this->dir . '/i/sicherungen/vor-update-000001-20260101-000000-1.0.0.0-abc.json.tmp', '{"halb');
         $this->backupFails = 'Die Sicherung ließ sich nicht schreiben (Speicherplatz?).';
@@ -303,6 +434,9 @@ final class UpdateServiceTest extends TestCase
         $this->assertThrows(fn () => $s->install('1.0.0.2'), 'Sicherung vor dem Update: Die Sicherung ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');
         $this->assertSame([], $this->installed, 'nicht eingespielt');
         $this->assertSame([], glob($this->dir . '/i/sicherungen/vor-update-*') ?: [], 'keine halbe Sicherung, alte Reste entfernt');
+        $this->assertSame([], $this->offsiteStored, 'ohne Sicherung auf dem Server auch nichts nach Google Drive');
+        $this->assertThrows(fn () => $s->install('1.0.0.2', 'manual', false, true), 'Das Update wurde nicht eingespielt.');
+        $this->assertSame([], $this->installed, 'ohne Sicherung auf dem Server nie, auch nicht ohne Google Drive');
 
         $this->backupFails = null;
         $s->install('1.0.0.2');

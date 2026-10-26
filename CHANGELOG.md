@@ -39,6 +39,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Sicherung vor jedem Update, auch in Google Drive**: Die App sichert die Daten jetzt vor jedem Update auf dem
+  Server, auch beim Zurückrollen (bisher nur bei Änderungen an der Datenbank und vor einer neuen Hauptversion). Sind
+  die Sicherungen in Google Drive eingeschaltet, kommt dieselbe Sicherung zusätzlich in den Ordner dort; die letzten
+  fünf bleiben. Klappt nur die Sicherung in Google Drive nicht, fragt die App nach, ob sie trotzdem aktualisieren soll.
+  Ein automatisches Update wird in diesem Fall zurückgestellt: Unter *Einstellungen → Zustand und Updates* steht der
+  Grund mit **Trotzdem aktualisieren** und **Abbrechen**, die Ampel wird gelb, und am nächsten Tag versucht es die App
+  wieder.
 - **Rechte in Gruppen**: Die Rechte einer Rolle und einer einzelnen Person stehen jetzt in Gruppen (Tabs und
   Navigation, Mitgliederbereich, Intern, Inhalte verwalten, Kompanie verwalten, Mitglieder und Rollen). Jede Gruppe lässt
   sich auf- und zuklappen; ein Haken vor der Gruppe setzt oder entfernt alle ihre Rechte auf einmal, ein Zähler zeigt,
@@ -62,6 +69,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   bekommt. Bisher durfte das Manifest einen Tag zwischengespeichert werden; jetzt prüft der Browser es jedes Mal beim
   Server nach (meist nur eine kurze Antwort „unverändert“). Wann Chrome die installierte App danach aktualisiert,
   entscheidet weiterhin Chrome (höchstens einmal am Tag).
+- **Mitgliederliste für die Anwesenheit**: Wer nur die Anwesenheit führt, sah in der Verwaltung den Knopf
+  **Mitglieder**, bekam beim Öffnen aber eine Fehlermeldung. Jetzt öffnet sich die Liste mit Namen, Rollen, Fotos und
+  Dienstgraden, ohne Punkte und Strafen.
 - **Ämter einer Person: Mitinhaber anklickbar**: Hatte jemand ein Amt gemeinsam mit einer anderen Person inne, steht
   diese im Zeitstrahl unter „mit“. Hat sie ein Konto, führt ein Tipp auf sie jetzt zu ihrer Seite, wie im Zeitstrahl
   aller Ämter: auf der Seite einer Person, unter „Meins“ und in der Verwaltung. Aus der Verwaltung geöffnet, landet man

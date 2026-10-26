@@ -82,7 +82,8 @@ gzip on; gzip_types text/css application/javascript application/json application
 Die App prüft einmal täglich die signierte Update-Liste ihrer Kompanie und spielt neue Versionen derselben
 Hauptversion selbst ein (abschaltbar unter *Einstellungen → Zustand und Updates*). Dabei werden die Programmdateien
 getauscht; bei einem Fehler kommt der vorige Stand zurück. `data/`, `media/` und `data-dir.php` bleiben
-unberührt. Vor Updates mit Datenbank-Änderungen sichert die App die Daten (die letzten fünf Sicherungen).
+unberührt. Vor jedem Update sichert die App die Daten (die letzten fünf Sicherungen), mit eingeschalteten Sicherungen
+in Google Drive auch dort. Scheitert nur Google Drive, bricht `update` ab; `--without-drive` spielt trotzdem ein.
 
 ```sh
 php bin/kompanie.php update-check              # Liste prüfen und anzeigen

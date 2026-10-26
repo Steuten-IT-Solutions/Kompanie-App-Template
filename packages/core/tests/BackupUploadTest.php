@@ -276,6 +276,43 @@ final class BackupUploadTest extends TestCase
         $this->assertSame('https://example.org/app/sicherung', $this->app->api()->config()['backupUrl']);
     }
 
+    /** Sicherung vor einem Update: in denselben Ordner, eigene Namen, die letzten fünf; zählt als Sicherung außerhalb. */
+    public function testBackupBeforeUpdateKeepsTheLastFiveBesideTheWeekly(): void
+    {
+        $offsite = $this->app->backupUpload();
+        $this->assertFalse($offsite->active());
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertTrue($offsite->active());
+        $offsite->upload();
+        $file = tempnam(sys_get_temp_dir(), 'vor');
+        file_put_contents($file, '{"format":"kompanie-app-backup"}');
+        for ($i = 1; $i <= 7; $i++) {
+            $this->clock->at = (new \DateTimeImmutable('2026-10-20 12:00:00 UTC'))->modify("+$i days");
+            $offsite->storeBeforeUpdate($file, "1.0.0.$i");
+        }
+        $names = array_column($this->drive, 'name');
+        sort($names);
+        $this->assertCount(1 + BackupUploadService::KEEP_BEFORE_UPDATE, $names, 'die wöchentliche bleibt, vor Updates die letzten fünf');
+        $this->assertStringStartsWith('sicherung-2026-10-20-', $names[0]);
+        $this->assertMatchesRegularExpression('/^vor-update-2026-10-23-\d{6}-1\.0\.0\.3\.json$/', $names[1]);
+        $this->assertStringEndsWith('-1.0.0.7.json', $names[5]);
+        $this->assertSame([$this->folders[0]], array_values(array_unique(array_column($this->drive, 'parent'))), 'derselbe Ordner');
+        $before = array_filter($this->drive, static fn (array $f): bool => str_starts_with($f['name'], 'vor-update-'));
+        $this->assertSame(['{"format":"kompanie-app-backup"}'], array_values(array_unique(array_column($before, 'content'))), 'die Sicherung vom Server');
+        $this->assertSame($this->clock->now()->getTimestamp(), $offsite->status()['last_ok'], 'zählt wie die wöchentliche');
+
+        $this->putStatus = 507;
+        try {
+            $offsite->storeBeforeUpdate($file, '1.0.0.8');
+            $this->fail('Fehler erwartet');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('storage quota', $e->getMessage());
+        }
+        @unlink($file);
+        $this->assertStringContainsString('storage quota', (string) $offsite->status()['error'], 'Grund steht bei den Sicherungen');
+    }
+
     public function testDeletedFolderIsCreatedAgain(): void
     {
         $this->connect();

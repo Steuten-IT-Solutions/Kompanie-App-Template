@@ -890,6 +890,13 @@ final class ApiScenario
         $guest = $this->user('kptest_anw_gast', 'guest');
         $this->d->actAs($m);
         $c->ok($this->req('GET', '/attendance')[0] === 403, 'Mitglied: GET /attendance → 403');
+        // Wer die Anwesenheit führt, sieht die Mitgliederliste der Verwaltung (wie der Knopf in der App), ohne Punkte und Strafen.
+        $this->d->actAs($this->user('kptest_anw_helfer', 'attendance'));
+        [$s, $list] = $this->req('GET', '/members');
+        $row = array_column((array) $list, null, 'id')[$m] ?? [];
+        $c->ok($s === 200 && $row !== [] && array_key_exists('points', $row) && $row['points'] === null && ($row['open_cents'] ?? null) === null, '„Anwesenheit verwalten“: Mitgliederliste ohne Punkte und Strafen');
+        [$s, $d] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && ($d['points'] ?? null) === null && ($d['penalties'] ?? null) === [], '„Anwesenheit verwalten“: Details ohne Punkte und Strafen');
         $this->d->actAs($admin);
         [$s, $l] = $this->req('PUT', '/attendance', ['source' => 'free', 'title' => 'Kptest Übung', 'date' => '2026-10-19', 'entries' => [$m => 'present', $cand => 'absent']]);
         $people = array_column((array) ($l['people'] ?? []), null, 'id');
