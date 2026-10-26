@@ -3146,7 +3146,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
       description: Wer Dienstgrade bzw. Titel verwaltet, sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
+      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
       parameters:
         - name: all
           in: query
@@ -3173,7 +3173,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
       description: Mit Bereich Geburtstage und Recht `create_users` auch `birthday` (mit Jahr und den Schaltern der Person, null ohne Eintrag).
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
+      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
       responses:
         '200':
           description: OK

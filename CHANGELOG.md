@@ -57,6 +57,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Mitgliederliste für die Anwesenheit**: Wer nur die Anwesenheit führt, sah in der Verwaltung den Knopf
+  **Mitglieder**, bekam beim Öffnen aber eine Fehlermeldung. Jetzt öffnet sich die Liste mit Namen, Rollen, Fotos und
+  Dienstgraden, ohne Punkte und Strafen.
 - **Benachrichtigungen über geänderte Kalendertermine kamen spät**: Ob sich im Google Kalender etwas geändert hat,
   prüft die App alle 15 Minuten. Dabei nahm sie bisher die zwischengespeicherten Termine, solange sie nach
   **Aktualisieren alle … Minuten** noch als aktuell galten, und verschickte die Nachricht erst im nächsten Lauf der

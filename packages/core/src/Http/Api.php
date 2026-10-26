@@ -497,7 +497,7 @@ final class Api
         $denyBoard = 'Das Schwarze Brett darfst du nicht sehen.';
         $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
-        // Mitgliederliste: wer Punkte oder Strafen vergibt, Mitglieder anlegt oder Rollen vergibt
+        // Mitgliederliste: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = Cap::memberList();
         $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
