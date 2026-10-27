@@ -315,14 +315,6 @@ final class PushService
         return true;
     }
 
-    /** Beim Abmelden auf dem Gerät und beim Löschen eines Kontos. */
-    public function deleteForUser(int $userId): void
-    {
-        foreach ($this->repository()->forUser($userId) as $sub) {
-            $this->repository()->delete($sub['id']);
-        }
-    }
-
     /** @param Subscription|null $sub */
     public static function formatSubscription(?array $sub): ?array
     {

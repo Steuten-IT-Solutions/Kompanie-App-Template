@@ -541,10 +541,7 @@ select {
   background: #d8ead9;
   color: #1d5a31;
 }
-.badge-role,
-.badge-level-organizer,
-.badge-level-manager,
-.badge-level-admin {
+.badge-role {
   background: var(--accent);
   color: var(--on-accent);
   margin-left: 6px;

@@ -1747,7 +1747,6 @@ export const api = {
   uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
-  mailGroups: () => request<MailGroup[]>('GET', '/mails/groups'),
   createMailGroup: (input: MailGroupInput) => request<MailGroup[]>('POST', '/mails/groups', input),
   updateMailGroup: (key: string, input: MailGroupInput) => request<MailGroup[]>('PATCH', `/mails/groups/${encodeURIComponent(key)}`, input),
   deleteMailGroup: (key: string) => request<MailGroup[]>('DELETE', `/mails/groups/${encodeURIComponent(key)}`),
