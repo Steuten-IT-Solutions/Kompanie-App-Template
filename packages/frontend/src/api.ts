@@ -429,7 +429,7 @@ export interface MemberSummary {
   level: Level;
   /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
   extra_roles?: Level[];
-  /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
+  /** Recht „Gehört zur Kompanie“; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
   /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
   group?: Level | null;
@@ -1143,7 +1143,7 @@ export interface AttendancePerson {
   role: Level;
   /** Rolle, als die die Person im Zähler zählt */
   group: Level;
-  /** Mit Mitgliederbereich: Punkte und Strafen möglich */
+  /** Recht „Gehört zur Kompanie“: Punkte und Strafen möglich */
   member: boolean;
   status: AttendanceStatus | null;
   /** Hat für diese Liste schon Punkte */
