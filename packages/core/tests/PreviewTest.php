@@ -65,7 +65,7 @@ final class PreviewTest extends TestCase
         $this->assertNotNull($user);
         $this->assertSame([$this->admin, 'admin', Roles::MEMBER, true], [$user->id, $user->login, $user->role, $user->preview]);
         $this->assertFalse($user->isAdmin());
-        $this->assertSame([Capability::Member, Capability::Calendar, Capability::ViewIntern], $user->capabilities);
+        $this->assertSame(TestApp::capabilities(['member']), $user->capabilities);
         $this->assertSame([], $this->app->roles()->extraRolesOf($user));
         $this->assertSame($this->admin, $preview->realUser()?->id);
         $this->assertSame($user, $this->app->authContext->currentUser(), 'einmal je Anfrage gebaut');

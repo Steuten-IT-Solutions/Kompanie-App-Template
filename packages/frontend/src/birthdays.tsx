@@ -12,6 +12,7 @@ import { navigate } from './router';
 import { Empty, ErrorBox, Loading, useAsync } from './ui';
 
 export { birthdaysVisible } from './upcomingBirthdays';
+export { ownBirthday } from './viewData';
 
 const sec = brand.labels.sections;
 

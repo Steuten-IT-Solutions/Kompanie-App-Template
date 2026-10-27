@@ -7,16 +7,53 @@ namespace KompanieApp\Core\Auth;
 /** Rechte in der App, unabhängig von WordPress. */
 enum Capability: string
 {
-    /** Eigene Punkte/Strafen, interne Galerie; schließt den internen Kalender ein. */
+    /**
+     * Gehört zur Kompanie: bekommt Punkte, Strafen, Dienstgrade und Titel, steht in Listen, Anwesenheit und mit Geburtstag
+     * im Kalender. Was die Person sieht, regeln die Rechte view_* (früher schloss dieses Recht alles ein, Issue: Rechte
+     * gruppieren); Rechte zum Verwalten setzen es voraus (requires()).
+     */
     case Member = 'member';
-    /** Interner Kalender ohne Mitgliederbereich, z. B. für Anwärter (Issue #23). */
+    /** Interner Kalender (auch ohne Mitgliedschaft, z. B. für Anwärter, Issue #23). */
     case Calendar = 'calendar';
     /**
-     * Bereich „Intern“: Mitglieder und Dokumente stehen in der Navigation gesammelt unter einem Knopf statt einzeln. Nur die
-     * Navigation; was die Person sieht, regeln die anderen Rechte (Dokumente z. B. der Mitgliederbereich). Wie der
-     * Kalender auch ohne Mitgliederbereich vergebbar und in ihm enthalten.
+     * Bereich „Intern“: Die Knöpfe der Bereiche, die die Person sieht (view_directory, view_documents …), stehen in der
+     * Navigation gesammelt unter einem Knopf statt einzeln. Nur die Navigation.
      */
     case ViewIntern = 'view_intern';
+    /** Öffentliche Termine (Tab Termine). */
+    case ViewEvents = 'view_events';
+    /** News (Tab News). */
+    case ViewNews = 'view_news';
+    /** Öffentliche Alben der Galerie. */
+    case ViewGallery = 'view_gallery';
+    /** Interne Bilder und Videos der Galerie (Ordner „intern“). */
+    case ViewGalleryInternal = 'view_gallery_internal';
+    /** Eigene Punkte in „Meins“. */
+    case ViewOwnPoints = 'view_own_points';
+    /** Eigene Strafen in „Meins“. */
+    case ViewOwnPenalties = 'view_own_penalties';
+    /** Eigener Dienstgrad mit Verlauf und eigene Titel in „Meins“. */
+    case ViewOwnRank = 'view_own_rank';
+    /** Eigene Anwesenheit in „Meins“. */
+    case ViewOwnAttendance = 'view_own_attendance';
+    /** Geburtstage der Mitglieder sehen und am Tag benachrichtigt werden. */
+    case ViewBirthdays = 'view_birthdays';
+    /** An Umfragen teilnehmen (Umfragen sehen und abstimmen). */
+    case VotePolls = 'vote_polls';
+    /** Intern: Liste der Mitglieder. */
+    case ViewDirectory = 'view_directory';
+    /** Intern: Ämter. */
+    case ViewOffices = 'view_offices';
+    /** Intern: ehemalige Mitglieder (in der Mitgliederliste). */
+    case ViewFormer = 'view_former';
+    /** Intern: Dokumente (die mit eingeschränkter Sichtbarkeit nur mit manage_documents). */
+    case ViewDocuments = 'view_documents';
+    /** Intern: Schwarzes Brett lesen und Benachrichtigungen dazu bekommen. */
+    case ViewBoard = 'view_board';
+    /** Intern: Liste der Dienstgrade. */
+    case ViewRanks = 'view_ranks';
+    /** Intern: Punktekatalog. */
+    case ViewCatalog = 'view_catalog';
     /** Punkte vergeben und stornieren, Punktekatalog pflegen (Bereich Punkte). */
     case ManagePoints = 'manage_points';
     /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen). */
@@ -59,23 +96,51 @@ enum Capability: string
     case ManageSettings = 'manage_settings';
 
     /**
-     * Rechte, die es auch ohne Mitgliederbereich gibt (z. B. für Anwärter); der Mitgliederbereich enthält sie alle.
-     *
-     * @return list<self>
+     * Recht, das dieses voraussetzt: Eigene Punkte, Strafen, Dienstgrad und Anwesenheit sowie alles zum Verwalten gibt es
+     * nur für Mitglieder (sonst sähe die Person ihre Mitglieder nicht bzw. hätte nichts Eigenes). Die einzige Stelle
+     * für diese Regel; die App hat sie in capabilities.ts (REQUIRES) noch einmal.
      */
-    public static function withoutMember(): array
+    public function requires(): ?self
     {
-        return [self::Calendar, self::ViewIntern];
+        if (in_array($this, self::ownData(), true)) {
+            return self::Member;
+        }
+        return $this->isView() || $this === self::Member ? null : self::Member;
     }
 
     /**
-     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade oder Titel pflegt,
-     * Mitglieder anlegt oder Rollen vergibt.
+     * Rechte zum Sehen (Tabs, Knöpfe unter „Intern“, eigene Daten): Diese lassen sich auch bei Gast und Mitglied
+     * einstellen (Roles::VIEW); Gast gilt dabei auch ohne Anmeldung.
+     */
+    public function isView(): bool
+    {
+        return in_array($this, [
+            self::Calendar, self::ViewIntern, self::ViewEvents, self::ViewNews, self::ViewGallery, self::ViewGalleryInternal,
+            self::ViewOwnPoints, self::ViewOwnPenalties, self::ViewOwnRank, self::ViewOwnAttendance, self::ViewBirthdays,
+            self::VotePolls, self::ViewDirectory, self::ViewOffices, self::ViewFormer, self::ViewDocuments, self::ViewBoard,
+            self::ViewRanks, self::ViewCatalog,
+        ], true);
+    }
+
+    /**
+     * Eigene Daten in „Meins“: nur für Mitglieder.
+     *
+     * @return list<self>
+     */
+    public static function ownData(): array
+    {
+        return [self::ViewOwnPoints, self::ViewOwnPenalties, self::ViewOwnRank, self::ViewOwnAttendance];
+    }
+
+    /**
+     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
+     * Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in adminNav.tsx). Punkte und
+     * Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht (MemberService::visibleParts).
      *
      * @return list<self>
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::CreateUsers, self::PromoteUsers];
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::CreateUsers, self::PromoteUsers];
     }
 }

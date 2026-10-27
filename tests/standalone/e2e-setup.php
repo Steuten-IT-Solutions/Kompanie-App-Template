@@ -45,7 +45,7 @@ $app = $kernel->app();
 // Alle Bereiche an (eine neue Installation hat keine; sonst wählt sie der Admin in der Einrichtung).
 $app->features()->update(array_fill_keys(KompanieApp\Core\Domain\Features::keys(), true));
 // Eigene Rolle wie die Leitung einer Kompanie (Punkte, Kasse, Termine), z. B. „Spieß“.
-$spiess = $app->roles()->create(['label' => 'Spieß', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']]);
+$spiess = $app->roles()->create(['label' => 'Spieß', 'capabilities' => KompanieApp\Core\Auth\Roles::expandLegacy(['member', 'manage_points', 'manage_penalties', 'manage_events'])]);
 $users->setRole($manager, $spiess['key']);
 $app->settings->set('calendar_ics_url', 'https://kalender.test/test.ics');
 $app->settings->set('news_source', 'rss');

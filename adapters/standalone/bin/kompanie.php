@@ -11,8 +11,11 @@
  *   php bin/kompanie.php import datei.json
  *   php bin/kompanie.php status
  *   php bin/kompanie.php update-check   Update-Liste prüfen und anzeigen
- *   php bin/kompanie.php update [--version=…] [--major]   neueste (oder angegebene) Version einspielen
- *   php bin/kompanie.php rollback --version=…   auf eine ältere Version zurück
+ *   php bin/kompanie.php update [--version=…] [--major] [--without-drive]   neueste (oder angegebene) Version einspielen
+ *   php bin/kompanie.php rollback --version=… [--without-drive]   auf eine ältere Version zurück
+ *
+ * Vor jedem Update wird gesichert, mit eingeschalteten Sicherungen in Google Drive auch dort. Scheitert nur Google
+ * Drive, bricht das Update ab; --without-drive spielt es trotzdem ein (die Sicherung auf dem Server ist da).
  *
  * Updates bitte als derselbe Benutzer ausführen, unter dem PHP auf dem Webspace läuft;
  * sonst gehören die neuen Dateien einem anderen Benutzer.
@@ -20,6 +23,8 @@
 
 declare(strict_types=1);
 
+use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Update\UpdateService;
 use KompanieApp\Standalone\HttpContext;
 use KompanieApp\Standalone\Kernel;
 use KompanieApp\Standalone\Setup;
@@ -173,7 +178,7 @@ try {
                 if ($version === '') {
                     throw new RuntimeException('Bitte die Version angeben: rollback --version=…');
                 }
-                $updates->rollback($version);
+                $updates->rollback($version, isset($opt['without-drive']));
             } else {
                 $st = $updates->status();
                 $version = $version !== '' ? $version : (string) ($st['available'] ? $st['latest'] : ($st['withdrawn'] ? $st['fallback'] : ''));
@@ -184,7 +189,7 @@ try {
                     echo "Schon aktuell.\n";
                     break;
                 }
-                $updates->install($version, 'manual', isset($opt['major']));
+                $updates->install($version, 'manual', isset($opt['major']), isset($opt['without-drive']));
             }
             echo "Version $version eingespielt.\n";
             break;
@@ -197,5 +202,8 @@ try {
     }
 } catch (Throwable $e) {
     fwrite(STDERR, 'Fehler: ' . $e->getMessage() . "\n");
+    if ($e instanceof ApiError && $e->errorCode === UpdateService::DRIVE_FAILED) {
+        fwrite(STDERR, "Trotzdem einspielen: denselben Befehl mit --without-drive.\n");
+    }
     exit(1);
 }

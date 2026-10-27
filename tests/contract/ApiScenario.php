@@ -18,6 +18,18 @@ final class ApiScenario
     {
     }
 
+    /**
+     * Rechte einer Rolle, wie sie früher gemeint waren (member schloss das Sehen ein), in der gespeicherten Reihenfolge.
+     *
+     * @param string[] $caps
+     * @return string[]
+     */
+    private static function caps(array $caps): array
+    {
+        $all = \KompanieApp\Core\Auth\Roles::expandLegacy($caps);
+        return array_values(array_filter(array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE), static fn (string $v): bool => in_array($v, $all, true)));
+    }
+
     public function run(): void
     {
         try {
@@ -102,19 +114,19 @@ final class ApiScenario
 
         // Standardrollen der Bereiche (Issue #28): Termine, Punkte und Strafen bringen je eine mit.
         $roles = array_column((array) $this->req('GET', '/admin/roles')[1], 'capabilities', 'key');
-        $c->ok(($roles['events'] ?? null) === ['member', 'manage_events'] && ($roles['points'] ?? null) === ['member', 'manage_points'] && ($roles['penalties'] ?? null) === ['member', 'manage_penalties'], 'Standardrollen der eingeschalteten Bereiche');
+        $c->ok(($roles['events'] ?? null) === self::caps(['member', 'manage_events']) && ($roles['points'] ?? null) === self::caps(['member', 'manage_points']) && ($roles['penalties'] ?? null) === self::caps(['member', 'manage_penalties']), 'Standardrollen der eingeschalteten Bereiche');
         // Für die folgenden Abschnitte: eine Leitung wie früher (Punkte, Strafen, Termine).
         // Bei wiederholten Läufen auf derselben Installation gibt es sie schon (Namen sind eindeutig).
         $this->leitung = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Leitung'] ?? '');
         if ($this->leitung === '') {
-            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => ['member', 'manage_points', 'manage_penalties', 'manage_events']]);
+            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => self::caps(['member', 'manage_points', 'manage_penalties', 'manage_events'])]);
             $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
         }
         $c->ok($this->leitung !== '', 'Rolle „Kptest Leitung“ vorhanden');
         // Anwärter sind eine eigene Rolle, wie ein Admin sie einrichtet.
         $this->anw = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Anwärter'] ?? '');
         if ($this->anw === '') {
-            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Anwärter', 'capabilities' => ['calendar'], 'new_accounts' => true, 'promotable' => true]);
+            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Anwärter', 'capabilities' => self::caps(['calendar']), 'new_accounts' => true, 'promotable' => true]);
             $this->anw = (string) (array_column((array) $d, 'key', 'label')['Kptest Anwärter'] ?? '');
         }
         $c->ok($this->anw !== '', 'Rolle „Kptest Anwärter“ vorhanden');
@@ -313,7 +325,12 @@ final class ApiScenario
             ['GET', '/me', [], [401, 200, 200, 200, 200, 200]],
             ['GET', '/me/points', [], [401, 403, 200, 200, 200, 200]],
             ['GET', '/me/penalties', [], [401, 403, 200, 200, 200, 200]],
-            ['GET', '/catalog', [], [401, 200, 200, 200, 200, 200]],
+            // Sehen-Rechte einzeln: Gast hat anfangs nur das Öffentliche
+            ['GET', '/catalog', [], [401, 403, 200, 200, 200, 200]],
+            ['GET', '/ranks', [], [401, 403, 200, 200, 200, 200]],
+            ['GET', '/documents', [], [401, 403, 200, 200, 200, 200]],
+            ['GET', '/board', [], [401, 403, 200, 200, 200, 200]],
+            ['GET', '/directory', [], [200, 200, 200, 200, 200, 200]],
             ['GET', '/members', [], [401, 403, 403, 403, 200, 200]],
             ['POST', '/events', ['title' => ''], [401, 403, 403, 400, 400, 400]],
             ['PATCH', "/members/$m2/role", ['level' => 'egal'], [401, 403, 403, 403, 403, 400]],
@@ -332,6 +349,30 @@ final class ApiScenario
             }
             $c->ok($got === $expected, sprintf('%s %s → %s', $method, $path, implode('/', $got)));
         }
+
+        // Sehen-Rechte einzeln, auch bei Gast (gilt ohne Anmeldung) und Mitglied.
+        $this->d->actAs($admin);
+        $before = array_column((array) $this->req('GET', '/admin/roles')[1], 'capabilities', 'key');
+        $memberCaps = (array) ($before['member'] ?? []);
+        $guestCaps = (array) ($before['guest'] ?? []);
+        [$s] = $this->req('PATCH', '/admin/roles/member', ['capabilities' => array_values(array_diff($memberCaps, ['view_catalog']))]);
+        $c->ok($s === 200, 'Mitglied ohne Punktekatalog');
+        $this->d->actAs($this->m1);
+        $c->ok($this->req('GET', '/catalog')[0] === 403 && $this->req('GET', '/ranks')[0] === 200, 'Mitglied: Katalog 403, Dienstgrade weiter 200');
+        $this->d->actAs($admin);
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'manage_points']])[0] === 400, 'Mitglied: nur Rechte zum Sehen → 400');
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => array_values(array_diff($memberCaps, ['member']))])[0] === 400, 'Mitglied ohne Mitgliedschaft → 400');
+        $c->ok($this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...$guestCaps, 'member']])[0] === 400, 'Gast mit Mitgliedschaft → 400');
+        [$s] = $this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...array_values(array_diff($guestCaps, ['view_directory'])), 'view_ranks']]);
+        $this->d->actAs(null);
+        $c->ok($s === 200 && $this->req('GET', '/directory')[0] === 401 && $this->req('GET', '/ranks')[0] === 200, 'Ohne Anmeldung wie Gast: Mitgliederliste 401, Dienstgrade 200');
+        $this->d->actAs($gast);
+        $c->ok($this->req('GET', '/directory')[0] === 403, 'Gast ohne Mitgliederliste → 403');
+        $this->d->actAs($admin);
+        $this->req('PATCH', '/admin/roles/member', ['capabilities' => $memberCaps]);
+        $this->req('PATCH', '/admin/roles/guest', ['capabilities' => $guestCaps]);
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/directory')[0] === 200, 'Gast wieder wie vorher');
 
         // Punkte und Strafen sind getrennte Rechte; die Mitgliederliste zeigt nur die eigenen Daten.
         $pw = $this->user('kptest_punktewart', 'points');
@@ -410,7 +451,7 @@ final class ApiScenario
         $c->ok($this->req('GET', '/admin/roles')[0] === 403, 'GET /admin/roles als Mitglied → 403');
 
         $this->d->actAs($admin);
-        [$s, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
+        [$s, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Jugend', 'capabilities' => self::caps(['member']), 'points_factor' => 0.5]);
         $role = array_column((array) $d, null, 'label')['Kptest Jugend'] ?? [];
         $c->ok($s === 201 && ($role['points_factor'] ?? null) == 0.5, 'Rolle „Jugend“ mit Faktor 0,5 angelegt');
         $key = (string) ($role['key'] ?? '');
@@ -433,7 +474,7 @@ final class ApiScenario
 
         // Wer Konten anlegen darf, ohne Admin zu sein: Passwörter nur von Mitgliedern mit eigenen Rechten.
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => ['member', 'create_users']]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => self::caps(['member', 'create_users'])]);
         $pflege = (string) (array_column((array) $d, 'key', 'label')['Kptest Kontenpflege'] ?? '');
         $holder = $this->user('kptest_rollen_pflege', $pflege);
         $guest = $this->user('kptest_rollen_gast', 'guest');
@@ -459,7 +500,7 @@ final class ApiScenario
         $m = $this->user('kptest_zusatz_m', 'member');
         $cand = $this->user('kptest_zusatz_anw', $this->anw);
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Zusatz Jugend', 'capabilities' => ['member'], 'points_factor' => 0.5]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Zusatz Jugend', 'capabilities' => self::caps(['member']), 'points_factor' => 0.5]);
         $young = (string) (array_column((array) $d, 'key', 'label')['Kptest Zusatz Jugend'] ?? '');
 
         [$s, $d] = $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties', $young]]);
@@ -509,7 +550,7 @@ final class ApiScenario
         $admin = $this->user('kptest_vorschau_admin', 'admin');
         $m = $this->user('kptest_vorschau_m', 'member');
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Vorschau Kasse', 'capabilities' => ['member', 'manage_points']]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Vorschau Kasse', 'capabilities' => self::caps(['member', 'manage_points'])]);
         $cash = (string) (array_column((array) $d, 'key', 'label')['Kptest Vorschau Kasse'] ?? '');
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties']]);
         $pdf = base64_encode("%PDF-1.4\n%%EOF\n");
@@ -525,7 +566,9 @@ final class ApiScenario
         sort($caps);
         $c->ok($s === 200 && ($d['preview']['role'] ?? '') === 'member' && is_string($d['preview']['label'] ?? null), '/config meldet die Vorschau mit Bezeichnung');
         $c->ok(($d['user']['id'] ?? 0) === $admin && ($d['user']['level'] ?? '') === 'member' && ($d['user']['extra_roles'] ?? null) === [], 'Vorschau: dieselbe Person mit der Rolle, ohne Zusatzrollen');
-        $c->ok($caps === ['calendar', 'member', 'view_intern'], 'Vorschau: genau die Rechte der Rolle');
+        $expected = \KompanieApp\Core\Auth\Roles::MEMBER_DEFAULTS;
+        sort($expected);
+        $c->ok($caps === $expected, 'Vorschau: genau die Rechte der Rolle');
         $c->ok(($d['setupPending'] ?? null) === false, 'Vorschau: kein Einrichtungsassistent');
         [$s, $me] = $this->req('GET', '/me');
         $c->ok($s === 200 && ($me['id'] ?? 0) === $admin && ($me['level'] ?? '') === 'member', '/me: eigene Daten des Admins mit der Rolle');
@@ -655,17 +698,17 @@ final class ApiScenario
 
         // Wer Konten anlegt, legt Anwärter an und nimmt sie auf – nur von Anwärter zu Mitglied.
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => ['member', 'create_users']]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => self::caps(['member', 'create_users'])]);
         $aufnahme = (string) (array_column((array) $d, 'key', 'label')['Kptest Aufnahme'] ?? '');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Nur Kalender', 'capabilities' => ['calendar']])[0] === 201, 'Eigene Rolle nur mit dem Kalender');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
-        // „Intern“ (Navigation): wie der Kalender auch ohne Mitgliederbereich, in ihm enthalten.
+        // „Intern“ (Navigation): wie der Kalender auch ohne Mitgliedschaft; jedes Recht gilt einzeln.
         [$s, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Intern', 'capabilities' => ['calendar', 'view_intern']]);
         $intern = array_column((array) $d, null, 'label')['Kptest Intern'] ?? [];
-        $c->ok($s === 201 && ($intern['capabilities'] ?? null) === ['calendar', 'view_intern'], 'Eigene Rolle mit Kalender und „Intern“, ohne Mitgliederbereich');
+        $c->ok($s === 201 && ($intern['capabilities'] ?? null) === ['view_intern', 'calendar'], 'Eigene Rolle mit Kalender und „Intern“, ohne Mitgliederbereich');
         [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Intern Mitglied', 'capabilities' => ['member', 'view_intern']]);
         $internMember = array_column((array) $d, null, 'label')['Kptest Intern Mitglied'] ?? [];
-        $c->ok(($internMember['capabilities'] ?? null) === ['member'], '„Intern“ im Mitgliederbereich enthalten, nicht doppelt gespeichert');
+        $c->ok(($internMember['capabilities'] ?? null) === ['view_intern', 'member'], 'Mitgliedschaft schließt „Intern“ nicht ein, beide gespeichert');
         foreach ([$intern, $internMember] as $r) {
             $this->req('DELETE', '/admin/roles/' . (string) ($r['key'] ?? ''));
         }
@@ -847,6 +890,13 @@ final class ApiScenario
         $guest = $this->user('kptest_anw_gast', 'guest');
         $this->d->actAs($m);
         $c->ok($this->req('GET', '/attendance')[0] === 403, 'Mitglied: GET /attendance → 403');
+        // Wer die Anwesenheit führt, sieht die Mitgliederliste der Verwaltung (wie der Knopf in der App), ohne Punkte und Strafen.
+        $this->d->actAs($this->user('kptest_anw_helfer', 'attendance'));
+        [$s, $list] = $this->req('GET', '/members');
+        $row = array_column((array) $list, null, 'id')[$m] ?? [];
+        $c->ok($s === 200 && $row !== [] && array_key_exists('points', $row) && $row['points'] === null && ($row['open_cents'] ?? null) === null, '„Anwesenheit verwalten“: Mitgliederliste ohne Punkte und Strafen');
+        [$s, $d] = $this->req('GET', "/members/$m");
+        $c->ok($s === 200 && ($d['points'] ?? null) === null && ($d['penalties'] ?? null) === [], '„Anwesenheit verwalten“: Details ohne Punkte und Strafen');
         $this->d->actAs($admin);
         [$s, $l] = $this->req('PUT', '/attendance', ['source' => 'free', 'title' => 'Kptest Übung', 'date' => '2026-10-19', 'entries' => [$m => 'present', $cand => 'absent']]);
         $people = array_column((array) ($l['people'] ?? []), null, 'id');
@@ -1266,7 +1316,7 @@ final class ApiScenario
         [$s, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [], 'updated_at' => '2000-01-01T00:00:00+00:00']);
         $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict, nichts überschrieben');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === ['member', 'manage_lists'], 'Standardrolle „Listen verwalten“');
+        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === self::caps(['member', 'manage_lists']), 'Standardrolle „Listen verwalten“');
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['lists']]);
         $this->d->actAs($m);
         [$s, $d] = $this->req('GET', "/lists/$id");
@@ -1313,7 +1363,7 @@ final class ApiScenario
         }
         $c->ok($this->req('GET', '/mails')[0] === 200 && $this->req('GET', '/mails/999999999')[0] === 404, 'Verlauf; unbekannte Mail → 404');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === ['member', 'send_mail'], 'Standardrolle „E-Mails verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === self::caps(['member', 'send_mail']), 'Standardrolle „E-Mails verwalten“');
         $this->req('PUT', '/admin/features', ['mail' => false]);
         [$s, $d] = $this->req('GET', '/mails/options');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');

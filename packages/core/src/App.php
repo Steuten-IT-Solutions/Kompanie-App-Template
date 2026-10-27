@@ -39,6 +39,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\ListService;
+use KompanieApp\Core\Domain\MailGroupService;
 use KompanieApp\Core\Domain\MailingService;
 use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BackupDownload;
@@ -157,6 +158,27 @@ final class App
         $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
+    }
+
+    /**
+     * Wer die Anfrage stellt; ohne Anmeldung ein Gast ohne Konto (ID 0) mit den Rechten der Rolle Gast, die auch ohne
+     * Anmeldung gilt. Nur zum Lesen von Bereichen, die Gast sehen kann, nie für Eigenes oder Änderungen.
+     */
+    public function viewer(): User
+    {
+        return $this->authContext->currentUser() ?? $this->anonymous();
+    }
+
+    /** Besucher ohne Anmeldung: Gast ohne Konto (ID 0) mit den Rechten der Rolle Gast. */
+    public function anonymous(): User
+    {
+        return new User(0, '', '', \KompanieApp\Core\Auth\Roles::GUEST, $this->roles()->guestCapabilities());
+    }
+
+    /** Hat, wer die Anfrage stellt, dieses Recht? Ohne Anmeldung zählen die Rechte von Gast (viewer). */
+    public function can(\KompanieApp\Core\Auth\Capability $capability): bool
+    {
+        return $this->viewer()->can($capability);
     }
 
     /** Vorschau „App als Rolle ansehen“ der laufenden Anfrage (Issue #63). */
@@ -292,7 +314,11 @@ final class App
             } elseif ($task === PushService::TASK_SEND) {
                 $this->push()->processQueue();
             } elseif ($task === PushService::TASK_WATCH) {
-                $this->pushTriggers()->watch();
+                // Eingereihtes gleich verschicken, nicht erst im nächsten Lauf von push_send: Mit WP-Cron oder dem
+                // Pseudo-Cron käme das sonst erst mit dem nächsten Cron-Aufruf bzw. Seitenaufruf.
+                if ($this->pushTriggers()->watch() > 0) {
+                    $this->push()->processQueue();
+                }
             } elseif ($task === BoardService::TASK) {
                 $this->board()->cleanup();
             } elseif ($task === BoardMailService::TASK) {
@@ -535,6 +561,12 @@ final class App
         return $this->service(MailingService::class, fn () => new MailingService($this));
     }
 
+    /** Mailgruppen für die E-Mails aus der Verwaltung (Standardgruppen und eigene) */
+    public function mailGroups(): MailGroupService
+    {
+        return $this->service(MailGroupService::class, fn () => new MailGroupService($this));
+    }
+
     /** Mailer mit den aktuellen Einstellungen (jedes Mal neu: Einstellungen können sich geändert haben). */
     public function mailer(): Mailer
     {
@@ -659,6 +691,7 @@ final class App
             $this->backup,
             $this->packageConfig,
             $this->telemetry(),
+            $this->backupUpload(),
         ));
     }
 

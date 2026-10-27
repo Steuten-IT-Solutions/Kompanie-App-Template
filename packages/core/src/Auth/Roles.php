@@ -8,8 +8,9 @@ namespace KompanieApp\Core\Auth;
  * Feste Rollen und die Rollen älterer Installationen.
  *
  * Welche Rollen es gibt und welche Rechte sie haben, entscheidet der Admin der Kompanie in der App
- * (Domain\RoleService). Fest sind guest (keine Rechte), member (Mitgliederbereich, Rolle neuer Konten) und admin
- * (alle Rechte); sie lassen sich nur umbenennen (Mitglied und Admin bekommen auch einen Punktefaktor). Weitere
+ * (Domain\RoleService). Fest sind guest (gilt auch ohne Anmeldung), member (Mitglied, Rolle neuer Konten) und admin
+ * (alle Rechte); sie lassen sich umbenennen (Mitglied und Admin bekommen auch einen Punktefaktor), bei Gast und
+ * Mitglied auch die Rechte zum Sehen. Weitere
  * Standardrollen bringen die Bereiche mit, wenn der Admin sie einschaltet (Domain\Features, z. B. „Punkte verwalten“).
  * Anwärter (Issue #23) legt der Admin als eigene Rolle an, z. B. nur mit dem internen Kalender.
  */
@@ -28,14 +29,31 @@ final class Roles
     public const KEY_MAX = 10;
 
     /**
-     * Feste Rollen in der Reihenfolge der Anzeige: Schlüssel => Rechte. Die Bezeichnungen kommen bei der
-     * Ersteinrichtung aus kompanie.json (labels.roles).
+     * Was ohne Anmeldung zu sehen war, bevor sich das einstellen ließ: die Vorgabe für Gast (gilt auch ohne Anmeldung)
+     * und für jede Rolle beim Update (RoleService::migrateViewRights).
+     */
+    public const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former'];
+
+    /**
+     * Was der frühere Mitgliederbereich (Recht member) alles einschloss, dazu das Öffentliche: die Vorgabe für Mitglied
+     * und die Rollen, die die Bereiche mitbringen.
+     */
+    public const MEMBER_DEFAULTS = [
+        'member', 'calendar', 'view_intern', ...self::PUBLIC_DEFAULTS, 'view_gallery_internal', 'view_own_points',
+        'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents',
+        'view_board', 'view_ranks', 'view_catalog',
+    ];
+
+    /**
+     * Feste Rollen in der Reihenfolge der Anzeige: Schlüssel => Rechte, wie bei der Ersteinrichtung. Die Bezeichnungen
+     * kommen dann aus kompanie.json (labels.roles). Admin hat immer alle Rechte; bei Gast und Mitglied lassen sich die
+     * Rechte zum Sehen ändern (Capability::isView), Mitglied hat immer member, Gast nie.
      *
      * @var array<string, string[]>
      */
     public const TEMPLATES = [
-        self::GUEST => [],
-        self::MEMBER => ['member'],
+        self::GUEST => self::PUBLIC_DEFAULTS,
+        self::MEMBER => self::MEMBER_DEFAULTS,
         self::ADMIN => [],
     ];
 
@@ -46,31 +64,58 @@ final class Roles
      * @var array<string, string[]>
      */
     public const LEGACY = [
-        self::ORGANIZER => ['member', 'manage_events', 'manage_documents'],
-        self::MANAGER => ['member', 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties'],
+        self::ORGANIZER => [...self::MEMBER_DEFAULTS, 'manage_events', 'manage_documents'],
+        self::MANAGER => [...self::MEMBER_DEFAULTS, 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties'],
     ];
 
+    /** Frühere feste Rolle „Anwärter“: interner Kalender und das Brett (wie damals mit dem Kalender), dazu das Öffentliche. */
+    public const CANDIDATE_DEFAULTS = ['calendar', 'view_board', ...self::PUBLIC_DEFAULTS];
+
     /**
-     * Rechte, die der Admin einer Rolle geben kann. manage_settings (Einstellungen, Updates,
-     * Datensicherung, also auch das Einspielen von Programmcode) bleibt den Admins vorbehalten.
+     * Rechte, die der Admin einer Rolle geben kann, in der Reihenfolge der Anzeige (Gruppen in capabilities.ts).
+     * manage_settings (Einstellungen, Updates, Datensicherung, also auch das Einspielen von Programmcode) bleibt den
+     * Admins vorbehalten.
      */
     public const GRANTABLE = [
-        Capability::Member,
-        Capability::Calendar,
+        // Tabs und Navigation
+        Capability::ViewEvents,
+        Capability::ViewNews,
+        Capability::ViewGallery,
         Capability::ViewIntern,
+        // Mitgliederbereich
+        Capability::Member,
+        Capability::ViewOwnPoints,
+        Capability::ViewOwnPenalties,
+        Capability::ViewOwnRank,
+        Capability::ViewOwnAttendance,
+        Capability::Calendar,
+        Capability::ViewGalleryInternal,
+        Capability::ViewBirthdays,
+        Capability::VotePolls,
+        // Intern
+        Capability::ViewDirectory,
+        Capability::ViewOffices,
+        Capability::ViewFormer,
+        Capability::ViewDocuments,
+        Capability::ViewBoard,
+        Capability::ViewRanks,
+        Capability::ViewCatalog,
+        // Inhalte verwalten
+        Capability::ManageEvents,
+        Capability::ManageDocuments,
+        Capability::PostBoard,
+        Capability::ManagePolls,
+        Capability::ManageLists,
+        Capability::SendMail,
+        // Kompanie verwalten
         Capability::ManagePoints,
         Capability::ManagePenalties,
         Capability::ManageRanks,
         Capability::ManageTitles,
         Capability::ManageAttendance,
-        Capability::ManageEvents,
-        Capability::ManageDocuments,
-        Capability::PostBoard,
-        Capability::ManagePolls,
-        Capability::ManageInventory,
         Capability::ManageOffices,
-        Capability::ManageLists,
-        Capability::SendMail,
+        Capability::ManageInventory,
+        // Mitglieder und Rollen
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];
@@ -86,29 +131,43 @@ final class Roles
         if ($key === self::ADMIN) {
             return Capability::cases();
         }
-        $caps = self::TEMPLATES[$key] ?? self::LEGACY[$key] ?? ($key === self::CANDIDATE ? [Capability::Calendar->value] : []);
-        return self::withImplied(array_values(array_filter(array_map(static fn (string $c): ?Capability => Capability::tryFrom($c), $caps))));
+        $caps = self::TEMPLATES[$key] ?? self::LEGACY[$key] ?? ($key === self::CANDIDATE ? self::CANDIDATE_DEFAULTS : []);
+        return self::from($caps);
     }
 
     /**
-     * Der Mitgliederbereich schließt den internen Kalender und den Bereich „Intern“ ein (Capability::withoutMember).
+     * Rechte aus ihren Werten; unbekannte fallen weg, Doppelte auch.
      *
-     * @param Capability[] $caps
+     * @param string[] $values
      * @return Capability[]
      */
-    public static function withImplied(array $caps): array
+    public static function from(array $values): array
     {
-        if (in_array(Capability::Member, $caps, true)) {
-            foreach (Capability::withoutMember() as $implied) {
-                if (!in_array($implied, $caps, true)) {
-                    $caps[] = $implied;
-                }
+        $out = [];
+        foreach ($values as $v) {
+            $cap = Capability::tryFrom($v);
+            if ($cap !== null && !in_array($cap, $out, true)) {
+                $out[] = $cap;
             }
         }
-        return $caps;
+        return $out;
     }
 
-    /** Fest: Rechte nicht änderbar, nicht löschbar (umbenennen geht). */
+    /**
+     * Rechte, wie sie vor dem Aufteilen gemeint waren (für die Migration und ältere Sicherungen): Jeder sah das
+     * Öffentliche, der Mitgliederbereich (member) schloss alles ein, was MEMBER_DEFAULTS aufzählt, der Kalender ohne
+     * ihn das Brett.
+     *
+     * @param string[] $values
+     * @return string[]
+     */
+    public static function expandLegacy(array $values): array
+    {
+        $add = in_array('member', $values, true) ? self::MEMBER_DEFAULTS : (in_array('calendar', $values, true) ? ['view_board'] : []);
+        return array_values(array_unique([...$values, ...self::PUBLIC_DEFAULTS, ...$add]));
+    }
+
+    /** Fest: nicht löschbar (umbenennen geht; bei Gast und Mitglied lassen sich die Rechte zum Sehen ändern). */
     public static function isSystem(string $key): bool
     {
         return isset(self::TEMPLATES[$key]);

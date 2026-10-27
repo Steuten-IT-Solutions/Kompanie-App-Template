@@ -112,8 +112,10 @@ final class AppPage
         $c = $app->config;
         $icons = KOMPANIE_APP_URL . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
-        header('Cache-Control: public, max-age=86400');
-        echo wp_json_encode([
+        // Immer neu prüfen (mit ETag meist 304): Chrome übernimmt Änderungen (Icons, Ausrichtung) in installierte Apps
+        // nur, wenn es beim Abgleich das neue Manifest bekommt.
+        header('Cache-Control: no-cache');
+        $body = (string) wp_json_encode([
             'name' => $c->name(),
             'short_name' => $c->shortName(),
             'description' => $c->description(),
@@ -121,11 +123,15 @@ final class AppPage
             'start_url' => $app->env->appUrl(),
             'scope' => $app->env->appUrl(),
             'display' => 'standalone',
-            'orientation' => 'portrait',
+            'orientation' => 'any',
             'background_color' => '#ffffff',
             'theme_color' => $c->primaryColor(),
             'icons' => ManifestIcons::entries($icons, self::distDir() . 'icons'),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (self::notModified(FileCache::contentEtag($body))) {
+            return;
+        }
+        echo $body;
     }
 
     private static function sendServiceWorker(App $app): void
@@ -243,7 +249,7 @@ final class AppPage
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
         return $app->gallery()->deliverVideo($id, $range, static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
     }
 
@@ -256,7 +262,7 @@ final class AppPage
     {
         return $app->gallery()->deliverPhoto($id, $size, static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
     }
 

@@ -79,7 +79,7 @@ durch das ausbleibende Lebenszeichen auf.
   | `CALENDAR_FETCH` | Quelle (`google`, `google_connection`, `ics`), dazu die Art | `ics_http_404`, `google_http_403`, `ics_timeout` |
   | `GALLERY_SYNC` | Art | `http_403`, `timeout` |
   | `UPDATE_CHECK` | Schritt | `network_dns`, `http_404`, `signature`, `invalid_list`, `other_kompanie`, `older_list` |
-  | `UPDATE_FAILED` | Schritt (`download`, `backup`, `install`), dazu die Art | `download_http_503`, `install` |
+  | `UPDATE_FAILED` | Schritt (`download`, `backup`, `drive` = Sicherung in Google Drive, `install`), dazu die Art | `download_http_503`, `install` |
   | `ROLLBACK` | `rollback` oder `withdrawn` | |
   | `TASK_FAILED` | Aufgabe und Klasse der Ausnahme | `push_send_typeerror` |
   | `SERVER_ERROR` | Klasse der Ausnahme, Methode und Route (mit Platzhaltern) | `typeerror_get_events_id` |

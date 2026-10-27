@@ -231,6 +231,14 @@ try {
     $c->ok(($headers['x-content-type-options'] ?? '') === 'nosniff' && ($headers['x-frame-options'] ?? '') === 'SAMEORIGIN', 'Sicherheits-Header');
     $man = json_decode((string) file_get_contents($base . 'index.php?r=/manifest.webmanifest'), true);
     $c->ok(($man['start_url'] ?? '') === $base && str_starts_with($man['icons'][0]['src'] ?? '', $base . 'app/icons/icon-192.png'), 'Manifest mit Start-Adresse und Icons');
+    // Drehbar (Querformat), nicht auf hochkant festgelegt
+    $c->ok(($man['orientation'] ?? '') === 'any', 'Manifest: Ausrichtung frei');
+    // Immer neu prüfen, damit Chrome Änderungen in installierte Apps übernimmt; mit ETag meist 304 ohne Inhalt.
+    $manRes = $d->send('GET', $base . 'index.php?r=/manifest.webmanifest', [], null);
+    $manEtag = (string) ($manRes[2]['etag'] ?? '');
+    $c->ok($manRes[0] === 200 && $manEtag !== '' && ($manRes[2]['cache-control'] ?? '') === 'private, no-cache', 'Manifest: mit ETag, no-cache');
+    $manAgain = $d->send('GET', $base . 'index.php?r=/manifest.webmanifest', ['If-None-Match' => $manEtag], null);
+    $c->ok($manAgain[0] === 304 && in_array($manAgain[1], [null, ''], true), 'Manifest: passender ETag → 304 ohne Inhalt');
     $sw = $d->send('GET', $base . 'sw.js', [], null);
     $c->ok($sw[0] === 200 && str_contains((string) ($sw[2]['content-type'] ?? ''), 'javascript'), 'sw.js liegt neben index.php (Bereich: ganze App)');
     // Ohne statische Auslieferung (Weg über index.php): ETag, bei passendem If-None-Match 304 (Issue #18).

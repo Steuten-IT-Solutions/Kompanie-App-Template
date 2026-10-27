@@ -39,6 +39,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Dauert sonst etwa 3 Minuten. Ohne Grenze liefe ein hängender Schritt (z. B. apt bei der Installation von
+    # Playwright) bis zu 6 Stunden und hielte „Kompanien abgleichen“ so lange auf.
+    timeout-minutes: 20
     outputs:
       kompanie-sha: ${{ steps.kompanie.outputs.sha }}
     steps:

@@ -11,7 +11,8 @@ const sec = brand.labels.sections;
 export default function Dienstgrade() {
   const { data, error, loading, reload } = useAsync(sources.ranks.load, sources.ranks.deps, sources.ranks.key);
   // Nur für die Markierung des eigenen Dienstgrads; ohne /me bleibt die Liste ohne Markierung.
-  const me = useAsync(sources.me.load, sources.me.deps, sources.me.key);
+  const signedIn = !!config?.user;
+  const me = useAsync(() => (signedIn ? sources.me.load() : Promise.resolve(null)), [], signedIn ? sources.me.key : undefined);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const ranks = data ?? [];

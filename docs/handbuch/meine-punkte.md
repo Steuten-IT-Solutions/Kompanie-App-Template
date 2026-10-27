@@ -1,7 +1,7 @@
 ---
 titel: "Meine {bereich.points}"
 reihenfolge: 40
-rechte: [member]
+rechte: [view_own_points]
 bereiche: [points]
 ---
 Hier siehst du, wie viele {bereich.points} du hast und wofür du sie bekommen hast. Die Seite ist nur zum Ansehen; andere Mitglieder sehen deine {bereich.points} nicht.

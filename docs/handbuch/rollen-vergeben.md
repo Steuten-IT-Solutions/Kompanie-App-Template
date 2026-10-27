@@ -30,7 +30,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 2. Entferne den Haken, um die Zusatzrolle wieder wegzunehmen.
 
 ### Ein einzelnes Recht geben oder entziehen
-1. Setze oder entferne unter **Rechte** den Haken beim Recht.
+1. Klappe unter **Rechte** die Gruppe auf, indem du auf ihren Namen tippst, und setze oder entferne den Haken beim Recht. Der Haken vor der Gruppe setzt oder entfernt alle Rechte der Gruppe auf einmal. Gruppen mit Ausnahmen sind schon aufgeklappt.
 2. Tippe auf **Rechte speichern**. Was von den Rollen abweicht, ist mit „zusätzlich“ oder „entzogen“ markiert.
 3. **Wie die Rolle** entfernt alle Ausnahmen wieder.
 
@@ -47,10 +47,10 @@ Du siehst nur die Teile, für die du das Recht hast:
 ![Passwort, Ehemalig und Konto](bild:rollen-vergeben-konto)
 
 ## Gut zu wissen
-- Die Person hat die Rechte aller ihrer Rollen zusammen; bei {bereich.points} zählt der kleinste Punktefaktor ihrer Rollen. Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich; {rolle.guest}, {rolle.member} und {rolle.admin} sind nur Grundrolle.
+- Die Person hat die Rechte aller ihrer Rollen zusammen; bei {bereich.points} zählt der kleinste Punktefaktor ihrer Rollen. Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört; {rolle.guest}, {rolle.member} und {rolle.admin} sind nur Grundrolle.
 - Die eigene Rolle und die eigenen Rechte ändert niemand selbst. Der letzte {rolle.admin} kann nicht herabgestuft werden.
 - Wer kein {rolle.admin} ist, vergibt und entfernt nur Rollen und Rechte, die er selbst hat – nie {rolle.admin} und nie „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
-- Ausnahmen bei den Rechten bleiben, wenn sich die Rollen ändern; was die Rollen dann ohnehin regeln, fällt weg. {rolle.admin}s haben immer alle Rechte, {rolle.guest}s keine: Für sie gibt es keine Ausnahmen. Einstellungen, Updates und Datensicherung bleiben {rolle.admin}s vorbehalten.
+- Ausnahmen bei den Rechten bleiben, wenn sich die Rollen ändern; was die Rollen dann ohnehin regeln, fällt weg. {rolle.admin}s haben immer alle Rechte, {rolle.guest}s die ihrer Rolle: Für sie gibt es keine Ausnahmen. Einstellungen, Updates und Datensicherung bleiben {rolle.admin}s vorbehalten.
 - Nach einem neuen Startpasswort gilt das alte nicht mehr, und die Person ist auf allen Geräten abgemeldet. Ein neuer Benutzername meldet sie ebenfalls überall ab.
 - **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank}, {bereich.titles}, Geburtstag, Eintritt, Foto, Antworten bei Umfragen und Benachrichtigungen. Was sie für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen. Wer nur ausgetreten oder verstorben ist, trägst du besser als ehemalig ein: Dann bleiben alle Daten erhalten.
 - Wer kein {rolle.admin} ist, setzt Passwörter nur bei Personen zurück (und ändert bzw. löscht nur deren Konten und Fotos), die keine weiteren Rechte als er selbst haben und weder Mitglieder anlegen noch Rollen vergeben dürfen.

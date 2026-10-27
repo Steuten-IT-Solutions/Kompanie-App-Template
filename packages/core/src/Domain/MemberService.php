@@ -297,7 +297,7 @@ final class MemberService
             throw ApiError::invalid('Admins haben schon alle Rechte und bekommen keine Zusatzrollen.');
         }
         if ($wanted !== [] && !$this->roles->allowsExtraRoles($base)) {
-            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle mit Mitgliederbereich, nicht zu „%s“.', $this->roles->label($base)));
+            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „%s“.', $this->roles->label($base)));
         }
         $changed = array_merge(array_diff(array_keys($wanted), $current), array_diff($current, array_keys($wanted)));
         if ($changed !== [] && !$this->roles->canHandleUser($actor, $target)) {
@@ -503,7 +503,7 @@ final class MemberService
             throw ApiError::forbidden('Konten von Admins verwalten nur Admins.');
         }
         if (!$actor->isAdmin() && !$target->isMember() && !self::calendarOnly($target)) {
-            throw ApiError::forbidden('Konten von Personen ohne Mitgliederbereich verwalten nur Admins.');
+            throw ApiError::forbidden('Konten von Personen, die nicht zur Kompanie gehören, verwalten nur Admins.');
         }
         if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {
             throw ApiError::forbidden($message);

@@ -97,7 +97,7 @@ final class DirectoryTest extends TestCase
 
     public function testCountsPerGroupWithoutRolesPerPerson(): void
     {
-        $young = $this->app->roles()->create(['label' => 'Jungmariner', 'capabilities' => ['member']])['key'];
+        $young = $this->app->roles()->create(['label' => 'Jungmariner', 'capabilities' => TestApp::caps(['member'])])['key'];
         $this->users->add('jung', $young);
         $counts = fn (int $viewer): array => array_column($this->countsAs($viewer)->data, 'count', 'group');
 

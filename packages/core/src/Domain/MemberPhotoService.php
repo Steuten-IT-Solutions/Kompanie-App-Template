@@ -18,7 +18,7 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
  *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert) und, soweit
  *   möglich, in Originalauflösung (MAX_EDGE), in der Datenbank (MemberPhotoRepository).
- * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (VIEWERS), und mit dem Bereich
+ * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (Capability::memberList), und mit dem Bereich
  *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste und der Ehemaligen (Issue #112,
  *   inDirectory).
  *   Ausgeliefert über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide
@@ -45,8 +45,6 @@ final class MemberPhotoService
     public const QUALITY = 82;
     /** Endung => Signatur; bei WebP steht „WEBP“ zusätzlich ab Byte 8. */
     public const TYPES = ['jpg' => "\xFF\xD8\xFF", 'jpeg' => "\xFF\xD8\xFF", 'png' => "\x89PNG\r\n\x1A\n", 'webp' => 'RIFF'];
-    /** Wer die Mitgliederliste der Verwaltung sieht (wie dort), sieht auch die Fotos. */
-    public const VIEWERS = [Capability::ManagePoints, Capability::ManagePenalties, Capability::ManageRanks, Capability::ManageTitles, Capability::CreateUsers, Capability::PromoteUsers];
 
     private ?MemberPhotoRepository $repo = null;
 
@@ -225,7 +223,8 @@ final class MemberPhotoService
     /** Ob $viewer Fotos anderer sieht (sonst nur das eigene). */
     public static function canSeeOthers(User $viewer): bool
     {
-        foreach (self::VIEWERS as $cap) {
+        // Wer die Mitgliederliste der Verwaltung sieht (wie dort), sieht auch die Fotos.
+        foreach (Capability::memberList() as $cap) {
             if ($viewer->can($cap)) {
                 return true;
             }

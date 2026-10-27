@@ -11,6 +11,9 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    # Dauert sonst unter 1 Minute. Ohne Grenze liefe ein hängender Schritt (z. B. ein E2E-Test, der auf den Testserver wartet)
+    # bis zu 6 Stunden.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -55,6 +58,9 @@ jobs:
 
   php:
     runs-on: ubuntu-latest
+    # Dauert sonst etwa 3 Minuten. Ohne Grenze liefe ein hängender Schritt (z. B. ein E2E-Test, der auf den Testserver wartet)
+    # bis zu 6 Stunden.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +96,9 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    # Dauert sonst etwa 1 Minute. Ohne Grenze liefe ein hängender Schritt (z. B. ein E2E-Test, der auf den Testserver wartet)
+    # bis zu 6 Stunden.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -130,6 +139,9 @@ jobs:
 
   wordpress:
     runs-on: ubuntu-latest
+    # Dauert sonst etwa 8 bis 18 Minuten. Ohne Grenze liefe ein hängender Schritt (z. B. ein E2E-Test, der auf den Testserver wartet)
+    # bis zu 6 Stunden.
+    timeout-minutes: 40
     services:
       mariadb:
         image: mariadb:10.11
@@ -202,6 +214,9 @@ jobs:
 
   standalone:
     runs-on: ubuntu-latest
+    # Dauert sonst etwa 10 Minuten. Ohne Grenze liefe ein hängender Schritt (z. B. ein E2E-Test, der auf den Testserver wartet)
+    # bis zu 6 Stunden.
+    timeout-minutes: 40
     services:
       mariadb:
         image: mariadb:10.11

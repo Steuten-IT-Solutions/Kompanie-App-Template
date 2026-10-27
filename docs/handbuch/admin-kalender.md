@@ -15,7 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Kalender**.
 - Eine Zeile, wie der Kalender gerade eingerichtet ist, z. B. **✓ Eingerichtet über die geheime iCal-Adresse.** oder **Noch kein Kalender eingerichtet.**
 - **Google-Kalender-IDs**: für den Weg über den Google-Zugang.
 - **Geheime iCal-Adresse** (oder, wenn schon eine gespeichert ist, **Neue iCal-Adresse (ersetzt die bisherige)**): für den Weg ohne Google-Zugang.
-- **Aktualisieren alle … Minuten**: wie lange die App die geladenen Termine zeigt, bevor sie bei Google neu nachfragt (Standard 15).
+- **Aktualisieren alle … Minuten**: wie lange die App die geladenen Termine zeigt, bevor sie bei Google neu nachfragt (Standard 15). Für die Benachrichtigungen über neue und geänderte Termine fragt die App unabhängig davon alle 15 Minuten bei Google nach.
 - **Kalender testen** und **Entfernen**: erscheinen, sobald ein Kalender eingerichtet ist.
 - **Speichern**: übernimmt die Eingaben.
 

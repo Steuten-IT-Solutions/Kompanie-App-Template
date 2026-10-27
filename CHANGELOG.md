@@ -15,6 +15,76 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.4.0] – 2026-10-27
+
+### Neu
+
+- **Wer sieht was, je Knopf einstellbar**: Für jeden Knopf unter **Intern** (Mitglieder, Ämter, Ehemalige,
+  Dokumente, Schwarzes Brett, Dienstgrade, Punktekatalog), für die Tabs unten (Termine, News, Galerie, Intern) und für
+  jeden Teil des Mitgliederbereichs (eigene Punkte, Strafen, Dienstgrad und Anwesenheit, interner Kalender, interne
+  Bilder, Geburtstage, Umfragen) gibt es jetzt ein eigenes Recht. Der Server prüft es: Wer es nicht hat, sieht den
+  Knopf nicht und kommt auch über einen Link nicht an die Daten.
+- **Übersicht „Wer sieht was“**: Unter *Einstellungen → Rollen* zeigt eine Tabelle alle Rechte für alle Rollen auf
+  einen Blick. Die Haken lassen sich dort direkt setzen und gemeinsam speichern.
+- **Gast und Mitglied einstellbar**: Bei den festen Rollen **Gast** und **Mitglied** lässt sich jetzt einstellen, was
+  sie sehen. **Gast** gilt auch für alle, die die App ohne Anmeldung öffnen, und für die Shortcodes auf der Webseite.
+- **E-Mails: Mailgruppen**: Unter *Verwaltung → E-Mails → Mailgruppen verwalten* lassen sich Empfängergruppen aus
+  Rollen, einzelnen Mitgliedern und freien Adressen anlegen (z. B. Vorstand) und beim Schreiben wie eine Rolle auswählen.
+  Zwei Standardgruppen pflegt die App selbst: **Alle Mitglieder** (alle, die zur Kompanie gehören, auch Admins und eigene
+  Rollen wie Spieß, ohne Anwärter) und **Alle Konten** (alle außer Gästen). Bisher erreichte eine Mail an die Rolle
+  „Mitglied“ keine Admins und Spieße. Ehemalige bekommen nie eine Mail, auch wenn sie noch in einer Gruppe stehen.
+- **Querformat**: Die App dreht sich mit dem Handy, auch als installierte App. Quer steht die Leiste mit den Bereichen
+  links, Kopfleiste und Hinweise oben sind flacher, und die Inhalte nutzen die ganze Breite: Listen stehen in zwei
+  Spalten, in Formularen je zwei Felder nebeneinander, die Kacheln der Verwaltung in vier Spalten. Längere Texte (News,
+  Hilfe) bleiben gut lesbar schmal. Hochkant, auf Tablets und am Computer ändert sich nichts. Eine schon installierte
+  App übernimmt die Drehung, sobald das Handy die App-Angaben neu einliest (beim Öffnen, spätestens nach einem Tag).
+
+### Geändert
+
+- **Sicherung vor jedem Update, auch in Google Drive**: Die App sichert die Daten jetzt vor jedem Update auf dem
+  Server, auch beim Zurückrollen (bisher nur bei Änderungen an der Datenbank und vor einer neuen Hauptversion). Sind
+  die Sicherungen in Google Drive eingeschaltet, kommt dieselbe Sicherung zusätzlich in den Ordner dort; die letzten
+  fünf bleiben. Klappt nur die Sicherung in Google Drive nicht, fragt die App nach, ob sie trotzdem aktualisieren soll.
+  Ein automatisches Update wird in diesem Fall zurückgestellt: Unter *Einstellungen → Zustand und Updates* steht der
+  Grund mit **Trotzdem aktualisieren** und **Abbrechen**, die Ampel wird gelb, und am nächsten Tag versucht es die App
+  wieder.
+- **Rechte in Gruppen**: Die Rechte einer Rolle und einer einzelnen Person stehen jetzt in Gruppen (Tabs und
+  Navigation, Mitgliederbereich, Intern, Inhalte verwalten, Kompanie verwalten, Mitglieder und Rollen). Jede Gruppe lässt
+  sich auf- und zuklappen; ein Haken vor der Gruppe setzt oder entfernt alle ihre Rechte auf einmal, ein Zähler zeigt,
+  wie viele davon gesetzt sind.
+- **Mitgliederbereich aufgeteilt**: Das frühere Recht *Mitgliederbereich* heißt jetzt **Gehört zur Kompanie** und
+  bedeutet nur noch, dass die Person Punkte, Strafen, Dienstgrade und Titel bekommt und in Listen steht. Was sie sieht,
+  regeln die einzelnen Rechte. Beim Update bekommt jede Rolle und jede Ausnahme genau die Rechte, mit denen alle dasselbe
+  sehen wie vorher.
+- **Ämter nach Jahren auch auf dem Handy**: Den Schalter „Chronik | Jahre“ im Tab Ämter gibt es jetzt auf jedem
+  Bildschirm. Auf dem Handy ist die Übersicht schmaler; quer gedreht nutzt sie die ganze Breite, sodass mehr Ämter
+  nebeneinander passen. Nach oben und unten scrollt die ganze Seite, seitlich die Übersicht; dabei bleiben oben die
+  Ämter und links die Jahre stehen. Ein Tipp auf einen Balken zeigt unten Jahre, Personen und Zusatz.
+- **Benachrichtigung „Termin geändert“ zeigt die Änderung**: Statt noch einmal aller Angaben zum Termin steht in der
+  Nachricht nur, was sich geändert hat, mit vorher und jetzt, z. B. „Probe – Uhrzeit: 19:00 Uhr → 20:00 Uhr“ oder
+  „Ort: Halle → Sporthalle“. Das gilt für öffentliche Termine und für den internen Kalender.
+
+### Behoben
+
+- **Änderungen am Manifest kamen verzögert bei installierten Apps an**: Neues Logo, Startbildschirm und die freie
+  Drehung des Bildschirms übernimmt Chrome in eine installierte App erst, wenn es beim Abgleich das neue Manifest
+  bekommt. Bisher durfte das Manifest einen Tag zwischengespeichert werden; jetzt prüft der Browser es jedes Mal beim
+  Server nach (meist nur eine kurze Antwort „unverändert“). Wann Chrome die installierte App danach aktualisiert,
+  entscheidet weiterhin Chrome (höchstens einmal am Tag).
+- **Mitgliederliste für die Anwesenheit**: Wer nur die Anwesenheit führt, sah in der Verwaltung den Knopf
+  **Mitglieder**, bekam beim Öffnen aber eine Fehlermeldung. Jetzt öffnet sich die Liste mit Namen, Rollen, Fotos und
+  Dienstgraden, ohne Punkte und Strafen.
+- **Ämter einer Person: Mitinhaber anklickbar**: Hatte jemand ein Amt gemeinsam mit einer anderen Person inne, steht
+  diese im Zeitstrahl unter „mit“. Hat sie ein Konto, führt ein Tipp auf sie jetzt zu ihrer Seite, wie im Zeitstrahl
+  aller Ämter: auf der Seite einer Person, unter „Meins“ und in der Verwaltung. Aus der Verwaltung geöffnet, landet man
+  beim Mitglied in der Verwaltung.
+- **Benachrichtigungen über geänderte Kalendertermine kamen spät**: Ob sich im Google Kalender etwas geändert hat,
+  prüft die App alle 15 Minuten. Dabei nahm sie bisher die zwischengespeicherten Termine, solange sie nach
+  **Aktualisieren alle … Minuten** noch als aktuell galten, und verschickte die Nachricht erst im nächsten Lauf der
+  Hintergrundaufgaben. Mit einer langen Aktualisierungszeit oder ohne häufige Seitenaufrufe konnte eine Nachricht so
+  weit über eine Stunde brauchen. Jetzt fragt die App bei jeder Prüfung bei Google nach und verschickt die Nachricht
+  gleich im selben Lauf.
+
 ## [0.3.0] – 2026-10-26
 
 ### Neu

@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.ranks}"
 reihenfolge: 39
-rechte: [member]
+rechte: [view_ranks]
 bereiche: [ranks]
 ---
 Hier siehst du alle {bereich.ranks} der {kompanie.name} der Reihe nach, mit ihren Abzeichen. Gibt es bei euch auch {bereich.points}, steht bei jedem {begriff.rank} dabei, ab wie vielen {bereich.points} er erreichbar ist. Die Seite ist nur zum Nachschlagen.

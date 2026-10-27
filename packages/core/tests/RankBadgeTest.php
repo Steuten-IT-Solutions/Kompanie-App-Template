@@ -302,7 +302,9 @@ final class RankBadgeTest extends TestCase
         $this->assertSame([128, 128], array_slice((array) getimagesize((string) ($ranks->badgeForDelivery($member, $pngRank, null, null)['path'] ?? '')), 0, 2), 'ohne s: 128');
         $this->assertSame(404, $ranks->badgeForDelivery($member, $pngRank, null, '999')['status'], 'unbekannte Größe');
 
-        $this->assertSame(200, $ranks->badgeForDelivery($candidate, $svgRank, $v, '128')['status'], 'Anwärter sehen Abzeichen');
+        // Abzeichen sieht, wer sie irgendwo sieht: Dienstgrade, eigener Dienstgrad, Mitgliederliste (Bereich an).
+        $this->assertSame(403, $ranks->badgeForDelivery($candidate, $svgRank, $v, '128')['status'], 'Anwärter ohne Dienstgrade und ohne Bereich Mitgliederliste');
+        $this->assertSame(200, $ranks->badgeForDelivery(new User(9998, 'Anw', 'anw', Roles::GUEST, [Capability::ViewRanks]), $svgRank, $v, '128')['status'], 'mit den Dienstgraden');
         $this->assertSame(401, $ranks->badgeForDelivery(null, $svgRank, $v, '128')['status'], 'nicht angemeldet');
         $denied = $ranks->badgeForDelivery($guest, $svgRank, $v, '128');
         $this->assertSame([403, 'no-store'], [$denied['status'], $denied['headers']['Cache-Control']], 'ohne Mitgliederbereich, Kalender und Mitgliederliste');

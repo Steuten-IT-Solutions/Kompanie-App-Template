@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\BirthdayRepository;
@@ -53,10 +54,16 @@ final class BirthdayService
         return $this->repo ??= new BirthdayRepository($this->app->db);
     }
 
-    /** Wer Geburtstage sieht, mit seinem erscheint und Benachrichtigungen dazu bekommt: alle mit Mitgliederbereich. */
+    /** Wer mit seinem Geburtstag erscheint: alle Mitglieder der Kompanie. */
     public static function isMember(?User $user): bool
     {
         return $user !== null && $user->isMember();
+    }
+
+    /** Wer Geburtstage sieht und Benachrichtigungen dazu bekommt: alle mit view_birthdays. */
+    public static function canSee(?User $user): bool
+    {
+        return $user !== null && $user->can(Capability::ViewBirthdays);
     }
 
     /* ---------------------------------------------------------------- */

@@ -436,9 +436,11 @@ final class Kernel
         $icons = $app->env->appUrl() . 'app/icons/';
         header('Content-Type: application/manifest+json; charset=utf-8');
         // Adressen hängen ohne fest eingetragene base_url von der Anfrage ab: nicht in fremden Caches speichern.
-        header('Cache-Control: private, max-age=86400');
+        // Immer neu prüfen (mit ETag meist 304): Chrome übernimmt Änderungen (Icons, Ausrichtung) in installierte Apps
+        // nur, wenn es beim Abgleich das neue Manifest bekommt.
+        header('Cache-Control: private, no-cache');
         $this->securityHeaders();
-        echo json_encode([
+        $body = (string) json_encode([
             'name' => $c->name(),
             'short_name' => $c->shortName(),
             'description' => $c->description(),
@@ -446,11 +448,15 @@ final class Kernel
             'start_url' => $app->env->appUrl(),
             'scope' => $app->env->appUrl(),
             'display' => 'standalone',
-            'orientation' => 'portrait',
+            'orientation' => 'any',
             'background_color' => '#ffffff',
             'theme_color' => $c->primaryColor(),
             'icons' => ManifestIcons::entries($icons, $this->appDir() . '/icons'),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($this->notModified(FileCache::contentEtag($body))) {
+            return;
+        }
+        echo $body;
     }
 
     /** Normalerweise liefert der Webserver sw.js direkt; das hier ist der Weg über index.php. */
@@ -484,7 +490,7 @@ final class Kernel
         }
         $res = $app->gallery()->deliverPhoto($id, $size, static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
         if (isset($res['placeholder'])) {
             // Noch nicht aufbereitet: Platzhalter, nicht speichern, später erneut versuchen.
@@ -522,7 +528,7 @@ final class Kernel
         }
         $res = $app->gallery()->deliverVideo($id, $this->http->header('Range'), static function () use ($app): array {
             $user = $app->authContext->currentUser();
-            return [(bool) $user?->isMember(), $user !== null];
+            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
         });
         http_response_code($res['status']);
         header('Accept-Ranges: bytes');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Tests;
 
+use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\ManifestIcons;
 use PHPUnit\Framework\TestCase;
 
@@ -34,6 +35,15 @@ final class ManifestIconsTest extends TestCase
 
         array_map('unlink', glob($dir . '/*'));
         rmdir($dir);
+    }
+
+    public function testEtagDesManifestsFolgtDemInhalt(): void
+    {
+        $etag = FileCache::contentEtag('{"orientation":"portrait"}');
+        $this->assertMatchesRegularExpression('/^"[a-f0-9]{32}"$/', $etag);
+        $this->assertSame($etag, FileCache::contentEtag('{"orientation":"portrait"}'));
+        $this->assertNotSame($etag, FileCache::contentEtag('{"orientation":"any"}'));
+        $this->assertTrue(FileCache::matches($etag, $etag));
     }
 
     public function testOhneDateiOhneVersion(): void

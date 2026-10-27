@@ -53,7 +53,7 @@ final class ExtraRolesTest extends TestCase
         $res = $this->setRoles($m, ['penalties', 'events']);
         $this->assertSame(200, $res->status, json_encode($res->data) ?: '');
         $this->assertSame(['id' => $m, 'level' => Roles::MEMBER, 'extra_roles' => ['events', 'penalties']], $res->data, 'Reihenfolge der Rollen, level bleibt die Grundrolle');
-        $this->assertEqualsCanonicalizing(['member', 'calendar', 'view_intern', 'manage_penalties', 'manage_events'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(TestApp::caps(['member', 'manage_penalties', 'manage_events']), $this->caps($m));
 
         $list = array_column($this->call('GET', '/members')->data, null, 'id');
         $this->assertSame(['events', 'penalties'], $list[$m]['extra_roles']);
@@ -72,7 +72,7 @@ final class ExtraRolesTest extends TestCase
         // Leere Liste: keine Zusatzrollen mehr, Grundrolle unverändert.
         $this->users->current = $this->admin;
         $this->assertSame([], $this->setRoles($m, [])->data['extra_roles']);
-        $this->assertEqualsCanonicalizing(['member', 'calendar', 'view_intern'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(TestApp::caps(['member']), $this->caps($m));
         // Nur level wie bisher: Zusatzrollen bleiben.
         $this->setRoles($m, ['events']);
         $res = $this->call('PATCH', "/members/$m/role", ['level' => 'points']);
@@ -111,7 +111,7 @@ final class ExtraRolesTest extends TestCase
         // Neue Grundrolle ohne Mitgliederbereich: Zusatzrollen fallen weg (sonst wirkten sie nach einem Wechsel zurück wieder).
         $res = $this->call('PATCH', "/members/$candidate/role", ['level' => TestApp::candidateRole($this->app)]);
         $this->assertSame([], $res->data['extra_roles']);
-        $this->assertEqualsCanonicalizing(['calendar'], $this->caps($candidate));
+        $this->assertEqualsCanonicalizing(TestApp::caps(['calendar']), $this->caps($candidate));
         $this->call('PATCH', "/members/$candidate/role", ['level' => Roles::MEMBER]);
         $this->assertSame([], $this->call('GET', "/members/$candidate")->data['extra_roles']);
     }
@@ -122,7 +122,7 @@ final class ExtraRolesTest extends TestCase
         $m = $this->users->add('m', Roles::MEMBER);
         $this->setRoles($m, ['points']);
         $this->users->setRole($m, TestApp::candidateRole($this->app));
-        $this->assertEqualsCanonicalizing(['calendar'], $this->caps($m));
+        $this->assertEqualsCanonicalizing(TestApp::caps(['calendar']), $this->caps($m));
         $this->assertSame([], $this->app->roles()->extraRoles($m, TestApp::candidateRole($this->app)));
         $this->users->setRole($m, Roles::MEMBER);
         $this->assertContains('manage_points', $this->caps($m));
@@ -130,8 +130,8 @@ final class ExtraRolesTest extends TestCase
 
     public function testSmallestPointsFactorApplies(): void
     {
-        $young = $this->app->roles()->create(['label' => 'Jungmariner', 'capabilities' => ['member'], 'points_factor' => 0.5])['key'];
-        $double = $this->app->roles()->create(['label' => 'Doppelt', 'capabilities' => ['member'], 'points_factor' => 2])['key'];
+        $young = $this->app->roles()->create(['label' => 'Jungmariner', 'capabilities' => TestApp::caps(['member']), 'points_factor' => 0.5])['key'];
+        $double = $this->app->roles()->create(['label' => 'Doppelt', 'capabilities' => TestApp::caps(['member']), 'points_factor' => 2])['key'];
         $a = $this->users->add('a', Roles::MEMBER);
         $b = $this->users->add('b', $double);
         $c = $this->users->add('c', $young);
@@ -144,7 +144,7 @@ final class ExtraRolesTest extends TestCase
 
     public function testNonAdminsAssignOnlyRolesTheyCouldGiveAsBaseRole(): void
     {
-        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => ['member', 'promote_users', 'manage_points', 'manage_events']]);
+        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'manage_points', 'manage_events'])]);
         $schrift = $this->users->add('schrift', 'r1');
         $m = $this->users->add('m', Roles::MEMBER);
         $kasse = $this->users->add('kasse', Roles::MEMBER);
@@ -163,8 +163,8 @@ final class ExtraRolesTest extends TestCase
 
     public function testDeletingARoleReplacesOrDropsItAsExtraRole(): void
     {
-        $r1 = $this->app->roles()->create(['label' => 'Fahnenträger', 'capabilities' => ['member', 'manage_events']])['key'];
-        $r2 = $this->app->roles()->create(['label' => 'Ersatz', 'capabilities' => ['member', 'manage_documents']])['key'];
+        $r1 = $this->app->roles()->create(['label' => 'Fahnenträger', 'capabilities' => TestApp::caps(['member', 'manage_events'])])['key'];
+        $r2 = $this->app->roles()->create(['label' => 'Ersatz', 'capabilities' => TestApp::caps(['member', 'manage_documents'])])['key'];
         $a = $this->users->add('a', Roles::MEMBER);
         $b = $this->users->add('b', $r2);
         $this->setRoles($a, [$r1]);

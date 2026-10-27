@@ -37,7 +37,9 @@ function scrollSpeed(y: number): number {
     return r && r.height > 0 ? r : null;
   };
   const top = Math.max(0, bar('.topbar')?.bottom ?? 0);
-  const bottom = Math.min(window.innerHeight, bar('.tabbar')?.top ?? window.innerHeight);
+  // Quer steht die Tab-Leiste links (styles.css); dann verdeckt unten nichts die Seite.
+  const tabbar = bar('.tabbar');
+  const bottom = tabbar && tabbar.width >= window.innerWidth / 2 ? Math.min(window.innerHeight, tabbar.top) : window.innerHeight;
   if (y < top + EDGE) return -Math.ceil(MAX_SPEED * Math.min(1, (top + EDGE - y) / EDGE));
   if (y > bottom - EDGE) return Math.ceil(MAX_SPEED * Math.min(1, (y - bottom + EDGE) / EDGE));
   return 0;

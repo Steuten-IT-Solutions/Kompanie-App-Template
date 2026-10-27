@@ -35,8 +35,11 @@ use KompanieApp\Core\Storage\MemberRoleRepository;
  *
  * Einzelnen Personen lassen sich Rechte zusätzlich geben oder entziehen (Ausnahmen), ohne dafür eine eigene
  * Rolle anzulegen. Sie gelten zusätzlich zu ihren Rollen und bleiben bei einem Wechsel der Rollen bestehen; was die
- * Rollen dann schon regeln, fällt dabei weg. Admins haben immer alle Rechte, Gäste keine: Für sie gibt es keine
+ * Rollen dann schon regeln, fällt dabei weg. Admins haben immer alle Rechte, Gäste die ihrer Rolle: Für sie gibt es keine
  * Ausnahmen. Gespeichert wie die Rollen als eine Einstellung.
+ *
+ * Rechte gelten einzeln, keines schließt ein anderes ein; manche setzen eines voraus (Capability::requires, z. B.
+ * Verwalten die Mitgliedschaft). Die Rolle Gast gilt auch ohne Anmeldung (guestCapabilities).
  */
 final class RoleService
 {
@@ -48,6 +51,8 @@ final class RoleService
     public const SEQ_SETTING = 'roles_seq';
     /** Gesetzt, sobald die frühere feste Rolle „Anwärter“ eine eigene Rolle ist (migrateCandidate). */
     public const CANDIDATE_SETTING = 'roles_candidate_own';
+    /** Gesetzt, sobald die Rollen die Rechte zum Sehen einzeln haben (migrateViewRights). */
+    public const VIEW_SETTING = 'roles_view_split';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
@@ -102,12 +107,21 @@ final class RoleService
      */
     public function capabilities(string $key): array
     {
-        return $key === Roles::ADMIN ? Capability::cases() : Roles::withImplied($this->granted($key));
+        return $this->granted($key);
     }
 
     /**
-     * Die der Rolle ausdrücklich gegebenen Rechte (ohne den im Mitgliederbereich enthaltenen Kalender), wie sie
-     * Einstellungen → Rollen zeigt.
+     * Rechte ohne Anmeldung: die der Rolle Gast.
+     *
+     * @return Capability[]
+     */
+    public function guestCapabilities(): array
+    {
+        return $this->granted(Roles::GUEST);
+    }
+
+    /**
+     * Die der Rolle gegebenen Rechte, wie sie Einstellungen → Rollen zeigt.
      *
      * @return Capability[]
      */
@@ -172,12 +186,13 @@ final class RoleService
         }
         $base = $this->grantedFor($id, $target->role);
         $next = self::normalized($base, ['grant' => $grant, 'revoke' => $revoke]);
+        // Zusätzlich gegebene Rechte brauchen ihre Voraussetzung; was eine entzogene voraussetzt, fällt weg (effective).
         $caps = array_diff(array_merge(self::values($base), $next['grant']), $next['revoke']);
-        if (array_intersect(self::values(Capability::withoutMember()), $revoke) !== [] && in_array(Capability::Member->value, $caps, true)) {
-            throw ApiError::invalid('Der interne Kalender und „Intern“ gehören zum Mitgliederbereich und lassen sich nur mit ihm entziehen.');
-        }
-        if (!in_array(Capability::Member->value, $caps, true) && array_diff($caps, self::values(Capability::withoutMember())) !== []) {
-            throw ApiError::invalid('Rechte zum Verwalten brauchen auch den Mitgliederbereich.');
+        foreach ($next['grant'] as $c) {
+            $needed = Capability::from($c)->requires();
+            if ($needed !== null && !in_array($needed->value, $caps, true)) {
+                throw ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.');
+            }
         }
         $old = self::normalized($base, $this->loadOverrides()[$id] ?? self::NO_OVERRIDES);
         $changed = array_merge(
@@ -248,10 +263,10 @@ final class RoleService
     }
 
     /**
-     * Rechte der Rolle mit den Ausnahmen. Ohne Mitgliederbereich bleiben höchstens Kalender und „Intern“: Verwalten
-     * setzt ihn voraus, auch wenn ein Rollenwechsel die Ausnahmen so zusammenbringt.
+     * Rechte der Rolle mit den Ausnahmen. Was seine Voraussetzung nicht hat (Capability::requires), fällt weg, auch wenn
+     * ein Rollenwechsel die Ausnahmen so zusammenbringt.
      *
-     * @param Capability[] $base Rechte der Rolle (ohne den im Mitgliederbereich enthaltenen Kalender)
+     * @param Capability[] $base Rechte der Rollen
      * @param array{grant: string[], revoke: string[]} $o
      * @return Capability[]
      */
@@ -264,15 +279,38 @@ final class RoleService
                 $caps[] = $cap;
             }
         }
-        if (!in_array(Capability::Member, $caps, true)) {
-            return array_values(array_filter(Capability::withoutMember(), static fn (Capability $c): bool => in_array($c, $caps, true)));
+        return self::withRequired($caps);
+    }
+
+    /**
+     * Ohne die Rechte, deren Voraussetzung fehlt.
+     *
+     * @param Capability[] $caps
+     * @return Capability[]
+     */
+    private static function withRequired(array $caps): array
+    {
+        return array_values(array_filter($caps, static fn (Capability $c): bool => $c->requires() === null || in_array($c->requires(), $caps, true)));
+    }
+
+    /**
+     * 400, wenn ein Recht seine Voraussetzung nicht hat (Capability::requires).
+     *
+     * @param string[] $values
+     */
+    private static function checkRequired(array $values): void
+    {
+        foreach ($values as $v) {
+            $needed = Capability::from($v)->requires();
+            if ($needed !== null && !in_array($needed->value, $values, true)) {
+                throw ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.');
+            }
         }
-        return Roles::withImplied($caps);
     }
 
     /**
      * Ausnahmen ohne das, was die Rolle schon regelt: zusätzlich nur Rechte, die sie nicht hat, entzogen nur
-     * Rechte, die sie hat. Den Kalender zusätzlich zu geben ist neben dem Mitgliederbereich überflüssig.
+     * Rechte, die sie hat.
      *
      * @param Capability[] $base
      * @param array{grant: string[], revoke: string[]} $o
@@ -283,9 +321,6 @@ final class RoleService
         $values = self::values($base);
         $grant = array_diff($o['grant'], $values);
         $revoke = array_intersect($o['revoke'], $values);
-        if (in_array(Capability::Member->value, array_diff(array_merge($values, $grant), $revoke), true)) {
-            $grant = array_diff($grant, self::values(Capability::withoutMember()));
-        }
         return ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)];
     }
 
@@ -297,7 +332,7 @@ final class RoleService
     private function view(User $actor, array $base, array $o): array
     {
         return [
-            'role' => self::values(Roles::withImplied($base)),
+            'role' => self::values($base),
             'grant' => $o['grant'],
             'revoke' => $o['revoke'],
             'editable' => self::values($this->editableBy($actor)),
@@ -608,6 +643,7 @@ final class RoleService
     {
         if (is_array($this->settings->get(self::SETTING))) {
             $this->migrateCandidate();
+            $this->migrateViewRights();
             return;
         }
         $roles = $this->templates();
@@ -615,12 +651,13 @@ final class RoleService
             $admin = $roles[Roles::ADMIN];
             unset($roles[Roles::ADMIN]);
             foreach (Roles::LEGACY as $key => $caps) {
-                $roles[$key] = self::role($key, $this->config->roleLabel($key), $caps);
+                $roles[$key] = self::role($key, $this->config->roleLabel($key), self::ordered($caps));
             }
             $roles[Roles::ADMIN] = $admin;
         }
         $this->save($roles);
         $this->settings->set(self::CANDIDATE_SETTING, true);
+        $this->settings->set(self::VIEW_SETTING, true);
     }
 
     /**
@@ -640,7 +677,9 @@ final class RoleService
         if ($role === null) {
             foreach ($this->users->list(false) as $u) {
                 if ($u->role === Roles::CANDIDATE) {
-                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->config->roleLabel(Roles::CANDIDATE), $roles), [Capability::Calendar->value]);
+                    // Vor migrateViewRights mit den Rechten von damals (die Migration ergänzt sie).
+                    $caps = $this->settings->get(self::VIEW_SETTING) ? self::ordered(Roles::CANDIDATE_DEFAULTS) : [Capability::Calendar->value];
+                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->config->roleLabel(Roles::CANDIDATE), $roles), $caps);
                     break;
                 }
             }
@@ -659,6 +698,65 @@ final class RoleService
             $this->save($next + [Roles::CANDIDATE => $role]);
         }
         $this->settings->set(self::CANDIDATE_SETTING, true);
+    }
+
+    /**
+     * Einmalig nach dem Update: Früher schloss der Mitgliederbereich (member) alles Sehen ein, Öffentliches sah jeder,
+     * und der Kalender brachte das Brett mit. Jetzt gilt jedes Recht einzeln: Jede Rolle bekommt ausdrücklich, was sie
+     * bisher sah (Roles::expandLegacy), Gast das Öffentliche. Die Ausnahmen einzelner Personen werden so umgerechnet, dass
+     * jede Person danach genau dasselbe sieht wie vorher.
+     */
+    private function migrateViewRights(): void
+    {
+        if ($this->settings->get(self::VIEW_SETTING)) {
+            return;
+        }
+        $roles = $this->all();
+        $before = static fn (string $key): array => $key === Roles::ADMIN ? [] : ($roles[$key]['capabilities'] ?? []);
+        // Ausnahmen zuerst nach den alten Regeln (Rechte der Rollen und Zusatzrollen, wie sie gespeichert sind).
+        $targets = [];
+        foreach ($this->loadOverrides() as $id => $o) {
+            $u = $this->users->find($id);
+            if ($u === null || !self::overridable($u->role)) {
+                continue;
+            }
+            $base = $before($u->role);
+            if (in_array(Capability::Member->value, $base, true)) {
+                foreach ($this->assignments()[$id] ?? [] as $extra) {
+                    if ($extra !== $u->role && self::canBeExtra($extra) && isset($roles[$extra])) {
+                        $base = [...$base, ...$before($extra)];
+                    }
+                }
+            }
+            $targets[$id] = [$u->role, self::legacyEffective(array_values(array_unique($base)), $o)];
+        }
+        foreach ($roles as $key => $r) {
+            if ($key !== Roles::ADMIN) {
+                $roles[$key]['capabilities'] = self::ordered(Roles::expandLegacy($r['capabilities']));
+            }
+        }
+        $this->save($roles);
+        foreach ($targets as $id => [$baseRole, $target]) {
+            $base = self::values($this->grantedFor($id, $baseRole));
+            $this->storeOverrides($id, ['grant' => self::ordered(array_diff($target, $base)), 'revoke' => self::ordered(array_diff($base, $target))]);
+        }
+        $this->settings->set(self::VIEW_SETTING, true);
+    }
+
+    /**
+     * Rechte einer Person mit Ausnahmen nach den Regeln vor migrateViewRights, in heutigen Rechten.
+     *
+     * @param string[] $base
+     * @param array{grant: string[], revoke: string[]} $o
+     * @return string[]
+     */
+    private static function legacyEffective(array $base, array $o): array
+    {
+        $caps = array_values(array_diff(array_unique([...$base, ...$o['grant']]), $o['revoke']));
+        $member = in_array(Capability::Member->value, $caps, true);
+        // Ohne Mitgliederbereich blieben nur Kalender und „Intern“, mit ihm gehörten beide dazu.
+        $kept = $member ? $caps : array_values(array_intersect($caps, [Capability::Calendar->value, Capability::ViewIntern->value]));
+        return Roles::expandLegacy($member ? [...$kept, Capability::Calendar->value, Capability::ViewIntern->value] : $kept);
     }
 
     /**
@@ -681,7 +779,8 @@ final class RoleService
                     return;
                 }
             }
-            $this->save(self::beforeAdmin($roles, self::role($key, $label, $capabilities)));
+            // Die Standardrolle sieht, was Mitglieder anfangs sehen (Features nennt nur member und das Recht des Bereichs).
+            $this->save(self::beforeAdmin($roles, self::role($key, $label, self::ordered(Roles::expandLegacy($capabilities)))));
             return;
         }
         if (!isset($roles[$key]) || Roles::isSystem($key)) {
@@ -710,7 +809,7 @@ final class RoleService
             throw ApiError::invalid(sprintf('Mehr als %d Rollen sind nicht möglich.', self::MAX_ROLES));
         }
         $label = $this->validLabel($in['label'] ?? null, null);
-        $role = self::role('', $label, self::validCapabilities($in['capabilities'] ?? []));
+        $role = self::role('', $label, self::validCapabilities($in['capabilities'] ?? [], null));
         $role['points_factor'] = array_key_exists('points_factor', $in) ? self::validFactor($in['points_factor']) : 1.0;
         $role['new_accounts'] = array_key_exists('new_accounts', $in) && self::validFlag($in['new_accounts']);
         $role['promotable'] = array_key_exists('promotable', $in) && self::validFlag($in['promotable']);
@@ -722,7 +821,8 @@ final class RoleService
     }
 
     /**
-     * Nur mitgeschickte Felder ändern. Gast: nur die Bezeichnung; Mitglied und Admin: Bezeichnung und Punktefaktor.
+     * Nur mitgeschickte Felder ändern. Gast: Bezeichnung und Rechte zum Sehen; Mitglied: dazu der Punktefaktor; Admin:
+     * Bezeichnung und Punktefaktor.
      *
      * @param array<string, mixed> $in label, capabilities, points_factor, new_accounts, promotable
      * @return array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}
@@ -739,10 +839,10 @@ final class RoleService
         }
         $fixed = Roles::isSystem($key);
         if (array_key_exists('capabilities', $in)) {
-            if ($fixed) {
-                throw ApiError::invalid('Die Rechte der festen Rollen (Gast, Mitglied, Admin) lassen sich nicht ändern.');
+            if ($key === Roles::ADMIN) {
+                throw ApiError::invalid('Admins haben immer alle Rechte.');
             }
-            $role['capabilities'] = self::validCapabilities($in['capabilities']);
+            $role['capabilities'] = self::validCapabilities($in['capabilities'], $fixed ? $key : null);
         }
         if (array_key_exists('points_factor', $in)) {
             // Punkte bekommen nur Personen mit Mitgliederbereich (Admins haben ihn immer).
@@ -849,7 +949,7 @@ final class RoleService
         if ($role === null || ($key !== Roles::MEMBER && !$role['new_accounts'])) {
             return false;
         }
-        $basic = array_diff(self::values($this->capabilities($key)), [Capability::Member->value, ...self::values(Capability::withoutMember())]) === [];
+        $basic = array_filter($this->capabilities($key), static fn (Capability $c): bool => !$c->isView() && $c !== Capability::Member) === [];
         return $actor->isAdmin() || $basic || $this->canHandle($actor, $key);
     }
 
@@ -912,7 +1012,7 @@ final class RoleService
     {
         $out = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            $out[$key] = self::role($key, $this->config->roleLabel($key), $caps);
+            $out[$key] = self::role($key, $this->config->roleLabel($key), self::ordered($caps));
         }
         return $out;
     }
@@ -986,10 +1086,13 @@ final class RoleService
                 $caps = array_values(array_unique(array_merge(array_diff($caps, ['manage']), ['manage_points', 'manage_penalties'])));
             }
             $system = Roles::isSystem($key);
+            if ($system) {
+                $caps = self::systemCapabilities($key, $caps);
+            }
             $out[$key] = [
                 'key' => $key,
                 'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->config->roleLabel($key),
-                'capabilities' => $system ? Roles::TEMPLATES[$key] : $caps,
+                'capabilities' => $caps,
                 'points_factor' => $key === Roles::GUEST ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
                 'new_accounts' => !$system && ($r['new_accounts'] ?? false) === true,
                 'promotable' => !$system && ($r['promotable'] ?? false) === true && !in_array(Capability::Member->value, $caps, true),
@@ -1002,7 +1105,7 @@ final class RoleService
             }
             // Fehlende feste Rolle (z. B. nach einem Update): Heißt schon eine eigene Rolle so, bekommt die feste einen
             // anderen Namen.
-            $role = self::role($key, $this->freeLabel($this->config->roleLabel($key), $front + $out), $caps);
+            $role = self::role($key, $this->freeLabel($this->config->roleLabel($key), $front + $out), self::ordered($caps));
             if ($key === Roles::ADMIN) {
                 $out[$key] = $role;
             } else {
@@ -1051,8 +1154,28 @@ final class RoleService
         return $label;
     }
 
-    /** @return string[] */
-    private static function validCapabilities(mixed $raw): array
+    /**
+     * Gespeicherte Rechte einer festen Rolle: Admin keine (er hat ohnehin alle), Gast nur Rechte zum Sehen ohne
+     * Voraussetzung, Mitglied immer member und sonst nur Rechte zum Sehen.
+     *
+     * @param string[] $caps
+     * @return string[]
+     */
+    private static function systemCapabilities(string $key, array $caps): array
+    {
+        if ($key === Roles::ADMIN) {
+            return [];
+        }
+        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => $c->isView() && ($key === Roles::MEMBER || $c->requires() === null));
+        return self::ordered([...self::values($out), ...($key === Roles::MEMBER ? [Capability::Member->value] : [])]);
+    }
+
+    /**
+     * Rechte einer Rolle aus der Anfrage; $system: Schlüssel einer festen Rolle (Gast, Mitglied), sonst null.
+     *
+     * @return string[]
+     */
+    private static function validCapabilities(mixed $raw, ?string $system): array
     {
         if (!is_array($raw)) {
             throw ApiError::invalid('Rechte als Liste angeben.');
@@ -1065,19 +1188,21 @@ final class RoleService
             }
             $out[$cap->value] = $cap->value;
         }
-        // Verwalten setzt den Mitgliederbereich voraus (sonst sähe die Person ihre Mitglieder nicht); nur den
-        // internen Kalender und „Intern“ gibt es auch ohne (wie bei Anwärtern).
-        $basic = self::values(Capability::withoutMember());
-        if (array_diff(array_keys($out), $basic) !== [] && !isset($out[Capability::Member->value])) {
-            throw ApiError::invalid('Rollen mit Rechten brauchen auch den Mitgliederbereich.');
-        }
-        // Der Mitgliederbereich schließt Kalender und „Intern“ ein: nicht doppelt speichern.
-        if (isset($out[Capability::Member->value])) {
-            foreach ($basic as $c) {
-                unset($out[$c]);
+        if ($system !== null) {
+            if ($system === Roles::GUEST && isset($out[Capability::Member->value])) {
+                throw ApiError::invalid('Gäste gehören nicht zur Kompanie; dafür gibt es die Rolle Mitglied.');
+            }
+            if ($system === Roles::MEMBER && !isset($out[Capability::Member->value])) {
+                throw ApiError::invalid('Mitglieder gehören immer zur Kompanie.');
+            }
+            foreach ($out as $c) {
+                if ($c !== Capability::Member->value && !Capability::from($c)->isView()) {
+                    throw ApiError::invalid('Gast und Mitglied haben nur Rechte zum Sehen; zum Verwalten bitte eine eigene Rolle anlegen.');
+                }
             }
         }
-        return array_values($out);
+        self::checkRequired(array_keys($out));
+        return self::ordered(array_keys($out));
     }
 
     private static function validFactor(mixed $raw): float
@@ -1110,7 +1235,7 @@ final class RoleService
     private static function checkPromotable(array $role): void
     {
         if ($role['promotable'] && in_array(Capability::Member->value, $role['capabilities'], true)) {
-            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle ohne Mitgliederbereich.');
+            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle, die nicht zur Kompanie gehört.');
         }
     }
 }

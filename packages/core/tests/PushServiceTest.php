@@ -474,9 +474,31 @@ final class PushServiceTest extends TestCase
         $app->push()->processQueue();
         $msgs = array_map(fn (array $c): array => self::decrypt((string) $c['body'], $d), $this->pushes());
         $this->assertSame(['Neuer Termin', 'Termin geändert'], array_column($msgs, 'title'));
+        $this->assertSame('Probe umbenannt – Ort: Halle → Sporthalle', $msgs[1]['body'], 'nur die Änderung, nicht der ganze Termin');
         // Issue #190: Ziel ist der Termin mit der Kennung aus dem Kalender.
         $ids = array_column($app->calendar()->events(), 'id', 'title');
         $this->assertSame(['termine/termin/' . $ids['Fest'], 'termine/termin/' . $ids['Probe umbenannt']], array_column($msgs, 'route'));
+    }
+
+    public function testWatchFetchesCalendarAndSendsInTheSameRun(): void
+    {
+        $this->settings->set('calendar_cache_minutes', 60);
+        $app = $this->app();
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $d = self::device('m');
+        $app->push()->subscribe($m, $d['endpoint'], $d['keys'], ['events'], null, '');
+
+        $this->ics(self::vevent('a', '20261101', 'Probe', 'Halle'));
+        $app->runTask(PushService::TASK_WATCH);
+        $this->assertSame([], $this->pushes(), 'erster Lauf: nur merken');
+
+        // Kopie noch frisch (60 Minuten), Termin inzwischen verlegt: Der Abgleich ruft trotzdem ab und verschickt gleich.
+        $this->clock->at = $this->clock->now()->modify('+15 minutes');
+        $this->ics(self::vevent('a', '20261101', 'Probe', 'Sporthalle'));
+        $app->runTask(PushService::TASK_WATCH);
+        $pushes = $this->pushes();
+        $this->assertCount(1, $pushes, 'im selben Lauf verschickt, nicht erst mit push_send');
+        $this->assertSame('Probe – Ort: Halle → Sporthalle', self::decrypt((string) $pushes[0]['body'], $d)['body']);
     }
 
     public function testPublicEventsGoToGuestsAndAccountsWithoutCalendar(): void
@@ -502,6 +524,30 @@ final class PushServiceTest extends TestCase
         $this->assertSame('Neuer Termin', $msg['title']);
         $this->assertSame('Sommerfest – Sa 07.11.2026 – Festplatz', $msg['body']);
         $this->assertSame('termine/termin/p' . $id, $msg['route'], 'öffentlicher Termin mit „p“ wie in der Liste (Issue #190)');
+    }
+
+    public function testChangedEventShowsOnlyTheChange(): void
+    {
+        $app = $this->app();
+        $g = self::device('g');
+        $app->push()->subscribe(null, $g['endpoint'], $g['keys'], ['events'], null, '1.1.1.1');
+        $this->users->current = $this->users->add('admin', Roles::ADMIN);
+        $id = $app->api()->handle(new Request('POST', '/events', [], ['title' => 'Probe', 'start_date' => '2026-11-07', 'start_time' => '19:00', 'end_time' => '21:00', 'location' => 'Halle']))->data['id'];
+        $patch = fn (array $body) => $app->api()->handle(new Request('PATCH', "/events/$id", [], $body, ['id' => (string) $id]));
+        $patch(['start_time' => '20:00', 'end_time' => '22:00']);
+        $patch(['end_time' => '23:00']);
+        $patch(['start_date' => '2026-11-08', 'location' => '']);
+        $patch(['location' => 'Sporthalle']);
+        $patch(['start_time' => '', 'end_time' => '']);
+        $app->push()->processQueue();
+        $bodies = array_map(fn (array $c): string => self::decrypt((string) $c['body'], $g)['body'], array_slice($this->pushes(), 1));
+        $this->assertSame([
+            'Probe – Uhrzeit: 19:00 Uhr → 20:00 Uhr',
+            'Probe – Ende: 22:00 Uhr → 23:00 Uhr',
+            'Probe – Datum: Sa 07.11.2026, 20:00 Uhr → So 08.11.2026, 20:00 Uhr · Ort: entfällt (vorher Halle)',
+            'Probe – Ort: Sporthalle',
+            'Probe – Datum: So 08.11.2026, 20:00 Uhr → So 08.11.2026',
+        ], $bodies);
     }
 
     public function testReminderOncePerDayFromTheConfiguredHour(): void

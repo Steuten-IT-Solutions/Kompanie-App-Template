@@ -67,7 +67,8 @@ final class DocumentService
 
     public static function canSee(?User $user, string $visibility): bool
     {
-        return $user !== null && $user->isMember() && ($visibility !== self::VISIBLE_MANAGERS || $user->can(Capability::ManageDocuments));
+        $manager = $user !== null && $user->can(Capability::ManageDocuments);
+        return $user !== null && ($manager || $user->can(Capability::ViewDocuments)) && ($visibility !== self::VISIBLE_MANAGERS || $manager);
     }
 
     /**
@@ -101,12 +102,12 @@ final class DocumentService
         if ($this->app->maintenance()->blocks($user)) {
             return ['status' => 503];
         }
-        if ($user === null) {
-            return ['status' => 401];
+        // Ohne Anmeldung mit den Rechten von Gast (App::anonymous).
+        $viewer = $user ?? $this->app->anonymous();
+        if (!$viewer->can(Capability::ViewDocuments) && !$viewer->can(Capability::ManageDocuments)) {
+            return ['status' => $user === null ? 401 : 403];
         }
-        if (!$user->isMember()) {
-            return ['status' => 403];
-        }
+        $user = $viewer;
         $doc = $this->repository()->find($id);
         if ($doc === null || !self::canSee($user, $doc['visibility']) || !isset(self::TYPES[$doc['ext']]) || !preg_match(self::FILE_PATTERN, $doc['file'])) {
             return ['status' => 404];

@@ -13,6 +13,23 @@ export type Capability =
   | 'member'
   | 'calendar'
   | 'view_intern'
+  | 'view_events'
+  | 'view_news'
+  | 'view_gallery'
+  | 'view_gallery_internal'
+  | 'view_own_points'
+  | 'view_own_penalties'
+  | 'view_own_rank'
+  | 'view_own_attendance'
+  | 'view_birthdays'
+  | 'vote_polls'
+  | 'view_directory'
+  | 'view_offices'
+  | 'view_former'
+  | 'view_documents'
+  | 'view_board'
+  | 'view_ranks'
+  | 'view_catalog'
   | 'manage_points'
   | 'manage_penalties'
   | 'manage_ranks'
@@ -82,6 +99,8 @@ export interface AppConfig {
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
   user: AppUser | null;
+  /** Rechte ohne Anmeldung: die der Rolle Gast (fehlt bei älteren Servern: das damals Öffentliche) */
+  guestCapabilities?: Capability[];
   /** Nur für Admins: Die Einrichtung ist noch nicht abgeschlossen (Assistent anbieten). */
   setupPending?: boolean;
   /** Nur für Admins: Datensicherung als Datei herunterladen (Stück für Stück erzeugt); fehlt bei älteren Servern */
@@ -250,8 +269,12 @@ export function applyRoles(list: RoleAdmin[]): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
-/** Darf der angemeldete Benutzer das? */
-export const can = (cap: Capability): boolean => !!config?.user?.capabilities.includes(cap);
+/** Darf der angemeldete Benutzer das? Ohne Anmeldung gelten die Rechte der Rolle Gast (guestCapabilities). */
+export const can = (cap: Capability): boolean =>
+  !!(config?.user ? config.user.capabilities.includes(cap) : (config?.guestCapabilities ?? FORMER_PUBLIC).includes(cap));
+
+/** Was ohne Anmeldung zu sehen war, bevor es sich einstellen ließ (wie Roles::PUBLIC_DEFAULTS im Kern). */
+const FORMER_PUBLIC: Capability[] = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former'];
 
 export const isMember = (): boolean => can('member');
 
@@ -623,7 +646,7 @@ export interface MemberImportResult {
 
 /** Rechte einer Person: die ihrer Rolle und Ausnahmen davon. */
 export interface MemberRights {
-  /** Rechte der Rolle (mit dem im Mitgliederbereich enthaltenen Kalender) */
+  /** Rechte der Rollen (jedes für sich) */
   role: Capability[];
   /** zusätzlich zur Rolle gegeben */
   grant: Capability[];
@@ -848,19 +871,38 @@ export interface BoardMailInfo {
 /** E-Mails aus der Verwaltung: Felder für Empfänger */
 export type MailField = 'to' | 'cc' | 'bcc';
 
-/** Empfänger eines Felds: Rollen, Konten und freie Adressen */
+/** Empfänger eines Felds: Mailgruppen, Rollen, Konten und freie Adressen */
 export interface MailSelection {
+  groups: string[];
   roles: Level[];
   users: number[];
   emails: string[];
 }
 
-/** Formular „E-Mail schreiben“: eingerichtet? Absender, wählbare Rollen und Mitglieder (ohne Adressen) */
+/**
+ * Mailgruppe: Standardgruppen („Alle Mitglieder“, „Alle Konten“) berechnet die App und lassen sich nur umbenennen; eigene
+ * bestehen aus Rollen, Konten und freien Adressen. members/with_email: erreichbare Konten (ohne Ehemalige und Gäste).
+ */
+export interface MailGroup {
+  key: string;
+  label: string;
+  standard: boolean;
+  roles: Level[];
+  users: number[];
+  emails: string[];
+  members: number;
+  with_email: number;
+}
+
+export type MailGroupInput = { label?: string } & Partial<Pick<MailGroup, 'roles' | 'users' | 'emails'>>;
+
+/** Formular „E-Mail schreiben“: eingerichtet? Absender, wählbare Gruppen, Rollen und Mitglieder (ohne Adressen) */
 export interface MailOptions {
   available: boolean;
   reason: string | null;
   from: string;
   from_name: string;
+  groups: MailGroup[];
   roles: { key: Level; label: string; members: number; with_email: number }[];
   members: { id: number; name: string; roles: Level[]; email: boolean }[];
   server_max_size: number | null;
@@ -887,7 +929,15 @@ export interface MailListItem {
 export interface MailDetail extends MailListItem {
   text: string;
   attachments: Attachment[];
-  selection: Record<MailField, { roles: { key: Level; label: string }[]; users: { id: number; name: string | null }[]; emails: string[] }>;
+  selection: Record<
+    MailField,
+    {
+      groups?: { key: string; label: string }[];
+      roles: { key: Level; label: string }[];
+      users: { id: number; name: string | null }[];
+      emails: string[];
+    }
+  >;
   log: {
     field: MailField;
     name: string | null;
@@ -1697,6 +1747,10 @@ export const api = {
   uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
+  mailGroups: () => request<MailGroup[]>('GET', '/mails/groups'),
+  createMailGroup: (input: MailGroupInput) => request<MailGroup[]>('POST', '/mails/groups', input),
+  updateMailGroup: (key: string, input: MailGroupInput) => request<MailGroup[]>('PATCH', `/mails/groups/${encodeURIComponent(key)}`, input),
+  deleteMailGroup: (key: string) => request<MailGroup[]>('DELETE', `/mails/groups/${encodeURIComponent(key)}`),
   // Formatierte Inhalte (Issue #172): Bilder, Signatur, Mails vom Brett
   richImageLimits: () => request<RichImageLimits>('GET', '/rich-images/limits'),
   uploadRichImage: async (file: File) => request<RichImage>('POST', '/rich-images', { file: await encodeFile(file) }),
@@ -1867,8 +1921,12 @@ export const api = {
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
-  installUpdate: (version: string, major = false) => request<{ installed: string }>('POST', '/admin/update/install', { version, major }),
-  rollback: (version: string) => request<{ installed: string }>('POST', '/admin/update/rollback', { version }),
+  installUpdate: (version: string, major = false, withoutDrive = false) =>
+    request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
+  installHeldUpdate: () => request<{ installed: string }>('POST', '/admin/update/held', {}),
+  dismissHeldUpdate: () => request<UpdateStatus>('DELETE', '/admin/update/held'),
+  rollback: (version: string, withoutDrive = false) =>
+    request<{ installed: string }>('POST', '/admin/update/rollback', { version, without_drive: withoutDrive }),
   updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
@@ -2013,6 +2071,8 @@ export interface UpdateStatus {
   problems: string[];
   versions: { version: string; published: string }[];
   last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;
+  /** Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte. */
+  held: { version: string; kind: 'auto' | 'withdrawn'; at: number; error: string } | null;
 }
 
 export interface AdminStatus {

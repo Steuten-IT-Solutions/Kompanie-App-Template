@@ -30,7 +30,13 @@ const gruppe: Gruppe = async (f) => {
   await knopf('+ Neue Rolle').click();
   const form = page.locator('form.role-form');
   await form.getByLabel('Name der Rolle').fill('Anwärter');
-  await form.getByLabel(/^Mitgliederbereich/).uncheck();
+  // Anwärter: im Mitgliederbereich ohne „Gehört zur Kompanie“, aber mit dem internen Kalender.
+  await form.getByRole('button', { name: 'Mitgliederbereich' }).click();
+  await form.getByLabel(/^Gehört zur Kompanie/).uncheck();
+  for (const label of [/: interne Bilder/, /der anderen sehen$/, /: teilnehmen$/]) {
+    const box = form.getByLabel(label);
+    if (await box.count()) await box.uncheck();
+  }
   await form.getByLabel(/^Interner Kalender/).check();
   await form.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
   await form.getByLabel(/^Wer Mitglieder anlegen darf/).check();

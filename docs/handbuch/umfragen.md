@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.polls}"
 reihenfolge: 33
-rechte: [member]
+rechte: [vote_polls]
 bereiche: [polls]
 ---
 Mit **{bereich.polls}** fragt die {kompanie.name} alle {rolle.member} nach ihrer Meinung, z. B. „Grillfest am Samstag oder Sonntag?“. Diese Seite listet alle {bereich.polls}: die laufenden und die beendeten.

@@ -56,6 +56,9 @@ final class StatusService
             return $this->item('updates', 'Updates', 'error', "Version {$s['current']} wurde zurückgezogen. "
                 . ($s['autoAllowed'] ? "Die Installation wechselt beim nächsten Abgleich automatisch auf Version {$s['fallback']}; das geht auch sofort unter Einstellungen → Zustand und Updates." : "Bitte unter Einstellungen → Zustand und Updates auf Version {$s['fallback']} wechseln (automatische Updates sind hier gesperrt)."));
         }
+        if ($s['held'] !== null) {
+            return $this->item('updates', 'Updates', 'warn', "Das automatische Update auf Version {$s['held']['version']} wurde zurückgestellt. {$s['held']['error']} Bitte unter Einstellungen → Zustand und Updates entscheiden: trotzdem aktualisieren oder abbrechen.");
+        }
         if ($last && !$last['ok'] && ($last['at'] ?? 0) >= ($s['checked_at'] ?? 0) - 86400 * 2) {
             return $this->item('updates', 'Updates', 'error', 'Das letzte Update hat nicht geklappt: ' . $last['error'] . ' Die bisherige Version läuft weiter.');
         }

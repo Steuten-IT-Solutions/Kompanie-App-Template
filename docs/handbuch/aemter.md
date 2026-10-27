@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.offices}"
 reihenfolge: 40
-rechte: []
+rechte: [view_offices]
 bereiche: [offices]
 ---
 Unter **{bereich.offices}** siehst du, wer welches Amt gerade hat und wer es früher hatte – als Zeitstrahl, der weit zurückreichen kann. Sehen kann ihn jeder, auch ohne Anmeldung.
@@ -24,11 +24,13 @@ Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und o
 
 ![Aufgeklappte Chronik eines Amts](bild:aemter-chronik)
 
-### Alle Ämter nach Jahren sehen (breiter Bildschirm)
-1. Tippe oben auf **Jahre**. Den Schalter **Chronik | Jahre** gibt es nur auf breiten Bildschirmen, etwa am Computer oder Tablet quer.
+### Alle Ämter nach Jahren sehen
+1. Tippe oben auf **Jahre**.
 2. Jedes Amt hat eine Spalte, nach Gruppen geordnet; jede Zeile ist ein Jahr, das neueste oben. Ein Balken zeigt, wer das Amt in diesen Jahren hatte. Wer es gleichzeitig mit anderen hatte (z. B. Fahne), steht daneben.
-3. Laufende Amtszeiten sind kräftiger gefärbt, Ehrungen tragen einen Stern. Zeigst du mit der Maus auf einen Balken, stehen dort Jahre, Personen und Zusatz.
-4. Gibt es viele Ämter, schiebst du die Übersicht seitlich. **Chronik** führt zurück zu den Karten. Die App merkt sich deine Wahl.
+3. Laufende Amtszeiten sind kräftiger gefärbt, Ehrungen tragen einen Stern. Tippst du auf einen Balken, stehen unten Jahre, Personen und Zusatz; am Computer reicht es, mit der Maus darauf zu zeigen.
+4. Gibt es viele Ämter, schiebst du die Übersicht seitlich, ältere Jahre findest du weiter unten. Die Ämter oben und die Jahre links bleiben dabei stehen. Nach oben und unten scrollst du wie gewohnt die ganze Seite; ganz oben steht wieder der Schalter **Chronik | Jahre**.
+5. Auf dem Handy ist die Übersicht schmaler. Drehst du das Handy quer, nutzt sie die ganze Breite und es passen mehr Ämter nebeneinander.
+6. **Chronik** führt zurück zu den Karten. Die App merkt sich deine Wahl.
 
 ### Die Ämter einer Person sehen
 1. Tippe in der Chronik oder unter **Im Amt** auf ihren Namen.

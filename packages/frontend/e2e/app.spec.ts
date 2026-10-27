@@ -69,6 +69,34 @@ function countOrderSaves(page: Page, path: string) {
   });
   return () => n;
 }
+/**
+ * Rechte im Formular einer Rolle (Gruppen zum Ein- und Ausklappen, rightsTree.tsx): alle Gruppen aufklappen und genau die
+ * Rechte anhaken, deren Beschriftung zu einem der Muster passt; gesperrte bleiben.
+ */
+async function chooseRights(scope: Locator, keep: RegExp[]) {
+  const open = scope.getByRole('button', { name: 'Alle aufklappen' });
+  if (await open.count()) await open.click();
+  const labels = scope.locator('.rights-group-body label');
+  for (let i = 0; i < (await labels.count()); i++) {
+    const label = labels.nth(i);
+    const box = label.locator('input');
+    if (await box.isDisabled()) continue;
+    const text = (await label.innerText()).trim();
+    await box.setChecked(keep.some((k) => k.test(text)));
+  }
+}
+/** Anwärter: interner Kalender und das Brett, dazu das Öffentliche (wie Roles::CANDIDATE_DEFAULTS im Kern). */
+const CANDIDATE_RIGHTS = [
+  /^Öffentliche Termine$/,
+  /^News$/,
+  /: öffentliche Alben$/,
+  /^Interner Kalender$/,
+  /^Mitglieder$/,
+  /^Ämter$/,
+  /^Ehemalige$/,
+  /^Schwarzes Brett lesen$/,
+];
+
 /** Rolle der Testperson „verwalter“ (tests/standalone/e2e-setup.php, scripts/setup-test-wp.sh) */
 const SPIESS = 'Spieß';
 const STANDALONE = process.env.KOMPANIE_VARIANT === 'standalone';
@@ -143,6 +171,8 @@ test('Gestaltung kommt aus kompanie.json, ohne fremde Motive', async ({ page }) 
   const manifest = await (await page.request.get('/app/manifest.webmanifest')).json();
   expect(manifest.short_name).toBe('Musterkompanie');
   expect(manifest.theme_color).toBe('#2e6b3f');
+  // Drehbar: installierte Apps folgen dem Handy ins Querformat
+  expect(manifest.orientation).toBe('any');
   const html = await page.content();
   expect(html).not.toMatch(/marine|anker|ahoi|wappen/i);
   await shot(page, '0-start-gast');
@@ -967,8 +997,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   if ((await rollen.locator('.row-title', { hasText: /^Anwärter$/ }).count()) === 0) {
     await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
     await rollen.getByLabel('Name der Rolle').fill('Anwärter');
-    await rollen.getByLabel(/^Mitgliederbereich/).uncheck();
-    await rollen.getByLabel(/^Interner Kalender/).check();
+    await chooseRights(rollen, CANDIDATE_RIGHTS);
+    await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).not.toBeChecked();
     await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
     await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
     await rollen.getByRole('button', { name: 'Anlegen' }).click();
@@ -1499,7 +1529,44 @@ test('Ämter: Einzahl auf der Seite einer Person, Hinweis mit Link bei Titeln, d
   expect(status.every((s) => s < 300)).toBe(true);
 });
 
-test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gemerkt (Issue #112)', async ({ page }) => {
+test('Querformat: Navigation links, Listen und Formulare zweispaltig, nichts scrollt seitlich', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Handy quer (iPhone 13): niedrig, daher Leiste links statt unten
+  await page.setViewportSize({ width: 844, height: 390 });
+  const noSideScroll = () => expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.goto('/app/#/verwaltung/mitglieder');
+  await expect
+    .poll(async () => {
+      const bar = await page.locator('.tabbar').boundingBox();
+      return !!bar && bar.x === 0 && bar.width < 120 && bar.height > 300;
+    })
+    .toBe(true);
+  // Mitgliederliste in zwei Spalten
+  const rows = page.locator('.card-list .member-row');
+  await expect(rows.nth(1)).toBeVisible();
+  const [a, b] = [await rows.nth(0).boundingBox(), await rows.nth(1).boundingBox()];
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+  expect(b!.x).toBeGreaterThan(a!.x + a!.width);
+  await noSideScroll();
+  // Formular: zwei Felder nebeneinander
+  await page.goto('/app/#/verwaltung/neu');
+  const user = await page.getByLabel('Benutzername (optional)').boundingBox();
+  const mail = await page.getByLabel('E-Mail (optional)').boundingBox();
+  expect(Math.abs(user!.y - mail!.y)).toBeLessThan(2);
+  expect(mail!.x).toBeGreaterThan(user!.x + user!.width);
+  await noSideScroll();
+  await shot(page, '1e-querformat');
+  // Wieder hochkant: Tab-Leiste unten über die ganze Breite
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(async () => {
+      const bar = await page.locator('.tabbar').boundingBox();
+      return !!bar && bar.width === 390 && bar.y > 700;
+    })
+    .toBe(true);
+});
+
+test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const office = `Fähnriche ${id}`;
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -1526,18 +1593,52 @@ test('Ämter: Jahresübersicht auf breiten Bildschirmen, eine Spalte je Amt, gem
     { id, office },
   );
 
-  // Schmal: keine Umschaltung
+  // Handy hochkant: „Jahre“ zeigt das schmale Raster mit dem Tipp zum Drehen; nur das Raster scrollt seitlich
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-card', { hasText: office })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Ansicht' })).toHaveCount(0);
-
-  // Breit: „Jahre“ zeigt das Raster; die Seite selbst scrollt nicht seitlich
-  await page.setViewportSize({ width: 1200, height: 900 });
   await page.getByRole('group', { name: 'Ansicht' }).getByRole('button', { name: 'Jahre' }).click();
   const grid = page.locator('.year-grid');
+  await expect(page.locator('.year-grid-head .yg-office', { hasText: office })).toBeAttached();
+  await expect(page.locator('.yg-rotate-hint')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Ein Tipp auf einen Balken zeigt Jahre und Personen
+  await grid.locator('.yg-bar', { hasText: `Carl Clau ${id}` }).scrollIntoViewIfNeeded();
+  await grid.locator('.yg-bar', { hasText: `Carl Clau ${id}` }).click();
+  await expect(page.locator('.yg-detail')).toContainText(`${office}: 1990–2006 · Carl Clau ${id}`);
+  await page.locator('.yg-detail').getByRole('button', { name: 'Schließen' }).click();
+  await expect(page.locator('.yg-detail')).toHaveCount(0);
+  // Senkrecht scrollt nur die Seite, nie das Raster (gemeldet: Wischen auf dem Kopf bewegte das Raster statt der Seite,
+  // man kam nicht mehr nach oben zum Schalter). Der Kopf mit den Ämtern bleibt beim Scrollen unter der Kopfleiste stehen.
+  const body = page.locator('.year-grid-scroll');
+  expect(await body.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect
+    .poll(async () => {
+      const head = await page.locator('.year-grid-head').boundingBox();
+      const bar = await page.locator('.topbar').boundingBox();
+      return !!head && !!bar && Math.abs(head.y - (bar.y + bar.height)) <= 1;
+    })
+    .toBe(true);
+  // Seitlich laufen Kopf und Raster zusammen (so weit das Raster breiter ist als der Bildschirm)
+  const left = await body.evaluate((el) => {
+    el.scrollLeft = 120;
+    return el.scrollLeft;
+  });
+  await expect.poll(() => page.locator('.year-grid-head').evaluate((el) => el.scrollLeft)).toBe(left);
+  const view = page.getByRole('group', { name: 'Ansicht' });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(view).toBeInViewport();
+
+  // Quer: ohne Tipp, die Seite scrollt weiter nicht seitlich
+  await page.setViewportSize({ width: 740, height: 360 });
+  await expect(page.locator('.yg-rotate-hint')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  // Breit: dasselbe Raster
+  await page.setViewportSize({ width: 1200, height: 900 });
   await expect(grid).toBeVisible();
-  await expect(grid.locator('.yg-office', { hasText: office })).toBeVisible();
+  await expect(page.locator('.year-grid-head .yg-office', { hasText: office })).toBeVisible();
   const bar = (name: string) => grid.locator('.yg-bar', { hasText: name });
   await expect(bar(`Anna Alt ${id}`)).toHaveClass(/current/);
   await expect(bar(`Bert Bunt ${id}`)).toHaveClass(/current/);
@@ -2357,7 +2458,8 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await memberAccount(page);
   const rechte = page.locator('.member-rights');
-  await expect(rechte.getByLabel(/^Mitgliederbereich/)).toBeChecked();
+  await rechte.getByRole('button', { name: 'Alle aufklappen' }).click();
+  await expect(rechte.getByLabel(/^Gehört zur Kompanie/)).toBeChecked();
   await rechte.getByLabel('Öffentliche Termine pflegen').check();
   await expect(rechte.locator('.badge-override')).toHaveText('zusätzlich');
   await rechte.getByRole('button', { name: 'Rechte speichern' }).click();
@@ -2394,6 +2496,7 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
   await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
   await rollen.getByLabel('Name der Rolle').fill('Kassenwart');
+  await rollen.getByRole('button', { name: /^Kompanie verwalten/ }).click();
   await rollen.getByLabel(/^Kasse vergeben/).check();
   await rollen.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
@@ -2421,6 +2524,54 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   await rollen.getByRole('button', { name: 'Löschen' }).click();
   await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
+});
+
+test('Wer sieht was: Gruppen einklappbar, Mitglied ohne Punktekatalog sieht den Knopf unter „Intern“ nicht', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  const rollen = page.locator('#einstellungen-rollen');
+  // Im Formular der Rolle: Gruppen zu Beginn zu, aufklappen zeigt die Haken; Haken der Gruppe für alle.
+  await rollen.getByRole('button', { name: 'Mitglied bearbeiten' }).click();
+  const intern = rollen.locator('.rights-group-toggle', { hasText: /^Intern/ });
+  await expect(intern).toHaveAttribute('aria-expanded', 'false');
+  await expect(rollen.getByLabel('Punktekatalog', { exact: true })).toBeHidden();
+  await intern.click();
+  await expect(intern).toHaveAttribute('aria-expanded', 'true');
+  await expect(rollen.getByLabel('Punktekatalog', { exact: true })).toBeChecked();
+  await expect(rollen.getByLabel('Intern: alle')).toBeChecked();
+  await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).toBeDisabled();
+  await rollen.getByRole('button', { name: 'Abbrechen' }).click();
+
+  // Übersicht: Punktekatalog für Mitglied abhaken, speichern.
+  await rollen.getByRole('button', { name: 'Wer sieht was' }).click();
+  await rollen.locator('.rights-matrix-toggle', { hasText: /^Intern/ }).click();
+  await rollen.getByLabel('Punktekatalog für Mitglied').uncheck();
+  await expect(rollen.getByLabel('Intern für Mitglied')).not.toBeChecked();
+  await shot(page, '20c-wer-sieht-was');
+  await rollen.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Rechte gespeichert');
+
+  await login(page, 'mitglied1');
+  await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
+  await expect(page.getByRole('button', { name: 'Dienstgrade' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Punktekatalog' })).toHaveCount(0);
+
+  // Wieder wie vorher.
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Rollen', { exact: true }) })
+    .click();
+  await rollen.getByRole('button', { name: 'Wer sieht was' }).click();
+  await rollen.locator('.rights-matrix-toggle', { hasText: /^Intern/ }).click();
+  await rollen.getByLabel('Punktekatalog für Mitglied').check();
+  await rollen.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Rechte gespeichert');
 });
 
 test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Rechte beider Rollen, Filter findet sie', async ({ page }) => {
@@ -4205,6 +4356,44 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
   await shot(page, '33f-email-verlauf');
   await page.getByRole('button', { name: '‹ E-Mails' }).click();
   await expect(page.locator('.mail-form')).toBeVisible();
+
+  // Mailgruppen: Standardgruppen nur umbenennen, eigene Gruppe anlegen und beim Schreiben wählen
+  await page.getByRole('button', { name: /Mailgruppen verwalten/ }).click();
+  const groups = page.locator('.mail-groups');
+  await expect(groups.locator('.mail-group-item').first()).toContainText('Alle Mitglieder');
+  await expect(groups.locator('.mail-group-item', { hasText: 'Alle Konten' })).toContainText('Standardgruppe');
+  await expect(groups.locator('.mail-group-item', { hasText: 'Alle Mitglieder' }).getByRole('button', { name: 'Löschen' })).toHaveCount(0);
+  await groups.getByRole('button', { name: 'Neue Mailgruppe' }).click();
+  const groupForm = groups.locator('.mail-group-form');
+  await groupForm.getByLabel('Bezeichnung').fill(`Vorstand ${id}`);
+  await groupForm.locator('.mail-recipient-input').fill('Mitglied1');
+  await groupForm.locator('.mail-recipient-input').press('Enter');
+  await groupForm.locator('.mail-recipient-input').fill(`vorstand-${id}@example.net`);
+  await groupForm.locator('.mail-recipient-input').press('Enter');
+  await groupForm.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  await expect(groups.locator('.mail-group-item', { hasText: `Vorstand ${id}` })).toContainText('+ 1 Adresse');
+  await shot(page, '33h-email-gruppen');
+  await page.getByRole('button', { name: '‹ E-Mails' }).click();
+  // Erst das Gerüst, dann das Formular: auf das echte Eingabefeld warten (das Gerüst trägt dieselbe Klasse)
+  const to2 = page.locator('.mail-form input.mail-to-input');
+  await to2.fill('Alle Mitg');
+  await page
+    .locator('.mail-suggestions')
+    .getByRole('button', { name: /Alle Mitglieder.*Gruppe/ })
+    .click();
+  await to2.fill(`Vorstand ${id}`);
+  await to2.press('Enter');
+  await expect(page.locator('.mail-form .mail-chip-group')).toHaveCount(2);
+  // Entwurf verwerfen: Gruppe wieder löschen und Formular leeren
+  await page.getByRole('button', { name: /Mailgruppen verwalten/ }).click();
+  await groups
+    .locator('.mail-group-item', { hasText: `Vorstand ${id}` })
+    .getByRole('button', { name: 'Löschen' })
+    .click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  await expect(groups.locator('.mail-group-item')).toHaveCount(2);
+  await page.evaluate(() => localStorage.removeItem('kompanie-mail-draft'));
 
   // Aufräumen: Mailversand wieder aus (andere Tests erwarten den Haken „E-Mail senden“ deaktiviert)
   await page.goto('/app/#/einstellungen/email');

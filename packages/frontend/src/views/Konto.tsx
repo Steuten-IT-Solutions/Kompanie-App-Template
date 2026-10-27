@@ -3,7 +3,7 @@ import { api, can, config, roleLabels, type MailPreference, type OwnAccount } fr
 import { boardVisible, SIGNATURE_RETURN_KEY } from '../board';
 import brand from '../generated/brand';
 import { isStandalone } from '../install';
-import { birthdaysVisible, OwnBirthdayCard } from '../birthdays';
+import { OwnBirthdayCard, ownBirthday } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate, useRoute } from '../router';
 import RichTextView from '../richtext/RichTextView';
@@ -233,7 +233,7 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       <ContactCard onToast={onToast} />
 
-      {birthdaysVisible() && <OwnBirthdayCard onToast={onToast} />}
+      {ownBirthday() && <OwnBirthdayCard onToast={onToast} />}
       {profileChoice() && <OwnJoinYearCard onToast={onToast} />}
 
       <div className="card account-card">
