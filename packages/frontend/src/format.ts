@@ -14,6 +14,12 @@ export function parseLocalDate(ymd: string): Date {
 
 export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
 
+/** Wochentag, Tag und Monat kurz, z. B. „Di., 27. Okt.“ */
+export const formatWeekdayDate = (d: Date) => weekdayFmt.format(d);
+
+/** Monat kurz ohne Punkt für das Datumsfeld links an Karten, z. B. „Okt“. */
+export const shortMonth = (d: Date) => d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
+
 /** Datum vom Server, das auch nur das Jahr sein kann (JJJJ-MM-TT oder JJJJ, z. B. Eintritt), zum Anzeigen. */
 export const formatYearOrDate = (value: string): string => (value.length === 4 ? value : formatDate(value));
 

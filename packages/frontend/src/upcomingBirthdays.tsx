@@ -4,7 +4,7 @@
 
 import { type BirthdayEntry } from './api';
 import brand from './generated/brand';
-import { parseLocalDate } from './format';
+import { formatWeekdayDate, parseLocalDate, shortMonth } from './format';
 import { navigate } from './router';
 import { ErrorBox, useAsync } from './ui';
 import { sources } from './viewData';
@@ -14,11 +14,9 @@ const sec = brand.labels.sections;
 // Steht bei den Daten der Ansichten (viewData.ts): Das Vorabladen braucht es auch.
 export { birthdaysVisible } from './viewData';
 
-const weekdayDate = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
-
 function whenText(b: BirthdayEntry): string {
   if (b.days_until === 1) return 'Morgen';
-  return weekdayDate.format(parseLocalDate(b.date));
+  return formatWeekdayDate(parseLocalDate(b.date));
 }
 
 export function BirthdayRow({ b }: { b: BirthdayEntry }) {
@@ -27,7 +25,7 @@ export function BirthdayRow({ b }: { b: BirthdayEntry }) {
     <li className={`card birthday-item ${b.today ? 'birthday-today' : ''}`}>
       <div className="date-badge" aria-hidden="true">
         <span className="day">{date.getDate()}</span>
-        <span className="mon">{date.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}</span>
+        <span className="mon">{shortMonth(date)}</span>
       </div>
       <div className="birthday-main">
         <div className="birthday-name">{b.name}</div>

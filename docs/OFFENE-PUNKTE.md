@@ -9,7 +9,7 @@ Ergänzt die [Architektur](ARCHITEKTUR.md). Jeder Punkt hat einen Vorschlag, die
 | 3 | [Rechtstexte und Datenschutz](#3-rechtstexte-und-datenschutz) | vor der ersten neuen Kompanie | rechtliche Prüfung beauftragen |
 | 4 | [Statusmeldungen](#4-statusmeldungen) | Phase 5/6 | Webspace/Subdomain für den Empfang |
 | 5 | [Google: „Mit Google verbinden“](#5-google-mit-google-verbinden-und-optional-drivefile) | umgesetzt; Test `drive.file` optional (Issue #40) | für den Test: Google-Cloud-Projekt, Test-Konto |
-| 6 | [Branches und PHP-Version](#6-branches-und-php-version) | sofort | Standard-Branch auf `main` umstellen, PHP-Version von Lank nachsehen |
+| 6 | [Branches und PHP-Version](#6-branches-und-php-version) | Branches umgesetzt; PHP-Version offen | PHP-Version von Lank nachsehen |
 
 ---
 
@@ -192,16 +192,11 @@ Client-ID, Client-Secret und API-Schlüssel gehören nicht in den Chat, sondern 
 
 ## 6. Branches und PHP-Version
 
-### Standard-Branch
+### Branches
 
-Weil das Repo leer war, ist mein Arbeits-Branch zum Standard-Branch geworden. Plan:
-
-1. Branch `main` aus dem aktuellen Stand anlegen. *Erledigt.*
-2. In GitHub unter *Settings → General → Default branch* auf `main` umstellen (braucht Admin-Rechte im Repo).
-3. **Regeln für `main`** (*Settings → Rules*): nur über Pull Requests, CI muss grün sein.
-4. Arbeits-Branches danach immer gegen `main`, jede Phase als eigener Pull Request.
-
-Die Schritte 2 und 3 macht ihr in den Einstellungen.
+**Umgesetzt:** `main` ist der Standard-Branch. Änderungen kommen per Pull Request nach `develop`, ein Release ist ein
+Pull Request `develop → main`. Ablauf und Pflicht-Checks für den Branch-Schutz von `main`:
+[Veröffentlichen, Abschnitt „Branches: develop und main“](RELEASE.md#branches-develop-und-main).
 
 ### PHP-Version
 

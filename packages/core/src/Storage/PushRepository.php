@@ -126,11 +126,6 @@ final class PushRepository
         $this->db->execute('DELETE FROM {push_queue} WHERE subscription_id = ?', [$subscriptionId]);
     }
 
-    public function markSent(int $id, string $now): void
-    {
-        $this->markSentMany([$id], $now);
-    }
-
     /** @param list<int> $ids Abos, an die gerade zugestellt wurde (eine Abfrage für alle) */
     public function markSentMany(array $ids, string $now): void
     {
