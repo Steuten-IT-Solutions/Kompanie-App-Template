@@ -15,6 +15,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.4.0] – 2026-10-27
+
 ### Neu
 
 - **Wer sieht was, je Knopf einstellbar**: Für jeden Knopf unter **Intern** (Mitglieder, Ämter, Ehemalige,
