@@ -16,6 +16,7 @@ Je Thema eine Zeile mit einem kurzen Satz. Tippe auf eine Zeile, um ihre Seite z
 - **Bereiche**: welche Bereiche die App für alle hat. Siehe [Bereiche](seite:admin-bereiche).
 - **Rollen**: wer was in der App darf. Siehe [Rollen](seite:admin-rollen-und-mitglieder).
 - **Benachrichtigungen**: angemeldete Geräte und Uhrzeit der Erinnerung. Siehe [Benachrichtigungen einstellen](seite:admin-benachrichtigungen).
+- **{bereich.birthdays}**: wie lange vorher anstehende {bereich.birthdays} bei den {bereich.events} erscheinen (nur, wenn {bereich.birthdays} an ist).
 - **E-Mail**: Kompanieadresse und Mailserver, z. B. für Nachrichten aus dem Bereich **{bereich.board}**. Siehe [E-Mail einrichten](seite:admin-email).
 - **Google-Zugang**: die Verbindung zu Google für {bereich.gallery} und Kalender. Siehe [Google-Zugang](seite:admin-google).
 - **{bereich.gallery}**: der Ordner in Google Drive mit den Fotoalben. Siehe [{bereich.gallery} einrichten](seite:admin-galerie).
