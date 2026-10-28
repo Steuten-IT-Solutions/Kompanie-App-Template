@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { api, can, type PersonalInfo } from './api';
-import { addressInput, EMPTY_ADDRESS, formatAddress, isAppleDevice, navigationUrl } from './address';
+import { addressInput, EMPTY_ADDRESS, formatAddress, mapPlatform, mapUrl } from './address';
 import { normalizeEmail } from './email';
 import { normalizePhone } from './phone';
 import { AddressFields, EmailField, PhoneField } from './ui';
 
 /**
- * Mitgliedsdetails → Persönliche Angaben: E-Mail-Adresse, Handynummer und Adresse der Person (Antippen: Route dorthin). Sehen mit view_personal
+ * Mitgliedsdetails → Persönliche Angaben: E-Mail-Adresse, Handynummer und Adresse der Person (Antippen: Ort in der Karten-App). Sehen mit view_personal
  * (sonst schickt der Server sie nicht), ändern mit manage_personal. Mit birthday steht oben der Geburtstag; Antippen
  * öffnet sein eigenes Fenster (Sichtbarkeit und Alter stellt nur die Person selbst ein). Eine neue eigene E-Mail-Adresse
  * nur mit dem aktuellen Passwort (wie unter Meins → Konto).
@@ -37,7 +37,7 @@ export function PersonalPanel({
   const emailChanged = editing !== null && start !== null && normalizeEmail(editing.email).toLowerCase() !== start.email.toLowerCase();
   const ownEmailChanged = self && emailChanged;
   const lines = formatAddress(personal.address);
-  const route = navigationUrl(personal.address, isAppleDevice());
+  const map = mapUrl(personal.address, mapPlatform());
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -128,10 +128,10 @@ export function PersonalPanel({
               )}
             </dd>
             <dt>Adresse</dt>
-            {/* Antippen: Route dorthin in der Karten-App */}
+            {/* Antippen: der Ort in der Karten-App; geo: nicht in einem neuen Tab, der bliebe leer zurück */}
             <dd className="address-lines">
-              {route ? (
-                <a href={route} target="_blank" rel="noreferrer">
+              {map ? (
+                <a href={map} {...(map.startsWith('https:') ? { target: '_blank', rel: 'noreferrer' } : {})}>
                   {lines.join('\n')}
                 </a>
               ) : (

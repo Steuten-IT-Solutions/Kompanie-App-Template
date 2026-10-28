@@ -7,7 +7,7 @@ import {
   addressProblems,
   EMPTY_ADDRESS,
   formatAddress,
-  navigationUrl,
+  mapUrl,
   normalizeAddress,
   normalizePostalCode,
   OTHER_COUNTRY,
@@ -101,14 +101,14 @@ test('Anzeige wie auf einem Brief', () => {
   ]);
 });
 
-test('Route in der Karten-App: ohne Zusatz, mit Land', () => {
-  assert.equal(navigationUrl(null, false), null);
-  assert.equal(navigationUrl(EMPTY_ADDRESS, true), null);
+test('Ort in der Karten-App: ohne Zusatz, mit Land', () => {
+  assert.equal(mapUrl(null, 'other'), null);
+  assert.equal(mapUrl(EMPTY_ADDRESS, 'android'), null);
   const q = encodeURIComponent('Musterstraße 1, 12345 Musterstadt, Deutschland');
-  assert.equal(navigationUrl(a({ ...ok, extra: 'c/o Muster' }), false), `https://www.google.com/maps/dir/?api=1&destination=${q}`);
-  assert.equal(navigationUrl(a(ok), true), `https://maps.apple.com/?daddr=${q}`);
+  assert.equal(mapUrl(a({ ...ok, extra: 'c/o Muster' }), 'android'), `geo:0,0?q=${q}`);
+  assert.equal(mapUrl(a(ok), 'other'), `https://www.google.com/maps/search/?api=1&query=${q}`);
   assert.equal(
-    navigationUrl(a({ ...ok, country: OTHER_COUNTRY, country_name: 'Norwegen', postal_code: '0150', city: 'Oslo' }), true),
-    `https://maps.apple.com/?daddr=${encodeURIComponent('Musterstraße 1, 0150 Oslo, Norwegen')}`,
+    mapUrl(a({ ...ok, country: OTHER_COUNTRY, country_name: 'Norwegen', postal_code: '0150', city: 'Oslo' }), 'apple'),
+    `https://maps.apple.com/?q=${encodeURIComponent('Musterstraße 1, 0150 Oslo, Norwegen')}`,
   );
 });

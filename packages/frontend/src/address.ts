@@ -196,24 +196,30 @@ export function formatAddress(a: Address | null | undefined): string[] {
   return lines;
 }
 
+/** Gerät für mapUrl: Android (App-Auswahl), Apple (Apple Karten) oder sonst (Google Maps im Browser) */
+export type MapPlatform = 'android' | 'apple' | 'other';
+
 /**
- * Route zur Adresse in der Karten-App: auf Apple-Geräten Apple Karten (maps.apple.com, daddr), sonst Google Maps
- * (Maps URLs, dir/?api=1); beide öffnen auf dem Handy die App, sonst die Website. Ohne Zusatz (c/o, Hinterhaus …), den
- * die Suche nicht kennt, dafür immer mit dem Land. null ohne Adresse.
+ * Adresse in der Karten-App zeigen (nur den Ort, keine Route): auf Android als geo:-Link, dann bietet Android alle
+ * Karten-Apps zur Auswahl an (Google Maps, Waze, OsmAnd …); auf Apple-Geräten Apple Karten (maps.apple.com, q), sonst
+ * Google Maps (Maps URLs, search/?api=1). Ohne Zusatz (c/o, Hinterhaus …), den die Suche nicht kennt, dafür immer mit
+ * dem Land. null ohne Adresse.
  */
-export function navigationUrl(a: Address | null | undefined, apple: boolean): string | null {
+export function mapUrl(a: Address | null | undefined, platform: MapPlatform): string | null {
   if (!a || isEmptyAddress(a)) return null;
   const land = a.country === OTHER_COUNTRY ? a.country_name : (country(a.country)?.name ?? a.country);
   const target = encodeURIComponent(
     [line(`${a.street} ${a.house_number}`), line(`${a.postal_code} ${a.city}`), land].filter(Boolean).join(', '),
   );
-  return apple ? `https://maps.apple.com/?daddr=${target}` : `https://www.google.com/maps/dir/?api=1&destination=${target}`;
+  if (platform === 'android') return `geo:0,0?q=${target}`;
+  return platform === 'apple' ? `https://maps.apple.com/?q=${target}` : `https://www.google.com/maps/search/?api=1&query=${target}`;
 }
 
-/** iPhone, iPad (gibt sich als Mac mit Touch aus) oder Mac: Dort ist Apple Karten die Karten-App. */
-export function isAppleDevice(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+/** Android; iPhone, iPad (gibt sich als Mac mit Touch aus) oder Mac; sonst (PC) */
+export function mapPlatform(): MapPlatform {
+  if (typeof navigator === 'undefined') return 'other';
+  if (/Android/.test(navigator.userAgent)) return 'android';
+  return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? 'apple' : 'other';
 }
 
 /** Für die Anfrage: null, wenn keine Adresse eingetragen ist. */
