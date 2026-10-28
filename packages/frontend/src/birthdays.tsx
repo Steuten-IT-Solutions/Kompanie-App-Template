@@ -1,15 +1,11 @@
-// Geburtstage (Issue #1): die ganze Liste unter #/termine/geburtstage, der eigene unter „Mein Konto“, die Pflege in
-// den Mitgliedsdetails (wer Mitglieder anlegen darf). Erst bei Bedarf geladen; die anstehenden bei den Terminen stehen
-// in upcomingBirthdays.tsx.
+// Geburtstage (Issue #1): der eigene unter „Mein Konto“, die Pflege in den Mitgliedsdetails (wer Mitglieder anlegen
+// darf). Erst bei Bedarf geladen; die anstehenden bei den Terminen stehen in upcomingBirthdays.tsx.
 
 import { useState, type FormEvent } from 'react';
-import { api, can, config, type Birthday, type BirthdayEntry, type ProfileVisibility } from './api';
+import { api, can, config, type Birthday, type ProfileVisibility } from './api';
 import { PROFILE_OPTIONS, profileChoice, profileHint, ProfileSelect } from './joinYear';
-import { BirthdayRow } from './upcomingBirthdays';
 import brand from './generated/brand';
-import { formatMonth, parseLocalDate } from './format';
-import { navigate } from './router';
-import { Empty, ErrorBox, Loading, useAsync } from './ui';
+import { ErrorBox, useAsync } from './ui';
 
 export { birthdaysVisible } from './upcomingBirthdays';
 export { ownBirthday } from './viewData';
@@ -111,44 +107,6 @@ export function BirthdayFields({
           onChange={(e) => onChange({ ...value, year: e.target.value.replace(/\D/g, '') })}
         />
       </label>
-    </div>
-  );
-}
-
-/** Alle sichtbaren Geburtstage, ab heute nach Monaten gruppiert (#/termine/geburtstage). */
-export default function BirthdayPage() {
-  const { data, error, loading, reload } = useAsync(() => api.birthdays(), [], 'geburtstage');
-  const back = (
-    <button className="btn btn-link back" onClick={() => navigate('termine')}>
-      ‹ {sec.events}
-    </button>
-  );
-  if (loading && !data) return <Loading />;
-  if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const groups: BirthdayEntry[][] = [];
-  for (const b of data ?? []) {
-    const last = groups[groups.length - 1];
-    if (last && last[0].date.slice(0, 7) === b.date.slice(0, 7)) last.push(b);
-    else groups.push([b]);
-  }
-  return (
-    <div className="birthdays-page">
-      {back}
-      <h2 className="birthdays-page-title">Alle {sec.birthdays}</h2>
-      {groups.length === 0 && <Empty>Noch hat niemand seinen Geburtstag eingetragen (oder zeigt ihn anderen).</Empty>}
-      {groups.map((list) => (
-        <section key={list[0].date.slice(0, 7)} className="month">
-          <h3 className="month-title">{formatMonth(parseLocalDate(list[0].date))}</h3>
-          <ul className="card-list birthday-list">
-            {list.map((b) => (
-              <BirthdayRow key={b.user_id} b={b} />
-            ))}
-          </ul>
-        </section>
-      ))}
-      <p className="muted small">
-        Deinen eigenen Geburtstag trägst du unter „Meins → Konto“ ein; dort legst du auch fest, ob andere ihn sehen.
-      </p>
     </div>
   );
 }

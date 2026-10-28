@@ -115,14 +115,6 @@ final class PollRepository
         }
     }
 
-    /** @param array<int, string> $titles ID der Möglichkeit => neuer Titel */
-    public function renameOptions(array $titles): void
-    {
-        foreach ($titles as $id => $title) {
-            $this->db->update('poll_options', ['title' => $title], ['id' => $id]);
-        }
-    }
-
     /* Teilnahmen und Antworten */
 
     /**

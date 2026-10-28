@@ -3,6 +3,8 @@ import brand from '../generated/brand';
 import {
   api,
   can,
+  config,
+  applyBirthdayUpcomingDays,
   applyFeatures,
   newsTitle,
   refreshRoles,
@@ -30,6 +32,7 @@ const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
+  { id: 'geburtstage', title: sec.birthdays, text: `Wie lange vorher anstehende ${sec.birthdays} bei den ${sec.events} erscheinen.` },
   { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
   { id: 'google', title: 'Google-Zugang', text: `Verbindung zu Google für ${sec.gallery} und Kalender.` },
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
@@ -64,6 +67,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
+      {page.id === 'geburtstage' && <BirthdaySettingsSection onToast={onToast} />}
       {page.id === 'email' && <MailSection onToast={onToast} />}
       {page.id === 'nutzung' && <Nutzung onToast={onToast} />}
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
@@ -77,13 +81,21 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
   );
 }
 
-/** Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat. */
+/**
+ * Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat, Geburtstage nur
+ * mit dem Bereich.
+ */
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
   // ein und schiebt die Zeilen darunter weg.
   const { data, loading } = useAsync(() => api.settings(), [], 'settings');
   if (loading && !data) return <Loading />;
-  const pages = PAGES.filter((p) => (p.id !== 'news' || !!data?.news) && (p.id !== 'nutzung' || can('view_activity')));
+  const pages = PAGES.filter(
+    (p) =>
+      (p.id !== 'news' || !!data?.news) &&
+      (p.id !== 'nutzung' || can('view_activity')) &&
+      (p.id !== 'geburtstage' || !!config?.features.birthdays),
+  );
   return (
     <ul className="card-list settings-overview">
       {pages.map((p) => (
@@ -195,6 +207,59 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <p className="small muted">
         Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).
+      </p>
+    </section>
+  );
+}
+
+/** Bis zu so vielen Tagen im Voraus zeigt die Karte „Anstehende Geburtstage“ einen Geburtstag (wie im Kern). */
+const UPCOMING_DAYS_MAX = 30;
+
+/** Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ bei den Terminen einen zeigt. */
+function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.birthdaySettings(), [], 'admin/birthdays');
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (!config?.features.birthdays) return <p className="muted">Der Bereich {sec.birthdays} ist ausgeschaltet.</p>;
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+
+  async function save(days: number) {
+    setBusy(true);
+    setSaveError(null);
+    try {
+      const next = await api.setBirthdayUpcomingDays(days);
+      setData(next);
+      applyBirthdayUpcomingDays(next.upcoming_days);
+      onToast('Gespeichert');
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" id="einstellungen-geburtstage">
+      <h3>{sec.birthdays}</h3>
+      <label className="field">
+        <span>Anstehende {sec.birthdays} anzeigen</span>
+        <select value={data!.upcoming_days} disabled={busy} onChange={(e) => save(Number(e.target.value))}>
+          {Array.from({ length: UPCOMING_DAYS_MAX + 1 }, (_, d) => (
+            <option key={d} value={d}>
+              {d === 0 ? 'nur am Tag selbst' : d === 1 ? '1 Tag vorher' : `${d} Tage vorher`}
+            </option>
+          ))}
+        </select>
+      </label>
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+      <p className="small muted">
+        So lange vorher erscheint ein Geburtstag oben bei den {sec.events} unter „Anstehende {sec.birthdays}“, für alle, die {sec.birthdays}{' '}
+        sehen.
       </p>
     </section>
   );

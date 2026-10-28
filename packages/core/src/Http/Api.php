@@ -45,7 +45,7 @@ final class Api
      * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
      * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/key', '/push/status', '/me/push/status', '/reports/form'];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/reports/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -462,6 +462,8 @@ final class Api
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
             // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
             'preview' => $a->preview()->info(),
+            // Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich
+            'birthdays' => ($features['birthdays'] ?? false) ? ['upcomingDays' => $a->birthdays()->upcomingDays()] : null,
         ];
     }
 
@@ -557,7 +559,6 @@ final class Api
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
-            new Route('GET', '/push/key', $P, fn () => ['supported' => $a->push()->supported(), 'publicKey' => $a->push()->publicKey()]),
             new Route('POST', '/me/push/status', $L, fn (Request $r) => $this->pushStatus($r, $this->user())),
             new Route('POST', '/push/status', $P, fn (Request $r) => $this->pushStatus($r, null)),
             new Route('POST', '/me/push', $L, fn (Request $r) => PushService::formatSubscription($a->push()->subscribe(
@@ -1007,6 +1008,12 @@ final class Api
                 }
                 return $a->push()->adminStatus();
             }, null, $denySettings),
+            // Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ einen Geburtstag zeigt
+            new Route('GET', '/admin/birthdays', Cap::ManageSettings, fn () => $a->birthdays()->settings(), 'birthdays', $denySettings),
+            new Route('PATCH', '/admin/birthdays', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->birthdays()->setUpcomingDays($r->input('upcoming_days'));
+                return $a->birthdays()->settings();
+            }, 'birthdays', $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
             // E-Mail (Issue #172): Kompanieadresse und SMTP, Verbindung prüfen, Testmail
             new Route('GET', '/admin/mail', Cap::ManageSettings, fn () => $a->mail()->describe(), null, $denySettings),

@@ -109,6 +109,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
+  /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
+  birthdays?: { upcomingDays: number } | null;
 }
 
 export interface MaintenanceInfo {
@@ -181,6 +183,13 @@ export const CONFIG_CHANGED = 'kompanie-config-changed';
 export function applyFeatures(list: FeatureInfo[]): void {
   if (!config) return;
   for (const f of list) config.features[f.key] = f.enabled && f.configured !== false;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Vorlauf der anstehenden Geburtstage in die geladene Konfiguration (nach dem Speichern). */
+export function applyBirthdayUpcomingDays(days: number): void {
+  if (!config) return;
+  config.birthdays = { upcomingDays: days };
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -429,7 +438,7 @@ export interface MemberSummary {
   level: Level;
   /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
   extra_roles?: Level[];
-  /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
+  /** Recht „Gehört zur Kompanie“; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
   /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
   group?: Level | null;
@@ -732,6 +741,12 @@ export interface BirthdayEntry {
   today: boolean;
   /** Alter an diesem Geburtstag, nur wenn freigegeben */
   age: number | null;
+}
+
+/** Einstellungen der Geburtstage (Einstellungen → Geburtstage). */
+export interface BirthdaySettings {
+  /** Anstehend: heute und die nächsten N Tage (0–30) */
+  upcoming_days: number;
 }
 
 export interface BirthdayInput {
@@ -1143,7 +1158,7 @@ export interface AttendancePerson {
   role: Level;
   /** Rolle, als die die Person im Zähler zählt */
   group: Level;
-  /** Mit Mitgliederbereich: Punkte und Strafen möglich */
+  /** Recht „Gehört zur Kompanie“: Punkte und Strafen möglich */
   member: boolean;
   status: AttendanceStatus | null;
   /** Hat für diese Liste schon Punkte */
@@ -1747,7 +1762,6 @@ export const api = {
   uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
-  mailGroups: () => request<MailGroup[]>('GET', '/mails/groups'),
   createMailGroup: (input: MailGroupInput) => request<MailGroup[]>('POST', '/mails/groups', input),
   updateMailGroup: (key: string, input: MailGroupInput) => request<MailGroup[]>('PATCH', `/mails/groups/${encodeURIComponent(key)}`, input),
   deleteMailGroup: (key: string) => request<MailGroup[]>('DELETE', `/mails/groups/${encodeURIComponent(key)}`),
@@ -1966,6 +1980,8 @@ export const api = {
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
+  birthdaySettings: () => request<BirthdaySettings>('GET', '/admin/birthdays'),
+  setBirthdayUpcomingDays: (upcoming_days: number) => request<BirthdaySettings>('PATCH', '/admin/birthdays', { upcoming_days }),
   setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
 
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung

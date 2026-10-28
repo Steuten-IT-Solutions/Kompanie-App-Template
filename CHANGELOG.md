@@ -22,12 +22,21 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
   schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
 
+- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
+  Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
+  Tage vorher, anfangs wie bisher 7 Tage).
+
 ### Behoben
 
 - **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
   ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
   Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
   die neue Version.
+
+### Entfernt
+
+- **Liste aller Geburtstage**: Die Seite „Alle Geburtstage“ gibt es nicht mehr. Die Karte „Anstehende Geburtstage“ bei
+  den Terminen bleibt; die Benachrichtigung am Geburtstag öffnet jetzt die Termine.
 
 ## [0.4.0] – 2026-10-27
 
