@@ -113,13 +113,19 @@ final class BackupCryptoTest extends TestCase
             }
             rewind($plain);
             $enc = fopen("$dir/enc", 'w+b');
+            // Den Spitzenwert zurücksetzen gibt es erst ab PHP 8.2; unter 8.1 nur Hin und zurück prüfen.
+            $measure = function_exists('memory_reset_peak_usage');
             $before = memory_get_usage();
-            memory_reset_peak_usage();
+            if ($measure) {
+                memory_reset_peak_usage();
+            }
             BackupCrypto::encryptStream($plain, $enc, self::$key);
             rewind($enc);
             $back = fopen("$dir/back", 'w+b');
             BackupCrypto::decryptStream($enc, $back, self::PASS);
-            $this->assertLessThan(4 * 1024 * 1024, memory_get_peak_usage() - $before, '20 MB mit wenig Speicher');
+            if ($measure) {
+                $this->assertLessThan(4 * 1024 * 1024, memory_get_peak_usage() - $before, '20 MB mit wenig Speicher');
+            }
             $this->assertSame(hash_file('sha256', "$dir/plain"), hash_file('sha256', "$dir/back"));
             fclose($plain);
             fclose($enc);
