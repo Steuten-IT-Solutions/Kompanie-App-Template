@@ -34,7 +34,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Adresse, Handynummer und E-Mail in Listen**: Unter *Verwaltung → Listen* gibt es die Datenspalten Adresse (die ganze
   Anschrift in einer Spalte), Straße und Nr., PLZ, Ort, Land, Handynummer und E-Mail, auch im CSV-Export. Mit den
   einzelnen Spalten lassen sich aus der CSV Serienbriefe und Adressetiketten erstellen. Die Werte sieht nur, wer das
-  Recht „Persönliche Angaben sehen“ hat.
+  Recht „Persönliche Angaben sehen“ hat. Die Handynummer steht in der CSV als „0049 …“, damit Excel sie unverändert
+  übernimmt.
 - **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
   Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
   Tage vorher, anfangs wie bisher 7 Tage).
