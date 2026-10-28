@@ -57,6 +57,9 @@ final class PersonalDataExportTest extends TestCase
         $db->insert('poll_votes', ['poll_id' => $poll, 'user_id' => $this->m, 'voted_at' => $now, 'updated_at' => $now]);
         $secret = $this->app->polls()->secret();
         $db->insert('poll_answers', ['poll_id' => $poll, 'vote_ref' => PollService::pseudonym($secret, $this->m), 'user_id' => null, 'option_id' => 0, 'answer_text' => 'Meine anonyme Meinung']);
+        // Namentliche Umfrage: Pseudonym und user_id (PollRepository::saveVote)
+        $named = $db->insert('polls', ['title' => 'Namentlich', 'description' => '', 'type' => 'text', 'anonymous' => 0, 'results' => 'after_vote', 'created_by' => $this->admin, 'created_at' => $now, 'updated_at' => $now]);
+        $db->insert('poll_answers', ['poll_id' => $named, 'vote_ref' => PollService::pseudonym($secret, $this->m), 'user_id' => $this->m, 'option_id' => 0, 'answer_text' => 'Meine namentliche Meinung']);
     }
 
     private function call(string $method, string $path, array $body = []): Response
@@ -74,7 +77,9 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame('kompanie-app-personal-data', $d['format']);
         $this->assertSame($this->m, $d['person']['id']);
         $this->assertSame(['Schützenfest'], array_column($d['data']['points'], 'reason'), 'nur eigene Punkte');
-        $this->assertSame('Meine anonyme Meinung', $d['data']['poll_answers'][0]['answer_text'] ?? null, 'eigene anonyme Antwort');
+        $answers = array_column($d['data']['poll_answers'], 'answer_text');
+        sort($answers);
+        $this->assertSame(['Meine anonyme Meinung', 'Meine namentliche Meinung'], $answers, 'eigene Antworten, jede einmal');
         $json = (string) json_encode($d);
         foreach (['GEHEIM-P256', 'GEHEIM-AUTH', 'vote_ref', 'Nicht meins'] as $hidden) {
             $this->assertStringNotContainsString($hidden, $json);
@@ -87,7 +92,7 @@ final class PersonalDataExportTest extends TestCase
         $res = $this->call('GET', "/members/{$this->m}/data");
         $this->assertSame(200, $res->status);
         $this->assertSame($this->m, $res->data['person']['id']);
-        $this->assertArrayNotHasKey('poll_answers', $res->data['data'], 'anonyme Antworten nicht für die Verwaltung');
+        $this->assertSame(['Meine namentliche Meinung'], array_column($res->data['data']['poll_answers'], 'answer_text'), 'anonyme Antworten nicht für die Verwaltung');
         $this->assertCount(1, $res->data['data']['poll_votes'], 'Teilnahme schon');
 
         // Wer Konten anlegt, aber kein Admin ist: keine Admins; ohne create_users gar nicht; ohne Anmeldung 401.

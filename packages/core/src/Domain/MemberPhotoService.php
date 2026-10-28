@@ -282,13 +282,13 @@ final class MemberPhotoService
             return $deny(503);
         }
         // Öffentlich nur, wenn Gast die Liste sehen darf (sonst ließen sich die Fotos über die fortlaufenden Nummern
-        // abrufen, obwohl die Liste verborgen ist); Angemeldete brauchen das Recht selbst.
+        // abrufen, obwohl die Liste verborgen ist); sonst brauchen Angemeldete das Recht selbst.
         $via = $this->publicVia($userId);
         $public = $via !== null && $this->app->anonymous()->can($via);
         if ($viewer === null && !$public) {
             return $deny(401);
         }
-        if ($viewer !== null && $viewer->id !== $userId && !self::canSeeOthers($viewer) && !($via !== null && $viewer->can($via))) {
+        if ($viewer !== null && $viewer->id !== $userId && !$public && !self::canSeeOthers($viewer) && !($via !== null && $viewer->can($via))) {
             return $deny(403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;
@@ -313,7 +313,8 @@ final class MemberPhotoService
             // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag speichern, nur im Browser, solange das Foto nicht
             // öffentlich in der Mitgliederliste steht: Ein entferntes Foto oder entzogene Rechte gelten so bald auch auf
             // Geräten, die es schon geladen haben. In der Vorschau (Issue #63) nie speichern.
-            'Cache-Control' => $this->app->preview()->cacheControl(($public ? 'public' : 'private') . ($current ? ', max-age=86400' : ', no-cache')),
+            // Die Originalauflösung gibt es nur nach der Anmeldung: nie in gemeinsamen Zwischenspeichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(($public && $size !== self::MAX_EDGE ? 'public' : 'private') . ($current ? ', max-age=86400' : ', no-cache')),
             'X-Robots-Tag' => 'noindex',
             'ETag' => '"' . $photo['version'] . '-' . $size . '"',
         ], 'body' => $body];

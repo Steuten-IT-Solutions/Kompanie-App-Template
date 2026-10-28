@@ -390,6 +390,14 @@ final class BackupUploadTest extends TestCase
         $this->assertSame(BackupUploadService::INTERVAL, $this->scheduler->scheduled[BackupUploadService::TASK] ?? null);
         $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
         $this->assertSame([200, ['ok' => false]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => 'falsch']));
+        // Nur Fehlversuche zählen (richtige Passwörter sperren kein Wiederherstellen im Notfall); nach zehn ist 15 Minuten Pause.
+        for ($i = 0; $i < 20; $i++) {
+            $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]), "richtig $i");
+        }
+        for ($i = 2; $i <= 10; $i++) {
+            $this->assertSame([200, ['ok' => false]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => 'falsch']), "Fehlversuch $i");
+        }
+        $this->assertSame(429, $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS])[0], 'nach zehn Fehlversuchen gesperrt');
         $stored = (string) json_encode($this->app->settings->get(BackupCrypto::SETTING));
         $this->assertStringNotContainsString(self::PASS, $stored, 'Passwort nicht gespeichert');
     }

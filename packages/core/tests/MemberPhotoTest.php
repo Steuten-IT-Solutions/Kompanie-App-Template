@@ -218,6 +218,7 @@ final class MemberPhotoTest extends TestCase
         $res = $photos->forDelivery($this->users->find($this->admin), $this->m, $version, '4096');
         $this->assertSame([200, $original], [$res['status'], $res['body'] ?? null]);
         $this->assertSame(404, $photos->forDelivery(null, $this->m, $version, '4096')['status'], 'Original nur für Angemeldete');
+        $this->assertStringStartsWith('private', $res['headers']['Cache-Control'], 'Original nie in gemeinsamen Zwischenspeichern');
         $this->assertSame(200, $photos->forDelivery(null, $this->m, $version, '1024')['status']);
         $this->assertStringEndsWith('&s=4096', $photos->urls(4096)[$this->m]);
 
@@ -323,6 +324,11 @@ final class MemberPhotoTest extends TestCase
 
         $this->assertSame(200, $patch(['view_news', 'view_directory'])->status);
         $this->assertSame(200, $deliver(null, $this->m)['status']);
+        // Was ohne Anmeldung zu sehen ist, sieht auch, wer angemeldet ist und das Recht selbst nicht hat.
+        $noList = $this->users->add('ohneliste', Roles::MEMBER);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $noList, [], ['view_directory']);
+        $this->assertFalse((bool) $this->users->find($noList)?->can(\KompanieApp\Core\Auth\Capability::ViewDirectory));
+        $this->assertSame(200, $deliver($noList, $this->m)['status']);
         $this->assertStringStartsWith('public', $deliver(null, $this->m)['headers']['Cache-Control']);
         $this->assertSame(401, $deliver(null, $former)['status'], 'Ehemalige ohne view_former');
         $this->assertSame(403, $deliver($guest, $former)['status'], 'Gast-Konto ohne view_former');

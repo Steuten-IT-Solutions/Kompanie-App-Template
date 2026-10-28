@@ -109,15 +109,23 @@ try {
                     throw new RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (Einstellungen → Datensicherung).');
                 }
                 $plain = tmpfile();
-                $target = fopen($out, 'wb');
+                $target = @fopen($out, 'wb');
+                if ($plain === false || $target === false) {
+                    throw new RuntimeException("$out lässt sich nicht schreiben (Ordner vorhanden, Schreibrechte?).");
+                }
                 @chmod($out, 0600);
                 try {
                     (new StandaloneBackup($kernel))->exportTo($plain);
                     rewind($plain);
                     $kernel->app()->backupEncryption()->encryptStream($plain, $target);
+                } catch (Throwable $e) {
+                    // Keine halbe Datei liegen lassen, die wie eine Sicherung aussieht.
+                    fclose($target);
+                    @unlink($out);
+                    throw $e;
                 } finally {
                     fclose($plain);
-                    fclose($target);
+                    is_resource($target) && fclose($target);
                 }
                 fwrite(STDERR, "Verschlüsselt gesichert in $out (wiederherstellen nur mit dem Passwort für Sicherungen).\n");
                 break;
@@ -149,9 +157,23 @@ try {
                 } else {
                     fwrite(STDERR, 'Passwort für Sicherungen: ');
                     $tty = function_exists('posix_isatty') && posix_isatty(STDIN);
-                    $tty && shell_exec('stty -echo');
+                    if ($tty) {
+                        shell_exec('stty -echo');
+                        // Bei Strg-C die Anzeige der Eingabe wieder einschalten (sonst bleibt das Terminal „stumm“).
+                        if (function_exists('pcntl_async_signals')) {
+                            pcntl_async_signals(true);
+                            pcntl_signal(SIGINT, static function (): void {
+                                shell_exec('stty echo');
+                                fwrite(STDERR, "\n");
+                                exit(130);
+                            });
+                        }
+                    }
                     $pass = rtrim((string) fgets(STDIN), "\r\n");
-                    $tty && shell_exec('stty echo');
+                    if ($tty) {
+                        shell_exec('stty echo');
+                        function_exists('pcntl_signal') && pcntl_signal(SIGINT, SIG_DFL);
+                    }
                     fwrite(STDERR, "\n");
                 }
                 $data = BackupCrypto::decryptToString($data, $pass);

@@ -64,8 +64,9 @@ final class PersonalDataExport
             $sql = 'SELECT * FROM {' . $table . '} WHERE ' . $column . ' = ?';
             $rows = $this->rows($sql, [$userId]);
             if ($table === 'poll_answers' && $self && ($secret = PollService::existingSecret($this->app->settings)) !== null) {
-                // Eigene anonyme Antworten (über das Pseudonym); nur die Person selbst bekommt sie.
-                $rows = [...$rows, ...$this->rows('SELECT * FROM {poll_answers} WHERE vote_ref = ?', [PollService::pseudonym($secret, $userId)])];
+                // Eigene anonyme Antworten (über das Pseudonym; namentliche kamen schon über user_id); nur die Person selbst
+                // bekommt sie.
+                $rows = [...$rows, ...$this->rows('SELECT * FROM {poll_answers} WHERE vote_ref = ? AND user_id IS NULL', [PollService::pseudonym($secret, $userId)])];
             }
             if ($rows !== []) {
                 $data[$table] = $rows;

@@ -482,13 +482,14 @@ final class FormerMemberService
     public function retentionStatus(): array
     {
         $config = $this->retention();
+        if ($config['years'] === 0) {
+            return $config + ['due' => [], 'soon' => []];
+        }
         $today = $this->app->time()->today();
-        return $config + [
-            'due' => $config['years'] > 0 ? $this->expired($config, $today) : [],
-            'soon' => $config['years'] > 0
-                ? array_values(array_udiff($this->expired($config, $today->modify('+30 days')), $this->expired($config, $today), static fn (array $a, array $b): int => $a['id'] <=> $b['id']))
-                : [],
-        ];
+        $due = $this->expired($config, $today);
+        $dueIds = array_column($due, 'id');
+        $soon = array_values(array_filter($this->expired($config, $today->modify('+30 days')), static fn (array $p): bool => !in_array($p['id'], $dueIds, true)));
+        return $config + ['due' => $due, 'soon' => $soon];
     }
 
     /**
@@ -534,8 +535,8 @@ final class FormerMemberService
             } catch (\DomainException) {
                 continue; // z. B. Administrator der Webseite: dort verwaltet
             }
+            // Löscht auch den Eintrag als ehemalig (former_members steht in UserData::TABLES).
             $this->app->userDeleted($person['id']);
-            $this->repository()->delete($person['id']);
             $deleted++;
         }
         $this->all = null;

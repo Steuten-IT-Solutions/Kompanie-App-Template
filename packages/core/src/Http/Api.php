@@ -1143,17 +1143,14 @@ final class Api
                     throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
                 }
                 // Als Text (JSON wie bisher) oder als Base64 (verschlüsselte Sicherung, mit passphrase).
-                $data = $r->input('backup');
-                if (is_string($r->input('backup_base64'))) {
-                    $data = base64_decode($r->input('backup_base64'), true);
-                    if ($data === false) {
-                        throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
-                    }
-                }
+                $base64 = $r->input('backup_base64');
+                $data = is_string($base64) ? $base64 : $r->input('backup');
                 if (!Input::bool($r->input('confirm')) || !is_string($data)) {
                     throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
                 }
-                $data = $a->backupEncryption()->decryptUpload($data, $r->input('passphrase'));
+                $data = is_string($base64)
+                    ? $a->backupEncryption()->readUpload($base64, $r->input('passphrase'))
+                    : $a->backupEncryption()->decryptUpload($data, $r->input('passphrase'));
                 try {
                     $backup->import($data);
                 } catch (\RuntimeException $e) {

@@ -5035,7 +5035,7 @@ paths:
     post:
       tags: [Wartung]
       summary: Passwort für Sicherungen prüfen
-      description: Höchstens 10 Versuche in 15 Minuten (danach 429).
+      description: Nach 10 Fehlversuchen in 15 Minuten 15 Minuten gesperrt (429); richtige Passwörter zählen nicht.
       x-capability: manage_settings
       requestBody:
         required: true
