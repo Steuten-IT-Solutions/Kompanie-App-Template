@@ -1,5 +1,16 @@
-import { useRef, useState, type ChangeEvent } from 'react';
-import { api, ApiError, config, type AdminStatus, type BackupDriveStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import {
+  api,
+  ApiError,
+  config,
+  inBackground,
+  type AdminStatus,
+  type BackupDriveStatus,
+  type ErrorLogEntry,
+  type UpdateProgress,
+  type UpdateStatus,
+  type UpdateStep,
+} from '../api';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -68,6 +79,62 @@ function date(ts: number | null | undefined): string {
   return ts ? new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) : '–';
 }
 
+const STEP_TEXT: Record<UpdateStep, string> = {
+  download: 'Paket wird geladen',
+  backup: 'Daten werden gesichert',
+  drive: 'Sicherung wird in Google Drive abgelegt',
+  install: 'Neue Version wird eingespielt',
+};
+
+/** Abfrage des laufenden Updates alle … ms; nach höchstens … ms aufgeben (das Zeitlimit von PHP sind 5 Minuten). */
+const POLL_MS = 3000;
+const WAIT_MAX_MS = 20 * 60 * 1000;
+
+/**
+ * Antwort auf das Einspielen ging verloren, das Update läuft aber auf dem Server weiter: keine Verbindung (Netzwechsel),
+ * Zeitlimit des Hosters vor PHP (Gateway-Fehler ohne Code der App) oder es läuft schon eines (z. B. nach erneutem Klick).
+ */
+function stillRunning(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    (err.code === 'update_running' || err.status === 0 || (!err.code && [502, 503, 504, 520, 522, 524].includes(err.status)))
+  );
+}
+
+function mb(bytes: number): string {
+  return (bytes / 1024 / 1024).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+/**
+ * Anzeige je Schritt, innerhalb von Sicherung und Hochladen nach Bytes. Die Größe der Sicherung steht erst am Ende fest
+ * (geschätzt aus der letzten): Der Balken bleibt dann vor dem Ende des Schritts stehen, bis der nächste beginnt.
+ */
+function UpdateProgressBar({ progress }: { progress: UpdateProgress | null }) {
+  const index = progress ? progress.steps.indexOf(progress.step) : -1;
+  const steps = progress?.steps.length ?? 0;
+  const { done = null, total = null, estimate = false } = progress ?? {};
+  const part = done !== null && total ? Math.min(done / total, estimate ? 0.95 : 1) : 0;
+  const bytes = done === null ? '' : total ? ` (${mb(done)} von ${estimate ? 'ca. ' : ''}${mb(total)} MB)` : ` (${mb(done)} MB)`;
+  return (
+    <div className="small" role="status" aria-live="polite">
+      {index >= 0 ? (
+        <>
+          <progress className="progress" value={index + part} max={steps} aria-label={`Update: Schritt ${index + 1} von ${steps}`} />
+          <p className="muted">
+            Schritt {index + 1} von {steps}: {STEP_TEXT[progress!.step]}
+            {bytes} … Bitte die Seite offen lassen; das kann einige Minuten dauern.
+          </p>
+        </>
+      ) : (
+        <>
+          <progress className="progress" aria-label="Update läuft" />
+          <p className="muted">Das Update läuft … Bitte die Seite offen lassen; das kann einige Minuten dauern.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChanged: () => void; onToast: (msg: string) => void }) {
   const [u, setU] = useState<UpdateStatus>(status.updates);
   const [reports, setReports] = useState(status.statusReports.enabled);
@@ -75,6 +142,15 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
   const [error, setError] = useState<string | null>(null);
   const [older, setOlder] = useState('');
   const [showPayload, setShowPayload] = useState(false);
+  /** Fortschritt des laufenden Updates; undefined: keins läuft */
+  const [progress, setProgress] = useState<UpdateProgress | null | undefined>(status.updates.running ? status.updates.progress : undefined);
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
 
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(label);
@@ -88,6 +164,69 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
     }
   }
 
+  /**
+   * Fragt den Stand ab, solange auf dem Server ein Update läuft, und zeigt den Fortschritt. Danach: eingespielt → App neu
+   * laden; gescheitert → der Stand zeigt „Letztes Update … hat nicht geklappt“.
+   *
+   * @param version Ziel des Updates; null: nur auf ein schon laufendes warten (z. B. nach dem Neuladen der Seite)
+   * @param done Promise der eigenen Anfrage; solange sie läuft, nur den Fortschritt zeigen
+   */
+  async function follow(version: string | null, done?: Promise<unknown>): Promise<void> {
+    let finished = !done;
+    let failure: unknown = null;
+    done?.then(
+      () => (finished = true),
+      (err) => {
+        finished = true;
+        failure = err;
+      },
+    );
+    const before = u.current;
+    const until = Date.now() + WAIT_MAX_MS;
+    setProgress((p) => p ?? null);
+    try {
+      for (;;) {
+        await new Promise((r) => setTimeout(r, done && finished ? 0 : POLL_MS));
+        if (!alive.current) return;
+        if (finished && done) {
+          // Antwort auf die eigene Anfrage: eingespielt, oder abgebrochen, während das Update weiterläuft.
+          if (!failure) return reloadApp(version!);
+          if (!stillRunning(failure)) throw failure;
+          done = undefined;
+          continue;
+        }
+        let next: UpdateStatus;
+        try {
+          next = await inBackground(() => api.updateStatus());
+        } catch {
+          if (Date.now() > until) throw new Error('Der Server antwortet nicht. Bitte in ein paar Minuten den Zustand neu laden.');
+          continue; // kurz nicht erreichbar (z. B. während die Dateien getauscht werden)
+        }
+        if (next.running) {
+          setProgress(next.progress);
+          if (Date.now() > until) throw new Error('Das Update läuft noch. Bitte in ein paar Minuten den Zustand neu laden.');
+          continue;
+        }
+        if (done) continue; // Anfrage läuft noch, Sperre noch nicht gesetzt oder schon frei: auf die Antwort warten
+        setU(next);
+        // Eingespielt (auch ein anderes, das schon lief, z. B. das automatische): die neue App laden.
+        if (next.current !== before) return reloadApp(next.current);
+        if (version && !(next.last && !next.last.ok && next.last.to === version)) {
+          throw new Error(`Version ${version} wurde nicht eingespielt. Bitte den Zustand neu laden und erneut versuchen.`);
+        }
+        return; // gescheitert: steht unter „Letztes Update … hat nicht geklappt“
+      }
+    } finally {
+      if (alive.current) setProgress(undefined);
+    }
+  }
+
+  /** Ein Update läuft schon (Seite neu geladen, automatisches Update, anderer Admin): warten und Fortschritt zeigen. */
+  useEffect(() => {
+    if (status.updates.running) void run('wait', () => follow(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Nach einem Update läuft im Browser noch die alte App: neu laden. */
   function reloadApp(version: string) {
     onToast(`Version ${version} ist eingespielt.`);
@@ -98,9 +237,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
    * Scheitert nur die Sicherung in Google Drive vor dem Update (die auf dem Server ist da), fragt die App nach:
    * trotzdem einspielen oder abbrechen.
    */
-  async function askWithoutDrive(fn: (withoutDrive: boolean) => Promise<unknown>) {
+  async function askWithoutDrive(version: string, fn: (withoutDrive: boolean) => Promise<unknown>) {
     try {
-      await fn(false);
+      await follow(version, fn(false));
     } catch (err) {
       if (
         !(err instanceof ApiError && err.code === 'drive_backup_failed') ||
@@ -108,14 +247,13 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
       ) {
         throw err;
       }
-      await fn(true);
+      await follow(version, fn(true));
     }
   }
 
   const install = (version: string, major = false) =>
     run('install', async () => {
-      await askWithoutDrive((withoutDrive) => api.installUpdate(version, major, withoutDrive));
-      reloadApp(version);
+      await askWithoutDrive(version, (withoutDrive) => api.installUpdate(version, major, withoutDrive));
     });
 
   const olderVersions = u.versions.filter((v) => compare(v.version, u.current) < 0);
@@ -170,8 +308,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                   disabled={!!busy}
                   onClick={() =>
                     run('held', async () => {
-                      await api.installHeldUpdate();
-                      reloadApp(u.held!.version);
+                      await follow(u.held!.version, api.installHeldUpdate());
                     })
                   }
                 >
@@ -188,6 +325,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               </div>
             </div>
           )}
+          {progress !== undefined && <UpdateProgressBar progress={progress} />}
           {u.error && <p className="form-error small">Letzte Prüfung: {u.error}</p>}
           {u.last && !u.last.ok && u.last.to !== u.held?.version && (
             <p className="form-error small">
@@ -303,8 +441,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 onClick={() =>
                   window.confirm(`Auf Version ${older} zurückgehen?`) &&
                   run('rollback', async () => {
-                    await askWithoutDrive((withoutDrive) => api.rollback(older, withoutDrive));
-                    reloadApp(older);
+                    await askWithoutDrive(older, (withoutDrive) => api.rollback(older, withoutDrive));
                   })
                 }
               >

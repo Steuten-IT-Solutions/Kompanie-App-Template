@@ -43,8 +43,10 @@ Die Fehler der letzten 14 Tage (höchstens 50) mit Zeitpunkt, Art des Fehlers un
 
 ### Eine neue Version einspielen
 1. Tippe auf **Nach Updates suchen**. Die App sucht ohnehin einmal am Tag selbst.
-2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert einige Minuten, mit Sicherung in Google Drive auch länger.
+2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert einige Minuten, mit Sicherung in Google Drive auch länger. Ein Balken zeigt den Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen auch die MB; die Größe der Sicherung ist aus der letzten geschätzt („ca.“).
 3. Danach lädt die App neu.
+
+Lass die Seite offen, bis die App neu lädt. Bricht die Verbindung zwischendurch ab, läuft das Update auf dem Server weiter und die App wartet darauf. Läuft schon ein Update, wenn du die Seite öffnest (z. B. das automatische), zeigt sie dessen Fortschritt.
 
 Klappt die Sicherung in Google Drive vor dem Update nicht (z. B. weil der Speicher voll ist), fragt die App nach: Bestätigst du, spielt sie das Update trotzdem ein; die Sicherung auf dem Server ist dann da. Brichst du ab, bleibt die bisherige Version.
 

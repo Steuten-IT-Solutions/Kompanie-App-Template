@@ -17,6 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
+  dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
+  auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
+  schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
 - **Adresse**: Jedes Mitglied trägt seine Postanschrift (Land, Straße, Hausnummer, Zusatz, PLZ, Ort) unter
   *Meins → Konto* selbst ein und ändert sie dort. Die App prüft die Eingabe wie bei E-Mail und Handynummer: Die
   Postleitzahl muss zum gewählten Land passen (z. B. fünf Ziffern in Deutschland, „1234 AB“ in den Niederlanden), die
@@ -36,6 +40,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - Handynummer und Geburtsdatum anderer sieht und ändert nicht mehr jeder, der Mitglieder anlegen darf, sondern nur,
   wer die neuen Rechte für persönliche Angaben hat. Rollen, die bisher „Mitglieder anlegen“ hatten, bekommen beide
   Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter *Einstellungen → Rollen* weg.
+
+### Behoben
+
+- **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
+  ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
+  Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
+  die neue Version.
 
 ### Entfernt
 
