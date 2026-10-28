@@ -53,6 +53,8 @@ final class RoleService
     public const CANDIDATE_SETTING = 'roles_candidate_own';
     /** Gesetzt, sobald die Rollen die Rechte zum Sehen einzeln haben (migrateViewRights). */
     public const VIEW_SETTING = 'roles_view_split';
+    /** Gesetzt, sobald Rollen mit create_users die Rechte für persönliche Angaben haben (migratePersonalRights). */
+    public const PERSONAL_SETTING = 'roles_personal_split';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
@@ -191,7 +193,7 @@ final class RoleService
         foreach ($next['grant'] as $c) {
             $needed = Capability::from($c)->requires();
             if ($needed !== null && !in_array($needed->value, $caps, true)) {
-                throw ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.');
+                throw self::missingRequired($needed);
             }
         }
         $old = self::normalized($base, $this->loadOverrides()[$id] ?? self::NO_OVERRIDES);
@@ -290,7 +292,12 @@ final class RoleService
      */
     private static function withRequired(array $caps): array
     {
-        return array_values(array_filter($caps, static fn (Capability $c): bool => $c->requires() === null || in_array($c->requires(), $caps, true)));
+        // Mehrstufig (manage_personal → view_personal → member): so lange, bis nichts mehr wegfällt.
+        do {
+            $before = count($caps);
+            $caps = array_values(array_filter($caps, static fn (Capability $c): bool => $c->requires() === null || in_array($c->requires(), $caps, true)));
+        } while (count($caps) < $before);
+        return $caps;
     }
 
     /**
@@ -303,9 +310,17 @@ final class RoleService
         foreach ($values as $v) {
             $needed = Capability::from($v)->requires();
             if ($needed !== null && !in_array($needed->value, $values, true)) {
-                throw ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.');
+                throw self::missingRequired($needed);
             }
         }
+    }
+
+    /** Fehlermeldung, wenn die Voraussetzung eines Rechts fehlt. */
+    private static function missingRequired(Capability $needed): ApiError
+    {
+        return $needed === Capability::Member
+            ? ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.')
+            : ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.');
     }
 
     /**
@@ -644,6 +659,7 @@ final class RoleService
         if (is_array($this->settings->get(self::SETTING))) {
             $this->migrateCandidate();
             $this->migrateViewRights();
+            $this->migratePersonalRights();
             return;
         }
         $roles = $this->templates();
@@ -658,6 +674,7 @@ final class RoleService
         $this->save($roles);
         $this->settings->set(self::CANDIDATE_SETTING, true);
         $this->settings->set(self::VIEW_SETTING, true);
+        $this->settings->set(self::PERSONAL_SETTING, true);
     }
 
     /**
@@ -741,6 +758,44 @@ final class RoleService
             $this->storeOverrides($id, ['grant' => self::ordered(array_diff($target, $base)), 'revoke' => self::ordered(array_diff($base, $target))]);
         }
         $this->settings->set(self::VIEW_SETTING, true);
+    }
+
+    /**
+     * Einmalig nach dem Update: Handynummer und Geburtsdatum anderer sah und änderte früher, wer Mitglieder anlegt
+     * (create_users); jetzt gibt es dafür view_personal und manage_personal. Jede Rolle mit create_users bekommt beide,
+     * ebenso jede Person, der create_users zusätzlich gegeben ist; wem es entzogen ist, dem werden auch diese entzogen.
+     * Danach sieht und ändert jede Person dieselben Angaben wie vorher.
+     */
+    private function migratePersonalRights(): void
+    {
+        if ($this->settings->get(self::PERSONAL_SETTING)) {
+            return;
+        }
+        $create = Capability::CreateUsers->value;
+        $personal = [Capability::ViewPersonal->value, Capability::ManagePersonal->value];
+        $roles = $this->all();
+        $changed = false;
+        foreach ($roles as $key => $r) {
+            if ($key !== Roles::ADMIN && in_array($create, $r['capabilities'], true)) {
+                $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$personal]);
+                $changed = true;
+            }
+        }
+        if ($changed) {
+            $this->save($roles);
+        }
+        foreach ($this->loadOverrides() as $id => $o) {
+            $u = $this->users->find($id);
+            if ($u === null || !self::overridable($u->role)) {
+                continue;
+            }
+            $grant = in_array($create, $o['grant'], true) ? [...$o['grant'], ...$personal] : $o['grant'];
+            $revoke = in_array($create, $o['revoke'], true) ? [...$o['revoke'], ...$personal] : $o['revoke'];
+            if ($grant !== $o['grant'] || $revoke !== $o['revoke']) {
+                $this->storeOverrides($id, self::normalized($this->grantedFor($id, $u->role), ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)]));
+            }
+        }
+        $this->settings->set(self::PERSONAL_SETTING, true);
     }
 
     /**

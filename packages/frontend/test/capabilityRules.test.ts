@@ -22,6 +22,15 @@ test('Anhaken bringt die Voraussetzung mit, Abhaken nimmt was sie voraussetzt', 
   assert.deepEqual(orderedCaps(before), ['member', 'view_own_points', 'view_ranks', 'manage_points'], 'unverändert');
 });
 
+test('persönliche Angaben: pflegen setzt sehen voraus, über mehrere Stufen', () => {
+  assert.equal(requires('manage_personal'), 'view_personal');
+  assert.equal(requires('view_personal'), 'member');
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_personal', true)), ['member', 'view_personal', 'manage_personal']);
+  const all = set('member', 'view_personal', 'manage_personal', 'view_ranks');
+  assert.deepEqual(orderedCaps(toggleCap(all, 'view_personal', false)), ['member', 'view_ranks']);
+  assert.deepEqual(orderedCaps(toggleCap(all, 'member', false)), ['view_ranks'], 'ohne Mitgliedschaft fällt beides weg');
+});
+
 test('Haken einer Gruppe: alle, einige, keine', () => {
   const keys: Capability[] = ['view_directory', 'view_offices', 'view_former'];
   const on = set('view_directory');

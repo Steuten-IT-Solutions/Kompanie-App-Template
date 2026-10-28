@@ -52,8 +52,8 @@ final class BirthdayServiceTest extends TestCase
         $this->m3 = $this->users->add('dritte', Roles::MEMBER);
         $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
-        // Eigene Rolle mit „Mitglieder anlegen“
-        $role = $this->app->roles()->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
+        // Eigene Rolle mit „Mitglieder anlegen“ und den persönlichen Angaben (Geburtsdatum anderer; ohne sie: PersonalInfoTest)
+        $role = $this->app->roles()->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users', 'view_personal', 'manage_personal'])]);
         $this->creator = $this->users->add('anleger', $role['key']);
         $this->users->current = $this->admin;
     }

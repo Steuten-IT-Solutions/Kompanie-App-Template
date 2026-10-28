@@ -13,7 +13,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, auf **+ Mitglied anlege
 ## Was du hier siehst
 - **‹ Einzeln anlegen**: zurück zum Formular für eine Person.
 - **Rolle für alle**: nur, wenn ein {rolle.admin} weitere Rollen für neue Konten freigegeben hat (z. B. Anwärter). Die Rolle gilt für jede Person.
-- **Person 1**, **Person 2** …: je Person **Vorname**, **Nachname**, **Benutzername (optional)**, **E-Mail (optional)**, **Geburtstag (optional)** und **Foto (optional)**. Für {rolle.member} gibt es, wenn du {bereich.points} verwalten darfst, auch **{bereich.points} (Anfangsbestand, optional)**.
+- **Person 1**, **Person 2** …: je Person **Vorname**, **Nachname**, **Benutzername (optional)**, **E-Mail (optional)**, **Handynummer (optional)**, **Adresse (optional)** zum Aufklappen, **Geburtstag (optional)** und **Foto (optional)**. Für {rolle.member} gibt es, wenn du {bereich.points} verwalten darfst, auch **{bereich.points} (Anfangsbestand, optional)**.
 - **+ Weitere Person**: fügt eine Zeile hinzu.
 - **Stand der Anfangspunkte**: das Datum für alle Anfangsbestände.
 - **Alle anlegen**.

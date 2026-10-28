@@ -1568,6 +1568,19 @@ final class ApiScenario
         [$a, $b] = $ids + [0, 0];
         [$s, $p] = $this->req('PATCH', "/members/$a/account", ['name' => "Kptest Anna Neu $sfx", 'email' => "anna_$sfx@example.org"]);
         $c->ok($s === 200 && ($p['name'] ?? '') === "Kptest Anna Neu $sfx" && ($p['email'] ?? '') === "anna_$sfx@example.org", 'Name und E-Mail ändern');
+        // Persönliche Angaben (view_personal, manage_personal): Adresse wird geprüft und vereinheitlicht
+        $address = ['street' => 'Musterstraße 5a', 'postal_code' => 'D-12345', 'city' => 'Musterstadt', 'country' => 'DE'];
+        [$s, $p] = $this->req('PUT', "/members/$a/personal", ['phone' => '+49 171 1234567', 'address' => $address]);
+        $c->ok($s === 200 && ($p['address']['house_number'] ?? '') === '5a' && ($p['address']['postal_code'] ?? '') === '12345', 'Adresse speichern: Hausnummer in ihr Feld, PLZ ohne D-');
+        $c->ok(($this->req('GET', "/members/$a")[1]['personal']['phone'] ?? '') === '+49 171 1234567', 'Persönliche Angaben auf der Seite der Person');
+        $c->ok($this->req('PUT', "/members/$a/personal", ['address' => ['street' => 'Weg', 'postal_code' => '1234', 'city' => 'Ort']])[0] === 400, 'PLZ passt nicht zum Land → 400');
+        $this->d->actAs($a);
+        [$s, $p] = $this->req('GET', '/me/account');
+        $c->ok($s === 200 && ($p['address']['city'] ?? '') === 'Musterstadt', 'Eigene Adresse unter Meins → Konto');
+        $c->ok($this->req('GET', "/members/$a")[0] === 403, 'Mitglied ohne Rechte: keine Mitgliedsdetails');
+        [$s, $p] = $this->req('PATCH', '/me/account', ['address' => null]);
+        $c->ok($s === 200 && array_key_exists('address', (array) $p) && $p['address'] === null && ($p['phone'] ?? '') === '+49 171 1234567', 'Eigene Adresse entfernen, Handynummer bleibt');
+        $this->d->actAs($admin);
         $this->req('POST', '/points', ['user_ids' => [$b], 'points' => 2, 'reason' => 'Kptest Konto']);
         $c->ok($this->req('DELETE', "/members/$b")[0] === 200, 'Konto aus der App entfernen');
         $list = array_column((array) $this->req('GET', '/members')[1], 'id');

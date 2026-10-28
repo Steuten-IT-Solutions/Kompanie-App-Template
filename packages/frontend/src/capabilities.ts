@@ -148,8 +148,19 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     label: 'Mitglieder und Rollen',
     items: [
       {
+        key: 'view_personal',
+        label: 'Persönliche Angaben sehen: Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum der Mitglieder',
+        short: 'Persönliches sehen',
+      },
+      {
+        key: 'manage_personal',
+        label: 'Persönliche Angaben pflegen: Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum ändern',
+        short: 'Persönliches pflegen',
+      },
+      {
         key: 'create_users',
-        label: 'Mitglieder anlegen und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)',
+        label:
+          'Mitglieder anlegen (auch mit ihren persönlichen Angaben) und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)',
         short: 'Mitglieder anlegen',
       },
       {
