@@ -736,6 +736,11 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
           Sicherung wiederherstellen …
         </button>
       </div>
+      {encrypted && (
+        <p className="muted small">
+          Kommt beim Herunterladen keine Datei an, steht der Grund unter Einstellungen → Zustand und Updates im Fehlerprotokoll.
+        </p>
+      )}
       <input
         ref={fileInput}
         type="file"

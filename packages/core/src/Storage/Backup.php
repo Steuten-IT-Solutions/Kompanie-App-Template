@@ -54,6 +54,9 @@ final class Backup
         // Öffentlicher Schlüssel für verschlüsselte Sicherungen (BackupCrypto::SETTING): gehört zur Installation. Eine ältere
         // Sicherung soll kein früheres Passwort zurückbringen; nach einem Umzug richtet der Admin es neu ein.
         'backup_encryption',
+        // Aufbewahrungsfrist für Ehemalige (FormerMemberService::RETENTION_SETTING): löscht endgültig und wird nur mit
+        // Vorschau eingestellt. Eine Sicherung soll sie nicht ungesehen (wieder) einschalten.
+        'former_retention',
         // Nutzungsauswertung (Issue #175): Geheimnis des Pseudonyms. Die Tabellen activity* sind keine Kerntabellen der Sicherung.
         'activity_secret',
         // Web Push: Stand der Abgleiche gehört zu dieser Installation (Schlüssel und Abos sind in der Sicherung).

@@ -112,18 +112,15 @@ final class PersonalDataExport
     }
 
     /**
-     * Zeilen ohne DROP_COLUMNS; fehlt eine Tabelle (ältere Version), keine.
+     * Zeilen ohne DROP_COLUMNS. Fehler gehen nach oben: Eine Auskunft, der still eine Tabelle fehlt, wäre falsch (die
+     * Tabellen legen die Migrationen an, sie fehlen nicht).
      *
      * @param list<mixed> $params
      * @return list<array<string, mixed>>
      */
     private function rows(string $sql, array $params): array
     {
-        try {
-            $rows = $this->app->db->select($sql, $params);
-        } catch (\RuntimeException) {
-            return [];
-        }
+        $rows = $this->app->db->select($sql, $params);
         return array_map(static fn (array $r): array => array_diff_key($r, array_flip(self::DROP_COLUMNS)), $rows);
     }
 }

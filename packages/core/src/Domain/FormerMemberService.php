@@ -26,7 +26,7 @@ use KompanieApp\Core\Storage\FormerMemberRepository;
  * - Import (Ersterfassung, z. B. aus einer Chronik): CSV vorname;nachname;eintritt;ausgeschieden;grund. Für jede Person
  *   entsteht ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen wird. Wer schon
  *   ein Konto mit genau diesem Namen hat, wird übersprungen.
- * - Aufbewahrungsfrist (DSGVO, Standard aus): Ist sie eingestellt, löscht die tägliche Aufgabe RETENTION_TASK Konto und
+ * - Aufbewahrungsfrist (DSGVO, Standard aus; gehört zur Installation, nicht in Sicherungen): Ist sie eingestellt, löscht die tägliche Aufgabe RETENTION_TASK Konto und
  *   Daten aller Ehemaligen, deren Ausscheiden länger als so viele Jahre zurückliegt (wie „Konto löschen“: App::userDeleted;
  *   Amtszeiten bleiben als Chronik mit dem Namen). Gründungsmitglieder und Verstorbene nur, wenn eigens eingestellt.
  *   Stichtag ist das Datum des Ausscheidens (nur ein Jahr: der 31.12.), ohne Datum der Tag des Eintragens.
@@ -41,7 +41,7 @@ final class FormerMemberService
     public const YEAR_MIN = 1800;
     public const IMPORT_MAX_BYTES = 200000;
     public const IMPORT_MAX_ROWS = 500;
-    /** Einstellung (gehört zu den Daten): {years: int (0 = aus), include_founders: bool, include_deceased: bool} */
+    /** Einstellung (gehört zur Installation, Backup::LOCAL_SETTINGS): {years: int (0 = aus), include_founders: bool, include_deceased: bool} */
     public const RETENTION_SETTING = 'former_retention';
     public const RETENTION_TASK = 'former_retention';
     public const RETENTION_MAX_YEARS = 50;
@@ -546,16 +546,17 @@ final class FormerMemberService
             if ($person['expires'] > $today) {
                 continue;
             }
+            // Scheitert eine Person, geht es mit den anderen weiter; sie kommt im nächsten Lauf wieder (solange das Konto
+            // noch da ist; die Daten löscht UserData::purge Tabelle für Tabelle, auch wenn eine fehlt).
             try {
                 $this->app->users->removeAccount($person['id']);
-            } catch (\DomainException $e) {
+                // Löscht auch den Eintrag als ehemalig (former_members steht in UserData::TABLES).
+                $this->app->userDeleted($person['id']);
+                $deleted++;
+            } catch (\Throwable $e) {
                 // z. B. Administrator der Webseite: dort verwaltet. Nicht still übergehen: Die Frist ist eine Zusage.
                 error_log('Kompanie-App: Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
-                continue;
             }
-            // Löscht auch den Eintrag als ehemalig (former_members steht in UserData::TABLES).
-            $this->app->userDeleted($person['id']);
-            $deleted++;
         }
         $this->all = null;
         if ($deleted > 0) {

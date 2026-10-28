@@ -108,13 +108,34 @@ final class BackupCrypto
      */
     public static function encryptStream($in, $out, array $key, array $meta = []): void
     {
+        self::encryptTo($out, $key, $meta, static function ($out) use ($in): void {
+            if (stream_copy_to_stream($in, $out) === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht lesen.');
+            }
+        });
+    }
+
+    /**
+     * Was $write nach $out schreibt, verschlüsselt schreiben (Kopf, Blöcke, Abschluss); der eine Weg für alle
+     * verschlüsselten Sicherungen.
+     *
+     * @param resource $out
+     * @param array{public_key: string} $key
+     * @param array<string, scalar> $meta
+     * @param \Closure(resource): void $write
+     * @return int geschriebene Bytes (zum Prüfen einer Datei auf Vollständigkeit)
+     * @throws \RuntimeException
+     */
+    public static function encryptTo($out, array $key, array $meta, \Closure $write): int
+    {
         $enc = BackupEncryptor::start($key, $meta);
         $enc->attach($out);
-        $copied = stream_copy_to_stream($in, $out);
+        $write($out);
         $enc->finish();
-        if ($copied === false || !fflush($out)) {
+        if (!fflush($out)) {
             throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
         }
+        return $enc->bytes;
     }
 
     /**

@@ -253,12 +253,14 @@ final class MemberPhotoService
      * die Fotos anderer verlinken (z. B. Ämter), damit sie keine Adressen ausgeben, die dann 401/403 liefern.
      * Öffentlich ist es nur, wenn Gast die Liste sehen darf; sonst braucht, wer angemeldet ist, das Recht selbst.
      *
+     * $guest: App::anonymous(), wenn eine Seite viele Fotos prüft (einmal ermittelt statt je Foto).
+     *
      * @return array{visible: bool, public: bool}
      */
-    public function visibility(?User $viewer, ?User $target): array
+    public function visibility(?User $viewer, ?User $target, ?User $guest = null): array
     {
         $via = $this->publicVia($target);
-        $public = $via !== null && $this->app->anonymous()->can($via); // Rollen hält RoleService je Anfrage
+        $public = $via !== null && ($guest ?? $this->app->anonymous())->can($via);
         $visible = $public || ($viewer !== null && $target !== null
             && ($viewer->id === $target->id || self::canSeeOthers($viewer) || ($via !== null && $viewer->can($via))));
         return ['visible' => $visible, 'public' => $public];

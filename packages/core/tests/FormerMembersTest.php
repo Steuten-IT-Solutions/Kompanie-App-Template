@@ -469,6 +469,9 @@ final class FormerMembersTest extends TestCase
         $this->assertSame(2, $this->app->formerMembers()->purgeExpired());
         $this->assertSame([$recent], array_column($this->call('GET', '/members/former')->data, 'id'));
 
+        // Die Frist gehört zur Installation: Eine Sicherung bringt sie nicht (ungesehen) zurück.
+        $this->assertContains(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_SETTING, Backup::LOCAL_SETTINGS);
+
         // Aus: Aufgabe nicht mehr eingeplant.
         $this->call('PUT', '/admin/former/retention', ['years' => 0]);
         $this->assertArrayNotHasKey(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK, $scheduler->scheduled);

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Storage\BackupCrypto;
+use KompanieApp\Core\Telemetry\Code;
 
 /**
  * „Datensicherung herunterladen“ als Datei über Environment::backupUrl (<App>/sicherung): Die Sicherung wird Stück für
@@ -58,7 +59,8 @@ final class BackupDownload
             try {
                 $file = $this->app->backupEncryption()->exportToTempFile($backup);
             } catch (\Throwable $e) {
-                error_log('Kompanie-App: verschlüsselte Sicherung nicht erstellt: ' . $e->getMessage());
+                // Der Browser zeigt bei einem Download nur „fehlgeschlagen“: der Grund steht im Fehlerprotokoll der App.
+                $this->app->telemetry()->record(Code::ServerError, 'backup_download', 'Verschlüsselte Sicherung nicht erstellt: ' . $e->getMessage());
                 return $deny(500);
             }
             return ['status' => 200, 'headers' => [

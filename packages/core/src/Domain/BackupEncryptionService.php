@@ -8,7 +8,6 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\BackupCrypto;
-use KompanieApp\Core\Storage\BackupEncryptor;
 
 /**
  * Passwort für Sicherungen (Storage\BackupCrypto): einrichten, prüfen, ändern, entfernen; Sicherungen verschlüsseln.
@@ -21,12 +20,13 @@ use KompanieApp\Core\Storage\BackupEncryptor;
 final class BackupEncryptionService
 {
     /**
-     * Fehlversuche „Passwort prüfen“ bzw. Wiederherstellen in 15 Minuten (für die ganze Installation), danach 15 Minuten
-     * gesperrt. Nur Fehlversuche zählen, damit Prüfen kein Wiederherstellen im Notfall sperrt.
+     * Fehlversuche „Passwort prüfen“ bzw. Wiederherstellen in 15 Minuten (je für die ganze Installation), danach 15
+     * Minuten gesperrt. Nur Fehlversuche zählen, und jeweils getrennt: Prüfen sperrt kein Wiederherstellen im Notfall.
      */
     public const ATTEMPTS = 10;
-    private const THROTTLE_KEY = 'backup_passphrase';
-    private const BLOCKED_KEY = 'backup_passphrase_blocked';
+    /** Eigene Zähler für „Prüfen“ und „Wiederherstellen“: Fehlversuche beim Prüfen sperren kein Wiederherstellen. */
+    private const VERIFY = 'verify';
+    private const RESTORE = 'restore';
 
     public function __construct(private readonly App $app)
     {
@@ -85,14 +85,14 @@ final class BackupEncryptionService
     public function verify(mixed $passphrase): bool
     {
         $key = $this->key() ?? throw ApiError::invalid('Es ist noch kein Passwort für Sicherungen eingerichtet.');
-        $this->throttle();
+        $this->throttle(self::VERIFY);
         try {
             $ok = is_string($passphrase) && BackupCrypto::matches($key, $passphrase);
         } catch (\RuntimeException $e) {
             throw ApiError::invalid($e->getMessage());
         }
         if (!$ok) {
-            $this->failed();
+            $this->failed(self::VERIFY);
         }
         return $ok;
     }
@@ -118,7 +118,7 @@ final class BackupEncryptionService
         if (!is_string($passphrase) || $passphrase === '') {
             throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
         }
-        $this->throttle();
+        $this->throttle(self::RESTORE);
         // Der verschlüsselte Inhalt darf in eine temporäre Datei, der Klartext entsteht nur im Arbeitsspeicher.
         $in = fopen('php://temp', 'w+b');
         if ($in === false) {
@@ -137,7 +137,7 @@ final class BackupEncryptionService
         } catch (\RuntimeException $e) {
             // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.
             if ($e->getCode() === BackupCrypto::WRONG_PASSPHRASE) {
-                $this->failed();
+                $this->failed(self::RESTORE);
             }
             throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
         } finally {
@@ -196,18 +196,12 @@ final class BackupEncryptionService
                 throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
             }
             try {
-                $enc = BackupEncryptor::start($key, $this->meta());
-                $enc->attach($out);
-                $write($out);
-                $enc->finish();
-                if (!fflush($out)) {
-                    throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
-                }
+                $bytes = BackupCrypto::encryptTo($out, $key, $this->meta(), $write);
             } finally {
                 fclose($out);
             }
             clearstatcache(true, $file);
-            if (filesize($file) !== $enc->bytes) {
+            if (filesize($file) !== $bytes) {
                 throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
             }
             return $file;
@@ -235,18 +229,18 @@ final class BackupEncryptionService
             + (is_numeric($k['set_at'] ?? null) ? ['set_at' => (int) $k['set_at']] : []);
     }
 
-    private function throttle(): void
+    private function throttle(string $kind): void
     {
-        if ($this->app->cache->get(self::BLOCKED_KEY) !== null) {
+        if ($this->app->cache->get('backup_passphrase_blocked_' . $kind) !== null) {
             throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
         }
     }
 
     /** Fehlversuch zählen; nach ATTEMPTS in 15 Minuten 15 Minuten sperren. */
-    private function failed(): void
+    private function failed(string $kind): void
     {
-        if ($this->app->cache->increment(self::THROTTLE_KEY, 900) >= self::ATTEMPTS) {
-            $this->app->cache->set(self::BLOCKED_KEY, 1, 900);
+        if ($this->app->cache->increment('backup_passphrase_' . $kind, 900) >= self::ATTEMPTS) {
+            $this->app->cache->set('backup_passphrase_blocked_' . $kind, 1, 900);
         }
     }
 }

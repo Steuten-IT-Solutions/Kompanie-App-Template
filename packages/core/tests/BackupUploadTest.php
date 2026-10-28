@@ -399,6 +399,14 @@ final class BackupUploadTest extends TestCase
             $this->assertSame([200, ['ok' => false]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => 'falsch']), "Fehlversuch $i");
         }
         $this->assertSame(429, $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS])[0], 'nach zehn Fehlversuchen gesperrt');
+        // Gesperrtes Prüfen sperrt kein Wiederherstellen (eigener Zähler).
+        $in = fopen('php://memory', 'w+b');
+        $out = fopen('php://memory', 'w+b');
+        fwrite($in, '{"format":"kompanie-app-backup"}');
+        rewind($in);
+        BackupCrypto::encryptStream($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
+        rewind($out);
+        $this->assertSame('{"format":"kompanie-app-backup"}', $this->app->backupEncryption()->readUpload(base64_encode((string) stream_get_contents($out)), self::PASS));
     }
 
     /** Eine beschädigte Datei ist kein Fehlversuch: Sie sperrt das Wiederherstellen nicht. */
