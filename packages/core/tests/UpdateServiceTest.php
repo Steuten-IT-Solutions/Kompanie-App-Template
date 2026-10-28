@@ -360,7 +360,7 @@ final class UpdateServiceTest extends TestCase
     /** Die Größe der Sicherung steht erst am Ende fest: Schätzung aus der letzten. */
     public function testProgressEstimatesTheBackupFromTheLastOne(): void
     {
-        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.3']);
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.2', '1.0.0.3']);
         $this->service('1.0.0.1')->install('1.0.0.2');
         $last = (int) filesize((string) (glob($this->dir . '/i/sicherungen/vor-update-*.json') ?: [''])[0]);
         $this->watch = $this->service('1.0.0.2');
