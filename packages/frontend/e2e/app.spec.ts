@@ -4657,8 +4657,11 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await page.reload();
   await expect(page.getByText('Vereinsabend')).toBeVisible();
   await expect(page.locator('.birthday-item', { hasText: 'Mitglied1' })).toHaveCount(0);
+  // Auf die Antwort warten, nicht auf den Toast: Der vom ersten Speichern kann noch zu sehen sein, und admin.close()
+  // bräche das Speichern sonst ab (Vorlauf bliebe 1 Tag).
+  const saved = admin.waitForResponse((r) => r.request().method() === 'PATCH' && decodeURIComponent(r.url()).includes('/admin/birthdays'));
   await days.selectOption('7');
-  await expect(admin.locator('.toast').last()).toHaveText('Gespeichert');
+  expect((await saved).ok()).toBe(true);
   await admin.close();
   await page.reload();
   await expect(page.locator('.birthday-item', { hasText: 'Mitglied1' })).toBeVisible();
