@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  *   Ortszeit, Standard 7 Uhr): an alle Mitglieder außer dem Geburtstagskind; je Geburtstag und Tag höchstens einmal
  *   (last_notified, atomar beansprucht). Admins können sie ausschalten (birthday_notify) und die Stunde wählen
  *   (birthday_notify_hour).
+ * - Anstehende Geburtstage bei den Terminen: heute und die nächsten N Tage; N stellen Admins ein (birthday_upcoming_days,
+ *   0–30, Standard 7). Die App bekommt N mit /config.
  *
  * @phpstan-import-type Birthday from BirthdayRepository
  */
@@ -40,8 +42,10 @@ final class BirthdayService
     public const NOTIFY_HOUR_SETTING = 'birthday_notify_hour';
     public const NOTIFY_HOUR_DEFAULT = 7;
     public const MIN_YEAR = 1900;
-    /** Anstehend: heute und die nächsten 7 Tage (App, „Anstehende Geburtstage“). */
+    /** Anstehend: heute und die nächsten N Tage (App, „Anstehende Geburtstage“); Einstellung der Admins. */
+    public const UPCOMING_DAYS_SETTING = 'birthday_upcoming_days';
     public const UPCOMING_DAYS = 7;
+    public const UPCOMING_DAYS_MAX = 30;
 
     private ?BirthdayRepository $repo = null;
 
@@ -379,5 +383,31 @@ final class BirthdayService
         if ($hour !== null) {
             $this->app->settings->set(self::NOTIFY_HOUR_SETTING, (int) $hour);
         }
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Anstehende Geburtstage                                           */
+    /* ---------------------------------------------------------------- */
+
+    /** Wie viele Tage im Voraus die App einen Geburtstag als anstehend zeigt (0 = nur heute). */
+    public function upcomingDays(): int
+    {
+        $d = $this->app->settings->get(self::UPCOMING_DAYS_SETTING, self::UPCOMING_DAYS);
+        return is_numeric($d) && (int) $d >= 0 && (int) $d <= self::UPCOMING_DAYS_MAX ? (int) $d : self::UPCOMING_DAYS;
+    }
+
+    /** Vorlauf ändern (PATCH /admin/birthdays: upcoming_days); ganze Tage von 0 bis 30. */
+    public function setUpcomingDays(mixed $days): void
+    {
+        if (!is_numeric($days) || (string) (int) $days !== (string) $days || (int) $days < 0 || (int) $days > self::UPCOMING_DAYS_MAX) {
+            throw ApiError::invalid(sprintf('Bitte eine ganze Zahl von 0 bis %d Tagen angeben.', self::UPCOMING_DAYS_MAX));
+        }
+        $this->app->settings->set(self::UPCOMING_DAYS_SETTING, (int) $days);
+    }
+
+    /** @return array{upcoming_days: int} Einstellungen der Geburtstage (GET /admin/birthdays) */
+    public function settings(): array
+    {
+        return ['upcoming_days' => $this->upcomingDays()];
     }
 }

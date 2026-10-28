@@ -109,6 +109,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
+  /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
+  birthdays?: { upcomingDays: number } | null;
 }
 
 export interface MaintenanceInfo {
@@ -181,6 +183,13 @@ export const CONFIG_CHANGED = 'kompanie-config-changed';
 export function applyFeatures(list: FeatureInfo[]): void {
   if (!config) return;
   for (const f of list) config.features[f.key] = f.enabled && f.configured !== false;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Vorlauf der anstehenden Geburtstage in die geladene Konfiguration (nach dem Speichern). */
+export function applyBirthdayUpcomingDays(days: number): void {
+  if (!config) return;
+  config.birthdays = { upcomingDays: days };
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -732,6 +741,12 @@ export interface BirthdayEntry {
   today: boolean;
   /** Alter an diesem Geburtstag, nur wenn freigegeben */
   age: number | null;
+}
+
+/** Einstellungen der Geburtstage (Einstellungen → Geburtstage). */
+export interface BirthdaySettings {
+  /** Anstehend: heute und die nächsten N Tage (0–30) */
+  upcoming_days: number;
 }
 
 export interface BirthdayInput {
@@ -1964,6 +1979,8 @@ export const api = {
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
+  birthdaySettings: () => request<BirthdaySettings>('GET', '/admin/birthdays'),
+  setBirthdayUpcomingDays: (upcoming_days: number) => request<BirthdaySettings>('PATCH', '/admin/birthdays', { upcoming_days }),
   setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
 
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung

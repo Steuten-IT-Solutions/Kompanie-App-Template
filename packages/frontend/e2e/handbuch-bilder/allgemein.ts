@@ -69,8 +69,8 @@ const gruppe: Gruppe = async (f) => {
   await expect(p.locator('.event-body')).toBeVisible();
   await f.foto('kalender-termin');
 
-  await f.oeffnen('termine/geburtstage');
-  await f.foto('geburtstage');
+  await f.oeffnen('termine');
+  await ausschnitt('geburtstage', p.locator('.birthdays-upcoming'));
 
   await f.oeffnen('meins/konto');
   await f.foto('anmelden-und-konto');

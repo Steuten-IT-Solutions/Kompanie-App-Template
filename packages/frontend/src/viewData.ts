@@ -27,7 +27,7 @@ async function loadEvents(): Promise<EventLike[]> {
 
 export const sources = {
   termine: source('termine', loadEvents),
-  upcomingBirthdays: source('geburtstage-anstehend', () => api.birthdays(7)),
+  upcomingBirthdays: source('geburtstage-anstehend', () => api.birthdays(upcomingBirthdayDays())),
   news: (page: number) => source('news', () => api.news(page), [page]),
   gallery: source('galerie', api.gallery),
   album: (id: number) => source('galerie-album', () => api.galleryAlbum(id), [id]),
@@ -49,6 +49,11 @@ export const sources = {
 /** Wer die Geburtstage anderer sieht: Bereich an und Recht view_birthdays (wie BirthdayService::canSee im Kern). */
 export function birthdaysVisible(): boolean {
   return !!config?.features.birthdays && can('view_birthdays');
+}
+
+/** Anstehende Geburtstage: heute und die nächsten N Tage, wie ein Admin es einstellt (ältere Server: 7). */
+export function upcomingBirthdayDays(): number {
+  return config?.birthdays?.upcomingDays ?? 7;
 }
 
 /** Wer seinen eigenen Geburtstag einträgt: Bereich an, Mitglieder (wie BirthdayService::isMember im Kern). */

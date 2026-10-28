@@ -462,6 +462,8 @@ final class Api
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
             // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
             'preview' => $a->preview()->info(),
+            // Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich
+            'birthdays' => ($features['birthdays'] ?? false) ? ['upcomingDays' => $a->birthdays()->upcomingDays()] : null,
         ];
     }
 
@@ -1006,6 +1008,12 @@ final class Api
                 }
                 return $a->push()->adminStatus();
             }, null, $denySettings),
+            // Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ einen Geburtstag zeigt
+            new Route('GET', '/admin/birthdays', Cap::ManageSettings, fn () => $a->birthdays()->settings(), 'birthdays', $denySettings),
+            new Route('PATCH', '/admin/birthdays', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->birthdays()->setUpcomingDays($r->input('upcoming_days'));
+                return $a->birthdays()->settings();
+            }, 'birthdays', $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
             // E-Mail (Issue #172): Kompanieadresse und SMTP, Verbindung prüfen, Testmail
             new Route('GET', '/admin/mail', Cap::ManageSettings, fn () => $a->mail()->describe(), null, $denySettings),

@@ -15,6 +15,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
+  Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
+  Tage vorher, anfangs wie bisher 7 Tage).
+
+### Entfernt
+
+- **Liste aller Geburtstage**: Die Seite „Alle Geburtstage“ gibt es nicht mehr. Die Karte „Anstehende Geburtstage“ bei
+  den Terminen bleibt; die Benachrichtigung am Geburtstag öffnet jetzt die Termine.
+
 ## [0.4.0] – 2026-10-27
 
 ### Neu

@@ -1994,7 +1994,7 @@ paths:
         - name: days
           in: query
           required: false
-          description: 'Nur die nächsten N Tage (0–366), heute eingeschlossen; die App fragt `days=7` (heute und die nächsten 7 Tage).'
+          description: 'Nur die nächsten N Tage (0–366), heute eingeschlossen; die App fragt `days` mit dem Vorlauf aus `/config` (`birthdays.upcomingDays`, Standard 7).'
           schema: { type: integer, minimum: 0, maximum: 366 }
       responses:
         '200':
@@ -4594,6 +4594,34 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /admin/birthdays:
+    get:
+      tags: [Einstellungen]
+      summary: Einstellungen der Geburtstage (Vorlauf der Karte „Anstehende Geburtstage“)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BirthdaySettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Vorlauf der Karte „Anstehende Geburtstage“ ändern
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upcoming_days]
+              properties:
+                upcoming_days: { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (0 = nur heute, Standard 7)' }
+      responses:
+        '200': { $ref: '#/components/responses/BirthdaySettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/status:
     get:
       tags: [Wartung]
@@ -5012,6 +5040,15 @@ components:
             type: object
             properties:
               sent: { type: boolean }
+    BirthdaySettings:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [upcoming_days]
+            properties:
+              upcoming_days: { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (Standard 7)' }
     PushAdmin:
       description: OK
       content:
@@ -5818,6 +5855,12 @@ components:
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
+        birthdays:
+          type: [object, 'null']
+          description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'
+          required: [upcomingDays]
+          properties:
+            upcomingDays: { type: integer, minimum: 0, maximum: 30 }
         preview:
           type: [object, 'null']
           description: 'Vorschau „App als Rolle ansehen“ (Issue #63), vom Server bestätigt; null ohne (gültige) Vorschau. user, capabilities und features sind dann die der Rolle.'

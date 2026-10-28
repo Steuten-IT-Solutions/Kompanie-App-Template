@@ -28,7 +28,6 @@ import { whenIdle } from './prefetch';
 const Anmelden = lazyView(() => import('./views/Anmelden'));
 const Galerie = lazyView(() => import('./views/Galerie'));
 const Meins = lazyView(() => import('./views/Meins'));
-const BirthdayPage = lazyView(() => import('./birthdays'));
 const MaintenancePage = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenancePage })));
 const MaintenanceBanner = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenanceBanner })));
 const Einrichtung = lazyView(() => import('./views/Einrichtung'));
@@ -560,8 +559,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
-              ) : path[1] === 'geburtstage' && birthdaysVisible() ? (
-                <BirthdayPage />
               ) : (
                 <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}
