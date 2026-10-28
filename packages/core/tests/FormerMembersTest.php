@@ -445,6 +445,12 @@ final class FormerMembersTest extends TestCase
         $this->assertSame(403, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status, 'nur Admins (manage_settings)');
         $this->users->current = $this->admin;
 
+        // Vorschau vor dem Speichern: zeigt, wen es trifft, speichert nichts und plant nichts ein.
+        $preview = $this->call('PUT', '/admin/former/retention', ['years' => 5, 'preview' => true]);
+        $this->assertSame([$old], array_column($preview->data['due'], 'id'));
+        $this->assertSame(0, $this->app->formerMembers()->retention()['years'], 'nicht gespeichert');
+        $this->assertArrayNotHasKey(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK, $scheduler->scheduled);
+
         // 5 Jahre: 2020 (31.12.2020 + 5 = 31.12.2025) ist fällig, 2024 nicht; Gründer und Verstorbene ausgenommen.
         $res = $this->call('PUT', '/admin/former/retention', ['years' => 5]);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));

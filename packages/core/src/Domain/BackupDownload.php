@@ -50,7 +50,11 @@ final class BackupDownload
         $name = 'sicherung-' . $this->app->time()->format($now, 'Y-m-d') . ($encrypted ? BackupCrypto::EXTENSION : '.json');
         if ($encrypted) {
             // Erst ganz erzeugen, dann senden: Scheitert das Sichern, kommt ein Fehler statt einer abgeschnittenen Datei,
-            // die der Browser als fertige Sicherung speichert.
+            // die der Browser als fertige Sicherung speichert. Große Sicherungen brauchen Zeit (wie beim Senden in den
+            // Adaptern); bricht PHP trotzdem ab, löscht das Ende der Anfrage die Datei (exportToTempFile).
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(300);
+            }
             try {
                 $file = $this->app->backupEncryption()->exportToTempFile($backup);
             } catch (\Throwable $e) {

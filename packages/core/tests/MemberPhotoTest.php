@@ -326,6 +326,9 @@ final class MemberPhotoTest extends TestCase
 
         $this->assertSame(200, $patch(['view_news', 'view_directory'])->status);
         $this->assertSame(200, $deliver(null, $this->m)['status']);
+        // Unbekannte Nummer: ohne Anmeldung wie ein verborgenes Foto (401), sonst ließe sich zählen, welche Konten es gibt.
+        $this->assertSame(401, $photos->forDelivery(null, 9999, 'x', '128')['status']);
+        $this->assertSame(404, $photos->forDelivery($this->users->find($this->admin), 9999, 'x', '128')['status']);
         // Was ohne Anmeldung zu sehen ist, sieht auch, wer angemeldet ist und das Recht selbst nicht hat.
         $noList = $this->users->add('ohneliste', Roles::MEMBER);
         $this->app->roles()->setOverrides($this->users->find($this->admin), $noList, [], ['view_directory']);

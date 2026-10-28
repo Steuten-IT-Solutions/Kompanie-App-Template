@@ -35,7 +35,8 @@ final class BackupCrypto
     public const EXTENSION = '.json.enc';
     /** Code der RuntimeException, wenn das Passwort nicht passt (zählt als Fehlversuch, eine beschädigte Datei nicht) */
     public const WRONG_PASSPHRASE = 1;
-    private const CHUNK = 65536;
+    /** Klartext je Block */
+    public const CHUNK = 65536;
     /** Obergrenzen für Parameter aus dem Kopf einer Datei (eine präparierte Datei soll den Server nicht lahmlegen). */
     private const MIN_OPS = 1;
     private const MIN_MEM = 8192;
@@ -107,42 +108,10 @@ final class BackupCrypto
      */
     public static function encryptStream($in, $out, array $key, array $meta = []): void
     {
-        $public = base64_decode((string) ($key['public_key'] ?? ''), true);
-        if ($public === false || strlen($public) !== SODIUM_CRYPTO_BOX_PUBLICKEYBYTES) {
-            throw new \RuntimeException('Für Sicherungen ist kein gültiges Passwort eingerichtet.');
-        }
-        $fileKey = sodium_crypto_secretstream_xchacha20poly1305_keygen();
-        try {
-            [$state, $streamHeader] = sodium_crypto_secretstream_xchacha20poly1305_init_push($fileKey);
-            $header = json_encode([
-                'format' => Backup::FORMAT,
-                'v' => self::FORMAT_VERSION,
-                'kdf' => ['alg' => 'argon2id13', 'salt' => $key['salt'] ?? '', 'ops' => (int) ($key['ops'] ?? 0), 'mem' => (int) ($key['mem'] ?? 0)],
-                'sealed_key' => base64_encode(sodium_crypto_box_seal($fileKey, $public)),
-                'stream' => base64_encode($streamHeader),
-                'chunk' => self::CHUNK,
-                'fingerprint' => self::fingerprint((string) $key['public_key']),
-            ] + $meta, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            self::write($out, self::MAGIC . pack('N', strlen($header)) . $header);
-            $ad = $header;
-            while (!feof($in)) {
-                $plain = self::readFull($in, self::CHUNK);
-                if ($plain === '') {
-                    break;
-                }
-                $cipher = sodium_crypto_secretstream_xchacha20poly1305_push($state, $plain, $ad, SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE);
-                $ad = '';
-                self::write($out, pack('N', strlen($cipher)) . $cipher);
-            }
-            // Abschluss immer als eigener, leerer Block: So muss beim Lesen niemand vorausschauen.
-            $cipher = sodium_crypto_secretstream_xchacha20poly1305_push($state, '', $ad, SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL);
-            self::write($out, pack('N', strlen($cipher)) . $cipher);
-        } catch (\JsonException | \SodiumException $e) {
-            // Als RuntimeException wie alle Fehler beim Sichern (Aufrufer fangen nur diese, z. B. vor einem Update).
-            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $e->getMessage(), 0, $e);
-        } finally {
-            sodium_memzero($fileKey);
-        }
+        $enc = BackupEncryptor::start($key, $meta);
+        $enc->attach($out);
+        stream_copy_to_stream($in, $out);
+        $enc->finish();
     }
 
     /**

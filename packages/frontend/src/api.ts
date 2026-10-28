@@ -1996,7 +1996,8 @@ export const api = {
   memberData: (id: number) => request<unknown>('GET', `/members/${id}/data`),
   /** Aufbewahrungsfrist für Ehemalige (nur Admins) */
   formerRetention: () => request<FormerRetention>('GET', '/admin/former/retention'),
-  setFormerRetention: (data: { years: number; include_founders: boolean; include_deceased: boolean }) =>
+  /** preview: nur zeigen, wen die Frist beim nächsten Lauf löscht, ohne zu speichern */
+  setFormerRetention: (data: { years: number; include_founders: boolean; include_deceased: boolean; preview?: boolean }) =>
     request<FormerRetention>('PUT', '/admin/former/retention', data),
   /** Inhalt aus backupPayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
   restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>

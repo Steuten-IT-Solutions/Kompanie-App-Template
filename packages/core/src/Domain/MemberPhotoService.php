@@ -297,10 +297,12 @@ final class MemberPhotoService
         // abrufen, obwohl die Liste verborgen ist); sonst brauchen Angemeldete das Recht selbst.
         $target = $this->app->users->find($userId);
         if ($target === null) {
-            return $deny(404); // Konto gelöscht: das Foto gibt es nicht mehr
+            // Konto gelöscht: 404 nur für die, die die Mitglieder sehen; sonst wie ein verborgenes Foto, damit sich über
+            // die fortlaufenden Nummern nicht herausfinden lässt, welche Konten es gibt.
+            return $deny($viewer === null ? 401 : (self::canSeeOthers($viewer) ? 404 : 403));
         }
         ['visible' => $visible, 'public' => $public] = $this->visibility($viewer, $target);
-        if (!$visible && !($viewer !== null && $viewer->id === $userId)) {
+        if (!$visible) {
             return $deny($viewer === null ? 401 : 403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;

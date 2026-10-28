@@ -479,9 +479,9 @@ final class FormerMemberService
      *
      * @return array{years: int, include_founders: bool, include_deceased: bool, due: list<array{id: int, name: string, left_on: string}>, soon: list<array{id: int, name: string, left_on: string}>}
      */
-    public function retentionStatus(): array
+    public function retentionStatus(?array $config = null): array
     {
-        $config = $this->retention();
+        $config ??= $this->retention();
         if ($config['years'] === 0) {
             return $config + ['due' => [], 'soon' => []];
         }
@@ -499,12 +499,13 @@ final class FormerMemberService
     }
 
     /**
-     * Frist einstellen (nur manage_settings, s. Api).
+     * Frist einstellen (nur manage_settings, s. Api). Mit $preview nur die Vorschau für diese Werte, ohne zu speichern:
+     * Die App zeigt vor dem Speichern, wen die Frist beim nächsten Lauf löscht (der erste Lauf kommt gleich danach).
      *
      * @param array<string, mixed> $in years, include_founders, include_deceased
      * @return array<string, mixed> retentionStatus()
      */
-    public function setRetention(array $in): array
+    public function setRetention(array $in, bool $preview = false): array
     {
         // Fehlt die Zahl oder ist sie ungültig: Fehler, nicht stillschweigend „aus“.
         $years = $in['years'] ?? null;
@@ -515,11 +516,15 @@ final class FormerMemberService
         if ($years < 0 || $years > self::RETENTION_MAX_YEARS) {
             throw ApiError::invalid('Die Frist darf höchstens ' . self::RETENTION_MAX_YEARS . ' Jahre sein (0 = aus).');
         }
-        $this->app->settings->set(self::RETENTION_SETTING, [
+        $config = [
             'years' => $years,
             'include_founders' => Input::bool($in['include_founders'] ?? false),
             'include_deceased' => Input::bool($in['include_deceased'] ?? false),
-        ]);
+        ];
+        if ($preview) {
+            return $this->retentionStatus($config);
+        }
+        $this->app->settings->set(self::RETENTION_SETTING, $config);
         $this->app->scheduleTasks();
         return $this->retentionStatus();
     }

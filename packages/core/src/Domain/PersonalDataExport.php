@@ -18,9 +18,10 @@ use KompanieApp\Core\Storage\UserData;
  *   {format: "kompanie-app-personal-data", formatVersion: 1, created, person: {...}, data: {tabelle: [zeilen]}}
  *
  * Die Tabellen kommen aus UserData::tables(), derselben Liste wie beim Löschen; dazu Push-Abos, Ämter, Zeilen in Listen,
- * eigene Änderungen am Schwarzen Brett und eigene Bilder (Signatur, Entwürfe). Ausgelassen bzw. gekürzt:
- * - Schlüssel (Push: p256dh, auth) und Pseudonyme (vote_ref), Bilddaten in Tabellen (das Foto steht unter person.photo,
- *   Bildschirmfotos wartender Fehlermeldungen können Daten anderer zeigen).
+ * eigene Änderungen am Schwarzen Brett und eigene Bilder (Signatur, Entwürfe). Ausgelassen:
+ * - Schlüssel (Push: p256dh, auth) und Pseudonyme (vote_ref); die Fassungen des Fotos (es steht einmal unter
+ *   person.photo); Bildschirmfotos wartender Fehlermeldungen (können Daten anderer zeigen). Eigene Bilder (Signatur,
+ *   Entwürfe) sind mit Inhalt dabei.
  * - Antworten in anonymen Umfragen nur beim eigenen Export: Sonst sähe die Verwaltung, wer was geantwortet hat.
  * - Nutzungsauswertung (activity*) nur beim eigenen Export und für Admins mit view_activity, die sie ohnehin sehen.
  * Was die Person für andere eingetragen hat (created_by, updated_by), gehört nicht dazu.
@@ -29,8 +30,8 @@ final class PersonalDataExport
 {
     public const FORMAT = 'kompanie-app-personal-data';
     public const FORMAT_VERSION = 1;
-    /** Spalten, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Bilddaten). */
-    private const DROP_COLUMNS = ['vote_ref', 'p256dh', 'auth', 'small', 'large', 'xlarge', 'original', 'data', 'screenshot'];
+    /** Spalten, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Fassungen des Fotos, Bildschirmfotos). */
+    private const DROP_COLUMNS = ['vote_ref', 'p256dh', 'auth', 'small', 'large', 'xlarge', 'original', 'screenshot'];
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
 
     public function __construct(private readonly App $app)
@@ -107,7 +108,7 @@ final class PersonalDataExport
     }
 
     /**
-     * Zeilen ohne Schlüssel, Pseudonyme und Bilddaten; fehlt eine Tabelle (ältere Version), keine.
+     * Zeilen ohne DROP_COLUMNS; fehlt eine Tabelle (ältere Version), keine.
      *
      * @param list<mixed> $params
      * @return list<array<string, mixed>>

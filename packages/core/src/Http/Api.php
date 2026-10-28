@@ -1165,7 +1165,7 @@ final class Api
             new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
             // Aufbewahrungsfrist für Ehemalige (Standard aus): Stand mit Vorschau, einstellen
             new Route('GET', '/admin/former/retention', Cap::ManageSettings, fn () => $a->formerMembers()->retentionStatus(), null, $denySettings),
-            new Route('PUT', '/admin/former/retention', Cap::ManageSettings, fn (Request $r) => $a->formerMembers()->setRetention($r->body), null, $denySettings),
+            new Route('PUT', '/admin/former/retention', Cap::ManageSettings, fn (Request $r) => $a->formerMembers()->setRetention($r->body, Input::bool($r->input('preview'))), null, $denySettings),
             new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
             new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
                 $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));

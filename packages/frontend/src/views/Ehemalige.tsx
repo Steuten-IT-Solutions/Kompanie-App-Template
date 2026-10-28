@@ -228,15 +228,21 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
       setSaveError('Bitte die Frist in ganzen Jahren angeben (0 bis 50; leer oder 0 = aus).');
       return;
     }
-    if (
-      years > 0 &&
-      !window.confirm(`Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Das lässt sich nicht rückgängig machen.`)
-    )
-      return;
+    const data = { years, include_founders: f.include_founders, include_deceased: f.include_deceased };
     setBusy(true);
     setSaveError(null);
     try {
-      setState(await api.setFormerRetention({ years, include_founders: f.include_founders, include_deceased: f.include_deceased }));
+      // Erst zeigen, wen es trifft: Der erste Lauf kommt wenige Minuten nach dem Speichern.
+      if (years > 0) {
+        const preview = await api.setFormerRetention({ ...data, preview: true });
+        const due = preview.due.length;
+        const question =
+          due > 0
+            ? `Beim nächsten Lauf (in wenigen Minuten) werden ${due} Ehemalige endgültig gelöscht, mit allen Daten: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
+            : `Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
+        if (!window.confirm(question)) return;
+      }
+      setState(await api.setFormerRetention(data));
       setForm(null);
       onChanged();
     } catch (err) {

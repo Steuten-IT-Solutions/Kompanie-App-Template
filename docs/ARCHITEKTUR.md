@@ -209,7 +209,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Auskunft (Art. 15 DSGVO)**: `Domain\PersonalDataExport`, `GET /me/data` (angemeldet) und `GET /members/{id}/data`
   (`create_users` mit `guardAccount` und `view_personal`), nicht in der Vorschau. Tabellen aus `UserData::tables()` (dieselbe Liste wie beim
   Löschen; ein Test prüft, dass jede Kerntabelle mit `user_id` dort steht oder begründet ausgenommen ist), dazu Push-Abos
-  ohne Schlüssel, Ämter, Listen, eigene Änderungen am Brett und eigene Bilder ohne Inhalt; ohne Pseudonyme. Antworten in
+  ohne Schlüssel, Ämter, Listen, eigene Änderungen am Brett und eigene Bilder (Signatur, Entwürfe) mit Inhalt; ohne Pseudonyme. Antworten in
   anonymen Umfragen nur für die Person selbst, Nutzungsauswertung nur für sie und `view_activity`. Der Service Worker
   speichert die Antworten nie.
 

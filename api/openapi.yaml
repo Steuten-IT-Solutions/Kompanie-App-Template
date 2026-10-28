@@ -152,7 +152,7 @@ paths:
         `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
         Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
         (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
-        eigene Bilder ohne Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
         Enthält auch die eigenen Antworten in anonymen Umfragen und die eigene Nutzungsauswertung.
       responses:
         '200':
@@ -3316,7 +3316,7 @@ paths:
         `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
         Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
         (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
-        eigene Bilder ohne Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich `view_personal` (sonst 403), denn die
         Auskunft enthält Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum.
@@ -5090,6 +5090,7 @@ paths:
                 years: { type: integer, minimum: 0, maximum: 50 }
                 include_founders: { type: boolean }
                 include_deceased: { type: boolean }
+                preview: { type: boolean, description: 'Nur die Vorschau (due/soon) für diese Werte, ohne zu speichern' }
       responses:
         '200': { $ref: '#/components/responses/FormerRetention' }
         '400': { $ref: '#/components/responses/Error' }

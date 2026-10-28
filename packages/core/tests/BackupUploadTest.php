@@ -424,22 +424,25 @@ final class BackupUploadTest extends TestCase
         $this->assertStringNotContainsString(self::PASS, $stored, 'Passwort nicht gespeichert');
     }
 
-    /** Ältere, unverschlüsselte Sicherungen im Ordner zählen mit und verschwinden nach und nach. */
-    public function testOldPlainBackupsRotateOut(): void
+    /** Ältere, unverschlüsselte Sicherungen (auch vor Updates) löscht die erste verschlüsselte; andere Dateien bleiben. */
+    public function testOldPlainBackupsAreRemoved(): void
     {
         $this->connect();
         $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
         $this->app->backupUpload()->upload();
         $folder = $this->folders[0];
-        for ($i = 1; $i <= BackupUploadService::KEEP; $i++) {
-            $this->drive['alt' . $i] = ['name' => sprintf('sicherung-2026-01-%02d-120000.json', $i), 'parent' => $folder, 'content' => '{}'];
-        }
+        $this->drive['alt1'] = ['name' => 'sicherung-2026-01-01-120000.json', 'parent' => $folder, 'content' => '{}'];
+        $this->drive['alt2'] = ['name' => 'vor-update-2026-01-02-120000-1.0.0.json', 'parent' => $folder, 'content' => '{}'];
+        $this->drive['fremd'] = ['name' => 'notizen.json', 'parent' => $folder, 'content' => '{}'];
         $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC');
         $this->app->backupUpload()->upload();
         $names = array_column($this->drive, 'name');
-        $this->assertCount(BackupUploadService::KEEP, $names);
-        $this->assertNotContains('sicherung-2026-01-01-120000.json', $names);
-        $this->assertNotContains('sicherung-2026-01-02-120000.json', $names);
+        sort($names);
+        $this->assertSame('notizen.json', $names[0], 'fremde Dateien bleiben');
+        $this->assertCount(3, $names, 'zwei verschlüsselte und die fremde');
+        foreach (array_slice($names, 1) as $n) {
+            $this->assertStringEndsWith('.json.enc', $n);
+        }
     }
 
     public function testEncryptedDownload(): void

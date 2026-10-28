@@ -149,7 +149,11 @@ try {
             if (BackupCrypto::isEncrypted($head)) {
                 $passFile = $str('passphrase-file');
                 if ($passFile !== '') {
-                    $pass = rtrim((string) @file_get_contents($passFile), "\r\n");
+                    $read = @file_get_contents($passFile);
+                    if ($read === false) {
+                        throw new RuntimeException("Die Datei mit dem Passwort ($passFile) lässt sich nicht lesen.");
+                    }
+                    $pass = rtrim($read, "\r\n");
                 } else {
                     fwrite(STDERR, 'Passwort für Sicherungen: ');
                     $tty = function_exists('posix_isatty') && posix_isatty(STDIN);
@@ -165,12 +169,16 @@ try {
                             });
                         }
                     }
-                    $pass = rtrim((string) fgets(STDIN), "\r\n");
+                    $line = fgets(STDIN);
+                    $pass = $line === false ? '' : rtrim($line, "\r\n");
                     if ($tty) {
                         shell_exec('stty echo');
                         function_exists('pcntl_signal') && pcntl_signal(SIGINT, SIG_DFL);
                     }
                     fwrite(STDERR, "\n");
+                }
+                if ($pass === '') {
+                    throw new RuntimeException('Kein Passwort für Sicherungen angegeben.');
                 }
                 // Klartext nur im Datenbereich der App, nicht im /tmp des Servers; danach gleich gelöscht.
                 $plain = $kernel->app()->files->tempFile();

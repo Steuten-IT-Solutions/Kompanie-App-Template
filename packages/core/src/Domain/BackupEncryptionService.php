@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\BackupCrypto;
+use KompanieApp\Core\Storage\BackupEncryptor;
 
 /**
  * Passwort für Sicherungen (Storage\BackupCrypto): einrichten, prüfen, ändern, entfernen; Sicherungen verschlüsseln.
@@ -186,29 +187,48 @@ final class BackupEncryptionService
     }
 
     /**
-     * Ganze Sicherung verschlüsselt in eine temporäre Datei (im Datenbereich der App, nicht im /tmp des Servers): erst
-     * der Klartext Stück für Stück, dann verschlüsselt, der Klartext gleich wieder gelöscht. Der Aufrufer löscht die
-     * Datei. Schlägt etwas fehl, bleibt nichts liegen.
+     * Ganze Sicherung verschlüsselt in eine temporäre Datei: beim Schreiben verschlüsselt (BackupEncryptor), der
+     * Klartext liegt nie als Datei vor. Der Aufrufer löscht die Datei; bricht PHP ab (Zeitlimit, Abbruch des
+     * Downloads), löscht sie das Ende der Anfrage.
      *
      * @return string Pfad der verschlüsselten Datei
      */
     public function exportToTempFile(BackupProvider $backup): string
     {
-        $plain = $this->app->files->tempFile();
+        $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
+        $file = $this->app->files->tempFile();
+        register_shutdown_function(static fn () => is_file($file) && @unlink($file));
         try {
-            $out = @fopen($plain, 'wb');
+            $out = @fopen($file, 'wb');
             if ($out === false) {
                 throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
             }
             try {
+                $enc = BackupEncryptor::start($key, $this->meta());
+                $enc->attach($out);
                 $backup->exportTo($out);
+                $enc->finish();
+                if (!fflush($out)) {
+                    throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                }
             } finally {
                 fclose($out);
             }
-            return $this->encryptFile($plain);
-        } finally {
-            @unlink($plain);
+            clearstatcache(true, $file);
+            if (filesize($file) !== $enc->bytes) {
+                throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
+            }
+            return $file;
+        } catch (\Throwable $e) {
+            @unlink($file);
+            throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage(), 0, $e);
         }
+    }
+
+    /** @return array<string, scalar> unverschlüsselte Angaben im Kopf */
+    private function meta(): array
+    {
+        return ['created' => gmdate('c', $this->app->time()->timestamp()), 'kompanie' => $this->app->config->name()];
     }
 
     /**
@@ -220,10 +240,7 @@ final class BackupEncryptionService
     public function encryptStream($in, $out): void
     {
         $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
-        BackupCrypto::encryptStream($in, $out, $key, [
-            'created' => gmdate('c', $this->app->time()->timestamp()),
-            'kompanie' => $this->app->config->name(),
-        ]);
+        BackupCrypto::encryptStream($in, $out, $key, $this->meta());
     }
 
     /**

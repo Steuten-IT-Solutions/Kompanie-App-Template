@@ -201,21 +201,28 @@ final class BackupUploadService implements OffsiteBackup
     }
 
     /**
-     * Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit; verschlüsselte und frühere
-     * unverschlüsselte zählen zusammen, so verschwinden die unverschlüsselten nach und nach). Fehler hier sind nicht schlimm.
+     * Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit). Unverschlüsselte (.json, von
+     * früheren Versionen) löscht sie ganz, sobald eine verschlüsselte hochgeladen ist: Lesbare Sicherungen mit
+     * Passwort-Prüfwerten und Adressen sollen nicht monatelang im Ordner bleiben. Fehler hier sind nicht schlimm.
      */
     private function prune(string $folder, string $prefix, int $keep): void
     {
         try {
             $names = [];
+            $plain = [];
             foreach ($this->app->drive()->listChildren($folder) as $f) {
                 $name = (string) ($f['name'] ?? '');
-                if (str_starts_with($name, $prefix) && (str_ends_with($name, '.json') || str_ends_with($name, BackupCrypto::EXTENSION)) && !DriveClient::isFolder($f)) {
+                if (DriveClient::isFolder($f) || !(str_starts_with($name, self::PREFIX) || str_starts_with($name, self::PREFIX_UPDATE))) {
+                    continue;
+                }
+                if (str_ends_with($name, '.json')) {
+                    $plain[] = (string) $f['id'];
+                } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION)) {
                     $names[(string) $f['id']] = $name;
                 }
             }
             arsort($names);
-            foreach (array_slice(array_keys($names), $keep) as $id) {
+            foreach ([...$plain, ...array_slice(array_keys($names), $keep)] as $id) {
                 $this->app->drive()->deleteFile((string) $id);
             }
         } catch (\RuntimeException $e) {

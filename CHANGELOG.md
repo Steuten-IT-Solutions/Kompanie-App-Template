@@ -61,7 +61,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Karten, am PC in Google Maps.
 - **Sicherungen in Google Drive nur noch verschlüsselt**: Sie pausieren, bis unter *Einstellungen → Datensicherung* ein
   Passwort für Sicherungen eingerichtet ist; die Ampel unter *Zustand und Updates* weist darauf hin. Ältere,
-  unverschlüsselte Sicherungen im Ordner verschwinden nach und nach.
+  unverschlüsselte Sicherungen im Ordner löscht die App, sobald die erste verschlüsselte dort liegt.
 
 ### Behoben
 
