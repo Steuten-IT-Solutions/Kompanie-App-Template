@@ -26,6 +26,10 @@ use KompanieApp\Core\Storage\FormerMemberRepository;
  * - Import (Ersterfassung, z. B. aus einer Chronik): CSV vorname;nachname;eintritt;ausgeschieden;grund. Für jede Person
  *   entsteht ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen wird. Wer schon
  *   ein Konto mit genau diesem Namen hat, wird übersprungen.
+ * - Aufbewahrungsfrist (DSGVO, Standard aus): Ist sie eingestellt, löscht die tägliche Aufgabe RETENTION_TASK Konto und
+ *   Daten aller Ehemaligen, deren Ausscheiden länger als so viele Jahre zurückliegt (wie „Konto löschen“: App::userDeleted;
+ *   Amtszeiten bleiben als Chronik mit dem Namen). Gründungsmitglieder und Verstorbene nur, wenn eigens eingestellt.
+ *   Stichtag ist das Datum des Ausscheidens (nur ein Jahr: der 31.12.), ohne Datum der Tag des Eintragens.
  */
 final class FormerMemberService
 {
@@ -37,6 +41,10 @@ final class FormerMemberService
     public const YEAR_MIN = 1800;
     public const IMPORT_MAX_BYTES = 200000;
     public const IMPORT_MAX_ROWS = 500;
+    /** Einstellung (gehört zu den Daten): {years: int (0 = aus), include_founders: bool, include_deceased: bool} */
+    public const RETENTION_SETTING = 'former_retention';
+    public const RETENTION_TASK = 'former_retention';
+    public const RETENTION_MAX_YEARS = 50;
 
     /** @var array<int, array<string, mixed>>|null Einträge dieser Anfrage (eine Abfrage) */
     private ?array $all = null;
@@ -455,6 +463,118 @@ final class FormerMemberService
         }
         $this->app->members()->guardAccount($actor, $target, $message);
         return [$target, $row];
+    }
+
+    /** @return array{years: int, include_founders: bool, include_deceased: bool} */
+    public function retention(): array
+    {
+        $c = $this->app->settings->get(self::RETENTION_SETTING);
+        $c = is_array($c) ? $c : [];
+        $years = is_numeric($c['years'] ?? null) ? max(0, min(self::RETENTION_MAX_YEARS, (int) $c['years'])) : 0;
+        return ['years' => $years, 'include_founders' => ($c['include_founders'] ?? false) === true, 'include_deceased' => ($c['include_deceased'] ?? false) === true];
+    }
+
+    /**
+     * Frist mit Vorschau: wer beim nächsten Lauf gelöscht würde (due) und wer in den nächsten 30 Tagen dazukommt (soon).
+     *
+     * @return array{years: int, include_founders: bool, include_deceased: bool, due: list<array{id: int, name: string, left_on: string}>, soon: list<array{id: int, name: string, left_on: string}>}
+     */
+    public function retentionStatus(): array
+    {
+        $config = $this->retention();
+        $today = $this->app->time()->today();
+        return $config + [
+            'due' => $config['years'] > 0 ? $this->expired($config, $today) : [],
+            'soon' => $config['years'] > 0
+                ? array_values(array_udiff($this->expired($config, $today->modify('+30 days')), $this->expired($config, $today), static fn (array $a, array $b): int => $a['id'] <=> $b['id']))
+                : [],
+        ];
+    }
+
+    /**
+     * Frist einstellen (nur manage_settings, s. Api).
+     *
+     * @param array<string, mixed> $in years, include_founders, include_deceased
+     * @return array<string, mixed> retentionStatus()
+     */
+    public function setRetention(array $in): array
+    {
+        $years = $in['years'] ?? 0;
+        if (!is_int($years) && !(is_string($years) && ctype_digit($years))) {
+            throw ApiError::invalid('Bitte die Frist in ganzen Jahren angeben (0 = aus).');
+        }
+        $years = (int) $years;
+        if ($years < 0 || $years > self::RETENTION_MAX_YEARS) {
+            throw ApiError::invalid('Die Frist darf höchstens ' . self::RETENTION_MAX_YEARS . ' Jahre sein (0 = aus).');
+        }
+        $this->app->settings->set(self::RETENTION_SETTING, [
+            'years' => $years,
+            'include_founders' => Input::bool($in['include_founders'] ?? false),
+            'include_deceased' => Input::bool($in['include_deceased'] ?? false),
+        ]);
+        $this->app->scheduleTasks();
+        return $this->retentionStatus();
+    }
+
+    /**
+     * Tägliche Aufgabe: Ehemalige nach Ablauf der Frist endgültig löschen. Ins Protokoll kommt nur die Anzahl.
+     *
+     * @return int Anzahl gelöschter Konten
+     */
+    public function purgeExpired(): int
+    {
+        $config = $this->retention();
+        if ($config['years'] === 0) {
+            return 0;
+        }
+        $deleted = 0;
+        foreach ($this->expired($config, $this->app->time()->today()) as $person) {
+            try {
+                $this->app->users->removeAccount($person['id']);
+            } catch (\DomainException) {
+                continue; // z. B. Administrator der Webseite: dort verwaltet
+            }
+            $this->app->userDeleted($person['id']);
+            $this->repository()->delete($person['id']);
+            $deleted++;
+        }
+        $this->all = null;
+        if ($deleted > 0) {
+            error_log('Kompanie-App: ' . $deleted . ' ehemalige Mitglieder nach Ablauf der Aufbewahrungsfrist gelöscht.');
+        }
+        return $deleted;
+    }
+
+    /**
+     * Ehemalige, deren Frist an $day abgelaufen ist.
+     *
+     * @param array{years: int, include_founders: bool, include_deceased: bool} $config
+     * @return list<array{id: int, name: string, left_on: string}>
+     */
+    private function expired(array $config, \DateTimeImmutable $day): array
+    {
+        $rows = $this->all();
+        $users = $this->app->users->findMany(array_keys($rows));
+        $out = [];
+        foreach ($rows as $id => $row) {
+            $user = $users[$id] ?? null;
+            if ($user === null || $user->role !== Roles::GUEST
+                || ($row['founder'] && !$config['include_founders'])
+                || ($row['reason'] === self::REASON_DECEASED && !$config['include_deceased'])) {
+                continue;
+            }
+            $left = match (strlen($row['left_on'])) {
+                10 => $row['left_on'],
+                4 => $row['left_on'] . '-12-31',
+                default => substr((string) $row['created_at'], 0, 10),
+            };
+            $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $left, $day->getTimezone());
+            if ($until !== false && $until->modify('+' . $config['years'] . ' years') <= $day) {
+                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on']];
+            }
+        }
+        usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        return $out;
     }
 
     /**

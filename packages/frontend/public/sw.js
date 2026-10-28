@@ -32,7 +32,8 @@
  * - Vorschau „App als Rolle ansehen“ (Issue #63): Anfragen mit dem Header X-Kompanie-Preview (API) oder dem Parameter
  *   vorschau (Bilder, Dokumente, Abzeichen) → durchreichen, nie speichern und nie aus dem Speicher beantworten: Sie
  *   gelten nur für diese Ansicht und dürfen sich nicht mit den Daten des Admins mischen.
- * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
+ * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) und Auskunft über die eigenen Daten (/me/data,
+ *   /members/<id>/data) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
  * Wo API und Programmdateien liegen, steht in den Parametern ?api=…&assets=…
@@ -161,7 +162,8 @@ function decodedHref(url) {
 }
 
 function isAdmin(url) {
-  return decodedHref(url).includes('/admin/');
+  const href = decodedHref(url);
+  return href.includes('/admin/') || /\/(?:me|members\/\d+)\/data(?:[?&#]|$)/.test(href);
 }
 
 /** Rückkehr von Google nach „Mit Google verbinden“: <App>/google/callback oder ?r=/google/callback */

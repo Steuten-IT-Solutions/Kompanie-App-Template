@@ -776,6 +776,15 @@ try {
     $c->ok(is_array($kernel->app()->settings->fresh(\KompanieApp\Core\Storage\BackupCrypto::SETTING)), 'Passwort für Sicherungen bleibt nach dem Wiederherstellen eingerichtet (gehört zur Installation)');
     $d->forgetSessions();
 
+    // Auskunft nach Art. 15 DSGVO: eigene Daten als Datei, nicht ohne Anmeldung
+    $d->actAs($max);
+    [$s, $mine] = $d->request('GET', '/me/data');
+    $c->ok($s === 200 && ($mine['format'] ?? '') === 'kompanie-app-personal-data' && ($mine['person']['id'] ?? null) === $max, 'GET /me/data liefert die eigenen Daten');
+    $c->ok($d->request('GET', "/members/$anna/data")[0] === 403, 'Mitglied darf die Daten anderer nicht exportieren');
+    $d->actAs(null);
+    $c->ok($d->request('GET', '/me/data')[0] === 401, 'Ohne Anmeldung → 401');
+    $d->forgetSessions();
+
     $c->section('Schöne Adressen (URL-Umschreibung)');
     $cfg = Config::load($data)->toArray();
     Config::write($data, ['url_mode' => 'rewrite'] + $cfg);

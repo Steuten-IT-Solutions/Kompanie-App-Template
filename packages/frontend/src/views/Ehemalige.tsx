@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   api,
+  can,
   levelLabel,
+  type FormerRetention,
   type CreatedFormer,
   type FormerImportResult,
   type FormerInfo,
@@ -192,7 +194,102 @@ export function FormerList() {
         ))}
         {list.length === 0 && (data ?? []).length > 0 && <Empty>Niemand gefunden.</Empty>}
       </ul>
+      {can('manage_settings') && <RetentionCard onChanged={reload} />}
     </div>
+  );
+}
+
+/**
+ * Aufbewahrungsfrist (nur Admins, Standard aus): Nach so vielen Jahren seit dem Ausscheiden löscht die App Konto und
+ * Daten endgültig, wie „Konto löschen“. Vorschau, wen es beim nächsten Lauf und in den nächsten 30 Tagen trifft.
+ */
+function RetentionCard({ onChanged }: { onChanged: () => void }) {
+  const { data, error, loading, reload } = useAsync(() => api.formerRetention(), [], 'admin/former/retention');
+  const [form, setForm] = useState<{ years: string; include_founders: boolean; include_deceased: boolean } | null>(null);
+  const [state, setState] = useState<FormerRetention | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const r = state ?? data!;
+  const f = form ?? {
+    years: r.years > 0 ? String(r.years) : '',
+    include_founders: r.include_founders,
+    include_deceased: r.include_deceased,
+  };
+  const names = (list: FormerRetention['due']) =>
+    list.map((p) => `${p.name}${p.left_on ? ` (${formatYearOrDate(p.left_on)})` : ''}`).join(', ');
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const years = f.years.trim() === '' ? 0 : Number(f.years);
+    if (
+      years > 0 &&
+      !window.confirm(`Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Das lässt sich nicht rückgängig machen.`)
+    )
+      return;
+    setBusy(true);
+    setSaveError(null);
+    try {
+      setState(await api.setFormerRetention({ years, include_founders: f.include_founders, include_deceased: f.include_deceased }));
+      setForm(null);
+      onChanged();
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="form card settings-section" onSubmit={save} aria-labelledby="former-retention-title">
+      <h3 id="former-retention-title">Aufbewahrungsfrist</h3>
+      <p className="muted small">
+        Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App Ehemalige so
+        viele Jahre nach dem Ausscheiden endgültig, mit allen Daten (wie „Konto löschen“); Amtszeiten bleiben als Chronik mit dem Namen
+        stehen. Ohne Datum des Ausscheidens zählt der Tag des Eintragens. Leer oder 0: aus.
+      </p>
+      <label className="field">
+        <span>Jahre nach dem Ausscheiden</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={50}
+          value={f.years}
+          onChange={(e) => setForm({ ...f, years: e.target.value })}
+        />
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={f.include_founders} onChange={(e) => setForm({ ...f, include_founders: e.target.checked })} />
+        <span>Gründungsmitglieder auch löschen</span>
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={f.include_deceased} onChange={(e) => setForm({ ...f, include_deceased: e.target.checked })} />
+        <span>Verstorbene auch löschen</span>
+      </label>
+      {r.years > 0 && (
+        <p className="small">
+          {r.due.length > 0 ? <>Beim nächsten Lauf (täglich) gelöscht: {names(r.due)}.</> : 'Zurzeit ist niemand fällig.'}
+          {r.soon.length > 0 && <> In den nächsten 30 Tagen fällig: {names(r.soon)}.</>}
+        </p>
+      )}
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+      {form && (
+        <div className="button-row">
+          <button className="btn" type="submit" disabled={busy}>
+            {busy ? 'Speichert …' : 'Speichern'}
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={() => setForm(null)}>
+            Abbrechen
+          </button>
+        </div>
+      )}
+    </form>
   );
 }
 

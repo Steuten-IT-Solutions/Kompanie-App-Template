@@ -50,6 +50,17 @@ final class UserData
         'activity_last' => 'user_id',
     ];
 
+    /**
+     * Tabelle => Spalte mit der Person; auch für die Auskunft (Domain\PersonalDataExport), damit Löschen und Auskunft
+     * dieselben Tabellen kennen.
+     *
+     * @return array<string, string>
+     */
+    public static function tables(): array
+    {
+        return self::TABLES;
+    }
+
     /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */
     public static function purge(Connection $db, int $userId, ?string $pollSecret = null): void
     {

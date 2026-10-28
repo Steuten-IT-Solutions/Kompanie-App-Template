@@ -417,4 +417,53 @@ final class FormerMembersTest extends TestCase
         }
         $this->assertNull($this->app->formerMembers()->repository()->find($this->m), 'kein halber Zustand');
     }
+
+    /** Aufbewahrungsfrist: Standard aus; danach Konto und Daten weg, Gründungsmitglieder und Verstorbene nur auf Wunsch. */
+    public function testRetentionDeletesFormerMembersAfterTheDeadline(): void
+    {
+        $old = $this->m;
+        $recent = $this->users->add('neulich', Roles::MEMBER);
+        $founder = $this->users->add('gruender', Roles::MEMBER);
+        $deceased = $this->users->add('verstorben', Roles::MEMBER);
+        $this->call('POST', '/points', ['user_ids' => [$old], 'points' => 5, 'reason' => 'Fest']);
+        foreach ([[$old, 'left', false, '2020'], [$recent, 'left', false, '2024-06-30'], [$founder, 'left', true, '2010'], [$deceased, 'deceased', false, '2001-03-01']] as [$id, $reason, $isFounder, $left]) {
+            $res = $this->call('PUT', "/members/$id/former", ['reason' => $reason, 'founder' => $isFounder, 'joined_on' => '', 'left_on' => $left]);
+            $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        }
+        $scheduler = $this->app->scheduler;
+        $this->assertInstanceOf(\KompanieApp\Core\Tests\Support\NullScheduler::class, $scheduler);
+
+        // Standard: aus, nichts geplant, nichts gelöscht.
+        $status = $this->call('GET', '/admin/former/retention')->data;
+        $this->assertSame([0, [], []], [$status['years'], $status['due'], $status['soon']]);
+        $this->assertSame(0, $this->app->formerMembers()->purgeExpired());
+
+        $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => 51])->status);
+        $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => 'fünf'])->status);
+        $this->users->current = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
+        $this->assertSame(403, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status, 'nur Admins (manage_settings)');
+        $this->users->current = $this->admin;
+
+        // 5 Jahre: 2020 (31.12.2020 + 5 = 31.12.2025) ist fällig, 2024 nicht; Gründer und Verstorbene ausgenommen.
+        $res = $this->call('PUT', '/admin/former/retention', ['years' => 5]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame([$old], array_column($res->data['due'], 'id'), 'Vorschau');
+        $this->assertSame(86400, $scheduler->scheduled[\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK] ?? null, 'täglich eingeplant');
+        $this->app->runTask(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK);
+        $this->assertNull($this->users->find($old), 'Konto gelöscht');
+        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {points} WHERE user_id = ?', [$old]), 'Daten gelöscht');
+        $left = array_column($this->call('GET', '/members/former')->data, 'id');
+        sort($left);
+        $this->assertSame([$recent, $founder, $deceased], $left);
+
+        // Mit Gründern und Verstorbenen; die übrigen bleiben bis zu ihrer Frist.
+        $res = $this->call('PUT', '/admin/former/retention', ['years' => 5, 'include_founders' => true, 'include_deceased' => true]);
+        $this->assertSame([$founder, $deceased], array_column($res->data['due'], 'id'), 'nach Namen: Gruender, Verstorben');
+        $this->assertSame(2, $this->app->formerMembers()->purgeExpired());
+        $this->assertSame([$recent], array_column($this->call('GET', '/members/former')->data, 'id'));
+
+        // Aus: Aufgabe nicht mehr eingeplant.
+        $this->call('PUT', '/admin/former/retention', ['years' => 0]);
+        $this->assertArrayNotHasKey(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK, $scheduler->scheduled);
+    }
 }

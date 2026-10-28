@@ -229,6 +229,18 @@ test('Verwaltung (/admin/) wird nie gespeichert', async () => {
   assert.equal((await (await sw.storage.open('kompanie-data-v2')).keys()).length, 0);
 });
 
+test('Auskunft über die eigenen Daten wird nie gespeichert', async () => {
+  const sw = load({
+    net: {
+      [`${API}me/data`]: () => response('{"person":1}', 'application/json'),
+      [`${API}members/7/data`]: () => response('{"person":7}', 'application/json'),
+    },
+  });
+  assert.equal(await sw.request(`${API}me/data`), undefined);
+  assert.equal(await sw.request(`${API}members/7/data`, 'cors', STALE_OK), undefined);
+  assert.equal((await (await sw.storage.open('kompanie-data-v2')).keys()).length, 0);
+});
+
 test('Rückkehr von Google wird nie aus dem Speicher beantwortet', async () => {
   const net = { [SCOPE]: () => response('<html>app</html>', 'text/html') };
   const sw = load({ net });

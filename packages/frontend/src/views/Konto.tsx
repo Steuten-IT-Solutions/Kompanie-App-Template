@@ -11,6 +11,7 @@ import { EmailField, ErrorBox, lazyView, Loading, PhoneField, useAsync } from '.
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { MemberAvatar } from '../memberPhoto';
+import { downloadPersonalData } from '../personalData';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 
 const MIN_LENGTH = 8;
@@ -247,6 +248,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       {signatureAllowed() && <SignatureCard onToast={onToast} />}
 
+      <MyDataCard />
+
       <div className="card account-card">
         <h3>Darstellung</h3>
         <p className="muted small">
@@ -318,6 +321,34 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 }
 
 /** Eigene E-Mail-Adresse und Handynummer ansehen und ändern; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+/** Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten der Person als JSON-Datei. */
+function MyDataCard() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="card account-card">
+      <h3>Meine Daten</h3>
+      <p className="muted small">
+        Alles, was die App über dich gespeichert hat, als Datei (JSON) zum Herunterladen, z. B. für eine Auskunft nach der DSGVO.
+      </p>
+      <button
+        className="btn btn-secondary btn-block"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setError(null);
+          downloadPersonalData()
+            .catch((err: Error) => setError(err.message))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy ? 'Wird zusammengestellt …' : 'Meine Daten herunterladen'}
+      </button>
+      {error && <p className="form-error small">{error}</p>}
+    </div>
+  );
+}
+
 function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(api.ownAccount, [], 'me/account');
   const [editing, setEditing] = useState<OwnAccount | null>(null);

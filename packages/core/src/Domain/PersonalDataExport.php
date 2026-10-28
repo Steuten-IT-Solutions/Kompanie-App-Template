@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+namespace KompanieApp\Core\Domain;
+
+use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
+use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\UserData;
+
+/**
+ * Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten einer Person als JSON, für sie selbst (Konto → Meine Daten) und
+ * für alle, die ihr Konto verwalten dürfen (create_users und MemberService::guardAccount), z. B. für eine Anfrage per Brief.
+ *
+ *   {format: "kompanie-app-personal-data", formatVersion: 1, created, person: {...}, data: {tabelle: [zeilen]}}
+ *
+ * Die Tabellen kommen aus UserData::tables(), derselben Liste wie beim Löschen; dazu Push-Abos, Ämter, Zeilen in Listen,
+ * eigene Änderungen am Schwarzen Brett und eigene Bilder (Signatur, Entwürfe). Ausgelassen bzw. gekürzt:
+ * - Schlüssel (Push: p256dh, auth) und Pseudonyme (vote_ref), Bilddaten in Tabellen (das Foto steht unter person.photo).
+ * - Antworten in anonymen Umfragen nur beim eigenen Export: Sonst sähe die Verwaltung, wer was geantwortet hat.
+ * - Nutzungsauswertung (activity*) nur beim eigenen Export und für Admins mit view_activity, die sie ohnehin sehen.
+ * Was die Person für andere eingetragen hat (created_by, updated_by), gehört nicht dazu.
+ */
+final class PersonalDataExport
+{
+    public const FORMAT = 'kompanie-app-personal-data';
+    public const FORMAT_VERSION = 1;
+    /** Spalten, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Bilddaten). */
+    private const DROP_COLUMNS = ['vote_ref', 'p256dh', 'auth', 'small', 'large', 'xlarge', 'original', 'data'];
+    private const ACTIVITY_TABLES = ['activity', 'activity_last'];
+
+    public function __construct(private readonly App $app)
+    {
+    }
+
+    /** @return array<string, mixed> */
+    public function export(User $actor, int $userId): array
+    {
+        if ($actor->preview) {
+            throw ApiError::forbidden('In der Vorschau gibt es keinen Export.');
+        }
+        $self = $actor->id === $userId;
+        if (!$self && !$actor->can(Capability::CreateUsers)) {
+            throw ApiError::forbidden('Die Daten dieser Person darfst du nicht exportieren.');
+        }
+        $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        // Prüft für andere guardAccount (z. B. Konten von Admins nur für Admins).
+        $profile = $this->app->members()->profile($userId, $actor);
+        unset($profile['can_change_login']);
+
+        $data = [];
+        foreach (UserData::tables() as $table => $column) {
+            if (in_array($table, self::ACTIVITY_TABLES, true) && !$self && !$actor->can(Capability::ViewActivity)) {
+                continue;
+            }
+            if ($table === 'member_photos') {
+                continue; // unter person.photo
+            }
+            $sql = 'SELECT * FROM {' . $table . '} WHERE ' . $column . ' = ?';
+            $rows = $this->rows($sql, [$userId]);
+            if ($table === 'poll_answers' && $self && ($secret = PollService::existingSecret($this->app->settings)) !== null) {
+                // Eigene anonyme Antworten (über das Pseudonym); nur die Person selbst bekommt sie.
+                $rows = [...$rows, ...$this->rows('SELECT * FROM {poll_answers} WHERE vote_ref = ?', [PollService::pseudonym($secret, $userId)])];
+            }
+            if ($rows !== []) {
+                $data[$table] = $rows;
+            }
+        }
+        foreach ([
+            'push_subscriptions' => 'SELECT * FROM {push_subscriptions} WHERE user_id = ?',
+            'office_holders' => 'SELECT * FROM {office_holders} WHERE user_id = ?',
+            'list_rows' => 'SELECT * FROM {list_rows} WHERE user_id = ?',
+            // Änderungen am Schwarzen Brett, die sie gemacht hat (bleiben beim Löschen als Verlauf der Nachricht)
+            'board_message_revisions' => 'SELECT * FROM {board_message_revisions} WHERE user_id = ?',
+            'rich_images' => "SELECT * FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?",
+        ] as $table => $sql) {
+            $rows = $this->rows($sql, [$userId]);
+            if ($rows !== []) {
+                $data[$table] = $rows;
+            }
+        }
+
+        $photo = $this->app->memberPhotos()->repository();
+        $jpeg = $photo->original($userId) ?? $photo->image($userId, 1024);
+        return [
+            'format' => self::FORMAT,
+            'formatVersion' => self::FORMAT_VERSION,
+            'created' => gmdate('c', $this->app->time()->timestamp()),
+            'kompanie' => $this->app->config->name(),
+            'person' => ['id' => $userId] + $profile + [
+                'level' => $target->role,
+                'extra_roles' => $this->app->roles()->extraRolesOf($target),
+                'birthday' => $this->app->birthdays()->of($userId),
+                'join_year' => $this->app->joinYears()->of($userId),
+                'former' => $this->app->formerMembers()->of($userId),
+                'photo' => $jpeg !== null ? ['type' => 'image/jpeg', 'base64' => base64_encode($jpeg)] : null,
+            ],
+            'data' => $data,
+        ];
+    }
+
+    /**
+     * Zeilen ohne Schlüssel, Pseudonyme und Bilddaten; fehlt eine Tabelle (ältere Version), keine.
+     *
+     * @param list<mixed> $params
+     * @return list<array<string, mixed>>
+     */
+    private function rows(string $sql, array $params): array
+    {
+        try {
+            $rows = $this->app->db->select($sql, $params);
+        } catch (\RuntimeException) {
+            return [];
+        }
+        return array_map(static fn (array $r): array => array_diff_key($r, array_flip(self::DROP_COLUMNS)), $rows);
+    }
+}

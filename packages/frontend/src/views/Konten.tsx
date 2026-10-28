@@ -9,6 +9,7 @@ import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
+import { downloadPersonalData } from '../personalData';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
@@ -451,20 +452,41 @@ export function AccountPanel({
             <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(p)}>
               Angaben ändern
             </button>
+            <button
+              className="btn btn-link"
+              disabled={busy}
+              title="Alle gespeicherten Daten dieser Person als Datei, z. B. für eine Auskunft nach der DSGVO"
+              onClick={() => {
+                setBusy(true);
+                setFormError(null);
+                downloadPersonalData(id)
+                  .catch((err: Error) => setFormError(err.message))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              Daten exportieren (Auskunft)
+            </button>
             {level !== 'admin' && !self && (
               <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
                 {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
               </button>
             )}
           </div>
+          {formError && !editing && (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          )}
           {confirming && (
             <div className="card account-delete" role="alertdialog" aria-labelledby="account-delete-title">
               <p id="account-delete-title">
                 <strong>{wordpress ? `${plainName(p.name)} aus der App entfernen?` : `Konto von ${plainName(p.name)} löschen?`}</strong>{' '}
                 Alle {brand.labels.sections.points}, {brand.labels.sections.penalties}, Anwesenheiten, {brand.labels.rank} und Titel dieser
                 Person werden gelöscht
-                {wordpress ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App).' : ', das Konto auch.'} Das lässt sich nicht
-                rückgängig machen.
+                {wordpress
+                  ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App). Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter Benutzer.'
+                  : ', das Konto auch.'}{' '}
+                Das lässt sich nicht rückgängig machen.
                 {!former &&
                   ' Wer nur ausgetreten oder verstorben ist, lässt sich stattdessen als ehemalig eintragen; dann bleiben die Daten.'}
               </p>

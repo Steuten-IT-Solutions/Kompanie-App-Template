@@ -46,6 +46,14 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 
 ![Vorschau beim Import der Ehemaligen](bild:ehemalige-mitglieder-import)
 
+### Eine Aufbewahrungsfrist einstellen ({rolle.admin}s)
+Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Unten auf der Seite stellt ein {rolle.admin} unter **Aufbewahrungsfrist** ein, nach wie vielen Jahren seit dem Ausscheiden die App Ehemalige endgültig löscht.
+1. Trage bei **Jahre nach dem Ausscheiden** die Zahl der Jahre ein (leer oder 0: aus, so ist es voreingestellt).
+2. Setze bei Bedarf **Gründungsmitglieder auch löschen** und **Verstorbene auch löschen**; ohne die Haken bleiben sie.
+3. Tippe auf **Speichern** und bestätige. Darunter steht, wen die App beim nächsten Lauf (täglich) löscht und wer in den nächsten 30 Tagen dazukommt.
+
+Gelöscht wird wie mit **Konto löschen**: Konto und alle Daten der Person, das lässt sich nicht rückgängig machen. Amtszeiten bleiben als Chronik mit dem Namen stehen. Stichtag ist **Ausgeschieden am** (nur ein Jahr: der 31.12.), ohne Datum der Tag, an dem die Person als ehemalig eingetragen wurde. Welche Frist für eure {kompanie.name} angemessen ist (z. B. wegen einer Chronik), klärt ihr am besten mit eurer bzw. eurem Datenschutzbeauftragten.
+
 ## Gut zu wissen
 - Danach hat die Person keine Rolle mehr: Sie steht nicht mehr in der Mitgliederliste, nicht in der öffentlichen Liste der {rolle.member}, bekommt keine Benachrichtigungen, nimmt nicht an {bereich.polls} teil und taucht bei den {bereich.birthdays} nicht mehr auf. Sie wird auf allen Geräten abgemeldet und kann sich nicht mehr anmelden.
 - Sind noch {bereich.penalties} offen, weist die App vorher darauf hin. Sie bleiben offen und stehen auch in der Liste der Ehemaligen.
@@ -61,7 +69,7 @@ Tippe unten auf **Verwaltung** und dann auf **Ehemalige**.
 - Steht eine importierte Person in den {bereich.offices} bisher nur mit ihrem Namen, verknüpft der Import diesen Eintrag mit ihrem neuen Konto, wenn der Name genau passt (Groß- und Kleinschreibung egal). Die Vorschau sagt vorher, wie viele Einträge verknüpft werden.
 - Aktive und Ehemalige aus einer gemeinsamen Liste übernimmst du unter [Mitglieder importieren](seite:mitglieder-import).
 
-> **Für Fortgeschrittene:** In der WordPress-Version bleibt der Benutzer der Webseite bestehen, hat in der App aber keine Rolle mehr.
+> **Für Fortgeschrittene:** In der WordPress-Version bleibt der Benutzer der Webseite bestehen, hat in der App aber keine Rolle mehr. Das gilt auch, wenn die Aufbewahrungsfrist die Person löscht: Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter **Benutzer**.
 
 ## Siehe auch
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)

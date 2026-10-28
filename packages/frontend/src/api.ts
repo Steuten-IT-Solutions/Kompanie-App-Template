@@ -1930,6 +1930,13 @@ export const api = {
   updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
+  /** Auskunft nach Art. 15 DSGVO: alle eigenen Daten bzw. die einer Person (create_users), als JSON */
+  myData: () => request<unknown>('GET', '/me/data'),
+  memberData: (id: number) => request<unknown>('GET', `/members/${id}/data`),
+  /** Aufbewahrungsfrist für Ehemalige (nur Admins) */
+  formerRetention: () => request<FormerRetention>('GET', '/admin/former/retention'),
+  setFormerRetention: (data: { years: number; include_founders: boolean; include_deceased: boolean }) =>
+    request<FormerRetention>('PUT', '/admin/former/retention', data),
   /** Inhalt aus backupPayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
   restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>
     request<{ restored: boolean }>('POST', '/admin/backup', { ...payload, ...(passphrase ? { passphrase } : {}), confirm: true }),
@@ -2057,6 +2064,15 @@ export interface BackupDriveStatus {
   error: string | null;
   every_days: number;
   keep: number;
+}
+
+/** Aufbewahrungsfrist für Ehemalige: 0 = aus; due wird beim nächsten Lauf gelöscht, soon in den nächsten 30 Tagen fällig */
+export interface FormerRetention {
+  years: number;
+  include_founders: boolean;
+  include_deceased: boolean;
+  due: { id: number; name: string; left_on: string }[];
+  soon: { id: number; name: string; left_on: string }[];
 }
 
 /** Passwort für Sicherungen (Einstellungen → Datensicherung) */

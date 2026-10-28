@@ -355,6 +355,16 @@ final class Api
     }
 
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    /** Auskunft als Datei (meine-daten-… bzw. daten-<id>-…), nie zwischengespeichert. */
+    private function personalData(int $userId): Response
+    {
+        $a = $this->app;
+        $data = $a->personalData()->export($this->user(), $userId);
+        $date = $a->time()->format($a->time()->timestamp(), 'Y-m-d');
+        $name = $this->user()->id === $userId ? 'meine-daten-' . $date . '.json' : 'daten-' . $userId . '-' . $date . '.json';
+        return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+    }
+
     private function showTitles(): bool
     {
         return $this->app->features()->enabled('titles') && $this->can(Cap::ManageTitles);
@@ -523,6 +533,7 @@ final class Api
             // Eigene Daten
             // Punkte und offene Strafen einmal (me()); vom Dienstgrad nur die Bezeichnung, ohne die Buchungen für den
             // Fortschritt erneut zu lesen (der steht unter /me/rank).
+            new Route('GET', '/me/data', $L, fn () => $this->personalData($this->user()->id)),
             new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
                 + ($a->features()->enabled('ranks') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['rank' => $a->ranks()->current($this->user()->id)] : [])
                 + ($a->features()->enabled('titles') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['titles' => $a->titles()->of($this->user()->id)] : [])),
@@ -957,6 +968,8 @@ final class Api
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
+            // Auskunft nach Art. 15 DSGVO (Domain\PersonalDataExport): alle Daten der Person als JSON-Datei
+            new Route('GET', '/members/{id}/data', Cap::CreateUsers, fn (Request $r) => $this->personalData($r->id()), null, $denyUsers),
             new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
                 $a->members()->removeAccount($this->user(), $r->id());
                 $a->userDeleted($r->id());
@@ -1139,6 +1152,9 @@ final class Api
             new Route('PUT', '/admin/backup/encryption', Cap::ManageSettings, fn (Request $r) => $a->backupEncryption()->set($r->input('passphrase'), $r->input('passphrase_confirm')), null, $denySettings),
             new Route('DELETE', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->remove(), null, $denySettings),
             new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
+            // Aufbewahrungsfrist für Ehemalige (Standard aus): Stand mit Vorschau, einstellen
+            new Route('GET', '/admin/former/retention', Cap::ManageSettings, fn () => $a->formerMembers()->retentionStatus(), null, $denySettings),
+            new Route('PUT', '/admin/former/retention', Cap::ManageSettings, fn (Request $r) => $a->formerMembers()->setRetention($r->body), null, $denySettings),
             new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
             new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
                 $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));

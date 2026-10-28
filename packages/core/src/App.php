@@ -12,6 +12,7 @@ use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
+use KompanieApp\Core\Domain\PersonalDataExport;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardMailService;
 use KompanieApp\Core\Domain\BoardService;
@@ -108,6 +109,7 @@ final class App
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ActivityService::TASK => ActivityService::INTERVAL,
+        FormerMemberService::RETENTION_TASK => 86400,
     ];
 
     /**
@@ -265,6 +267,8 @@ final class App
             BackupUploadService::TASK => $this->backupUpload()->active(),
             // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
             ActivityService::TASK => true,
+            // Ehemalige nach Ablauf der Aufbewahrungsfrist löschen: täglich, nur mit eingestellter Frist.
+            FormerMemberService::RETENTION_TASK => $this->formerMembers()->retention()['years'] > 0,
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -336,6 +340,8 @@ final class App
                 $this->backupUpload()->runTask();
             } elseif ($task === ActivityService::TASK) {
                 $this->activity()->prune();
+            } elseif ($task === FormerMemberService::RETENTION_TASK) {
+                $this->formerMembers()->purgeExpired();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -700,6 +706,12 @@ final class App
     public function backupEncryption(): BackupEncryptionService
     {
         return $this->service(BackupEncryptionService::class, fn () => new BackupEncryptionService($this));
+    }
+
+    /** Auskunft nach Art. 15 DSGVO: alle Daten einer Person */
+    public function personalData(): PersonalDataExport
+    {
+        return $this->service(PersonalDataExport::class, fn () => new PersonalDataExport($this));
     }
 
     /** Sicherungen automatisch in Google Drive */

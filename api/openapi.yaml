@@ -143,6 +143,26 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Error' }
 
+  /me/data:
+    get:
+      tags: [Eigene Daten]
+      summary: Alle eigenen Daten herunterladen (Auskunft nach Art. 15 DSGVO)
+      description: |
+        Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
+        `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
+        (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
+        eigene Bilder ohne Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        Enthält auch die eigenen Antworten in anonymen Umfragen und die eigene Nutzungsauswertung.
+      responses:
+        '200':
+          description: Daten der Person
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /me/attendance:
     get:
       tags: [Eigene Daten]
@@ -3302,6 +3322,31 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/data:
+    get:
+      tags: [Verwaltung]
+      summary: Alle Daten einer Person herunterladen (Auskunft nach Art. 15 DSGVO)
+      description: |
+        Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
+        `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
+        (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
+        eigene Bilder ohne Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
+        Grenzen wie beim Löschen (Konten von Admins nur für Admins).
+      x-capability: create_users
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Daten der Person
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/former:
     get:
       tags: [Verwaltung]
@@ -4947,6 +4992,41 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /admin/former/retention:
+    get:
+      tags: [Verwaltung]
+      summary: Aufbewahrungsfrist für Ehemalige – Stand mit Vorschau
+      description: |
+        Mit Frist (years > 0) löscht eine tägliche Aufgabe Ehemalige so viele Jahre nach dem Ausscheiden endgültig
+        (wie `DELETE /members/{id}`); Gründungsmitglieder und Verstorbene nur mit `include_founders` bzw.
+        `include_deceased`. Stichtag: Datum des Ausscheidens (nur Jahr: 31.12.), ohne Datum der Tag des Eintragens.
+        `due`: beim nächsten Lauf fällig, `soon`: in den nächsten 30 Tagen.
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/FormerRetention' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Verwaltung]
+      summary: Aufbewahrungsfrist für Ehemalige einstellen (0 = aus)
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [years]
+              properties:
+                years: { type: integer, minimum: 0, maximum: 50 }
+                include_founders: { type: boolean }
+                include_deceased: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/FormerRetention' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/backup/drive:
     get:
       tags: [Wartung]
@@ -5072,6 +5152,23 @@ components:
               error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
               every_days: { type: integer }
               keep: { type: integer }
+    FormerRetention:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [years, include_founders, include_deceased, due, soon]
+            properties:
+              years: { type: integer, description: 0 = aus }
+              include_founders: { type: boolean }
+              include_deceased: { type: boolean }
+              due:
+                type: array
+                items: { $ref: '#/components/schemas/FormerRetentionPerson' }
+              soon:
+                type: array
+                items: { $ref: '#/components/schemas/FormerRetentionPerson' }
     BackupEncryptionStatus:
       description: OK
       content:
@@ -6340,6 +6437,14 @@ components:
         founder: { type: boolean }
         left_on: { $ref: '#/components/schemas/FormerDate' }
         previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
+
+    FormerRetentionPerson:
+      type: object
+      required: [id, name, left_on]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        left_on: { $ref: '#/components/schemas/FormerDate' }
 
     FormerMember:
       allOf:

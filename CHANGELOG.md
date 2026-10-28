@@ -21,6 +21,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   einrichten. Heruntergeladene Sicherungen und alle Sicherungen in Google Drive sind damit verschlüsselt; wer die Datei
   findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
   sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
+- **Meine Daten herunterladen (Auskunft nach DSGVO)**: Unter *Konto → Meine Daten* lädt jede Person alles herunter,
+  was die App über sie gespeichert hat. Wer Mitglieder anlegen darf, kann das auch für eine Person tun
+  (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne Antworten in anonymen Umfragen.
+- **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
+  seit dem Ausscheiden die App Ehemalige mit allen Daten endgültig löscht (Gründungsmitglieder und Verstorbene nur auf
+  Wunsch). Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
 
 ### Geändert
 
