@@ -2,7 +2,7 @@
 titel: Konto und Rolle
 reihenfolge: 53
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, promote_users]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, view_personal, manage_personal, create_users, promote_users]
 ---
 Unter **Konto und Rolle** auf der Seite eines Mitglieds legst du fest, welche Rolle und welche Rechte die Person hat, erzeugst ein neues Startpasswort, trägst sie als ehemalig ein oder änderst und löschst ihr Konto. Wer nur {bereich.points}, {bereich.penalties} oder Ähnliches pflegt, sieht hier nur die Rolle.
 
@@ -52,7 +52,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 - Wer kein {rolle.admin} ist, vergibt und entfernt nur Rollen und Rechte, die er selbst hat – nie {rolle.admin} und nie „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
 - Ausnahmen bei den Rechten bleiben, wenn sich die Rollen ändern; was die Rollen dann ohnehin regeln, fällt weg. {rolle.admin}s haben immer alle Rechte, {rolle.guest}s die ihrer Rolle: Für sie gibt es keine Ausnahmen. Einstellungen, Updates und Datensicherung bleiben {rolle.admin}s vorbehalten.
 - Nach einem neuen Startpasswort gilt das alte nicht mehr, und die Person ist auf allen Geräten abgemeldet. Ein neuer Benutzername meldet sie ebenfalls überall ab.
-- **Daten exportieren (Auskunft)** lädt alle gespeicherten Daten der Person als Datei herunter, z. B. wenn jemand nach der DSGVO (Art. 15) Auskunft verlangt. Antworten in anonymen Umfragen sind nicht dabei (sie bleiben anonym); die bekommt die Person nur selbst unter **Konto → Meine Daten**.
+- **Daten exportieren (Auskunft)** (nur mit dem Recht „Persönliche Angaben sehen“) lädt alle gespeicherten Daten der Person als Datei herunter, z. B. wenn jemand nach der DSGVO (Art. 15) Auskunft verlangt. Antworten in anonymen Umfragen sind nicht dabei (sie bleiben anonym); die bekommt die Person nur selbst unter **Konto → Meine Daten**.
 - **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank}, {bereich.titles}, Geburtstag, Eintritt, Foto, Antworten bei Umfragen und Benachrichtigungen. Was sie für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen. Wer nur ausgetreten oder verstorben ist, trägst du besser als ehemalig ein: Dann bleiben alle Daten erhalten.
 - Wer kein {rolle.admin} ist, setzt Passwörter nur bei Personen zurück (und ändert bzw. löscht nur deren Konten und Fotos), die keine weiteren Rechte als er selbst haben und weder Mitglieder anlegen noch Rollen vergeben dürfen.
 - Bei einer ehemaligen Person lassen sich Rolle, Rechte und Passwort erst nach **Wieder aufnehmen** ändern.

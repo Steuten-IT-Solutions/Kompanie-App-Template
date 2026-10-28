@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Tests;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
 use KompanieApp\Core\Storage\Backup;
@@ -295,10 +296,12 @@ final class ListServiceTest extends TestCase
         $this->users->current = $this->lister;
         $mine = $this->ok('GET', "/lists/{$list['id']}");
         $this->assertSame(
-            ['nr' => true, 'name' => true, 'first_name' => true, 'last_name' => true, 'role' => false, 'rank' => true, 'titles' => true, 'birthday' => true, 'points' => false, 'penalties' => false],
+            ['nr' => true, 'name' => true, 'first_name' => true, 'last_name' => true, 'role' => false, 'rank' => true, 'titles' => true, 'birthday' => true]
+            + array_fill_keys(ListService::PERSONAL_FIELDS, false) + ['points' => false, 'penalties' => false],
             array_column($mine['fields'], 'available', 'key'),
         );
-        $this->assertSame(array_column($mine['fields'], 'available'), array_column($mine['columns'], 'available'));
+        $fields = array_column($mine['fields'], 'available', 'key');
+        $this->assertSame(array_intersect_key($fields, array_column($mine['columns'], 'available', 'field')), array_column($mine['columns'], 'available', 'field'));
         $values = array_column($mine['rows'], null, 'user_id')[$this->anna]['values'];
         $this->assertEquals((object) ['name' => 'Anna Müller', 'first_name' => 'Anna', 'last_name' => 'Müller', 'rank' => 'Gefreiter', 'titles' => ['Ehrenmitglied'], 'birthday' => '09.03.'], $values);
 
@@ -309,6 +312,30 @@ final class ListServiceTest extends TestCase
         $this->users->current = $this->admin;
         $available = array_column($this->ok('GET', "/lists/{$list['id']}")['fields'], 'available', 'key');
         $this->assertSame([true, true, false], [$available['rank'], $available['titles'], $available['birthday']]);
+    }
+
+    /** Adresse (ganz und in Teilen), Handynummer und E-Mail: nur mit view_personal, mit einer festen Zahl von Abfragen. */
+    public function testPersonalFields(): void
+    {
+        $this->setUpApp();
+        $this->ok('PUT', "/members/{$this->anna}/personal", ['phone' => '+49 171 1234567', 'address' => ['street' => 'Musterstraße', 'house_number' => '1', 'extra' => 'c/o Muster', 'postal_code' => '12345', 'city' => 'Musterstadt', 'country' => 'DE']]);
+        $this->ok('PUT', "/members/{$this->bernd}/personal", ['address' => ['street' => 'Hauptplatz', 'house_number' => '2', 'postal_code' => '1010', 'city' => 'Wien', 'country' => 'AT']]);
+        $columns = array_map(static fn (string $f): array => ['kind' => 'field', 'field' => $f], ['name', ...ListService::PERSONAL_FIELDS]);
+        $list = $this->ok('POST', '/lists', ['title' => 'Adressen', 'columns' => $columns]);
+        $list = $this->ok('POST', "/lists/{$list['id']}/sync-members", ['apply' => true])['list'];
+        $byId = array_column($list['rows'], null, 'user_id');
+        $this->assertEquals((object) [
+            'name' => 'Anna Müller', 'address' => 'Musterstraße 1, c/o Muster, 12345 Musterstadt', 'street' => 'Musterstraße 1', 'postal_code' => '12345',
+            'city' => 'Musterstadt', 'country' => 'Deutschland', 'phone' => '+49 171 1234567', 'email' => 'anna@example.org',
+        ], $byId[$this->anna]['values']);
+        $this->assertSame(['Hauptplatz 2, 1010 Wien, Österreich', 'Österreich', null], [$byId[$this->bernd]['values']->address, $byId[$this->bernd]['values']->country, $byId[$this->bernd]['values']->phone], 'Land außerhalb Deutschlands auch in der ganzen Adresse');
+        $this->assertNull($byId[$this->lister]['values']->address, 'ohne Adresse');
+
+        // Nur manage_lists, ohne view_personal: Spalten bleiben, Werte nicht.
+        $this->users->current = $this->lister;
+        $mine = $this->ok('GET', "/lists/{$list['id']}");
+        $this->assertSame([true, ...array_fill(0, count(ListService::PERSONAL_FIELDS), false)], array_column($mine['columns'], 'available'));
+        $this->assertEquals((object) ['name' => 'Anna Müller'], array_column($mine['rows'], null, 'user_id')[$this->anna]['values']);
     }
 
     public function testRightsAndFeature(): void

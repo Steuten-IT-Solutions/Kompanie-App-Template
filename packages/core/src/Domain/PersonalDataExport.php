@@ -12,7 +12,8 @@ use KompanieApp\Core\Storage\UserData;
 
 /**
  * Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten einer Person als JSON, für sie selbst (Konto → Meine Daten) und
- * für alle, die ihr Konto verwalten dürfen (create_users und MemberService::guardAccount), z. B. für eine Anfrage per Brief.
+ * für alle, die ihr Konto verwalten und ihre persönlichen Angaben sehen dürfen (create_users mit
+ * MemberService::guardAccount und view_personal), z. B. für eine Anfrage per Brief.
  *
  *   {format: "kompanie-app-personal-data", formatVersion: 1, created, person: {...}, data: {tabelle: [zeilen]}}
  *
@@ -42,13 +43,15 @@ final class PersonalDataExport
             throw ApiError::forbidden('In der Vorschau gibt es keinen Export.');
         }
         $self = $actor->id === $userId;
-        if (!$self && !$actor->can(Capability::CreateUsers)) {
+        // Die Auskunft enthält Adresse, Handynummer, E-Mail und Geburtsdatum: für andere nur mit view_personal.
+        if (!$self && (!$actor->can(Capability::CreateUsers) || !$actor->can(Capability::ViewPersonal))) {
             throw ApiError::forbidden('Die Daten dieser Person darfst du nicht exportieren.');
         }
         $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         // Prüft für andere guardAccount (z. B. Konten von Admins nur für Admins).
         $profile = $this->app->members()->profile($userId, $actor);
         unset($profile['can_change_login']);
+        $profile = $this->app->members()->personal($userId) + $profile;
 
         $data = [];
         foreach (UserData::tables() as $table => $column) {

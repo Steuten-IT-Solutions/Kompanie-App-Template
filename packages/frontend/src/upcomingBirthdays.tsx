@@ -1,33 +1,29 @@
 // Geburtstage (Issue #1), was die App schon beim Start braucht: wer sie sieht und die Karte „Anstehende Geburtstage“
-// bei den Terminen. Alles Übrige (ganze Liste, eigener Geburtstag, Pflege) steht in birthdays.tsx und wird erst bei
-// Bedarf geladen.
+// bei den Terminen. Alles Übrige (eigener Geburtstag, Pflege) steht in birthdays.tsx und wird erst bei Bedarf geladen.
 
 import { type BirthdayEntry } from './api';
 import brand from './generated/brand';
-import { parseLocalDate } from './format';
-import { navigate } from './router';
+import { formatWeekdayDate, parseLocalDate, shortMonth } from './format';
 import { ErrorBox, useAsync } from './ui';
-import { sources } from './viewData';
+import { sources, upcomingBirthdayDays } from './viewData';
 
 const sec = brand.labels.sections;
 
 // Steht bei den Daten der Ansichten (viewData.ts): Das Vorabladen braucht es auch.
 export { birthdaysVisible } from './viewData';
 
-const weekdayDate = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
-
 function whenText(b: BirthdayEntry): string {
   if (b.days_until === 1) return 'Morgen';
-  return weekdayDate.format(parseLocalDate(b.date));
+  return formatWeekdayDate(parseLocalDate(b.date));
 }
 
-export function BirthdayRow({ b }: { b: BirthdayEntry }) {
+function BirthdayRow({ b }: { b: BirthdayEntry }) {
   const date = parseLocalDate(b.date);
   return (
     <li className={`card birthday-item ${b.today ? 'birthday-today' : ''}`}>
       <div className="date-badge" aria-hidden="true">
         <span className="day">{date.getDate()}</span>
-        <span className="mon">{date.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}</span>
+        <span className="mon">{shortMonth(date)}</span>
       </div>
       <div className="birthday-main">
         <div className="birthday-name">{b.name}</div>
@@ -41,9 +37,15 @@ export function BirthdayRow({ b }: { b: BirthdayEntry }) {
   );
 }
 
+function noneText(days: number): string {
+  if (days === 0) return 'Heute hat niemand Geburtstag.';
+  if (days === 1) return 'Heute und morgen hat niemand Geburtstag.';
+  return `In den nächsten ${days} Tagen hat niemand Geburtstag.`;
+}
+
 /**
- * Karte „Anstehende Geburtstage“ oben bei den Termine: heute und die nächsten 7 Tage, heute hervorgehoben. Ohne
- * anstehende erscheint sie nicht (außer mit `always`, wenn es sonst nichts zu sehen gibt).
+ * Karte „Anstehende Geburtstage“ oben bei den Terminen: heute und die nächsten N Tage (stellt ein Admin ein), heute
+ * hervorgehoben. Ohne anstehende erscheint sie nicht (außer mit `always`, wenn es sonst nichts zu sehen gibt).
  */
 export function UpcomingBirthdays({ always = false }: { always?: boolean }) {
   return <UpcomingBirthdaysCard state={useUpcomingBirthdays(true)} always={always} />;
@@ -69,7 +71,7 @@ export function UpcomingBirthdaysCard({
     <section className="card birthdays-upcoming" aria-label={`Anstehende ${sec.birthdays}`}>
       <h2 className="birthdays-title">Anstehende {sec.birthdays}</h2>
       {data.length === 0 ? (
-        <p className="muted small">In den nächsten 7 Tagen hat niemand Geburtstag.</p>
+        <p className="muted small">{noneText(upcomingBirthdayDays())}</p>
       ) : (
         <ul className="card-list birthday-list">
           {data.map((b) => (
@@ -77,9 +79,6 @@ export function UpcomingBirthdaysCard({
           ))}
         </ul>
       )}
-      <button className="btn btn-link birthdays-all" onClick={() => navigate('termine/geburtstage')}>
-        Alle {sec.birthdays}
-      </button>
     </section>
   );
 }

@@ -17,7 +17,7 @@ use KompanieApp\Core\Storage\ListRepository;
  *   Alle mit manage_lists sehen und bearbeiten dieselben Listen.
  * - Spalten: Datenspalten (field) mit Werten aus der App oder leere Spalten (blank) zum Ausfüllen auf Papier, auch als
  *   Kästchen. Die Werte werden beim Lesen ermittelt, nie gespeichert, und nur, soweit die ansehende Person sie in der
- *   App ohnehin sehen darf (available).
+ *   App ohnehin sehen darf (available). Adresse, Handynummer und E-Mail nur mit view_personal (wie in der Verwaltung).
  * - Zeilen: Mitgliedszeilen (Konto) oder freie Zeilen (freier Name oder leer). Mitgliedszeilen legt nur syncMembers()
  *   an („Mitglieder aktualisieren“); es löscht auch die Zeilen von Konten, die es nicht mehr gibt oder die kein Mitglied
  *   mehr sind. Mitglied heißt: Recht member (wie MemberService::list(false)), also ohne Gäste und Anwärter.
@@ -40,7 +40,9 @@ final class ListService
     public const ROW_MEMBER = 'member';
     public const ROW_FREE = 'free';
     /** Datenspalten in der Reihenfolge der Auswahl. nr zählt die Zeilen (macht die App). */
-    public const FIELDS = ['nr', 'name', 'first_name', 'last_name', 'role', 'rank', 'titles', 'birthday', 'points', 'penalties'];
+    public const FIELDS = ['nr', 'name', 'first_name', 'last_name', 'role', 'rank', 'titles', 'birthday', 'address', 'street', 'postal_code', 'city', 'country', 'phone', 'email', 'points', 'penalties'];
+    /** Persönliche Angaben (Recht view_personal): die ganze Adresse, ihre Teile einzeln (für Serienbriefe aus der CSV), Handynummer, E-Mail */
+    public const PERSONAL_FIELDS = ['address', 'street', 'postal_code', 'city', 'country', 'phone', 'email'];
     public const WIDTHS = ['narrow', 'normal', 'wide'];
     public const ORIENTATIONS = ['portrait', 'landscape'];
 
@@ -281,6 +283,8 @@ final class ListService
             'titles' => $f->enabled('titles') && ($directory || $viewer->can(Capability::ManageTitles)),
             // Geburtstage sehen nur Mitglieder, und nur die, die die Person freigegeben hat (Issue #1).
             'birthday' => $f->enabled('birthdays') && BirthdayService::canSee($viewer),
+            // Persönliche Angaben anderer nur mit view_personal (wie auf der Seite der Person in der Verwaltung).
+            ...array_fill_keys(self::PERSONAL_FIELDS, $viewer->can(Capability::ViewPersonal)),
             'points' => $f->enabled('points') && $viewer->can(Capability::ManagePoints),
             'penalties' => $f->enabled('penalties') && $viewer->can(Capability::ManagePenalties),
         ];
@@ -302,6 +306,9 @@ final class ListService
         $ranks = isset($want['rank']) ? $this->app->ranks()->titles() : [];
         $titles = isset($want['titles']) ? $this->app->titles()->byUser() : [];
         $totals = isset($want['points']) || isset($want['penalties']) ? $this->app->scores()->totalsByUser() : [];
+        $contacts = array_intersect_key($want, array_flip(['address', 'street', 'postal_code', 'city', 'country', 'phone'])) !== []
+            ? $this->app->memberContacts()->all() : [];
+        $emails = isset($want['email']) ? $this->app->users->emails(array_keys($users)) : [];
         $birthdays = [];
         if (isset($want['birthday'])) {
             foreach ($this->app->birthdays()->repository()->visible() as $b) {
@@ -310,6 +317,7 @@ final class ListService
         }
         $out = [];
         foreach ($users as $id => $u) {
+            $address = $contacts[$id]['address'] ?? null;
             $v = [];
             foreach ($fields as $field) {
                 $v[$field] = match ($field) {
@@ -322,6 +330,13 @@ final class ListService
                     'titles' => array_map(static fn (array $t): string => $t['title'], $titles[$id] ?? []),
                     // Geburtstage nur von Mitgliedern (BirthdayService::list)
                     'birthday' => BirthdayService::isMember($u) ? ($birthdays[$id] ?? null) : null,
+                    'address' => $address !== null ? Address::oneLine($address) : null,
+                    'street' => $address !== null ? Address::streetLine($address) : null,
+                    'postal_code' => $address['postal_code'] ?? null,
+                    'city' => $address['city'] ?? null,
+                    'country' => $address !== null ? Address::countryName($address) : null,
+                    'phone' => ($contacts[$id]['phone'] ?? '') !== '' ? $contacts[$id]['phone'] : null,
+                    'email' => ($emails[$id] ?? '') !== '' ? $emails[$id] : null,
                     'points' => $totals[$id]['points'] ?? 0,
                     'penalties' => $totals[$id]['open_cents'] ?? 0,
                     default => null,

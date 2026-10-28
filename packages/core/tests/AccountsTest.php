@@ -70,12 +70,12 @@ final class AccountsTest extends TestCase
     public function testOwnEmailAndPhone(): void
     {
         $this->users->current = $this->m;
-        $this->assertSame(['email' => '', 'phone' => ''], $this->call('GET', '/me/account')->data);
+        $this->assertSame(['email' => '', 'phone' => '', 'address' => null], $this->call('GET', '/me/account')->data);
 
         // Handynummer ohne Passwort; Leerzeichen werden vereinheitlicht.
         $res = $this->call('PATCH', '/me/account', ['email' => '', 'phone' => ' +49  171 1234567 ']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['email' => '', 'phone' => '+49 171 1234567'], $res->data);
+        $this->assertSame(['email' => '', 'phone' => '+49 171 1234567', 'address' => null], $res->data);
         $this->assertSame(400, $this->call('PATCH', '/me/account', ['phone' => 'abc 123'])->status);
         $this->assertSame(400, $this->call('PATCH', '/me/account', ['phone' => '12'])->status, 'zu wenige Ziffern');
 
@@ -83,7 +83,7 @@ final class AccountsTest extends TestCase
         $this->assertSame(400, $this->call('PATCH', '/me/account', ['email' => 'neu@example.org', 'phone' => '+49 171 1234567'])->status);
         $this->assertSame(400, $this->call('PATCH', '/me/account', ['email' => 'neu@example.org', 'current_password' => 'falsch'])->status);
         $res = $this->call('PATCH', '/me/account', ['email' => 'neu@example.org', 'phone' => '', 'current_password' => 'geheim123']);
-        $this->assertSame(['email' => 'neu@example.org', 'phone' => ''], $res->data);
+        $this->assertSame(['email' => 'neu@example.org', 'phone' => '', 'address' => null], $res->data);
         $this->assertSame(200, $this->call('PATCH', '/me/account', ['email' => 'Neu@Example.org'])->status, 'nur Groß-/Kleinschreibung');
         $this->assertSame(400, $this->call('PATCH', '/me/account', ['email' => 'kein-mail', 'current_password' => 'geheim123'])->status);
 

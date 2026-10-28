@@ -11,7 +11,7 @@ import {
   type FormerOfficesPreview,
   type FormerReason,
 } from '../api';
-import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday } from '../birthdays';
+import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
@@ -358,7 +358,7 @@ export function NewFormer() {
     e.preventDefault();
     setFormError(null);
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
-    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
@@ -424,7 +424,7 @@ export function NewFormer() {
       </button>
       <NameFields value={name} onChange={setName} />
       <FormerFields value={former} onChange={setFormer} />
-      {canSetBirthdays() && (
+      {canEnterBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
           <legend>Geburtstag (optional)</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />

@@ -1,6 +1,7 @@
 // Zugriff auf die API der Kompanie-App (siehe api/openapi.yaml), unabhängig davon,
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
+import type { Address } from './address';
 import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
@@ -43,6 +44,8 @@ export type Capability =
   | 'manage_offices'
   | 'manage_lists'
   | 'send_mail'
+  | 'view_personal'
+  | 'manage_personal'
   | 'create_users'
   | 'promote_users'
   | 'view_activity'
@@ -109,6 +112,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
+  /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
+  birthdays?: { upcomingDays: number } | null;
 }
 
 export interface MaintenanceInfo {
@@ -181,6 +186,13 @@ export const CONFIG_CHANGED = 'kompanie-config-changed';
 export function applyFeatures(list: FeatureInfo[]): void {
   if (!config) return;
   for (const f of list) config.features[f.key] = f.enabled && f.configured !== false;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Vorlauf der anstehenden Geburtstage in die geladene Konfiguration (nach dem Speichern). */
+export function applyBirthdayUpcomingDays(days: number): void {
+  if (!config) return;
+  config.birthdays = { upcomingDays: days };
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -320,11 +332,16 @@ export interface OpenPenalty extends Penalty {
   user_name: string | null;
 }
 
-/** Eigene Kontaktangaben (Meins → Konto) */
-export interface OwnAccount {
+/** Persönliche Angaben: eigene (Meins → Konto) und in der Verwaltung mit view_personal */
+export interface PersonalInfo {
   email: string;
   phone: string;
+  /** null, wenn keine hinterlegt ist; fehlt bei älteren Servern */
+  address?: Address | null;
 }
+
+/** Eigene Kontaktangaben (Meins → Konto) */
+export type OwnAccount = PersonalInfo;
 
 export interface CalendarEvent {
   id: string;
@@ -429,7 +446,7 @@ export interface MemberSummary {
   level: Level;
   /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
   extra_roles?: Level[];
-  /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
+  /** Recht „Gehört zur Kompanie“; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
   /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
   group?: Level | null;
@@ -508,8 +525,10 @@ export interface MemberDetail extends MemberSummary {
   /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
   rank?: RankStatus;
   rank_history?: RankHistoryEntry[];
-  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
+  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage und view_personal; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** E-Mail-Adresse, Handynummer und Adresse (nur mit view_personal) */
+  personal?: PersonalInfo;
   /** Eintritt mit Anzeige (nur für create_users; null ohne Eintrag) */
   join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
@@ -614,6 +633,8 @@ export interface MemberImportRow {
   /** leer bei Ehemaligen (sie melden sich nicht an) */
   username?: string;
   email?: string;
+  phone?: string;
+  address?: Address | null;
   /** JJJJ-MM-TT oder MM-TT */
   birthday?: string;
   /** JJJJ-MM-TT oder JJJJ */
@@ -732,6 +753,12 @@ export interface BirthdayEntry {
   today: boolean;
   /** Alter an diesem Geburtstag, nur wenn freigegeben */
   age: number | null;
+}
+
+/** Einstellungen der Geburtstage (Einstellungen → Geburtstage). */
+export interface BirthdaySettings {
+  /** Anstehend: heute und die nächsten N Tage (0–30) */
+  upcoming_days: number;
 }
 
 export interface BirthdayInput {
@@ -1143,7 +1170,7 @@ export interface AttendancePerson {
   role: Level;
   /** Rolle, als die die Person im Zähler zählt */
   group: Level;
-  /** Mit Mitgliederbereich: Punkte und Strafen möglich */
+  /** Recht „Gehört zur Kompanie“: Punkte und Strafen möglich */
   member: boolean;
   status: AttendanceStatus | null;
   /** Hat für diese Liste schon Punkte */
@@ -1274,7 +1301,24 @@ export interface OfficeImportResult {
 }
 
 /** Listen (Issue #121): Datenspalten; nr zählt die Zeilen. */
-export type ListField = 'nr' | 'name' | 'first_name' | 'last_name' | 'role' | 'rank' | 'titles' | 'birthday' | 'points' | 'penalties';
+export type ListField =
+  | 'nr'
+  | 'name'
+  | 'first_name'
+  | 'last_name'
+  | 'role'
+  | 'rank'
+  | 'titles'
+  | 'birthday'
+  | 'address'
+  | 'street'
+  | 'postal_code'
+  | 'city'
+  | 'country'
+  | 'phone'
+  | 'email'
+  | 'points'
+  | 'penalties';
 export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
 
 export interface ListColumn {
@@ -1300,6 +1344,16 @@ export interface ListValues {
   titles?: string[];
   /** „TT.MM.“ oder null (nicht freigegeben) */
   birthday?: string | null;
+  /** Persönliche Angaben (nur mit view_personal); null ohne Eintrag. address: die ganze Adresse in einer Zeile */
+  address?: string | null;
+  /** Straße mit Hausnummer */
+  street?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  /** Name des Landes, auch Deutschland */
+  country?: string | null;
+  phone?: string | null;
+  email?: string | null;
   points?: number;
   /** Offene Strafen in Cent */
   penalties?: number;
@@ -1416,6 +1470,8 @@ export interface PersonName {
 export interface NewPerson extends PersonName {
   username?: string;
   email?: string;
+  phone?: string;
+  address?: Address | null;
   initial_points?: number;
   initial_points_date?: string;
   rank_id?: number;
@@ -1429,7 +1485,7 @@ export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
-  /** Handynummer oder '' */
+  /** Handynummer oder '' (nur mit view_personal, sonst '') */
   phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
@@ -1665,10 +1721,13 @@ export const api = {
   },
   createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  /** Eigene E-Mail-Adresse und Handynummer; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+  /** Eigene E-Mail-Adresse, Handynummer und Adresse; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
   ownAccount: () => request<OwnAccount>('GET', '/me/account'),
-  updateOwnAccount: (data: { email: string; phone: string; current_password?: string }) =>
+  updateOwnAccount: (data: { email: string; phone: string; address: Address | null; current_password?: string }) =>
     request<OwnAccount>('PATCH', '/me/account', data),
+  /** Persönliche Angaben einer anderen Person ändern (manage_personal); was fehlt, bleibt. */
+  updatePersonal: (id: number, data: { email?: string; phone?: string; address?: Address | null; current_password?: string }) =>
+    request<PersonalInfo>('PUT', `/members/${id}/personal`, data),
   updateAccount: (
     id: number,
     data: Partial<PersonName> & { email?: string; phone?: string; username?: string; current_password?: string },
@@ -1688,6 +1747,8 @@ export const api = {
     data: PersonName & {
       username?: string;
       email?: string;
+      phone?: string;
+      address?: Address | null;
       level?: Level;
       initial_points?: number;
       initial_points_date?: string;
@@ -1747,7 +1808,6 @@ export const api = {
   uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
-  mailGroups: () => request<MailGroup[]>('GET', '/mails/groups'),
   createMailGroup: (input: MailGroupInput) => request<MailGroup[]>('POST', '/mails/groups', input),
   updateMailGroup: (key: string, input: MailGroupInput) => request<MailGroup[]>('PATCH', `/mails/groups/${encodeURIComponent(key)}`, input),
   deleteMailGroup: (key: string) => request<MailGroup[]>('DELETE', `/mails/groups/${encodeURIComponent(key)}`),
@@ -1920,6 +1980,7 @@ export const api = {
   retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
+  updateStatus: () => request<UpdateStatus>('GET', '/admin/update'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
   installUpdate: (version: string, major = false, withoutDrive = false) =>
     request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
@@ -1979,6 +2040,8 @@ export const api = {
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
+  birthdaySettings: () => request<BirthdaySettings>('GET', '/admin/birthdays'),
+  setBirthdayUpcomingDays: (upcoming_days: number) => request<BirthdaySettings>('PATCH', '/admin/birthdays', { upcoming_days }),
   setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
 
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
@@ -2109,6 +2172,24 @@ export interface UpdateStatus {
   last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;
   /** Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte. */
   held: { version: string; kind: 'auto' | 'withdrawn'; at: number; error: string } | null;
+  /** Gerade läuft ein Update (auch eines, dessen Anfrage durch ein Zeitlimit abgebrochen ist). */
+  running: boolean;
+  /** Nur während running: Schritt des laufenden Updates für die Fortschrittsanzeige */
+  progress: UpdateProgress | null;
+}
+
+export type UpdateStep = 'download' | 'backup' | 'drive' | 'install';
+export interface UpdateProgress {
+  version: string;
+  step: UpdateStep;
+  steps: UpdateStep[];
+  at: number;
+  /** Bytes: geschrieben (backup) oder hochgeladen (drive); sonst null */
+  done: number | null;
+  /** Größe in Bytes; null: unbekannt */
+  total: number | null;
+  /** total ist geschätzt (Größe der letzten Sicherung) */
+  estimate: boolean;
 }
 
 export interface AdminStatus {

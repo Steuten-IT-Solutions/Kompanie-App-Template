@@ -91,10 +91,15 @@ final class PersonalDataExportTest extends TestCase
         $this->assertCount(1, $res->data['data']['poll_votes'], 'Teilnahme schon');
 
         // Wer Konten anlegt, aber kein Admin ist: keine Admins; ohne create_users gar nicht; ohne Anmeldung 401.
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Verwalter', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Nur Konten', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
+        $this->assertLessThan(300, $res->status, (string) json_encode($res->data));
+        $accountsOnly = $this->users->add('konten', (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Nur Konten']);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Verwalter', 'capabilities' => TestApp::caps(['member', 'create_users', 'view_personal'])]);
         $this->assertLessThan(300, $res->status, (string) json_encode($res->data));
         $role = (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Verwalter'];
         $manager = $this->users->add('verwalter', $role);
+        $this->users->current = $accountsOnly;
+        $this->assertSame(403, $this->call('GET', "/members/{$this->m}/data")->status, 'ohne view_personal');
         $this->users->current = $manager;
         $this->assertSame(200, $this->call('GET', "/members/{$this->m}/data")->status);
         $this->assertSame(403, $this->call('GET', "/members/{$this->admin}/data")->status);

@@ -17,22 +17,63 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
+  dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
+  auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
+  schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
+- **Adresse**: Jedes Mitglied trägt seine Postanschrift (Land, Straße, Hausnummer, Zusatz, PLZ, Ort) unter
+  *Meins → Konto* selbst ein und ändert sie dort. Die App prüft die Eingabe wie bei E-Mail und Handynummer: Die
+  Postleitzahl muss zum gewählten Land passen (z. B. fünf Ziffern in Deutschland, „1234 AB“ in den Niederlanden), die
+  Hausnummer rückt aus der Straße in ihr Feld, und Hinweise wie „Hausnummer vergessen?“ stehen direkt am Feld.
+- **Rechte „Persönliche Angaben sehen“ und „Persönliche Angaben pflegen“**: Adresse, Handynummer, E-Mail-Adresse und
+  Geburtsdatum anderer stehen in der Verwaltung auf der Seite der Person unter **Persönliche Angaben**, sichtbar nur mit
+  diesem Recht; ändern lassen sie sich mit „Persönliche Angaben pflegen“.
+- **Beim Anlegen alles eintragen**: Beim Anlegen einzelner und mehrerer Mitglieder und beim Import lassen sich jetzt
+  auch Handynummer und Adresse eintragen (im Import mit den Spalten Handynummer, Straße, Hausnummer, Adresszusatz, PLZ,
+  Ort und Land).
+- **Adresse, Handynummer und E-Mail in Listen**: Unter *Verwaltung → Listen* gibt es die Datenspalten Adresse (die ganze
+  Anschrift in einer Spalte), Straße und Nr., PLZ, Ort, Land, Handynummer und E-Mail, auch im CSV-Export. Mit den
+  einzelnen Spalten lassen sich aus der CSV Serienbriefe und Adressetiketten erstellen. Die Werte sieht nur, wer das
+  Recht „Persönliche Angaben sehen“ hat. Die Handynummer steht in der CSV als „0049 …“, damit Excel sie unverändert
+  übernimmt.
+- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
+  Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
+  Tage vorher, anfangs wie bisher 7 Tage).
 - **Verschlüsselte Sicherungen**: Unter *Einstellungen → Datensicherung* lässt sich ein **Passwort für Sicherungen**
   einrichten. Heruntergeladene Sicherungen und alle Sicherungen in Google Drive sind damit verschlüsselt; wer die Datei
   findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
   sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
 - **Meine Daten herunterladen (Auskunft nach DSGVO)**: Unter *Konto → Meine Daten* lädt jede Person alles herunter,
-  was die App über sie gespeichert hat. Wer Mitglieder anlegen darf, kann das auch für eine Person tun
-  (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne Antworten in anonymen Umfragen.
+  was die App über sie gespeichert hat. Wer Mitglieder anlegen und persönliche Angaben sehen darf, kann das auch für
+  eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne Antworten in anonymen Umfragen.
 - **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
   seit dem Ausscheiden die App Ehemalige mit allen Daten endgültig löscht (Gründungsmitglieder und Verstorbene nur auf
   Wunsch). Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
 
 ### Geändert
 
+- Handynummer und Geburtsdatum anderer sieht und ändert nicht mehr jeder, der Mitglieder anlegen darf, sondern nur,
+  wer die neuen Rechte für persönliche Angaben hat. Rollen, die bisher „Mitglieder anlegen“ hatten, bekommen beide
+  Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter *Einstellungen → Rollen* weg.
+- Auf der Seite eines Mitglieds in der Verwaltung steht der Geburtstag jetzt bei **Persönliche Angaben** (ohne das Recht
+  dazu weiter bei Eintritt und Austritt), und **Persönliche Angaben** stehen unter den Ämtern, über *Konto und Rolle*.
+  Antippen der Adresse zeigt den Ort in der Karten-App: auf Android mit Auswahl der App, auf iPhone und Mac in Apple
+  Karten, am PC in Google Maps.
 - **Sicherungen in Google Drive nur noch verschlüsselt**: Sie pausieren, bis unter *Einstellungen → Datensicherung* ein
   Passwort für Sicherungen eingerichtet ist; die Ampel unter *Zustand und Updates* weist darauf hin. Ältere,
   unverschlüsselte Sicherungen im Ordner verschwinden nach und nach.
+
+### Behoben
+
+- **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
+  ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
+  Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
+  die neue Version.
+
+### Entfernt
+
+- **Liste aller Geburtstage**: Die Seite „Alle Geburtstage“ gibt es nicht mehr. Die Karte „Anstehende Geburtstage“ bei
+  den Terminen bleibt; die Benachrichtigung am Geburtstag öffnet jetzt die Termine.
 
 ### Sicherheit
 

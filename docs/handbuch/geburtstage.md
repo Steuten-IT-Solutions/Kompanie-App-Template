@@ -4,18 +4,16 @@ reihenfolge: 34
 rechte: [view_birthdays]
 bereiche: [birthdays]
 ---
-Unter **Alle {bereich.birthdays}** siehst du, wann die {rolle.member} der {kompanie.name} Geburtstag haben, der nächste zuerst. Deinen eigenen Geburtstag trägst du in deinem Konto ein und legst dort fest, wer ihn sieht.
+In der Karte **Anstehende {bereich.birthdays}** siehst du, welche {rolle.member} der {kompanie.name} bald Geburtstag haben, der nächste zuerst. Deinen eigenen Geburtstag trägst du in deinem Konto ein und legst dort fest, wer ihn sieht.
 
-![Liste aller {bereich.birthdays}, nach Monaten geordnet](bild:geburtstage)
+![Karte „Anstehende {bereich.birthdays}“ oben bei den {bereich.events}](bild:geburtstage)
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.events}**. Oben steht die Karte **Anstehende {bereich.birthdays}**; tippe darin auf **Alle {bereich.birthdays}**.
+Tippe unten auf **{bereich.events}**. Oben steht die Karte **Anstehende {bereich.birthdays}**.
 
 ## Was du hier siehst
-- **Anstehende {bereich.birthdays}** (Karte oben unter **{bereich.events}**): alle, die heute oder in den nächsten 7 Tagen Geburtstag haben. Wer heute Geburtstag hat, ist mit **Heute** hervorgehoben, morgen steht dort „Morgen“.
-- **Alle {bereich.birthdays}**: die ganze Liste, nach Monaten geordnet, beginnend mit dem nächsten Geburtstag.
+- **Anstehende {bereich.birthdays}** (Karte oben unter **{bereich.events}**): alle, die heute oder in den nächsten Tagen Geburtstag haben. Wie viele Tage vorher ein Geburtstag erscheint, legt ein {rolle.admin} fest (anfangs 7 Tage). Wer heute Geburtstag hat, ist mit **Heute** hervorgehoben, morgen steht dort „Morgen“.
 - **Eintrag**: Datum, Name und Wochentag, bei freigegebenem Alter z. B. „wird 45“.
-- **‹ {bereich.events}**: zurück zu den Terminen.
 
 ## So gehst du vor
 ### Deinen Geburtstag eintragen
@@ -31,10 +29,10 @@ Tippe unten auf **{bereich.events}**. Oben steht die Karte **Anstehende {bereich
 Ändern geht jederzeit genauso. Mit **Entfernen** löschst du deinen Geburtstag ganz.
 
 ## Gut zu wissen
-- Hat in den nächsten 7 Tagen niemand Geburtstag, fehlt die Karte **Anstehende {bereich.birthdays}**. Nutzt die {kompanie.name} keine Termine, steht unter **{bereich.events}** nur diese Karte, dann gegebenenfalls mit „In den nächsten 7 Tagen hat niemand Geburtstag.“
+- Hat in den nächsten Tagen niemand Geburtstag, fehlt die Karte **Anstehende {bereich.birthdays}**. Nutzt die {kompanie.name} keine Termine, steht unter **{bereich.events}** nur diese Karte, dann gegebenenfalls z. B. mit „In den nächsten 7 Tagen hat niemand Geburtstag.“
 - Am Anfang ist **Anderen Mitgliedern zeigen** eingeschaltet, **Alter anzeigen** ausgeschaltet und auf deiner Seite unter {bereich.directory} **Mitgliedern anzeigen** gewählt.
 - Mit **Alter anzeigen** und Jahr steht auf deiner Seite unter {bereich.directory} das ganze Datum mit deinem Alter, sonst nur Tag und Monat. Diese Auswahl gilt nur für deine Seite; die {bereich.birthdays} und die Benachrichtigung richten sich nach **Anderen Mitgliedern zeigen**.
-- Wer am 29. Februar Geburtstag hat, steht in Jahren ohne Schalttag am 28. Februar in der Liste. Einen 29. Februar mit Jahr kannst du nur in einem Schaltjahr eintragen.
+- Wer am 29. Februar Geburtstag hat, steht in Jahren ohne Schalttag am 28. Februar in der Karte. Einen 29. Februar mit Jahr kannst du nur in einem Schaltjahr eintragen.
 - Geburtstage sieht, wessen Rolle das Recht **{bereich.birthdays} der anderen sehen** hat, anfangs die {rolle.member}. Darin erscheinen nur {rolle.member}: Gäste und Personen, die nicht zur Kompanie gehören (z. B. Anwärter), erscheinen nirgends.
 - Wer Mitglieder anlegen darf, kann das Datum für dich eintragen oder korrigieren. Die Schalter stellst nur du selbst ein.
 - Am Geburtstag bekommen die anderen {rolle.member} eine Benachrichtigung wie „Heute hat Max Muster Geburtstag (wird 45)“ – das Alter nur, wenn es freigegeben ist. Sie kommt ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 7 Uhr); er kann sie auch ganz ausschalten. Empfangen kann sie, wer die Art **{bereich.birthdays}: am Tag selbst** eingeschaltet hat.

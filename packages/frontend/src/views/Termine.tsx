@@ -3,7 +3,7 @@ import { can, config } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
-import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
+import { eventEnd, eventStart, formatEventWhen, formatMonth, shortMonth } from '../format';
 import { downloadIcs } from '../ics';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -89,7 +89,7 @@ function EventList({ focus }: { focus?: string }) {
                   <button className="event-head" onClick={() => setOpen(isOpen ? null : ev.id)} aria-expanded={isOpen}>
                     <div className="date-badge" aria-hidden="true">
                       <span className="day">{s.getDate()}</span>
-                      <span className="mon">{s.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}</span>
+                      <span className="mon">{shortMonth(s)}</span>
                     </div>
                     <div className="event-main">
                       <div className="event-title">{ev.title}</div>

@@ -13,7 +13,8 @@ interface OffsiteBackup
     /**
      * Die fertige Sicherung $path ablegen, ältere Sicherungen vor Updates aufräumen.
      *
+     * @param (callable(int, int): void)|null $onProgress beim Hochladen: übertragene Bytes, Größe (Fortschrittsanzeige)
      * @throws \RuntimeException mit verständlicher Meldung
      */
-    public function storeBeforeUpdate(string $path, string $version): void;
+    public function storeBeforeUpdate(string $path, string $version, ?callable $onProgress = null): void;
 }

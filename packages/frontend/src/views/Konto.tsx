@@ -7,9 +7,10 @@ import { OwnBirthdayCard, ownBirthday } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate, useRoute } from '../router';
 import RichTextView from '../richtext/RichTextView';
-import { EmailField, ErrorBox, lazyView, Loading, PhoneField, useAsync } from '../ui';
+import { AddressFields, EmailField, ErrorBox, lazyView, Loading, PhoneField, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
+import { addressInput, EMPTY_ADDRESS, formatAddress } from '../address';
 import { MemberAvatar } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
@@ -320,7 +321,6 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
   );
 }
 
-/** Eigene E-Mail-Adresse und Handynummer ansehen und ändern; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
 /** Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten der Person als JSON-Datei. */
 function MyDataCard() {
   const [busy, setBusy] = useState(false);
@@ -349,6 +349,10 @@ function MyDataCard() {
   );
 }
 
+/**
+ * Eigene E-Mail-Adresse, Handynummer und Adresse ansehen und ändern; eine neue E-Mail-Adresse nur mit dem aktuellen
+ * Passwort. Andere sehen sie nur mit dem Recht „Persönliche Angaben sehen“.
+ */
 function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(api.ownAccount, [], 'me/account');
   const [editing, setEditing] = useState<OwnAccount | null>(null);
@@ -372,6 +376,7 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
         await api.updateOwnAccount({
           email: normalizeEmail(editing.email),
           phone: normalizePhone(editing.phone),
+          address: addressInput(editing.address),
           ...(emailChanged ? { current_password: password } : {}),
         }),
       );
@@ -401,6 +406,12 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
         onChange={(email) => setEditing({ ...editing, email })}
       />
       <PhoneField label="Handynummer" autoComplete="tel" value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
+      <AddressFields
+        label="Adresse"
+        own
+        value={editing.address ?? EMPTY_ADDRESS}
+        onChange={(address) => setEditing({ ...editing, address })}
+      />
       {emailChanged && (
         <label className="field">
           <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
@@ -429,7 +440,10 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
         <dd>{account.email || <span className="muted">nicht hinterlegt</span>}</dd>
         <dt>Handynummer</dt>
         <dd>{account.phone || <span className="muted">nicht hinterlegt</span>}</dd>
+        <dt>Adresse</dt>
+        <dd className="address-lines">{formatAddress(account.address).join('\n') || <span className="muted">nicht hinterlegt</span>}</dd>
       </dl>
+      <p className="muted small">Sehen können das nur du und wer in der Verwaltung persönliche Angaben sehen darf.</p>
       <button className="btn btn-secondary btn-block" onClick={() => setEditing(account)}>
         Ändern
       </button>
