@@ -1697,8 +1697,8 @@ final class ApiScenario
         $c = $this->c;
         $c->section('Benachrichtigungen');
         $this->d->actAs(null);
-        [$s, $d] = $this->req('GET', '/push/key');
-        $c->ok($s === 200 && is_bool($d['supported'] ?? null), 'GET /push/key öffentlich');
+        [$s, $d] = $this->req('POST', '/push/status', []);
+        $c->ok($s === 200 && is_bool($d['supported'] ?? null), 'POST /push/status öffentlich');
         if (!($d['supported'] ?? false)) {
             $c->ok(true, 'Server ohne Push-Unterstützung: übrige Prüfungen übersprungen');
             return;

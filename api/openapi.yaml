@@ -525,23 +525,6 @@ paths:
         '429': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
-  /push/key:
-    get:
-      tags: [Benachrichtigungen]
-      summary: Öffentlicher VAPID-Schlüssel des Servers
-      security: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [supported, publicKey]
-                properties:
-                  supported: { type: boolean, description: Der Server kann Push-Nachrichten verschlüsseln und signieren }
-                  publicKey: { type: string, description: 'applicationServerKey (base64url, unkomprimierter P-256-Punkt); leer, wenn nicht unterstützt' }
-
   /me/push/status:
     post:
       tags: [Benachrichtigungen]
