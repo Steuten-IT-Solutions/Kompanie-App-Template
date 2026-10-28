@@ -4792,6 +4792,18 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
 
   /admin/update:
+    get:
+      tags: [Wartung]
+      summary: Stand der Updates (ohne die übrige Statusseite), z. B. für die Fortschrittsanzeige während eines Updates
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Wartung]
       summary: Automatische Updates, Kanal und Statusmeldungen einstellen
@@ -5819,6 +5831,15 @@ components:
             kind: { type: string, enum: [auto, withdrawn] }
             at: { type: integer }
             error: { type: string }
+        running: { type: boolean, description: 'Gerade läuft ein Update (auch eines, dessen Anfrage durch ein Zeitlimit abgebrochen ist)' }
+        progress:
+          type: [object, 'null']
+          description: 'Nur während running: Schritt des laufenden Updates für die Fortschrittsanzeige'
+          properties:
+            version: { type: string }
+            step: { type: string, enum: [download, backup, drive, install] }
+            steps: { type: array, items: { type: string, enum: [download, backup, drive, install] }, description: Schritte dieses Updates in ihrer Reihenfolge }
+            at: { type: integer, description: Beginn des Schritts }
 
     AppConfig:
       type: object

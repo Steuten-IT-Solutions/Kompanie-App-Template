@@ -1920,6 +1920,7 @@ export const api = {
   retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
+  updateStatus: () => request<UpdateStatus>('GET', '/admin/update'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
   installUpdate: (version: string, major = false, withoutDrive = false) =>
     request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
@@ -2073,6 +2074,18 @@ export interface UpdateStatus {
   last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;
   /** Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte. */
   held: { version: string; kind: 'auto' | 'withdrawn'; at: number; error: string } | null;
+  /** Gerade läuft ein Update (auch eines, dessen Anfrage durch ein Zeitlimit abgebrochen ist). */
+  running: boolean;
+  /** Nur während running: Schritt des laufenden Updates für die Fortschrittsanzeige */
+  progress: UpdateProgress | null;
+}
+
+export type UpdateStep = 'download' | 'backup' | 'drive' | 'install';
+export interface UpdateProgress {
+  version: string;
+  step: UpdateStep;
+  steps: UpdateStep[];
+  at: number;
 }
 
 export interface AdminStatus {

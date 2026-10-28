@@ -47,6 +47,8 @@ final class UpdateServiceTest extends TestCase
     public ?string $offsiteFails = null;
     /** @var array<int, array{0: string, 1: string}> nach Google Drive: Inhalt der Sicherung, Version davor */
     public array $offsiteStored = [];
+    /** @var string[] Schritte der Fortschrittsanzeige, wie sie während des Updates gespeichert sind */
+    public array $progressSeen = [];
     private string $dir = '';
 
     protected function setUp(): void
@@ -90,6 +92,12 @@ final class UpdateServiceTest extends TestCase
         $this->listJson = SignedEnvelope::sign($payload, $this->secret, $this->keyId);
     }
 
+    public function noteProgress(): void
+    {
+        $p = (array) $this->settings->get('update_progress', []);
+        $this->progressSeen[] = ($p['step'] ?? '') . ' von ' . implode(',', (array) ($p['steps'] ?? []));
+    }
+
     private function service(string $current, ?Telemetry $telemetry = null): UpdateService
     {
         $test = $this;
@@ -118,6 +126,7 @@ final class UpdateServiceTest extends TestCase
                 if ($this->t->failInstall) {
                     throw new \RuntimeException('Schreibrechte fehlen.');
                 }
+                $this->t->noteProgress();
                 $this->t->installed[] = [$version, (string) file_get_contents($zipFile)];
             }
         };
@@ -166,6 +175,7 @@ final class UpdateServiceTest extends TestCase
                 if ($this->t->offsiteFails !== null) {
                     throw new \RuntimeException($this->t->offsiteFails);
                 }
+                $this->t->noteProgress();
                 $this->t->offsiteStored[] = [(string) file_get_contents($path), $version];
             }
         };
@@ -325,7 +335,11 @@ final class UpdateServiceTest extends TestCase
     {
         $this->publish(['1.0.0.1', '1.0.0.2'], ['1.0.0.2']);
         $this->offsiteActive = true;
-        $this->service('1.0.0.1')->install('1.0.0.2');
+        $s = $this->service('1.0.0.1');
+        $s->install('1.0.0.2');
+        $this->assertSame(['drive von download,backup,drive,install', 'install von download,backup,drive,install'], $this->progressSeen, 'Fortschritt für die App');
+        $this->assertNull($s->status()['progress'], 'nach dem Update kein Fortschritt mehr');
+        $this->assertNull($this->settings->get('update_progress'));
         $this->assertSame([[(string) json_encode(['format' => 'kompanie-app-backup']), '1.0.0.1']], $this->offsiteStored, 'dieselbe Sicherung wie auf dem Server');
         $this->assertSame('1.0.0.2', $this->installed[0][0]);
         $this->assertCount(1, glob($this->dir . '/i/sicherungen/vor-update-*.json') ?: []);
@@ -496,9 +510,12 @@ final class UpdateServiceTest extends TestCase
 
         // Ein Update zur selben Zeit: 409
         $lock = fopen($this->dir . '/i/sicherungen/update.lock', 'c');
+        $this->assertFalse($s1->status()['running']);
         flock($lock, LOCK_EX);
+        $this->assertTrue($s1->status()['running'], 'die App wartet, statt erneut einspielen zu lassen');
         $this->assertThrows(fn () => $s1->install('1.0.0.3'), 'schon ein Update');
         flock($lock, LOCK_UN);
+        $this->assertFalse($s1->status()['running']);
         $s1->install('1.0.0.3');
         $this->assertSame('1.0.0.3', end($this->installed)[0]);
     }

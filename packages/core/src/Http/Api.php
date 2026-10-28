@@ -1085,6 +1085,8 @@ final class Api
                 $a->updates()->rollback(is_string($r->input('version')) ? $r->input('version') : '', Input::bool($r->input('without_drive')));
                 return ['installed' => $r->input('version')];
             }, null, $denySettings),
+            // Leichter Abruf für die Fortschrittsanzeige während eines Updates (running, progress).
+            new Route('GET', '/admin/update', Cap::ManageSettings, fn () => $a->updates()->status(), null, $denySettings),
             new Route('PATCH', '/admin/update', Cap::ManageSettings, function (Request $r) use ($a) {
                 if ($r->has('auto')) {
                     $a->updates()->setAuto(Input::bool($r->input('auto')));

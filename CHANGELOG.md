@@ -15,6 +15,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
+  dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen). Läuft beim Öffnen der Seite
+  schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
+
+### Behoben
+
+- **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
+  ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
+  Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
+  die neue Version.
+
 ## [0.4.0] – 2026-10-27
 
 ### Neu
