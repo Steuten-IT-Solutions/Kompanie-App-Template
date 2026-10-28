@@ -232,7 +232,7 @@ final class Api
                 $this->app->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
-                $created['warning'] = 'Angelegt, aber Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
+                $created['warning'] = trim(($created['warning'] ?? '') . ' Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.');
             }
             $this->storeBirthday((int) $created['id'], $birthday, $created);
             $this->storePhoto((int) $created['id'], $photo, $created);
@@ -497,6 +497,7 @@ final class Api
         $denyBoard = 'Das Schwarze Brett darfst du nicht sehen.';
         $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
+        $denyPersonal = 'Persönliche Angaben anderer pflegt nur, wer das Recht dazu hat.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = Cap::memberList();
@@ -832,11 +833,12 @@ final class Api
                 }
                 return $a->birthdays()->list($days);
             }, 'birthdays', $denyView),
-            new Route('PUT', '/members/{id}/birthday', Cap::CreateUsers, fn (Request $r) => ['birthday' => $a->birthdays()->saveFor($this->user(), $r->id(), $r->body)], 'birthdays', $denyRights),
-            new Route('DELETE', '/members/{id}/birthday', Cap::CreateUsers, function (Request $r) use ($a) {
+            // Geburtsdatum anderer: gehört zu den persönlichen Angaben (manage_personal)
+            new Route('PUT', '/members/{id}/birthday', Cap::ManagePersonal, fn (Request $r) => ['birthday' => $a->birthdays()->saveFor($this->user(), $r->id(), $r->body)], 'birthdays', $denyPersonal),
+            new Route('DELETE', '/members/{id}/birthday', Cap::ManagePersonal, function (Request $r) use ($a) {
                 $a->birthdays()->removeFor($r->id());
                 return ['birthday' => null];
-            }, 'birthdays', $denyRights),
+            }, 'birthdays', $denyPersonal),
             new Route('PUT', '/members/{id}/join-year', Cap::CreateUsers, fn (Request $r) => ['join_year' => $a->joinYears()->saveFor($this->user(), $r->id(), $r->body)], null, $denyRights),
             new Route('DELETE', '/members/{id}/join-year', Cap::CreateUsers, function (Request $r) use ($a) {
                 $a->joinYears()->removeFor($r->id());
@@ -918,9 +920,10 @@ final class Api
                 + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
                 + $this->memberRank($r->id())
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
-                // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
-                // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
+                // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
+                // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
+                + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($r->id())] : [])
+                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
                 // Eintrittsjahr mit Anzeige, ebenso nur für create_users
                 + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
                 // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
@@ -957,6 +960,8 @@ final class Api
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
+            // Persönliche Angaben anderer: E-Mail, Handynummer, Adresse (Geburtstag unter /members/{id}/birthday)
+            new Route('PUT', '/members/{id}/personal', Cap::ManagePersonal, fn (Request $r) => $a->members()->updatePersonal($this->user(), $r->id(), $r->body), null, $denyPersonal),
             new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
                 $a->members()->removeAccount($this->user(), $r->id());
                 $a->userDeleted($r->id());
@@ -979,7 +984,7 @@ final class Api
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
                 } catch (\Throwable $e) {
                     error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
-                    $created['warning'] = 'Das Konto ist angelegt, aber Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.';
+                    $created['warning'] = trim(($created['warning'] ?? '') . ' Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.');
                 }
                 $this->storeBirthday((int) $created['id'], $birthday, $created);
                 $this->storePhoto((int) $created['id'], $photo, $created);

@@ -229,7 +229,7 @@ test('Mitgliederliste und Seite eines Mitglieds: für jede Aufgabe, die sie öff
     }
   }
   // Geburtstag eines Mitglieds: Pflegeseite nur mit dem Recht dazu, sonst die Seite des Mitglieds
-  assert.equal(helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['create_users'])), 'geburtstage-pflegen');
+  assert.equal(helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_personal'])), 'geburtstage-pflegen');
   assert.equal(
     helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_points'], ['points', 'birthdays'])),
     'mitglied-uebersicht',

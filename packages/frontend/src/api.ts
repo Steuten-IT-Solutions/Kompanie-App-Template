@@ -1,6 +1,7 @@
 // Zugriff auf die API der Kompanie-App (siehe api/openapi.yaml), unabhängig davon,
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
+import type { Address } from './address';
 import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
@@ -43,6 +44,8 @@ export type Capability =
   | 'manage_offices'
   | 'manage_lists'
   | 'send_mail'
+  | 'view_personal'
+  | 'manage_personal'
   | 'create_users'
   | 'promote_users'
   | 'view_activity'
@@ -320,11 +323,16 @@ export interface OpenPenalty extends Penalty {
   user_name: string | null;
 }
 
-/** Eigene Kontaktangaben (Meins → Konto) */
-export interface OwnAccount {
+/** Persönliche Angaben: eigene (Meins → Konto) und in der Verwaltung mit view_personal */
+export interface PersonalInfo {
   email: string;
   phone: string;
+  /** null, wenn keine hinterlegt ist; fehlt bei älteren Servern */
+  address?: Address | null;
 }
+
+/** Eigene Kontaktangaben (Meins → Konto) */
+export type OwnAccount = PersonalInfo;
 
 export interface CalendarEvent {
   id: string;
@@ -508,8 +516,10 @@ export interface MemberDetail extends MemberSummary {
   /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
   rank?: RankStatus;
   rank_history?: RankHistoryEntry[];
-  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
+  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage und view_personal; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** E-Mail-Adresse, Handynummer und Adresse (nur mit view_personal) */
+  personal?: PersonalInfo;
   /** Eintritt mit Anzeige (nur für create_users; null ohne Eintrag) */
   join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
@@ -614,6 +624,8 @@ export interface MemberImportRow {
   /** leer bei Ehemaligen (sie melden sich nicht an) */
   username?: string;
   email?: string;
+  phone?: string;
+  address?: Address | null;
   /** JJJJ-MM-TT oder MM-TT */
   birthday?: string;
   /** JJJJ-MM-TT oder JJJJ */
@@ -1416,6 +1428,8 @@ export interface PersonName {
 export interface NewPerson extends PersonName {
   username?: string;
   email?: string;
+  phone?: string;
+  address?: Address | null;
   initial_points?: number;
   initial_points_date?: string;
   rank_id?: number;
@@ -1429,7 +1443,7 @@ export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
-  /** Handynummer oder '' */
+  /** Handynummer oder '' (nur mit view_personal, sonst '') */
   phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
@@ -1665,10 +1679,13 @@ export const api = {
   },
   createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  /** Eigene E-Mail-Adresse und Handynummer; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+  /** Eigene E-Mail-Adresse, Handynummer und Adresse; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
   ownAccount: () => request<OwnAccount>('GET', '/me/account'),
-  updateOwnAccount: (data: { email: string; phone: string; current_password?: string }) =>
+  updateOwnAccount: (data: { email: string; phone: string; address: Address | null; current_password?: string }) =>
     request<OwnAccount>('PATCH', '/me/account', data),
+  /** Persönliche Angaben einer anderen Person ändern (manage_personal); was fehlt, bleibt. */
+  updatePersonal: (id: number, data: { email?: string; phone?: string; address?: Address | null; current_password?: string }) =>
+    request<PersonalInfo>('PUT', `/members/${id}/personal`, data),
   updateAccount: (
     id: number,
     data: Partial<PersonName> & { email?: string; phone?: string; username?: string; current_password?: string },
@@ -1688,6 +1705,8 @@ export const api = {
     data: PersonName & {
       username?: string;
       email?: string;
+      phone?: string;
+      address?: Address | null;
       level?: Level;
       initial_points?: number;
       initial_points_date?: string;

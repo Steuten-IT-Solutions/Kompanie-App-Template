@@ -5563,3 +5563,37 @@ button.spotlight-person:focus-visible {
     margin-inline: auto;
   }
 }
+
+/* Postanschrift (AddressFields): Straße und Nr., PLZ und Ort nebeneinander; Nr. und PLZ schmal */
+.address-fields .field {
+  margin-bottom: 8px;
+}
+.address-row {
+  display: flex;
+  gap: 8px;
+}
+.address-row > .field {
+  flex: 1;
+  min-width: 0;
+}
+.address-row > .address-house-number {
+  flex: 0 0 5.5em;
+}
+.address-row > .address-postal-code {
+  flex: 0 0 7em;
+}
+.address-lines {
+  margin: 0;
+  white-space: pre-line;
+}
+.address-fields {
+  margin: 0 0 12px;
+  min-width: 0;
+}
+.bulk-address {
+  margin: 0 0 12px;
+}
+.bulk-address summary {
+  cursor: pointer;
+  padding: 4px 0;
+}

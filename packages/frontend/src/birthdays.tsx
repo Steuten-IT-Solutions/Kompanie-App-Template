@@ -16,8 +16,13 @@ export { ownBirthday } from './viewData';
 
 const sec = brand.labels.sections;
 
-/** Das Datum anderer pflegen: wer Mitglieder anlegen darf. */
+/** Das Datum anderer ändern: wer persönliche Angaben pflegt (manage_personal). */
 export function canSetBirthdays(): boolean {
+  return !!config?.features.birthdays && can('manage_personal');
+}
+
+/** Das Datum beim Anlegen eintragen: wer Mitglieder anlegen darf (danach sieht es nur view_personal). */
+export function canEnterBirthdays(): boolean {
   return !!config?.features.birthdays && can('create_users');
 }
 

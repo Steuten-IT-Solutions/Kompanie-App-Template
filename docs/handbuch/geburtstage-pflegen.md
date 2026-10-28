@@ -1,10 +1,10 @@
 ---
 titel: Geburtstag eines Mitglieds
 reihenfolge: 73
-rechte: [create_users]
+rechte: [manage_personal]
 bereiche: [birthdays]
 ---
-Jedes Mitglied trägt seinen Geburtstag selbst unter **Meins → Konto** ein. Wer Mitglieder anlegen darf, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
+Jedes Mitglied trägt seinen Geburtstag selbst unter **Meins → Konto** ein. Wer das Recht **Persönliche Angaben pflegen** hat, kann das Datum auch für andere eintragen, ändern oder entfernen – etwa wenn jemand die App nicht nutzt oder um eine bestehende Liste zu übernehmen.
 
 ![Fenster Geburtstag auf der Seite eines Mitglieds](bild:geburtstage-pflegen)
 
@@ -31,9 +31,8 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe auf die Perso
 - Erlaubt sind nur echte Daten: der 29. Februar nur in einem Schaltjahr (oder ohne Jahr), Jahre ab 1900 und nichts in der Zukunft.
 - Ein neu eingetragener Geburtstag ist für andere {rolle.member} sichtbar, ohne Alter. Auf der Seite der Person unter **{bereich.directory}** sehen ihn angemeldete {rolle.member}, bis sie selbst etwas anderes wählt.
 - Geburtstage sieht, wessen Rolle das Recht dazu hat, anfangs die {rolle.member}. Von Personen, die noch nicht zur Kompanie gehören (z. B. Anwärtern), kannst du schon einen eintragen; er erscheint, sobald die Person als {rolle.member} aufgenommen ist.
-- Beim Anlegen neuer Mitglieder kannst du den Geburtstag gleich mit eintragen.
+- Beim Anlegen neuer Mitglieder kann, wer Mitglieder anlegen darf, den Geburtstag gleich mit eintragen. Das ganze Datum anderer sieht danach nur, wer **Persönliche Angaben sehen** darf.
 - Wird ein Konto gelöscht, ist auch der Geburtstag weg.
 
 ## Siehe auch
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)
-- [Mitglied anlegen](seite:mitglieder-anlegen)

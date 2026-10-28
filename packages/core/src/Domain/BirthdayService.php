@@ -160,7 +160,7 @@ final class BirthdayService
     }
 
     /**
-     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, create_users): nur Tag, Monat und Jahr; visible,
+     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, manage_personal): nur Tag, Monat und Jahr; visible,
      * show_age und profile bleiben, wie die Person sie gesetzt hat (mitgeschickte Schalter werden nicht übernommen).
      *
      * @param array<string, mixed> $in month, day, year
