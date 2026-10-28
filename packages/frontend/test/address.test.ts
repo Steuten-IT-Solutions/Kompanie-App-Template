@@ -7,6 +7,7 @@ import {
   addressProblems,
   EMPTY_ADDRESS,
   formatAddress,
+  navigationUrl,
   normalizeAddress,
   normalizePostalCode,
   OTHER_COUNTRY,
@@ -98,4 +99,16 @@ test('Anzeige wie auf einem Brief', () => {
     '1010 Wien',
     'Österreich',
   ]);
+});
+
+test('Route in der Karten-App: ohne Zusatz, mit Land', () => {
+  assert.equal(navigationUrl(null, false), null);
+  assert.equal(navigationUrl(EMPTY_ADDRESS, true), null);
+  const q = encodeURIComponent('Musterstraße 1, 12345 Musterstadt, Deutschland');
+  assert.equal(navigationUrl(a({ ...ok, extra: 'c/o Muster' }), false), `https://www.google.com/maps/dir/?api=1&destination=${q}`);
+  assert.equal(navigationUrl(a(ok), true), `https://maps.apple.com/?daddr=${q}`);
+  assert.equal(
+    navigationUrl(a({ ...ok, country: OTHER_COUNTRY, country_name: 'Norwegen', postal_code: '0150', city: 'Oslo' }), true),
+    `https://maps.apple.com/?daddr=${encodeURIComponent('Musterstraße 1, 0150 Oslo, Norwegen')}`,
+  );
 });

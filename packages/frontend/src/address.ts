@@ -196,6 +196,26 @@ export function formatAddress(a: Address | null | undefined): string[] {
   return lines;
 }
 
+/**
+ * Route zur Adresse in der Karten-App: auf Apple-Geräten Apple Karten (maps.apple.com, daddr), sonst Google Maps
+ * (Maps URLs, dir/?api=1); beide öffnen auf dem Handy die App, sonst die Website. Ohne Zusatz (c/o, Hinterhaus …), den
+ * die Suche nicht kennt, dafür immer mit dem Land. null ohne Adresse.
+ */
+export function navigationUrl(a: Address | null | undefined, apple: boolean): string | null {
+  if (!a || isEmptyAddress(a)) return null;
+  const land = a.country === OTHER_COUNTRY ? a.country_name : (country(a.country)?.name ?? a.country);
+  const target = encodeURIComponent(
+    [line(`${a.street} ${a.house_number}`), line(`${a.postal_code} ${a.city}`), land].filter(Boolean).join(', '),
+  );
+  return apple ? `https://maps.apple.com/?daddr=${target}` : `https://www.google.com/maps/dir/?api=1&destination=${target}`;
+}
+
+/** iPhone, iPad (gibt sich als Mac mit Touch aus) oder Mac: Dort ist Apple Karten die Karten-App. */
+export function isAppleDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+}
+
 /** Für die Anfrage: null, wenn keine Adresse eingetragen ist. */
 export function addressInput(a: Address | null | undefined): Address | null {
   return !a || isEmptyAddress(a) ? null : normalizeAddress(a);
