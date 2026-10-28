@@ -196,6 +196,32 @@ export function formatAddress(a: Address | null | undefined): string[] {
   return lines;
 }
 
+/** Gerät für mapUrl: Android (App-Auswahl), Apple (Apple Karten) oder sonst (Google Maps im Browser) */
+export type MapPlatform = 'android' | 'apple' | 'other';
+
+/**
+ * Adresse in der Karten-App zeigen (nur den Ort, keine Route): auf Android als geo:-Link, dann bietet Android alle
+ * Karten-Apps zur Auswahl an (Google Maps, Waze, OsmAnd …); auf Apple-Geräten Apple Karten (maps.apple.com, q), sonst
+ * Google Maps (Maps URLs, search/?api=1). Ohne Zusatz (c/o, Hinterhaus …), den die Suche nicht kennt, dafür immer mit
+ * dem Land. null ohne Adresse.
+ */
+export function mapUrl(a: Address | null | undefined, platform: MapPlatform): string | null {
+  if (!a || isEmptyAddress(a)) return null;
+  const land = a.country === OTHER_COUNTRY ? a.country_name : (country(a.country)?.name ?? a.country);
+  const target = encodeURIComponent(
+    [line(`${a.street} ${a.house_number}`), line(`${a.postal_code} ${a.city}`), land].filter(Boolean).join(', '),
+  );
+  if (platform === 'android') return `geo:0,0?q=${target}`;
+  return platform === 'apple' ? `https://maps.apple.com/?q=${target}` : `https://www.google.com/maps/search/?api=1&query=${target}`;
+}
+
+/** Android; iPhone, iPad (gibt sich als Mac mit Touch aus) oder Mac; sonst (PC) */
+export function mapPlatform(): MapPlatform {
+  if (typeof navigator === 'undefined') return 'other';
+  if (/Android/.test(navigator.userAgent)) return 'android';
+  return /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? 'apple' : 'other';
+}
+
 /** Für die Anfrage: null, wenn keine Adresse eingetragen ist. */
 export function addressInput(a: Address | null | undefined): Address | null {
   return !a || isEmptyAddress(a) ? null : normalizeAddress(a);

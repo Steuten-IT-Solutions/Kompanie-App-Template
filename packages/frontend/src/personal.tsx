@@ -1,25 +1,29 @@
 import { useState, type FormEvent } from 'react';
 import { api, can, type PersonalInfo } from './api';
-import { addressInput, EMPTY_ADDRESS, formatAddress } from './address';
+import { addressInput, EMPTY_ADDRESS, formatAddress, mapPlatform, mapUrl } from './address';
 import { normalizeEmail } from './email';
 import { normalizePhone } from './phone';
 import { AddressFields, EmailField, PhoneField } from './ui';
 
 /**
- * Mitgliedsdetails → Persönliche Angaben: E-Mail-Adresse, Handynummer und Adresse der Person. Sehen mit view_personal
- * (sonst schickt der Server sie nicht), ändern mit manage_personal; das Geburtsdatum steht bei den Daten darüber. Eine
- * neue eigene E-Mail-Adresse nur mit dem aktuellen Passwort (wie unter Meins → Konto).
+ * Mitgliedsdetails → Persönliche Angaben: E-Mail-Adresse, Handynummer und Adresse der Person (Antippen: Ort in der Karten-App). Sehen mit view_personal
+ * (sonst schickt der Server sie nicht), ändern mit manage_personal. Mit birthday steht oben der Geburtstag; Antippen
+ * öffnet sein eigenes Fenster (Sichtbarkeit und Alter stellt nur die Person selbst ein). Eine neue eigene E-Mail-Adresse
+ * nur mit dem aktuellen Passwort (wie unter Meins → Konto).
  */
 export function PersonalPanel({
   id,
   personal,
   self,
+  birthday,
   onChanged,
   onToast,
 }: {
   id: number;
   personal: PersonalInfo;
   self: boolean;
+  /** Geburtstag wie angezeigt (null ohne Eintrag) und was Antippen öffnet; fehlt, wenn er hier nicht steht */
+  birthday?: { text: string | null; onOpen: () => void };
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -33,6 +37,7 @@ export function PersonalPanel({
   const emailChanged = editing !== null && start !== null && normalizeEmail(editing.email).toLowerCase() !== start.email.toLowerCase();
   const ownEmailChanged = self && emailChanged;
   const lines = formatAddress(personal.address);
+  const map = mapUrl(personal.address, mapPlatform());
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +105,16 @@ export function PersonalPanel({
       ) : (
         <div className="card account-card">
           <dl className="contact-list">
+            {birthday && (
+              <>
+                <dt>Geburtstag</dt>
+                <dd>
+                  <button type="button" className="link-button" onClick={birthday.onOpen}>
+                    {birthday.text ?? 'nicht hinterlegt'}
+                  </button>
+                </dd>
+              </>
+            )}
             <dt>E-Mail-Adresse</dt>
             <dd>
               {personal.email ? <a href={`mailto:${personal.email}`}>{personal.email}</a> : <span className="muted">nicht hinterlegt</span>}
@@ -113,7 +128,16 @@ export function PersonalPanel({
               )}
             </dd>
             <dt>Adresse</dt>
-            <dd className="address-lines">{lines.length > 0 ? lines.join('\n') : <span className="muted">nicht hinterlegt</span>}</dd>
+            {/* Antippen: der Ort in der Karten-App; geo: nicht in einem neuen Tab, der bliebe leer zurück */}
+            <dd className="address-lines">
+              {map ? (
+                <a href={map} {...(map.startsWith('https:') ? { target: '_blank', rel: 'noreferrer' } : {})}>
+                  {lines.join('\n')}
+                </a>
+              ) : (
+                <span className="muted">nicht hinterlegt</span>
+              )}
+            </dd>
           </dl>
           {can('manage_personal') && (
             <button
