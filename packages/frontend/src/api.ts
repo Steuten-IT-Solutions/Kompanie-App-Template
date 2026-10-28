@@ -1301,7 +1301,24 @@ export interface OfficeImportResult {
 }
 
 /** Listen (Issue #121): Datenspalten; nr zählt die Zeilen. */
-export type ListField = 'nr' | 'name' | 'first_name' | 'last_name' | 'role' | 'rank' | 'titles' | 'birthday' | 'points' | 'penalties';
+export type ListField =
+  | 'nr'
+  | 'name'
+  | 'first_name'
+  | 'last_name'
+  | 'role'
+  | 'rank'
+  | 'titles'
+  | 'birthday'
+  | 'address'
+  | 'street'
+  | 'postal_code'
+  | 'city'
+  | 'country'
+  | 'phone'
+  | 'email'
+  | 'points'
+  | 'penalties';
 export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
 
 export interface ListColumn {
@@ -1327,6 +1344,16 @@ export interface ListValues {
   titles?: string[];
   /** „TT.MM.“ oder null (nicht freigegeben) */
   birthday?: string | null;
+  /** Persönliche Angaben (nur mit view_personal); null ohne Eintrag. address: die ganze Adresse in einer Zeile */
+  address?: string | null;
+  /** Straße mit Hausnummer */
+  street?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  /** Name des Landes, auch Deutschland */
+  country?: string | null;
+  phone?: string | null;
+  email?: string | null;
   points?: number;
   /** Offene Strafen in Cent */
   penalties?: number;

@@ -633,9 +633,15 @@ final class App
             $this->cache,
             $this->roles(),
             fn (User $user): ?string => $this->formerMembers()->previousRole($user),
-            new MemberContactRepository($this->db),
+            $this->memberContacts(),
             $this->time(),
         ));
+    }
+
+    /** Handynummer und Adresse der Konten (MemberService, Listen) */
+    public function memberContacts(): MemberContactRepository
+    {
+        return $this->service(MemberContactRepository::class, fn () => new MemberContactRepository($this->db));
     }
 
     public function formerMembers(): FormerMemberService

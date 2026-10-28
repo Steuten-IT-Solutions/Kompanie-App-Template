@@ -22,7 +22,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.lists}**. Tippe bei einer Li
 ## So gehst du vor
 ### Spalten einrichten
 Es gibt zwei Arten von Spalten:
-- **Datenspalten** füllt die App mit den Angaben der Mitglieder: Nr. (zählt die Zeilen), Name, Vorname, Nachname, Rolle, {begriff.rank}, {bereich.titles}, Geburtstag, {bereich.points} und {bereich.penalties} (offen).
+- **Datenspalten** füllt die App mit den Angaben der Mitglieder: Nr. (zählt die Zeilen), Name, Vorname, Nachname, Rolle, {begriff.rank}, {bereich.titles}, Geburtstag, Adresse (die ganze Anschrift in einer Spalte), Straße und Nr., PLZ, Ort, Land, Handynummer, E-Mail, {bereich.points} und {bereich.penalties} (offen).
 - **Leere Spalten** bleiben zum Ausfüllen auf Papier, z. B. „Bezahlt“ oder „Größe“.
 
 1. Wähle unter **Datenspalte** die Angabe und tippe auf **+ Datenspalte**. Für eine Spalte zum Ausfüllen tippe auf **+ Leere Spalte**.
@@ -59,7 +59,8 @@ Zeilen verschiebst du am Griff links. **✕** entfernt eine Zeile. **Nach Namen 
 - **Mitglieder aktualisieren** legt für jedes {rolle.member} eine Zeile an, das noch keine hat. Es löscht die Zeilen von Konten, die es nicht mehr gibt oder die kein {rolle.member} mehr sind. {rolle.guest}, Ehemalige und Rollen, die nicht zur Kompanie gehören (z. B. Anwärter), kommen nicht in die Liste. Neue Mitglieder ordnet die App nach dem Nachnamen zwischen die vorhandenen ein.
 - Eigene Zeilen bleiben beim Aktualisieren stehen. Entfernst du die Zeile eines Mitglieds, legt das nächste **Mitglieder aktualisieren** sie wieder an.
 - Wird ein Konto gelöscht, bleibt seine Zeile ohne Namen stehen, bis du die Liste aktualisierst. Die App weist darauf hin.
-- Zur Auswahl stehen nur Datenspalten, deren Bereich eingeschaltet ist und deren Angaben du in der App ohnehin sehen darfst. Die Rolle siehst du z. B. nur, wenn du die Mitgliederliste der Verwaltung siehst, {bereich.points} nur, wenn du sie vergeben darfst. Geburtstage stehen nur in der Liste, wenn die Person sie für andere freigegeben hat, und nur mit Tag und Monat.
+- Zur Auswahl stehen nur Datenspalten, deren Bereich eingeschaltet ist und deren Angaben du in der App ohnehin sehen darfst. Die Rolle siehst du z. B. nur, wenn du die Mitgliederliste der Verwaltung siehst, {bereich.points} nur, wenn du sie vergeben darfst. Geburtstage stehen nur in der Liste, wenn die Person sie für andere freigegeben hat, und nur mit Tag und Monat. Adresse, Handynummer und E-Mail siehst du nur mit dem Recht **Persönliche Angaben sehen**.
+- Für Serienbriefe oder Adressetiketten nimmst du statt **Adresse** die einzelnen Spalten **Straße und Nr.**, **PLZ**, **Ort** und **Land** und lädst die Liste als CSV herunter; jede Angabe steht dann in einer eigenen Spalte. Die Handynummer steht in der CSV mit 00 statt + (z. B. 0049 171 1234567), damit Excel sie unverändert übernimmt.
 - Öffnet jemand die Liste, der eine Datenspalte nicht sehen darf, bleibt sie für ihn leer, auch im Ausdruck und in der Datei.
 - Eine Liste hat höchstens 20 Spalten und 500 Zeilen.
 - Hat jemand anderes die Liste inzwischen geändert, speichert die App nicht, sondern meldet das. Lade die Liste dann neu und trage deine Änderungen noch einmal ein.

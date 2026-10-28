@@ -1,7 +1,7 @@
 // Listen (src/lists.ts, Issue #121): CSV für ein deutsches Excel, Schutz vor CSV-Injection, Dateiname.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { columnWidths, csvField, csvFileName, toCsv } from '../src/lists.ts';
+import { columnWidths, csvField, csvFileName, csvPhone, toCsv } from '../src/lists.ts';
 
 const BOM = String.fromCharCode(0xfeff);
 
@@ -47,4 +47,12 @@ test('Spaltenbreiten: nach Anteil, Namen mindestens so breit wie verlangt, sonst
   // Passt nicht: nach Anteil
   assert.deepEqual(columnWidths([1, 1], [300, 300], 400), [200, 200]);
   assert.deepEqual(columnWidths([], [], 400), []);
+});
+
+test('Handynummer in der CSV mit 00 statt +, damit Excel kein Apostroph zeigt', () => {
+  assert.equal(csvPhone('+49 171 1234567'), '0049 171 1234567');
+  assert.equal(csvField(csvPhone('+49 171 1234567')), '0049 171 1234567');
+  assert.equal(csvPhone('+12125550100'), '+12125550100', 'ohne Leerzeichen läse Excel eine Zahl ohne führende Nullen');
+  assert.equal(csvPhone('0171 1234567'), '0171 1234567');
+  assert.equal(csvPhone('+=1'), '+=1');
 });
