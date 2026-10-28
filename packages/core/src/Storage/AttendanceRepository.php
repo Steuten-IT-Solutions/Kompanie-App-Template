@@ -191,11 +191,6 @@ final class AttendanceRepository
         )));
     }
 
-    public function deleteForUser(int $userId): void
-    {
-        $this->db->execute('DELETE FROM {attendance_entries} WHERE user_id = ?', [$userId]);
-    }
-
     /**
      * @param array<string, mixed> $r
      * @return AttendanceList

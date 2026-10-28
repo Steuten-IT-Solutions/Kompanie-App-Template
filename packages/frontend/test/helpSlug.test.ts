@@ -57,7 +57,6 @@ function sees(slug: string, ctx: HelpContext): boolean {
 const PATHS = [
   ['termine'],
   ['termine', 'verwalten'],
-  ['termine', 'geburtstage'],
   ['news'],
   ['news', 'abc'],
   ['galerie'],
@@ -135,6 +134,7 @@ const PATHS = [
     'galerie',
     'news',
     'benachrichtigungen',
+    'geburtstage',
     'email',
     'zustand',
     'wartung',

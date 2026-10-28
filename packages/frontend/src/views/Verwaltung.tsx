@@ -1118,7 +1118,7 @@ function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: bool
 /**
  * Wer Rollen vergeben darf, legt hier die Grundrolle und die Zusatzrollen fest (Issue #66): genau eine Grundrolle,
  * dazu beliebig viele eigene Rollen zum Ankreuzen; die Rechte sind die aller Rollen zusammen. Zusatzrollen gibt es nur
- * zu einer Grundrolle mit Mitgliederbereich und nicht für Admins.
+ * zu einer Grundrolle mit „Gehört zur Kompanie“ und nicht für Admins.
  */
 function RoleControl({
   id,

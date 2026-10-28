@@ -4616,7 +4616,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await card.scrollIntoViewIfNeeded();
   await shot(member, '36-geburtstag-konto');
 
-  // Ein anderes Mitglied sieht ihn oben unter Termine, mit Alter; „Alle Geburtstage“ zeigt die ganze Liste.
+  // Ein anderes Mitglied sieht ihn oben unter Termine, mit Alter; eine Liste aller Geburtstage gibt es nicht.
   await login(page, 'mitglied2');
   await page.goto('/app/#/termine');
   const upcoming = page.locator('.birthdays-upcoming');
@@ -4626,9 +4626,24 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await expect(entry).toContainText('wird 30');
   await expect(entry).not.toContainText(String(in3.getFullYear() - 30));
   await shot(page, '35-geburtstage');
-  await upcoming.getByRole('button', { name: 'Alle Geburtstage' }).click();
-  await expect(page).toHaveURL(/#\/termine\/geburtstage$/);
-  await expect(page.locator('.birthdays-page .birthday-item', { hasText: 'Mitglied1' })).toBeVisible();
+  await expect(upcoming.getByRole('button', { name: 'Alle Geburtstage' })).toHaveCount(0);
+
+  // Admins stellen den Vorlauf ein: 1 Tag vorher → der Geburtstag in drei Tagen steht (noch) nicht drin.
+  const admin = await browser.newPage();
+  await login(admin, 'admin', ADMIN_PASSWORD);
+  await admin.goto('/app/#/einstellungen/geburtstage');
+  const days = admin.getByLabel('Anstehende Geburtstage anzeigen');
+  await expect(days).toHaveValue('7');
+  await days.selectOption('1');
+  await expect(admin.locator('.toast')).toHaveText('Gespeichert');
+  await page.reload();
+  await expect(page.getByText('Vereinsabend')).toBeVisible();
+  await expect(page.locator('.birthday-item', { hasText: 'Mitglied1' })).toHaveCount(0);
+  await days.selectOption('7');
+  await expect(admin.locator('.toast').last()).toHaveText('Gespeichert');
+  await admin.close();
+  await page.reload();
+  await expect(page.locator('.birthday-item', { hasText: 'Mitglied1' })).toBeVisible();
 
   // „Anderen Mitgliedern zeigen“ aus: verschwindet.
   await card.getByLabel('Anderen Mitgliedern zeigen').uncheck();

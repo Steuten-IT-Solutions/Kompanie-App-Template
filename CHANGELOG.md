@@ -27,12 +27,20 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Beim Anlegen alles eintragen**: Beim Anlegen einzelner und mehrerer Mitglieder und beim Import lassen sich jetzt
   auch Handynummer und Adresse eintragen (im Import mit den Spalten Handynummer, Straße, Hausnummer, Adresszusatz, PLZ,
   Ort und Land).
+- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
+  Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
+  Tage vorher, anfangs wie bisher 7 Tage).
 
 ### Geändert
 
 - Handynummer und Geburtsdatum anderer sieht und ändert nicht mehr jeder, der Mitglieder anlegen darf, sondern nur,
   wer die neuen Rechte für persönliche Angaben hat. Rollen, die bisher „Mitglieder anlegen“ hatten, bekommen beide
   Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter *Einstellungen → Rollen* weg.
+
+### Entfernt
+
+- **Liste aller Geburtstage**: Die Seite „Alle Geburtstage“ gibt es nicht mehr. Die Karte „Anstehende Geburtstage“ bei
+  den Terminen bleibt; die Benachrichtigung am Geburtstag öffnet jetzt die Termine.
 
 ## [0.4.0] – 2026-10-27
 
