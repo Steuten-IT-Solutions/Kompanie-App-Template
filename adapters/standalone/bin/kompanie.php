@@ -108,24 +108,19 @@ try {
                 if (!$kernel->app()->backupEncryption()->configured()) {
                     throw new RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (Einstellungen → Datensicherung).');
                 }
-                $plain = tmpfile();
-                $target = @fopen($out, 'wb');
-                if ($plain === false || $target === false) {
-                    throw new RuntimeException("$out lässt sich nicht schreiben (Ordner vorhanden, Schreibrechte?).");
-                }
-                @chmod($out, 0600);
+                // Erst ganz erzeugen (temporär im Datenbereich), dann unter neuem Namen daneben schreiben und umbenennen:
+                // Scheitert etwas, bleibt eine vorhandene Datei unter --out unverändert, und es entsteht keine halbe.
+                $file = $kernel->app()->backupEncryption()->exportToTempFile(new StandaloneBackup($kernel));
+                $part = $out . '.' . bin2hex(random_bytes(4)) . '.part';
                 try {
-                    (new StandaloneBackup($kernel))->exportTo($plain);
-                    rewind($plain);
-                    $kernel->app()->backupEncryption()->encryptStream($plain, $target);
-                } catch (Throwable $e) {
-                    // Keine halbe Datei liegen lassen, die wie eine Sicherung aussieht.
-                    fclose($target);
-                    @unlink($out);
-                    throw $e;
+                    $copied = @copy($file, $part);
+                    @chmod($part, 0600);
+                    if (!$copied || !@rename($part, $out)) {
+                        throw new RuntimeException("$out lässt sich nicht schreiben (Ordner vorhanden, Schreibrechte?).");
+                    }
                 } finally {
-                    fclose($plain);
-                    is_resource($target) && fclose($target);
+                    @unlink($file);
+                    @unlink($part);
                 }
                 fwrite(STDERR, "Verschlüsselt gesichert in $out (wiederherstellen nur mit dem Passwort für Sicherungen).\n");
                 break;

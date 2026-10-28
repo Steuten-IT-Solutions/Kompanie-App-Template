@@ -354,7 +354,6 @@ final class Api
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
     }
 
-    /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     /** Auskunft als Datei (meine-daten-… bzw. daten-<id>-…), nie zwischengespeichert. */
     private function personalData(int $userId): Response
     {
@@ -365,6 +364,7 @@ final class Api
         return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
     }
 
+    /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showTitles(): bool
     {
         return $this->app->features()->enabled('titles') && $this->can(Cap::ManageTitles);

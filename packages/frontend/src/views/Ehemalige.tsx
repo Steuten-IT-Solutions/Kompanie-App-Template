@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   api,
   can,
+  config,
   levelLabel,
   type FormerRetention,
   type CreatedFormer,
@@ -248,6 +249,8 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
         Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App Ehemalige so
         viele Jahre nach dem Ausscheiden endgültig, mit allen Daten (wie „Konto löschen“); Amtszeiten bleiben als Chronik mit dem Namen
         stehen. Ohne Datum des Ausscheidens zählt der Tag des Eintragens. Leer oder 0: aus.
+        {config?.variant === 'wordpress' &&
+          ' Der Benutzer der Webseite (Name, E-Mail-Adresse) bleibt in WordPress; ihn löscht ein Administrator der Webseite unter Benutzer.'}
       </p>
       <label className="field">
         <span>Jahre nach dem Ausscheiden</span>

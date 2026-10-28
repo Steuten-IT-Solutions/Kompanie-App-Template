@@ -83,6 +83,13 @@ final class BackupCryptoTest extends TestCase
         BackupCrypto::decryptToString($bad, self::PASS);
     }
 
+    /** Fehler beim Verschlüsseln kommen als RuntimeException (Aufrufer vor einem Update fangen nur diese). */
+    public function testErrorsAreRuntimeExceptions(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        self::encrypt('{}', ['kompanie' => "kaputt \xB1\x31"]); // kein gültiges UTF-8: json_encode wirft JsonException
+    }
+
     public function testMatchesAndFingerprint(): void
     {
         $this->assertTrue(BackupCrypto::matches(self::$key, self::PASS));

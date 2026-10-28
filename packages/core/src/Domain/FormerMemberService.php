@@ -486,9 +486,15 @@ final class FormerMemberService
             return $config + ['due' => [], 'soon' => []];
         }
         $today = $this->app->time()->today();
-        $due = $this->expired($config, $today);
-        $dueIds = array_column($due, 'id');
-        $soon = array_values(array_filter($this->expired($config, $today->modify('+30 days')), static fn (array $p): bool => !in_array($p['id'], $dueIds, true)));
+        $in30 = $today->modify('+30 days');
+        $due = $soon = [];
+        foreach ($this->candidates($config) as $p) {
+            if ($p['expires'] <= $today) {
+                $due[] = ['id' => $p['id'], 'name' => $p['name'], 'left_on' => $p['left_on']];
+            } elseif ($p['expires'] <= $in30) {
+                $soon[] = ['id' => $p['id'], 'name' => $p['name'], 'left_on' => $p['left_on']];
+            }
+        }
         return $config + ['due' => $due, 'soon' => $soon];
     }
 
@@ -529,7 +535,11 @@ final class FormerMemberService
             return 0;
         }
         $deleted = 0;
-        foreach ($this->expired($config, $this->app->time()->today()) as $person) {
+        $today = $this->app->time()->today();
+        foreach ($this->candidates($config) as $person) {
+            if ($person['expires'] > $today) {
+                continue;
+            }
             try {
                 $this->app->users->removeAccount($person['id']);
             } catch (\DomainException) {
@@ -547,13 +557,14 @@ final class FormerMemberService
     }
 
     /**
-     * Ehemalige, deren Frist an $day abgelaufen ist.
+     * Ehemalige, für die die Frist gilt, mit dem Tag, an dem sie abläuft (expires), nach Namen.
      *
      * @param array{years: int, include_founders: bool, include_deceased: bool} $config
-     * @return list<array{id: int, name: string, left_on: string}>
+     * @return list<array{id: int, name: string, left_on: string, expires: \DateTimeImmutable}>
      */
-    private function expired(array $config, \DateTimeImmutable $day): array
+    private function candidates(array $config): array
     {
+        $tz = $this->app->time()->today()->getTimezone();
         $rows = $this->all();
         $users = $this->app->users->findMany(array_keys($rows));
         $out = [];
@@ -569,9 +580,9 @@ final class FormerMemberService
                 4 => $row['left_on'] . '-12-31',
                 default => substr((string) $row['created_at'], 0, 10),
             };
-            $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $left, $day->getTimezone());
-            if ($until !== false && $until->modify('+' . $config['years'] . ' years') <= $day) {
-                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on']];
+            $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $left, $tz);
+            if ($until !== false) {
+                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $until->modify('+' . $config['years'] . ' years')];
             }
         }
         usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));

@@ -129,27 +129,16 @@ final class BackupUploadService implements OffsiteBackup
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
-        $tmp = $this->app->files->tempFile();
         $encrypted = null;
         try {
-            // Erst Stück für Stück in eine temporäre Datei, dann in Stücken hochladen: Die Sicherung muss nie ganz in
-            // den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als memory_limit).
-            $out = @fopen($tmp, 'wb');
-            if ($out === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
-            }
-            try {
-                $backup->exportTo($out);
-            } finally {
-                fclose($out);
-            }
-            $encrypted = $this->app->backupEncryption()->encryptFile($tmp);
+            // Erst Stück für Stück in eine temporäre Datei (verschlüsselt), dann in Stücken hochladen: Die Sicherung muss
+            // nie ganz in den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als memory_limit).
+            $encrypted = $this->app->backupEncryption()->exportToTempFile($backup);
             $this->store($encrypted, self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
         } catch (\Throwable $e) {
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
-            @unlink($tmp);
             $encrypted !== null && @unlink($encrypted);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }

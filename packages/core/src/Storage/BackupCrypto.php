@@ -131,6 +131,9 @@ final class BackupCrypto
             // Abschluss immer als eigener, leerer Block: So muss beim Lesen niemand vorausschauen.
             $cipher = sodium_crypto_secretstream_xchacha20poly1305_push($state, '', $ad, SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL);
             self::write($out, pack('N', strlen($cipher)) . $cipher);
+        } catch (\JsonException | \SodiumException $e) {
+            // Als RuntimeException wie alle Fehler beim Sichern (Aufrufer fangen nur diese, z. B. vor einem Update).
+            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $e->getMessage(), 0, $e);
         } finally {
             sodium_memzero($fileKey);
         }

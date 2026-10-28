@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\BackupCrypto;
 
 /**
@@ -96,41 +97,31 @@ final class BackupEncryptionService
     }
 
     /**
-     * Hochgeladene Sicherung: verschlüsselt → mit dem Passwort entschlüsseln, sonst unverändert (ältere Sicherungen).
+     * Hochgeladene Sicherung als Text: verschlüsselt → mit dem Passwort entschlüsseln, sonst unverändert (ältere
+     * Sicherungen).
      *
-     * @throws ApiError 400 passphrase_required, wenn das Passwort fehlt; 400 bei falschem Passwort
+     * @throws ApiError 400 passphrase_required, wenn das Passwort fehlt; 400 bei falschem Passwort; 429 nach zu vielen
      */
     public function decryptUpload(string $data, mixed $passphrase): string
     {
         if (!BackupCrypto::isEncrypted($data)) {
             return $data;
         }
-        if (!is_string($passphrase) || $passphrase === '') {
-            throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
-        }
-        $this->throttle();
-        try {
-            return BackupCrypto::decryptToString($data, $passphrase);
-        } catch (\RuntimeException $e) {
-            $this->failed();
-            throw ApiError::invalid($e->getMessage());
-        }
+        return $this->withTemp(function ($in) use ($data, $passphrase): string {
+            fwrite($in, $data);
+            return $this->decryptFrom($in, $passphrase);
+        });
     }
 
     /**
-     * Hochgeladene Datei als Base64 (POST /admin/backup, backup_base64): Stück für Stück über temporäre Dateien
+     * Hochgeladene Datei als Base64 (POST /admin/backup, backup_base64): Stück für Stück über eine temporäre Datei
      * dekodieren und entschlüsseln, damit neben dem Inhalt der Anfrage nur der Klartext im Arbeitsspeicher liegt.
      *
      * @throws ApiError wie decryptUpload()
      */
     public function readUpload(string $base64, mixed $passphrase): string
     {
-        $in = fopen('php://temp', 'w+b');
-        $out = fopen('php://temp', 'w+b');
-        if ($in === false || $out === false) {
-            throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
-        }
-        try {
+        return $this->withTemp(function ($in) use ($base64, $passphrase): string {
             $filter = stream_filter_append($in, 'convert.base64-decode', STREAM_FILTER_WRITE);
             for ($pos = 0, $len = strlen($base64); $pos < $len; $pos += 1048576) {
                 fwrite($in, substr($base64, $pos, 1048576));
@@ -143,22 +134,77 @@ final class BackupEncryptionService
                 rewind($in);
                 return (string) stream_get_contents($in); // unverschlüsselte Sicherung
             }
-            rewind($in);
-            if (!is_string($passphrase) || $passphrase === '') {
-                throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
-            }
-            $this->throttle();
-            try {
-                BackupCrypto::decryptStream($in, $out, $passphrase);
-            } catch (\RuntimeException $e) {
-                $this->failed();
-                throw ApiError::invalid($e->getMessage());
-            }
-            rewind($out);
-            return (string) stream_get_contents($out);
+            return $this->decryptFrom($in, $passphrase);
+        });
+    }
+
+    /**
+     * @param \Closure(resource): string $fn
+     */
+    private function withTemp(\Closure $fn): string
+    {
+        $in = fopen('php://temp', 'w+b');
+        if ($in === false) {
+            throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
+        }
+        try {
+            return $fn($in);
         } finally {
             fclose($in);
+        }
+    }
+
+    /**
+     * Verschlüsselte Sicherung aus $in mit dem Passwort entschlüsseln: Passwort nötig, Drossel, Fehlversuche zählen.
+     *
+     * @param resource $in
+     */
+    private function decryptFrom($in, mixed $passphrase): string
+    {
+        if (!is_string($passphrase) || $passphrase === '') {
+            throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
+        }
+        $this->throttle();
+        $out = fopen('php://temp', 'w+b');
+        if ($out === false) {
+            throw ApiError::invalid('Die Sicherung ließ sich nicht entschlüsseln.');
+        }
+        try {
+            rewind($in);
+            BackupCrypto::decryptStream($in, $out, $passphrase);
+            rewind($out);
+            return (string) stream_get_contents($out);
+        } catch (\RuntimeException $e) {
+            $this->failed();
+            throw ApiError::invalid($e->getMessage());
+        } finally {
             fclose($out);
+        }
+    }
+
+    /**
+     * Ganze Sicherung verschlüsselt in eine temporäre Datei (im Datenbereich der App, nicht im /tmp des Servers): erst
+     * der Klartext Stück für Stück, dann verschlüsselt, der Klartext gleich wieder gelöscht. Der Aufrufer löscht die
+     * Datei. Schlägt etwas fehl, bleibt nichts liegen.
+     *
+     * @return string Pfad der verschlüsselten Datei
+     */
+    public function exportToTempFile(BackupProvider $backup): string
+    {
+        $plain = $this->app->files->tempFile();
+        try {
+            $out = @fopen($plain, 'wb');
+            if ($out === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
+            }
+            try {
+                $backup->exportTo($out);
+            } finally {
+                fclose($out);
+            }
+            return $this->encryptFile($plain);
+        } finally {
+            @unlink($plain);
         }
     }
 

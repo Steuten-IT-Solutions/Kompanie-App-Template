@@ -49,28 +49,33 @@ final class BackupDownload
         $now = $this->app->time()->timestamp();
         $name = 'sicherung-' . $this->app->time()->format($now, 'Y-m-d') . ($encrypted ? BackupCrypto::EXTENSION : '.json');
         if ($encrypted) {
+            // Erst ganz erzeugen, dann senden: Scheitert das Sichern, kommt ein Fehler statt einer abgeschnittenen Datei,
+            // die der Browser als fertige Sicherung speichert.
+            try {
+                $file = $this->app->backupEncryption()->exportToTempFile($backup);
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: verschlüsselte Sicherung nicht erstellt: ' . $e->getMessage());
+                return $deny(500);
+            }
             return ['status' => 200, 'headers' => [
                 'Content-Type' => 'application/octet-stream',
                 'Content-Disposition' => 'attachment; filename="' . $name . '"',
                 'Cache-Control' => 'no-store',
                 'X-Content-Type-Options' => 'nosniff',
                 'X-Robots-Tag' => 'noindex',
-            ], 'write' => function ($out) use ($backup, $now): void {
-                $tmp = $this->app->files->tempFile();
+            ], 'write' => function ($out) use ($file, $now): void {
                 try {
-                    $plain = @fopen($tmp, 'w+b');
-                    if ($plain === false) {
-                        throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
+                    $in = fopen($file, 'rb');
+                    if ($in === false) {
+                        throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht lesen.');
                     }
                     try {
-                        $backup->exportTo($plain);
-                        rewind($plain);
-                        $this->app->backupEncryption()->encryptStream($plain, $out);
+                        stream_copy_to_stream($in, $out);
                     } finally {
-                        fclose($plain);
+                        fclose($in);
                     }
                 } finally {
-                    @unlink($tmp);
+                    @unlink($file);
                 }
                 $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
             }];
