@@ -873,6 +873,8 @@ test('Konten: das eigene Konto in der Verwaltung ändern, ohne Löschen', async 
   if (email !== 'chef-neu@example.org') await form.getByLabel(/Aktuelles Passwort/).fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Speichern', exact: true }).click();
   await expect(form).toHaveCount(0);
+  // Erst die neu geladenen Angaben abwarten (E-Mail wieder wie vorher).
+  if (email !== 'chef-neu@example.org') await expect(personal).not.toContainText('chef-neu@example.org');
   await personal.getByRole('button', { name: 'Ändern' }).click();
   await personal.getByLabel('Handynummer (optional)').fill('');
   for (const field of ['Straße', 'Nr.', 'PLZ', 'Ort']) await personal.getByLabel(field, { exact: true }).fill('');

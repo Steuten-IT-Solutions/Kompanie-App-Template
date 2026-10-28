@@ -24,10 +24,14 @@ export function PersonalPanel({
   onToast: (msg: string) => void;
 }) {
   const [editing, setEditing] = useState<PersonalInfo | null>(null);
+  // Stand beim Öffnen: Gespeichert wird nur, was sich daran geändert hat. Sonst schriebe ein Formular, das noch vor dem
+  // Neuladen der Seite geöffnet wurde, ältere Werte zurück.
+  const [start, setStart] = useState<PersonalInfo | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const ownEmailChanged = self && editing !== null && normalizeEmail(editing.email).toLowerCase() !== personal.email.toLowerCase();
+  const emailChanged = editing !== null && start !== null && normalizeEmail(editing.email).toLowerCase() !== start.email.toLowerCase();
+  const ownEmailChanged = self && emailChanged;
   const lines = formatAddress(personal.address);
 
   async function save(e: FormEvent) {
@@ -35,15 +39,19 @@ export function PersonalPanel({
     if (!editing) return;
     setFormError(null);
     if (ownEmailChanged && !password) return setFormError('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+    const phone = normalizePhone(editing.phone);
+    const address = addressInput(editing.address);
+    const before = start ?? personal;
     setBusy(true);
     try {
       await api.updatePersonal(id, {
-        email: normalizeEmail(editing.email),
-        phone: normalizePhone(editing.phone),
-        address: addressInput(editing.address),
+        ...(emailChanged ? { email: normalizeEmail(editing.email) } : {}),
+        ...(phone !== normalizePhone(before.phone) ? { phone } : {}),
+        ...(JSON.stringify(address) !== JSON.stringify(addressInput(before.address)) ? { address } : {}),
         ...(ownEmailChanged ? { current_password: password } : {}),
       });
       setEditing(null);
+      setStart(null);
       setPassword('');
       onToast('Gespeichert');
       onChanged();
@@ -56,6 +64,7 @@ export function PersonalPanel({
 
   function cancel() {
     setEditing(null);
+    setStart(null);
     setPassword('');
     setFormError(null);
   }
@@ -107,7 +116,13 @@ export function PersonalPanel({
             <dd className="address-lines">{lines.length > 0 ? lines.join('\n') : <span className="muted">nicht hinterlegt</span>}</dd>
           </dl>
           {can('manage_personal') && (
-            <button className="btn btn-secondary btn-block" onClick={() => setEditing(personal)}>
+            <button
+              className="btn btn-secondary btn-block"
+              onClick={() => {
+                setEditing(personal);
+                setStart(personal);
+              }}
+            >
               Ändern
             </button>
           )}
