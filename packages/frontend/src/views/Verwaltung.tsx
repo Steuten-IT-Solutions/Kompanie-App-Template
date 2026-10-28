@@ -624,7 +624,8 @@ let sheetOpenedHere = false;
 
 /**
  * Mitglied in der Verwaltung, alles auf einer Seite: Name, Dienstgradabzeichen und Foto, Rolle, Kacheln für Punkte,
- * Offen und Titel, Ämter, Geburtstag, Eintritt und Austritt, ganz unten „Konto und Rolle“ zum Aufklappen. Bearbeitet
+ * Offen und Titel, Eintritt und Austritt, Ämter, persönliche Angaben mit dem Geburtstag (ohne view_personal steht er bei
+ * Eintritt und Austritt), ganz unten „Konto und Rolle“ zum Aufklappen. Bearbeitet
  * wird durch Antippen: Es öffnet sich ein Fenster (verwaltung/mitglied/<id>/<fenster>; ältere Links auf die früheren
  * Unterseiten öffnen so das passende Fenster). Ehemalige haben dieselbe Seite unter verwaltung/ehemalige/<id>; steht
  * eine Person unter der falschen Adresse (alter Link, gerade als ehemalig eingetragen oder wieder aufgenommen), leitet
@@ -804,6 +805,8 @@ function MemberDetailView({
   // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
   const officesOn = !!config?.features.offices && (!!config.features.directory || can('manage_offices'));
   const birthdayOn = m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays());
+  // Der Geburtstag steht bei den persönlichen Angaben, soweit es sie gibt (view_personal), sonst bei Eintritt und Austritt.
+  const birthdayPersonal = birthdayOn && !!m.personal;
   // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt bei den Angaben zum Ausscheiden, Gäste keinen.
   const joinOn = m.join_year !== undefined && !m.former && m.level !== 'guest';
   // Als ehemalig eintragen bzw. die Angaben ändern; m.former fehlt bei älteren Servern (dann nicht).
@@ -890,9 +893,9 @@ function MemberDetailView({
         </button>
       )}
 
-      {(birthdayOn || joinOn || !!m.former || formerEditable) && (
+      {((birthdayOn && !birthdayPersonal) || joinOn || !!m.former || formerEditable) && (
         <ul className="card member-dates">
-          {birthdayOn && (
+          {birthdayOn && !birthdayPersonal && (
             <DateRow label="Geburtstag" onOpen={() => openSheet('geburtstag')}>
               {m.birthday ? formatBirthday(m.birthday) : null}
             </DateRow>
@@ -917,13 +920,24 @@ function MemberDetailView({
         </ul>
       )}
 
-      {m.personal && <PersonalPanel id={m.id} personal={m.personal} self={self} onChanged={reload} onToast={onToast} />}
-
       {officesOn && (
         <section className="member-offices">
           <h3 className="section-title">{sec.offices}</h3>
           <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} to={(other) => `verwaltung/mitglied/${other}`} />
         </section>
+      )}
+
+      {m.personal && (
+        <PersonalPanel
+          id={m.id}
+          personal={m.personal}
+          self={self}
+          birthday={
+            birthdayPersonal ? { text: m.birthday ? formatBirthday(m.birthday) : null, onOpen: () => openSheet('geburtstag') } : undefined
+          }
+          onChanged={reload}
+          onToast={onToast}
+        />
       )}
 
       <FoldSection

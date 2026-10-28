@@ -7,19 +7,23 @@ import { AddressFields, EmailField, PhoneField } from './ui';
 
 /**
  * Mitgliedsdetails → Persönliche Angaben: E-Mail-Adresse, Handynummer und Adresse der Person. Sehen mit view_personal
- * (sonst schickt der Server sie nicht), ändern mit manage_personal; das Geburtsdatum steht bei den Daten darüber. Eine
- * neue eigene E-Mail-Adresse nur mit dem aktuellen Passwort (wie unter Meins → Konto).
+ * (sonst schickt der Server sie nicht), ändern mit manage_personal. Mit birthday steht oben der Geburtstag; Antippen
+ * öffnet sein eigenes Fenster (Sichtbarkeit und Alter stellt nur die Person selbst ein). Eine neue eigene E-Mail-Adresse
+ * nur mit dem aktuellen Passwort (wie unter Meins → Konto).
  */
 export function PersonalPanel({
   id,
   personal,
   self,
+  birthday,
   onChanged,
   onToast,
 }: {
   id: number;
   personal: PersonalInfo;
   self: boolean;
+  /** Geburtstag wie angezeigt (null ohne Eintrag) und was Antippen öffnet; fehlt, wenn er hier nicht steht */
+  birthday?: { text: string | null; onOpen: () => void };
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -100,6 +104,16 @@ export function PersonalPanel({
       ) : (
         <div className="card account-card">
           <dl className="contact-list">
+            {birthday && (
+              <>
+                <dt>Geburtstag</dt>
+                <dd>
+                  <button type="button" className="link-button" onClick={birthday.onOpen}>
+                    {birthday.text ?? 'nicht hinterlegt'}
+                  </button>
+                </dd>
+              </>
+            )}
             <dt>E-Mail-Adresse</dt>
             <dd>
               {personal.email ? <a href={`mailto:${personal.email}`}>{personal.email}</a> : <span className="muted">nicht hinterlegt</span>}
