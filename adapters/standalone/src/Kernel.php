@@ -352,7 +352,7 @@ final class Kernel
             $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === '/sicherung') {
             $app = $this->app();
-            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
+            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
         } elseif (preg_match('#^/anhang/([a-f0-9]{32})$#', $path, $m)) {
             $this->beginPreview();
             $app = $this->app();

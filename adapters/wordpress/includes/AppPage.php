@@ -98,7 +98,7 @@ final class AppPage
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === 'sicherung') {
-            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
+            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
         } elseif (preg_match('#^anhang/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {

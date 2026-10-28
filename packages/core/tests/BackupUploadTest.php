@@ -11,6 +11,7 @@ use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
@@ -21,6 +22,10 @@ use PHPUnit\Framework\TestCase;
 /** Sicherungen automatisch in Google Drive (Google simuliert: Ordner, fortsetzbares Hochladen, Liste, Löschen). */
 final class BackupUploadTest extends TestCase
 {
+    private const PASS = 'passwort-fuer-sicherungen';
+    /** Schlüssel mit den kleinsten Parametern (schnell), einmal je Lauf */
+    private static ?array $key = null;
+
     private FixedClock $clock;
     private NullScheduler $scheduler;
     private App $app;
@@ -67,6 +72,14 @@ final class BackupUploadTest extends TestCase
         $this->app = TestApp::create(TestApp::connection(), $users, ['name' => 'Testkompanie'], $this->http(), clock: $this->clock, scheduler: $this->scheduler, backup: $backup);
         $holder->app = $this->app;
         $users->current = $users->add('anna', 'admin');
+        // Nach Drive nur verschlüsselt: Passwort für Sicherungen ist eingerichtet (ohne: testNeedsPassphrase).
+        self::$key ??= BackupCrypto::newKey(self::PASS, 1, 8192);
+        $this->app->settings->set(BackupCrypto::SETTING, self::$key);
+    }
+
+    private static function decrypt(string $content): string
+    {
+        return BackupCrypto::decryptToString($content, self::PASS);
     }
 
     private function http(): FakeHttpClient
@@ -181,9 +194,10 @@ final class BackupUploadTest extends TestCase
         $this->app->runTask(BackupUploadService::TASK);
         $this->assertCount(1, $this->folders, 'eigener Ordner angelegt');
         $file = array_values($this->drive)[0];
-        $this->assertMatchesRegularExpression('/^sicherung-2026-10-20-\d{6}\.json$/', $file['name'], 'Datum und Uhrzeit (Ortszeit) im Namen');
+        $this->assertMatchesRegularExpression('/^sicherung-2026-10-20-\d{6}\.json\.enc$/', $file['name'], 'Datum und Uhrzeit (Ortszeit) im Namen');
         $this->assertSame($this->folders[0], $file['parent']);
-        $this->assertSame(Backup::FORMAT, json_decode($file['content'], true)['format'] ?? null, 'Inhalt ist die Sicherung');
+        $this->assertTrue(BackupCrypto::isEncrypted($file['content']), 'verschlüsselt');
+        $this->assertSame(Backup::FORMAT, json_decode(self::decrypt($file['content']), true)['format'] ?? null, 'Inhalt ist die Sicherung');
         $status = $this->app->backupUpload()->status();
         $this->assertSame($this->clock->now()->getTimestamp(), $status['last_ok']);
         $this->assertSame('https://drive.google.com/drive/folders/' . $this->folders[0], $status['folder_url']);
@@ -237,7 +251,7 @@ final class BackupUploadTest extends TestCase
         $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
         $this->app->backupUpload()->upload();
         $backup = array_values($this->drive)[0]['content'];
-        $data = json_decode($backup, true);
+        $data = json_decode(self::decrypt($backup), true);
         $this->assertSame(Backup::FORMAT, $data['format'] ?? null, 'Sicherung Stück für Stück erzeugt, gültiges JSON');
         $this->assertSame((new Backup($this->app->db))->dump(Backup::CORE_TABLES), $data['tables']);
         $this->assertSame([null], $this->puts, 'klein: in einem Stück');
@@ -295,11 +309,12 @@ final class BackupUploadTest extends TestCase
         sort($names);
         $this->assertCount(1 + BackupUploadService::KEEP_BEFORE_UPDATE, $names, 'die wöchentliche bleibt, vor Updates die letzten fünf');
         $this->assertStringStartsWith('sicherung-2026-10-20-', $names[0]);
-        $this->assertMatchesRegularExpression('/^vor-update-2026-10-23-\d{6}-1\.0\.0\.3\.json$/', $names[1]);
-        $this->assertStringEndsWith('-1.0.0.7.json', $names[5]);
+        $this->assertMatchesRegularExpression('/^vor-update-2026-10-23-\d{6}-1\.0\.0\.3\.json\.enc$/', $names[1]);
+        $this->assertStringEndsWith('-1.0.0.7.json.enc', $names[5]);
         $this->assertSame([$this->folders[0]], array_values(array_unique(array_column($this->drive, 'parent'))), 'derselbe Ordner');
         $before = array_filter($this->drive, static fn (array $f): bool => str_starts_with($f['name'], 'vor-update-'));
-        $this->assertSame(['{"format":"kompanie-app-backup"}'], array_values(array_unique(array_column($before, 'content'))), 'die Sicherung vom Server');
+        $this->assertSame(['{"format":"kompanie-app-backup"}'], array_values(array_unique(array_map(self::decrypt(...), array_column($before, 'content')))), 'die Sicherung vom Server, verschlüsselt');
+        $this->assertSame('{"format":"kompanie-app-backup"}', file_get_contents($file), 'auf dem Server unverändert');
         $this->assertSame($this->clock->now()->getTimestamp(), $offsite->status()['last_ok'], 'zählt wie die wöchentliche');
 
         $this->putStatus = 507;
@@ -340,9 +355,78 @@ final class BackupUploadTest extends TestCase
         $this->assertStringContainsString('Google Drive', $item['text']);
     }
 
+    /** Ohne Passwort für Sicherungen: nicht einschaltbar; eine früher eingeschaltete Sicherung pausiert (gelb). */
+    public function testNeedsPassphrase(): void
+    {
+        $this->connect();
+        $this->app->settings->delete(BackupCrypto::SETTING);
+        [$s, $r] = $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertSame(400, $s);
+        $this->assertStringContainsString('Passwort für Sicherungen', $r['message']);
+
+        // Vor diesem Update eingeschaltet: pausiert, die Ampel sagt warum.
+        $this->app->settings->set(BackupUploadService::SETTING, ['enabled' => true]);
+        $this->app->scheduleTasks();
+        $offsite = $this->app->backupUpload();
+        $this->assertFalse($offsite->active());
+        $this->assertTrue($offsite->status()['needs_passphrase']);
+        $this->assertArrayNotHasKey(BackupUploadService::TASK, $this->scheduler->scheduled);
+        $item = $this->backupItem();
+        $this->assertSame('warn', $item['level']);
+        $this->assertStringContainsString('pausieren', $item['text']);
+
+        // Passwort einrichten (Mindestlänge, beide gleich), dann läuft es wieder.
+        $this->assertSame(400, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => 'kurz', 'passphrase_confirm' => 'kurz'])[0]);
+        $this->assertSame(400, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => self::PASS, 'passphrase_confirm' => self::PASS . 'x'])[0]);
+        [$s, $r] = $this->api('PUT', '/admin/backup/encryption', ['passphrase' => self::PASS, 'passphrase_confirm' => self::PASS]);
+        $this->assertSame(200, $s, (string) json_encode($r));
+        $this->assertTrue($r['configured']);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{4}( [0-9a-f]{4}){3}$/', $r['fingerprint']);
+        $this->assertTrue($offsite->active());
+        $this->assertSame(BackupUploadService::INTERVAL, $this->scheduler->scheduled[BackupUploadService::TASK] ?? null);
+        $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
+        $this->assertSame([200, ['ok' => false]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => 'falsch']));
+        $stored = (string) json_encode($this->app->settings->get(BackupCrypto::SETTING));
+        $this->assertStringNotContainsString(self::PASS, $stored, 'Passwort nicht gespeichert');
+    }
+
+    /** Ältere, unverschlüsselte Sicherungen im Ordner zählen mit und verschwinden nach und nach. */
+    public function testOldPlainBackupsRotateOut(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->app->backupUpload()->upload();
+        $folder = $this->folders[0];
+        for ($i = 1; $i <= BackupUploadService::KEEP; $i++) {
+            $this->drive['alt' . $i] = ['name' => sprintf('sicherung-2026-01-%02d-120000.json', $i), 'parent' => $folder, 'content' => '{}'];
+        }
+        $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC');
+        $this->app->backupUpload()->upload();
+        $names = array_column($this->drive, 'name');
+        $this->assertCount(BackupUploadService::KEEP, $names);
+        $this->assertNotContains('sicherung-2026-01-01-120000.json', $names);
+        $this->assertNotContains('sicherung-2026-01-02-120000.json', $names);
+    }
+
+    public function testEncryptedDownload(): void
+    {
+        $download = $this->app->backupDownload();
+        $admin = $this->app->authContext->currentUser();
+        $res = $download->forDelivery($admin, true);
+        $this->assertSame(200, $res['status']);
+        $this->assertSame('attachment; filename="sicherung-2026-10-20.json.enc"', $res['headers']['Content-Disposition']);
+        $out = fopen('php://temp', 'w+b');
+        ($res['write'])($out);
+        rewind($out);
+        $this->assertSame(Backup::FORMAT, json_decode(self::decrypt((string) stream_get_contents($out)), true)['format'] ?? null);
+        $this->app->settings->delete(BackupCrypto::SETTING);
+        $this->assertSame(409, $download->forDelivery($admin, true)['status'], 'ohne Passwort für Sicherungen');
+    }
+
     public function testStateStaysWithTheInstallation(): void
     {
         $this->assertContains(BackupUploadService::STATE_SETTING, Backup::LOCAL_SETTINGS);
+        $this->assertContains(BackupCrypto::SETTING, Backup::LOCAL_SETTINGS, 'ein älterer Stand bringt kein früheres Passwort zurück');
         $this->assertNotContains(BackupUploadService::SETTING, Backup::LOCAL_SETTINGS, 'Ein/aus und Ordner kommen mit der Sicherung zurück');
     }
 }

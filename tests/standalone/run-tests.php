@@ -759,6 +759,21 @@ try {
     [$s, $r] = $d->request('POST', '/admin/backup', ['backup' => json_encode($dl), 'confirm' => true]);
     $c->ok($s === 200 && ($r['restored'] ?? false) === true, 'POST /admin/backup stellt wieder her');
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Gelöschter Termin ist nach dem Wiederherstellen über die API wieder da');
+    // Verschlüsselte Sicherung: Passwort einrichten, verschlüsselt herunterladen, nur mit dem Passwort wiederherstellen.
+    $d->forgetSessions();
+    $d->actAs($anna);
+    $pass = 'sehr-geheimes-sicherungs-passwort';
+    [$s, $enc] = $d->request('PUT', '/admin/backup/encryption', ['passphrase' => $pass, 'passphrase_confirm' => $pass]);
+    $c->ok($s === 200 && ($enc['configured'] ?? false) === true, 'Passwort für Sicherungen eingerichtet');
+    $raw = (string) file_get_contents($base . 'index.php?r=/sicherung&verschluesselt=1', false, stream_context_create(['http' => ['header' => 'Cookie: ' . Sessions::COOKIE . '=' . $d->token($anna), 'ignore_errors' => true]]));
+    $c->ok(str_starts_with($raw, \KompanieApp\Core\Storage\BackupCrypto::MAGIC) && !str_contains($raw, 'Sicherungstest'), 'Verschlüsselt heruntergeladen (Inhalt nicht lesbar)');
+    $d->request('DELETE', '/events/' . (int) $kernel->db()->scalar("SELECT id FROM {events} WHERE title = 'Sicherungstest'"));
+    [$s, $r] = $d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true]);
+    $c->ok($s === 400 && ($r['code'] ?? '') === 'passphrase_required', 'Verschlüsselte Sicherung ohne Passwort → 400 passphrase_required');
+    $c->ok($d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true, 'passphrase' => 'falsch'])[0] === 400, 'Falsches Passwort → 400');
+    [$s, $r] = $d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true, 'passphrase' => $pass]);
+    $c->ok($s === 200 && (int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Verschlüsselte Sicherung mit Passwort wiederhergestellt');
+    $c->ok(is_array($kernel->app()->settings->fresh(\KompanieApp\Core\Storage\BackupCrypto::SETTING)), 'Passwort für Sicherungen bleibt nach dem Wiederherstellen eingerichtet (gehört zur Installation)');
     $d->forgetSessions();
 
     $c->section('Schöne Adressen (URL-Umschreibung)');

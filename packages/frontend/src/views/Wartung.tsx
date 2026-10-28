@@ -1,5 +1,15 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { api, ApiError, config, type AdminStatus, type BackupDriveStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
+import {
+  api,
+  ApiError,
+  config,
+  type AdminStatus,
+  type BackupDriveStatus,
+  type BackupEncryptionStatus,
+  type ErrorLogEntry,
+  type UpdateStatus,
+} from '../api';
+import { backupPayload, isEncryptedBackup } from '../backupFile';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -10,13 +20,7 @@ import { ErrorBox, Loading, useAsync } from '../ui';
 /** Seiten „Zustand und Updates“ und „Datensicherung“ der Einstellungen. */
 export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => api.status(), [], 'admin/status');
-  if (part === 'datensicherung')
-    return (
-      <>
-        <Datensicherung onToast={onToast} onChanged={reload} />
-        <DriveSicherung onToast={onToast} />
-      </>
-    );
+  if (part === 'datensicherung') return <DatensicherungSeite onToast={onToast} onChanged={reload} />;
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
@@ -476,18 +480,40 @@ export function compare(a: string, b: string): number {
   return 0;
 }
 
-function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
+/** Datensicherung mit Passwort für Sicherungen; das Passwort bestimmt Download und Google Drive. */
+function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
+  const { data, error, loading, reload } = useAsync(() => api.backupEncryption(), [], 'admin/backup/encryption');
+  const [enc, setEnc] = useState<BackupEncryptionStatus | null>(null);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const e = enc ?? data!;
+  return (
+    <>
+      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e.configured} />
+      <Verschluesselung status={e} onChange={setEnc} onToast={onToast} />
+      {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (pausiert oder nicht) */}
+      <DriveSicherung key={String(e.configured)} onToast={onToast} />
+    </>
+  );
+}
+
+function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: string) => void; onChanged: () => void; encrypted: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Verschlüsselte Datei zum Wiederherstellen: wartet auf das Passwort für Sicherungen.
+  const [pending, setPending] = useState<{ name: string; bytes: Uint8Array } | null>(null);
+  const [passphrase, setPassphrase] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
-  async function download() {
+  async function download(plain = false) {
     setError(null);
     // Als Datei über die eigene Adresse: Der Server schreibt die Sicherung Stück für Stück, weder er noch der Browser
-    // braucht sie ganz im Arbeitsspeicher (Fotos und Dokumente machen sie schnell groß).
+    // braucht sie ganz im Arbeitsspeicher (Fotos und Dokumente machen sie schnell groß). Mit Passwort für Sicherungen
+    // verschlüsselt, außer auf ausdrücklichen Wunsch.
     if (config?.backupUrl) {
       const a = document.createElement('a');
-      a.href = config.backupUrl;
+      const url = config.backupUrl;
+      a.href = encrypted && !plain ? `${url}${url.includes('?') ? '&' : '?'}verschluesselt=1` : url;
       a.download = '';
       document.body.appendChild(a);
       a.click();
@@ -495,6 +521,10 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       onToast('Sicherung wird heruntergeladen');
       // Die Ampel zählt die Sicherung, sobald sie ganz geschrieben ist.
       setTimeout(onChanged, 5000);
+      return;
+    }
+    if (encrypted && !plain) {
+      setError('Verschlüsselt herunterladen geht nur über die Adresse der App; bitte die Seite neu laden.');
       return;
     }
     setBusy(true);
@@ -527,10 +557,22 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       )
     )
       return;
+    setError(null);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (isEncryptedBackup(bytes)) {
+      setPending({ name: file.name, bytes });
+      setPassphrase('');
+      return;
+    }
+    await send(bytes);
+  }
+
+  async function send(bytes: Uint8Array, pass?: string) {
     setBusy(true);
     setError(null);
     try {
-      await api.restoreBackup(await file.text());
+      await api.restoreBackup(backupPayload(bytes), pass);
+      setPending(null);
       onToast('Sicherung wiederhergestellt');
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
@@ -550,14 +592,223 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
         eingeschaltet sind, auch dort.
       </p>
       <div className="button-row">
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>
-          Sicherung herunterladen
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void download()}>
+          {encrypted ? 'Sicherung verschlüsselt herunterladen' : 'Sicherung herunterladen'}
         </button>
+        {encrypted && (
+          <button type="button" className="btn btn-link" disabled={busy} onClick={() => void download(true)}>
+            unverschlüsselt herunterladen
+          </button>
+        )}
         <button type="button" className="btn btn-link" disabled={busy} onClick={() => fileInput.current?.click()}>
           Sicherung wiederherstellen …
         </button>
       </div>
-      <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={restore} />
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/json,application/octet-stream,.json,.enc"
+        hidden
+        onChange={(e) => void restore(e)}
+      />
+      {pending && (
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(pending.bytes, passphrase);
+          }}
+        >
+          <p className="small">„{pending.name}“ ist verschlüsselt. Zum Wiederherstellen bitte das Passwort für Sicherungen eingeben.</p>
+          <label className="field">
+            <span>Passwort für Sicherungen</span>
+            <input type="password" autoComplete="off" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} required />
+          </label>
+          <div className="button-row">
+            <button type="submit" className="btn btn-primary" disabled={busy || passphrase === ''}>
+              {busy ? 'Stellt wieder her …' : 'Wiederherstellen'}
+            </button>
+            <button type="button" className="btn btn-link" disabled={busy} onClick={() => setPending(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Passwort für Sicherungen: Sicherungen außerhalb des Servers (Download, Google Drive) sind damit verschlüsselt. Die App
+ * speichert nur einen öffentlichen Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht
+ * wiederherstellen, auch nicht von den Betreuern.
+ */
+function Verschluesselung({
+  status,
+  onChange,
+  onToast,
+}: {
+  status: BackupEncryptionStatus;
+  onChange: (s: BackupEncryptionStatus) => void;
+  onToast: (msg: string) => void;
+}) {
+  const [mode, setMode] = useState<'view' | 'set' | 'check'>('view');
+  const [pass, setPass] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [kept, setKept] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function open(next: 'view' | 'set' | 'check') {
+    setMode(next);
+    setPass('');
+    setRepeat('');
+    setKept(false);
+    setError(null);
+  }
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" aria-labelledby="backup-enc-title">
+      <h3 id="backup-enc-title">Passwort für Sicherungen</h3>
+      <p className="muted small">
+        Mit diesem Passwort sind heruntergeladene Sicherungen und die Sicherungen in Google Drive verschlüsselt: Wer die Datei findet, kann
+        sie ohne das Passwort nicht lesen. Die App speichert das Passwort nicht.{' '}
+        <strong>
+          Ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen, auch nicht von den Betreuern der App.
+        </strong>{' '}
+        Bitte an einem sicheren Ort aufbewahren (z. B. im Passwort-Manager oder ausgedruckt im Tresor). Die Sicherungen vor Updates auf dem
+        Server bleiben unverschlüsselt.
+      </p>
+      {!status.available ? (
+        <p className="small">Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.</p>
+      ) : status.configured && mode === 'view' ? (
+        <>
+          <p className="small">
+            Eingerichtet{status.set_at ? ` am ${date(status.set_at)}` : ''}. Fingerabdruck: <code>{status.fingerprint}</code>
+          </p>
+          <div className="button-row">
+            <button type="button" className="btn btn-secondary" onClick={() => open('check')}>
+              Passwort prüfen
+            </button>
+            <button type="button" className="btn btn-link" onClick={() => open('set')}>
+              Ändern
+            </button>
+            <button
+              type="button"
+              className="btn btn-link"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, und die Sicherungen in Google Drive pausieren. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
+                  )
+                )
+                  void run(async () => {
+                    onChange(await api.removeBackupEncryption());
+                    onToast('Passwort für Sicherungen entfernt');
+                  });
+              }}
+            >
+              Entfernen
+            </button>
+          </div>
+        </>
+      ) : mode === 'check' ? (
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              const { ok } = await api.verifyBackupEncryption(pass);
+              if (ok) {
+                onToast('Das Passwort für Sicherungen stimmt');
+                open('view');
+              } else setError('Das Passwort stimmt nicht.');
+            });
+          }}
+        >
+          <label className="field">
+            <span>Passwort für Sicherungen</span>
+            <input type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} required />
+          </label>
+          <div className="button-row">
+            <button type="submit" className="btn btn-primary" disabled={busy || pass === ''}>
+              Prüfen
+            </button>
+            <button type="button" className="btn btn-link" onClick={() => open('view')}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      ) : mode === 'set' || !status.configured ? (
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              onChange(await api.setBackupEncryption(pass, repeat));
+              onToast('Passwort für Sicherungen eingerichtet');
+              open('view');
+            });
+          }}
+        >
+          {status.configured && (
+            <p className="small">
+              Das neue Passwort gilt für neue Sicherungen. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.
+            </p>
+          )}
+          <label className="field">
+            <span>Neues Passwort für Sicherungen (mind. {status.min_length} Zeichen)</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              minLength={status.min_length}
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Passwort wiederholen</span>
+            <input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} required />
+          </label>
+          <label className="toggle">
+            <input type="checkbox" checked={kept} onChange={(e) => setKept(e.target.checked)} />
+            <span>Ich habe das Passwort sicher aufbewahrt. Ohne es lässt sich keine verschlüsselte Sicherung wiederherstellen.</span>
+          </label>
+          <div className="button-row">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={busy || !kept || pass.length < status.min_length || pass !== repeat}
+            >
+              {busy ? 'Richtet ein …' : 'Passwort einrichten'}
+            </button>
+            {status.configured && (
+              <button type="button" className="btn btn-link" onClick={() => open('view')}>
+                Abbrechen
+              </button>
+            )}
+          </div>
+        </form>
+      ) : null}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -598,8 +849,14 @@ function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
       <p className="muted small">
         Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt: Die App legt einmal pro{' '}
         {d.every_days === 7 ? 'Woche' : `${d.every_days} Tage`} eine Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und
-        behält die letzten {d.keep}. Die Sicherungen enthalten Zugangsschlüssel und Passwort-Prüfwerte; den Ordner bitte nicht freigeben.
+        behält die letzten {d.keep}. Die Sicherungen gehen nur verschlüsselt mit dem Passwort für Sicherungen dorthin; den Ordner trotzdem
+        bitte nicht freigeben.
       </p>
+      {d.needs_passphrase && (
+        <p className={d.enabled ? 'form-error' : 'small'} role={d.enabled ? 'alert' : undefined}>
+          {d.enabled ? 'Pausiert: ' : ''}Bitte zuerst oben ein Passwort für Sicherungen einrichten.
+        </p>
+      )}
       {!d.available ? (
         <p className="small">
           Dafür braucht die App eine Verbindung über „Mit Google verbinden“ (<a href="#/einstellungen/google">Google-Zugang</a>).
@@ -615,7 +872,7 @@ function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
           <input
             type="checkbox"
             checked={d.enabled}
-            disabled={busy || (!d.enabled && !(d.available && d.access))}
+            disabled={busy || (!d.enabled && !(d.available && d.access && !d.needs_passphrase))}
             onChange={(e) => {
               const on = e.target.checked;
               void run(
@@ -645,7 +902,7 @@ function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
           Letzter Versuch ({date(d.last_try)}) fehlgeschlagen: {d.error}
         </p>
       )}
-      {d.enabled && d.access && (
+      {d.enabled && d.access && !d.needs_passphrase && (
         <div className="button-row">
           <button
             type="button"

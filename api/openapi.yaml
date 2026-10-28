@@ -4845,6 +4845,8 @@ paths:
         alle Sitzungen enden. WordPress: nur Sicherungen derselben Website; fehlende Konten werden mit
         ihrer ID angelegt (nur mit den WP-Rechten create_users und promote_users), vorhandene behalten
         Anmeldedaten. Passt eine ID nicht zum Benutzernamen, wird nichts geändert (400).
+        Verschlüsselte Sicherungen (beginnen mit `KOMPANIE-BACKUP-ENC`) als `backup_base64` mit `passphrase`;
+        ohne Passwort 400 `passphrase_required`, mit falschem 400.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -4852,9 +4854,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [backup, confirm]
+              required: [confirm]
               properties:
-                backup: { type: string, description: Inhalt der Sicherungsdatei }
+                backup: { type: string, description: Inhalt der Sicherungsdatei (JSON) }
+                backup_base64: { type: string, description: Inhalt der Sicherungsdatei als Base64 (verschlüsselte Sicherung) }
+                passphrase: { type: string, description: Passwort für Sicherungen (nur für verschlüsselte) }
                 confirm: { type: boolean, enum: [true] }
       responses:
         '200':
@@ -4869,6 +4873,79 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/encryption:
+    get:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen – Stand
+      description: |
+        Mit Passwort sind heruntergeladene Sicherungen (`<App>/sicherung?verschluesselt=1`) und alle Sicherungen in
+        Google Drive verschlüsselt (Argon2id, X25519, XChaCha20-Poly1305). Gespeichert wird nur der öffentliche
+        Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen.
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen einrichten oder ändern
+      description: Mindestens 12 Zeichen, beide gleich (sonst 400). Ältere Sicherungen brauchen weiter das bisherige Passwort.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passphrase, passphrase_confirm]
+              properties:
+                passphrase: { type: string, minLength: 12 }
+                passphrase_confirm: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen entfernen (neue Sicherungen unverschlüsselt, Google Drive pausiert)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/encryption/verify:
+    post:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen prüfen
+      description: Höchstens 10 Versuche in 15 Minuten (danach 429).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passphrase]
+              properties:
+                passphrase: { type: string }
+      responses:
+        '200':
+          description: Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
 
   /admin/backup/drive:
     get:
@@ -4884,8 +4961,9 @@ paths:
       summary: Sicherungen in Google Drive ein- oder ausschalten
       description: |
         Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
-        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen
-        eigenen Ordner im verbundenen Google-Konto und behält die letzten acht.
+        drive.file erlaubt hat und ein Passwort für Sicherungen (sonst 400). Die App lädt dann einmal pro Woche
+        eine verschlüsselte Sicherung (`.json.enc`) in einen eigenen Ordner im verbundenen Google-Konto und behält
+        die letzten acht.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -4981,11 +5059,12 @@ components:
         application/json:
           schema:
             type: object
-            required: [available, access, enabled, email, folder_url, last_ok, last_try, error, every_days, keep]
+            required: [available, access, enabled, needs_passphrase, email, folder_url, last_ok, last_try, error, every_days, keep]
             properties:
               available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
               access: { type: boolean, description: Google hat drive.file erlaubt }
               enabled: { type: boolean }
+              needs_passphrase: { type: boolean, description: Kein Passwort für Sicherungen; eingeschaltet heißt dann pausiert }
               email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
               folder_url: { type: [string, 'null'] }
               last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
@@ -4993,6 +5072,19 @@ components:
               error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
               every_days: { type: integer }
               keep: { type: integer }
+    BackupEncryptionStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, configured, fingerprint, set_at, min_length]
+            properties:
+              available: { type: boolean, description: PHP hat die Erweiterung sodium }
+              configured: { type: boolean }
+              fingerprint: { type: [string, 'null'], description: 'Fingerabdruck des öffentlichen Schlüssels, z. B. „3f2a 9c41 07be d5e0“' }
+              set_at: { type: [integer, 'null'], description: Eingerichtet am (Unix-Zeit) }
+              min_length: { type: integer }
     PushStatus:
       description: OK
       content:

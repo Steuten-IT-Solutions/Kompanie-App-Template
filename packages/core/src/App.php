@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\AttendanceService;
+use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardMailService;
@@ -693,6 +694,12 @@ final class App
             $this->telemetry(),
             $this->backupUpload(),
         ));
+    }
+
+    /** Passwort für Sicherungen, verschlüsselte Sicherungen */
+    public function backupEncryption(): BackupEncryptionService
+    {
+        return $this->service(BackupEncryptionService::class, fn () => new BackupEncryptionService($this));
     }
 
     /** Sicherungen automatisch in Google Drive */

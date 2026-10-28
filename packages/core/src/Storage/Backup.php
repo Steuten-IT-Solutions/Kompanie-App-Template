@@ -51,6 +51,9 @@ final class Backup
         'bug_reports_registered',
         // Zustand der Sicherungen in Google Drive (BackupUploadService::STATE_SETTING): letzter Lauf, Fehler.
         'backup_drive_state',
+        // Öffentlicher Schlüssel für verschlüsselte Sicherungen (BackupCrypto::SETTING): gehört zur Installation. Eine ältere
+        // Sicherung soll kein früheres Passwort zurückbringen; nach einem Umzug richtet der Admin es neu ein.
+        'backup_encryption',
         // Nutzungsauswertung (Issue #175): Geheimnis des Pseudonyms. Die Tabellen activity* sind keine Kerntabellen der Sicherung.
         'activity_secret',
         // Web Push: Stand der Abgleiche gehört zu dieser Installation (Schlüssel und Abos sind in der Sicherung).

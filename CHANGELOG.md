@@ -15,6 +15,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Verschlüsselte Sicherungen**: Unter *Einstellungen → Datensicherung* lässt sich ein **Passwort für Sicherungen**
+  einrichten. Heruntergeladene Sicherungen und alle Sicherungen in Google Drive sind damit verschlüsselt; wer die Datei
+  findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
+  sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
+
+### Geändert
+
+- **Sicherungen in Google Drive nur noch verschlüsselt**: Sie pausieren, bis unter *Einstellungen → Datensicherung* ein
+  Passwort für Sicherungen eingerichtet ist; die Ampel unter *Zustand und Updates* weist darauf hin. Ältere,
+  unverschlüsselte Sicherungen im Ordner verschwinden nach und nach.
+
 ### Sicherheit
 
 - **Mitgliederfotos folgen den Rechten von Gast**: Hat ein Admin unter *Einstellungen → Rollen* der Rolle **Gast** die

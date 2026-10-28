@@ -1115,16 +1115,30 @@ final class Api
                 if (!$backup->canImport()) {
                     throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
                 }
-                if (!Input::bool($r->input('confirm')) || !is_string($r->input('backup'))) {
+                // Als Text (JSON wie bisher) oder als Base64 (verschlüsselte Sicherung, mit passphrase).
+                $data = $r->input('backup');
+                if (is_string($r->input('backup_base64'))) {
+                    $data = base64_decode($r->input('backup_base64'), true);
+                    if ($data === false) {
+                        throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
+                    }
+                }
+                if (!Input::bool($r->input('confirm')) || !is_string($data)) {
                     throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
                 }
+                $data = $a->backupEncryption()->decryptUpload($data, $r->input('passphrase'));
                 try {
-                    $backup->import($r->input('backup'));
+                    $backup->import($data);
                 } catch (\RuntimeException $e) {
                     throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
                 }
                 return ['restored' => true];
             }, null, $denySettings),
+            // Passwort für Sicherungen (verschlüsselte Sicherungen, Pflicht für Google Drive)
+            new Route('GET', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/encryption', Cap::ManageSettings, fn (Request $r) => $a->backupEncryption()->set($r->input('passphrase'), $r->input('passphrase_confirm')), null, $denySettings),
+            new Route('DELETE', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->remove(), null, $denySettings),
+            new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
             new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
             new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
                 $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));

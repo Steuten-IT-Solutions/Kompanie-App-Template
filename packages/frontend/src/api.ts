@@ -1930,7 +1930,14 @@ export const api = {
   updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
-  restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  /** Inhalt aus backupPayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
+  restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>
+    request<{ restored: boolean }>('POST', '/admin/backup', { ...payload, ...(passphrase ? { passphrase } : {}), confirm: true }),
+  backupEncryption: () => request<BackupEncryptionStatus>('GET', '/admin/backup/encryption'),
+  setBackupEncryption: (passphrase: string, passphrase_confirm: string) =>
+    request<BackupEncryptionStatus>('PUT', '/admin/backup/encryption', { passphrase, passphrase_confirm }),
+  removeBackupEncryption: () => request<BackupEncryptionStatus>('DELETE', '/admin/backup/encryption'),
+  verifyBackupEncryption: (passphrase: string) => request<{ ok: boolean }>('POST', '/admin/backup/encryption/verify', { passphrase }),
   backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
   setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
   uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
@@ -2041,6 +2048,8 @@ export interface BackupDriveStatus {
   /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
   access: boolean;
   enabled: boolean;
+  /** Kein Passwort für Sicherungen: Drive nicht einschaltbar bzw. pausiert */
+  needs_passphrase: boolean;
   email: string;
   folder_url: string | null;
   last_ok: number | null;
@@ -2048,6 +2057,17 @@ export interface BackupDriveStatus {
   error: string | null;
   every_days: number;
   keep: number;
+}
+
+/** Passwort für Sicherungen (Einstellungen → Datensicherung) */
+export interface BackupEncryptionStatus {
+  /** PHP hat sodium */
+  available: boolean;
+  configured: boolean;
+  /** Fingerabdruck des Schlüssels, z. B. „3f2a 9c41 07be d5e0“ */
+  fingerprint: string | null;
+  set_at: number | null;
+  min_length: number;
 }
 
 export interface UpdateStatus {

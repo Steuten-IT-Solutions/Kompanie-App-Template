@@ -146,6 +146,9 @@ final class StatusService
         $text = 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '.';
         if ($drive['enabled']) {
             $text .= ' Letzte Sicherung in Google Drive: ' . $this->date($drive['last_ok']) . '.';
+            if ($drive['needs_passphrase']) {
+                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Sicherungen in Google Drive pausieren: Sie gehen nur noch verschlüsselt dorthin. Bitte unter Einstellungen → Datensicherung ein Passwort für Sicherungen einrichten.');
+            }
             if (!$drive['access']) {
                 return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Verbindung zu Google erlaubt das Hochladen nicht mehr; bitte unter Einstellungen → Google-Zugang neu verbinden.');
             }

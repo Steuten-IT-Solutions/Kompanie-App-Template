@@ -7,8 +7,8 @@
  *   php bin/kompanie.php create-admin --name="Vorname Nachname" --login=name [--email=…] [--password=…]
  *   php bin/kompanie.php reset-password --login=name
  *   php bin/kompanie.php cron           fällige Aufgaben ausführen (z. B. stündlich als Cronjob)
- *   php bin/kompanie.php export [--out=datei.json]
- *   php bin/kompanie.php import datei.json
+ *   php bin/kompanie.php export [--out=datei.json] [--encrypt]   --encrypt: mit dem Passwort für Sicherungen verschlüsselt
+ *   php bin/kompanie.php import datei.json [--passphrase-file=…]   verschlüsselte Sicherungen fragen nach dem Passwort
  *   php bin/kompanie.php status
  *   php bin/kompanie.php update-check   Update-Liste prüfen und anzeigen
  *   php bin/kompanie.php update [--version=…] [--major] [--without-drive]   neueste (oder angegebene) Version einspielen
@@ -24,6 +24,7 @@
 declare(strict_types=1);
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Update\UpdateService;
 use KompanieApp\Standalone\HttpContext;
 use KompanieApp\Standalone\Kernel;
@@ -99,6 +100,28 @@ try {
 
         case 'export':
             $kernel->upgrade();
+            if (isset($opt['encrypt'])) {
+                $out = $str('out');
+                if ($out === '') {
+                    throw new RuntimeException('Verschlüsselt nur in eine Datei: bitte --out=datei' . BackupCrypto::EXTENSION . ' angeben.');
+                }
+                if (!$kernel->app()->backupEncryption()->configured()) {
+                    throw new RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (Einstellungen → Datensicherung).');
+                }
+                $plain = tmpfile();
+                $target = fopen($out, 'wb');
+                @chmod($out, 0600);
+                try {
+                    (new StandaloneBackup($kernel))->exportTo($plain);
+                    rewind($plain);
+                    $kernel->app()->backupEncryption()->encryptStream($plain, $target);
+                } finally {
+                    fclose($plain);
+                    fclose($target);
+                }
+                fwrite(STDERR, "Verschlüsselt gesichert in $out (wiederherstellen nur mit dem Passwort für Sicherungen).\n");
+                break;
+            }
             $json = json_encode((new StandaloneBackup($kernel))->export(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $out = $str('out');
             if ($out === '') {
@@ -117,6 +140,22 @@ try {
             }
             $kernel->upgrade();
             $backup = new StandaloneBackup($kernel);
+            // Erst entschlüsseln: Ein falsches Passwort soll nichts anlegen.
+            $data = (string) file_get_contents($file);
+            if (BackupCrypto::isEncrypted($data)) {
+                $passFile = $str('passphrase-file');
+                if ($passFile !== '') {
+                    $pass = rtrim((string) @file_get_contents($passFile), "\r\n");
+                } else {
+                    fwrite(STDERR, 'Passwort für Sicherungen: ');
+                    $tty = function_exists('posix_isatty') && posix_isatty(STDIN);
+                    $tty && shell_exec('stty -echo');
+                    $pass = rtrim((string) fgets(STDIN), "\r\n");
+                    $tty && shell_exec('stty echo');
+                    fwrite(STDERR, "\n");
+                }
+                $data = BackupCrypto::decryptToString($data, $pass);
+            }
             // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
             $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.json';
             $out = fopen($before, 'wb');
@@ -127,7 +166,7 @@ try {
                 fclose($out);
             }
             echo "Bisheriger Stand gesichert: $before\n";
-            $backup->import((string) file_get_contents($file));
+            $backup->import($data);
             echo "Sicherung wiederhergestellt. Alle Geräte müssen sich neu anmelden; die Galeriebilder werden neu aufbereitet.\n";
             break;
 

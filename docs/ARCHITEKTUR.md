@@ -662,6 +662,19 @@ Jede Kompanie kann in der App unter *Einstellungen → Zustand und Updates* auf 
 - **Sicherungen in Google Drive** (`BackupUploadService`, optional): wöchentlich in einen eigenen Ordner des über
   „Mit Google verbinden“ verbundenen Kontos (Berechtigung `drive.file`, die App sieht nur eigene Dateien), die letzten
   acht bleiben.
+- **Verschlüsselte Sicherungen** (`Storage\BackupCrypto`, `Domain\BackupEncryptionService`): Aus dem Passwort für
+  Sicherungen und einem zufälligen Salz entsteht mit Argon2id (`sodium_crypto_pwhash`, Parameter INTERACTIVE, 64 MiB) ein
+  X25519-Schlüsselpaar; gespeichert wird nur der öffentliche Schlüssel mit Salz und Parametern (Einstellung
+  `backup_encryption`, in `Backup::LOCAL_SETTINGS`). So verschlüsselt der Server jederzeit, auch die wöchentliche
+  Sicherung, lesen kann sie nur, wer das Passwort kennt. Datei (`.json.enc`): `KOMPANIE-BACKUP-ENC\n`, Länge und Kopf
+  (JSON mit Salz, Parametern, dem mit `crypto_box_seal` versiegelten Dateischlüssel und dem Kopf des Streams), dann
+  Blöcke von 64 KiB mit `crypto_secretstream_xchacha20poly1305` (Kopf als zusätzliche Daten des ersten Blocks, letzter
+  Block `TAG_FINAL`: geänderter Kopf und abgeschnittene Dateien fallen auf). Nach Drive gehen Sicherungen nur
+  verschlüsselt (ohne Passwort pausiert `BackupUploadService`), der Download auf Wunsch (`/sicherung?verschluesselt=1`),
+  `POST /admin/backup` nimmt verschlüsselte Dateien als `backup_base64` mit `passphrase`. Die Sicherungen vor Updates
+  auf dem Server bleiben unverschlüsselt (gleicher Ort wie die Datenbank; Wiederherstellen ohne Passwort).
+  Bewusst **keine** Verschlüsselung einzelner Felder in der Datenbank: Der Schlüssel läge auf demselben Webspace wie
+  die Daten (`config.php` bzw. `wp-config.php`) und schützte nur gegen eine gestohlene Datenbank ohne die Dateien.
 - Die Ampel wird gelb, wenn 30 Tage lang keine Sicherung außerhalb des Servers entstand (heruntergeladen oder in Google Drive).
 
 ### Update-Liste und gestaffelte Verteilung
