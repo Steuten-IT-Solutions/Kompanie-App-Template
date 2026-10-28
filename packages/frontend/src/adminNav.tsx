@@ -18,7 +18,16 @@ const canMail = (): boolean => !!config?.features.mail && can('send_mail');
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen oder Rollen vergeben. */
 export function memberListAllowed(): boolean {
-  return canPoints() || canPenalties() || canRanks() || canTitles() || canAttendance() || can('create_users') || can('promote_users');
+  return (
+    canPoints() ||
+    canPenalties() ||
+    canRanks() ||
+    canTitles() ||
+    canAttendance() ||
+    can('view_personal') ||
+    can('create_users') ||
+    can('promote_users')
+  );
 }
 
 type AdminTab = { id: string; label: string; on: boolean; route?: string; group?: string };

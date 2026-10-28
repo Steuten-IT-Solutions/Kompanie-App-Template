@@ -5,6 +5,19 @@ import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh 
 import { noteError } from './lastError';
 import { emailProblem, emailSuggestion, normalizeEmail, tidyEmail } from './email';
 import { composePhone, COUNTRIES, normalizePhone, OTHER, phoneHint, phoneProblem, splitPhone, tidyPhone } from './phone';
+import {
+  ADDRESS_COUNTRIES,
+  addressHints,
+  addressProblems,
+  CITY_MAX,
+  COUNTRY_NAME_MAX,
+  HOUSE_NUMBER_MAX,
+  normalizeAddress,
+  OTHER_COUNTRY,
+  STREET_MAX,
+  type Address,
+  type AddressField,
+} from './address';
 
 /**
  * Lädt Daten asynchron; reload() lädt neu.
@@ -519,6 +532,103 @@ export function PhoneField({
       </div>
       {left && problem ? <p className="field-note form-error">{problem}</p> : hint && <p className="field-note muted">{hint}</p>}
     </div>
+  );
+}
+
+/**
+ * Postanschrift: Land (dieselben wie bei der Ländervorwahl), Straße und Hausnummer, Zusatz, PLZ und Ort. Beim Verlassen
+ * eines Felds wird geglättet (address.ts: PLZ wie im Land üblich, Hausnummer aus der Straße in ihr Feld), danach stehen
+ * Fehler und Hinweise am Feld; Fehler halten das Formular an (setCustomValidity). Alles leer heißt keine Adresse.
+ * own: die eigene Adresse (das Handy darf vorschlagen), sonst ohne Autofill.
+ */
+export function AddressFields({
+  value,
+  onChange,
+  label = 'Adresse (optional)',
+  own = false,
+  disabled,
+}: {
+  value: Address;
+  onChange: (a: Address) => void;
+  label?: string;
+  own?: boolean;
+  disabled?: boolean;
+}) {
+  const [left, setLeft] = useState<Partial<Record<AddressField, boolean>>>({});
+  const problems = addressProblems(value);
+  const hints = addressHints(value);
+  const refs = useRef<Partial<Record<AddressField, HTMLInputElement | null>>>({});
+  useEffect(() => {
+    for (const f of Object.keys(refs.current) as AddressField[]) refs.current[f]?.setCustomValidity(problems[f] ?? '');
+  });
+  const ac = (token: string) => (own ? token : 'off');
+  const set = (patch: Partial<Address>) => onChange({ ...value, ...patch });
+  const leave = (f: AddressField) => {
+    setLeft((l) => ({ ...l, [f]: true }));
+    const n = normalizeAddress(value);
+    if (JSON.stringify(n) !== JSON.stringify(value)) onChange(n);
+  };
+  const note = (f: AddressField) =>
+    left[f] && problems[f] ? (
+      <p className="field-note form-error">{problems[f]}</p>
+    ) : left[f] && hints[f] ? (
+      <p className="field-note muted">{hints[f]}</p>
+    ) : null;
+  const input = (f: AddressField, text: string, extra: { autoComplete: string; maxLength: number; inputMode?: 'text' | 'numeric' }) => (
+    <label className={`field address-${f.replace('_', '-')}`}>
+      <span>{text}</span>
+      <input
+        ref={(el) => {
+          refs.current[f] = el;
+        }}
+        type="text"
+        autoComplete={extra.autoComplete}
+        inputMode={extra.inputMode}
+        maxLength={extra.maxLength}
+        value={value[f]}
+        disabled={disabled}
+        aria-invalid={!!left[f] && !!problems[f]}
+        onChange={(e) => set({ [f]: e.target.value })}
+        onBlur={() => leave(f)}
+      />
+      {note(f)}
+    </label>
+  );
+  const country = ADDRESS_COUNTRIES.find((c) => c.code === value.country);
+  return (
+    <fieldset className="fieldset address-fields">
+      <legend>{label}</legend>
+      <label className="field">
+        <span>Land</span>
+        <select
+          autoComplete={ac('country')}
+          value={country ? value.country : OTHER_COUNTRY}
+          disabled={disabled}
+          onChange={(e) => onChange(normalizeAddress({ ...value, country: e.target.value }))}
+        >
+          {ADDRESS_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.flag} {c.name}
+            </option>
+          ))}
+          <option value={OTHER_COUNTRY}>🌐 anderes Land</option>
+        </select>
+      </label>
+      {!country && input('country_name', 'Name des Landes', { autoComplete: ac('country-name'), maxLength: COUNTRY_NAME_MAX })}
+      <div className="address-row">
+        {input('street', 'Straße', { autoComplete: ac('address-line1'), maxLength: STREET_MAX })}
+        {input('house_number', 'Nr.', { autoComplete: 'off', maxLength: HOUSE_NUMBER_MAX })}
+      </div>
+      {input('extra', 'Adresszusatz (optional)', { autoComplete: ac('address-line2'), maxLength: STREET_MAX })}
+      <div className="address-row">
+        {input('postal_code', 'PLZ', {
+          autoComplete: ac('postal-code'),
+          maxLength: 12,
+          inputMode: country && /^\d/.test(country.example) && country.code !== 'NL' && country.code !== 'GB' ? 'numeric' : 'text',
+        })}
+        {input('city', 'Ort', { autoComplete: ac('address-level2'), maxLength: CITY_MAX })}
+      </div>
+    </fieldset>
   );
 }
 

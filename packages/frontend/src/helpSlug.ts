@@ -135,7 +135,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
       austritt: 'ehemalige-mitglieder',
     };
     if (page && memberPages[page]) return memberPages[page];
-    if (page === 'geburtstag' && ctx.can('create_users') && ctx.features.birthdays) return 'geburtstage-pflegen';
+    if (page === 'geburtstag' && ctx.can('manage_personal') && ctx.features.birthdays) return 'geburtstage-pflegen';
     return former ? 'ehemalige-mitglieder' : 'mitglied-uebersicht';
   }
   return null;

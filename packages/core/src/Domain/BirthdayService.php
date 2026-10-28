@@ -17,8 +17,8 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  *   Mitgliedern zeigen“ (visible, Standard an) und „Alter anzeigen“ (show_age, Standard aus). Dazu wählt es, wem der
  *   Geburtstag auf seiner Seite in der Mitgliederliste erscheint (profile: none, members, public; Standard members,
  *   unabhängig von visible): mit show_age und Jahr das ganze Datum und das Alter, sonst nur Tag und Monat.
- * - Wer Mitglieder anlegen darf (create_users), trägt das Datum anderer ein oder entfernt es; die beiden Schalter
- *   bleiben dabei, wie die Person sie gesetzt hat.
+ * - Wer persönliche Angaben pflegt (manage_personal), trägt das Datum anderer ein oder entfernt es (beim Anlegen auch,
+ *   wer Mitglieder anlegen darf); die beiden Schalter bleiben dabei, wie die Person sie gesetzt hat.
  * - Sehen und erscheinen: nur Konten mit Mitgliederbereich (Recht member). Gäste und Anwärter sehen keine Geburtstage
  *   und erscheinen auch nicht. Ohne visible weder in der Liste noch in der Benachrichtigung. Das Alter nur mit show_age
  *   und Jahr; das Geburtsjahr gibt /birthdays nie aus.
@@ -164,7 +164,7 @@ final class BirthdayService
     }
 
     /**
-     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, create_users): nur Tag, Monat und Jahr; visible,
+     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, manage_personal): nur Tag, Monat und Jahr; visible,
      * show_age und profile bleiben, wie die Person sie gesetzt hat (mitgeschickte Schalter werden nicht übernommen).
      *
      * @param array<string, mixed> $in month, day, year

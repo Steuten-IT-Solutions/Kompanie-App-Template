@@ -357,10 +357,13 @@ final class MemberService
      * Angaben eines neuen Kontos prüfen; $taken sammelt Benutzernamen und E-Mail-Adressen, die schon für andere
      * Einträge derselben Anfrage vorgesehen sind (mehrere anlegen).
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level
+     * Beim Anlegen lassen sich alle persönlichen Angaben eintragen (phone, address), auch ohne view_personal: Eingeben ist
+     * nicht Sehen, danach zeigt sie nur noch view_personal.
+     *
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, phone, address, level
      * @param array<string, true> $taken
      * @param User|null $actor wer anlegt (null: intern); bestimmt, welche Rollen neue Konten bekommen dürfen
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone: string, address: array<string, string>|null}
      */
     public function prepare(array $in, array &$taken, ?User $actor = null): array
     {
@@ -404,8 +407,10 @@ final class MemberService
             }
             $taken['email:' . mb_strtolower($email)] = true;
         }
+        $phone = self::phoneInput($in['phone'] ?? null);
+        $address = Address::parse($in['address'] ?? null);
         $taken['login:' . mb_strtolower($login)] = true;
-        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level];
+        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level, 'phone' => $phone, 'address' => $address];
     }
 
     /**
@@ -441,9 +446,10 @@ final class MemberService
     }
 
     /**
-     * Konto mit zufälligem Startpasswort anlegen (geprüft mit prepare()).
+     * Konto mit zufälligem Startpasswort anlegen (geprüft mit prepare()), danach Handynummer und Adresse. Scheitern die,
+     * ist das Konto trotzdem angelegt; dann steht ein Hinweis in warning.
      *
-     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string} $p
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone?: string, address?: array<string, string>|null} $p
      * @return array<string, mixed>
      */
     public function insert(array $p): array
@@ -455,7 +461,18 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
-        return ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
+        $out = ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
+        $phone = $p['phone'] ?? '';
+        $address = $p['address'] ?? null;
+        if ($phone !== '' || $address !== null) {
+            try {
+                $this->storeContacts($id, $phone !== '' ? $phone : null, $address ?? false);
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Handynummer bzw. Adresse nicht übernommen: ' . $e->getMessage());
+                $out['warning'] = 'Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
+            }
+        }
+        return $out;
     }
 
     /** Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. */
@@ -511,7 +528,8 @@ final class MemberService
     }
 
     /**
-     * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt).
+     * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt): Name, Benutzername, E-Mail-Adresse. Die Handynummer
+     * nur für die Person selbst, intern (ohne $actor) und wer persönliche Angaben sieht (view_personal); sonst ''.
      *
      * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
      */
@@ -522,7 +540,68 @@ final class MemberService
             $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht sehen.');
         }
         $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        return $p + ['phone' => $this->contacts?->phone($id) ?? '', 'can_change_login' => $this->users->canChangeLogin()];
+        $phone = $actor === null || $actor->id === $id || $actor->can(Capability::ViewPersonal) ? ($this->contacts?->phone($id) ?? '') : '';
+        return $p + ['phone' => $phone, 'can_change_login' => $this->users->canChangeLogin()];
+    }
+
+    /**
+     * Persönliche Angaben einer Person (view_personal): E-Mail-Adresse, Handynummer, Adresse. Für alle Konten, ohne die
+     * Grenzen von guardAccount (auch die Adresse eines Admins pflegt etwa eine Schriftführerin).
+     *
+     * @return array{email: string, phone: string, address: array<string, string>|null}
+     */
+    public function personal(int $id): array
+    {
+        $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $c = $this->contacts?->contact($id) ?? ['phone' => '', 'address' => null];
+        return ['email' => $p['email'], 'phone' => $c['phone'], 'address' => $c['address']];
+    }
+
+    /**
+     * Persönliche Angaben einer Person ändern (manage_personal): email, phone, address; was fehlt, bleibt. Eine andere
+     * E-Mail-Adresse nur mit den Grenzen von guardAccount, denn über sie lässt sich (bei WordPress) das Passwort
+     * zurücksetzen; die eigene nur mit current_password (wie updateProfile).
+     *
+     * @param array<string, mixed> $in
+     * @return array{email: string, phone: string, address: array<string, string>|null}
+     */
+    public function updatePersonal(User $actor, int $id, array $in): array
+    {
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $current = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $phone = array_key_exists('phone', $in) ? self::phoneInput($in['phone']) : null;
+        $address = array_key_exists('address', $in) ? Address::parse($in['address']) : false;
+        if (array_key_exists('email', $in)) {
+            $email = trim(is_string($in['email']) ? $in['email'] : '');
+            if (mb_strtolower($email) !== mb_strtolower($current['email'])) {
+                if ($actor->id !== $id) {
+                    $this->guardAccount($actor, $target, 'Die E-Mail-Adresse dieser Person darfst du nicht ändern.');
+                }
+                $this->updateProfile($actor, $id, ['email' => $email, 'current_password' => $in['current_password'] ?? null]);
+            }
+        }
+        $this->storeContacts($id, $phone, $address);
+        return $this->personal($id);
+    }
+
+    /**
+     * Handynummer und Adresse speichern (geprüft mit phoneInput bzw. Address::parse).
+     *
+     * @param string|null $phone null: unverändert
+     * @param array<string, string>|null|false $address false: unverändert, null: entfernen
+     */
+    public function storeContacts(int $id, ?string $phone, array|null|false $address): void
+    {
+        if ($this->contacts === null) {
+            return;
+        }
+        $now = $this->time?->nowUtc() ?? gmdate('Y-m-d H:i:s');
+        if ($phone !== null) {
+            $this->contacts->setPhone($id, $phone, $now);
+        }
+        if ($address !== false) {
+            $this->contacts->setAddress($id, $address, $now);
+        }
     }
 
     /**
@@ -556,7 +635,10 @@ final class MemberService
                 throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
             }
         }
-        $phone = array_key_exists('phone', $in) ? self::phone($in['phone']) : null;
+        $phone = array_key_exists('phone', $in) ? self::phoneInput($in['phone']) : null;
+        if ($phone !== null && $actor->id !== $id && !$actor->can(Capability::ManagePersonal)) {
+            throw ApiError::forbidden('Die Handynummer anderer ändert nur, wer persönliche Angaben pflegen darf.');
+        }
         $login = null;
         if (array_key_exists('username', $in)) {
             $wanted = trim(is_string($in['username']) ? $in['username'] : '');
@@ -578,42 +660,42 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }
-        if ($phone !== null && $this->contacts !== null) {
-            $this->contacts->setPhone($id, $phone, $this->time?->nowUtc() ?? gmdate('Y-m-d H:i:s'));
-        }
+        $this->storeContacts($id, $phone, false);
         if ($login !== null && $actor->id === $id) {
             $this->auth->afterPasswordChange($id);
         }
-        return $this->profile($id);
+        return $this->profile($id, $actor);
     }
 
     /**
-     * Eigene E-Mail-Adresse und Handynummer (Meins → Konto).
+     * Eigene E-Mail-Adresse, Handynummer und Adresse (Meins → Konto).
      *
-     * @return array{email: string, phone: string}
+     * @return array{email: string, phone: string, address: array<string, string>|null}
      */
     public function ownAccount(User $user): array
     {
-        $p = $this->profile($user->id);
-        return ['email' => $p['email'], 'phone' => $p['phone']];
+        return $this->personal($user->id);
     }
 
     /**
-     * Eigene E-Mail-Adresse und Handynummer ändern. Eine neue E-Mail-Adresse nur mit dem aktuellen Passwort: Über sie
-     * lässt sich (bei WordPress) das Passwort zurücksetzen, eine fremde Sitzung soll so nicht das Konto übernehmen.
+     * Eigene E-Mail-Adresse, Handynummer und Adresse ändern. Eine neue E-Mail-Adresse nur mit dem aktuellen Passwort:
+     * Über sie lässt sich (bei WordPress) das Passwort zurücksetzen, eine fremde Sitzung soll so nicht das Konto
+     * übernehmen. Die Adresse ohne Passwort.
      *
-     * @param array<string, mixed> $in email, phone, current_password
-     * @return array{email: string, phone: string}
+     * @param array<string, mixed> $in email, phone, address, current_password
+     * @return array{email: string, phone: string, address: array<string, string>|null}
      */
     public function updateOwnAccount(User $user, array $in): array
     {
-        // Das Passwort prüft updateProfile; Name und Benutzername ändert hier niemand.
+        // Erst alles prüfen, dann schreiben; das Passwort prüft updateProfile. Name und Benutzername ändert hier niemand.
+        $address = array_key_exists('address', $in) ? Address::parse($in['address']) : false;
         $this->updateProfile($user, $user->id, array_intersect_key($in, ['email' => true, 'phone' => true, 'current_password' => true]));
+        $this->storeContacts($user->id, null, $address);
         return $this->ownAccount($user);
     }
 
     /** Handynummer prüfen und vereinheitlichen; leer heißt „keine“. */
-    private static function phone(mixed $raw): string
+    public static function phoneInput(mixed $raw): string
     {
         $phone = Text::line(is_string($raw) ? $raw : '');
         if ($phone === '') {

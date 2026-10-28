@@ -1402,6 +1402,28 @@ WHERE title IS NULL",
             // Handynummern einheitlich schreiben wie die App sie jetzt speichert (packages/frontend/src/phone.ts):
             // +491716438655 → +49 171 6438655. Nur Nummern aus + und Ziffern; was schon Leerzeichen hat, bleibt.
             34 => self::phoneFormat(),
+            // Postanschrift je Konto (Domain\Address) neben der Handynummer: Land als ISO-Code (DE), bei einem Land
+            // außerhalb der Auswahl der Name in country_name. Alle Felder leer heißt keine Adresse.
+            35 => [
+                'mysql' => [
+                    "ALTER TABLE {member_contacts} ADD COLUMN street varchar(100) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN house_number varchar(10) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN address_extra varchar(100) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN postal_code varchar(12) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN city varchar(60) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country varchar(2) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country_name varchar(60) NOT NULL DEFAULT ''",
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {member_contacts} ADD COLUMN street TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN house_number TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN address_extra TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country_name TEXT NOT NULL DEFAULT ''",
+                ],
+            ],
         ];
     }
 

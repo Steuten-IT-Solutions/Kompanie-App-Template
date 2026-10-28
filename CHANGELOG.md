@@ -21,10 +21,25 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
   auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
   schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
-
+- **Adresse**: Jedes Mitglied trägt seine Postanschrift (Land, Straße, Hausnummer, Zusatz, PLZ, Ort) unter
+  *Meins → Konto* selbst ein und ändert sie dort. Die App prüft die Eingabe wie bei E-Mail und Handynummer: Die
+  Postleitzahl muss zum gewählten Land passen (z. B. fünf Ziffern in Deutschland, „1234 AB“ in den Niederlanden), die
+  Hausnummer rückt aus der Straße in ihr Feld, und Hinweise wie „Hausnummer vergessen?“ stehen direkt am Feld.
+- **Rechte „Persönliche Angaben sehen“ und „Persönliche Angaben pflegen“**: Adresse, Handynummer, E-Mail-Adresse und
+  Geburtsdatum anderer stehen in der Verwaltung auf der Seite der Person unter **Persönliche Angaben**, sichtbar nur mit
+  diesem Recht; ändern lassen sie sich mit „Persönliche Angaben pflegen“.
+- **Beim Anlegen alles eintragen**: Beim Anlegen einzelner und mehrerer Mitglieder und beim Import lassen sich jetzt
+  auch Handynummer und Adresse eintragen (im Import mit den Spalten Handynummer, Straße, Hausnummer, Adresszusatz, PLZ,
+  Ort und Land).
 - **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
   Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
   Tage vorher, anfangs wie bisher 7 Tage).
+
+### Geändert
+
+- Handynummer und Geburtsdatum anderer sieht und ändert nicht mehr jeder, der Mitglieder anlegen darf, sondern nur,
+  wer die neuen Rechte für persönliche Angaben hat. Rollen, die bisher „Mitglieder anlegen“ hatten, bekommen beide
+  Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter *Einstellungen → Rollen* weg.
 
 ### Behoben
 

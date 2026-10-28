@@ -23,6 +23,7 @@ import { navigate, redirect as redirectTo } from '../router';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
+  AddressFields,
   DateRow,
   emptyName,
   EmailField,
@@ -32,12 +33,16 @@ import {
   Loading,
   MemberPicker,
   NameFields,
+  PhoneField,
   Sheet,
   StatCard,
   trimName,
   useAsync,
 } from '../ui';
 import { normalizeEmail } from '../email';
+import { normalizePhone } from '../phone';
+import { addressInput, EMPTY_ADDRESS } from '../address';
+import { PersonalPanel } from '../personal';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import { prefetchOnTap, sources } from '../viewData';
 import { PersonName, PersonSkeleton } from '../skeleton';
@@ -69,7 +74,16 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
-import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, formatBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import {
+  BirthdayFields,
+  birthdayString,
+  canEnterBirthdays,
+  canSetBirthdays,
+  emptyBirthday,
+  formatBirthday,
+  MemberBirthday,
+  readBirthday,
+} from '../birthdays';
 import { joinText, MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
@@ -903,6 +917,8 @@ function MemberDetailView({
         </ul>
       )}
 
+      {m.personal && <PersonalPanel id={m.id} personal={m.personal} self={self} onChanged={reload} onToast={onToast} />}
+
       {officesOn && (
         <section className="member-offices">
           <h3 className="section-title">{sec.offices}</h3>
@@ -948,7 +964,7 @@ function MemberDetailView({
         {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
         {/* Gäste gehören nicht zur Kompanie. */}
         {formerEditable && formerPanel(false)}
-        {/* Das eigene Konto ohne Löschen; E-Mail und Handynummer auch unter Meins → Konto. */}
+        {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
         {can('create_users') && (
           <AccountPanel id={m.id} level={m.level} former={!!m.former} self={self} onChanged={reload} onToast={onToast} />
         )}
@@ -1270,6 +1286,8 @@ function NewMember() {
   const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState(EMPTY_ADDRESS);
   const [birthday, setBirthday] = useState(emptyBirthday());
   const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1280,7 +1298,7 @@ function NewMember() {
     e.preventDefault();
     setFormError(null);
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
-    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
@@ -1289,6 +1307,8 @@ function NewMember() {
           ...trimName(name),
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(normalizeEmail(email) ? { email: normalizeEmail(email) } : {}),
+          ...(normalizePhone(phone) ? { phone: normalizePhone(phone) } : {}),
+          ...(addressInput(address) ? { address: addressInput(address) } : {}),
           level,
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
@@ -1315,6 +1335,8 @@ function NewMember() {
             setName(emptyName());
             setUsername('');
             setEmail('');
+            setPhone('');
+            setAddress(EMPTY_ADDRESS);
             setInitialPoints('');
             setRankId('');
             setBirthday(emptyBirthday());
@@ -1353,6 +1375,8 @@ function NewMember() {
         />
       </label>
       <EmailField value={email} onChange={setEmail} />
+      <PhoneField value={phone} onChange={setPhone} />
+      <AddressFields value={address} onChange={setAddress} />
       <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>
@@ -1384,7 +1408,7 @@ function NewMember() {
           Für die Übernahme bestehender Mitglieder: aktuellen Stand an {sec.points} und {brand.labels.rank} eintragen.
         </p>
       )}
-      {canSetBirthdays() && (
+      {canEnterBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
           <legend>Geburtstag (optional)</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />
