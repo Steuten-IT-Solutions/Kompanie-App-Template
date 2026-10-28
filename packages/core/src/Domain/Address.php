@@ -84,6 +84,33 @@ final class Address
         return $a;
     }
 
+    /** Name des Landes: aus der Auswahl, sonst wie eingetragen. @param AddressData $a */
+    public static function countryName(array $a): string
+    {
+        return self::COUNTRIES[$a['country']][0] ?? $a['country_name'];
+    }
+
+    /** Straße mit Hausnummer, z. B. „Musterstraße 1“. @param AddressData $a */
+    public static function streetLine(array $a): string
+    {
+        return trim($a['street'] . ' ' . $a['house_number']);
+    }
+
+    /**
+     * Die ganze Adresse in einer Zeile wie in address.ts (formatAddress): „Musterstraße 1, c/o …, 12345 Musterstadt“,
+     * das Land nur außerhalb Deutschlands.
+     *
+     * @param AddressData $a
+     */
+    public static function oneLine(array $a): string
+    {
+        $parts = [self::streetLine($a), $a['extra'], trim($a['postal_code'] . ' ' . $a['city'])];
+        if ($a['country'] !== self::DEFAULT_COUNTRY) {
+            $parts[] = self::countryName($a);
+        }
+        return implode(', ', array_filter($parts, static fn (string $p): bool => $p !== ''));
+    }
+
     /** @param AddressData $a */
     private static function check(array $a): void
     {

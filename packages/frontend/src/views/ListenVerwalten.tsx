@@ -27,8 +27,23 @@ const FIELD_LABELS: Record<ListField, string> = {
   rank: brand.labels.rank,
   titles: sec.titles,
   birthday: 'Geburtstag',
+  address: 'Adresse',
+  street: 'Straße und Nr.',
+  postal_code: 'PLZ',
+  city: 'Ort',
+  country: 'Land',
+  phone: 'Handynummer',
+  email: 'E-Mail',
   points: sec.points,
   penalties: `${sec.penalties} (offen)`,
+};
+
+/** Breite einer neuen Datenspalte (sonst normal) */
+const FIELD_WIDTHS: Partial<Record<ListField, ListColumn['width']>> = {
+  nr: 'narrow',
+  postal_code: 'narrow',
+  address: 'wide',
+  email: 'wide',
 };
 
 const WIDTH_LABELS: Record<ListColumn['width'], string> = { narrow: 'schmal', normal: 'normal', wide: 'breit' };
@@ -474,7 +489,7 @@ function ColumnEditor({
           onClick={() =>
             onChange([
               ...columns,
-              { kind: 'field', field, label: '', width: field === 'nr' ? 'narrow' : 'normal', checkbox: false, available: true },
+              { kind: 'field', field, label: '', width: FIELD_WIDTHS[field] ?? 'normal', checkbox: false, available: true },
             ])
           }
         >

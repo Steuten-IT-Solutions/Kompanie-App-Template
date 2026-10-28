@@ -6622,7 +6622,7 @@ components:
         kind: { type: string, enum: [field, blank], description: 'field: Wert aus der App, blank: leer zum Ausfüllen auf Papier' }
         field:
           type: [string, 'null']
-          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, points, penalties, null]
+          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, address, street, postal_code, city, country, phone, email, points, penalties, null]
           description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
         label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
         width: { type: string, enum: [narrow, normal, wide], default: normal }
@@ -6643,7 +6643,7 @@ components:
             deleted: { type: boolean }
             values:
               type: object
-              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), points (Zahl), penalties (offene Cent)'
+              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), mit view_personal address (ganze Adresse in einer Zeile, das Land nur außerhalb Deutschlands), street (Straße und Nr.), postal_code, city, country (Name des Landes), phone, email (je null ohne Eintrag), points (Zahl), penalties (offene Cent)'
               additionalProperties: true
         - type: object
           description: Freie Zeile

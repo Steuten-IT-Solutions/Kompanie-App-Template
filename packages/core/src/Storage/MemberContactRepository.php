@@ -59,6 +59,20 @@ final class MemberContactRepository
         return ['phone' => (string) ($row['phone'] ?? ''), 'address' => $row !== null ? self::addressOf($row) : null];
     }
 
+    /**
+     * Handynummer und Adresse aller Konten mit Eintrag, mit einer Abfrage (Listen).
+     *
+     * @return array<int, array{phone: string, address: AddressRow|null}> Benutzer-ID => Angaben
+     */
+    public function all(): array
+    {
+        $out = [];
+        foreach ($this->db->select('SELECT * FROM {member_contacts}') as $row) {
+            $out[(int) $row['user_id']] = ['phone' => (string) $row['phone'], 'address' => self::addressOf($row)];
+        }
+        return $out;
+    }
+
     /** @param AddressRow|null $address null entfernt sie */
     public function setAddress(int $userId, ?array $address, string $now): void
     {
