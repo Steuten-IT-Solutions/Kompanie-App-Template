@@ -143,8 +143,7 @@ try {
             }
             $kernel->upgrade();
             $backup = new StandaloneBackup($kernel);
-            // Erst entschlüsseln: Ein falsches Passwort soll nichts anlegen. Verschlüsselt direkt aus der Datei in eine
-            // temporäre Datei (nur der Klartext kommt in den Arbeitsspeicher).
+            // Erst entschlüsseln: Ein falsches Passwort soll nichts anlegen.
             $head = (string) file_get_contents($file, false, null, 0, strlen(BackupCrypto::MAGIC));
             if (BackupCrypto::isEncrypted($head)) {
                 $passFile = $str('passphrase-file');
@@ -156,45 +155,28 @@ try {
                     $pass = rtrim($read, "\r\n");
                 } else {
                     fwrite(STDERR, 'Passwort für Sicherungen: ');
-                    $tty = function_exists('posix_isatty') && posix_isatty(STDIN);
-                    if ($tty) {
-                        shell_exec('stty -echo');
-                        // Bei Strg-C die Anzeige der Eingabe wieder einschalten (sonst bleibt das Terminal „stumm“).
-                        if (function_exists('pcntl_async_signals')) {
-                            pcntl_async_signals(true);
-                            pcntl_signal(SIGINT, static function (): void {
-                                shell_exec('stty echo');
-                                fwrite(STDERR, "\n");
-                                exit(130);
-                            });
-                        }
-                    }
-                    $line = fgets(STDIN);
-                    $pass = $line === false ? '' : rtrim($line, "\r\n");
-                    if ($tty) {
-                        shell_exec('stty echo');
-                        function_exists('pcntl_signal') && pcntl_signal(SIGINT, SIG_DFL);
+                    if (function_exists('posix_isatty') && posix_isatty(STDIN)) {
+                        // Eingabe verdeckt; die Shell stellt die Anzeige auch bei Strg-C wieder her (trap), ohne pcntl.
+                        $line = shell_exec("sh -c 'trap \"stty echo; exit 130\" INT TERM; stty -echo; IFS= read -r p; stty echo; printf \"%s\" \"\$p\"'");
+                        $pass = is_string($line) ? $line : '';
+                    } else {
+                        $line = fgets(STDIN);
+                        $pass = $line === false ? '' : rtrim($line, "\r\n");
                     }
                     fwrite(STDERR, "\n");
                 }
                 if ($pass === '') {
                     throw new RuntimeException('Kein Passwort für Sicherungen angegeben.');
                 }
-                // Klartext nur im Datenbereich der App, nicht im /tmp des Servers; danach gleich gelöscht.
-                $plain = $kernel->app()->files->tempFile();
+                // Direkt aus der Datei in den Arbeitsspeicher entschlüsseln: Der Klartext liegt nie als Datei vor.
                 $in = @fopen($file, 'rb');
-                $out = @fopen($plain, 'w+b');
+                if ($in === false) {
+                    throw new RuntimeException('Die Sicherung ließ sich nicht lesen.');
+                }
                 try {
-                    if ($in === false || $out === false) {
-                        throw new RuntimeException('Die Sicherung ließ sich nicht lesen.');
-                    }
-                    BackupCrypto::decryptStream($in, $out, $pass);
-                    rewind($out);
-                    $data = (string) stream_get_contents($out);
+                    $data = BackupCrypto::decrypt($in, $pass);
                 } finally {
-                    is_resource($in) && fclose($in);
-                    is_resource($out) && fclose($out);
-                    @unlink($plain);
+                    fclose($in);
                 }
             } else {
                 $data = (string) file_get_contents($file);

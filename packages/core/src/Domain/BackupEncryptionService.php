@@ -98,15 +98,28 @@ final class BackupEncryptionService
     }
 
     /**
-     * Hochgeladene Sicherung (POST /admin/backup, backup_base64): Stück für Stück dekodieren; ist sie verschlüsselt,
-     * mit dem Passwort entschlüsseln. Der verschlüsselte Inhalt darf in eine temporäre Datei, der Klartext bleibt im
-     * Arbeitsspeicher (php://memory), damit er nicht im /tmp des Servers landet.
+     * Hochgeladene Sicherung (POST /admin/backup, backup_base64); ist sie verschlüsselt, mit dem Passwort entschlüsseln.
+     * Der Klartext entsteht nur im Arbeitsspeicher (einmal), damit er nicht im /tmp des Servers landet.
      *
      * @throws ApiError 400 passphrase_required, wenn das Passwort fehlt; 400 bei falschem Passwort oder beschädigter
      *                  Datei; 429 nach zu vielen Fehlversuchen
      */
     public function readUpload(string $base64, mixed $passphrase): string
     {
+        // Am Anfang erkennen, was es ist: Klartext nie in eine Datei (php://temp schreibt ab 2 MB ins /tmp des Servers).
+        $head = (string) base64_decode(substr($base64, 0, 4 * (int) ceil(strlen(BackupCrypto::MAGIC) / 3)), false);
+        if (!BackupCrypto::isEncrypted($head)) {
+            $plain = base64_decode($base64, true);
+            if ($plain === false) {
+                throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
+            }
+            return $plain; // unverschlüsselte Sicherung
+        }
+        if (!is_string($passphrase) || $passphrase === '') {
+            throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
+        }
+        $this->throttle();
+        // Der verschlüsselte Inhalt darf in eine temporäre Datei, der Klartext entsteht nur im Arbeitsspeicher.
         $in = fopen('php://temp', 'w+b');
         if ($in === false) {
             throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
@@ -120,32 +133,13 @@ final class BackupEncryptionService
                 stream_filter_remove($filter); // schreibt den Rest
             }
             rewind($in);
-            if (!BackupCrypto::isEncrypted((string) fread($in, strlen(BackupCrypto::MAGIC)))) {
-                rewind($in);
-                return (string) stream_get_contents($in); // unverschlüsselte Sicherung
+            return BackupCrypto::decrypt($in, $passphrase);
+        } catch (\RuntimeException $e) {
+            // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.
+            if ($e->getCode() === BackupCrypto::WRONG_PASSPHRASE) {
+                $this->failed();
             }
-            if (!is_string($passphrase) || $passphrase === '') {
-                throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
-            }
-            $this->throttle();
-            $out = fopen('php://memory', 'w+b');
-            if ($out === false) {
-                throw ApiError::invalid('Die Sicherung ließ sich nicht entschlüsseln.');
-            }
-            try {
-                rewind($in);
-                BackupCrypto::decryptStream($in, $out, $passphrase);
-                rewind($out);
-                return (string) stream_get_contents($out);
-            } catch (\RuntimeException $e) {
-                // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.
-                if ($e->getCode() === BackupCrypto::WRONG_PASSPHRASE) {
-                    $this->failed();
-                }
-                throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
-            } finally {
-                fclose($out);
-            }
+            throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
         } finally {
             fclose($in);
         }

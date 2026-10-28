@@ -614,14 +614,18 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
   const { data, error, loading, reload } = useAsync(() => api.backupEncryption(), [], 'admin/backup/encryption');
   const [enc, setEnc] = useState<BackupEncryptionStatus | null>(null);
   if (loading && !data) return <Loading />;
-  if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const e = enc ?? data!;
+  const e = enc ?? data;
+  // Ohne den Stand des Passworts bleiben Herunterladen (unverschlüsselt) und Wiederherstellen trotzdem möglich.
   return (
     <>
-      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e.configured} />
-      <Verschluesselung status={e} onChange={setEnc} onToast={onToast} />
+      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e?.configured ?? false} />
+      {e ? (
+        <Verschluesselung status={e} onChange={setEnc} onToast={onToast} />
+      ) : (
+        <ErrorBox message={error ?? 'Nicht geladen'} onRetry={reload} />
+      )}
       {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (pausiert oder nicht) */}
-      <DriveSicherung key={String(e.configured)} onToast={onToast} />
+      <DriveSicherung key={String(e?.configured)} onToast={onToast} />
     </>
   );
 }
@@ -925,7 +929,8 @@ function Verschluesselung({
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={busy || !kept || pass.length < status.min_length || pass !== repeat}
+              // Zeichen wie auf dem Server (mb_strlen), nicht UTF-16-Einheiten
+              disabled={busy || !kept || [...pass].length < status.min_length || pass !== repeat}
             >
               {busy ? 'Richtet ein …' : 'Passwort einrichten'}
             </button>

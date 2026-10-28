@@ -126,6 +126,31 @@ final class BackupCrypto
      */
     public static function decryptStream($in, $out, string $passphrase): void
     {
+        self::decryptEach($in, static fn (string $plain) => self::write($out, $plain), $passphrase);
+    }
+
+    /**
+     * Verschlüsselte Sicherung lesen und den Klartext als Zeichenkette liefern (für den Import, der sie ohnehin ganz
+     * braucht): ohne Zwischenspeicher, nur eine Kopie im Arbeitsspeicher.
+     *
+     * @param resource $in
+     * @throws \RuntimeException wie decryptStream()
+     */
+    public static function decrypt($in, string $passphrase): string
+    {
+        $out = '';
+        self::decryptEach($in, static function (string $plain) use (&$out): void {
+            $out .= $plain;
+        }, $passphrase);
+        return $out;
+    }
+
+    /**
+     * @param resource $in
+     * @param \Closure(string): void $sink bekommt den Klartext Block für Block
+     */
+    private static function decryptEach($in, \Closure $sink, string $passphrase): void
+    {
         if (self::readFull($in, strlen(self::MAGIC)) !== self::MAGIC) {
             throw new \RuntimeException('Die Datei ist keine verschlüsselte Sicherung der App.');
         }
@@ -177,7 +202,7 @@ final class BackupCrypto
                 $ad = '';
                 [$plain, $tag] = $res;
                 if ($plain !== '') {
-                    self::write($out, $plain);
+                    $sink($plain);
                 }
                 if ($tag === SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL) {
                     break;
