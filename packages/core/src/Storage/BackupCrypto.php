@@ -33,12 +33,18 @@ final class BackupCrypto
     public const MIN_LENGTH = 12;
     /** Endung verschlüsselter Sicherungen */
     public const EXTENSION = '.json.enc';
+    /** Code der RuntimeException, wenn das Passwort nicht passt (zählt als Fehlversuch, eine beschädigte Datei nicht) */
+    public const WRONG_PASSPHRASE = 1;
     private const CHUNK = 65536;
     /** Obergrenzen für Parameter aus dem Kopf einer Datei (eine präparierte Datei soll den Server nicht lahmlegen). */
     private const MIN_OPS = 1;
     private const MIN_MEM = 8192;
-    private const MAX_OPS = 20;
-    private const MAX_MEM = 1024 * 1024 * 1024;
+    /**
+     * Höchstens MODERATE (3 Durchgänge, 256 MiB): Die Werte stehen ungeprüft im Kopf, und libsodium holt den Speicher
+     * außerhalb von memory_limit. Erzeugt werden Dateien mit INTERACTIVE (2, 64 MiB).
+     */
+    private const MAX_OPS = 3;
+    private const MAX_MEM = 256 * 1024 * 1024;
     private const MAX_HEADER = 8192;
 
     /** Ob PHP alles Nötige mitbringt (libsodium ab PHP 7.2 eingebaut, aber abschaltbar). */
@@ -176,7 +182,7 @@ final class BackupCrypto
         $fileKey = sodium_crypto_box_seal_open($sealed, $keypair);
         sodium_memzero($keypair);
         if ($fileKey === false) {
-            throw new \RuntimeException('Das Passwort für Sicherungen passt nicht zu dieser Datei (oder die Datei ist beschädigt).');
+            throw new \RuntimeException('Das Passwort für Sicherungen passt nicht zu dieser Datei (oder die Datei ist beschädigt).', self::WRONG_PASSPHRASE);
         }
         try {
             $state = sodium_crypto_secretstream_xchacha20poly1305_init_pull($streamHeader, $fileKey);
@@ -210,26 +216,6 @@ final class BackupCrypto
             }
         } finally {
             sodium_memzero($fileKey);
-        }
-    }
-
-    /** Wie decryptStream(), für Inhalte, die schon im Arbeitsspeicher sind (Hochladen über die API). */
-    public static function decryptToString(string $data, string $passphrase): string
-    {
-        $in = fopen('php://memory', 'w+b');
-        $out = fopen('php://temp', 'w+b');
-        if ($in === false || $out === false) {
-            throw new \RuntimeException('Die Sicherung ließ sich nicht entschlüsseln.');
-        }
-        try {
-            fwrite($in, $data);
-            rewind($in);
-            self::decryptStream($in, $out, $passphrase);
-            rewind($out);
-            return (string) stream_get_contents($out);
-        } finally {
-            fclose($in);
-            fclose($out);
         }
     }
 

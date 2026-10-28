@@ -175,7 +175,10 @@ final class BackupEncryptionService
             rewind($out);
             return (string) stream_get_contents($out);
         } catch (\RuntimeException $e) {
-            $this->failed();
+            // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.
+            if ($e->getCode() === BackupCrypto::WRONG_PASSPHRASE) {
+                $this->failed();
+            }
             throw ApiError::invalid($e->getMessage());
         } finally {
             fclose($out);

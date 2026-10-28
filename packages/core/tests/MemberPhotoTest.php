@@ -316,6 +316,8 @@ final class MemberPhotoTest extends TestCase
 
         $this->assertSame(200, $patch(['view_news', 'view_former'])->status);
         $this->assertSame(401, $deliver(null, $this->m)['status'], 'Liste für Gäste aus: kein Foto ohne Anmeldung');
+        $this->assertFalse($photos->visibility(null, $this->users->find($this->m))['visible'], 'Seiten wie Ämter verlinken es dann nicht');
+        $this->assertTrue($photos->visibility($this->users->find($reader), $this->users->find($this->m))['visible']);
         $this->assertSame(403, $deliver($guest, $this->m)['status'], 'Gast-Konto ebenso');
         $res = $deliver($reader, $this->m);
         $this->assertSame(200, $res['status'], 'mit view_directory');

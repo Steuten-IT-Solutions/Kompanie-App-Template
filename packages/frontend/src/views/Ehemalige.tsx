@@ -224,6 +224,10 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
   async function save(e: FormEvent) {
     e.preventDefault();
     const years = f.years.trim() === '' ? 0 : Number(f.years);
+    if (!Number.isInteger(years) || years < 0 || years > 50) {
+      setSaveError('Bitte die Frist in ganzen Jahren angeben (0 bis 50; leer oder 0 = aus).');
+      return;
+    }
     if (
       years > 0 &&
       !window.confirm(`Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Das lässt sich nicht rückgängig machen.`)

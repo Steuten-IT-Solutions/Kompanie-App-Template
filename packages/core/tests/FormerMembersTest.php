@@ -440,6 +440,7 @@ final class FormerMembersTest extends TestCase
 
         $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => 51])->status);
         $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => 'fünf'])->status);
+        $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => null])->status, 'fehlt: Fehler, nicht „aus“');
         $this->users->current = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->assertSame(403, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status, 'nur Admins (manage_settings)');
         $this->users->current = $this->admin;

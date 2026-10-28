@@ -12,6 +12,7 @@ use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\BackupCrypto;
+use KompanieApp\Core\Tests\Support\Decrypt;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
@@ -79,7 +80,7 @@ final class BackupUploadTest extends TestCase
 
     private static function decrypt(string $content): string
     {
-        return BackupCrypto::decryptToString($content, self::PASS);
+        return Decrypt::string($content, self::PASS);
     }
 
     private function http(): FakeHttpClient
@@ -398,6 +399,27 @@ final class BackupUploadTest extends TestCase
             $this->assertSame([200, ['ok' => false]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => 'falsch']), "Fehlversuch $i");
         }
         $this->assertSame(429, $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS])[0], 'nach zehn Fehlversuchen gesperrt');
+    }
+
+    /** Eine beschädigte Datei ist kein Fehlversuch: Sie sperrt das Wiederherstellen nicht. */
+    public function testDamagedFileIsNoFailedAttempt(): void
+    {
+        $in = fopen('php://memory', 'w+b');
+        $out = fopen('php://memory', 'w+b');
+        fwrite($in, '{}');
+        rewind($in);
+        $this->app->backupEncryption()->encryptStream($in, $out);
+        rewind($out);
+        $damaged = substr((string) stream_get_contents($out), 0, -5);
+        for ($i = 0; $i < 12; $i++) {
+            try {
+                $this->app->backupEncryption()->decryptUpload($damaged, self::PASS);
+                $this->fail('beschädigt');
+            } catch (\KompanieApp\Core\Http\ApiError $e) {
+                $this->assertSame(400, $e->status, "Versuch $i");
+            }
+        }
+        $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
         $stored = (string) json_encode($this->app->settings->get(BackupCrypto::SETTING));
         $this->assertStringNotContainsString(self::PASS, $stored, 'Passwort nicht gespeichert');
     }

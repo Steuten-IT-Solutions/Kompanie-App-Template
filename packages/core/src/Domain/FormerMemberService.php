@@ -506,7 +506,8 @@ final class FormerMemberService
      */
     public function setRetention(array $in): array
     {
-        $years = $in['years'] ?? 0;
+        // Fehlt die Zahl oder ist sie ungültig: Fehler, nicht stillschweigend „aus“.
+        $years = $in['years'] ?? null;
         if (!is_int($years) && !(is_string($years) && ctype_digit($years))) {
             throw ApiError::invalid('Bitte die Frist in ganzen Jahren angeben (0 = aus).');
         }
@@ -542,8 +543,10 @@ final class FormerMemberService
             }
             try {
                 $this->app->users->removeAccount($person['id']);
-            } catch (\DomainException) {
-                continue; // z. B. Administrator der Webseite: dort verwaltet
+            } catch (\DomainException $e) {
+                // z. B. Administrator der Webseite: dort verwaltet. Nicht still übergehen: Die Frist ist eine Zusage.
+                error_log('Kompanie-App: Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
+                continue;
             }
             // Löscht auch den Eintrag als ehemalig (former_members steht in UserData::TABLES).
             $this->app->userDeleted($person['id']);

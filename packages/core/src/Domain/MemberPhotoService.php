@@ -237,19 +237,31 @@ final class MemberPhotoService
      * Mitgliederliste (Bereich directory, Issue #112): Über welches Recht das Foto zu sehen ist: view_directory für die
      * Personen in der Mitgliederliste, view_former für die Ehemaligen (Tab daneben); null für andere Gäste.
      */
-    private function publicVia(int $userId): ?Capability
+    private function publicVia(?User $target): ?Capability
     {
-        if (!$this->app->features()->enabled('directory')) {
-            return null;
-        }
-        $target = $this->app->users->find($userId);
-        if ($target === null) {
+        if ($target === null || !$this->app->features()->enabled('directory')) {
             return null;
         }
         if (MemberService::inDirectory($target)) {
             return Capability::ViewDirectory;
         }
         return $this->app->formerMembers()->previousRole($target) !== null ? Capability::ViewFormer : null;
+    }
+
+    /**
+     * Ob $viewer (null: ohne Anmeldung) das Foto von $target sehen darf: dieselbe Regel wie forDelivery(), für Seiten,
+     * die Fotos anderer verlinken (z. B. Ämter), damit sie keine Adressen ausgeben, die dann 401/403 liefern.
+     * Öffentlich ist es nur, wenn Gast die Liste sehen darf; sonst braucht, wer angemeldet ist, das Recht selbst.
+     *
+     * @return array{visible: bool, public: bool}
+     */
+    public function visibility(?User $viewer, ?User $target): array
+    {
+        $via = $this->publicVia($target);
+        $public = $via !== null && $this->app->anonymous()->can($via); // Rollen hält RoleService je Anfrage
+        $visible = $public || ($viewer !== null && $target !== null
+            && ($viewer->id === $target->id || self::canSeeOthers($viewer) || ($via !== null && $viewer->can($via))));
+        return ['visible' => $visible, 'public' => $public];
     }
 
     /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */
@@ -283,13 +295,13 @@ final class MemberPhotoService
         }
         // Öffentlich nur, wenn Gast die Liste sehen darf (sonst ließen sich die Fotos über die fortlaufenden Nummern
         // abrufen, obwohl die Liste verborgen ist); sonst brauchen Angemeldete das Recht selbst.
-        $via = $this->publicVia($userId);
-        $public = $via !== null && $this->app->anonymous()->can($via);
-        if ($viewer === null && !$public) {
-            return $deny(401);
+        $target = $this->app->users->find($userId);
+        if ($target === null) {
+            return $deny(404); // Konto gelöscht: das Foto gibt es nicht mehr
         }
-        if ($viewer !== null && $viewer->id !== $userId && !$public && !self::canSeeOthers($viewer) && !($via !== null && $viewer->can($via))) {
-            return $deny(403);
+        ['visible' => $visible, 'public' => $public] = $this->visibility($viewer, $target);
+        if (!$visible && !($viewer !== null && $viewer->id === $userId)) {
+            return $deny($viewer === null ? 401 : 403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;
         // Originalauflösung nur für Angemeldete; die Großansicht bleibt dann bei der 1024er (wie bei älteren Fotos).

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\Storage\BackupCrypto;
+use KompanieApp\Core\Tests\Support\Decrypt;
 use PHPUnit\Framework\TestCase;
 
 /** Verschlüsselte Sicherungen: Hin und zurück, falsches Passwort, beschädigte und abgeschnittene Dateien, Speicher. */
@@ -37,7 +38,7 @@ final class BackupCryptoTest extends TestCase
             $plain = $n > 0 ? random_bytes($n) : '';
             $enc = self::encrypt($plain);
             $this->assertTrue(BackupCrypto::isEncrypted($enc), "$n Bytes");
-            $this->assertSame($plain, BackupCrypto::decryptToString($enc, self::PASS), "$n Bytes");
+            $this->assertSame($plain, Decrypt::string($enc, self::PASS), "$n Bytes");
         }
         $json = '{"format":"kompanie-app-backup","tables":{"points":[{"reason":"Geheimnis"}]}}';
         $enc = self::encrypt($json, ['version' => '1.2.3']);
@@ -49,7 +50,7 @@ final class BackupCryptoTest extends TestCase
     public function testWrongPassphrase(): void
     {
         $this->expectExceptionMessage('Das Passwort für Sicherungen passt nicht');
-        BackupCrypto::decryptToString(self::encrypt('{}'), 'falsches-passwort');
+        Decrypt::string(self::encrypt('{}'), 'falsches-passwort');
     }
 
     public function testDetectsTamperingAndTruncation(): void
@@ -66,7 +67,7 @@ final class BackupCryptoTest extends TestCase
         ];
         foreach ($cases as $label => $bad) {
             try {
-                BackupCrypto::decryptToString($bad, self::PASS);
+                Decrypt::string($bad, self::PASS);
                 $this->fail("$label: nicht erkannt");
             } catch (\RuntimeException $e) {
                 $this->assertStringContainsString('beschädigt', $e->getMessage(), $label);
@@ -80,7 +81,7 @@ final class BackupCryptoTest extends TestCase
         $bad = str_replace('"mem":8192', '"mem":99999999999', $enc);
         $bad = substr_replace($bad, pack('N', strlen($bad) - strlen($enc) + unpack('N', substr($enc, strlen(BackupCrypto::MAGIC), 4))[1]), strlen(BackupCrypto::MAGIC), 4);
         $this->expectExceptionMessage('beschädigt');
-        BackupCrypto::decryptToString($bad, self::PASS);
+        Decrypt::string($bad, self::PASS);
     }
 
     /** Fehler beim Verschlüsseln kommen als RuntimeException (Aufrufer vor einem Update fangen nur diese). */

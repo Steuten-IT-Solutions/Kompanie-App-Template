@@ -143,9 +143,10 @@ try {
             }
             $kernel->upgrade();
             $backup = new StandaloneBackup($kernel);
-            // Erst entschlüsseln: Ein falsches Passwort soll nichts anlegen.
-            $data = (string) file_get_contents($file);
-            if (BackupCrypto::isEncrypted($data)) {
+            // Erst entschlüsseln: Ein falsches Passwort soll nichts anlegen. Verschlüsselt direkt aus der Datei in eine
+            // temporäre Datei (nur der Klartext kommt in den Arbeitsspeicher).
+            $head = (string) file_get_contents($file, false, null, 0, strlen(BackupCrypto::MAGIC));
+            if (BackupCrypto::isEncrypted($head)) {
                 $passFile = $str('passphrase-file');
                 if ($passFile !== '') {
                     $pass = rtrim((string) @file_get_contents($passFile), "\r\n");
@@ -171,7 +172,24 @@ try {
                     }
                     fwrite(STDERR, "\n");
                 }
-                $data = BackupCrypto::decryptToString($data, $pass);
+                // Klartext nur im Datenbereich der App, nicht im /tmp des Servers; danach gleich gelöscht.
+                $plain = $kernel->app()->files->tempFile();
+                $in = @fopen($file, 'rb');
+                $out = @fopen($plain, 'w+b');
+                try {
+                    if ($in === false || $out === false) {
+                        throw new RuntimeException('Die Sicherung ließ sich nicht lesen.');
+                    }
+                    BackupCrypto::decryptStream($in, $out, $pass);
+                    rewind($out);
+                    $data = (string) stream_get_contents($out);
+                } finally {
+                    is_resource($in) && fclose($in);
+                    is_resource($out) && fclose($out);
+                    @unlink($plain);
+                }
+            } else {
+                $data = (string) file_get_contents($file);
             }
             // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
             $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.json';

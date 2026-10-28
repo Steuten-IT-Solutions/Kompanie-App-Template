@@ -111,7 +111,8 @@ final class OfficeService
                         if ($user !== null && ($public || $manager || $viewer?->id === $user->id)) {
                             $out['user_id'] = $user->id;
                         }
-                        if ($public) {
+                        // Foto nur, wenn der Betrachter es abrufen darf (Regel von MemberPhotoService::forDelivery).
+                        if ($public && $this->app->memberPhotos()->visibility($viewer, $user)['visible']) {
                             $out['photo_url'] = $photos[$user->id] ?? null;
                         }
                         return $out;
