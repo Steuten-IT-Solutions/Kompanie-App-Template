@@ -12,7 +12,7 @@ import {
   type UpdateStatus,
   type UpdateStep,
 } from '../api';
-import { backupPayload, isEncryptedBackup } from '../backupFile';
+import { filePayload, isEncryptedFile } from '../backupFile';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -630,7 +630,7 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Verschlüsselte Datei zum Wiederherstellen: wartet auf das Passwort für Sicherungen.
-  const [pending, setPending] = useState<{ name: string; bytes: Uint8Array } | null>(null);
+  const [pending, setPending] = useState<File | null>(null);
   const [passphrase, setPassphrase] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -687,20 +687,19 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
     )
       return;
     setError(null);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    if (isEncryptedBackup(bytes)) {
-      setPending({ name: file.name, bytes });
+    if (await isEncryptedFile(file)) {
+      setPending(file);
       setPassphrase('');
       return;
     }
-    await send(bytes);
+    await send(file);
   }
 
-  async function send(bytes: Uint8Array, pass?: string) {
+  async function send(file: File, pass?: string) {
     setBusy(true);
     setError(null);
     try {
-      await api.restoreBackup(backupPayload(bytes), pass);
+      await api.restoreBackup(await filePayload(file), pass);
       setPending(null);
       onToast('Sicherung wiederhergestellt');
       setTimeout(() => window.location.reload(), 1500);
@@ -745,7 +744,7 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
           className="form"
           onSubmit={(e) => {
             e.preventDefault();
-            void send(pending.bytes, passphrase);
+            void send(pending, passphrase);
           }}
         >
           <p className="small">„{pending.name}“ ist verschlüsselt. Zum Wiederherstellen bitte das Passwort für Sicherungen eingeben.</p>

@@ -22,7 +22,23 @@ export function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Inhalt für die API: verschlüsselt als backup_base64, sonst als Text (wie bisher). */
-export function backupPayload(bytes: Uint8Array): { backup: string } | { backup_base64: string } {
-  return isEncryptedBackup(bytes) ? { backup_base64: toBase64(bytes) } : { backup: new TextDecoder().decode(bytes) };
+/** Ob die gewählte Datei eine verschlüsselte Sicherung ist (liest nur den Anfang). */
+export async function isEncryptedFile(file: Blob): Promise<boolean> {
+  return isEncryptedBackup(new Uint8Array(await file.slice(0, BACKUP_MAGIC.length).arrayBuffer()));
+}
+
+/**
+ * Inhalt einer gewählten Datei für die API. Im Browser kodiert FileReader die verschlüsselte Datei selbst als Base64,
+ * ohne Zwischenschritt über eine Zeichenkette der ganzen Datei (große Sicherungen mit vielen Fotos).
+ */
+export async function filePayload(file: Blob): Promise<{ backup: string } | { backup_base64: string }> {
+  if (!(await isEncryptedFile(file))) return { backup: await file.text() };
+  if (typeof FileReader === 'undefined') return { backup_base64: toBase64(new Uint8Array(await file.arrayBuffer())) };
+  const url = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Die Datei ließ sich nicht lesen.'));
+    reader.readAsDataURL(file);
+  });
+  return { backup_base64: url.slice(url.indexOf(',') + 1) };
 }

@@ -408,12 +408,12 @@ final class BackupUploadTest extends TestCase
         $out = fopen('php://memory', 'w+b');
         fwrite($in, '{}');
         rewind($in);
-        $this->app->backupEncryption()->encryptStream($in, $out);
+        BackupCrypto::encryptStream($in, $out, self::$key);
         rewind($out);
         $damaged = substr((string) stream_get_contents($out), 0, -5);
         for ($i = 0; $i < 12; $i++) {
             try {
-                $this->app->backupEncryption()->decryptUpload($damaged, self::PASS);
+                $this->app->backupEncryption()->readUpload(base64_encode($damaged), self::PASS);
                 $this->fail('beschädigt');
             } catch (\KompanieApp\Core\Http\ApiError $e) {
                 $this->assertSame(400, $e->status, "Versuch $i");

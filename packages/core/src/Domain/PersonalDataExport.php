@@ -83,6 +83,10 @@ final class PersonalDataExport
             'rich_images' => "SELECT * FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?",
         ] as $table => $sql) {
             $rows = $this->rows($sql, [$userId]);
+            if ($table === 'push_subscriptions' && !$self) {
+                // Die Adresse eines Abos ist ein Zugang beim Push-Dienst: nur in der eigenen Auskunft.
+                $rows = array_map(static fn (array $r): array => array_diff_key($r, ['endpoint' => 1, 'endpoint_hash' => 1]), $rows);
+            }
             if ($rows !== []) {
                 $data[$table] = $rows;
             }

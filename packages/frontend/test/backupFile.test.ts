@@ -1,7 +1,7 @@
 // Sicherungsdatei beim Wiederherstellen (src/backupFile.ts): verschlüsselt erkennen, als Base64 senden.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BACKUP_MAGIC, backupPayload, isEncryptedBackup, toBase64 } from '../src/backupFile.ts';
+import { BACKUP_MAGIC, filePayload, isEncryptedBackup, isEncryptedFile, toBase64 } from '../src/backupFile.ts';
 
 const enc = new TextEncoder();
 
@@ -17,8 +17,11 @@ test('Base64 auch für große Dateien, gleich wie Node', () => {
   assert.equal(toBase64(new Uint8Array()), '');
 });
 
-test('Inhalt für die API', () => {
-  assert.deepEqual(backupPayload(enc.encode('{"ä":1}')), { backup: '{"ä":1}' });
-  const encrypted = enc.encode(BACKUP_MAGIC + 'x');
-  assert.deepEqual(backupPayload(encrypted), { backup_base64: Buffer.from(encrypted).toString('base64') });
+test('gewählte Datei: Anfang prüfen, Inhalt für die API', async () => {
+  const plain = new Blob(['{"ä":1}']);
+  const encrypted = new Blob([BACKUP_MAGIC + 'x']);
+  assert.equal(await isEncryptedFile(plain), false);
+  assert.equal(await isEncryptedFile(encrypted), true);
+  assert.deepEqual(await filePayload(plain), { backup: '{"ä":1}' });
+  assert.deepEqual(await filePayload(encrypted), { backup_base64: Buffer.from(BACKUP_MAGIC + 'x').toString('base64') });
 });

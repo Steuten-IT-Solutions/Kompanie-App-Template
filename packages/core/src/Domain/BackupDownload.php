@@ -74,14 +74,18 @@ final class BackupDownload
                         throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht lesen.');
                     }
                     try {
-                        stream_copy_to_stream($in, $out);
+                        $copied = stream_copy_to_stream($in, $out);
                     } finally {
                         fclose($in);
                     }
+                    $complete = $copied !== false && $copied === filesize($file);
                 } finally {
                     @unlink($file);
                 }
-                $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
+                // Nur eine ganz gesendete Sicherung zählt für die Ampel.
+                if ($complete) {
+                    $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
+                }
             }];
         }
         return ['status' => 200, 'headers' => [

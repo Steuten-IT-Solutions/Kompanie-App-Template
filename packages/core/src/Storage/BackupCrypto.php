@@ -110,8 +110,11 @@ final class BackupCrypto
     {
         $enc = BackupEncryptor::start($key, $meta);
         $enc->attach($out);
-        stream_copy_to_stream($in, $out);
+        $copied = stream_copy_to_stream($in, $out);
         $enc->finish();
+        if ($copied === false || !fflush($out)) {
+            throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+        }
     }
 
     /**

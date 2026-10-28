@@ -91,6 +91,8 @@ final class PersonalDataExportTest extends TestCase
     {
         $res = $this->call('GET', "/members/{$this->m}/data");
         $this->assertSame(200, $res->status);
+        $this->assertStringNotContainsString('push.example', (string) json_encode($res->data), 'Push-Adresse nur in der eigenen Auskunft');
+        $this->assertCount(1, $res->data['data']['push_subscriptions'], 'das Abo selbst schon');
         $this->assertSame($this->m, $res->data['person']['id']);
         $this->assertSame(['Meine namentliche Meinung'], array_column($res->data['data']['poll_answers'], 'answer_text'), 'anonyme Antworten nicht für die Verwaltung');
         $this->assertCount(1, $res->data['data']['poll_votes'], 'Teilnahme schon');

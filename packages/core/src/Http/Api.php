@@ -19,6 +19,7 @@ use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Detail;
@@ -1148,9 +1149,14 @@ final class Api
                 if (!Input::bool($r->input('confirm')) || !is_string($data)) {
                     throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
                 }
-                $data = is_string($base64)
-                    ? $a->backupEncryption()->readUpload($base64, $r->input('passphrase'))
-                    : $a->backupEncryption()->decryptUpload($data, $r->input('passphrase'));
+                if (is_string($base64)) {
+                    $data = $a->backupEncryption()->readUpload($base64, $r->input('passphrase'));
+                } elseif (BackupCrypto::isEncrypted($data)) {
+                    // Als Text gelesen ist eine verschlüsselte Datei nicht mehr lesbar (Zeichensatz); die App sendet sie als Base64.
+                    throw ApiError::invalid('Verschlüsselte Sicherungen bitte als Datei hochladen (backup_base64).');
+                }
+                // Hintergrundaufgaben (z. B. die Aufbewahrungsfrist aus der Sicherung) plant der nächste Aufruf neu: Der
+                // Import löscht tasks_planned (App::upgrade). Nicht hier: Die Einstellungen dieser Anfrage sind noch die alten.
                 try {
                     $backup->import($data);
                 } catch (\RuntimeException $e) {
