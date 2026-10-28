@@ -42,7 +42,7 @@ final class UpdateService
     /** Zurückgestelltes automatisches Update: {version, kind, at, error} */
     public const HELD = 'update_held';
     public const DRIVE_FAILED = 'drive_backup_failed';
-    /** Laufendes Update für die Fortschrittsanzeige: {version, step, steps, at} */
+    /** Laufendes Update für die Fortschrittsanzeige: {version, step, steps, at, done?, total?, estimate?, file?} */
     private const PROGRESS = 'update_progress';
     private const MAX_BACKUPS = 5;
 
@@ -172,7 +172,15 @@ final class UpdateService
             'progress' => null,
         ];
         if ($out['running'] && is_array($p = $this->settings->get(self::PROGRESS))) {
-            $out['progress'] = ['version' => (string) ($p['version'] ?? ''), 'step' => (string) ($p['step'] ?? ''), 'steps' => array_values((array) ($p['steps'] ?? [])), 'at' => (int) ($p['at'] ?? 0)];
+            $out['progress'] = ['version' => (string) ($p['version'] ?? ''), 'step' => (string) ($p['step'] ?? ''), 'steps' => array_values((array) ($p['steps'] ?? [])), 'at' => (int) ($p['at'] ?? 0),
+                'done' => isset($p['done']) ? (int) $p['done'] : null, 'total' => !empty($p['total']) ? (int) $p['total'] : null, 'estimate' => (bool) ($p['estimate'] ?? false)];
+            // Sicherung: Ihre Größe steht erst am Ende fest; geschrieben ist, was schon in der Datei steht.
+            $file = (string) ($p['file'] ?? '');
+            if ($file !== '' && $file === basename($file)) {
+                $path = dirname($this->lockPath()) . '/' . $file;
+                clearstatcache(true, $path);
+                $out['progress']['done'] = is_file($path) ? (int) filesize($path) : null;
+            }
         }
         if (!is_array($state['list'] ?? null) || !$this->configured()) {
             return $out;
@@ -299,8 +307,8 @@ final class UpdateService
         $record = ['from' => $this->currentVersion, 'to' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'ok' => false, 'error' => ''];
         // Schritte für die Fortschrittsanzeige (status()['progress']), solange die Sperre gehalten wird.
         $steps = ['download', ...($this->backup !== null ? ['backup'] : []), ...(!$withoutDrive && $this->backup !== null && $this->offsite?->active() ? ['drive'] : []), 'install'];
-        $progress = function (string $step) use ($version, $steps): void {
-            $this->settings->set(self::PROGRESS, ['version' => $version, 'step' => $step, 'steps' => $steps, 'at' => $this->time->timestamp()]);
+        $progress = function (string $step, array $extra = []) use ($version, $steps): void {
+            $this->settings->set(self::PROGRESS, $extra + ['version' => $version, 'step' => $step, 'steps' => $steps, 'at' => $this->time->timestamp()]);
         };
         $step = 'download';
         try {
@@ -308,12 +316,12 @@ final class UpdateService
             $zip = $this->download($file);
             try {
                 $step = 'backup';
-                $this->backup !== null && $progress($step);
-                $local = $this->backupBefore();
+                // Größe der letzten Sicherung als Schätzung; geschrieben ist, was schon in der Datei steht (status()).
+                $local = $this->backupBefore(static fn (string $tmp, int $estimate) => $progress('backup', ['file' => basename($tmp), 'total' => $estimate, 'estimate' => true]));
                 if ($local !== null && !$withoutDrive && $this->offsite?->active()) {
                     $step = 'drive';
-                    $progress($step);
-                    $this->backupOffsite($local);
+                    $at = $this->time->timestamp();
+                    $this->backupOffsite($local, static fn (int $done, int $total) => $progress('drive', ['done' => $done, 'total' => $total, 'at' => $at]));
                 }
                 $step = 'install';
                 $progress($step);
@@ -446,9 +454,10 @@ final class UpdateService
     /**
      * Vor jedem Update automatisch sichern (geschützter Bereich, die letzten 5).
      *
+     * @param (callable(string, int): void)|null $started mit der vorläufigen Datei und der Größe der letzten Sicherung (0: keine)
      * @return string|null Pfad der Sicherung (null: keine Datensicherung hier)
      */
-    private function backupBefore(): ?string
+    private function backupBefore(?callable $started = null): ?string
     {
         if ($this->backup === null) {
             return null;
@@ -481,6 +490,10 @@ final class UpdateService
             throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Schreibrechte?). Das Update wurde nicht eingespielt.');
         }
         @chmod($tmp, 0600);
+        if ($started !== null) {
+            sort($numbered);
+            $started($tmp, $numbered ? (int) @filesize(end($numbered)) : 0);
+        }
         try {
             $this->backup->exportTo($out);
             if (!fflush($out)) {
@@ -506,15 +519,20 @@ final class UpdateService
         return $path;
     }
 
-    /** Die Sicherung vom Server zusätzlich in Google Drive. @throws ApiError 409 DRIVE_FAILED */
-    private function backupOffsite(string $path): void
+    /**
+     * Die Sicherung vom Server zusätzlich in Google Drive.
+     *
+     * @param (callable(int, int): void)|null $onProgress hochgeladene Bytes, Größe
+     * @throws ApiError 409 DRIVE_FAILED
+     */
+    private function backupOffsite(string $path, ?callable $onProgress = null): void
     {
         // Hochladen großer Sicherungen dauert: Zeitlimit neu beginnen.
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
         try {
-            $this->offsite?->storeBeforeUpdate($path, $this->currentVersion);
+            $this->offsite?->storeBeforeUpdate($path, $this->currentVersion, $onProgress);
         } catch (\RuntimeException $e) {
             throw new ApiError(409, self::DRIVE_FAILED, 'Die Sicherung in Google Drive vor dem Update hat nicht geklappt: ' . rtrim($e->getMessage(), '.')
                 . '. Das Update wurde nicht eingespielt; die Sicherung auf dem Server ist da.');

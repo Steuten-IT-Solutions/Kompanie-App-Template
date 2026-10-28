@@ -145,7 +145,7 @@ final class BackupUploadService implements OffsiteBackup
      * Sicherung vor einem Update (schon auf dem Server geschrieben) hochladen. Zählt wie die wöchentliche: Sie ist eine
      * vollständige Sicherung außerhalb des Servers.
      */
-    public function storeBeforeUpdate(string $path, string $version): void
+    public function storeBeforeUpdate(string $path, string $version, ?callable $onProgress = null): void
     {
         if (!$this->active()) {
             throw new \RuntimeException('Sicherungen in Google Drive sind nicht eingeschaltet.');
@@ -155,7 +155,7 @@ final class BackupUploadService implements OffsiteBackup
         $state['last_try'] = $now;
         try {
             $name = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His') . '-' . $version . '.json';
-            $this->store($path, $name, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state);
+            $this->store($path, $name, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
         } catch (\RuntimeException $e) {
             $state['error'] = $e->getMessage();
             throw $e;
@@ -168,11 +168,12 @@ final class BackupUploadService implements OffsiteBackup
      * Datei in den Ordner hochladen, ältere mit demselben Anfang über $keep hinaus löschen.
      *
      * @param array{last_ok: int, last_try: int, error: string} $state
+     * @param (callable(int, int): void)|null $onProgress übertragene Bytes, Größe
      */
-    private function store(string $path, string $name, string $prefix, int $keep, array &$state): void
+    private function store(string $path, string $name, string $prefix, int $keep, array &$state, ?callable $onProgress = null): void
     {
         $folder = $this->folder();
-        $this->app->drive()->uploadFile($folder, $name, $path, 'application/json');
+        $this->app->drive()->uploadFile($folder, $name, $path, 'application/json', DriveClient::UPLOAD_CHUNK, $onProgress);
         $this->prune($folder, $prefix, $keep);
         $state['last_ok'] = $state['last_try'];
         $state['error'] = '';

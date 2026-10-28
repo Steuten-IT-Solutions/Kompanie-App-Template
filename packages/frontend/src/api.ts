@@ -2086,6 +2086,12 @@ export interface UpdateProgress {
   step: UpdateStep;
   steps: UpdateStep[];
   at: number;
+  /** Bytes: geschrieben (backup) oder hochgeladen (drive); sonst null */
+  done: number | null;
+  /** Größe in Bytes; null: unbekannt */
+  total: number | null;
+  /** total ist geschätzt (Größe der letzten Sicherung) */
+  estimate: boolean;
 }
 
 export interface AdminStatus {

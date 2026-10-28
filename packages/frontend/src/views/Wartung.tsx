@@ -101,17 +101,28 @@ function stillRunning(err: unknown): boolean {
   );
 }
 
-/** Schrittweise Anzeige: Innerhalb eines Schritts (z. B. der Sicherung) kennt der Server keinen Anteil. */
+function mb(bytes: number): string {
+  return (bytes / 1024 / 1024).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+/**
+ * Anzeige je Schritt, innerhalb von Sicherung und Hochladen nach Bytes. Die Größe der Sicherung steht erst am Ende fest
+ * (geschätzt aus der letzten): Der Balken bleibt dann vor dem Ende des Schritts stehen, bis der nächste beginnt.
+ */
 function UpdateProgressBar({ progress }: { progress: UpdateProgress | null }) {
   const index = progress ? progress.steps.indexOf(progress.step) : -1;
-  const total = progress?.steps.length ?? 0;
+  const steps = progress?.steps.length ?? 0;
+  const { done = null, total = null, estimate = false } = progress ?? {};
+  const part = done !== null && total ? Math.min(done / total, estimate ? 0.95 : 1) : 0;
+  const bytes = done === null ? '' : total ? ` (${mb(done)} von ${estimate ? 'ca. ' : ''}${mb(total)} MB)` : ` (${mb(done)} MB)`;
   return (
     <div className="small" role="status" aria-live="polite">
       {index >= 0 ? (
         <>
-          <progress className="progress" value={index} max={total} aria-label={`Update: Schritt ${index + 1} von ${total}`} />
+          <progress className="progress" value={index + part} max={steps} aria-label={`Update: Schritt ${index + 1} von ${steps}`} />
           <p className="muted">
-            Schritt {index + 1} von {total}: {STEP_TEXT[progress!.step]} … Bitte die Seite offen lassen; das kann einige Minuten dauern.
+            Schritt {index + 1} von {steps}: {STEP_TEXT[progress!.step]}
+            {bytes} … Bitte die Seite offen lassen; das kann einige Minuten dauern.
           </p>
         </>
       ) : (

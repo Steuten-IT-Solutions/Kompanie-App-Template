@@ -5840,6 +5840,9 @@ components:
             step: { type: string, enum: [download, backup, drive, install] }
             steps: { type: array, items: { type: string, enum: [download, backup, drive, install] }, description: Schritte dieses Updates in ihrer Reihenfolge }
             at: { type: integer, description: Beginn des Schritts }
+            done: { type: [integer, 'null'], description: 'Bytes: bei backup schon geschrieben, bei drive schon hochgeladen; sonst null' }
+            total: { type: [integer, 'null'], description: 'Größe in Bytes; null = unbekannt' }
+            estimate: { type: boolean, description: 'total ist geschätzt (bei backup: Größe der letzten Sicherung vor einem Update)' }
 
     AppConfig:
       type: object

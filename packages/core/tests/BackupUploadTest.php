@@ -247,9 +247,13 @@ final class BackupUploadTest extends TestCase
         $file = tempnam(sys_get_temp_dir(), 'gross');
         $content = random_bytes(600 * 1024);
         file_put_contents($file, $content);
-        $id = $this->app->drive()->uploadFile('ORDNER', 'gross.bin', $file, 'application/octet-stream', 256 * 1024);
+        $seen = [];
+        $id = $this->app->drive()->uploadFile('ORDNER', 'gross.bin', $file, 'application/octet-stream', 256 * 1024, function (int $done, int $total) use (&$seen): void {
+            $seen[] = "$done/$total";
+        });
         @unlink($file);
         $this->assertSame(['bytes 0-262143/614400', 'bytes 262144-524287/614400', 'bytes 524288-614399/614400'], $this->puts);
+        $this->assertSame(['0/614400', '262144/614400', '524288/614400'], $seen, 'Fortschritt nach jedem angenommenen Stück');
         $this->assertSame($content, $this->drive[$id]['content']);
     }
 

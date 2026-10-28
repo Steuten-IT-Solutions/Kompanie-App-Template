@@ -18,7 +18,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 ### Neu
 
 - **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
-  dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen). Läuft beim Öffnen der Seite
+  dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
+  auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
   schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
 
 ### Behoben
