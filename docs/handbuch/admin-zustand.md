@@ -19,7 +19,7 @@ Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was l
 - **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen bzw. in Google Drive abgelegt wurde.
 - **Server**: welche PHP-Version und Datenbank laufen; gelb, wenn auf dem Webspace weniger als 200 MB frei sind.
 - **Push-Benachrichtigungen**: wie viele Geräte angemeldet sind, oder was dem Server fehlt, um Benachrichtigungen zu senden.
-- Nur ohne WordPress: **Schutz der Daten** (ob Datenbank und Zugangsdaten aus dem Internet abrufbar wären; ist die Zeile rot, lass das sofort beim Hoster beheben) und **Hintergrundaufgaben** (ob ein Cronjob beim Hoster die Aufgaben erledigt, mit der Adresse dafür).
+- Nur ohne WordPress: **Schutz der Daten** (ob Datenbank und Zugangsdaten aus dem Internet abrufbar wären; ist die Zeile rot, lass das sofort beim Hoster beheben), **Verschlüsselte Verbindung** (gelb, wenn die App über `http://` statt `https://` läuft; dann gehen Passwörter und Daten unverschlüsselt durchs Netz) und **Hintergrundaufgaben** (ob ein Cronjob beim Hoster die Aufgaben erledigt, mit der Adresse dafür).
 
 Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erledigt werden, z. B. eine neue Datensicherung. **Rot** heißt, etwas funktioniert nicht. **Grau** heißt ausgeschaltet, noch nicht eingerichtet oder in dieser Installation nicht verfügbar. Ist bei euch eine Kontaktadresse der Betreuer hinterlegt, steht sie darunter bei **Hilfe**.
 

@@ -30,6 +30,8 @@ Zuverlässiger geht es mit einem **Cronjob**: einem Auftrag im Kundenmenü des H
 2. Lege im Kundenmenü des Hosters einen Cronjob an, der diese Adresse alle 15 Minuten aufruft.
 3. Prüfe nach einer Weile unter **Hintergrundaufgaben**, ob dort steht, dass ein Cronjob die Aufgaben erledigt (siehe [Zustand und Updates](seite:admin-zustand)).
 
+> **Für Fortgeschrittene:** Der Schlüssel in der Cron-Adresse (`key=…`) landet im Zugriffsprotokoll des Webservers. Kann der Cronjob einen Header senden, ist das besser: `curl -s -H "X-Kompanie-Cron-Key: <Schlüssel>" "<Cron-Adresse ohne &key=…>"`. Der Schlüssel stößt nur fällige Hintergrundaufgaben an.
+
 ### Die App reparieren oder neu einspielen
 Lade `install.php` erneut in den Ordner `app` und öffne es im Browser. Nach der Anmeldung eines {rolle.admin} bietet der Installer **Aktualisieren / Reparieren** an: Die aktuelle Version wird neu eingespielt, die Daten bleiben erhalten.
 
@@ -37,6 +39,7 @@ Lade `install.php` erneut in den Ordner `app` und öffne es im Browser. Nach der
 - Läuft auf dem Webspace schon WordPress, richtet der Installer nichts ein und empfiehlt stattdessen das Plugin.
 - Updates spielt die App danach selbst ein (siehe [Zustand und Updates](seite:admin-zustand)).
 - Die Daten der App müssen vor Zugriffen aus dem Internet geschützt sein. Die App prüft das selbst und zeigt das Ergebnis unter **Zustand und Updates** bei **Schutz der Daten**.
+- Die App sollte nur über `https://` laufen, sonst gehen Passwörter und Daten der Mitglieder unverschlüsselt durchs Netz. Ein Zertifikat richtet der Hoster ein, oft kostenlos. Über HTTPS sagt die App dem Browser, sie künftig nur noch verschlüsselt zu öffnen (HSTS); wer das nicht will, trägt in `config.php` `'hsts' => false` ein.
 
 > **Für Fortgeschrittene: Server mit nginx.** Die meisten Hoster nutzen den Webserver Apache oder LiteSpeed; dann richtet die App alles selbst ein (über die Dateien `.htaccess`). Läuft euer Webspace mit **nginx**, wertet der Server diese Dateien nicht aus. Die App läuft trotzdem, aber bittet den Hoster, die Ordner `data`, `src`, `core` und `bin` im App-Ordner für Zugriffe von außen zu sperren (der Installer prüft das und legt die Daten sonst außerhalb des Web-Verzeichnisses ab). Damit die App schneller lädt, sollten außerdem Dateien unter `app/assets/` ein Jahr im Browser zwischengespeichert werden (`Cache-Control: public, max-age=31536000, immutable`; ihr Name ändert sich mit jeder Version), Symbole und Manifest unter `app/` einen Tag, und Textdateien (HTML, CSS, JavaScript, JSON, SVG, Manifest) komprimiert (gzip) ausgeliefert werden.
 

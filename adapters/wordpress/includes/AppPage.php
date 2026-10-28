@@ -456,6 +456,19 @@ final class AppPage
         $pos = strpos($html, '<head>');
         $html = $pos === false ? $head . $html : substr_replace($html, $head, $pos + strlen('<head>'), 0);
         header('Content-Type: text/html; charset=utf-8');
+        self::securityHeaders();
         echo $html; // phpcs:ignore WordPress.Security.EscapeOutput
+    }
+
+    /**
+     * Wie die eigenständige Version: nicht in fremde Seiten einbetten (Klickbetrug, „Clickjacking“), Typ nicht raten,
+     * Adresse nur gekürzt weitergeben. HSTS bleibt Sache von WordPress bzw. des Hosters (gilt für die ganze Seite).
+     */
+    private static function securityHeaders(): void
+    {
+        header('X-Content-Type-Options: nosniff');
+        header('X-Frame-Options: SAMEORIGIN');
+        header("Content-Security-Policy: frame-ancestors 'self'");
+        header('Referrer-Policy: strict-origin-when-cross-origin');
     }
 }

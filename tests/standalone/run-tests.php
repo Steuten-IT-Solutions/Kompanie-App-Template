@@ -229,6 +229,9 @@ try {
     $c->ok(isset($nm[1], $sm[1]) && !str_contains($sm[1], 'unsafe') && str_contains($html, 'nonce="') , 'Skripte nur von der eigenen Seite oder mit Nonce');
     $c->ok(!preg_match('#(src|href)="\./#', $html) && str_contains($html, $base . 'app/assets/'), 'Pfade der App-Dateien zeigen auf app/');
     $c->ok(($headers['x-content-type-options'] ?? '') === 'nosniff' && ($headers['x-frame-options'] ?? '') === 'SAMEORIGIN', 'Sicherheits-Header');
+    $c->ok(!isset($headers['strict-transport-security']), 'Über HTTP kein HSTS');
+    $hsts = $d->send('GET', $base, ['X-Forwarded-Proto' => 'https'], null)[2]['strict-transport-security'] ?? '';
+    $c->ok($hsts === 'max-age=15552000', 'Über HTTPS (hinter einem Proxy) mit HSTS, ohne includeSubDomains');
     $man = json_decode((string) file_get_contents($base . 'index.php?r=/manifest.webmanifest'), true);
     $c->ok(($man['start_url'] ?? '') === $base && str_starts_with($man['icons'][0]['src'] ?? '', $base . 'app/icons/icon-192.png'), 'Manifest mit Start-Adresse und Icons');
     // Drehbar (Querformat), nicht auf hochkant festgelegt
@@ -249,6 +252,8 @@ try {
     $c->ok($swAgain[0] === 304 && !isset($swAgain[2]['content-length']), 'sw.js über index.php: passender ETag → 304 ohne Inhalt');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron&key=falsch', [], null)[0] === 403, 'Cron mit falschem Schlüssel → 403');
     $c->ok($d->send('GET', $kernel->cronUrl(), [], null)[0] === 200, 'Cron mit Schlüssel → 200');
+    $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron-Key' => $kernel->cronKey()], null)[0] === 200, 'Cron mit Schlüssel im Header → 200');
+    $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron-Key' => 'falsch'], null)[0] === 403, 'Cron mit falschem Schlüssel im Header → 403');
     // Schwarzes Brett (Issue #5, #172): Der Cron führt das Aufräumen aus und löscht Nachrichten 30 Tage nach ihrem Ende.
     $kdb = $kernel->db();
     $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
@@ -551,6 +556,12 @@ try {
         [$k] = $counted($unreachable);
         $cron = array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'cron'))[0] ?? [];
         $c->ok(($cron['level'] ?? '') === 'error' && str_contains($cron['text'] ?? '', 'Cronjob') && str_contains($cron['text'] ?? '', 'key='), 'Statusseite meldet den fehlschlagenden Selbstaufruf und empfiehlt einen Cronjob mit Adresse');
+        $https = static fn (Kernel $k): array => array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'https'))[0] ?? [];
+        $c->ok($https($k) === [], 'Statusseite: localhost ohne Hinweis zu HTTPS');
+        [$k] = $counted(new Config($data, ['base_url' => 'http://example.org/app/'] + Config::load($data)->toArray()));
+        $c->ok(($https($k)['level'] ?? '') === 'warn', 'Statusseite: Adresse mit http:// → Warnung „Verschlüsselte Verbindung“');
+        [$k] = $counted(new Config($data, ['base_url' => 'https://example.org/app/'] + Config::load($data)->toArray()));
+        $c->ok(($https($k)['level'] ?? '') === 'ok', 'Statusseite: Adresse mit https:// → in Ordnung');
         $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
         $kernel->scheduler()->refresh();
         $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);

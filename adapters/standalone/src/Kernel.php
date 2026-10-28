@@ -664,9 +664,10 @@ final class Kernel
 
     private function sendCron(): void
     {
-        // Schlüssel im Header (Selbstaufruf) oder als Parameter (Cronjob des Hosters).
+        // Schlüssel im Header (Selbstaufruf: X-Kompanie-Cron; Cronjob des Hosters: X-Kompanie-Cron-Key, landet nicht
+        // im Zugriffsprotokoll des Webservers) oder als Parameter (Cronjob des Hosters, wenn er nur eine Adresse nimmt).
         $header = $this->http->header('X-Kompanie-Cron');
-        $key = (string) ($header ?? (is_string($_GET['key'] ?? null) ? $_GET['key'] : ''));
+        $key = (string) ($header ?? $this->http->header('X-Kompanie-Cron-Key') ?? (is_string($_GET['key'] ?? null) ? $_GET['key'] : ''));
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
             $this->sendPlain(403, 'Falscher Schlüssel.');
@@ -793,6 +794,21 @@ final class Kernel
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('X-Frame-Options: SAMEORIGIN');
         header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+        // HSTS: der Browser ruft die App danach ein halbes Jahr nur noch über HTTPS auf. Nur über HTTPS (über HTTP
+        // ignorieren Browser den Header ohnehin) und ohne includeSubDomains: die App liegt oft unter der Domain des
+        // Vereins, deren andere Seiten nicht betroffen sein sollen. Abschalten: 'hsts' => false in config.php.
+        if ($this->http->isHttps() && $this->hstsEnabled()) {
+            header('Strict-Transport-Security: max-age=15552000');
+        }
+    }
+
+    private function hstsEnabled(): bool
+    {
+        try {
+            return $this->config()->hsts();
+        } catch (\Throwable) {
+            return true; // noch nicht eingerichtet
+        }
     }
 
     private function appDir(): string

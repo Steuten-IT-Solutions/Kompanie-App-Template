@@ -22,4 +22,13 @@ final class MailResult
     {
         return new self(true);
     }
+
+    /**
+     * Fehlertext fürs Protokoll des Servers ohne E-Mail-Adressen: SMTP-Server wiederholen sie oft
+     * („550 <name@example.org>: User unknown“), und das Protokoll soll keine personenbezogenen Daten sammeln.
+     */
+    public static function redactAddresses(string $text): string
+    {
+        return (string) preg_replace('/[^\s<>"\'(),;:]+@[^\s<>"\'(),;:]+/', '[Adresse]', $text);
+    }
 }

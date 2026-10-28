@@ -94,6 +94,12 @@ final class Config
         return $url === '' ? '' : rtrim($url, '/') . '/';
     }
 
+    /** HSTS-Header über HTTPS senden (Vorgabe); 'hsts' => false in config.php schaltet ihn ab. */
+    public function hsts(): bool
+    {
+        return ($this->data['hsts'] ?? true) !== false;
+    }
+
     public function timezone(): string
     {
         $tz = (string) ($this->data['timezone'] ?? 'Europe/Berlin');

@@ -476,9 +476,15 @@ final class WpUsers implements UserDirectory, AuthContext
             $role = AppRoles::MEMBER;
         }
         $caps = $this->capabilities !== null ? ($this->capabilities)($role, (int) $u->ID) : AppRoles::templateCapabilities($role);
-        // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter.
+        // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter. create_users
+        // öffnet in der App auch E-Mail und Telefon der Mitglieder: Wer das für Rollen der Webseite nicht will, kürzt die
+        // Liste mit dem Filter kompanie_app_wp_capability_map (z. B. return []).
         $wp = ['create_users' => Capability::CreateUsers, 'promote_users' => Capability::PromoteUsers, 'manage_options' => Capability::ManageSettings];
-        foreach ($wp as $wpCap => $cap) {
+        $wp = apply_filters('kompanie_app_wp_capability_map', $wp, $u);
+        foreach (is_array($wp) ? $wp : [] as $wpCap => $cap) {
+            if (!is_string($wpCap) || !$cap instanceof Capability) {
+                continue;
+            }
             if (!in_array($cap, $caps, true) && user_can($u, $wpCap)) {
                 $caps[] = $cap;
             }

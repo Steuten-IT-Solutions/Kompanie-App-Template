@@ -15,6 +15,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Sicherheit
+
+- **Mitgliederfotos folgen den Rechten von Gast**: Hat ein Admin unter *Einstellungen → Rollen* der Rolle **Gast** die
+  Mitgliederliste bzw. die Ehemaligen weggenommen, waren die Fotos darin trotzdem ohne Anmeldung abrufbar. Jetzt sind
+  sie nur noch öffentlich, wenn Gast die Liste sehen darf. Die Originalauflösung gibt es nur noch nach der Anmeldung.
+- **HTTPS (eigenständige Version)**: Über HTTPS schickt die App jetzt HSTS mit (der Browser öffnet sie danach nur noch
+  verschlüsselt). Läuft die App über `http://`, warnen der Installer und *Einstellungen → Zustand und Updates*.
+- **WordPress**: Die App-Seite lässt sich nicht mehr in fremde Seiten einbetten (Schutz vor Clickjacking).
+- **Keine E-Mail-Adressen im Fehlerprotokoll des Servers**, wenn eine Mail nicht zugestellt werden kann.
+- **Cronjob**: Der Schlüssel lässt sich jetzt auch im Header `X-Kompanie-Cron-Key` senden, dann steht er nicht im
+  Zugriffsprotokoll des Webservers. Die bisherige Adresse mit `key=` funktioniert weiter.
+
 ## [0.4.0] – 2026-10-27
 
 ### Neu

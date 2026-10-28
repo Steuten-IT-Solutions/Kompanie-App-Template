@@ -215,8 +215,10 @@ final class MemberPhotoTest extends TestCase
         }
         $version = (string) $repo->find($this->m)['version'];
         $photos = $this->app->memberPhotos();
-        $res = $photos->forDelivery(null, $this->m, $version, '4096');
+        $res = $photos->forDelivery($this->users->find($this->admin), $this->m, $version, '4096');
         $this->assertSame([200, $original], [$res['status'], $res['body'] ?? null]);
+        $this->assertSame(404, $photos->forDelivery(null, $this->m, $version, '4096')['status'], 'Original nur für Angemeldete');
+        $this->assertSame(200, $photos->forDelivery(null, $this->m, $version, '1024')['status']);
         $this->assertStringEndsWith('&s=4096', $photos->urls(4096)[$this->m]);
 
         // Kleine Fotos: so groß wie hochgeladen, nie vergrößert.
@@ -292,6 +294,38 @@ final class MemberPhotoTest extends TestCase
         $this->app->features()->update(['directory' => false]);
         $this->assertSame(403, $deliver($candidate, $this->m), 'Bereich aus');
         $this->assertSame(401, $deliver(null, $this->m), 'Bereich aus');
+    }
+
+    /** Hat Gast die Liste nicht (Einstellungen → Rollen), sind die Fotos nicht mehr öffentlich (auch nicht über die Nummer). */
+    public function testDirectoryPhotosFollowGuestRights(): void
+    {
+        $guest = $this->users->add('gast', Roles::GUEST);
+        $reader = $this->users->add('leser', $this->roleWith('Leser', ['view_directory']));
+        $former = $this->users->add('ehemalig', Roles::MEMBER);
+        foreach ([$this->m, $former] as $id) {
+            $this->call('PUT', "/members/$id/photo", ['file' => self::file('a.jpg', self::image(300, 300))]);
+        }
+        $this->call('PUT', "/members/$former/former", ['reason' => 'left', 'joined_on' => '', 'left_on' => '2020']);
+        $photos = $this->app->memberPhotos();
+        $deliver = function (?int $viewer, int $owner) use ($photos): array {
+            $version = $photos->repository()->find($owner)['version'] ?? '';
+            return $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $owner, $version, '128');
+        };
+        $patch = fn (array $caps): Response => $this->call('PATCH', '/admin/roles/' . Roles::GUEST, ['capabilities' => $caps]);
+
+        $this->assertSame(200, $patch(['view_news', 'view_former'])->status);
+        $this->assertSame(401, $deliver(null, $this->m)['status'], 'Liste für Gäste aus: kein Foto ohne Anmeldung');
+        $this->assertSame(403, $deliver($guest, $this->m)['status'], 'Gast-Konto ebenso');
+        $res = $deliver($reader, $this->m);
+        $this->assertSame(200, $res['status'], 'mit view_directory');
+        $this->assertStringStartsWith('private', $res['headers']['Cache-Control'], 'nicht öffentlich zwischenspeichern');
+        $this->assertSame(200, $deliver(null, $former)['status'], 'Ehemalige: view_former hat Gast noch');
+
+        $this->assertSame(200, $patch(['view_news', 'view_directory'])->status);
+        $this->assertSame(200, $deliver(null, $this->m)['status']);
+        $this->assertStringStartsWith('public', $deliver(null, $this->m)['headers']['Cache-Control']);
+        $this->assertSame(401, $deliver(null, $former)['status'], 'Ehemalige ohne view_former');
+        $this->assertSame(403, $deliver($guest, $former)['status'], 'Gast-Konto ohne view_former');
     }
 
     public function testPhotoWhenCreatingAccounts(): void
