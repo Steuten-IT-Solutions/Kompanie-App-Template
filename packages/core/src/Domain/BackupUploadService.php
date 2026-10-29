@@ -203,7 +203,7 @@ final class BackupUploadService implements OffsiteBackup
     /** Kennung des Schlüssels im Dateinamen (Anfang des Fingerabdrucks): zeigt, mit welchem Passwort eine Sicherung geht. */
     private function keyTag(): string
     {
-        return 'k' . substr(str_replace(' ', '', (string) $this->app->backupEncryption()->status()['fingerprint']), 0, 8);
+        return 'k' . substr(str_replace(' ', '', (string) $this->app->backupEncryption()->fingerprint()), 0, 8);
     }
 
     /**

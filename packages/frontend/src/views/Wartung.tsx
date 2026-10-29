@@ -611,17 +611,17 @@ export function compare(a: string, b: string): number {
 
 /** Datensicherung mit Passwort für Sicherungen; das Passwort bestimmt Download und Google Drive. */
 function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.backupEncryption(), [], 'admin/backup/encryption');
-  const [enc, setEnc] = useState<BackupEncryptionStatus | null>(null);
+  // Änderungen über setData: auch in den Zwischenspeicher, sonst zeigte ein erneutes Öffnen kurz den alten Stand.
+  const { data, error, loading, reload, setData } = useAsync(() => api.backupEncryption(), [], 'admin/backup/encryption');
   if (loading && !data) return <Loading />;
-  const e = enc ?? data;
+  const e = data;
   // Ohne den Stand des Passworts bleiben Herunterladen (unverschlüsselt) und Wiederherstellen trotzdem möglich.
   return (
     <>
       {/* Ohne Stand (Fehler): ausdrücklich „unverschlüsselt“, nicht stillschweigend */}
       <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e ? e.configured : null} />
       {e ? (
-        <Verschluesselung status={e} onChange={setEnc} onToast={onToast} />
+        <Verschluesselung status={e} onChange={setData} onToast={onToast} />
       ) : (
         <ErrorBox message={error ?? 'Nicht geladen'} onRetry={reload} />
       )}
@@ -706,6 +706,7 @@ function Datensicherung({
       setPassphrase('');
       return;
     }
+    setPending(null); // eine zuvor gewählte verschlüsselte Datei ist damit nicht mehr gemeint
     await send(file, false);
   }
 

@@ -48,6 +48,13 @@ final class BackupEncryptionService
         return ($this->key()['verified'] ?? false) === true;
     }
 
+    /** Fingerabdruck des eingerichteten Schlüssels (BackupCrypto::fingerprint), sonst null. */
+    public function fingerprint(): ?string
+    {
+        $key = $this->key();
+        return $key !== null ? BackupCrypto::fingerprint($key['public_key']) : null;
+    }
+
     /** @return array{available: bool, configured: bool, verified: bool, fingerprint: ?string, set_at: ?int, min_length: int} */
     public function status(): array
     {
@@ -56,7 +63,7 @@ final class BackupEncryptionService
             'available' => BackupCrypto::available(),
             'configured' => $this->configured(), // wie überall: nur mit sodium (sonst steht available: false dabei)
             'verified' => $this->verified(),
-            'fingerprint' => $key !== null ? BackupCrypto::fingerprint($key['public_key']) : null,
+            'fingerprint' => $this->fingerprint(),
             'set_at' => $key !== null && is_int($key['set_at'] ?? null) ? $key['set_at'] : null,
             'min_length' => BackupCrypto::MIN_LENGTH,
         ];
