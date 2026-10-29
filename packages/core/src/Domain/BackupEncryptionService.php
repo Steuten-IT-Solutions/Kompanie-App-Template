@@ -173,6 +173,17 @@ final class BackupEncryptionService
     }
 
     /**
+     * Ganze Sicherung verschlüsselt nach $out (z. B. an den Browser): beim Schreiben verschlüsselt, ohne Zwischendatei.
+     *
+     * @param resource $out
+     */
+    public function exportEncryptedTo(BackupProvider $backup, $out): void
+    {
+        $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
+        BackupCrypto::encryptTo($out, $key, $this->meta(), static fn ($o) => $backup->exportTo($o));
+    }
+
+    /**
      * Datei (z. B. die Sicherung vor einem Update auf dem Server) verschlüsselt in eine temporäre Datei schreiben (zum
      * Hochladen); der Aufrufer löscht sie.
      *

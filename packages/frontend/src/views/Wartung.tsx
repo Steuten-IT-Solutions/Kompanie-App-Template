@@ -618,7 +618,8 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
   // Ohne den Stand des Passworts bleiben Herunterladen (unverschlüsselt) und Wiederherstellen trotzdem möglich.
   return (
     <>
-      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e?.configured ?? false} />
+      {/* Ohne Stand (Fehler): ausdrücklich „unverschlüsselt“, nicht stillschweigend */}
+      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e ? e.configured : null} />
       {e ? (
         <Verschluesselung status={e} onChange={setEnc} onToast={onToast} />
       ) : (
@@ -630,7 +631,16 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
   );
 }
 
-function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: string) => void; onChanged: () => void; encrypted: boolean }) {
+function Datensicherung({
+  onToast,
+  onChanged,
+  encrypted,
+}: {
+  onToast: (msg: string) => void;
+  onChanged: () => void;
+  /** null: Stand des Passworts unbekannt (nicht geladen) */
+  encrypted: boolean | null;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Verschlüsselte Datei zum Wiederherstellen: wartet auf das Passwort für Sicherungen.
@@ -725,7 +735,11 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
       </p>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void download()}>
-          {encrypted ? 'Sicherung verschlüsselt herunterladen' : 'Sicherung herunterladen'}
+          {encrypted
+            ? 'Sicherung verschlüsselt herunterladen'
+            : encrypted === null
+              ? 'Sicherung unverschlüsselt herunterladen'
+              : 'Sicherung herunterladen'}
         </button>
         {encrypted && (
           <button type="button" className="btn btn-link" disabled={busy} onClick={() => void download(true)}>
@@ -738,7 +752,8 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
       </div>
       {encrypted && (
         <p className="muted small">
-          Kommt beim Herunterladen keine Datei an, steht der Grund unter Einstellungen → Zustand und Updates im Fehlerprotokoll.
+          Bricht das Herunterladen ab, ist die Datei unvollständig (die App erkennt das beim Wiederherstellen); der Grund steht unter
+          Einstellungen → Zustand und Updates im Fehlerprotokoll.
         </p>
       )}
       <input

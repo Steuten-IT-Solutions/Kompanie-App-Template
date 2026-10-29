@@ -16,8 +16,8 @@ use KompanieApp\Core\Telemetry\Code;
  * Browser zu entstehen. Nur für Admins (manage_settings), nie in der Vorschau. GET /admin/backup bleibt für
  * Werkzeuge, die die Sicherung als JSON der API holen.
  *
- * Mit $encrypted (Adresse mit ?verschluesselt=1) verschlüsselt mit dem Passwort für Sicherungen (BackupCrypto): Die
- * Sicherung geht erst in eine temporäre Datei, dann verschlüsselt Stück für Stück an den Browser.
+ * Mit $encrypted (Adresse mit ?verschluesselt=1) verschlüsselt mit dem Passwort für Sicherungen (BackupCrypto), beim
+ * Schreiben Stück für Stück.
  */
 final class BackupDownload
 {
@@ -50,46 +50,24 @@ final class BackupDownload
         $now = $this->app->time()->timestamp();
         $name = 'sicherung-' . $this->app->time()->format($now, 'Y-m-d') . ($encrypted ? BackupCrypto::EXTENSION : '.json');
         if ($encrypted) {
-            // Erst ganz erzeugen, dann senden: Scheitert das Sichern, kommt ein Fehler statt einer abgeschnittenen Datei,
-            // die der Browser als fertige Sicherung speichert. Große Sicherungen brauchen Zeit (wie beim Senden in den
-            // Adaptern); bricht PHP trotzdem ab, löscht das Ende der Anfrage die Datei (exportToTempFile).
-            // Nur verlängern, nie verkürzen (0 = ohne Grenze).
-            $limit = (int) ini_get('max_execution_time');
-            if ($limit > 0 && $limit < 300 && function_exists('set_time_limit')) {
-                @set_time_limit(300);
-            }
-            try {
-                $file = $this->app->backupEncryption()->exportToTempFile($backup);
-            } catch (\Throwable $e) {
-                // Der Browser zeigt bei einem Download nur „fehlgeschlagen“: der Grund steht im Fehlerprotokoll der App.
-                $this->app->telemetry()->record(Code::ServerError, 'backup_download', 'Verschlüsselte Sicherung nicht erstellt: ' . $e->getMessage());
-                return $deny(500);
-            }
+            // Stück für Stück verschlüsselt an den Browser, wie die unverschlüsselte Sicherung (keine Zwischendatei, kein
+            // Warten vor dem ersten Byte, das ein Proxy als Zeitüberschreitung abbricht). Bricht es ab, fehlt der Abschluss
+            // der Datei: Beim Wiederherstellen gilt sie dann als unvollständig, nie als ganze Sicherung.
             return ['status' => 200, 'headers' => [
                 'Content-Type' => 'application/octet-stream',
                 'Content-Disposition' => 'attachment; filename="' . $name . '"',
                 'Cache-Control' => 'no-store',
                 'X-Content-Type-Options' => 'nosniff',
                 'X-Robots-Tag' => 'noindex',
-            ], 'write' => function ($out) use ($file, $now): void {
+            ], 'write' => function ($out) use ($backup, $now): void {
                 try {
-                    $in = fopen($file, 'rb');
-                    if ($in === false) {
-                        throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht lesen.');
-                    }
-                    try {
-                        $copied = stream_copy_to_stream($in, $out);
-                    } finally {
-                        fclose($in);
-                    }
-                    $complete = $copied !== false && $copied === filesize($file);
-                } finally {
-                    @unlink($file);
+                    $this->app->backupEncryption()->exportEncryptedTo($backup, $out);
+                } catch (\Throwable $e) {
+                    // Der Browser zeigt bei einem Download nur „fehlgeschlagen“: der Grund steht im Fehlerprotokoll der App.
+                    $this->app->telemetry()->record(Code::ServerError, 'backup_download', 'Verschlüsselte Sicherung nicht erstellt: ' . $e->getMessage());
+                    throw $e;
                 }
-                // Nur eine ganz gesendete Sicherung zählt für die Ampel.
-                if ($complete) {
-                    $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
-                }
+                $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
             }];
         }
         return ['status' => 200, 'headers' => [

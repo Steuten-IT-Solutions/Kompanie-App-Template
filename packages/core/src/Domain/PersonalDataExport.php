@@ -30,8 +30,11 @@ final class PersonalDataExport
 {
     public const FORMAT = 'kompanie-app-personal-data';
     public const FORMAT_VERSION = 1;
-    /** Spalten, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Fassungen des Fotos, Bildschirmfotos). */
-    private const DROP_COLUMNS = ['vote_ref', 'p256dh', 'auth', 'small', 'large', 'xlarge', 'original', 'screenshot'];
+    /**
+     * Spalten je Tabelle, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Bildschirmfotos); je Tabelle, damit eine
+     * gleich benannte Spalte anderswo nicht still fehlt. member_photos steht ganz unter person.photo.
+     */
+    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot']];
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
 
     public function __construct(private readonly App $app)
@@ -64,11 +67,11 @@ final class PersonalDataExport
                 continue; // unter person.photo
             }
             $sql = 'SELECT * FROM {' . $table . '} WHERE ' . $column . ' = ?';
-            $rows = $this->rows($sql, [$userId]);
+            $rows = $this->rows($table, $sql, [$userId]);
             if ($table === 'poll_answers' && $self && ($secret = PollService::existingSecret($this->app->settings)) !== null) {
                 // Eigene anonyme Antworten (über das Pseudonym; namentliche kamen schon über user_id); nur die Person selbst
                 // bekommt sie.
-                $rows = [...$rows, ...$this->rows('SELECT * FROM {poll_answers} WHERE vote_ref = ? AND user_id IS NULL', [PollService::pseudonym($secret, $userId)])];
+                $rows = [...$rows, ...$this->rows('poll_answers', 'SELECT * FROM {poll_answers} WHERE vote_ref = ? AND user_id IS NULL', [PollService::pseudonym($secret, $userId)])];
             }
             if ($rows !== []) {
                 $data[$table] = $rows;
@@ -82,7 +85,7 @@ final class PersonalDataExport
             'board_message_revisions' => 'SELECT * FROM {board_message_revisions} WHERE user_id = ?',
             'rich_images' => "SELECT * FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?",
         ] as $table => $sql) {
-            $rows = $this->rows($sql, [$userId]);
+            $rows = $this->rows($table, $sql, [$userId]);
             if ($table === 'push_subscriptions' && !$self) {
                 // Die Adresse eines Abos ist ein Zugang beim Push-Dienst: nur in der eigenen Auskunft.
                 $rows = array_map(static fn (array $r): array => array_diff_key($r, ['endpoint' => 1, 'endpoint_hash' => 1]), $rows);
@@ -113,15 +116,15 @@ final class PersonalDataExport
     }
 
     /**
-     * Zeilen ohne DROP_COLUMNS. Fehler gehen nach oben: Eine Auskunft, der still eine Tabelle fehlt, wäre falsch (die
+     * Zeilen ohne die DROP_COLUMNS der Tabelle. Fehler gehen nach oben: Eine Auskunft, der still eine Tabelle fehlt, wäre falsch (die
      * Tabellen legen die Migrationen an, sie fehlen nicht).
      *
      * @param list<mixed> $params
      * @return list<array<string, mixed>>
      */
-    private function rows(string $sql, array $params): array
+    private function rows(string $table, string $sql, array $params): array
     {
-        $rows = $this->app->db->select($sql, $params);
-        return array_map(static fn (array $r): array => array_diff_key($r, array_flip(self::DROP_COLUMNS)), $rows);
+        $drop = array_flip(self::DROP_COLUMNS[$table] ?? []);
+        return array_map(static fn (array $r): array => array_diff_key($r, $drop), $this->app->db->select($sql, $params));
     }
 }

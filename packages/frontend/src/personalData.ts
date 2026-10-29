@@ -1,4 +1,5 @@
 import { api } from './api';
+import { todayYmd } from './format';
 
 /**
  * Auskunft nach Art. 15 DSGVO als Datei: eigene Daten (ohne id) oder die einer Person (Verwaltung). Der Service Worker
@@ -9,7 +10,7 @@ export async function downloadPersonalData(id?: number): Promise<void> {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${id === undefined ? 'meine-daten' : `daten-${id}`}-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `${id === undefined ? 'meine-daten' : `daten-${id}`}-${todayYmd()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();

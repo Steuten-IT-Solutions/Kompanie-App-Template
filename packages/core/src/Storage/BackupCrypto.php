@@ -77,8 +77,8 @@ final class BackupCrypto
     {
         $salt = base64_decode((string) ($key['salt'] ?? ''), true);
         $public = base64_decode((string) ($key['public_key'] ?? ''), true);
-        if ($salt === false || $public === false) {
-            return false;
+        if ($salt === false || $public === false || strlen($salt) !== SODIUM_CRYPTO_PWHASH_SALTBYTES || strlen($public) !== SODIUM_CRYPTO_BOX_PUBLICKEYBYTES) {
+            throw new \RuntimeException('Das eingerichtete Passwort für Sicherungen ist beschädigt. Bitte neu einrichten.');
         }
         $keypair = self::keypair($passphrase, $salt, (int) ($key['ops'] ?? 0), (int) ($key['mem'] ?? 0));
         $ok = hash_equals($public, sodium_crypto_box_publickey($keypair));
@@ -117,7 +117,8 @@ final class BackupCrypto
             $write($out);
         } catch (\Throwable $e) {
             $enc->abort(); // ohne Abschluss: bleibt als abgeschnitten erkennbar
-            throw $e;
+            // Scheiterte das Verschlüsseln im Filter, ist das die Ursache (das folgende Schreiben scheitert nur deshalb).
+            throw $enc->error !== null ? new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $enc->error->getMessage(), 0, $enc->error) : $e;
         }
         $enc->finish();
         if (!fflush($out)) {
