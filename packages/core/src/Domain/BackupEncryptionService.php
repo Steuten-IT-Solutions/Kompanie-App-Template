@@ -104,7 +104,11 @@ final class BackupEncryptionService
         if (!$ok) {
             $this->failed(self::VERIFY);
         } elseif (($key['verified'] ?? false) !== true) {
-            $this->app->settings->set(BackupCrypto::SETTING, ['verified' => true] + (array) $this->app->settings->get(BackupCrypto::SETTING));
+            // Nur den geprüften Schlüssel markieren: Hat jemand inzwischen ein neues Passwort gesetzt, bleibt es ungeprüft.
+            $now = $this->app->settings->fresh(BackupCrypto::SETTING);
+            if (is_array($now) && ($now['public_key'] ?? null) === $key['public_key']) {
+                $this->app->settings->set(BackupCrypto::SETTING, ['verified' => true] + $now);
+            }
         }
         return $ok;
     }
@@ -201,7 +205,7 @@ final class BackupEncryptionService
     {
         $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
         $file = $this->app->files->tempFile();
-        register_shutdown_function(static fn () => is_file($file) && @unlink($file));
+        self::cleanupAtShutdown($file);
         try {
             $out = @fopen($file, 'wb');
             if ($out === false) {
@@ -221,6 +225,22 @@ final class BackupEncryptionService
             @unlink($file);
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage(), 0, $e);
         }
+    }
+
+    /** @var array<string, true> temporäre Dateien, die das Ende der Anfrage löscht (falls noch da) */
+    private static array $temp = [];
+
+    /** Bricht PHP ab (Zeitlimit, Abbruch eines Downloads), löscht das Ende der Anfrage die Datei; eine Funktion für alle. */
+    private static function cleanupAtShutdown(string $file): void
+    {
+        if (self::$temp === []) {
+            register_shutdown_function(static function (): void {
+                foreach (array_keys(self::$temp) as $f) {
+                    is_file($f) && @unlink($f);
+                }
+            });
+        }
+        self::$temp[$file] = true;
     }
 
     /** @return array<string, scalar> unverschlüsselte Angaben im Kopf */

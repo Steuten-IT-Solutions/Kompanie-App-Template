@@ -155,7 +155,8 @@ try {
                     $pass = rtrim($read, "\r\n");
                 } else {
                     fwrite(STDERR, 'Passwort für Sicherungen: ');
-                    if (function_exists('posix_isatty') && posix_isatty(STDIN)) {
+                    // shell_exec ist bei manchen Hostern gesperrt: dann ohne Verdecken lesen.
+                    if (function_exists('posix_isatty') && posix_isatty(STDIN) && function_exists('shell_exec')) {
                         // Eingabe verdeckt; die Shell stellt die Anzeige auch bei Strg-C wieder her (trap), ohne pcntl.
                         $line = shell_exec("sh -c 'trap \"stty echo; exit 130\" INT TERM; stty -echo; IFS= read -r p; stty echo; printf \"%s\" \"\$p\"'");
                         $pass = is_string($line) ? $line : '';

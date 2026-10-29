@@ -116,6 +116,15 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame(401, $this->call('GET', '/me/data')->status);
     }
 
+    /** Ältere Fotos (nur 128 und 480 Pixel): die größte vorhandene Fassung. */
+    public function testOlderPhotoWithoutLargeSizes(): void
+    {
+        $jpeg = base64_encode('alt-480');
+        $this->app->db->insert('member_photos', ['user_id' => $this->m, 'version' => 'alt', 'small' => base64_encode('alt-128'), 'large' => $jpeg, 'updated_by' => $this->admin, 'updated_at' => '2020-01-01 00:00:00']);
+        $this->users->current = $this->m;
+        $this->assertSame($jpeg, $this->call('GET', '/me/data')->data['person']['photo']['base64'] ?? null);
+    }
+
     /** Jede Kerntabelle mit user_id steht in UserData (Löschen und Auskunft) oder ist hier begründet ausgenommen. */
     public function testEveryPersonalTableIsCovered(): void
     {

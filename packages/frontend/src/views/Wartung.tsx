@@ -882,6 +882,7 @@ function Verschluesselung({
               const { ok } = await api.verifyBackupEncryption(pass);
               if (ok) {
                 onToast('Das Passwort für Sicherungen stimmt');
+                onChange(await api.backupEncryption()); // jetzt geprüft: Hinweis weg
                 open('view');
               } else setError('Das Passwort stimmt nicht.');
             });

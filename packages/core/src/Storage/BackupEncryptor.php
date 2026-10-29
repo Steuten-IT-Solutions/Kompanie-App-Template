@@ -61,12 +61,6 @@ final class BackupEncryptor
         return new self($state, BackupCrypto::MAGIC . pack('N', strlen($header)) . $header, $header);
     }
 
-    /** Magic, Länge und Kopf: zuerst schreiben. */
-    public function head(): string
-    {
-        return $this->head;
-    }
-
     /**
      * Klartext aufnehmen; $emit bekommt jeden fertigen Block (je CHUNK Bytes Klartext) einzeln. Große Stücke werden
      * über einen Versatz abgearbeitet, ohne den Rest bei jedem Block neu zu kopieren.

@@ -93,7 +93,8 @@ final class PersonalDataExport
         }
 
         $photo = $this->app->memberPhotos()->repository();
-        $jpeg = $photo->original($userId) ?? $photo->image($userId, 1024);
+        // Größte vorhandene Fassung (ältere Fotos haben kein Original und keine 1024er).
+        $jpeg = $photo->original($userId) ?? $photo->image($userId, 1024) ?? $photo->image($userId, 480) ?? $photo->image($userId, 128);
         return [
             'format' => self::FORMAT,
             'formatVersion' => self::FORMAT_VERSION,
