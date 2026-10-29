@@ -667,7 +667,8 @@ final class Kernel
         // Schlüssel im Header (Selbstaufruf: X-Kompanie-Cron; Cronjob des Hosters: X-Kompanie-Cron-Key, landet nicht
         // im Zugriffsprotokoll des Webservers) oder als Parameter (Cronjob des Hosters, wenn er nur eine Adresse nimmt).
         // Der erste nicht leere: Ein leer mitgeschickter Header verdeckt den Schlüssel nicht.
-        $candidates = [$this->http->header('X-Kompanie-Cron'), $this->http->header('X-Kompanie-Cron-Key'), is_string($_GET['key'] ?? null) ? $_GET['key'] : null];
+        $header = $this->http->header('X-Kompanie-Cron'); // gesetzt: Selbstaufruf (runDueTasks unten)
+        $candidates = [$header, $this->http->header('X-Kompanie-Cron-Key'), is_string($_GET['key'] ?? null) ? $_GET['key'] : null];
         $key = (string) (array_values(array_filter($candidates, static fn (?string $k): bool => $k !== null && $k !== ''))[0] ?? '');
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
@@ -684,7 +685,7 @@ final class Kernel
         if (!$this->finishResponse()) {
             $this->flushResponse();
         }
-        $this->runDueTasks($header !== null ? 'spawn' : 'cron');
+        $this->runDueTasks($header !== null && $header !== '' ? 'spawn' : 'cron');
     }
 
     private function sendApp(): void
