@@ -510,6 +510,7 @@ final class FormerMembersTest extends TestCase
         // Chronik bleibt
         $this->assertNotNull($this->users->find($old), 'Konto mit Namen bleibt');
         $this->assertTrue($this->app->formerMembers()->of($old)['personal_deleted'] ?? false, 'beim Wiederaufnehmen erkennbar');
+        $this->assertSame(['level' => Roles::MEMBER], $this->app->formerMembers()->repository()->find($old)['restore'] ?? null, 'von den Rollen nur die Grundrolle');
         foreach (['points', 'join_years', 'former_members'] as $table) {
             $this->assertSame(1, $count($table), "$table bleibt");
         }

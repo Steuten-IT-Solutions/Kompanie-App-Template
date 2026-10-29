@@ -426,7 +426,7 @@ final class BackupUploadTest extends TestCase
         rewind($in);
         Crypt::encrypt($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
         rewind($out);
-        $this->assertSame($plain, $this->app->backupEncryption()->readUpload(chunk_split(base64_encode((string) stream_get_contents($out)), 76, "\n"), self::PASS));
+        $this->assertSame($plain, $this->app->backupEncryption()->readUpload("\r\n" . chunk_split(base64_encode((string) stream_get_contents($out)), 76, "\n"), self::PASS));
     }
 
     /** Eine beschädigte Datei ist kein Fehlversuch: Sie sperrt das Wiederherstellen nicht. */

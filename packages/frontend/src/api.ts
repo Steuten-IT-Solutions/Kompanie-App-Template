@@ -2,6 +2,7 @@
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
 import type { Address } from './address';
+import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
@@ -1129,14 +1130,7 @@ export type EncodedFile = { name: string; data: string };
 
 /** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
 export async function encodeFile(file: File): Promise<EncodedFile> {
-  const data = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
-    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
-    reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
-    reader.readAsDataURL(file);
-  });
-  return { name: file.name, data };
+  return { name: file.name, data: await readBase64(file) };
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
@@ -2002,7 +1996,7 @@ export const api = {
   formerRetention: () => request<FormerRetention>('GET', '/admin/former/retention'),
   /** preview: nur zeigen, wen die Frist beim nächsten Lauf löscht, ohne zu speichern */
   setFormerRetention: (data: { years: number; preview?: boolean }) => request<FormerRetention>('PUT', '/admin/former/retention', data),
-  /** Inhalt aus backupPayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
+  /** Inhalt aus filePayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
   restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>
     request<{ restored: boolean }>('POST', '/admin/backup', { ...payload, ...(passphrase ? { passphrase } : {}), confirm: true }),
   backupEncryption: () => request<BackupEncryptionStatus>('GET', '/admin/backup/encryption'),

@@ -69,6 +69,40 @@ final class UserData
     }
 
     /**
+     * Wer von $userIds hat noch persönliche Angaben (Tabellen außer CHRONICLE, Push-Abos, eigene Bilder, Entwürfe)? Für
+     * die Aufbewahrungsfrist: nur bei ihnen erneut löschen. Eine Abfrage je Tabelle, nicht je Person.
+     *
+     * @param list<int> $userIds
+     * @return list<int>
+     */
+    public static function withPersonalData(Connection $db, array $userIds): array
+    {
+        $queries = [];
+        foreach (self::TABLES as $table => $column) {
+            if (!in_array($table, self::CHRONICLE, true)) {
+                $queries[] = 'SELECT DISTINCT ' . $column . ' AS id FROM {' . $table . '} WHERE ' . $column . ' IN (%s)';
+            }
+        }
+        $queries[] = 'SELECT DISTINCT user_id AS id FROM {push_subscriptions} WHERE user_id IN (%s)';
+        $queries[] = "SELECT DISTINCT owner_id AS id FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id IN (%s)";
+        $queries[] = "SELECT DISTINCT owner_id AS id FROM {attachments} WHERE owner_type = 'draft' AND owner_id IN (%s)";
+        $found = [];
+        foreach (array_chunk(array_values(array_unique($userIds)), 500) as $chunk) {
+            $in = implode(', ', array_fill(0, count($chunk), '?'));
+            foreach ($queries as $sql) {
+                try {
+                    foreach ($db->select(sprintf($sql, $in), $chunk) as $r) {
+                        $found[(int) $r['id']] = true;
+                    }
+                } catch (\RuntimeException) {
+                    // Tabelle fehlt: dort ist nichts
+                }
+            }
+        }
+        return array_keys($found);
+    }
+
+    /**
      * @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden
      * @param bool $keepChronicle nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige): CHRONICLE bleibt
      * @return bool ob alles geklappt hat (sonst steht es im Fehlerprotokoll)

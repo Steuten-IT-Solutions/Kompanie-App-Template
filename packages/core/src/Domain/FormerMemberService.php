@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\FormerMemberRepository;
+use KompanieApp\Core\Storage\UserData;
 
 /**
  * Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden.
@@ -46,6 +47,7 @@ final class FormerMemberService
     public const RETENTION_SETTING = 'former_retention';
     public const RETENTION_TASK = 'former_retention';
     public const RETENTION_MAX_YEARS = 50;
+    public const RETENTION_INTERVAL = 86400;
 
     /** @var array<int, array<string, mixed>>|null Einträge dieser Anfrage (eine Abfrage) */
     private ?array $all = null;
@@ -542,8 +544,11 @@ final class FormerMemberService
         }
         $done = 0;
         $today = $this->app->time()->today();
-        foreach ($this->candidates($config, true) as $person) {
-            if ($person['expires'] > $today) {
+        $due = array_values(array_filter($this->candidates($config, true), static fn (array $p): bool => $p['expires'] <= $today));
+        // Schon Erledigte nur, wenn wieder etwas Persönliches da ist (eine Abfrage je Tabelle für alle).
+        $again = array_flip(UserData::withPersonalData($this->app->db, array_column(array_filter($due, static fn (array $p): bool => $p['purged']), 'id')));
+        foreach ($due as $person) {
+            if ($person['purged'] && !isset($again[$person['id']])) {
                 continue;
             }
             if ($person['purged']) {

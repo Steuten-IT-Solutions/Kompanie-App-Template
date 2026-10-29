@@ -147,6 +147,11 @@ final class BackupEncryptionService
      */
     public function readUpload(string $base64, mixed $passphrase): string
     {
+        // Zeilenumbrüche (z. B. von `base64` auf der Kommandozeile) zuerst entfernen: Sonst verdeckten sie den Anfang, und
+        // die Stücke unten passten nicht.
+        if (strpbrk($base64, " \r\n\t") !== false) {
+            $base64 = (string) preg_replace('/\s+/', '', $base64);
+        }
         // Am Anfang erkennen, was es ist: Klartext nie in eine Datei (php://temp schreibt ab 2 MB ins /tmp des Servers).
         $head = (string) base64_decode(substr($base64, 0, 4 * (int) ceil(strlen(BackupCrypto::MAGIC) / 3)), false);
         if (!BackupCrypto::isEncrypted($head)) {
@@ -166,10 +171,6 @@ final class BackupEncryptionService
             throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
         }
         try {
-            // Zeilenumbrüche (z. B. von `base64` auf der Kommandozeile) erst entfernen: Sonst passten die Stücke nicht.
-            if (strpbrk($base64, " \r\n\t") !== false) {
-                $base64 = (string) preg_replace('/\s+/', '', $base64);
-            }
             // In Stücken von 1 MiB (durch 4 teilbar): streng geprüft, damit
             // eine abgeschnittene oder kaputte Übertragung nicht als „beschädigte Sicherung“ erscheint.
             for ($pos = 0, $len = strlen($base64); $pos < $len; $pos += 1048576) {

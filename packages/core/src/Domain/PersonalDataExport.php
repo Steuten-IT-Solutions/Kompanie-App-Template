@@ -41,11 +41,12 @@ final class PersonalDataExport
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
     /**
      * Rechte für die Auskunft über andere: Sie enthält Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, namentliche
-     * Umfragen und E-Mails; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
+     * Umfragen, E-Mails und Listen; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
      */
     public const OTHERS_REQUIRE = [
         Capability::CreateUsers, Capability::ViewPersonal, Capability::ManagePoints, Capability::ManagePenalties,
         Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance, Capability::ManagePolls, Capability::SendMail,
+        Capability::ManageLists,
     ];
 
     public function __construct(private readonly App $app)

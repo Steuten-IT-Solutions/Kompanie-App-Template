@@ -109,7 +109,7 @@ final class App
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ActivityService::TASK => ActivityService::INTERVAL,
-        FormerMemberService::RETENTION_TASK => 86400,
+        FormerMemberService::RETENTION_TASK => FormerMemberService::RETENTION_INTERVAL,
     ];
 
     /**

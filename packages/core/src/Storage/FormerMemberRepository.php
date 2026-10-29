@@ -75,10 +75,15 @@ final class FormerMemberRepository
         ], ['user_id' => $userId]);
     }
 
-    /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (FormerMemberService::purgeExpired). */
+    /**
+     * Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (FormerMemberService::purgeExpired). Vom Stand der
+     * Rollen von vorher bleibt nur die Grundrolle (für „Wieder aufnehmen“); Zusatzrollen und eigene Rechte fallen weg.
+     */
     public function markPurged(int $userId, string $now): void
     {
-        $this->db->update('former_members', ['purged_at' => $now], ['user_id' => $userId]);
+        $restore = $this->find($userId)['restore'] ?? [];
+        $keep = is_string($restore['level'] ?? null) ? ['level' => $restore['level']] : [];
+        $this->db->update('former_members', ['purged_at' => $now, 'restore' => (string) json_encode($keep)], ['user_id' => $userId]);
     }
 
     public function delete(int $userId): void

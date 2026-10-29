@@ -34,11 +34,16 @@ export async function isEncryptedFile(file: Blob): Promise<boolean> {
 export async function filePayload(file: Blob, encrypted?: boolean): Promise<{ backup: string } | { backup_base64: string }> {
   if (!(encrypted ?? (await isEncryptedFile(file)))) return { backup: await file.text() };
   if (typeof FileReader === 'undefined') return { backup_base64: toBase64(new Uint8Array(await file.arrayBuffer())) };
-  const url = await new Promise<string>((resolve, reject) => {
+  return { backup_base64: await readBase64(file) };
+}
+
+/** Inhalt einer Datei als Base64 (ohne „data:…;base64,“), über FileReader; auch für Dateien an die API (encodeFile). */
+export function readBase64(file: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Die Datei ließ sich nicht lesen.'));
+    // Nur der Base64-Teil: spart auf dem Server eine Kopie der Datei.
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
+    reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
     reader.readAsDataURL(file);
   });
-  return { backup_base64: url.slice(url.indexOf(',') + 1) };
 }
