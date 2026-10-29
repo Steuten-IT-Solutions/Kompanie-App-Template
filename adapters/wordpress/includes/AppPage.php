@@ -468,7 +468,8 @@ final class AppPage
     {
         header('X-Content-Type-Options: nosniff');
         header('X-Frame-Options: SAMEORIGIN');
-        header("Content-Security-Policy: frame-ancestors 'self'");
+        // Zusätzlich (false): Eine CSP der Webseite oder eines Sicherheits-Plugins bleibt; Browser beachten beide.
+        header("Content-Security-Policy: frame-ancestors 'self'", false);
         header('Referrer-Policy: strict-origin-when-cross-origin');
     }
 }

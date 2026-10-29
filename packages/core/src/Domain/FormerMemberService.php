@@ -10,7 +10,6 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\FormerMemberRepository;
-use KompanieApp\Core\Storage\UserData;
 
 /**
  * Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden.
@@ -570,11 +569,12 @@ final class FormerMemberService
      */
     private function forgetPersonal(int $userId): void
     {
-        UserData::purge($this->app->db, $userId, PollService::existingSecret($this->app->settings), keepChronicle: true);
-        $this->app->attachments()->deleteDraftsOf($userId);
-        $this->app->roles()->forget($userId);
-        $this->app->activity()->forget($userId);
+        // Die Anmeldung zuerst: Sie fällt weg, auch wenn danach etwas scheitert.
         $this->app->users->forgetLogin($userId);
+        // Erledigt erst, wenn alles geklappt hat; sonst wiederholt der nächste Lauf alles (jeder Schritt lässt sich wiederholen).
+        if (!$this->app->userDeleted($userId, keepChronicle: true)) {
+            throw new \RuntimeException('Nicht alle Angaben gelöscht (siehe Fehlerprotokoll); nächster Versuch beim nächsten Lauf.');
+        }
         $this->repository()->markPurged($userId, $this->app->time()->nowUtc());
     }
 

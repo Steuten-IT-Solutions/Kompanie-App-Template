@@ -71,8 +71,9 @@ final class UserData
     /**
      * @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden
      * @param bool $keepChronicle nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige): CHRONICLE bleibt
+     * @return bool ob alles geklappt hat (sonst steht es im Fehlerprotokoll)
      */
-    public static function purge(Connection $db, int $userId, ?string $pollSecret = null, bool $keepChronicle = false): void
+    public static function purge(Connection $db, int $userId, ?string $pollSecret = null, bool $keepChronicle = false): bool
     {
         $ok = true;
         if ($pollSecret !== null) {
@@ -122,5 +123,6 @@ final class UserData
         if (!$ok) {
             error_log('Kompanie-App: Nicht alle Tabellen gefunden beim Löschen der Daten von Benutzer ' . $userId . '.');
         }
+        return $ok;
     }
 }

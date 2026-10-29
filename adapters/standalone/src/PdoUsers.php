@@ -195,8 +195,15 @@ final class PdoUsers implements UserDirectory
 
     public function forgetLogin(int $id): void
     {
-        // Benutzername eindeutig und ohne Bezug zur Person; ein leerer Prüfwert passt zu keinem Passwort.
-        $this->db->update('users', ['login' => 'ehemalig-' . $id, 'email' => '', 'password_hash' => '', 'last_login_at' => null, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+        // Benutzername ohne Bezug zur Person (Zufall: nie gleich einem frei gewählten); als Passwort ein zufälliges, das
+        // niemand kennt (ein echter Prüfwert: die Anmeldung dauert so lange wie bei anderen Konten).
+        $this->db->update('users', [
+            'login' => 'ehemalig-' . bin2hex(random_bytes(6)),
+            'email' => '',
+            'password_hash' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT),
+            'last_login_at' => null,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+        ], ['id' => $id]);
         $this->sessions?->destroyAllFor($id);
     }
 

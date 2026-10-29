@@ -440,21 +440,30 @@ final class App
      * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“). Aus der Nutzungsauswertung
      * (Issue #175) verschwinden ihre Einträge, „zuletzt aktiv“ und ihr Pseudonym; die Tageszahlen ohne Personenbezug bleiben.
      */
-    public function userDeleted(int $userId): void
+    public function userDeleted(int $userId, bool $keepChronicle = false): bool
     {
-        UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
+        // $keepChronicle: nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige, UserData::CHRONICLE bleibt).
+        $ok = UserData::purge($this->db, $userId, PollService::existingSecret($this->settings), $keepChronicle);
         // Noch nicht gespeicherte Dateianhänge samt Dateien (Anhänge gespeicherter Nachrichten und Mails bleiben bei ihnen).
         try {
             $this->attachments()->deleteDraftsOf($userId);
         } catch (\Throwable $e) {
+            $ok = false;
             error_log('Kompanie-App: Entwürfe von Anhängen nicht gelöscht: ' . $e->getMessage());
         }
-        $this->roles()->forget($userId);
+        try {
+            $this->roles()->forget($userId);
+        } catch (\Throwable $e) {
+            $ok = false;
+            error_log('Kompanie-App: Eigene Rechte nicht gelöscht: ' . $e->getMessage());
+        }
         try {
             $this->activity()->forget($userId);
         } catch (\Throwable $e) {
+            $ok = false;
             error_log('Kompanie-App: Pseudonym der Nutzungsauswertung nicht gelöscht: ' . $e->getMessage());
         }
+        return $ok;
     }
 
     public function pushTriggers(): PushTriggers

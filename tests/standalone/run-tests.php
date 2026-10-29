@@ -98,7 +98,8 @@ try {
     $users->deactivate($gone);
     $users->forgetLogin($gone);
     $row = $kernel->db()->selectOne('SELECT login, email, password_hash, name FROM {users} WHERE id = ?', [$gone]);
-    $c->ok($row !== null && $row['login'] === "ehemalig-$gone" && $row['email'] === '' && $row['password_hash'] === '' && $row['name'] === 'Ehe Malig', 'forgetLogin: Anmeldedaten weg, Name bleibt');
+    $c->ok($row !== null && preg_match('/^ehemalig-[0-9a-f]{12}$/', (string) $row['login']) === 1 && $row['email'] === '' && $row['name'] === 'Ehe Malig', 'forgetLogin: Anmeldedaten weg, Name bleibt');
+    $c->ok(str_starts_with((string) $row['password_hash'], '$') && !password_verify('ehemalig-passwort', (string) $row['password_hash']), 'forgetLogin: altes Passwort passt nicht, Prüfwert wie bei anderen Konten');
     $c->ok($users->findForLogin('ehemalig@example.org') === null, 'forgetLogin: über die alte E-Mail-Adresse nicht mehr zu finden');
     $login = static fn (string $u, string $p, ?bool $remember = true, array $headers = []) => $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $headers + $json, (string) json_encode(['username' => $u, 'password' => $p] + ($remember === null ? [] : ['remember' => $remember])));
     $cookieOf = static fn (array $res): ?string => preg_match('/' . Sessions::COOKIE . '=([a-f0-9]{64})/', $res[2]['set-cookie'], $m) ? $m[1] : null;
