@@ -467,7 +467,10 @@ final class AppPage
     private static function securityHeaders(): void
     {
         header('X-Content-Type-Options: nosniff');
-        header('X-Frame-Options: SAMEORIGIN');
+        // Ein strengeres DENY der Webseite oder eines Plugins nicht überschreiben.
+        if (!array_filter(headers_list(), static fn (string $h): bool => stripos($h, 'X-Frame-Options:') === 0)) {
+            header('X-Frame-Options: SAMEORIGIN');
+        }
         // Zusätzlich (false): Eine CSP der Webseite oder eines Sicherheits-Plugins bleibt; Browser beachten beide.
         header("Content-Security-Policy: frame-ancestors 'self'", false);
         header('Referrer-Policy: strict-origin-when-cross-origin');

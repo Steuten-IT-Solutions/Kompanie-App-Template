@@ -668,8 +668,7 @@ final class Kernel
         // im Zugriffsprotokoll des Webservers) oder als Parameter (Cronjob des Hosters, wenn er nur eine Adresse nimmt).
         // Der erste nicht leere: Ein leer mitgeschickter Header verdeckt den Schlüssel nicht.
         $header = $this->http->header('X-Kompanie-Cron'); // gesetzt: Selbstaufruf (runDueTasks unten)
-        $candidates = [$header, $this->http->header('X-Kompanie-Cron-Key'), is_string($_GET['key'] ?? null) ? $_GET['key'] : null];
-        $key = (string) (array_values(array_filter($candidates, static fn (?string $k): bool => $k !== null && $k !== ''))[0] ?? '');
+        $key = ($header ?: $this->http->header('X-Kompanie-Cron-Key')) ?: (is_string($_GET['key'] ?? null) ? $_GET['key'] : '');
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
             $this->sendPlain(403, 'Falscher Schlüssel.');

@@ -5339,6 +5339,7 @@ components:
               email: { type: string }
               phone: { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist oder der Betrachter view_personal nicht hat' }
               can_change_login: { type: boolean, description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)' }
+              can_export: { type: boolean, description: 'Ob der Betrachter die Auskunft (GET /members/{id}/data) bekommt' }
     OwnAccount:
       description: Eigene Kontaktangaben
       content:

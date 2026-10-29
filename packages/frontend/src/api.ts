@@ -1489,6 +1489,8 @@ export interface AccountProfile extends PersonName {
   phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
+  /** Auskunft (Daten exportieren) erlaubt: der Server prüft die Rechte aller enthaltenen Bereiche */
+  can_export: boolean;
 }
 
 export class ApiError extends Error {

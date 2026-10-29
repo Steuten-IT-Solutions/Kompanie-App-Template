@@ -65,7 +65,7 @@ final class PersonalDataExport
         $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         // Prüft für andere guardAccount (z. B. Konten von Admins nur für Admins).
         $profile = $this->app->members()->profile($userId, $actor);
-        unset($profile['can_change_login']);
+        unset($profile['can_change_login'], $profile['can_export']);
         $profile = $this->app->members()->personal($userId) + $profile;
 
         $data = [];

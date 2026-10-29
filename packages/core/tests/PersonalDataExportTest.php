@@ -127,7 +127,9 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame(403, $this->call('GET', "/members/{$this->m}/data")->status, 'ohne view_personal');
         $this->users->current = $secretary;
         $this->assertSame(403, $this->call('GET', "/members/{$this->m}/data")->status, 'ohne Strafen, Anwesenheit, Umfragen …: sähe sonst Verborgenes');
+        $this->assertFalse($this->call('GET', "/members/{$this->m}/account")->data['can_export'], 'Knopf ausgeblendet');
         $this->users->current = $manager;
+        $this->assertTrue($this->call('GET', "/members/{$this->m}/account")->data['can_export']);
         $this->assertSame(200, $this->call('GET', "/members/{$this->m}/data")->status);
         $this->assertSame(403, $this->call('GET', "/members/{$this->admin}/data")->status);
         $this->users->current = $this->other;

@@ -1,15 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import {
-  api,
-  can,
-  config,
-  newAccountRoles,
-  type AccountProfile,
-  type BulkResult,
-  type CreatedUser,
-  type Level,
-  type NewPerson,
-} from '../api';
+import { api, config, newAccountRoles, type AccountProfile, type BulkResult, type CreatedUser, type Level, type NewPerson } from '../api';
 import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
@@ -21,20 +11,6 @@ import { addressInput, EMPTY_ADDRESS, isEmptyAddress, type Address } from '../ad
 import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
-import { previewRole } from '../preview';
-
-/** Wie PersonalDataExport::OTHERS_REQUIRE: Die Auskunft über andere enthält alle diese Bereiche. */
-const OTHERS_EXPORT_CAPS = [
-  'create_users',
-  'view_personal',
-  'manage_points',
-  'manage_penalties',
-  'manage_ranks',
-  'manage_titles',
-  'manage_attendance',
-  'manage_polls',
-  'send_mail',
-] as const;
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
@@ -496,7 +472,7 @@ export function AccountPanel({
             >
               Angaben ändern
             </button>
-            {OTHERS_EXPORT_CAPS.every((c) => can(c)) && !previewRole() && (
+            {p.can_export && (
               <button
                 className="btn btn-link"
                 disabled={busy}

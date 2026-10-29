@@ -295,6 +295,13 @@ final class BackupEncryptionService
         }
     }
 
+    /** Temporäre Datei (exportToTempFile, encryptFile) löschen, wenn der Aufrufer fertig ist; auch aus der Liste fürs Ende. */
+    public static function discard(string $file): void
+    {
+        @unlink($file);
+        unset(self::$temp[$file]);
+    }
+
     /** @var array<string, true> temporäre Dateien, die das Ende der Anfrage löscht (falls noch da) */
     private static array $temp = [];
 

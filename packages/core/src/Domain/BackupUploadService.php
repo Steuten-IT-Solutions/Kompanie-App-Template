@@ -149,7 +149,7 @@ final class BackupUploadService implements OffsiteBackup
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
-            $tmp !== null && @unlink($tmp);
+            $tmp !== null && BackupEncryptionService::discard($tmp);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
         return $this->status();
@@ -182,7 +182,7 @@ final class BackupUploadService implements OffsiteBackup
             $state['error'] = $e->getMessage();
             throw $e;
         } finally {
-            $encrypted !== null && @unlink($encrypted);
+            $encrypted !== null && BackupEncryptionService::discard($encrypted);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
     }

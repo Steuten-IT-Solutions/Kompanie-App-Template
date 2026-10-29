@@ -531,7 +531,7 @@ final class MemberService
      * Angaben eines Kontos zum Bearbeiten (für wer Konten anlegt): Name, Benutzername, E-Mail-Adresse. Die Handynummer
      * nur für die Person selbst, intern (ohne $actor) und wer persönliche Angaben sieht (view_personal); sonst ''.
      *
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool, can_export: bool}
      */
     public function profile(int $id, ?User $actor = null): array
     {
@@ -541,7 +541,9 @@ final class MemberService
         }
         $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         $phone = $actor === null || $actor->id === $id || $actor->can(Capability::ViewPersonal) ? ($this->contacts?->phone($id) ?? '') : '';
-        return $p + ['phone' => $phone, 'can_change_login' => $this->users->canChangeLogin()];
+        // Auskunft (GET /members/{id}/data): für sich selbst immer, für andere wie PersonalDataExport prüft.
+        $canExport = $actor !== null && !$actor->preview && ($actor->id === $id || PersonalDataExport::mayExportOthers($actor));
+        return $p + ['phone' => $phone, 'can_change_login' => $this->users->canChangeLogin(), 'can_export' => $canExport];
     }
 
     /**
@@ -609,7 +611,7 @@ final class MemberService
      * Kontos; ändert jemand den eigenen, bleibt dieses Gerät angemeldet. Die eigene E-Mail-Adresse nur mit current_password.
      *
      * @param array<string, mixed> $in first_name, last_name (oder name), email, phone, username, current_password
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, phone: string, can_change_login: bool, can_export: bool}
      */
     public function updateProfile(User $actor, int $id, array $in): array
     {
