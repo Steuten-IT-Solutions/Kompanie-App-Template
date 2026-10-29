@@ -794,9 +794,11 @@ final class Kernel
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('X-Frame-Options: SAMEORIGIN');
         header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-        // HSTS: der Browser ruft die App danach ein halbes Jahr nur noch über HTTPS auf. Nur über HTTPS (über HTTP
-        // ignorieren Browser den Header ohnehin) und ohne includeSubDomains: die App liegt oft unter der Domain des
-        // Vereins, deren andere Seiten nicht betroffen sein sollen. Abschalten: 'hsts' => false in config.php.
+        // HSTS: der Browser ruft danach ein halbes Jahr alles unter diesem Host nur noch über HTTPS auf. Nur über HTTPS
+        // (über HTTP ignorieren Browser den Header ohnehin), ohne includeSubDomains (andere Subdomains des Vereins) und
+        // von sich aus nur, wenn die App den Host allein hat (liegt im Wurzelverzeichnis): In einem Unterordner gälte
+        // es auch für die anderen Seiten des Vereins unter demselben Host. 'hsts' => true/false in config.php
+        // schaltet es immer ein bzw. aus.
         if ($this->http->isHttps() && $this->hstsEnabled()) {
             header('Strict-Transport-Security: max-age=15552000');
         }
@@ -805,10 +807,11 @@ final class Kernel
     private function hstsEnabled(): bool
     {
         try {
-            return $this->config()->hsts();
+            $set = $this->config()->hsts();
         } catch (\Throwable) {
-            return true; // noch nicht eingerichtet
+            $set = null; // noch nicht eingerichtet
         }
+        return $set ?? (parse_url($this->http->baseUrl(), PHP_URL_PATH) ?: '/') === '/';
     }
 
     private function appDir(): string

@@ -619,7 +619,7 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
   return (
     <>
       {/* Ohne Stand (Fehler): ausdrücklich „unverschlüsselt“, nicht stillschweigend */}
-      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e ? e.available && e.configured : null} />
+      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e ? e.configured : null} />
       {e ? (
         <Verschluesselung status={e} onChange={setEnc} onToast={onToast} />
       ) : (

@@ -54,7 +54,7 @@ final class BackupEncryptionService
         $key = $this->key();
         return [
             'available' => BackupCrypto::available(),
-            'configured' => $key !== null,
+            'configured' => $this->configured(), // wie überall: nur mit sodium (sonst steht available: false dabei)
             'verified' => $this->verified(),
             'fingerprint' => $key !== null ? BackupCrypto::fingerprint($key['public_key']) : null,
             'set_at' => $key !== null && is_int($key['set_at'] ?? null) ? $key['set_at'] : null,

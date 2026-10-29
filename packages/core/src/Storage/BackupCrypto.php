@@ -136,6 +136,9 @@ final class BackupCrypto
      */
     public static function decrypt($in, string $passphrase): string
     {
+        if (!self::available()) {
+            throw new \RuntimeException('Zum Entschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.');
+        }
         try {
             return self::readPlain($in, $passphrase);
         } catch (\SodiumException $e) {

@@ -205,14 +205,13 @@ export function FormerList() {
  * Daten endgültig, wie „Konto löschen“. Vorschau, wen es beim nächsten Lauf und in den nächsten 30 Tagen trifft.
  */
 function RetentionCard({ onChanged }: { onChanged: () => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.formerRetention(), [], 'admin/former/retention');
+  const { data, error, loading, reload, setData } = useAsync(() => api.formerRetention(), [], 'admin/former/retention');
   const [form, setForm] = useState<{ years: string; include_founders: boolean; include_deceased: boolean } | null>(null);
-  const [state, setState] = useState<FormerRetention | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  const r = state ?? data!;
+  const r = data!;
   const f = form ?? {
     years: r.years > 0 ? String(r.years) : '',
     include_founders: r.include_founders,
@@ -243,7 +242,7 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
             : `Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
         if (!window.confirm(question)) return;
       }
-      setState(await api.setFormerRetention(data));
+      setData(await api.setFormerRetention(data)); // auch in den Zwischenspeicher, neu geladen wird wie sonst
       setForm(null);
       onChanged();
     } catch (err) {

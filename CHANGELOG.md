@@ -82,7 +82,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Mitgliederliste bzw. die Ehemaligen weggenommen, waren die Fotos darin trotzdem ohne Anmeldung abrufbar. Jetzt sind
   sie nur noch öffentlich, wenn Gast die Liste sehen darf. Die Originalauflösung gibt es nur noch nach der Anmeldung.
 - **HTTPS (eigenständige Version)**: Über HTTPS schickt die App jetzt HSTS mit (der Browser öffnet sie danach nur noch
-  verschlüsselt). Läuft die App über `http://`, warnen der Installer und *Einstellungen → Zustand und Updates*.
+  verschlüsselt), wenn sie im Hauptverzeichnis ihrer Adresse liegt; in einem Unterordner nur mit `'hsts' => true` in
+  `config.php`, weil es sonst auch für die übrigen Seiten unter derselben Adresse gälte. Läuft die App über `http://`, warnen der Installer und *Einstellungen → Zustand und Updates*.
 - **WordPress**: Die App-Seite lässt sich nicht mehr in fremde Seiten einbetten (Schutz vor Clickjacking).
 - **Keine E-Mail-Adressen im Fehlerprotokoll des Servers**, wenn eine Mail nicht zugestellt werden kann.
 - **Cronjob**: Der Schlüssel lässt sich jetzt auch im Header `X-Kompanie-Cron-Key` senden, dann steht er nicht im
