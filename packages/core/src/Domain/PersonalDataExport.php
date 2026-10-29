@@ -17,7 +17,8 @@ use KompanieApp\Core\Storage\UserData;
  *
  *   {format: "kompanie-app-personal-data", formatVersion: 1, created, person: {...}, data: {tabelle: [zeilen]}}
  *
- * Die Tabellen kommen aus UserData::tables(), derselben Liste wie beim Löschen; dazu Push-Abos, Ämter, Zeilen in Listen,
+ * Die Tabellen kommen aus UserData::tables(), derselben Liste wie beim Löschen; dazu Push-Abos (und wartende
+ * Benachrichtigungen), Ämter und für sie beendete Amtszeiten, Zeilen in Listen,
  * eigene Änderungen am Schwarzen Brett, eigene Bilder (Signatur, Entwürfe) und Anhänge von Entwürfen (Angaben zur Datei).
  * Ausgelassen:
  * - Schlüssel (Push: p256dh, auth), Pseudonyme (vote_ref) und Ablageorte (Anhänge: file); die Fassungen des Fotos (es
@@ -87,6 +88,10 @@ final class PersonalDataExport
         foreach ([
             'push_subscriptions' => 'SELECT * FROM {push_subscriptions} WHERE user_id = ?',
             'office_holders' => 'SELECT * FROM {office_holders} WHERE user_id = ?',
+            // Amtszeiten, die für sie beendet wurden (UserData::purge löst den Verweis)
+            'office_terms' => 'SELECT * FROM {office_terms} WHERE ended_for = ?',
+            // Noch nicht zugestellte Benachrichtigungen an ihre Geräte: nur in der eigenen Auskunft (wie die Push-Adresse)
+            ...($self ? ['push_queue' => 'SELECT q.* FROM {push_queue} q JOIN {push_subscriptions} s ON s.id = q.subscription_id WHERE s.user_id = ?'] : []),
             'list_rows' => 'SELECT * FROM {list_rows} WHERE user_id = ?',
             // Änderungen am Schwarzen Brett, die sie gemacht hat (bleiben beim Löschen als Verlauf der Nachricht)
             'board_message_revisions' => 'SELECT * FROM {board_message_revisions} WHERE user_id = ?',
