@@ -346,7 +346,11 @@ function MyDataCard() {
       >
         {busy ? 'Wird zusammengestellt …' : 'Meine Daten herunterladen'}
       </button>
-      {error && <p className="form-error small">{error}</p>}
+      {error && (
+        <p className="form-error small" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
