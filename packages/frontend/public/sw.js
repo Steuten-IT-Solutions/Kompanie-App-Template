@@ -162,8 +162,8 @@ function decodedHref(url) {
 }
 
 function isAdmin(url) {
-  const href = decodedHref(url);
-  // Auch mit Schrägstrich am Ende (die API nimmt ihn genauso an)
+  // Ohne Unterschied in Groß- und Kleinschreibung (WordPress nimmt REST-Pfade so an), auch mit Schrägstrich am Ende
+  const href = decodedHref(url).toLowerCase();
   return href.includes('/admin/') || /\/(?:me|members\/\d+)\/data\/*(?:[?&#]|$)/.test(href);
 }
 

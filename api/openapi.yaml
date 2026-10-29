@@ -4999,7 +4999,8 @@ paths:
       description: |
         Mit Passwort sind heruntergeladene Sicherungen (`<App>/sicherung?verschluesselt=1`) und alle Sicherungen in
         Google Drive verschlüsselt (Argon2id, X25519, XChaCha20-Poly1305). Gespeichert wird nur der öffentliche
-        Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen.
+        Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen. Verschlüsselt
+        herunterladen geht erst, wenn das Passwort einmal geprüft ist (`verified`, sonst 409).
       x-capability: manage_settings
       responses:
         '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
@@ -5027,7 +5028,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
     delete:
       tags: [Wartung]
-      summary: Passwort für Sicherungen entfernen (neue Sicherungen unverschlüsselt, Google Drive pausiert)
+      summary: Passwort für Sicherungen entfernen (neue Sicherungen unverschlüsselt, auch die in Google Drive)
       x-capability: manage_settings
       responses:
         '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
@@ -5114,9 +5115,10 @@ paths:
       summary: Sicherungen in Google Drive ein- oder ausschalten
       description: |
         Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
-        drive.file erlaubt hat und ein Passwort für Sicherungen (sonst 400). Die App lädt dann einmal pro Woche
-        eine verschlüsselte Sicherung (`.json.enc`) in einen eigenen Ordner im verbundenen Google-Konto und behält
-        die letzten acht.
+        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen eigenen Ordner
+        im verbundenen Google-Konto und behält die letzten acht: mit Passwort für Sicherungen verschlüsselt
+        (`.json.enc`), ohne unverschlüsselt (`.json`). Ist ein Passwort eingerichtet, fehlt aber die Erweiterung
+        sodium, scheitert das Hochladen (statt unverschlüsselt).
       x-capability: manage_settings
       requestBody:
         required: true
