@@ -438,13 +438,16 @@ final class FormerMembersTest extends TestCase
         $this->assertSame([], $this->call('GET', '/admin/former/retention')->data['due']);
     }
 
-    /** Ausgeschieden am 29. Februar: Die Frist endet in einem Nicht-Schaltjahr am 28. Februar, nicht am 1. März. */
+    /**
+     * Ausgeschieden am 29. Februar: Die Frist endet in einem Nicht-Schaltjahr mit Ablauf des 28. Februar (nicht des 1. März);
+     * gelöscht wird ab dem Tag danach.
+     */
     public function testRetentionFromLeapDay(): void
     {
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'founder' => false, 'joined_on' => '', 'left_on' => '2024-02-29'])->status);
-        $this->clock->at = new \DateTimeImmutable('2026-02-28 12:00:00');
+        $this->clock->at = new \DateTimeImmutable('2026-03-01 12:00:00');
         $this->assertSame([$this->m], array_column($this->call('PUT', '/admin/former/retention', ['years' => 2, 'preview' => true])->data['due'], 'id'));
-        $this->clock->at = new \DateTimeImmutable('2026-02-27 12:00:00');
+        $this->clock->at = new \DateTimeImmutable('2026-02-28 12:00:00');
         $this->assertSame([], $this->call('PUT', '/admin/former/retention', ['years' => 2, 'preview' => true])->data['due']);
     }
 

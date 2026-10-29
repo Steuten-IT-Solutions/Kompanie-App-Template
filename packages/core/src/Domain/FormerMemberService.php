@@ -587,17 +587,17 @@ final class FormerMemberService
      */
     private function forgetPersonal(int $userId): void
     {
-        // Die Anmeldung zuerst: Sie fällt weg, auch wenn danach etwas scheitert.
-        $this->app->users->forgetLogin($userId);
         // Erledigt erst, wenn alles geklappt hat; sonst wiederholt der nächste Lauf alles (jeder Schritt lässt sich wiederholen).
+        // Die Anmeldung zum Schluss (gesperrt ist sie als ehemalig schon): So stimmt personal_deleted mit ihr überein.
         if (!$this->app->userDeleted($userId, keepChronicle: true)) {
             throw new \RuntimeException('Nicht alle Angaben gelöscht (siehe Fehlerprotokoll); nächster Versuch beim nächsten Lauf.');
         }
+        $this->app->users->forgetLogin($userId);
         $this->repository()->markPurged($userId, $this->app->time()->nowUtc());
     }
 
     /**
-     * Ehemalige, für die die Frist gilt, mit dem Tag, an dem sie abläuft (expires), nach Namen; mit $withPurged auch die
+     * Ehemalige, für die die Frist gilt, mit dem ersten Tag nach ihrem Ablauf (expires: ab dann fällig), nach Namen; mit $withPurged auch die
      * schon erledigten (purged).
      *
      * @param array{years: int} $config
@@ -626,7 +626,8 @@ final class FormerMemberService
                 [$y, $m, $d] = array_map('intval', explode('-', $until->format('Y-n-j')));
                 $y += $config['years'];
                 $first = $until->setDate($y, $m, 1);
-                $expires = $first->setDate($y, $m, min($d, (int) $first->format('t')));
+                // Die Frist endet mit Ablauf dieses Tages (§ 188 BGB); gelöscht wird ab dem Tag danach.
+                $expires = $first->setDate($y, $m, min($d, (int) $first->format('t')))->modify('+1 day');
                 $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $expires, 'purged' => $row['purged_at'] !== ''];
             }
         }

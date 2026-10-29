@@ -621,7 +621,14 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
       {/* Ohne Stand (Fehler): ausdrücklich „unverschlüsselt“, nicht stillschweigend */}
       <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e ? e.configured : null} />
       {e ? (
-        <Verschluesselung status={e} onChange={setData} onToast={onToast} />
+        <Verschluesselung
+          status={e}
+          onChange={(s) => {
+            setData(s);
+            onChanged(); // Ampel (z. B. „Passwort nicht geprüft“) neu laden
+          }}
+          onToast={onToast}
+        />
       ) : (
         <ErrorBox message={error ?? 'Nicht geladen'} onRetry={reload} />
       )}
