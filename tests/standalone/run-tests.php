@@ -232,8 +232,18 @@ try {
     $c->ok(!isset($headers['strict-transport-security']), 'Über HTTP kein HSTS');
     $hsts = $d->send('GET', $base, ['X-Forwarded-Proto' => 'https'], null)[2]['strict-transport-security'] ?? '';
     $c->ok($hsts === 'max-age=15552000', 'Über HTTPS (hinter einem Proxy) mit HSTS, ohne includeSubDomains');
-    $hstsIn = static fn (string $path): bool => (fn (): bool => $this->hstsEnabled())->call(new Kernel($app, new HttpContext([], ['HTTP_HOST' => 'example.org', 'HTTPS' => 'on'], $path)));
-    $c->ok($hstsIn('/') && !$hstsIn('/verein/app/'), 'HSTS von sich aus nur im Hauptverzeichnis (gälte sonst für den ganzen Host)');
+    // Nach der eingetragenen Adresse (base_url), ohne sie nach der Anfrage.
+    $hstsIn = static function (string $path, string $baseUrl) use ($app, $data): bool {
+        $cfg = Config::load($data)->toArray();
+        Config::write($data, ['base_url' => $baseUrl] + $cfg);
+        try {
+            return (fn (): bool => $this->hstsEnabled())->call(new Kernel($app, new HttpContext([], ['HTTP_HOST' => 'example.org', 'HTTPS' => 'on'], $path)));
+        } finally {
+            Config::write($data, $cfg);
+        }
+    };
+    $c->ok($hstsIn('/', '') && !$hstsIn('/verein/app/', ''), 'HSTS von sich aus nur im Hauptverzeichnis (gälte sonst für den ganzen Host)');
+    $c->ok(!$hstsIn('/', 'https://example.org/verein/app/'), 'HSTS: eingetragene Adresse im Unterordner gilt (Proxy schreibt den Pfad um)');
     $man = json_decode((string) file_get_contents($base . 'index.php?r=/manifest.webmanifest'), true);
     $c->ok(($man['start_url'] ?? '') === $base && str_starts_with($man['icons'][0]['src'] ?? '', $base . 'app/icons/icon-192.png'), 'Manifest mit Start-Adresse und Icons');
     // Drehbar (Querformat), nicht auf hochkant festgelegt

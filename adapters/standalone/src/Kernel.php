@@ -813,7 +813,13 @@ final class Kernel
         } catch (\Throwable) {
             $set = null; // noch nicht eingerichtet
         }
-        return $set ?? (parse_url($this->http->baseUrl(), PHP_URL_PATH) ?: '/') === '/';
+        // Die eingetragene Adresse gilt vor der Anfrage (hinter einem Proxy, der den Pfad umschreibt, sieht PHP „/“).
+        try {
+            $base = $this->config()->baseUrl();
+        } catch (\Throwable) {
+            $base = '';
+        }
+        return $set ?? (parse_url($base !== '' ? $base : $this->http->baseUrl(), PHP_URL_PATH) ?: '/') === '/';
     }
 
     private function appDir(): string

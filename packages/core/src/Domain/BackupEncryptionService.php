@@ -105,14 +105,25 @@ final class BackupEncryptionService
         }
         if (!$ok) {
             $this->failed(self::VERIFY);
-        } elseif (($key['verified'] ?? false) !== true) {
-            // Nur den geprüften Schlüssel markieren: Hat jemand inzwischen ein neues Passwort gesetzt, bleibt es ungeprüft.
-            $now = $this->app->settings->fresh(BackupCrypto::SETTING);
-            if (is_array($now) && ($now['public_key'] ?? null) === $key['public_key']) {
-                $this->app->settings->set(BackupCrypto::SETTING, ['verified' => true] + $now);
-            }
+        } else {
+            $this->markVerified($key);
         }
         return $ok;
+    }
+
+    /**
+     * @param array{public_key: string, verified?: bool} $key
+     */
+    private function markVerified(array $key): void
+    {
+        if (($key['verified'] ?? false) === true) {
+            return;
+        }
+        // Nur den geprüften Schlüssel markieren: Hat jemand inzwischen ein neues Passwort gesetzt, bleibt es ungeprüft.
+        $now = $this->app->settings->fresh(BackupCrypto::SETTING);
+        if (is_array($now) && ($now['public_key'] ?? null) === $key['public_key']) {
+            $this->app->settings->set(BackupCrypto::SETTING, ['verified' => true] + $now);
+        }
     }
 
     /**
@@ -155,7 +166,17 @@ final class BackupEncryptionService
                 }
             }
             rewind($in);
-            return BackupCrypto::decrypt($in, $passphrase);
+            $plain = BackupCrypto::decrypt($in, $passphrase);
+            // Wiederhergestellt mit dem eingerichteten Passwort: Das ist so gut wie „Passwort prüfen“.
+            $key = $this->key();
+            try {
+                if ($key !== null && !$this->verified() && BackupCrypto::matches($key, $passphrase)) {
+                    $this->markVerified($key);
+                }
+            } catch (\RuntimeException) {
+                // nur eine Zugabe: Das Wiederherstellen scheitert daran nicht
+            }
+            return $plain;
         } catch (\RuntimeException $e) {
             // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.
             if ($e->getCode() === BackupCrypto::WRONG_PASSPHRASE) {

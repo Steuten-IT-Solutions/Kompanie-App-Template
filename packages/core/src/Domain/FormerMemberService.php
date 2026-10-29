@@ -589,7 +589,8 @@ final class FormerMemberService
             $left = match (strlen($row['left_on'])) {
                 10 => $row['left_on'],
                 4 => $row['left_on'] . '-12-31',
-                default => substr((string) $row['created_at'], 0, 10),
+                // ohne Datum: Tag des Eintrags (created_at in UTC) in der Zeitzone der App
+                default => (new \DateTimeImmutable((string) $row['created_at'], new \DateTimeZone('UTC')))->setTimezone($tz)->format('Y-m-d'),
             };
             $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $left, $tz);
             if ($until !== false) {

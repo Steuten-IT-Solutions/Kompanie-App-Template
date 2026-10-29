@@ -196,7 +196,7 @@ final class BackupUploadTest extends TestCase
         $this->app->runTask(BackupUploadService::TASK);
         $this->assertCount(1, $this->folders, 'eigener Ordner angelegt');
         $file = array_values($this->drive)[0];
-        $this->assertMatchesRegularExpression('/^sicherung-2026-10-20-\d{6}\.json\.enc$/', $file['name'], 'Datum und Uhrzeit (Ortszeit) im Namen');
+        $this->assertMatchesRegularExpression('/^sicherung-2026-10-20-\d{6}-k[0-9a-f]{8}\.json\.enc$/', $file['name'], 'Datum und Uhrzeit (Ortszeit) im Namen');
         $this->assertSame($this->folders[0], $file['parent']);
         $this->assertTrue(BackupCrypto::isEncrypted($file['content']), 'verschlüsselt');
         $this->assertSame(Backup::FORMAT, json_decode(self::decrypt($file['content']), true)['format'] ?? null, 'Inhalt ist die Sicherung');
@@ -315,7 +315,7 @@ final class BackupUploadTest extends TestCase
         sort($names);
         $this->assertCount(1 + BackupUploadService::KEEP_BEFORE_UPDATE, $names, 'die wöchentliche bleibt, vor Updates die letzten fünf');
         $this->assertStringStartsWith('sicherung-2026-10-20-', $names[0]);
-        $this->assertMatchesRegularExpression('/^vor-update-2026-10-23-\d{6}-1\.0\.0\.3\.json\.enc$/', $names[1]);
+        $this->assertMatchesRegularExpression('/^vor-update-2026-10-23-\d{6}-k[0-9a-f]{8}-1\.0\.0\.3\.json\.enc$/', $names[1]);
         $this->assertStringEndsWith('-1.0.0.7.json.enc', $names[5]);
         $this->assertSame([$this->folders[0]], array_values(array_unique(array_column($this->drive, 'parent'))), 'derselbe Ordner');
         $before = array_filter($this->drive, static fn (array $f): bool => str_starts_with($f['name'], 'vor-update-'));
@@ -453,13 +453,27 @@ final class BackupUploadTest extends TestCase
         $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
         $this->app->backupUpload()->upload();
         $this->drive['alt'] = ['name' => 'sicherung-2026-01-01-120000.json', 'parent' => $this->folders[0], 'content' => '{}'];
-        $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC');
-        $this->app->backupUpload()->upload();
-        $this->assertContains('sicherung-2026-01-01-120000.json', array_column($this->drive, 'name'), 'noch nicht geprüft: bleibt');
+        // Mit einem früheren Passwort: bleibt ebenso; die mit dem aktuellen wechseln durch (KEEP).
+        $this->drive['frueher'] = ['name' => 'sicherung-2026-01-02-120000-k00000000.json.enc', 'parent' => $this->folders[0], 'content' => 'x'];
+        for ($i = 0; $i < 9; $i++) {
+            $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC +' . (7 * $i) . ' days');
+            $this->app->backupUpload()->upload();
+        }
+        $names = array_column($this->drive, 'name');
+        $this->assertContains('sicherung-2026-01-01-120000.json', $names, 'noch nicht geprüft: bleibt');
+        $this->assertContains('sicherung-2026-01-02-120000-k00000000.json.enc', $names, 'früheres Passwort: bleibt');
+        $this->assertCount(8 + 2, $names, 'aktuelles Passwort: die letzten acht');
         $this->assertStringContainsString('noch nicht geprüft', $this->backupItem()['text'], 'Statusübersicht sagt es');
-        $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
+        // Wiederhergestellt mit dem eingerichteten Passwort: zählt wie „Passwort prüfen“.
+        $in = fopen('php://memory', 'w+b');
+        $out = fopen('php://memory', 'w+b');
+        fwrite($in, '{}');
+        rewind($in);
+        Crypt::encrypt($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
+        rewind($out);
+        $this->app->backupEncryption()->readUpload(base64_encode((string) stream_get_contents($out)), self::PASS);
         $this->assertTrue($this->app->backupEncryption()->status()['verified']);
-        $this->clock->at = new \DateTimeImmutable('2026-11-04 12:00:00 UTC');
+        $this->clock->at = new \DateTimeImmutable('2027-01-04 12:00:00 UTC');
         $this->app->backupUpload()->upload();
         $this->assertNotContains('sicherung-2026-01-01-120000.json', array_column($this->drive, 'name'), 'geprüft: gelöscht');
     }

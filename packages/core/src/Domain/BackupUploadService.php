@@ -134,7 +134,7 @@ final class BackupUploadService implements OffsiteBackup
             // Erst Stück für Stück in eine temporäre Datei (verschlüsselt), dann in Stücken hochladen: Die Sicherung muss
             // nie ganz in den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als memory_limit).
             $encrypted = $this->app->backupEncryption()->exportToTempFile($backup);
-            $this->store($encrypted, self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
+            $this->store($encrypted, self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . '-' . $this->keyTag() . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
         } catch (\Throwable $e) {
             $state['error'] = $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
@@ -161,7 +161,7 @@ final class BackupUploadService implements OffsiteBackup
         try {
             // Die Sicherung auf dem Server bleibt unverschlüsselt (sie liegt neben der Datenbank); nach Drive nur verschlüsselt.
             $encrypted = $this->app->backupEncryption()->encryptFile($path);
-            $name = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His') . '-' . $version . BackupCrypto::EXTENSION;
+            $name = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His') . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION;
             $this->store($encrypted, $name, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
         } catch (\RuntimeException $e) {
             $state['error'] = $e->getMessage();
@@ -200,31 +200,35 @@ final class BackupUploadService implements OffsiteBackup
         return $id;
     }
 
+    /** Kennung des Schlüssels im Dateinamen (Anfang des Fingerabdrucks): zeigt, mit welchem Passwort eine Sicherung geht. */
+    private function keyTag(): string
+    {
+        return 'k' . substr(str_replace(' ', '', (string) $this->app->backupEncryption()->status()['fingerprint']), 0, 8);
+    }
+
     /**
      * Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit). Unverschlüsselte (.json, von
      * früheren Versionen) löscht sie ganz, sobald eine verschlüsselte hochgeladen ist: Lesbare Sicherungen mit
-     * Passwort-Prüfwerten und Adressen sollen nicht monatelang im Ordner bleiben. Gelöscht wird erst, wenn das Passwort
-     * einmal geprüft wurde (BackupEncryptionService::verified): Ein vertipptes Passwort darf keine lesbare Sicherung
-     * kosten. Fehler hier sind nicht schlimm.
+     * Passwort-Prüfwerten und Adressen sollen nicht monatelang im Ordner bleiben. Solange das Passwort nicht einmal
+     * geprüft wurde (BackupEncryptionService::verified), wechseln nur die Sicherungen mit dem aktuellen Schlüssel (keyTag)
+     * durch: Ein vertipptes Passwort darf keine lesbare Sicherung kosten (unverschlüsselte, mit einem früheren Passwort).
+     * Fehler hier sind nicht schlimm.
      */
     private function prune(string $folder, string $prefix, int $keep): void
     {
         try {
             $names = [];
             $plain = [];
-            // Ungeprüftes Passwort: nichts löschen, weder unverschlüsselte noch ältere verschlüsselte Sicherungen. Ein
-            // vertipptes Passwort soll keine lesbare Sicherung kosten; der Ordner wächst so lange (Hinweis in der App).
-            if (!$this->app->backupEncryption()->verified()) {
-                return;
-            }
+            $verified = $this->app->backupEncryption()->verified();
+            $tag = '-' . $this->keyTag();
             foreach ($this->app->drive()->listChildren($folder) as $f) {
                 $name = (string) ($f['name'] ?? '');
                 if (DriveClient::isFolder($f) || !(str_starts_with($name, self::PREFIX) || str_starts_with($name, self::PREFIX_UPDATE))) {
                     continue;
                 }
                 if (str_ends_with($name, '.json')) {
-                    $plain[] = (string) $f['id'];
-                } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION)) {
+                    $verified && $plain[] = (string) $f['id'];
+                } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION) && ($verified || str_contains($name, $tag))) {
                     $names[(string) $f['id']] = $name;
                 }
             }
