@@ -1606,8 +1606,10 @@ async function requestFull<T>(
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
-  // Ausnahme: die Abfrage des Push-Status beim Start, ein POST ohne Änderung an den angezeigten Daten.
-  if (method !== 'GET' && !path.endsWith('/push/status')) dataCache.clear();
+  // Ausnahmen ohne Änderung an den angezeigten Daten: die Abfrage des Push-Status beim Start und Vorschauen ({preview: true},
+  // z. B. die Frist für Ehemalige vor dem Speichern).
+  const readOnly = path.endsWith('/push/status') || (body as { preview?: unknown } | undefined)?.preview === true;
+  if (method !== 'GET' && !readOnly) dataCache.clear();
 
   const data = await res.json().catch(() => null);
 

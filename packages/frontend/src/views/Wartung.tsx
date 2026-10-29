@@ -619,7 +619,13 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
   return (
     <>
       {/* Ohne Stand (Fehler): ausdrücklich „unverschlüsselt“, nicht stillschweigend */}
-      <Datensicherung onToast={onToast} onChanged={onChanged} encrypted={e ? e.configured : null} />
+      {/* Verschlüsselt erst mit geprüftem Passwort: Ein vertipptes machte die Sicherung unbrauchbar. */}
+      <Datensicherung
+        onToast={onToast}
+        onChanged={onChanged}
+        encrypted={e ? e.configured && e.verified : null}
+        unverified={!!e && e.configured && !e.verified}
+      />
       {e ? (
         <Verschluesselung
           status={e}
@@ -642,11 +648,14 @@ function Datensicherung({
   onToast,
   onChanged,
   encrypted,
+  unverified = false,
 }: {
   onToast: (msg: string) => void;
   onChanged: () => void;
   /** null: Stand des Passworts unbekannt (nicht geladen) */
   encrypted: boolean | null;
+  /** Passwort eingerichtet, aber noch nicht geprüft: noch nicht verschlüsselt herunterladen */
+  unverified?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -758,6 +767,12 @@ function Datensicherung({
           Sicherung wiederherstellen …
         </button>
       </div>
+      {unverified && (
+        <p className="small">
+          Verschlüsselt herunterladen geht, sobald das Passwort unten mit „Passwort prüfen“ bestätigt ist: Mit einem vertippten Passwort
+          ließe sich die Sicherung nicht wiederherstellen.
+        </p>
+      )}
       {encrypted && (
         <p className="muted small">
           Bricht das Herunterladen ab, ist die Datei unvollständig (die App erkennt das beim Wiederherstellen); der Grund steht unter

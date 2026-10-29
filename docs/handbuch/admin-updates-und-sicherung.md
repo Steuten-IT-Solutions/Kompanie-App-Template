@@ -11,7 +11,7 @@ Hier lädst du eine Sicherung aller Daten der App herunter, spielst eine Sicheru
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Datensicherung**.
 
 ## Was du hier siehst
-- **Datensicherung**: was die Sicherung enthält, mit den Knöpfen **Sicherung herunterladen** (mit Passwort für Sicherungen: **Sicherung verschlüsselt herunterladen**) und **Sicherung wiederherstellen …**.
+- **Datensicherung**: was die Sicherung enthält, mit den Knöpfen **Sicherung herunterladen** (mit geprüftem Passwort für Sicherungen: **Sicherung verschlüsselt herunterladen**; vor der ersten Prüfung unverschlüsselt, weil ein vertipptes Passwort die Sicherung unbrauchbar machte) und **Sicherung wiederherstellen …**.
 - **Passwort für Sicherungen**: ob eines eingerichtet ist, mit Fingerabdruck und den Knöpfen **Passwort prüfen**, **Ändern** und **Entfernen**.
 - **Sicherungen in Google Drive**: der Schalter **Wöchentlich in Google Drive sichern**, darunter wann zuletzt gesichert wurde, **Ordner öffnen** und **Jetzt in Google Drive sichern**. Fehlt die nötige Verbindung zu Google, steht hier stattdessen, was zu tun ist.
 

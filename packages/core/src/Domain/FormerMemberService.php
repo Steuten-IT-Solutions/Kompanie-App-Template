@@ -601,7 +601,8 @@ final class FormerMemberService
     {
         // Die Anmeldung zuerst (E-Mail-Adresse, Benutzername, Passwort): Sie fällt sicher zum Stichtag weg. Danach gilt die
         // Person als erledigt (personal_deleted passt so immer zur Anmeldung); scheitert beim Rest etwas, findet das tägliche
-        // Nachräumen (UserData::withPersonalData) die übrigen Zeilen und versucht es wieder.
+        // Nachräumen (UserData::withPersonalData) übrige Zeilen in den Tabellen und versucht es wieder. Was dort nicht steht
+        // (Pseudonym der Nutzungsauswertung, Dateien von Entwürfen), meldet nur das Fehlerprotokoll.
         $this->app->users->forgetLogin($userId);
         $complete = $this->app->userDeleted($userId, keepChronicle: true);
         $this->repository()->markPurged($userId, $this->app->time()->nowUtc());

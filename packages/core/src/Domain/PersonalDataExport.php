@@ -132,6 +132,8 @@ final class PersonalDataExport
             'person' => ['id' => $userId] + $profile + [
                 'level' => $target->role,
                 'extra_roles' => $this->app->roles()->extraRolesOf($target),
+                // persönlich vergebene bzw. entzogene Rechte (Ausnahmen zur Rolle)
+                'overrides' => $this->app->roles()->overridesOf($userId),
                 'birthday' => $this->app->birthdays()->of($userId),
                 'join_year' => $this->app->joinYears()->of($userId),
                 'former' => $this->app->formerMembers()->of($userId),
