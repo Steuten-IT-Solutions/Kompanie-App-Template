@@ -7,7 +7,9 @@ namespace KompanieApp\Core\Storage;
 /**
  * Verschlüsselt eine Sicherung beim Schreiben (Format: BackupCrypto). Als Filter an einem Ausgabestrom (attach/finish)
  * lässt sich die Sicherung direkt verschlüsselt schreiben: Der Klartext liegt nie als Datei vor und nie ganz im
- * Arbeitsspeicher (immer nur ein Block von BackupCrypto::CHUNK Bytes).
+ * Arbeitsspeicher (immer nur ein Block von BackupCrypto::CHUNK Bytes). Was in einem Schreibvorgang ankommt, hält der
+ * Filter bis zu dessen Ende etwa dreifach im Speicher: also nur in begrenzten Stücken schreiben (Backup::write,
+ * BackupCrypto::copy), nie eine ganze Datei auf einmal.
  */
 final class BackupEncryptor
 {

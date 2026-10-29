@@ -37,6 +37,8 @@ final class BackupCrypto
     public const WRONG_PASSPHRASE = 1;
     /** Klartext je Block */
     public const CHUNK = 65536;
+    /** copy(): Bytes je Schreibvorgang (ein Vielfaches von CHUNK) */
+    private const COPY_BLOCK = 4 * self::CHUNK;
     /** Obergrenzen für Parameter aus dem Kopf einer Datei (eine präparierte Datei soll den Server nicht lahmlegen). */
     private const MIN_OPS = 1;
     private const MIN_MEM = 8192;
@@ -106,6 +108,32 @@ final class BackupCrypto
     public static function isEncrypted(string $prefix): bool
     {
         return str_starts_with($prefix, self::MAGIC);
+    }
+
+    /**
+     * Datei $in in Stücken von höchstens COPY_BLOCK Bytes nach $out kopieren (z. B. in encryptTo). Nicht mit
+     * stream_copy_to_stream: Wie groß die Stücke dort sind, legt PHP fest (eine Datei kann es per mmap in einem Stück
+     * weiterreichen), und der Filter zum Verschlüsseln (BackupEncryptor) hält ein Stück etwa dreifach im Speicher
+     * (eingehend, kopiert, verschlüsselt). So scheiterte das Update mit Sicherung in Google Drive an memory_limit.
+     *
+     * @param resource $in
+     * @param resource $out
+     * @throws \RuntimeException wenn sich nicht lesen oder schreiben lässt
+     */
+    public static function copy($in, $out): void
+    {
+        while (!feof($in)) {
+            $block = fread($in, self::COPY_BLOCK);
+            if ($block === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
+            }
+            for ($done = 0, $len = strlen($block); $done < $len; $done += $n) {
+                $n = fwrite($out, $done === 0 ? $block : substr($block, $done));
+                if ($n === false || $n === 0) {
+                    throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                }
+            }
+        }
     }
 
     /**

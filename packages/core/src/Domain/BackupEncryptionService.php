@@ -277,11 +277,7 @@ final class BackupEncryptionService
             throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
         }
         try {
-            return $this->writeBackupFile(static function ($out) use ($in): void {
-                if (stream_copy_to_stream($in, $out) === false) {
-                    throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
-                }
-            });
+            return $this->writeBackupFile(static fn ($out) => BackupCrypto::copy($in, $out));
         } finally {
             fclose($in);
         }
