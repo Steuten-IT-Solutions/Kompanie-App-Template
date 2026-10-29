@@ -547,8 +547,9 @@ final class FormerMemberService
             if ($person['expires'] > $today) {
                 continue;
             }
-            // Scheitert eine Person, geht es mit den anderen weiter; sie kommt im nächsten Lauf wieder (solange das Konto
-            // noch da ist; die Daten löscht UserData::purge Tabelle für Tabelle, auch wenn eine fehlt).
+            // Scheitert eine Person, geht es mit den anderen weiter. Lässt sich das Konto nicht löschen, kommt sie im nächsten
+            // Lauf wieder. Danach löscht UserData::purge Tabelle für Tabelle (wie „Konto löschen“) und protokolliert eine
+            // Tabelle, die scheitert; einen weiteren Lauf gibt es dann nicht, das Konto ist schon weg.
             try {
                 $this->app->users->removeAccount($person['id']);
                 // Löscht auch den Eintrag als ehemalig (former_members steht in UserData::TABLES).

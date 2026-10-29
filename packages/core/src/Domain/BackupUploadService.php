@@ -70,7 +70,7 @@ final class BackupUploadService implements OffsiteBackup
             'available' => $this->available(),
             'access' => $this->app->drive()->backupAccess(),
             'enabled' => $this->enabled(),
-            // Eingeschaltet, aber ohne Passwort für Sicherungen: pausiert
+            // Eingeschaltet, aber ohne Passwort für Sicherungen (oder ohne sodium, BackupEncryptionService::configured): pausiert
             'needs_passphrase' => !$this->app->backupEncryption()->configured(),
             'email' => $this->app->drive()->oauthEmail(),
             'folder_url' => $folder !== '' ? 'https://drive.google.com/drive/folders/' . rawurlencode($folder) : null,
@@ -136,7 +136,7 @@ final class BackupUploadService implements OffsiteBackup
             $encrypted = $this->app->backupEncryption()->exportToTempFile($backup);
             $this->store($encrypted, self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
         } catch (\Throwable $e) {
-            $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
+            $state['error'] = $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
             $encrypted !== null && @unlink($encrypted);

@@ -186,8 +186,17 @@ final class BackupEncryptionService
      */
     public function exportEncryptedTo(BackupProvider $backup, $out): int
     {
+        return $this->encryptInto($out, static fn ($o) => $backup->exportTo($o));
+    }
+
+    /**
+     * @param resource $out
+     * @param \Closure(resource): void $write
+     */
+    private function encryptInto($out, \Closure $write): int
+    {
         $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
-        return BackupCrypto::encryptTo($out, $key, $this->meta(), static fn ($o) => $backup->exportTo($o));
+        return BackupCrypto::encryptTo($out, $key, $this->meta(), $write);
     }
 
     /**
@@ -221,7 +230,9 @@ final class BackupEncryptionService
      */
     private function writeEncrypted(\Closure $write): string
     {
-        $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
+        if (!$this->configured()) {
+            throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
+        }
         $file = $this->app->files->tempFile();
         self::cleanupAtShutdown($file);
         try {
@@ -230,7 +241,7 @@ final class BackupEncryptionService
                 throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
             }
             try {
-                $bytes = BackupCrypto::encryptTo($out, $key, $this->meta(), $write);
+                $bytes = $this->encryptInto($out, $write);
             } finally {
                 fclose($out);
             }

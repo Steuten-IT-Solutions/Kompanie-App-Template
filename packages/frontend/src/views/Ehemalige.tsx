@@ -232,13 +232,14 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
     setBusy(true);
     setSaveError(null);
     try {
-      // Erst zeigen, wen es trifft: Der erste Lauf kommt wenige Minuten nach dem Speichern.
+      // Erst zeigen, wen es trifft: Beim Einschalten kommt der erste Lauf wenige Minuten nach dem Speichern, sonst gilt
+      // der tägliche Lauf.
       if (years > 0) {
         const preview = await api.setFormerRetention({ ...data, preview: true });
         const due = preview.due.length;
         const question =
           due > 0
-            ? `Beim nächsten Lauf (in wenigen Minuten) werden ${due} Ehemalige endgültig gelöscht, mit allen Daten: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
+            ? `Beim nächsten Lauf (spätestens in einem Tag) werden ${due} Ehemalige endgültig gelöscht, mit allen Daten: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
             : `Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
         if (!window.confirm(question)) return;
       }

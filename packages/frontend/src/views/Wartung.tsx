@@ -626,7 +626,7 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
         <ErrorBox message={error ?? 'Nicht geladen'} onRetry={reload} />
       )}
       {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (pausiert oder nicht) */}
-      <DriveSicherung key={String(e?.configured)} onToast={onToast} />
+      <DriveSicherung key={String(e?.configured)} onToast={onToast} noSodium={e?.available === false} />
     </>
   );
 }
@@ -979,7 +979,7 @@ function Verschluesselung({
 }
 
 /** Sicherungen automatisch in Google Drive (wöchentlich, die letzten acht bleiben). */
-function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
+function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void; noSodium: boolean }) {
   const { data, error, loading, reload } = useAsync(() => api.backupDrive(), [], 'admin/backup/drive');
   const [state, setState] = useState<BackupDriveStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1014,7 +1014,10 @@ function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
       </p>
       {d.needs_passphrase && (
         <p className={d.enabled ? 'form-error' : 'small'} role={d.enabled ? 'alert' : undefined}>
-          {d.enabled ? 'Pausiert: ' : ''}Bitte zuerst oben ein Passwort für Sicherungen einrichten.
+          {d.enabled ? 'Pausiert: ' : ''}
+          {noSodium
+            ? 'Zum Verschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.'
+            : 'Bitte zuerst oben ein Passwort für Sicherungen einrichten.'}
         </p>
       )}
       {!d.available ? (

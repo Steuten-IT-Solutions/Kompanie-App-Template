@@ -136,32 +136,16 @@ final class BackupCrypto
      */
     public static function decrypt($in, string $passphrase): string
     {
-        $out = '';
-        self::decryptEach($in, static function (string $plain) use (&$out): void {
-            $out .= $plain;
-        }, $passphrase);
-        return $out;
-    }
-
-    /**
-     * @param resource $in
-     * @param \Closure(string): void $sink bekommt den Klartext Block für Block
-     */
-    private static function decryptEach($in, \Closure $sink, string $passphrase): void
-    {
         try {
-            self::decryptEachUnchecked($in, $sink, $passphrase);
+            return self::readPlain($in, $passphrase);
         } catch (\SodiumException $e) {
             // z. B. ein Schlüssel falscher Länge in einer beschädigten Datei: wie jede beschädigte Datei melden
             throw new \RuntimeException(self::damaged()->getMessage(), 0, $e);
         }
     }
 
-    /**
-     * @param resource $in
-     * @param \Closure(string): void $sink
-     */
-    private static function decryptEachUnchecked($in, \Closure $sink, string $passphrase): void
+    /** @param resource $in */
+    private static function readPlain($in, string $passphrase): string
     {
         if (self::readFull($in, strlen(self::MAGIC)) !== self::MAGIC) {
             throw new \RuntimeException('Die Datei ist keine verschlüsselte Sicherung der App.');
@@ -196,6 +180,7 @@ final class BackupCrypto
         try {
             $state = sodium_crypto_secretstream_xchacha20poly1305_init_pull($streamHeader, $fileKey);
             $ad = $header;
+            $out = '';
             $max = $chunk + SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES;
             while (true) {
                 $len = self::readFull($in, 4);
@@ -213,9 +198,7 @@ final class BackupCrypto
                 }
                 $ad = '';
                 [$plain, $tag] = $res;
-                if ($plain !== '') {
-                    $sink($plain);
-                }
+                $out .= $plain;
                 if ($tag === SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL) {
                     break;
                 }
@@ -223,6 +206,7 @@ final class BackupCrypto
             if (self::readFull($in, 1) !== '') {
                 throw self::damaged(); // Daten nach dem Abschluss
             }
+            return $out;
         } finally {
             sodium_memzero($fileKey);
         }

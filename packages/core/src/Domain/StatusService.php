@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Storage\BackupCrypto;
 
 /**
  * Statusseite für Admins: eine Ampel je Bereich in Alltagssprache, mit dem, was zu tun ist.
@@ -147,7 +148,8 @@ final class StatusService
         if ($drive['enabled']) {
             $text .= ' Letzte Sicherung in Google Drive: ' . $this->date($drive['last_ok']) . '.';
             if ($drive['needs_passphrase']) {
-                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Sicherungen in Google Drive pausieren: Sie gehen nur noch verschlüsselt dorthin. Bitte unter Einstellungen → Datensicherung ein Passwort für Sicherungen einrichten.');
+                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Sicherungen in Google Drive pausieren: Sie gehen nur noch verschlüsselt dorthin. '
+                    . (BackupCrypto::available() ? 'Bitte unter Einstellungen → Datensicherung ein Passwort für Sicherungen einrichten.' : 'Dafür fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.'));
             }
             if (!$drive['access']) {
                 return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Verbindung zu Google erlaubt das Hochladen nicht mehr; bitte unter Einstellungen → Google-Zugang neu verbinden.');
