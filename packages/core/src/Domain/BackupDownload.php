@@ -53,7 +53,9 @@ final class BackupDownload
             // Erst ganz erzeugen, dann senden: Scheitert das Sichern, kommt ein Fehler statt einer abgeschnittenen Datei,
             // die der Browser als fertige Sicherung speichert. Große Sicherungen brauchen Zeit (wie beim Senden in den
             // Adaptern); bricht PHP trotzdem ab, löscht das Ende der Anfrage die Datei (exportToTempFile).
-            if (function_exists('set_time_limit')) {
+            // Nur verlängern, nie verkürzen (0 = ohne Grenze).
+            $limit = (int) ini_get('max_execution_time');
+            if ($limit > 0 && $limit < 300 && function_exists('set_time_limit')) {
                 @set_time_limit(300);
             }
             try {

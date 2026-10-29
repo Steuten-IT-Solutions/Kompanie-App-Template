@@ -362,7 +362,7 @@ final class Api
         $data = $a->personalData()->export($this->user(), $userId);
         $date = $a->time()->format($a->time()->timestamp(), 'Y-m-d');
         $name = $this->user()->id === $userId ? 'meine-daten-' . $date . '.json' : 'daten-' . $userId . '-' . $date . '.json';
-        return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+        return Response::attachment($data, $name);
     }
 
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -1136,7 +1136,7 @@ final class Api
                 $data = $backup->export();
                 $a->settings->set(StatusService::BACKUP_SETTING, $a->time()->timestamp());
                 $name = 'sicherung-' . $a->time()->format($a->time()->timestamp(), 'Y-m-d') . '.json';
-                return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+                return Response::attachment($data, $name);
             }, null, $denySettings),
             new Route('POST', '/admin/backup', Cap::ManageSettings, function (Request $r) use ($a) {
                 $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');

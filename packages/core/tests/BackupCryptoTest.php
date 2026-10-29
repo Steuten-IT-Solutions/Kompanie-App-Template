@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\Storage\BackupCrypto;
-use KompanieApp\Core\Tests\Support\Decrypt;
+use KompanieApp\Core\Tests\Support\Crypt;
 use PHPUnit\Framework\TestCase;
 
 /** Verschlüsselte Sicherungen: Hin und zurück, falsches Passwort, beschädigte und abgeschnittene Dateien, Speicher. */
@@ -27,7 +27,7 @@ final class BackupCryptoTest extends TestCase
         $out = fopen('php://memory', 'w+b');
         fwrite($in, $plain);
         rewind($in);
-        BackupCrypto::encryptStream($in, $out, self::$key, $meta);
+        Crypt::encrypt($in, $out, self::$key, $meta);
         rewind($out);
         return (string) stream_get_contents($out);
     }
@@ -38,7 +38,7 @@ final class BackupCryptoTest extends TestCase
             $plain = $n > 0 ? random_bytes($n) : '';
             $enc = self::encrypt($plain);
             $this->assertTrue(BackupCrypto::isEncrypted($enc), "$n Bytes");
-            $this->assertSame($plain, Decrypt::string($enc, self::PASS), "$n Bytes");
+            $this->assertSame($plain, Crypt::string($enc, self::PASS), "$n Bytes");
         }
         $json = '{"format":"kompanie-app-backup","tables":{"points":[{"reason":"Geheimnis"}]}}';
         $enc = self::encrypt($json, ['version' => '1.2.3']);
@@ -50,7 +50,7 @@ final class BackupCryptoTest extends TestCase
     public function testWrongPassphrase(): void
     {
         $this->expectExceptionMessage('Das Passwort für Sicherungen passt nicht');
-        Decrypt::string(self::encrypt('{}'), 'falsches-passwort');
+        Crypt::string(self::encrypt('{}'), 'falsches-passwort');
     }
 
     public function testDetectsTamperingAndTruncation(): void
@@ -67,7 +67,7 @@ final class BackupCryptoTest extends TestCase
         ];
         foreach ($cases as $label => $bad) {
             try {
-                Decrypt::string($bad, self::PASS);
+                Crypt::string($bad, self::PASS);
                 $this->fail("$label: nicht erkannt");
             } catch (\RuntimeException $e) {
                 $this->assertStringContainsString('beschädigt', $e->getMessage(), $label);
@@ -81,7 +81,7 @@ final class BackupCryptoTest extends TestCase
         $bad = str_replace('"mem":8192', '"mem":99999999999', $enc);
         $bad = substr_replace($bad, pack('N', strlen($bad) - strlen($enc) + unpack('N', substr($enc, strlen(BackupCrypto::MAGIC), 4))[1]), strlen(BackupCrypto::MAGIC), 4);
         $this->expectExceptionMessage('beschädigt');
-        Decrypt::string($bad, self::PASS);
+        Crypt::string($bad, self::PASS);
     }
 
     /** Fehler beim Verschlüsseln kommen als RuntimeException (Aufrufer vor einem Update fangen nur diese). */
@@ -89,6 +89,33 @@ final class BackupCryptoTest extends TestCase
     {
         $this->expectException(\RuntimeException::class);
         self::encrypt('{}', ['kompanie' => "kaputt \xB1\x31"]); // kein gültiges UTF-8: json_encode wirft JsonException
+    }
+
+    /** Bricht das Schreiben ab, endet die Datei ohne Abschluss: Sie gilt nie als vollständige Sicherung. */
+    public function testAbortedWriteIsNeverComplete(): void
+    {
+        $out = fopen('php://memory', 'w+b');
+        try {
+            BackupCrypto::encryptTo($out, self::$key, [], static function ($o): void {
+                fwrite($o, str_repeat('x', 200000));
+                throw new \RuntimeException('Datenbank weg');
+            });
+            $this->fail('Fehler erwartet');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Datenbank weg', $e->getMessage());
+        }
+        fclose($out); // auch beim Schließen kein Abschluss
+        $out = fopen('php://memory', 'w+b');
+        try {
+            BackupCrypto::encryptTo($out, self::$key, [], static function ($o): void {
+                fwrite($o, str_repeat('x', 200000));
+                throw new \RuntimeException('Datenbank weg');
+            });
+        } catch (\RuntimeException) {
+        }
+        rewind($out);
+        $this->expectExceptionMessage('beschädigt');
+        BackupCrypto::decrypt($out, self::PASS);
     }
 
     public function testMatchesAndFingerprint(): void
@@ -127,17 +154,14 @@ final class BackupCryptoTest extends TestCase
             if ($measure) {
                 memory_reset_peak_usage();
             }
-            BackupCrypto::encryptStream($plain, $enc, self::$key);
-            rewind($enc);
-            $back = fopen("$dir/back", 'w+b');
-            BackupCrypto::decryptStream($enc, $back, self::PASS);
+            Crypt::encrypt($plain, $enc, self::$key);
             if ($measure) {
-                $this->assertLessThan(4 * 1024 * 1024, memory_get_peak_usage() - $before, '20 MB mit wenig Speicher');
+                $this->assertLessThan(4 * 1024 * 1024, memory_get_peak_usage() - $before, '20 MB verschlüsseln mit wenig Speicher');
             }
-            $this->assertSame(hash_file('sha256', "$dir/plain"), hash_file('sha256', "$dir/back"));
+            rewind($enc);
+            $this->assertSame(hash_file('sha256', "$dir/plain"), hash('sha256', BackupCrypto::decrypt($enc, self::PASS)));
             fclose($plain);
             fclose($enc);
-            fclose($back);
         } finally {
             array_map('unlink', glob("$dir/*") ?: []);
             rmdir($dir);

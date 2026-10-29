@@ -696,14 +696,14 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
       setPassphrase('');
       return;
     }
-    await send(file);
+    await send(file, false);
   }
 
-  async function send(file: File, pass?: string) {
+  async function send(file: File, encrypted: boolean, pass?: string) {
     setBusy(true);
     setError(null);
     try {
-      await api.restoreBackup(await filePayload(file), pass);
+      await api.restoreBackup(await filePayload(file, encrypted), pass);
       setPending(null);
       onToast('Sicherung wiederhergestellt');
       setTimeout(() => window.location.reload(), 1500);
@@ -753,7 +753,7 @@ function Datensicherung({ onToast, onChanged, encrypted }: { onToast: (msg: stri
           className="form"
           onSubmit={(e) => {
             e.preventDefault();
-            void send(pending, passphrase);
+            void send(pending, true, passphrase);
           }}
         >
           <p className="small">„{pending.name}“ ist verschlüsselt. Zum Wiederherstellen bitte das Passwort für Sicherungen eingeben.</p>
@@ -840,6 +840,12 @@ function Verschluesselung({
           <p className="small">
             Eingerichtet{status.set_at ? ` am ${date(status.set_at)}` : ''}. Fingerabdruck: <code>{status.fingerprint}</code>
           </p>
+          {!status.verified && (
+            <p className="small">
+              Bitte das Passwort einmal mit „Passwort prüfen“ bestätigen. Erst danach löscht die App ältere, unverschlüsselte Sicherungen in
+              Google Drive.
+            </p>
+          )}
           <div className="button-row">
             <button type="button" className="btn btn-secondary" onClick={() => open('check')}>
               Passwort prüfen

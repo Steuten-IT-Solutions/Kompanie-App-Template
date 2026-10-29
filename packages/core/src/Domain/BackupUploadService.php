@@ -202,22 +202,25 @@ final class BackupUploadService implements OffsiteBackup
 
     /**
      * Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit). Unverschlüsselte (.json, von
-     * früheren Versionen) löscht sie ganz, sobald eine verschlüsselte hochgeladen ist: Lesbare Sicherungen mit
-     * Passwort-Prüfwerten und Adressen sollen nicht monatelang im Ordner bleiben. Fehler hier sind nicht schlimm.
+     * früheren Versionen) löscht sie ganz, sobald eine verschlüsselte hochgeladen ist und das Passwort einmal geprüft
+     * wurde (BackupEncryptionService::verified): Lesbare Sicherungen mit Passwort-Prüfwerten und Adressen sollen nicht
+     * monatelang im Ordner bleiben, aber ein vertipptes Passwort darf nicht die letzte lesbare kosten. Bis dahin zählen
+     * sie mit den verschlüsselten. Fehler hier sind nicht schlimm.
      */
     private function prune(string $folder, string $prefix, int $keep): void
     {
         try {
             $names = [];
             $plain = [];
+            $dropPlain = $this->app->backupEncryption()->verified();
             foreach ($this->app->drive()->listChildren($folder) as $f) {
                 $name = (string) ($f['name'] ?? '');
                 if (DriveClient::isFolder($f) || !(str_starts_with($name, self::PREFIX) || str_starts_with($name, self::PREFIX_UPDATE))) {
                     continue;
                 }
-                if (str_ends_with($name, '.json')) {
+                if ($dropPlain && str_ends_with($name, '.json')) {
                     $plain[] = (string) $f['id'];
-                } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION)) {
+                } elseif (str_starts_with($name, $prefix) && (str_ends_with($name, BackupCrypto::EXTENSION) || str_ends_with($name, '.json'))) {
                     $names[(string) $f['id']] = $name;
                 }
             }

@@ -37,13 +37,23 @@ final class BackupEncryptionService
         return $this->key() !== null;
     }
 
-    /** @return array{available: bool, configured: bool, fingerprint: ?string, set_at: ?int, min_length: int} */
+    /**
+     * Wurde das Passwort seit dem Einrichten einmal richtig geprüft („Passwort prüfen“)? Erst dann löscht Google Drive
+     * die alten unverschlüsselten Sicherungen: Ein vertipptes Passwort ließe sonst keine lesbare Sicherung übrig.
+     */
+    public function verified(): bool
+    {
+        return ($this->key()['verified'] ?? false) === true;
+    }
+
+    /** @return array{available: bool, configured: bool, verified: bool, fingerprint: ?string, set_at: ?int, min_length: int} */
     public function status(): array
     {
         $key = $this->key();
         return [
             'available' => BackupCrypto::available(),
             'configured' => $key !== null,
+            'verified' => ($key['verified'] ?? false) === true,
             'fingerprint' => $key !== null ? BackupCrypto::fingerprint($key['public_key']) : null,
             'set_at' => $key !== null && is_int($key['set_at'] ?? null) ? $key['set_at'] : null,
             'min_length' => BackupCrypto::MIN_LENGTH,
@@ -68,7 +78,7 @@ final class BackupEncryptionService
         } catch (\RuntimeException $e) {
             throw ApiError::invalid($e->getMessage());
         }
-        $this->app->settings->set(BackupCrypto::SETTING, $key + ['set_at' => $this->app->time()->timestamp()]);
+        $this->app->settings->set(BackupCrypto::SETTING, $key + ['set_at' => $this->app->time()->timestamp(), 'verified' => false]);
         $this->app->scheduleTasks();
         return $this->status();
     }
@@ -93,6 +103,8 @@ final class BackupEncryptionService
         }
         if (!$ok) {
             $this->failed(self::VERIFY);
+        } elseif (($key['verified'] ?? false) !== true) {
+            $this->app->settings->set(BackupCrypto::SETTING, ['verified' => true] + (array) $this->app->settings->get(BackupCrypto::SETTING));
         }
         return $ok;
     }
@@ -226,7 +238,9 @@ final class BackupEncryptionService
         }
         // WordPress kann Zahlen als Zeichenkette zurückgeben.
         return ['public_key' => $k['public_key'], 'salt' => $k['salt'], 'ops' => (int) $k['ops'], 'mem' => (int) $k['mem']]
-            + (is_numeric($k['set_at'] ?? null) ? ['set_at' => (int) $k['set_at']] : []);
+            + (is_numeric($k['set_at'] ?? null) ? ['set_at' => (int) $k['set_at']] : [])
+            // Ältere Einstellungen ohne den Schalter gelten als geprüft (wie vor dieser Prüfung).
+            + ['verified' => !array_key_exists('verified', $k) || $k['verified'] === true || $k['verified'] === '1' || $k['verified'] === 1];
     }
 
     private function throttle(string $kind): void

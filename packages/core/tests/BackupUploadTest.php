@@ -12,7 +12,7 @@ use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\BackupCrypto;
-use KompanieApp\Core\Tests\Support\Decrypt;
+use KompanieApp\Core\Tests\Support\Crypt;
 use KompanieApp\Core\Tests\Support\FakeHttpClient;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
@@ -80,7 +80,7 @@ final class BackupUploadTest extends TestCase
 
     private static function decrypt(string $content): string
     {
-        return Decrypt::string($content, self::PASS);
+        return Crypt::string($content, self::PASS);
     }
 
     private function http(): FakeHttpClient
@@ -404,7 +404,7 @@ final class BackupUploadTest extends TestCase
         $out = fopen('php://memory', 'w+b');
         fwrite($in, '{"format":"kompanie-app-backup"}');
         rewind($in);
-        BackupCrypto::encryptStream($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
+        Crypt::encrypt($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
         rewind($out);
         $this->assertSame('{"format":"kompanie-app-backup"}', $this->app->backupEncryption()->readUpload(base64_encode((string) stream_get_contents($out)), self::PASS));
     }
@@ -416,7 +416,7 @@ final class BackupUploadTest extends TestCase
         $out = fopen('php://memory', 'w+b');
         fwrite($in, '{}');
         rewind($in);
-        BackupCrypto::encryptStream($in, $out, self::$key);
+        Crypt::encrypt($in, $out, self::$key);
         rewind($out);
         $damaged = substr((string) stream_get_contents($out), 0, -5);
         for ($i = 0; $i < 12; $i++) {
@@ -430,6 +430,25 @@ final class BackupUploadTest extends TestCase
         $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
         $stored = (string) json_encode($this->app->settings->get(BackupCrypto::SETTING));
         $this->assertStringNotContainsString(self::PASS, $stored, 'Passwort nicht gespeichert');
+    }
+
+    /** Unverschlüsselte Sicherungen bleiben, bis das neue Passwort einmal geprüft ist (ein vertipptes Passwort). */
+    public function testPlainBackupsStayUntilPassphraseVerified(): void
+    {
+        $this->connect();
+        $this->assertSame(200, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => self::PASS, 'passphrase_confirm' => self::PASS])[0]);
+        $this->assertFalse($this->app->backupEncryption()->status()['verified']);
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->app->backupUpload()->upload();
+        $this->drive['alt'] = ['name' => 'sicherung-2026-01-01-120000.json', 'parent' => $this->folders[0], 'content' => '{}'];
+        $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC');
+        $this->app->backupUpload()->upload();
+        $this->assertContains('sicherung-2026-01-01-120000.json', array_column($this->drive, 'name'), 'noch nicht geprüft: bleibt');
+        $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
+        $this->assertTrue($this->app->backupEncryption()->status()['verified']);
+        $this->clock->at = new \DateTimeImmutable('2026-11-04 12:00:00 UTC');
+        $this->app->backupUpload()->upload();
+        $this->assertNotContains('sicherung-2026-01-01-120000.json', array_column($this->drive, 'name'), 'geprüft: gelöscht');
     }
 
     /** Ältere, unverschlüsselte Sicherungen (auch vor Updates) löscht die erste verschlüsselte; andere Dateien bleiben. */

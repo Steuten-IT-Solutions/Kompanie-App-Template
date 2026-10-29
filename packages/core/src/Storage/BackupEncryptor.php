@@ -16,6 +16,7 @@ final class BackupEncryptor
     private string $buffer = '';
     private string $ad;
     private bool $finished = false;
+    private bool $aborted = false;
     /** Fehler im Filter (dort darf keine Ausnahme hinaus); finish() wirft ihn. */
     public ?\Throwable $error = null;
     /** Geschriebene Bytes (Kopf und Blöcke), um eine Datei auf Vollständigkeit zu prüfen */
@@ -66,22 +67,50 @@ final class BackupEncryptor
         return $this->head;
     }
 
-    /** Klartext aufnehmen; liefert die fertigen Blöcke (je CHUNK Bytes Klartext). */
-    public function update(string $plain): string
+    /**
+     * Klartext aufnehmen; $emit bekommt jeden fertigen Block (je CHUNK Bytes Klartext) einzeln. Große Stücke werden
+     * über einen Versatz abgearbeitet, ohne den Rest bei jedem Block neu zu kopieren.
+     *
+     * @param \Closure(string): void $emit
+     */
+    public function update(string $plain, \Closure $emit): void
     {
-        $this->buffer .= $plain;
-        $out = '';
-        while (strlen($this->buffer) >= BackupCrypto::CHUNK) {
-            $out .= $this->push(substr($this->buffer, 0, BackupCrypto::CHUNK), SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE);
-            $this->buffer = substr($this->buffer, BackupCrypto::CHUNK);
+        if ($this->buffer !== '') {
+            $need = BackupCrypto::CHUNK - strlen($this->buffer);
+            if (strlen($plain) < $need) {
+                $this->buffer .= $plain;
+                return;
+            }
+            $emit($this->push($this->buffer . substr($plain, 0, $need), SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE));
+            $this->buffer = '';
+            $offset = $need;
+        } else {
+            $offset = 0;
         }
-        return $out;
+        $len = strlen($plain);
+        for (; $len - $offset >= BackupCrypto::CHUNK; $offset += BackupCrypto::CHUNK) {
+            $emit($this->push(substr($plain, $offset, BackupCrypto::CHUNK), SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE));
+        }
+        $this->buffer = (string) substr($plain, $offset);
+    }
+
+    /**
+     * Abbrechen: kein Abschluss mehr. Eine abgebrochene Sicherung darf nie wie eine vollständige enden (sonst ließe sie
+     * sich fehlerfrei, aber gekürzt entschlüsseln); ohne TAG_FINAL erkennt BackupCrypto::decrypt sie als abgeschnitten.
+     */
+    public function abort(): void
+    {
+        $this->aborted = true;
+        if ($this->filter !== null) {
+            @stream_filter_remove($this->filter);
+            $this->filter = null;
+        }
     }
 
     /** Rest und Abschluss (immer ein eigener, leerer Block mit TAG_FINAL). */
     public function final(): string
     {
-        if ($this->finished) {
+        if ($this->finished || $this->aborted) {
             return '';
         }
         $out = $this->buffer !== '' ? $this->push($this->buffer, SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE) : '';

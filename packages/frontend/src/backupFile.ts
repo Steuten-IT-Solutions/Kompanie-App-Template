@@ -31,8 +31,8 @@ export async function isEncryptedFile(file: Blob): Promise<boolean> {
  * Inhalt einer gewählten Datei für die API. Im Browser kodiert FileReader die verschlüsselte Datei selbst als Base64,
  * ohne Zwischenschritt über eine Zeichenkette der ganzen Datei (große Sicherungen mit vielen Fotos).
  */
-export async function filePayload(file: Blob): Promise<{ backup: string } | { backup_base64: string }> {
-  if (!(await isEncryptedFile(file))) return { backup: await file.text() };
+export async function filePayload(file: Blob, encrypted?: boolean): Promise<{ backup: string } | { backup_base64: string }> {
+  if (!(encrypted ?? (await isEncryptedFile(file)))) return { backup: await file.text() };
   if (typeof FileReader === 'undefined') return { backup_base64: toBase64(new Uint8Array(await file.arrayBuffer())) };
   const url = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();

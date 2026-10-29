@@ -99,23 +99,6 @@ final class BackupCrypto
     }
 
     /**
-     * Strom $in verschlüsselt nach $out schreiben.
-     *
-     * @param resource $in
-     * @param resource $out
-     * @param array{public_key: string} $key Einstellung SETTING
-     * @param array<string, scalar> $meta zusätzliche, unverschlüsselte Angaben im Kopf (z. B. created, version)
-     */
-    public static function encryptStream($in, $out, array $key, array $meta = []): void
-    {
-        self::encryptTo($out, $key, $meta, static function ($out) use ($in): void {
-            if (stream_copy_to_stream($in, $out) === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht lesen.');
-            }
-        });
-    }
-
-    /**
      * Was $write nach $out schreibt, verschlüsselt schreiben (Kopf, Blöcke, Abschluss); der eine Weg für alle
      * verschlüsselten Sicherungen.
      *
@@ -130,7 +113,12 @@ final class BackupCrypto
     {
         $enc = BackupEncryptor::start($key, $meta);
         $enc->attach($out);
-        $write($out);
+        try {
+            $write($out);
+        } catch (\Throwable $e) {
+            $enc->abort(); // ohne Abschluss: bleibt als abgeschnitten erkennbar
+            throw $e;
+        }
         $enc->finish();
         if (!fflush($out)) {
             throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
@@ -139,23 +127,11 @@ final class BackupCrypto
     }
 
     /**
-     * Verschlüsselte Sicherung lesen und als Klartext nach $out schreiben.
-     *
-     * @param resource $in
-     * @param resource $out
-     * @throws \RuntimeException mit verständlicher Meldung (falsches Passwort, beschädigte Datei)
-     */
-    public static function decryptStream($in, $out, string $passphrase): void
-    {
-        self::decryptEach($in, static fn (string $plain) => self::write($out, $plain), $passphrase);
-    }
-
-    /**
      * Verschlüsselte Sicherung lesen und den Klartext als Zeichenkette liefern (für den Import, der sie ohnehin ganz
      * braucht): ohne Zwischenspeicher, nur eine Kopie im Arbeitsspeicher.
      *
      * @param resource $in
-     * @throws \RuntimeException wie decryptStream()
+     * @throws \RuntimeException mit verständlicher Meldung (falsches Passwort: Code WRONG_PASSPHRASE, beschädigte Datei)
      */
     public static function decrypt($in, string $passphrase): string
     {
@@ -171,6 +147,20 @@ final class BackupCrypto
      * @param \Closure(string): void $sink bekommt den Klartext Block für Block
      */
     private static function decryptEach($in, \Closure $sink, string $passphrase): void
+    {
+        try {
+            self::decryptEachUnchecked($in, $sink, $passphrase);
+        } catch (\SodiumException $e) {
+            // z. B. ein Schlüssel falscher Länge in einer beschädigten Datei: wie jede beschädigte Datei melden
+            throw new \RuntimeException(self::damaged()->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * @param resource $in
+     * @param \Closure(string): void $sink
+     */
+    private static function decryptEachUnchecked($in, \Closure $sink, string $passphrase): void
     {
         if (self::readFull($in, strlen(self::MAGIC)) !== self::MAGIC) {
             throw new \RuntimeException('Die Datei ist keine verschlüsselte Sicherung der App.');
@@ -267,14 +257,6 @@ final class BackupCrypto
             $data .= $part;
         }
         return $data;
-    }
-
-    /** @param resource $out */
-    private static function write($out, string $data): void
-    {
-        if (fwrite($out, $data) !== strlen($data)) {
-            throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
-        }
     }
 
     private static function damaged(): \RuntimeException
