@@ -786,6 +786,9 @@ try {
     $pass = 'sehr-geheimes-sicherungs-passwort';
     [$s, $enc] = $d->request('PUT', '/admin/backup/encryption', ['passphrase' => $pass, 'passphrase_confirm' => $pass]);
     $c->ok($s === 200 && ($enc['configured'] ?? false) === true, 'Passwort für Sicherungen eingerichtet');
+    $encUrl = $base . 'index.php?r=/sicherung&verschluesselt=1';
+    $c->ok($d->send('GET', $encUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)], null)[0] === 409, 'Verschlüsselt herunterladen erst mit geprüftem Passwort');
+    $c->ok(($d->request('POST', '/admin/backup/encryption/verify', ['passphrase' => $pass])[1]['ok'] ?? false) === true, 'Passwort geprüft');
     $raw = (string) file_get_contents($base . 'index.php?r=/sicherung&verschluesselt=1', false, stream_context_create(['http' => ['header' => 'Cookie: ' . Sessions::COOKIE . '=' . $d->token($anna), 'ignore_errors' => true]]));
     $c->ok(str_starts_with($raw, \KompanieApp\Core\Storage\BackupCrypto::MAGIC) && !str_contains($raw, 'Sicherungstest'), 'Verschlüsselt heruntergeladen (Inhalt nicht lesbar)');
     $d->request('DELETE', '/events/' . (int) $kernel->db()->scalar("SELECT id FROM {events} WHERE title = 'Sicherungstest'"));

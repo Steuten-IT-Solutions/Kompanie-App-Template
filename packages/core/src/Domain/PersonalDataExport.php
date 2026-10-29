@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\Sql\Schema;
 use KompanieApp\Core\Storage\UserData;
 
 /**
@@ -171,6 +172,11 @@ final class PersonalDataExport
     private function rows(string $table, string $sql, array $params): array
     {
         $drop = array_flip(self::DROP_COLUMNS[$table] ?? []);
+        if ($drop !== [] && str_starts_with($sql, 'SELECT * ')) {
+            // Ausgelassene Spalten gar nicht erst laden (z. B. Bildschirmfotos wartender Fehlermeldungen, mehrere MB).
+            $columns = array_values(array_diff(Schema::columns($this->app->db, $table), array_keys($drop)));
+            $sql = 'SELECT ' . implode(', ', $columns) . ' ' . substr($sql, strlen('SELECT * '));
+        }
         return array_map(static fn (array $r): array => array_diff_key($r, $drop), $this->app->db->select($sql, $params));
     }
 }

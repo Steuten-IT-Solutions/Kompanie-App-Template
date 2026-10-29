@@ -108,6 +108,10 @@ try {
                 if (!$kernel->app()->backupEncryption()->configured()) {
                     throw new RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (Einstellungen → Datensicherung).');
                 }
+                if (!$kernel->app()->backupEncryption()->verified()) {
+                    // Ein vertipptes Passwort machte die Sicherung unbrauchbar.
+                    throw new RuntimeException('Das Passwort für Sicherungen ist noch nicht geprüft: bitte erst unter Einstellungen → Datensicherung „Passwort prüfen“.');
+                }
                 // Verschlüsselt direkt in eine neue Datei daneben schreiben (nie Klartext auf der Platte), erst danach
                 // umbenennen: Scheitert etwas, bleibt eine vorhandene Datei unter --out unverändert, und es entsteht keine halbe.
                 $part = $out . '.' . bin2hex(random_bytes(4)) . '.part';

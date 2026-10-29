@@ -44,7 +44,9 @@ final class BackupDownload
         if (!$viewer->can(Capability::ManageSettings) || $viewer->preview) {
             return $deny(403);
         }
-        if ($encrypted && !$this->app->backupEncryption()->configured()) {
+        // Verschlüsselt nur mit geprüftem Passwort: Ein vertipptes machte die Sicherung unbrauchbar (die Seite bietet es
+        // vorher nicht an).
+        if ($encrypted && (!$this->app->backupEncryption()->configured() || !$this->app->backupEncryption()->verified())) {
             return $deny(409);
         }
         $now = $this->app->time()->timestamp();
