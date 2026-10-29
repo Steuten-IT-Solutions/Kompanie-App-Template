@@ -20,7 +20,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Datensicher
 Mit diesem Passwort sind heruntergeladene Sicherungen und alle Sicherungen in Google Drive verschlüsselt: Wer die Datei findet, kann ohne das Passwort nichts darin lesen.
 1. Überlege dir ein langes Passwort (mindestens 12 Zeichen, gern ein Satz) und bewahre es sicher auf, z. B. im Passwort-Manager oder ausgedruckt im Tresor der Kompanie.
 2. Trage es unter **Passwort für Sicherungen** zweimal ein, setze das Häkchen **Ich habe das Passwort sicher aufbewahrt** und tippe auf **Passwort einrichten**.
-3. Prüfe gleich danach und ab und zu mit **Passwort prüfen**, ob ihr es noch habt. Erst nach der ersten richtigen Prüfung (oder einer Wiederherstellung mit diesem Passwort) löscht die App in Google Drive ältere, unverschlüsselte Sicherungen und die mit einem früheren Passwort.
+3. Prüfe gleich danach und ab und zu mit **Passwort prüfen**, ob ihr es noch habt. Erst nach der ersten richtigen Prüfung (oder einer Wiederherstellung mit diesem Passwort) löscht die App in Google Drive ältere, unverschlüsselte Sicherungen; die mit einem früheren Passwort wechseln dann wie die übrigen durch.
 
 > **Wichtig:** Die App speichert das Passwort nicht. **Ist es verloren, lässt sich keine verschlüsselte Sicherung mehr wiederherstellen, auch nicht von den Betreuern der App.** Ein neues Passwort gilt nur für neue Sicherungen; ältere brauchen weiter das bisherige.
 

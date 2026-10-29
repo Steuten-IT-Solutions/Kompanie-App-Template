@@ -41,6 +41,9 @@ final class StandaloneHealthChecks implements HealthChecks
     {
         // Ohne fest eingetragene Adresse die der Anfrage (über die die Statusseite gerade geöffnet ist).
         $base = $this->config->baseUrl();
+        if ($base === '' && $this->kernel->requestPath() === '/cron') {
+            return null; // Cronjob des Hosters: sagt nichts darüber, wie Mitglieder die App öffnen
+        }
         $https = $base !== '' ? strtolower((string) parse_url($base, PHP_URL_SCHEME)) === 'https' : $this->kernel->http()->isHttps();
         $host = strtolower((string) ($base !== '' ? parse_url($base, PHP_URL_HOST) : parse_url($this->kernel->http()->baseUrl(), PHP_URL_HOST)));
         if (in_array($host, ['', 'localhost', '127.0.0.1', '::1', '[::1]'], true)) {

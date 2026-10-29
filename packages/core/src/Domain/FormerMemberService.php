@@ -555,7 +555,9 @@ final class FormerMemberService
                 // Schon erledigt: Was seither dazugekommen ist (z. B. neu eingetragene Kontaktdaten, unter WordPress nach
                 // einer neuen Anmeldung), löscht jeder Lauf wieder; die Anmeldung bleibt, wie sie nach dem ersten Lauf ist.
                 try {
-                    $this->app->userDeleted($person['id'], keepChronicle: true);
+                    if (!$this->app->userDeleted($person['id'], keepChronicle: true)) {
+                        throw new \RuntimeException('nicht alles gelöscht (siehe Fehlerprotokoll); nächster Versuch beim nächsten Lauf');
+                    }
                 } catch (\Throwable $e) {
                     error_log('Kompanie-App: Persönliche Angaben von Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
                 }
