@@ -111,26 +111,10 @@ try {
                 // Verschlüsselt direkt in eine neue Datei daneben schreiben (nie Klartext auf der Platte), erst danach
                 // umbenennen: Scheitert etwas, bleibt eine vorhandene Datei unter --out unverändert, und es entsteht keine halbe.
                 $part = $out . '.' . bin2hex(random_bytes(4)) . '.part';
-                $h = @fopen($part, 'xb');
-                if ($h === false) {
+                $kernel->app()->backupEncryption()->exportToFile(new StandaloneBackup($kernel), $part);
+                if (!@rename($part, $out)) {
+                    @unlink($part);
                     throw new RuntimeException("$out lässt sich nicht schreiben (Ordner vorhanden, Schreibrechte?).");
-                }
-                try {
-                    @chmod($part, 0600);
-                    try {
-                        $bytes = $kernel->app()->backupEncryption()->exportEncryptedTo(new StandaloneBackup($kernel), $h);
-                    } finally {
-                        fclose($h);
-                    }
-                    clearstatcache(true, $part);
-                    if (filesize($part) !== $bytes) {
-                        throw new RuntimeException("$out ließ sich nicht vollständig schreiben (Speicherplatz?).");
-                    }
-                    if (!@rename($part, $out)) {
-                        throw new RuntimeException("$out lässt sich nicht schreiben (Ordner vorhanden, Schreibrechte?).");
-                    }
-                } finally {
-                    is_file($part) && @unlink($part);
                 }
                 fwrite(STDERR, "Verschlüsselt gesichert in $out (wiederherstellen nur mit dem Passwort für Sicherungen).\n");
                 break;

@@ -472,7 +472,14 @@ export function AccountPanel({
             )}
           </p>
           <div className="button-row">
-            <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(p)}>
+            <button
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => {
+                setFormError(null); // z. B. vom Export
+                setEditing(p);
+              }}
+            >
               Angaben ändern
             </button>
             {can('view_personal') && (

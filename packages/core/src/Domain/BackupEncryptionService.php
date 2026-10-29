@@ -179,6 +179,15 @@ final class BackupEncryptionService
     }
 
     /**
+     * Ganze Sicherung verschlüsselt in die neue Datei $path (Kommandozeile; nur für den Besitzer lesbar). Gibt es sie
+     * schon, oder scheitert etwas, gibt es eine Ausnahme; eine halbe Datei bleibt nicht liegen.
+     */
+    public function exportToFile(BackupProvider $backup, string $path): void
+    {
+        $this->writeEncrypted(static fn ($out) => $backup->exportTo($out), $path);
+    }
+
+    /**
      * Ganze Sicherung verschlüsselt nach $out (z. B. an den Browser): beim Schreiben verschlüsselt, ohne Zwischendatei.
      *
      * @param resource $out
@@ -223,23 +232,26 @@ final class BackupEncryptionService
     }
 
     /**
-     * Temporäre Datei, in die $write verschlüsselt schreibt; geprüft, ob alles angekommen ist (Speicherplatz). Bricht PHP
-     * ab (Zeitlimit, Abbruch eines Downloads), löscht das Ende der Anfrage die Datei.
+     * Datei (ohne $file: temporär), in die $write verschlüsselt schreibt; geprüft, ob alles angekommen ist
+     * (Speicherplatz). Bricht PHP ab (Zeitlimit, Abbruch eines Downloads), löscht das Ende der Anfrage die Datei.
      *
      * @param \Closure(resource): void $write
      */
-    private function writeEncrypted(\Closure $write): string
+    private function writeEncrypted(\Closure $write, ?string $file = null): string
     {
         if (!$this->configured()) {
             throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
         }
-        $file = $this->app->files->tempFile();
+        $temp = $file === null;
+        $file ??= $this->app->files->tempFile();
+        // Eine vorgegebene Datei nur neu anlegen (x), nie eine fremde überschreiben oder löschen.
+        $out = @fopen($file, $temp ? 'wb' : 'xb');
+        if ($out === false) {
+            throw new \RuntimeException($temp ? 'Die Sicherung ließ sich nicht erstellen (temporäre Datei).' : "$file lässt sich nicht anlegen (Ordner vorhanden, Schreibrechte, gibt es sie schon?).");
+        }
         self::cleanupAtShutdown($file);
+        @chmod($file, 0600);
         try {
-            $out = @fopen($file, 'wb');
-            if ($out === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
-            }
             try {
                 $bytes = $this->encryptInto($out, $write);
             } finally {
@@ -248,6 +260,9 @@ final class BackupEncryptionService
             clearstatcache(true, $file);
             if (filesize($file) !== $bytes) {
                 throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
+            }
+            if (!$temp) {
+                unset(self::$temp[$file]); // fertig: bleibt (eine temporäre löscht der Aufrufer, sonst das Ende der Anfrage)
             }
             return $file;
         } catch (\Throwable $e) {
@@ -262,7 +277,9 @@ final class BackupEncryptionService
     /** Bricht PHP ab (Zeitlimit, Abbruch eines Downloads), löscht das Ende der Anfrage die Datei; eine Funktion für alle. */
     private static function cleanupAtShutdown(string $file): void
     {
-        if (self::$temp === []) {
+        static $registered = false;
+        if (!$registered) {
+            $registered = true;
             register_shutdown_function(static function (): void {
                 foreach (array_keys(self::$temp) as $f) {
                     is_file($f) && @unlink($f);

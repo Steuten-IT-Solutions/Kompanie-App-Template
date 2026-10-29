@@ -23,7 +23,8 @@ use KompanieApp\Core\Storage\UserData;
  * - Schlüssel (Push: p256dh, auth) und Pseudonyme (vote_ref); die Fassungen des Fotos (es steht einmal unter
  *   person.photo); Bildschirmfotos wartender Fehlermeldungen (können Daten anderer zeigen). Eigene Bilder (Signatur,
  *   Entwürfe) sind mit Inhalt dabei.
- * - Antworten in anonymen Umfragen nur beim eigenen Export: Sonst sähe die Verwaltung, wer was geantwortet hat.
+ * - Antworten in anonymen Umfragen und Entwürfe (Bilder, Anhänge) nur beim eigenen Export: Sonst sähe die Verwaltung,
+ *   wer was geantwortet hat, und was in der App nur die Person selbst sieht.
  * - Nutzungsauswertung (activity*) nur beim eigenen Export und für Admins mit view_activity, die sie ohnehin sehen.
  * Was die Person für andere eingetragen hat (created_by, updated_by), gehört nicht dazu.
  */
@@ -84,9 +85,13 @@ final class PersonalDataExport
             'list_rows' => 'SELECT * FROM {list_rows} WHERE user_id = ?',
             // Änderungen am Schwarzen Brett, die sie gemacht hat (bleiben beim Löschen als Verlauf der Nachricht)
             'board_message_revisions' => 'SELECT * FROM {board_message_revisions} WHERE user_id = ?',
-            'rich_images' => "SELECT * FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?",
+            // Entwürfe (Bilder, Anhänge) sieht in der App nur die Person selbst (RichImageService, AttachmentService::canView):
+            // für andere nur die Signatur.
+            'rich_images' => $self
+                ? "SELECT * FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?"
+                : "SELECT * FROM {rich_images} WHERE owner_type = 'signature' AND owner_id = ?",
             // Anhänge noch nicht gesendeter Entwürfe (Angaben zur Datei; gehören ihr wie beim Löschen, AttachmentService::deleteDraftsOf)
-            'attachments' => "SELECT * FROM {attachments} WHERE owner_type = 'draft' AND owner_id = ?",
+            ...($self ? ['attachments' => "SELECT * FROM {attachments} WHERE owner_type = 'draft' AND owner_id = ?"] : []),
         ] as $table => $sql) {
             $rows = $this->rows($table, $sql, [$userId]);
             if ($table === 'push_subscriptions' && !$self) {

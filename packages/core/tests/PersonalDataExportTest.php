@@ -60,6 +60,11 @@ final class PersonalDataExportTest extends TestCase
         // Namentliche Umfrage: Pseudonym und user_id (PollRepository::saveVote)
         $named = $db->insert('polls', ['title' => 'Namentlich', 'description' => '', 'type' => 'text', 'anonymous' => 0, 'results' => 'after_vote', 'created_by' => $this->admin, 'created_at' => $now, 'updated_at' => $now]);
         $db->insert('poll_answers', ['poll_id' => $named, 'vote_ref' => PollService::pseudonym($secret, $this->m), 'user_id' => $this->m, 'option_id' => 0, 'answer_text' => 'Meine namentliche Meinung']);
+        // Entwürfe: in der App nur für sie selbst sichtbar
+        foreach (['signature' => 'sig-bild', 'draft' => 'entwurf-bild'] as $owner => $uid) {
+            $db->insert('rich_images', ['uid' => $uid, 'owner_type' => $owner, 'owner_id' => $this->m, 'user_id' => $this->m, 'mime' => 'image/png', 'width' => 1, 'height' => 1, 'bytes' => 1, 'data' => 'AA==', 'created_at' => $now]);
+        }
+        $db->insert('attachments', ['uid' => 'entwurf-anhang', 'owner_type' => 'draft', 'owner_id' => $this->m, 'user_id' => $this->m, 'name' => 'entwurf.txt', 'mime' => 'text/plain', 'bytes' => 1, 'file' => 'anh-x.bin', 'created_at' => $now]);
     }
 
     private function call(string $method, string $path, array $body = []): Response
@@ -85,6 +90,8 @@ final class PersonalDataExportTest extends TestCase
             $this->assertStringNotContainsString($hidden, $json);
         }
         $this->assertSame('https://push.example/abc', $d['data']['push_subscriptions'][0]['endpoint']);
+        $this->assertEqualsCanonicalizing(['sig-bild', 'entwurf-bild'], array_column($d['data']['rich_images'], 'uid'));
+        $this->assertSame(['entwurf-anhang'], array_column($d['data']['attachments'], 'uid'));
     }
 
     public function testExportForAdministration(): void
@@ -96,6 +103,8 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame($this->m, $res->data['person']['id']);
         $this->assertSame(['Meine namentliche Meinung'], array_column($res->data['data']['poll_answers'], 'answer_text'), 'anonyme Antworten nicht für die Verwaltung');
         $this->assertCount(1, $res->data['data']['poll_votes'], 'Teilnahme schon');
+        $this->assertSame(['sig-bild'], array_column($res->data['data']['rich_images'], 'uid'), 'Entwürfe nur in der eigenen Auskunft');
+        $this->assertArrayNotHasKey('attachments', $res->data['data']);
 
         // Wer Konten anlegt, aber kein Admin ist: keine Admins; ohne create_users gar nicht; ohne Anmeldung 401.
         $res = $this->call('POST', '/admin/roles', ['label' => 'Nur Konten', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
