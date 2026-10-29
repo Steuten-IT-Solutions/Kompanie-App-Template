@@ -625,7 +625,7 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
       ) : (
         <ErrorBox message={error ?? 'Nicht geladen'} onRetry={reload} />
       )}
-      {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (pausiert oder nicht) */}
+      {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (verschlüsselt oder nicht) */}
       <DriveSicherung key={String(e?.configured)} onToast={onToast} noSodium={e?.available === false} />
     </>
   );
@@ -876,7 +876,7 @@ function Verschluesselung({
               onClick={() => {
                 if (
                   window.confirm(
-                    'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, und die Sicherungen in Google Drive pausieren. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
+                    'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, auch die in Google Drive. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
                   )
                 )
                   void run(async () => {
@@ -1010,15 +1010,14 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
       <p className="muted small">
         Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt: Die App legt einmal pro{' '}
         {d.every_days === 7 ? 'Woche' : `${d.every_days} Tage`} eine Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und
-        behält die letzten {d.keep}. Die Sicherungen gehen nur verschlüsselt mit dem Passwort für Sicherungen dorthin; den Ordner trotzdem
-        bitte nicht freigeben.
+        behält die letzten {d.keep}. Ist oben ein Passwort für Sicherungen eingerichtet, gehen sie verschlüsselt dorthin; den Ordner
+        trotzdem bitte nicht freigeben.
       </p>
-      {d.needs_passphrase && (
-        <p className={d.enabled ? 'form-error' : 'small'} role={d.enabled ? 'alert' : undefined}>
-          {d.enabled ? 'Pausiert: ' : ''}
+      {!d.encrypted && (
+        <p className="small">
           {noSodium
-            ? 'Zum Verschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.'
-            : 'Bitte zuerst oben ein Passwort für Sicherungen einrichten.'}
+            ? 'Unverschlüsselt: Zum Verschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium.'
+            : 'Unverschlüsselt: Wer den Ordner öffnen kann, kann die Sicherungen lesen. Mit einem Passwort für Sicherungen (oben) gehen sie verschlüsselt dorthin.'}
         </p>
       )}
       {!d.available ? (
@@ -1036,7 +1035,7 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
           <input
             type="checkbox"
             checked={d.enabled}
-            disabled={busy || (!d.enabled && !(d.available && d.access && !d.needs_passphrase))}
+            disabled={busy || (!d.enabled && !(d.available && d.access))}
             onChange={(e) => {
               const on = e.target.checked;
               void run(
@@ -1066,7 +1065,7 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
           Letzter Versuch ({date(d.last_try)}) fehlgeschlagen: {d.error}
         </p>
       )}
-      {d.enabled && d.access && !d.needs_passphrase && (
+      {d.enabled && d.access && (
         <div className="button-row">
           <button
             type="button"

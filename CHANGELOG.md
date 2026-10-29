@@ -59,10 +59,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   dazu weiter bei Eintritt und Austritt), und **Persönliche Angaben** stehen unter den Ämtern, über *Konto und Rolle*.
   Antippen der Adresse zeigt den Ort in der Karten-App: auf Android mit Auswahl der App, auf iPhone und Mac in Apple
   Karten, am PC in Google Maps.
-- **Sicherungen in Google Drive nur noch verschlüsselt**: Sie pausieren, bis unter *Einstellungen → Datensicherung* ein
-  Passwort für Sicherungen eingerichtet ist; die Ampel unter *Zustand und Updates* weist darauf hin. Ältere,
-  unverschlüsselte Sicherungen im Ordner löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal
-  mit *Passwort prüfen* (oder einer Wiederherstellung) bestätigt ist.
+- **Sicherungen in Google Drive verschlüsselt**, sobald unter *Einstellungen → Datensicherung* ein Passwort für
+  Sicherungen eingerichtet ist (ohne Passwort wie bisher unverschlüsselt). Ältere, unverschlüsselte Sicherungen im Ordner
+  löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal mit *Passwort prüfen* (oder einer
+  Wiederherstellung) bestätigt ist.
 
 ### Behoben
 

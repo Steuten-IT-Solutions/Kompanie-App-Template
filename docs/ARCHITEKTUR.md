@@ -687,8 +687,8 @@ Jede Kompanie kann in der App unter *Einstellungen → Zustand und Updates* auf 
   Sicherung, lesen kann sie nur, wer das Passwort kennt. Datei (`.json.enc`): `KOMPANIE-BACKUP-ENC\n`, Länge und Kopf
   (JSON mit Salz, Parametern, dem mit `crypto_box_seal` versiegelten Dateischlüssel und dem Kopf des Streams), dann
   Blöcke von 64 KiB mit `crypto_secretstream_xchacha20poly1305` (Kopf als zusätzliche Daten des ersten Blocks, letzter
-  Block `TAG_FINAL`: geänderter Kopf und abgeschnittene Dateien fallen auf). Nach Drive gehen Sicherungen nur
-  verschlüsselt (ohne Passwort pausiert `BackupUploadService`), der Download auf Wunsch (`/sicherung?verschluesselt=1`),
+  Block `TAG_FINAL`: geänderter Kopf und abgeschnittene Dateien fallen auf). Nach Drive gehen Sicherungen mit
+  Passwort verschlüsselt (ohne wie bisher als `.json`, `BackupUploadService`), der Download auf Wunsch (`/sicherung?verschluesselt=1`),
   `POST /admin/backup` nimmt verschlüsselte Dateien als `backup_base64` mit `passphrase`. Die Sicherungen vor Updates
   auf dem Server bleiben unverschlüsselt (gleicher Ort wie die Datenbank; Wiederherstellen ohne Passwort).
   Bewusst **keine** Verschlüsselung einzelner Felder in der Datenbank: Der Schlüssel läge auf demselben Webspace wie

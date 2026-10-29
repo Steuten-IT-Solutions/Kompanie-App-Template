@@ -362,34 +362,43 @@ final class BackupUploadTest extends TestCase
     }
 
     /** Ohne Passwort für Sicherungen: nicht einschaltbar; eine früher eingeschaltete Sicherung pausiert (gelb). */
-    public function testNeedsPassphrase(): void
+    public function testWithoutPassphraseUnencrypted(): void
     {
         $this->connect();
         $this->app->settings->delete(BackupCrypto::SETTING);
-        [$s, $r] = $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
-        $this->assertSame(400, $s);
-        $this->assertStringContainsString('Passwort für Sicherungen', $r['message']);
-
-        // Vor diesem Update eingeschaltet: pausiert, die Ampel sagt warum.
-        $this->app->settings->set(BackupUploadService::SETTING, ['enabled' => true]);
-        $this->app->scheduleTasks();
+        // Ohne Passwort für Sicherungen: einschaltbar, unverschlüsselt wie bisher; die unverschlüsselten wechseln durch.
+        $this->assertSame(200, $this->api('PUT', '/admin/backup/drive', ['enabled' => true])[0]);
         $offsite = $this->app->backupUpload();
-        $this->assertFalse($offsite->active());
-        $this->assertTrue($offsite->status()['needs_passphrase']);
-        $this->assertArrayNotHasKey(BackupUploadService::TASK, $this->scheduler->scheduled);
-        $item = $this->backupItem();
-        $this->assertSame('warn', $item['level']);
-        $this->assertStringContainsString('pausieren', $item['text']);
+        $this->assertTrue($offsite->active());
+        $this->assertFalse($offsite->status()['encrypted']);
+        $this->assertSame(BackupUploadService::INTERVAL, $this->scheduler->scheduled[BackupUploadService::TASK] ?? null);
+        for ($i = 0; $i < 9; $i++) {
+            $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC +' . (7 * $i) . ' days');
+            $offsite->upload();
+        }
+        $names = array_column($this->drive, 'name');
+        $this->assertCount(8, $names, 'die letzten acht');
+        foreach ($names as $n) {
+            $this->assertMatchesRegularExpression('/^sicherung-[\d-]+\.json$/', $n);
+        }
+        $this->assertSame('ok', $this->backupItem()['level'], 'keine Warnung ohne Passwort');
+        $local = $this->app->files->tempFile();
+        file_put_contents($local, '{"format":"kompanie-app-backup"}');
+        $offsite->storeBeforeUpdate($local, '1.2.3');
+        @unlink($local);
+        $this->assertContains('{"format":"kompanie-app-backup"}', array_column(array_filter($this->drive, static fn (array $f): bool => str_starts_with($f['name'], 'vor-update-') && str_ends_with($f['name'], '-1.2.3.json')), 'content'), 'vor dem Update unverschlüsselt');
 
-        // Passwort einrichten (Mindestlänge, beide gleich), dann läuft es wieder.
+        // Passwort einrichten (Mindestlänge, beide gleich), dann verschlüsselt.
         $this->assertSame(400, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => 'kurz', 'passphrase_confirm' => 'kurz'])[0]);
         $this->assertSame(400, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => self::PASS, 'passphrase_confirm' => self::PASS . 'x'])[0]);
         [$s, $r] = $this->api('PUT', '/admin/backup/encryption', ['passphrase' => self::PASS, 'passphrase_confirm' => self::PASS]);
         $this->assertSame(200, $s, (string) json_encode($r));
         $this->assertTrue($r['configured']);
         $this->assertMatchesRegularExpression('/^[0-9a-f]{4}( [0-9a-f]{4}){3}$/', $r['fingerprint']);
-        $this->assertTrue($offsite->active());
-        $this->assertSame(BackupUploadService::INTERVAL, $this->scheduler->scheduled[BackupUploadService::TASK] ?? null);
+        $this->assertTrue($offsite->status()['encrypted']);
+        $this->clock->at = new \DateTimeImmutable('2027-03-01 12:00:00 UTC');
+        $offsite->upload();
+        $this->assertCount(1, array_filter(array_column($this->drive, 'name'), static fn (string $n): bool => str_ends_with($n, BackupCrypto::EXTENSION)));
         $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
         $this->assertSame([200, ['ok' => false]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => 'falsch']));
         // Nur Fehlversuche zählen (richtige Passwörter sperren kein Wiederherstellen im Notfall); nach zehn ist 15 Minuten Pause.

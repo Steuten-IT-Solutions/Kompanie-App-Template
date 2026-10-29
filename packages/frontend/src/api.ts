@@ -2119,8 +2119,8 @@ export interface BackupDriveStatus {
   /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
   access: boolean;
   enabled: boolean;
-  /** Kein Passwort für Sicherungen: Drive nicht einschaltbar bzw. pausiert */
-  needs_passphrase: boolean;
+  /** mit Passwort für Sicherungen verschlüsselt */
+  encrypted: boolean;
   email: string;
   folder_url: string | null;
   last_ok: number | null;

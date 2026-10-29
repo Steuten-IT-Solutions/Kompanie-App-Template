@@ -5209,12 +5209,12 @@ components:
         application/json:
           schema:
             type: object
-            required: [available, access, enabled, needs_passphrase, email, folder_url, last_ok, last_try, error, every_days, keep]
+            required: [available, access, enabled, encrypted, email, folder_url, last_ok, last_try, error, every_days, keep]
             properties:
               available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
               access: { type: boolean, description: Google hat drive.file erlaubt }
               enabled: { type: boolean }
-              needs_passphrase: { type: boolean, description: Kein Passwort für Sicherungen; eingeschaltet heißt dann pausiert }
+              encrypted: { type: boolean, description: Mit Passwort für Sicherungen verschlüsselt (.json.enc), sonst unverschlüsselt (.json) }
               email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
               folder_url: { type: [string, 'null'] }
               last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }

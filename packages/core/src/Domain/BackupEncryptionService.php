@@ -92,7 +92,7 @@ final class BackupEncryptionService
         return $this->status();
     }
 
-    /** Passwort entfernen: neue Sicherungen sind dann unverschlüsselt, Drive pausiert. @return array<string, mixed> */
+    /** Passwort entfernen: neue Sicherungen sind dann unverschlüsselt, auch in Drive. @return array<string, mixed> */
     public function remove(): array
     {
         $this->app->settings->delete(BackupCrypto::SETTING);
