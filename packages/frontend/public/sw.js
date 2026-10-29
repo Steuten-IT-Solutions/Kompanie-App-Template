@@ -152,12 +152,22 @@ function isApi(url) {
   return API !== '' && url.href.startsWith(API);
 }
 
-/** Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. */
+/**
+ * Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. Ist sie irgendwo ungültig
+ * kodiert (z. B. ein einzelnes %E0), wird jede Stelle für sich dekodiert: Sonst ließe sich %2Fme%2Fdata daneben an der
+ * Prüfung vorbeischleusen, während der Server es dekodiert und beantwortet.
+ */
 function decodedHref(url) {
   try {
     return decodeURIComponent(url.href);
   } catch {
-    return url.href; // unvollständig kodiert: wie angegeben prüfen
+    return url.href.replace(/%[0-9a-f]{2}/gi, (m) => {
+      try {
+        return decodeURIComponent(m);
+      } catch {
+        return m;
+      }
+    });
   }
 }
 

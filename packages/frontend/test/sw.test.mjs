@@ -236,12 +236,14 @@ test('Auskunft über die eigenen Daten wird nie gespeichert', async () => {
       [`${API}members/7/data`]: () => response('{"person":7}', 'application/json'),
       [`${API}me/data/`]: () => response('{"person":1}', 'application/json'),
       [`${API}ME/DATA`]: () => response('{"person":1}', 'application/json'),
+      [`${API}%6De%2Fdata?x=%E0`]: () => response('{"person":1}', 'application/json'),
     },
   });
   assert.equal(await sw.request(`${API}me/data`), undefined);
   assert.equal(await sw.request(`${API}members/7/data`, 'cors', STALE_OK), undefined);
   assert.equal(await sw.request(`${API}me/data/`), undefined, 'auch mit Schrägstrich am Ende');
   assert.equal(await sw.request(`${API}ME/DATA`), undefined, 'auch in Großbuchstaben (WordPress)');
+  assert.equal(await sw.request(`${API}%6De%2Fdata?x=%E0`), undefined, 'auch kodiert neben einer ungültigen Stelle');
   assert.equal((await (await sw.storage.open('kompanie-data-v2')).keys()).length, 0);
 });
 
