@@ -433,6 +433,7 @@ final class FormerMembersTest extends TestCase
             $this->app->db->execute('ALTER TABLE {penalties_weg} RENAME TO {penalties}');
         }
         $this->assertSame([$this->m], array_column($this->call('GET', '/admin/former/retention')->data['due'], 'id'), 'weiter fällig');
+        $this->assertStringContainsString('Aufbewahrungsfrist', implode(' ', array_column($this->app->telemetry()->log(), 'message')), 'im Fehlerprotokoll der App');
         $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {birthdays} WHERE user_id = ?', [$this->m]), 'was ging, ist schon weg');
         $this->assertSame(1, $this->app->formerMembers()->purgeExpired(), 'nächster Lauf');
         $this->assertSame([], $this->call('GET', '/admin/former/retention')->data['due']);

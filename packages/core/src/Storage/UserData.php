@@ -95,8 +95,9 @@ final class UserData
                     foreach ($db->select(sprintf($sql, $in), $chunk) as $r) {
                         $found[(int) $r['id']] = true;
                     }
-                } catch (\RuntimeException) {
-                    // Tabelle fehlt: dort ist nichts
+                } catch (\RuntimeException $e) {
+                    // Tabelle fehlt oder kurz nicht erreichbar: der nächste Lauf prüft wieder
+                    error_log('Kompanie-App: Prüfung auf persönliche Angaben unvollständig: ' . $e->getMessage());
                 }
             }
         }

@@ -11,6 +11,8 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\FormerMemberRepository;
 use KompanieApp\Core\Storage\UserData;
+use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 
 /**
  * Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden.
@@ -559,7 +561,7 @@ final class FormerMemberService
                         throw new \RuntimeException('nicht alles gelöscht (siehe Fehlerprotokoll); nächster Versuch beim nächsten Lauf');
                     }
                 } catch (\Throwable $e) {
-                    error_log('Kompanie-App: Persönliche Angaben von Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
+                    $this->retentionFailed($person['id'], $e);
                 }
                 continue;
             }
@@ -569,8 +571,7 @@ final class FormerMemberService
                 $this->forgetPersonal($person['id']);
                 $done++;
             } catch (\Throwable $e) {
-                // Nicht still übergehen: Die Frist ist eine Zusage.
-                error_log('Kompanie-App: Persönliche Angaben von Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
+                $this->retentionFailed($person['id'], $e);
             }
         }
         $this->all = null;
@@ -578,6 +579,17 @@ final class FormerMemberService
             error_log('Kompanie-App: Persönliche Angaben von ' . $done . ' ehemaligen Mitgliedern nach Ablauf der Aufbewahrungsfrist gelöscht.');
         }
         return $done;
+    }
+
+    /** Nicht still übergehen: Die Frist ist eine Zusage. Ins Fehlerprotokoll der App (Admins sehen es) und ins error_log. */
+    private function retentionFailed(int $userId, \Throwable $e): void
+    {
+        $message = 'Persönliche Angaben von Konto ' . $userId . ' nach Ablauf der Aufbewahrungsfrist nicht (ganz) gelöscht: ' . $e->getMessage();
+        error_log('Kompanie-App: ' . $message);
+        try {
+            $this->app->telemetry()->record(Code::TaskFailed, Detail::of(self::RETENTION_TASK), $message);
+        } catch (\Throwable) {
+        }
     }
 
     /**
