@@ -144,6 +144,7 @@ final class StatusService
         }
         $drive = $this->app->backupUpload()->status();
         $text = 'Letzte heruntergeladene Sicherung: ' . $this->date($last) . '.';
+        $hint = '';
         if ($drive['enabled']) {
             $text .= ' Letzte Sicherung in Google Drive: ' . $this->date($drive['last_ok']) . '.';
             if (!$drive['access']) {
@@ -153,16 +154,16 @@ final class StatusService
                 return $this->item('backup', 'Datensicherung', 'warn', $text . ' Das letzte Hochladen ist fehlgeschlagen: ' . $drive['error']);
             }
             if ($drive['encrypted'] && !$this->app->backupEncryption()->verified()) {
-                // Nach den dringenderen Hinweisen: Bis dahin bleiben in Drive unverschlüsselte Sicherungen liegen
-                // (BackupUploadService::prune).
-                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Das Passwort für Sicherungen ist noch nicht geprüft; bis dahin bleiben ältere, unverschlüsselte Sicherungen in Google Drive liegen. Bitte unter Einstellungen → Datensicherung „Passwort prüfen“ wählen.');
+                // Kein eigener Abbruch: Die Erinnerung an eine zu alte Sicherung (unten) bleibt sichtbar. Bis dahin bleiben
+                // in Drive unverschlüsselte Sicherungen liegen (BackupUploadService::prune).
+                $hint = ' Das Passwort für Sicherungen ist noch nicht geprüft; bis dahin bleiben ältere, unverschlüsselte Sicherungen in Google Drive liegen. Bitte unter Einstellungen → Datensicherung „Passwort prüfen“ wählen.';
             }
         }
         $newest = max($last ?? 0, $drive['enabled'] ? (int) $drive['last_ok'] : 0);
         if ($newest < $this->app->time()->timestamp() - self::BACKUP_REMIND_DAYS * 86400) {
-            return $this->item('backup', 'Datensicherung', 'warn', $text . ' Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren oder Sicherungen in Google Drive einschalten.');
+            return $this->item('backup', 'Datensicherung', 'warn', $text . ' Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren oder Sicherungen in Google Drive einschalten.' . $hint);
         }
-        return $this->item('backup', 'Datensicherung', 'ok', $text);
+        return $this->item('backup', 'Datensicherung', $hint !== '' ? 'warn' : 'ok', $text . $hint);
     }
 
     private function push(): array

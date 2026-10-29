@@ -147,6 +147,28 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame($jpeg, $this->call('GET', '/me/data')->data['person']['photo']['base64'] ?? null);
     }
 
+    /**
+     * Jede Tabelle der Auskunft gehört zu einem Recht aus PersonalDataExport::OTHERS_REQUIRE (bzw. view_activity, das die
+     * Auskunft eigens prüft): Eine neue Tabelle braucht hier eine Zuordnung, sonst sähe man über die Auskunft über andere,
+     * was die App einem sonst verbirgt.
+     */
+    public function testEveryExportedTableHasACapability(): void
+    {
+        $area = [
+            'points' => 'manage_points', 'penalties' => 'manage_penalties', 'rank_history' => 'manage_ranks', 'member_ranks' => 'manage_ranks',
+            'member_titles' => 'manage_titles', 'member_roles' => 'create_users', 'attendance_entries' => 'manage_attendance',
+            'poll_votes' => 'manage_polls', 'poll_answers' => 'manage_polls', 'birthdays' => 'view_personal', 'join_years' => 'view_personal',
+            'member_photos' => 'view_personal', 'former_members' => 'create_users', 'member_contacts' => 'view_personal',
+            'bug_reports' => 'view_personal', 'user_signatures' => 'view_personal', 'user_settings' => 'view_personal',
+            'board_mails' => 'send_mail', 'mailing_recipients' => 'send_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',
+        ];
+        $required = [...array_map(static fn ($c) => $c->value, \KompanieApp\Core\Domain\PersonalDataExport::OTHERS_REQUIRE), 'view_activity'];
+        foreach (array_keys(UserData::tables()) as $table) {
+            $this->assertArrayHasKey($table, $area, "$table: welches Recht braucht die Auskunft über andere?");
+            $this->assertContains($area[$table], $required, "$table: Recht fehlt in PersonalDataExport::OTHERS_REQUIRE");
+        }
+    }
+
     /** Jede Kerntabelle mit user_id steht in UserData (Löschen und Auskunft) oder ist hier begründet ausgenommen. */
     public function testEveryPersonalTableIsCovered(): void
     {

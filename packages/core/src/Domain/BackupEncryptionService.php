@@ -32,6 +32,12 @@ final class BackupEncryptionService
     {
     }
 
+    /** Ist ein Passwort eingerichtet, auch wenn sodium gerade fehlt (dann ist es nicht configured)? */
+    public function stored(): bool
+    {
+        return $this->key() !== null;
+    }
+
     public function configured(): bool
     {
         // Ohne sodium (Erweiterung später abgeschaltet) lässt sich nichts verschlüsseln: nicht als eingerichtet zählen,
@@ -202,6 +208,36 @@ final class BackupEncryptionService
     public function exportToTempFile(BackupProvider $backup): string
     {
         return $this->writeEncrypted(static fn ($out) => $backup->exportTo($out));
+    }
+
+    /**
+     * Ganze Sicherung unverschlüsselt in eine temporäre Datei (Google Drive ohne Passwort für Sicherungen), mit denselben
+     * Vorkehrungen wie verschlüsselt: nur für den Besitzer lesbar, gelöscht am Ende der Anfrage, falls PHP abbricht. Der
+     * Aufrufer löscht sie (discard).
+     */
+    public function exportPlainToTempFile(BackupProvider $backup): string
+    {
+        $file = $this->app->files->tempFile();
+        self::cleanupAtShutdown($file);
+        @chmod($file, 0600);
+        try {
+            $out = @fopen($file, 'wb');
+            if ($out === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
+            }
+            try {
+                $backup->exportTo($out);
+                if (!fflush($out)) {
+                    throw new \RuntimeException('Die Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
+                }
+            } finally {
+                fclose($out);
+            }
+            return $file;
+        } catch (\Throwable $e) {
+            self::discard($file);
+            throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     /**

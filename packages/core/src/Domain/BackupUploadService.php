@@ -129,20 +129,11 @@ final class BackupUploadService implements OffsiteBackup
             // Sicherung muss nie ganz in den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als
             // memory_limit).
             $date = self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His');
-            if ($this->app->backupEncryption()->configured()) {
+            if ($this->encrypt()) {
                 $tmp = $this->app->backupEncryption()->exportToTempFile($backup);
                 $this->store($tmp, $date . '-' . $this->keyTag() . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
             } else {
-                $tmp = $this->app->files->tempFile();
-                $out = @fopen($tmp, 'wb');
-                if ($out === false) {
-                    throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
-                }
-                try {
-                    $backup->exportTo($out);
-                } finally {
-                    fclose($out);
-                }
+                $tmp = $this->app->backupEncryption()->exportPlainToTempFile($backup);
                 $this->store($tmp, $date . '.json', self::PREFIX, self::KEEP, $state);
             }
         } catch (\Throwable $e) {
@@ -172,7 +163,7 @@ final class BackupUploadService implements OffsiteBackup
             // Die Sicherung auf dem Server bleibt unverschlüsselt (sie liegt neben der Datenbank); mit Passwort für
             // Sicherungen geht sie verschlüsselt nach Drive.
             $date = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His');
-            if ($this->app->backupEncryption()->configured()) {
+            if ($this->encrypt()) {
                 $encrypted = $this->app->backupEncryption()->encryptFile($path);
                 $this->store($encrypted, $date . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
             } else {
@@ -214,6 +205,19 @@ final class BackupUploadService implements OffsiteBackup
             $this->app->settings->set(self::SETTING, ['folder_id' => $id] + $config);
         }
         return $id;
+    }
+
+    /**
+     * Verschlüsselt hochladen? Mit Passwort ja, ohne nein. Ist eins eingerichtet, fehlt aber sodium (später abgeschaltet):
+     * Fehler statt still unverschlüsselt (der Zustand und die Ampel zeigen ihn).
+     */
+    private function encrypt(): bool
+    {
+        $enc = $this->app->backupEncryption();
+        if (!$enc->configured() && $enc->stored()) {
+            throw new \RuntimeException('Es ist ein Passwort für Sicherungen eingerichtet, aber PHP fehlt die Erweiterung sodium: Die Sicherung geht nicht unverschlüsselt nach Google Drive. Bitte beim Hoster nachfragen.');
+        }
+        return $enc->configured();
     }
 
     /** Kennung des Schlüssels im Dateinamen (Anfang des Fingerabdrucks): zeigt, mit welchem Passwort eine Sicherung geht. */
