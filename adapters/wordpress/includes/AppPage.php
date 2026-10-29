@@ -467,12 +467,15 @@ final class AppPage
     private static function securityHeaders(): void
     {
         header('X-Content-Type-Options: nosniff');
-        // Ein strengeres DENY der Webseite oder eines Plugins nicht überschreiben.
-        if (!array_filter(headers_list(), static fn (string $h): bool => stripos($h, 'X-Frame-Options:') === 0)) {
+        // Ein strengeres DENY der Webseite oder eines Plugins nicht überschreiben, und in der CSP ebenso streng bleiben:
+        // Browser richten sich nach frame-ancestors vor X-Frame-Options.
+        $frame = array_values(array_filter(headers_list(), static fn (string $h): bool => stripos($h, 'X-Frame-Options:') === 0));
+        $deny = $frame !== [] && stripos($frame[0], 'deny') !== false;
+        if ($frame === []) {
             header('X-Frame-Options: SAMEORIGIN');
         }
         // Zusätzlich (false): Eine CSP der Webseite oder eines Sicherheits-Plugins bleibt; Browser beachten beide.
-        header("Content-Security-Policy: frame-ancestors 'self'", false);
+        header('Content-Security-Policy: frame-ancestors ' . ($deny ? "'none'" : "'self'"), false);
         header('Referrer-Policy: strict-origin-when-cross-origin');
     }
 }

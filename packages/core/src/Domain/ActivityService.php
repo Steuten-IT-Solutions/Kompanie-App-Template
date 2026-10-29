@@ -236,6 +236,13 @@ final class ActivityService
         }
     }
 
+    /** Geheimnis der Pseudonyme, falls es schon eins gibt (sonst gibt es auch keine Einträge in activity_seen). */
+    public static function existingSecret(\KompanieApp\Core\Port\Settings $settings): ?string
+    {
+        $secret = $settings->get(self::SECRET_SETTING);
+        return is_string($secret) && $secret !== '' ? $secret : null;
+    }
+
     public static function token(string $secret, int $userId): string
     {
         return substr(hash_hmac('sha256', 'activity:' . $userId, $secret), 0, 32);

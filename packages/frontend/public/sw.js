@@ -163,7 +163,8 @@ function decodedHref(url) {
 
 function isAdmin(url) {
   const href = decodedHref(url);
-  return href.includes('/admin/') || /\/(?:me|members\/\d+)\/data(?:[?&#]|$)/.test(href);
+  // Auch mit Schrägstrich am Ende (die API nimmt ihn genauso an)
+  return href.includes('/admin/') || /\/(?:me|members\/\d+)\/data\/*(?:[?&#]|$)/.test(href);
 }
 
 /** Rückkehr von Google nach „Mit Google verbinden“: <App>/google/callback oder ?r=/google/callback */

@@ -42,12 +42,12 @@ final class PersonalDataExport
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
     /**
      * Rechte für die Auskunft über andere: Sie enthält Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, namentliche
-     * Umfragen, E-Mails und Listen; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
+     * Umfragen, E-Mails, Listen, Änderungen am Schwarzen Brett und Ämter; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
      */
     public const OTHERS_REQUIRE = [
         Capability::CreateUsers, Capability::ViewPersonal, Capability::ManagePoints, Capability::ManagePenalties,
         Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance, Capability::ManagePolls, Capability::SendMail,
-        Capability::ManageLists,
+        Capability::ManageLists, Capability::PostBoard, Capability::ViewOffices,
     ];
 
     public function __construct(private readonly App $app)
@@ -119,6 +119,16 @@ final class PersonalDataExport
             }
             if ($rows !== []) {
                 $data[$table] = $rows;
+            }
+        }
+
+        // „Zuletzt gesehen“ der Nutzungsauswertung (über das Pseudonym, ohne es zu nennen), wie activity nur für sie selbst
+        // und wer die Nutzung ohnehin sieht.
+        $activitySecret = ActivityService::existingSecret($this->app->settings);
+        if ($activitySecret !== null && ($self || $actor->can(Capability::ViewActivity))) {
+            $seen = $this->app->db->select('SELECT area, at FROM {activity_seen} WHERE token = ? ORDER BY area', [ActivityService::token($activitySecret, $userId)]);
+            if ($seen !== []) {
+                $data['activity_seen'] = $seen;
             }
         }
 

@@ -64,6 +64,8 @@ final class PersonalDataExportTest extends TestCase
         foreach (['signature' => 'sig-bild', 'draft' => 'entwurf-bild'] as $owner => $uid) {
             $db->insert('rich_images', ['uid' => $uid, 'owner_type' => $owner, 'owner_id' => $this->m, 'user_id' => $this->m, 'mime' => 'image/png', 'width' => 1, 'height' => 1, 'bytes' => 1, 'data' => 'AA==', 'created_at' => $now]);
         }
+        $this->app->settings->set(\KompanieApp\Core\Domain\ActivityService::SECRET_SETTING, str_repeat('ab', 32));
+        $db->insert('activity_seen', ['token' => \KompanieApp\Core\Domain\ActivityService::token(str_repeat('ab', 32), $this->m), 'area' => 'events', 'at' => 1793000000]);
         $db->insert('bug_reports', ['uuid' => 'b1', 'user_id' => $this->m, 'report' => 'Fehlertext mit Daten anderer', 'screenshot' => 'BILD', 'created_at' => 1]);
         $db->insert('attachments', ['uid' => 'entwurf-anhang', 'owner_type' => 'draft', 'owner_id' => $this->m, 'user_id' => $this->m, 'name' => 'entwurf.txt', 'mime' => 'text/plain', 'bytes' => 1, 'file' => 'anh-x.bin', 'created_at' => $now]);
     }
@@ -94,6 +96,7 @@ final class PersonalDataExportTest extends TestCase
         $this->assertEqualsCanonicalizing(['sig-bild', 'entwurf-bild'], array_column($d['data']['rich_images'], 'uid'));
         $this->assertSame(['entwurf-anhang'], array_column($d['data']['attachments'], 'uid'));
         $this->assertArrayNotHasKey('file', $d['data']['attachments'][0], 'Ablageort auf dem Server nicht');
+        $this->assertSame([['area' => 'events', 'at' => 1793000000]], array_map(static fn (array $r): array => ['area' => $r['area'], 'at' => (int) $r['at']], $d['data']['activity_seen'] ?? []), 'zuletzt gesehen, ohne Pseudonym');
         $this->assertSame(['Fehlertext mit Daten anderer'], array_column($d['data']['bug_reports'], 'report'));
         $this->assertStringNotContainsString('BILD', $json);
     }

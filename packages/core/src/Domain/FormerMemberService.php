@@ -160,8 +160,7 @@ final class FormerMemberService
             return null;
         }
         $out = self::out($user, $row);
-        // personal_deleted: Die Aufbewahrungsfrist hat die persönlichen Angaben gelöscht (auch die Anmeldung).
-        return ['reason' => $out['reason'], 'joined_on' => $out['joined_on'], 'founder' => $out['founder'], 'left_on' => $out['left_on'], 'previous_level' => $out['previous_level'], 'personal_deleted' => $row['purged_at'] !== ''];
+        return ['reason' => $out['reason'], 'joined_on' => $out['joined_on'], 'founder' => $out['founder'], 'left_on' => $out['left_on'], 'previous_level' => $out['previous_level'], 'personal_deleted' => $out['personal_deleted']];
     }
 
     /**
@@ -548,9 +547,16 @@ final class FormerMemberService
         $due = array_values(array_filter($this->candidates($config, true), static fn (array $p): bool => $p['expires'] <= $today));
         // Schon Erledigte nur, wenn wieder etwas Persönliches da ist (eine Abfrage je Tabelle für alle).
         $purged = array_column(array_filter($due, static fn (array $p): bool => $p['purged']), 'id');
-        $again = array_flip(UserData::withPersonalData($this->app->db, $purged, PollService::existingSecret($this->app->settings)));
+        $again = array_flip(UserData::withPersonalData($this->app->db, $purged, PollService::existingSecret($this->app->settings), ActivityService::existingSecret($this->app->settings)));
         foreach ($due as $person) {
             if ($person['purged'] && !isset($again[$person['id']])) {
+                continue;
+            }
+            // Unmittelbar vorher neu prüfen: Wer seit dem Einlesen wieder aufgenommen wurde oder ein anderes Datum bekam,
+            // ist nicht (mehr) dran.
+            $row = $this->repository()->find($person['id']);
+            $user = $this->app->users->find($person['id']);
+            if ($row === null || $user === null || $user->role !== Roles::GUEST || $row['left_on'] !== $person['left_on']) {
                 continue;
             }
             if ($person['purged']) {
@@ -667,6 +673,8 @@ final class FormerMemberService
             'founder' => $row['founder'],
             'left_on' => $row['left_on'],
             'previous_level' => is_string($level) && $level !== '' ? $level : Roles::MEMBER,
+            // Die Aufbewahrungsfrist hat die persönlichen Angaben gelöscht (eigenständig auch die Anmeldung).
+            'personal_deleted' => $row['purged_at'] !== '',
         ];
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Storage\Sql\Connection;
 
@@ -74,9 +75,10 @@ final class UserData
      *
      * @param list<int> $userIds
      * @param string|null $pollSecret wie bei purge(): auch anonyme Antworten in Umfragen (über das Pseudonym)
+     * @param string|null $activitySecret auch „zuletzt gesehen“ der Nutzungsauswertung (activity_seen, über das Pseudonym)
      * @return list<int>
      */
-    public static function withPersonalData(Connection $db, array $userIds, ?string $pollSecret = null): array
+    public static function withPersonalData(Connection $db, array $userIds, ?string $pollSecret = null, ?string $activitySecret = null): array
     {
         $queries = [];
         foreach (self::TABLES as $table => $column) {
@@ -102,16 +104,23 @@ final class UserData
                 }
             }
         }
-        if ($pollSecret !== null && $userIds !== []) {
+        // Über Pseudonyme: anonyme Antworten in Umfragen, „zuletzt gesehen“ der Nutzungsauswertung
+        $pseudonymous = [];
+        if ($pollSecret !== null) {
+            $pseudonymous[] = ['SELECT DISTINCT vote_ref AS ref FROM {poll_answers} WHERE user_id IS NULL AND vote_ref IN (%s)', static fn (int $id): string => PollService::pseudonym($pollSecret, $id)];
+        }
+        if ($activitySecret !== null) {
+            $pseudonymous[] = ['SELECT DISTINCT token AS ref FROM {activity_seen} WHERE token IN (%s)', static fn (int $id): string => ActivityService::token($activitySecret, $id)];
+        }
+        foreach ($pseudonymous as [$sql, $ref]) {
             $refs = [];
             foreach ($userIds as $id) {
-                $refs[PollService::pseudonym($pollSecret, $id)] = $id;
+                $refs[$ref($id)] = $id;
             }
             foreach (array_chunk(array_keys($refs), 500) as $chunk) {
                 try {
-                    $rows = $db->select('SELECT DISTINCT vote_ref FROM {poll_answers} WHERE user_id IS NULL AND vote_ref IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ')', $chunk);
-                    foreach ($rows as $r) {
-                        $found[$refs[(string) $r['vote_ref']]] = true;
+                    foreach ($db->select(sprintf($sql, implode(', ', array_fill(0, count($chunk), '?'))), $chunk) as $r) {
+                        $found[$refs[(string) $r['ref']]] = true;
                     }
                 } catch (\RuntimeException $e) {
                     error_log('Kompanie-App: Prüfung auf persönliche Angaben unvollständig: ' . $e->getMessage());

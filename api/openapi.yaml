@@ -3322,7 +3322,7 @@ paths:
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `view_personal`,
         `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
-        `send_mail`, `manage_lists`.
+        `send_mail`, `manage_lists`, `post_board`, `view_offices`.
       x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }

@@ -29,6 +29,7 @@ final class MailResult
      */
     public static function redactAddresses(string $text): string
     {
-        return (string) preg_replace('/[^\s<>"\'(),;:]+@[^\s<>"\'(),;:]+/', '[Adresse]', $text);
+        // Auch mit Anführungszeichen im lokalen Teil („"max"@example.org“, gültig nach FILTER_VALIDATE_EMAIL)
+        return (string) preg_replace('/(?:"[^"\r\n]*"|[^\s<>"\'(),;:]+)@[^\s<>"\'(),;:]+/', '[Adresse]', $text);
     }
 }
