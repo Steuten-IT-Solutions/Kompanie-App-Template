@@ -451,12 +451,7 @@ final class App
             $ok = false;
             error_log('Kompanie-App: Entwürfe von Anhängen nicht gelöscht: ' . $e->getMessage());
         }
-        try {
-            $this->roles()->forget($userId);
-        } catch (\Throwable $e) {
-            $ok = false;
-            error_log('Kompanie-App: Eigene Rechte nicht gelöscht: ' . $e->getMessage());
-        }
+        $this->roles()->forget($userId); // Fehler gehen nach oben (wie bisher: Löschen meldet 500)
         try {
             $this->activity()->forget($userId);
         } catch (\Throwable $e) {

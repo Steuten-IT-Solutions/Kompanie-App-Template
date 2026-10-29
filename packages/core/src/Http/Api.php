@@ -1165,7 +1165,7 @@ final class Api
                 }
                 return ['restored' => true];
             }, null, $denySettings),
-            // Passwort für Sicherungen (verschlüsselte Sicherungen, Pflicht für Google Drive)
+            // Passwort für Sicherungen (verschlüsselte Sicherungen, auch in Google Drive)
             new Route('GET', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->status(), null, $denySettings),
             new Route('PUT', '/admin/backup/encryption', Cap::ManageSettings, fn (Request $r) => $a->backupEncryption()->set($r->input('passphrase'), $r->input('passphrase_confirm')), null, $denySettings),
             new Route('DELETE', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->remove(), null, $denySettings),

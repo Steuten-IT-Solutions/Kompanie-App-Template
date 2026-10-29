@@ -3318,9 +3318,11 @@ paths:
         (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
         eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
-        Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich `view_personal` (sonst 403), denn die
-        Auskunft enthält Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum.
-      x-capability: create_users und view_personal
+        Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
+        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `view_personal`,
+        `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
+        `send_mail`.
+      x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:

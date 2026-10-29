@@ -15,7 +15,7 @@ use KompanieApp\Core\Storage\BackupCrypto;
  * Gespeichert wird nur der öffentliche Schlüssel (Einstellung BackupCrypto::SETTING, gehört zur Installation und kommt
  * nicht in Sicherungen). Das Passwort selbst kennt die App nicht: Wer es vergisst, kann verschlüsselte Sicherungen nicht
  * mehr wiederherstellen. Ändern betrifft nur neue Sicherungen; ältere brauchen weiter das alte Passwort.
- * Sicherungen in Google Drive gibt es nur mit Passwort (BackupUploadService).
+ * Mit Passwort gehen auch die Sicherungen in Google Drive verschlüsselt dorthin, ohne unverschlüsselt (BackupUploadService).
  */
 final class BackupEncryptionService
 {
@@ -88,7 +88,6 @@ final class BackupEncryptionService
             throw ApiError::invalid($e->getMessage());
         }
         $this->app->settings->set(BackupCrypto::SETTING, $key + ['set_at' => $this->app->time()->timestamp(), 'verified' => false]);
-        $this->app->scheduleTasks();
         return $this->status();
     }
 
@@ -96,7 +95,6 @@ final class BackupEncryptionService
     public function remove(): array
     {
         $this->app->settings->delete(BackupCrypto::SETTING);
-        $this->app->scheduleTasks();
         return $this->status();
     }
 

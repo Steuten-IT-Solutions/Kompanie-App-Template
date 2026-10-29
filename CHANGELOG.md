@@ -44,8 +44,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
   sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
 - **Meine Daten herunterladen (Auskunft nach DSGVO)**: Unter *Konto → Meine Daten* lädt jede Person alles herunter,
-  was die App über sie gespeichert hat. Wer Mitglieder anlegen und persönliche Angaben sehen darf, kann das auch für
-  eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne Antworten in anonymen Umfragen.
+  was die App über sie gespeichert hat. Wer jeden darin enthaltenen Bereich auch in der App sehen darf (in der Regel
+  Admins), kann das auch für eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne
+  Antworten in anonymen Umfragen.
 - **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
   seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
   Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.

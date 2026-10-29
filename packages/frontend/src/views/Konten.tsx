@@ -23,6 +23,19 @@ import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 import { previewRole } from '../preview';
 
+/** Wie PersonalDataExport::OTHERS_REQUIRE: Die Auskunft über andere enthält alle diese Bereiche. */
+const OTHERS_EXPORT_CAPS = [
+  'create_users',
+  'view_personal',
+  'manage_points',
+  'manage_penalties',
+  'manage_ranks',
+  'manage_titles',
+  'manage_attendance',
+  'manage_polls',
+  'send_mail',
+] as const;
+
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
   return [
@@ -483,7 +496,7 @@ export function AccountPanel({
             >
               Angaben ändern
             </button>
-            {can('view_personal') && !previewRole() && (
+            {OTHERS_EXPORT_CAPS.every((c) => can(c)) && !previewRole() && (
               <button
                 className="btn btn-link"
                 disabled={busy}

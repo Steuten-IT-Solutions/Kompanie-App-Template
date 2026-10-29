@@ -12,8 +12,8 @@ use KompanieApp\Core\Storage\UserData;
 
 /**
  * Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten einer Person als JSON, für sie selbst (Konto → Meine Daten) und
- * für alle, die ihr Konto verwalten und ihre persönlichen Angaben sehen dürfen (create_users mit
- * MemberService::guardAccount und view_personal), z. B. für eine Anfrage per Brief.
+ * für alle, die ihr Konto verwalten (MemberService::guardAccount) und alle darin enthaltenen Bereiche sehen dürfen
+ * (OTHERS_REQUIRE), z. B. für eine Anfrage per Brief.
  *
  *   {format: "kompanie-app-personal-data", formatVersion: 1, created, person: {...}, data: {tabelle: [zeilen]}}
  *
@@ -39,6 +39,14 @@ final class PersonalDataExport
      */
     private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot'], 'attachments' => ['file']];
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
+    /**
+     * Rechte für die Auskunft über andere: Sie enthält Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, namentliche
+     * Umfragen und E-Mails; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
+     */
+    public const OTHERS_REQUIRE = [
+        Capability::CreateUsers, Capability::ViewPersonal, Capability::ManagePoints, Capability::ManagePenalties,
+        Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance, Capability::ManagePolls, Capability::SendMail,
+    ];
 
     public function __construct(private readonly App $app)
     {
@@ -51,9 +59,8 @@ final class PersonalDataExport
             throw ApiError::forbidden('In der Vorschau gibt es keinen Export.');
         }
         $self = $actor->id === $userId;
-        // Die Auskunft enthält Adresse, Handynummer, E-Mail und Geburtsdatum: für andere nur mit view_personal.
-        if (!$self && (!$actor->can(Capability::CreateUsers) || !$actor->can(Capability::ViewPersonal))) {
-            throw ApiError::forbidden('Die Daten dieser Person darfst du nicht exportieren.');
+        if (!$self && !self::mayExportOthers($actor)) {
+            throw ApiError::forbidden('Die Auskunft über andere enthält alle Bereiche (Punkte, Strafen, Anwesenheit, Umfragen, E-Mails, persönliche Angaben); dafür fehlen dir Rechte.');
         }
         $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         // Prüft für andere guardAccount (z. B. Konten von Admins nur für Admins).
@@ -131,6 +138,16 @@ final class PersonalDataExport
             ],
             'data' => $data,
         ];
+    }
+
+    public static function mayExportOthers(User $actor): bool
+    {
+        foreach (self::OTHERS_REQUIRE as $cap) {
+            if (!$actor->can($cap)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

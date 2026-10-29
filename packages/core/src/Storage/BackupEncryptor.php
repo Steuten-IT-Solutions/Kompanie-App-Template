@@ -69,6 +69,9 @@ final class BackupEncryptor
      */
     public function update(string $plain, \Closure $emit): void
     {
+        if ($this->aborted) {
+            return; // abgebrochen: nichts mehr (der Schlüssel ist schon gelöscht)
+        }
         if ($this->buffer !== '') {
             $need = BackupCrypto::CHUNK - strlen($this->buffer);
             if (strlen($plain) < $need) {
@@ -94,6 +97,9 @@ final class BackupEncryptor
      */
     public function abort(): void
     {
+        if (!$this->aborted && !$this->finished) {
+            sodium_memzero($this->state); // Schlüssel des Streams wie bei final() nicht im Speicher lassen
+        }
         $this->aborted = true;
         if ($this->filter !== null) {
             @stream_filter_remove($this->filter);
