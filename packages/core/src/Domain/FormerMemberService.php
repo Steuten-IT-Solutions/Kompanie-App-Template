@@ -542,8 +542,18 @@ final class FormerMemberService
         }
         $done = 0;
         $today = $this->app->time()->today();
-        foreach ($this->candidates($config) as $person) {
+        foreach ($this->candidates($config, true) as $person) {
             if ($person['expires'] > $today) {
+                continue;
+            }
+            if ($person['purged']) {
+                // Schon erledigt: Was seither dazugekommen ist (z. B. neu eingetragene Kontaktdaten, unter WordPress nach
+                // einer neuen Anmeldung), löscht jeder Lauf wieder; die Anmeldung bleibt, wie sie nach dem ersten Lauf ist.
+                try {
+                    $this->app->userDeleted($person['id'], keepChronicle: true);
+                } catch (\Throwable $e) {
+                    error_log('Kompanie-App: Persönliche Angaben von Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
+                }
                 continue;
             }
             // Scheitert eine Person, geht es mit den anderen weiter; sie kommt im nächsten Lauf wieder (erledigt ist sie
@@ -580,12 +590,13 @@ final class FormerMemberService
     }
 
     /**
-     * Ehemalige, für die die Frist gilt, mit dem Tag, an dem sie abläuft (expires), nach Namen.
+     * Ehemalige, für die die Frist gilt, mit dem Tag, an dem sie abläuft (expires), nach Namen; mit $withPurged auch die
+     * schon erledigten (purged).
      *
      * @param array{years: int} $config
-     * @return list<array{id: int, name: string, left_on: string, expires: \DateTimeImmutable}>
+     * @return list<array{id: int, name: string, left_on: string, expires: \DateTimeImmutable, purged: bool}>
      */
-    private function candidates(array $config): array
+    private function candidates(array $config, bool $withPurged = false): array
     {
         $tz = $this->app->time()->today()->getTimezone();
         $rows = $this->all();
@@ -593,7 +604,7 @@ final class FormerMemberService
         $out = [];
         foreach ($rows as $id => $row) {
             $user = $users[$id] ?? null;
-            if ($user === null || $user->role !== Roles::GUEST || $row['purged_at'] !== '') {
+            if ($user === null || $user->role !== Roles::GUEST || (!$withPurged && $row['purged_at'] !== '')) {
                 continue;
             }
             $left = match (strlen($row['left_on'])) {
@@ -609,7 +620,7 @@ final class FormerMemberService
                 $y += $config['years'];
                 $first = $until->setDate($y, $m, 1);
                 $expires = $first->setDate($y, $m, min($d, (int) $first->format('t')));
-                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $expires];
+                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $expires, 'purged' => $row['purged_at'] !== ''];
             }
         }
         usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));

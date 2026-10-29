@@ -542,7 +542,7 @@ final class MemberService
         $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         $phone = $actor === null || $actor->id === $id || $actor->can(Capability::ViewPersonal) ? ($this->contacts?->phone($id) ?? '') : '';
         // Auskunft (GET /members/{id}/data): für sich selbst immer, für andere wie PersonalDataExport prüft.
-        $canExport = $actor !== null && !$actor->preview && ($actor->id === $id || PersonalDataExport::mayExportOthers($actor));
+        $canExport = $actor !== null && PersonalDataExport::mayExport($actor, $id);
         return $p + ['phone' => $phone, 'can_change_login' => $this->users->canChangeLogin(), 'can_export' => $canExport];
     }
 

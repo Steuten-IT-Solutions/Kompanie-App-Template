@@ -166,7 +166,11 @@ final class BackupEncryptionService
             throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
         }
         try {
-            // In Stücken von 1 MiB (durch 4 teilbar, Base64 ohne Zeilenumbrüche wie von der App): streng geprüft, damit
+            // Zeilenumbrüche (z. B. von `base64` auf der Kommandozeile) erst entfernen: Sonst passten die Stücke nicht.
+            if (strpbrk($base64, " \r\n\t") !== false) {
+                $base64 = (string) preg_replace('/\s+/', '', $base64);
+            }
+            // In Stücken von 1 MiB (durch 4 teilbar): streng geprüft, damit
             // eine abgeschnittene oder kaputte Übertragung nicht als „beschädigte Sicherung“ erscheint.
             for ($pos = 0, $len = strlen($base64); $pos < $len; $pos += 1048576) {
                 $chunk = base64_decode(substr($base64, $pos, 1048576), true);

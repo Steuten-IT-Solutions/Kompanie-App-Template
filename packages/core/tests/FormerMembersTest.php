@@ -518,9 +518,13 @@ final class FormerMembersTest extends TestCase
         sort($formerIds);
         $this->assertSame([$old, $recent, $founder], $formerIds, 'alle bleiben in der Liste der Ehemaligen');
 
-        // Erledigt: kommt nicht wieder dran; die übrigen bis zu ihrer Frist.
+        // Erledigt: kommt nicht wieder dran; die übrigen bis zu ihrer Frist. Was danach dazukommt, löscht jeder Lauf wieder.
         $this->assertSame([], $this->call('GET', '/admin/former/retention')->data['due']);
+        $db->insert('birthdays', ['user_id' => $old, 'month' => 1, 'day' => 2, 'updated_by' => $this->admin, 'updated_at' => $now]);
+        $login = $this->users->profile($old)['login'];
         $this->assertSame(0, $this->app->formerMembers()->purgeExpired());
+        $this->assertSame(0, $count('birthdays'), 'neu eingetragener Geburtstag wieder weg');
+        $this->assertSame($login, $this->users->profile($old)['login'], 'Anmeldung nicht jedes Mal neu');
 
         // Die Frist gehört zur Installation: Eine Sicherung bringt sie nicht (ungesehen) zurück.
         $this->assertContains(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_SETTING, Backup::LOCAL_SETTINGS);

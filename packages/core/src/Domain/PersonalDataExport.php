@@ -59,7 +59,7 @@ final class PersonalDataExport
             throw ApiError::forbidden('In der Vorschau gibt es keinen Export.');
         }
         $self = $actor->id === $userId;
-        if (!$self && !self::mayExportOthers($actor)) {
+        if (!self::mayExport($actor, $userId)) {
             throw ApiError::forbidden('Die Auskunft über andere enthält alle Bereiche (Punkte, Strafen, Anwesenheit, Umfragen, E-Mails, persönliche Angaben); dafür fehlen dir Rechte.');
         }
         $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
@@ -138,6 +138,12 @@ final class PersonalDataExport
             ],
             'data' => $data,
         ];
+    }
+
+    /** Darf $actor die Auskunft über $userId abrufen (ohne guardAccount, das prüft export über MemberService::profile)? */
+    public static function mayExport(User $actor, int $userId): bool
+    {
+        return !$actor->preview && ($actor->id === $userId || self::mayExportOthers($actor));
     }
 
     public static function mayExportOthers(User $actor): bool

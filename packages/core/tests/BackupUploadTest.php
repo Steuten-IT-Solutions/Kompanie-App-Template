@@ -416,7 +416,17 @@ final class BackupUploadTest extends TestCase
         rewind($in);
         Crypt::encrypt($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
         rewind($out);
-        $this->assertSame('{"format":"kompanie-app-backup"}', $this->app->backupEncryption()->readUpload(base64_encode((string) stream_get_contents($out)), self::PASS));
+        $enc = (string) stream_get_contents($out);
+        $this->assertSame('{"format":"kompanie-app-backup"}', $this->app->backupEncryption()->readUpload(base64_encode($enc), self::PASS));
+        // Mit Zeilenumbrüchen wie von `base64` auf der Kommandozeile, größer als ein Stück (1 MiB Base64)
+        $plain = random_bytes(900000);
+        $in = fopen('php://memory', 'w+b');
+        $out = fopen('php://memory', 'w+b');
+        fwrite($in, $plain);
+        rewind($in);
+        Crypt::encrypt($in, $out, (array) $this->app->settings->get(BackupCrypto::SETTING));
+        rewind($out);
+        $this->assertSame($plain, $this->app->backupEncryption()->readUpload(chunk_split(base64_encode((string) stream_get_contents($out)), 76, "\n"), self::PASS));
     }
 
     /** Eine beschädigte Datei ist kein Fehlversuch: Sie sperrt das Wiederherstellen nicht. */

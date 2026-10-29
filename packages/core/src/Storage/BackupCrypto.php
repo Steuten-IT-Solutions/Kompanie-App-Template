@@ -124,12 +124,12 @@ final class BackupCrypto
         try {
             $enc->attach($out);
             $write($out);
+            $enc->finish(); // auch ein Fehler erst beim Abschluss löscht unten den Schlüssel (abort)
         } catch (\Throwable $e) {
             $enc->abort(); // ohne Abschluss: bleibt als abgeschnitten erkennbar
             // Scheiterte das Verschlüsseln im Filter, ist das die Ursache (das folgende Schreiben scheitert nur deshalb).
             throw $enc->error !== null ? new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $enc->error->getMessage(), 0, $enc->error) : $e;
         }
-        $enc->finish();
         if (!fflush($out)) {
             throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
         }
