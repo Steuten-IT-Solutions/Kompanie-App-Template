@@ -837,6 +837,18 @@ function Verschluesselung({
     }
   }
 
+  function remove() {
+    if (
+      window.confirm(
+        'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, auch die in Google Drive. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
+      )
+    )
+      void run(async () => {
+        onChange(await api.removeBackupEncryption());
+        onToast('Passwort für Sicherungen entfernt');
+      });
+  }
+
   return (
     <section className="card settings-section" aria-labelledby="backup-enc-title">
       <h3 id="backup-enc-title">Passwort für Sicherungen</h3>
@@ -850,7 +862,22 @@ function Verschluesselung({
         Server bleiben unverschlüsselt.
       </p>
       {!status.available ? (
-        <p className="small">Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.</p>
+        <>
+          <p className="small">Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.</p>
+          {status.stored && (
+            <>
+              <p className="form-error" role="alert">
+                Ein Passwort ist eingerichtet, lässt sich ohne sodium aber nicht nutzen: Heruntergeladene Sicherungen sind unverschlüsselt,
+                und Sicherungen in Google Drive werden nicht hochgeladen. Entfernst du das Passwort, gehen sie unverschlüsselt dorthin.
+              </p>
+              <div className="button-row">
+                <button type="button" className="btn btn-link" disabled={busy} onClick={remove}>
+                  Passwort entfernen
+                </button>
+              </div>
+            </>
+          )}
+        </>
       ) : status.configured && mode === 'view' ? (
         <>
           <p className="small">
@@ -869,22 +896,7 @@ function Verschluesselung({
             <button type="button" className="btn btn-link" onClick={() => open('set')}>
               Ändern
             </button>
-            <button
-              type="button"
-              className="btn btn-link"
-              disabled={busy}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, auch die in Google Drive. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
-                  )
-                )
-                  void run(async () => {
-                    onChange(await api.removeBackupEncryption());
-                    onToast('Passwort für Sicherungen entfernt');
-                  });
-              }}
-            >
+            <button type="button" className="btn btn-link" disabled={busy} onClick={remove}>
               Entfernen
             </button>
           </div>
@@ -1016,7 +1028,7 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
       {!d.encrypted && (
         <p className="small">
           {noSodium
-            ? 'Unverschlüsselt: Zum Verschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium.'
+            ? 'Zum Verschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium: Ist oben ein Passwort eingerichtet, werden keine Sicherungen hochgeladen, sonst unverschlüsselt.'
             : 'Unverschlüsselt: Wer den Ordner öffnen kann, kann die Sicherungen lesen. Mit einem Passwort für Sicherungen (oben) gehen sie verschlüsselt dorthin.'}
         </p>
       )}

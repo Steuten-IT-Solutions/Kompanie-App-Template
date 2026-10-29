@@ -2143,6 +2143,8 @@ export interface BackupEncryptionStatus {
   /** PHP hat sodium */
   available: boolean;
   configured: boolean;
+  /** Eingerichtet, auch ohne sodium (dann nur entfernen) */
+  stored: boolean;
   /** Seit dem Einrichten einmal richtig geprüft; erst dann löscht Drive alte unverschlüsselte Sicherungen */
   verified: boolean;
   /** Fingerabdruck des Schlüssels, z. B. „3f2a 9c41 07be d5e0“ */

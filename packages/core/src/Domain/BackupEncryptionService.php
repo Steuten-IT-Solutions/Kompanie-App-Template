@@ -61,13 +61,14 @@ final class BackupEncryptionService
         return $key !== null ? BackupCrypto::fingerprint($key['public_key']) : null;
     }
 
-    /** @return array{available: bool, configured: bool, verified: bool, fingerprint: ?string, set_at: ?int, min_length: int} */
+    /** @return array{available: bool, configured: bool, stored: bool, verified: bool, fingerprint: ?string, set_at: ?int, min_length: int} */
     public function status(): array
     {
         $key = $this->key();
         return [
             'available' => BackupCrypto::available(),
             'configured' => $this->configured(), // wie überall: nur mit sodium (sonst steht available: false dabei)
+            'stored' => $this->stored(), // eingerichtet, auch wenn sodium fehlt (dann lässt es sich nur entfernen)
             'verified' => $this->verified(),
             'fingerprint' => $this->fingerprint(),
             'set_at' => $key !== null && is_int($key['set_at'] ?? null) ? $key['set_at'] : null,
@@ -217,27 +218,7 @@ final class BackupEncryptionService
      */
     public function exportPlainToTempFile(BackupProvider $backup): string
     {
-        $file = $this->app->files->tempFile();
-        self::cleanupAtShutdown($file);
-        @chmod($file, 0600);
-        try {
-            $out = @fopen($file, 'wb');
-            if ($out === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
-            }
-            try {
-                $backup->exportTo($out);
-                if (!fflush($out)) {
-                    throw new \RuntimeException('Die Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
-                }
-            } finally {
-                fclose($out);
-            }
-            return $file;
-        } catch (\Throwable $e) {
-            self::discard($file);
-            throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage(), 0, $e);
-        }
+        return $this->writeEncrypted(static fn ($out) => $backup->exportTo($out), null, false);
     }
 
     /**
@@ -300,25 +281,35 @@ final class BackupEncryptionService
      *
      * @param \Closure(resource): void $write
      */
-    private function writeEncrypted(\Closure $write, ?string $file = null): string
+    private function writeEncrypted(\Closure $write, ?string $file = null, bool $encrypt = true): string
     {
         $temp = $file === null;
         $file ??= $this->app->files->tempFile();
         // Eine vorgegebene Datei nur neu anlegen (x), nie eine fremde überschreiben oder löschen.
         $out = @fopen($file, $temp ? 'wb' : 'xb');
         if ($out === false) {
+            $temp && @unlink($file); // tempFile() hat sie schon angelegt
             throw new \RuntimeException($temp ? 'Die Sicherung ließ sich nicht erstellen (temporäre Datei).' : "$file lässt sich nicht anlegen (Ordner vorhanden, Schreibrechte, gibt es sie schon?).");
         }
         self::cleanupAtShutdown($file);
         @chmod($file, 0600);
         try {
             try {
-                $bytes = $this->encryptInto($out, $write);
+                if ($encrypt) {
+                    $bytes = $this->encryptInto($out, $write);
+                } else {
+                    // Unverschlüsselt (Google Drive ohne Passwort): Die Länge kennt nur der Schreiber; fflush meldet volle Platte.
+                    $write($out);
+                    if (!fflush($out)) {
+                        throw new \RuntimeException('Die Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
+                    }
+                    $bytes = null;
+                }
             } finally {
                 fclose($out);
             }
             clearstatcache(true, $file);
-            if (filesize($file) !== $bytes) {
+            if ($bytes !== null && filesize($file) !== $bytes) {
                 throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
             }
             if (!$temp) {
@@ -326,7 +317,7 @@ final class BackupEncryptionService
             }
             return $file;
         } catch (\Throwable $e) {
-            @unlink($file);
+            self::discard($file);
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage(), 0, $e);
         }
     }
