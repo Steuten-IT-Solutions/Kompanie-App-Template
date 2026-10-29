@@ -774,6 +774,27 @@ try {
     [$s, $r] = $d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true, 'passphrase' => $pass]);
     $c->ok($s === 200 && (int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Verschlüsselte Sicherung mit Passwort wiederhergestellt');
     $c->ok(is_array($kernel->app()->settings->fresh(\KompanieApp\Core\Storage\BackupCrypto::SETTING)), 'Passwort für Sicherungen bleibt nach dem Wiederherstellen eingerichtet (gehört zur Installation)');
+    // Kommandozeile: verschlüsselt exportieren (keine Reste daneben), nur mit dem Passwort importieren.
+    $cli = static function (string ...$args) use ($app, $data): array {
+        $p = proc_open([PHP_BINARY, $app . '/bin/kompanie.php', ...$args], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $app, ['KOMPANIE_DATA_DIR' => $data] + getenv());
+        fclose($pipes[0]);
+        $out = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+        return [proc_close($p), $out];
+    };
+    $encFile = $data . '-cli' . \KompanieApp\Core\Storage\BackupCrypto::EXTENSION;
+    file_put_contents($data . '-pass', $pass . "\n");
+    file_put_contents($data . '-wrong', "falsch\n");
+    try {
+        [$code, $msg] = $cli('export', '--encrypt', '--out=' . $encFile);
+        $raw = (string) @file_get_contents($encFile);
+        $c->ok($code === 0 && str_starts_with($raw, \KompanieApp\Core\Storage\BackupCrypto::MAGIC) && !str_contains($raw, 'Sicherungstest'), 'CLI export --encrypt schreibt verschlüsselt' . ($code !== 0 ? ": $msg" : ''));
+        $c->ok((fileperms($encFile) & 0777) === 0600 && glob($encFile . '.*.part') === [], 'CLI-Export nur für den Besitzer lesbar, keine Reste');
+        $c->ok($cli('import', $encFile, '--passphrase-file=' . $data . '-wrong')[0] !== 0, 'CLI-Import mit falschem Passwort scheitert');
+        [$code, $msg] = $cli('import', $encFile, '--passphrase-file=' . $data . '-pass');
+        $c->ok($code === 0 && (int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'CLI-Import mit Passwort' . ($code !== 0 ? ": $msg" : ''));
+    } finally {
+        array_map('unlink', array_filter([$encFile, $data . '-pass', $data . '-wrong'], 'is_file'));
+    }
     $d->forgetSessions();
 
     // Auskunft nach Art. 15 DSGVO: eigene Daten als Datei, nicht ohne Anmeldung

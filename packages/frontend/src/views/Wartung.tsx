@@ -857,8 +857,8 @@ function Verschluesselung({
           </p>
           {!status.verified && (
             <p className="small">
-              Bitte das Passwort einmal mit „Passwort prüfen“ bestätigen. Erst danach löscht die App ältere, unverschlüsselte Sicherungen in
-              Google Drive.
+              Bitte das Passwort einmal mit „Passwort prüfen“ bestätigen. Erst danach löscht die App ältere Sicherungen in Google Drive
+              (auch die unverschlüsselten); bis dahin bleiben alle.
             </p>
           )}
           <div className="button-row">

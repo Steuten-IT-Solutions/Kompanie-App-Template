@@ -471,7 +471,8 @@ final class FormerMemberService
         $c = $this->app->settings->get(self::RETENTION_SETTING);
         $c = is_array($c) ? $c : [];
         $years = is_numeric($c['years'] ?? null) ? max(0, min(self::RETENTION_MAX_YEARS, (int) $c['years'])) : 0;
-        return ['years' => $years, 'include_founders' => ($c['include_founders'] ?? false) === true, 'include_deceased' => ($c['include_deceased'] ?? false) === true];
+        // Input::bool: WordPress kann Werte als Zeichenkette zurückgeben.
+        return ['years' => $years, 'include_founders' => Input::bool($c['include_founders'] ?? false), 'include_deceased' => Input::bool($c['include_deceased'] ?? false)];
     }
 
     /**

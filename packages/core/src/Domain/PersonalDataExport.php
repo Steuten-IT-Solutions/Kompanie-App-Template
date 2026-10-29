@@ -18,7 +18,8 @@ use KompanieApp\Core\Storage\UserData;
  *   {format: "kompanie-app-personal-data", formatVersion: 1, created, person: {...}, data: {tabelle: [zeilen]}}
  *
  * Die Tabellen kommen aus UserData::tables(), derselben Liste wie beim Löschen; dazu Push-Abos, Ämter, Zeilen in Listen,
- * eigene Änderungen am Schwarzen Brett und eigene Bilder (Signatur, Entwürfe). Ausgelassen:
+ * eigene Änderungen am Schwarzen Brett, eigene Bilder (Signatur, Entwürfe) und Anhänge von Entwürfen (Angaben zur Datei).
+ * Ausgelassen:
  * - Schlüssel (Push: p256dh, auth) und Pseudonyme (vote_ref); die Fassungen des Fotos (es steht einmal unter
  *   person.photo); Bildschirmfotos wartender Fehlermeldungen (können Daten anderer zeigen). Eigene Bilder (Signatur,
  *   Entwürfe) sind mit Inhalt dabei.
@@ -84,6 +85,8 @@ final class PersonalDataExport
             // Änderungen am Schwarzen Brett, die sie gemacht hat (bleiben beim Löschen als Verlauf der Nachricht)
             'board_message_revisions' => 'SELECT * FROM {board_message_revisions} WHERE user_id = ?',
             'rich_images' => "SELECT * FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?",
+            // Anhänge noch nicht gesendeter Entwürfe (Angaben zur Datei; gehören ihr wie beim Löschen, AttachmentService::deleteDraftsOf)
+            'attachments' => "SELECT * FROM {attachments} WHERE owner_type = 'draft' AND owner_id = ?",
         ] as $table => $sql) {
             $rows = $this->rows($table, $sql, [$userId]);
             if ($table === 'push_subscriptions' && !$self) {

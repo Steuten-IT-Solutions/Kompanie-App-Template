@@ -53,7 +53,7 @@ final class BackupEncryptionService
         return [
             'available' => BackupCrypto::available(),
             'configured' => $key !== null,
-            'verified' => ($key['verified'] ?? false) === true,
+            'verified' => $this->verified(),
             'fingerprint' => $key !== null ? BackupCrypto::fingerprint($key['public_key']) : null,
             'set_at' => $key !== null && is_int($key['set_at'] ?? null) ? $key['set_at'] : null,
             'min_length' => BackupCrypto::MIN_LENGTH,
@@ -176,11 +176,12 @@ final class BackupEncryptionService
      * Ganze Sicherung verschlüsselt nach $out (z. B. an den Browser): beim Schreiben verschlüsselt, ohne Zwischendatei.
      *
      * @param resource $out
+     * @return int geschriebene Bytes
      */
-    public function exportEncryptedTo(BackupProvider $backup, $out): void
+    public function exportEncryptedTo(BackupProvider $backup, $out): int
     {
         $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
-        BackupCrypto::encryptTo($out, $key, $this->meta(), static fn ($o) => $backup->exportTo($o));
+        return BackupCrypto::encryptTo($out, $key, $this->meta(), static fn ($o) => $backup->exportTo($o));
     }
 
     /**
