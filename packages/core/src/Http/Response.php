@@ -19,6 +19,13 @@ final class Response
         return new self($data, 201);
     }
 
+    /** Antwort als Datei zum Herunterladen (Sicherung, Auskunft), nie zwischengespeichert. */
+    public static function attachment(mixed $data, string $filename): self
+    {
+        $name = (string) preg_replace('/[^A-Za-z0-9._-]/', '_', $filename);
+        return new self($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+    }
+
     public static function error(ApiError $e): self
     {
         return new self(['code' => $e->errorCode, 'message' => $e->getMessage()] + $e->extra, $e->status);

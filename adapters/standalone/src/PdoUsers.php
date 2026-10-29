@@ -193,6 +193,32 @@ final class PdoUsers implements UserDirectory
         $this->sessions?->destroyAllFor($id);
     }
 
+    public function accountData(int $id): array
+    {
+        $row = $this->db->selectOne('SELECT created_at, updated_at, last_login_at, disabled_at FROM {users} WHERE id = ?', [$id]) ?? [];
+        try {
+            // Sitzungen ohne token_hash (der Schlüssel der Anmeldung)
+            $sessions = $this->db->select('SELECT created_at, renewed_at, expires_at, remember FROM {sessions} WHERE user_id = ? ORDER BY created_at', [$id]);
+        } catch (\RuntimeException) {
+            $sessions = [];
+        }
+        return $row + ['sessions' => $sessions];
+    }
+
+    public function forgetLogin(int $id): void
+    {
+        // Benutzername ohne Bezug zur Person (Zufall: nie gleich einem frei gewählten); als Passwort ein zufälliges, das
+        // niemand kennt (ein echter Prüfwert: die Anmeldung dauert so lange wie bei anderen Konten).
+        $this->db->update('users', [
+            'login' => 'ehemalig-' . bin2hex(random_bytes(6)),
+            'email' => '',
+            'password_hash' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT),
+            'last_login_at' => null,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+        ], ['id' => $id]);
+        $this->sessions?->destroyAllFor($id);
+    }
+
     public function reactivate(int $id, string $role): void
     {
         $this->db->update('users', ['level' => $role, 'disabled_at' => null, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);

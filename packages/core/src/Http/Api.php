@@ -19,6 +19,7 @@ use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Detail;
@@ -354,6 +355,16 @@ final class Api
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
     }
 
+    /** Auskunft als Datei (meine-daten-… bzw. daten-<id>-…), nie zwischengespeichert. */
+    private function personalData(int $userId): Response
+    {
+        $a = $this->app;
+        $data = $a->personalData()->export($this->user(), $userId);
+        $date = $a->time()->format($a->time()->timestamp(), 'Y-m-d');
+        $name = $this->user()->id === $userId ? 'meine-daten-' . $date . '.json' : 'daten-' . $userId . '-' . $date . '.json';
+        return Response::attachment($data, $name);
+    }
+
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showTitles(): bool
     {
@@ -526,6 +537,7 @@ final class Api
             // Eigene Daten
             // Punkte und offene Strafen einmal (me()); vom Dienstgrad nur die Bezeichnung, ohne die Buchungen für den
             // Fortschritt erneut zu lesen (der steht unter /me/rank).
+            new Route('GET', '/me/data', $L, fn () => $this->personalData($this->user()->id)),
             new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
                 + ($a->features()->enabled('ranks') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['rank' => $a->ranks()->current($this->user()->id)] : [])
                 + ($a->features()->enabled('titles') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['titles' => $a->titles()->of($this->user()->id)] : [])),
@@ -961,6 +973,8 @@ final class Api
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
+            // Auskunft nach Art. 15 DSGVO (Domain\PersonalDataExport): alle Daten der Person als JSON-Datei
+            new Route('GET', '/members/{id}/data', Cap::CreateUsers, fn (Request $r) => $this->personalData($r->id()), null, $denyUsers),
             // Persönliche Angaben anderer: E-Mail, Handynummer, Adresse (Geburtstag unter /members/{id}/birthday)
             new Route('PUT', '/members/{id}/personal', Cap::ManagePersonal, fn (Request $r) => $a->members()->updatePersonal($this->user(), $r->id(), $r->body), null, $denyPersonal),
             new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
@@ -1122,23 +1136,43 @@ final class Api
                 $data = $backup->export();
                 $a->settings->set(StatusService::BACKUP_SETTING, $a->time()->timestamp());
                 $name = 'sicherung-' . $a->time()->format($a->time()->timestamp(), 'Y-m-d') . '.json';
-                return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+                return Response::attachment($data, $name);
             }, null, $denySettings),
             new Route('POST', '/admin/backup', Cap::ManageSettings, function (Request $r) use ($a) {
                 $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
                 if (!$backup->canImport()) {
                     throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
                 }
-                if (!Input::bool($r->input('confirm')) || !is_string($r->input('backup'))) {
+                // Als Text (JSON wie bisher) oder als Base64 (verschlüsselte Sicherung, mit passphrase).
+                $base64 = $r->input('backup_base64');
+                $data = is_string($base64) ? $base64 : $r->input('backup');
+                if (!Input::bool($r->input('confirm')) || !is_string($data)) {
                     throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
                 }
+                if (is_string($base64)) {
+                    $data = $a->backupEncryption()->readUpload($base64, $r->input('passphrase'));
+                } elseif (BackupCrypto::isEncrypted($data)) {
+                    // Als Text gelesen ist eine verschlüsselte Datei nicht mehr lesbar (Zeichensatz); die App sendet sie als Base64.
+                    throw ApiError::invalid('Verschlüsselte Sicherungen bitte als Datei hochladen (backup_base64).');
+                }
+                // Hintergrundaufgaben (abhängig von den wiederhergestellten Einstellungen, z. B. Mail oder Updates) plant der
+                // nächste Aufruf neu: Der Import löscht tasks_planned (App::upgrade). Nicht hier: Die Einstellungen dieser
+                // Anfrage sind noch die alten. Die Aufbewahrungsfrist kommt nie aus einer Sicherung (Backup::LOCAL_SETTINGS).
                 try {
-                    $backup->import($r->input('backup'));
+                    $backup->import($data);
                 } catch (\RuntimeException $e) {
                     throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
                 }
                 return ['restored' => true];
             }, null, $denySettings),
+            // Passwort für Sicherungen (verschlüsselte Sicherungen, auch in Google Drive)
+            new Route('GET', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/encryption', Cap::ManageSettings, fn (Request $r) => $a->backupEncryption()->set($r->input('passphrase'), $r->input('passphrase_confirm')), null, $denySettings),
+            new Route('DELETE', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->remove(), null, $denySettings),
+            new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
+            // Aufbewahrungsfrist für Ehemalige (Standard aus): Stand mit Vorschau, einstellen
+            new Route('GET', '/admin/former/retention', Cap::ManageSettings, fn () => $a->formerMembers()->retentionStatus(), null, $denySettings),
+            new Route('PUT', '/admin/former/retention', Cap::ManageSettings, fn (Request $r) => $a->formerMembers()->setRetention($r->body, Input::bool($r->input('preview'))), null, $denySettings),
             new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
             new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
                 $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));

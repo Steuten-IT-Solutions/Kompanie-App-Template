@@ -618,9 +618,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ki_checks_ok($checks)) {
         } catch (Error $e) {
             // nur ein Hinweis
         }
+        // Ohne HTTPS gehen Passwörter und Daten der Mitglieder unverschlüsselt durchs Netz: deutlich hinweisen, aber nicht
+        // sperren (Test auf dem eigenen Rechner, Zertifikat folgt später). Die Statusseite wiederholt den Hinweis.
+        $plain = str_starts_with($base, 'http://') && !in_array(strtolower((string) parse_url($base, PHP_URL_HOST)), ['localhost', '127.0.0.1', '[::1]'], true);
+        $https = $plain ? '<p class="bad">Die App läuft über HTTP: Passwörter und Daten der Mitglieder gehen unverschlüsselt durchs Netz. Bitte beim Hoster ein Zertifikat einrichten lassen (oft kostenlos über Let’s Encrypt) und danach in config.php die Adresse (base_url) auf https:// umstellen.</p>' : '';
         $deleted = ki_self_delete();
         ki_page('Fertig', '<div class="card"><h2>Die App ist eingerichtet</h2><p>Version ' . ki_h($entry['version']) . '. Jetzt mit dem eben angelegten Admin-Konto anmelden; danach führt die App durch die restliche Einrichtung (Bereiche wählen, dann z. B. Kalender, Galerie, Neuigkeiten).</p>'
-            . $cron
+            . $https . $cron
             . ($deleted ? '<p class="hint">Der Installer hat sich selbst gelöscht.</p>' : '<p class="bad">Bitte die Datei install.php jetzt im Dateimanager löschen.</p>')
             . '<a class="btn" href="' . ki_h($base) . '">Zur App</a></div>');
     } catch (Exception $e) {

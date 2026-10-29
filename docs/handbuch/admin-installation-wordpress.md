@@ -34,9 +34,13 @@ In `[kompanie_mitglieder]` stehen bei Personen ohne Foto ihre Anfangsbuchstaben.
 
 ## Gut zu wissen
 - **Einstellungen:** Die Einstellungen der App findest du in der App unter **Verwaltung → Einstellungen**. Zusätzlich gibt es im WordPress-Backend unter *Einstellungen* eine Seite der App mit Wartungsmodus, Bereichen, Google-Zugang, {bereich.calendar}, {bereich.gallery} und dem Platzhalterbild. Sie hilft, wenn die App selbst nicht erreichbar ist.
-- **{rolle.admin}s:** {rolle.admin} in der App ist, wer in WordPress Administrator ist. Diese Rolle vergibst du nur in WordPress. Die Rolle anderer Personen wählst du in der App oder im WordPress-Benutzerprofil unter **Rolle in der App** (siehe [Rollen](seite:admin-rollen-und-mitglieder)).
+- **{rolle.admin}s:** {rolle.admin} in der App ist, wer in WordPress Administrator ist. Diese Rolle vergibst du nur in WordPress. Die Rolle anderer Personen wählst du in der App oder im WordPress-Benutzerprofil unter **Rolle in der App** (siehe [Rollen](seite:admin-rollen-und-mitglieder)). Wer in WordPress Benutzer anlegen darf (z. B. weil ein Plugin das einer Redakteursrolle gibt), darf das auch in der App und sieht damit E-Mail und Telefon der Mitglieder.
 - **Adresse:** Ohne „schöne“ Permalinks (die lesbaren Adressen von WordPress) läuft die App unter einer längeren Adresse; WordPress zeigt sie dann oben im Backend an. Für die kurze Adresse `/app/` wählst du unter **Einstellungen → Permalinks** z. B. „Beitragsname“.
 - **{bereich.news}:** Sie kommen immer aus den Beiträgen der Webseite; dafür gibt es nichts einzustellen.
+
+- **HTTPS:** Die Webseite sollte nur über `https://` laufen, sonst gehen Passwörter und Daten der Mitglieder unverschlüsselt durchs Netz. Das Zertifikat (und HSTS) richten WordPress bzw. der Hoster für die ganze Webseite ein.
+
+> **Für Fortgeschrittene: Rechte aus WordPress.** Die WordPress-Rechte `create_users`, `promote_users` und `manage_options` gelten in der App als *Konten anlegen*, *Rollen vergeben* und *Einstellungen*. Wer das nicht will, kürzt die Zuordnung mit dem Filter `kompanie_app_wp_capability_map`, z. B. `add_filter('kompanie_app_wp_capability_map', fn () => []);`. Administratoren der Webseite bleiben {rolle.admin}s der App.
 
 > **Für Fortgeschrittene: Server mit nginx.** Auf den Webservern Apache und LiteSpeed sorgt das Plugin selbst dafür, dass die Dateien der App lange im Browser bleiben und komprimiert ankommen (über `.htaccess`). Läuft die Webseite mit **nginx**, bitte den Hoster, die Dateien unter `wp-content/plugins/kompanie-app/app/assets/` ein Jahr zwischenspeichern zu lassen (`Cache-Control: public, max-age=31536000, immutable`; ihr Name ändert sich mit jeder Version) und Textdateien komprimiert (gzip) auszuliefern. Die App läuft auch ohne, lädt beim ersten Öffnen aber langsamer.
 

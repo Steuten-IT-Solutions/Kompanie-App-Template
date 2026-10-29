@@ -32,7 +32,8 @@
  * - Vorschau „App als Rolle ansehen“ (Issue #63): Anfragen mit dem Header X-Kompanie-Preview (API) oder dem Parameter
  *   vorschau (Bilder, Dokumente, Abzeichen) → durchreichen, nie speichern und nie aus dem Speicher beantworten: Sie
  *   gelten nur für diese Ansicht und dürfen sich nicht mit den Daten des Admins mischen.
- * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
+ * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) und Auskunft über die eigenen Daten (/me/data,
+ *   /members/<id>/data) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
  * Wo API und Programmdateien liegen, steht in den Parametern ?api=…&assets=…
@@ -151,17 +152,29 @@ function isApi(url) {
   return API !== '' && url.href.startsWith(API);
 }
 
-/** Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. */
+/**
+ * Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. Ist sie irgendwo ungültig
+ * kodiert (z. B. ein einzelnes %E0), wird jede Stelle für sich dekodiert: Sonst ließe sich %2Fme%2Fdata daneben an der
+ * Prüfung vorbeischleusen, während der Server es dekodiert und beantwortet.
+ */
 function decodedHref(url) {
   try {
     return decodeURIComponent(url.href);
   } catch {
-    return url.href; // unvollständig kodiert: wie angegeben prüfen
+    return url.href.replace(/%[0-9a-f]{2}/gi, (m) => {
+      try {
+        return decodeURIComponent(m);
+      } catch {
+        return m;
+      }
+    });
   }
 }
 
 function isAdmin(url) {
-  return decodedHref(url).includes('/admin/');
+  // Ohne Unterschied in Groß- und Kleinschreibung (WordPress nimmt REST-Pfade so an), auch mit Schrägstrich am Ende
+  const href = decodedHref(url).toLowerCase();
+  return href.includes('/admin/') || /\/(?:me|members\/\d+)\/data\/*(?:[?&#]|$)/.test(href);
 }
 
 /** Rückkehr von Google nach „Mit Google verbinden“: <App>/google/callback oder ?r=/google/callback */

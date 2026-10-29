@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Update\OffsiteBackup;
 
 /**
@@ -18,6 +19,9 @@ use KompanieApp\Core\Update\OffsiteBackup;
  *
  * Vor jedem Update kommt die Sicherung vom Server zusätzlich in denselben Ordner (storeBeforeUpdate, die letzten
  * KEEP_BEFORE_UPDATE); scheitert das, fragt UpdateService nach, ob trotzdem aktualisiert werden soll.
+ *
+ * Ist ein Passwort für Sicherungen eingerichtet (BackupEncryptionService), gehen sie verschlüsselt nach Drive (Endung
+ * .json.enc), sonst wie bisher als .json.
  */
 final class BackupUploadService implements OffsiteBackup
 {
@@ -66,6 +70,8 @@ final class BackupUploadService implements OffsiteBackup
             'available' => $this->available(),
             'access' => $this->app->drive()->backupAccess(),
             'enabled' => $this->enabled(),
+            // Mit Passwort für Sicherungen verschlüsselt, sonst unverschlüsselt
+            'encrypted' => $this->app->backupEncryption()->configured(),
             'email' => $this->app->drive()->oauthEmail(),
             'folder_url' => $folder !== '' ? 'https://drive.google.com/drive/folders/' . rawurlencode($folder) : null,
             'last_ok' => $state['last_ok'] > 0 ? $state['last_ok'] : null,
@@ -117,25 +123,24 @@ final class BackupUploadService implements OffsiteBackup
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
-        $tmp = $this->app->files->tempFile();
+        $tmp = null;
         try {
-            // Erst Stück für Stück in eine temporäre Datei, dann in Stücken hochladen: Die Sicherung muss nie ganz in
-            // den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als memory_limit).
-            $out = @fopen($tmp, 'wb');
-            if ($out === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht erstellen (temporäre Datei).');
+            // Erst Stück für Stück in eine temporäre Datei (mit Passwort verschlüsselt), dann in Stücken hochladen: Die
+            // Sicherung muss nie ganz in den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als
+            // memory_limit).
+            $date = self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His');
+            if ($this->encrypt()) {
+                $tmp = $this->app->backupEncryption()->exportToTempFile($backup);
+                $this->store($tmp, $date . '-' . $this->keyTag() . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
+            } else {
+                $tmp = $this->app->backupEncryption()->exportPlainToTempFile($backup);
+                $this->store($tmp, $date . '.json', self::PREFIX, self::KEEP, $state);
             }
-            try {
-                $backup->exportTo($out);
-            } finally {
-                fclose($out);
-            }
-            $this->store($tmp, self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His') . '.json', self::PREFIX, self::KEEP, $state);
         } catch (\Throwable $e) {
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
-            @unlink($tmp);
+            $tmp !== null && BackupEncryptionService::discard($tmp);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
         return $this->status();
@@ -153,13 +158,22 @@ final class BackupUploadService implements OffsiteBackup
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
+        $encrypted = null;
         try {
-            $name = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His') . '-' . $version . '.json';
-            $this->store($path, $name, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+            // Die Sicherung auf dem Server bleibt unverschlüsselt (sie liegt neben der Datenbank); mit Passwort für
+            // Sicherungen geht sie verschlüsselt nach Drive.
+            $date = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His');
+            if ($this->encrypt()) {
+                $encrypted = $this->app->backupEncryption()->encryptFile($path);
+                $this->store($encrypted, $date . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+            } else {
+                $this->store($path, $date . '-' . $version . '.json', self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+            }
         } catch (\RuntimeException $e) {
             $state['error'] = $e->getMessage();
             throw $e;
         } finally {
+            $encrypted !== null && BackupEncryptionService::discard($encrypted);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
     }
@@ -173,7 +187,8 @@ final class BackupUploadService implements OffsiteBackup
     private function store(string $path, string $name, string $prefix, int $keep, array &$state, ?callable $onProgress = null): void
     {
         $folder = $this->folder();
-        $this->app->drive()->uploadFile($folder, $name, $path, 'application/json', DriveClient::UPLOAD_CHUNK, $onProgress);
+        $type = str_ends_with($name, BackupCrypto::EXTENSION) ? 'application/octet-stream' : 'application/json';
+        $this->app->drive()->uploadFile($folder, $name, $path, $type, DriveClient::UPLOAD_CHUNK, $onProgress);
         $this->prune($folder, $prefix, $keep);
         $state['last_ok'] = $state['last_try'];
         $state['error'] = '';
@@ -192,19 +207,60 @@ final class BackupUploadService implements OffsiteBackup
         return $id;
     }
 
-    /** Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit). Fehler hier sind nicht schlimm. */
+    /**
+     * Verschlüsselt hochladen? Mit Passwort ja, ohne nein. Ist eins eingerichtet, fehlt aber sodium (später abgeschaltet):
+     * Fehler statt still unverschlüsselt (der Zustand und die Ampel zeigen ihn).
+     */
+    private function encrypt(): bool
+    {
+        $enc = $this->app->backupEncryption();
+        if (!$enc->configured() && $enc->stored()) {
+            throw new \RuntimeException('Es ist ein Passwort für Sicherungen eingerichtet, aber PHP fehlt die Erweiterung sodium: Die Sicherung geht nicht unverschlüsselt nach Google Drive. Bitte beim Hoster nachfragen.');
+        }
+        return $enc->configured();
+    }
+
+    /** Kennung des Schlüssels im Dateinamen (Anfang des Fingerabdrucks): zeigt, mit welchem Passwort eine Sicherung geht. */
+    private function keyTag(): string
+    {
+        return 'k' . substr(str_replace(' ', '', (string) $this->app->backupEncryption()->fingerprint()), 0, 8);
+    }
+
+    /**
+     * Ältere Sicherungen über $keep hinaus löschen (der Name enthält Datum und Uhrzeit). Ohne Passwort für Sicherungen
+     * wechseln die unverschlüsselten (.json) durch. Mit Passwort löscht sie die unverschlüsselten ganz, sobald eine
+     * verschlüsselte hochgeladen ist: Lesbare Sicherungen mit Passwort-Prüfwerten und Adressen sollen nicht monatelang im
+     * Ordner bleiben. Solange das Passwort nicht einmal
+     * geprüft wurde (BackupEncryptionService::verified), wechseln nur die Sicherungen mit dem aktuellen Schlüssel (keyTag)
+     * durch: Ein vertipptes Passwort darf keine lesbare Sicherung kosten (unverschlüsselte, mit einem früheren Passwort).
+     * Fehler hier sind nicht schlimm.
+     */
     private function prune(string $folder, string $prefix, int $keep): void
     {
         try {
             $names = [];
+            $plain = [];
+            $encrypted = $this->app->backupEncryption()->configured();
+            $verified = $encrypted && $this->app->backupEncryption()->verified();
+            $tag = '-' . $this->keyTag();
             foreach ($this->app->drive()->listChildren($folder) as $f) {
                 $name = (string) ($f['name'] ?? '');
-                if (str_starts_with($name, $prefix) && str_ends_with($name, '.json') && !DriveClient::isFolder($f)) {
+                if (DriveClient::isFolder($f) || !(str_starts_with($name, self::PREFIX) || str_starts_with($name, self::PREFIX_UPDATE))) {
+                    continue;
+                }
+                if (!$encrypted) {
+                    // ohne Passwort: wie bisher die unverschlüsselten durchwechseln; verschlüsselte von früher bleiben
+                    if (str_starts_with($name, $prefix) && str_ends_with($name, '.json')) {
+                        $names[(string) $f['id']] = $name;
+                    }
+                } elseif (str_ends_with($name, '.json')) {
+                    $verified && $plain[] = (string) $f['id'];
+                } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION) && ($verified || str_contains($name, $tag))) {
                     $names[(string) $f['id']] = $name;
                 }
             }
             arsort($names);
-            foreach (array_slice(array_keys($names), $keep) as $id) {
+            foreach ([...$plain, ...array_slice(array_keys($names), $keep)] as $id) {
                 $this->app->drive()->deleteFile((string) $id);
             }
         } catch (\RuntimeException $e) {

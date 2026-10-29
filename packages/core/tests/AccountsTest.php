@@ -40,7 +40,7 @@ final class AccountsTest extends TestCase
     public function testEditNameEmailAndLogin(): void
     {
         $this->assertSame(
-            ['name' => 'Mitglied', 'first_name' => 'Mitglied', 'last_name' => '', 'login' => 'mitglied', 'email' => '', 'phone' => '', 'can_change_login' => true],
+            ['name' => 'Mitglied', 'first_name' => 'Mitglied', 'last_name' => '', 'login' => 'mitglied', 'email' => '', 'phone' => '', 'can_change_login' => true, 'can_export' => true],
             $this->call('GET', "/members/{$this->m}/account")->data,
         );
         $res = $this->call('PATCH', "/members/{$this->m}/account", ['name' => 'Max Muster', 'email' => 'max@example.org', 'username' => 'max']);

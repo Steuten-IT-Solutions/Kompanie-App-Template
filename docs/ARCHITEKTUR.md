@@ -206,6 +206,13 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Löschen: Port `UserDirectory::removeAccount()` beendet alle Sitzungen; Standalone löscht das Konto, WordPress entfernt nur die Rolle in der App (Entscheidung: der Benutzer der Webseite bleibt). Danach löscht `App::userDeleted()` alle eigenen Daten (Punkte, Strafen, Anwesenheit, Dienstgrad mit Verlauf, Titel, Zusatzrollen, Push-Abos), auch wenn WordPress einen Benutzer im Backend löscht. Amtszeiten (Issue #112) bleiben als Chronik mit dem gespeicherten Namen stehen; nur `office_holders.user_id` wird `NULL` (Entscheidung im Issue). Zeilen in Listen (Issue #121) bleiben ohne Namen stehen (`list_rows.user_id` wird `NULL`), bis die Liste aktualisiert wird. Was die Person für andere eingetragen hat, bleibt; angezeigt als „gelöschtes Konto“ (`UserNames`).
 - Mehrere anlegen (`POST /users/bulk`, höchstens 50): erst alles prüfen (`MemberService::prepare`, Benutzernamen und E-Mail auch untereinander, Anfangspunkte und Dienstgrad), dann anlegen. Die Zugangsdaten enthalten den Link zur Installationsanleitung und lassen sich als Zettel je Person ausdrucken.
 
+- **Auskunft (Art. 15 DSGVO)**: `Domain\PersonalDataExport`, `GET /me/data` (angemeldet) und `GET /members/{id}/data`
+  (`create_users` mit `guardAccount` und `view_personal`), nicht in der Vorschau. Tabellen aus `UserData::tables()` (dieselbe Liste wie beim
+  Löschen; ein Test prüft, dass jede Kerntabelle mit `user_id` dort steht oder begründet ausgenommen ist), dazu Push-Abos
+  ohne Schlüssel, Ämter, Listen, eigene Änderungen am Brett und eigene Bilder (Signatur, Entwürfe) mit Inhalt; ohne Pseudonyme. Antworten in
+  anonymen Umfragen nur für die Person selbst, Nutzungsauswertung nur für sie und `view_activity`. Der Service Worker
+  speichert die Antworten nie.
+
 #### Persönliche Angaben: E-Mail-Adresse, Handynummer, Adresse, Geburtsdatum
 
 - `GET`/`PATCH /me/account` (angemeldet, Meins → Konto): E-Mail-Adresse, Handynummer und Adresse der Person selbst (`MemberService::ownAccount`/`updateOwnAccount`). Eine neue E-Mail-Adresse nur mit `current_password` (gleiche Begrenzung wie beim Passwortwechsel, `MemberService::checkPassword`), weil sich bei WordPress darüber das Passwort zurücksetzen lässt; Handynummer und Adresse ohne. Erst wird alles geprüft, dann geschrieben. Name und Benutzername ändert hier niemand.
@@ -224,6 +231,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Ämter enden beim Ausscheiden** (Issue #181): `mark()` legt das Konto still und beendet in **einer** Transaktion (`Connection::transaction`, verschachtelt; unter WordPress läuft auch die Rolle über `wpdb`) mit `OfficeService::endFor` jede laufende Amtszeit des Kontos (`period` ohne Ende, auch mit `honor`). Ende = Jahr aus `left_on`, leer `Time::today()`, nie vor `start_year`. Allein: `end_year` setzen. Gemeinsam: neue Amtszeit für das Konto (gleiches Amt, Art, Beginn, `note`, `honor`, Inhaber mit gespeichertem Namen), aus der laufenden entfernt; die anderen laufen weiter. Dann `syncTitles` für die verknüpften Titel (das Konto ist Gast, also kein `isMember()`: verknüpfte Titel entfallen, andere bleiben). Antwort mit `offices_ended`; Vorschau `GET /members/{id}/former/offices?left_on=` (gleiche Prüfung wie `mark`, ändert nichts, `clamped` bei Austritt vor dem Beginn, `shared`). `office_terms.ended_for` (Migration 26) merkt das Konto: `update()` mit neuem `left_on` setzt das Ende dieser Amtszeiten neu (`moveEndFor`); jede Änderung von Hand (`updateTerm`), `reactivate()` (öffnet nichts wieder) und das Löschen des Kontos (`UserData::purge`) setzen `ended_for` auf NULL. `create()` und der Import legen neue Konten an, die keine laufenden Amtszeiten haben.
 - **Einzeln anlegen** (`POST /members/former`, in der App „+ Ehemalige Person anlegen“ wie „+ Mitglied anlegen“): Vor- und Nachname, Felder wie bei `PUT /members/{id}/former`, dazu Geburtstag und Foto wie bei `POST /users`. Erst prüfen (`FormerMemberService::valid`, `MemberService::prepare`), dann `createImported` wie eine Zeile des Imports. Gleicher Anzeigename eines vorhandenen Kontos → 400 (wie `existing` beim Import, damit niemand doppelt entsteht); danach `OfficeService::linkNames` für diesen Namen.
 - **Import** (`POST /members/former/import`, Ersterfassung z. B. aus einer Chronik): CSV mit Semikolon oder Tabulator `vorname;nachname;eintritt;ausgeschieden;grund`, UTF-8 (mit oder ohne BOM) oder Windows-1252, höchstens 200 KB bzw. 500 Zeilen. Eintritt „Gründer“ setzt `founder`. Ohne `apply` Vorschau je Zeile (Fehler, `existing` bei gleichem Anzeigenamen eines vorhandenen Kontos, gleiche Namen in der Tabelle sind ein Fehler); mit `apply` nur ohne Fehler. Je Person `MemberService::prepare`/`insert` (Benutzername aus dem Namen, zufälliges Passwort, das niemand erfährt) und gleich `deactivate`. Keine Transaktion (WordPress-Benutzer): Bricht es ab, findet ein zweiter Lauf die schon angelegten als `existing`. Danach verknüpft `OfficeService::linkNames` freie Namen in Amtszeiten (ohne `user_id`) mit den neuen Konten und mit schon früher importierten Ehemaligen, wenn der Name nach `Text::line` ohne Unterschied in Groß- und Kleinschreibung gleich ist und die Person in der Amtszeit noch nicht steht; `name` bleibt. `offices_linked` zählt die Einträge (in der Vorschau die zu verknüpfenden).
+
+- **Aufbewahrungsfrist** (Einstellung `former_retention`, gehört zur Installation und kommt nicht mit einer Sicherung zurück, Standard aus; `GET`/`PUT /admin/former/retention`
+  mit `manage_settings`): Aufgabe `former_retention` (täglich, nur mit Frist) löscht bei Ehemaligen nach `years` Jahren ab
+  `left_on` (nur Jahr: 31.12., leer: `created_at` in Ortszeit) die persönlichen Angaben: `UserData::purge` mit
+  `keepChronicle` (es bleiben `UserData::CHRONICLE`, Ämter und Listen), Entwürfe, eigene Rechte, Pseudonym der
+  Nutzungsauswertung und `UserDirectory::forgetLogin` (Standalone: E-Mail, Benutzername, Passwort; WordPress: nur
+  Sitzungen). Zum Schluss `former_members.purged_at`: danach nicht wieder; bis dahin wiederholt der nächste Lauf alles.
+  Ins Protokoll kommt nur die Anzahl.
 
 #### Fotos der Mitglieder
 
@@ -668,6 +683,19 @@ Jede Kompanie kann in der App unter *Einstellungen → Zustand und Updates* auf 
 - **Sicherungen in Google Drive** (`BackupUploadService`, optional): wöchentlich in einen eigenen Ordner des über
   „Mit Google verbinden“ verbundenen Kontos (Berechtigung `drive.file`, die App sieht nur eigene Dateien), die letzten
   acht bleiben.
+- **Verschlüsselte Sicherungen** (`Storage\BackupCrypto`, `Domain\BackupEncryptionService`): Aus dem Passwort für
+  Sicherungen und einem zufälligen Salz entsteht mit Argon2id (`sodium_crypto_pwhash`, Parameter INTERACTIVE, 64 MiB) ein
+  X25519-Schlüsselpaar; gespeichert wird nur der öffentliche Schlüssel mit Salz und Parametern (Einstellung
+  `backup_encryption`, in `Backup::LOCAL_SETTINGS`). So verschlüsselt der Server jederzeit, auch die wöchentliche
+  Sicherung, lesen kann sie nur, wer das Passwort kennt. Datei (`.json.enc`): `KOMPANIE-BACKUP-ENC\n`, Länge und Kopf
+  (JSON mit Salz, Parametern, dem mit `crypto_box_seal` versiegelten Dateischlüssel und dem Kopf des Streams), dann
+  Blöcke von 64 KiB mit `crypto_secretstream_xchacha20poly1305` (Kopf als zusätzliche Daten des ersten Blocks, letzter
+  Block `TAG_FINAL`: geänderter Kopf und abgeschnittene Dateien fallen auf). Nach Drive gehen Sicherungen mit
+  Passwort verschlüsselt (ohne wie bisher als `.json`, `BackupUploadService`), der Download auf Wunsch (`/sicherung?verschluesselt=1`),
+  `POST /admin/backup` nimmt verschlüsselte Dateien als `backup_base64` mit `passphrase`. Die Sicherungen vor Updates
+  auf dem Server bleiben unverschlüsselt (gleicher Ort wie die Datenbank; Wiederherstellen ohne Passwort).
+  Bewusst **keine** Verschlüsselung einzelner Felder in der Datenbank: Der Schlüssel läge auf demselben Webspace wie
+  die Daten (`config.php` bzw. `wp-config.php`) und schützte nur gegen eine gestohlene Datenbank ohne die Dateien.
 - Die Ampel wird gelb, wenn 30 Tage lang keine Sicherung außerhalb des Servers entstand (heruntergeladen oder in Google Drive).
 
 ### Update-Liste und gestaffelte Verteilung

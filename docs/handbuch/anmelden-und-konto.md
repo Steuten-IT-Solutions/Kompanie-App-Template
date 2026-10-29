@@ -63,6 +63,10 @@ Die Wahl gilt nur auf diesem Gerät und bleibt auch nach dem Abmelden erhalten. 
 
 Das neue Passwort muss mindestens 8 Zeichen lang sein, sich vom bisherigen unterscheiden und darf nicht mit einem Leerzeichen beginnen oder enden. Du bleibst auf diesem Gerät angemeldet; auf allen anderen Geräten musst du dich neu anmelden.
 
+### Deine Daten herunterladen
+1. Tippe in der Karte **Meine Daten** auf **Meine Daten herunterladen**.
+2. Der Browser speichert eine Datei `meine-daten-<Datum>.json` mit allem, was die App über dich gespeichert hat: Konto, Rollen, Geburtstag, Foto und deine Einträge (z. B. {bereich.points}, Anwesenheit, Antworten in Umfragen). Das ist deine Auskunft nach der DSGVO (Art. 15).
+
 ### Dich abmelden
 1. Tippe ganz unten auf **Abmelden**.
 2. Die App meldet dich ab und löscht die Daten, die sie auf dem Gerät gespeichert hat.

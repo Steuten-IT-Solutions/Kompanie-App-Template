@@ -93,6 +93,14 @@ try {
     $anna = $users->add('Anna Admin', 'anna', 'anna@example.org', 'anna-passwort', Roles::ADMIN);
     $max = $users->add('Max Mitglied', 'max', 'max@example.org', 'max-passwort', Roles::MEMBER);
     $json = ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
+    // Aufbewahrungsfrist: Anmeldedaten vergessen, Name bleibt
+    $gone = $users->add('Ehe Malig', 'ehemalig', 'ehemalig@example.org', 'ehemalig-passwort', Roles::MEMBER);
+    $users->deactivate($gone);
+    $users->forgetLogin($gone);
+    $row = $kernel->db()->selectOne('SELECT login, email, password_hash, name FROM {users} WHERE id = ?', [$gone]);
+    $c->ok($row !== null && preg_match('/^ehemalig-[0-9a-f]{12}$/', (string) $row['login']) === 1 && $row['email'] === '' && $row['name'] === 'Ehe Malig', 'forgetLogin: Anmeldedaten weg, Name bleibt');
+    $c->ok(str_starts_with((string) $row['password_hash'], '$') && !password_verify('ehemalig-passwort', (string) $row['password_hash']), 'forgetLogin: altes Passwort passt nicht, Prüfwert wie bei anderen Konten');
+    $c->ok($users->findForLogin('ehemalig@example.org') === null, 'forgetLogin: über die alte E-Mail-Adresse nicht mehr zu finden');
     $login = static fn (string $u, string $p, ?bool $remember = true, array $headers = []) => $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $headers + $json, (string) json_encode(['username' => $u, 'password' => $p] + ($remember === null ? [] : ['remember' => $remember])));
     $cookieOf = static fn (array $res): ?string => preg_match('/' . Sessions::COOKIE . '=([a-f0-9]{64})/', $res[2]['set-cookie'], $m) ? $m[1] : null;
     // Das zuletzt gesetzte Sitzungs-Cookie (der Browser übernimmt das letzte).
@@ -229,6 +237,21 @@ try {
     $c->ok(isset($nm[1], $sm[1]) && !str_contains($sm[1], 'unsafe') && str_contains($html, 'nonce="') , 'Skripte nur von der eigenen Seite oder mit Nonce');
     $c->ok(!preg_match('#(src|href)="\./#', $html) && str_contains($html, $base . 'app/assets/'), 'Pfade der App-Dateien zeigen auf app/');
     $c->ok(($headers['x-content-type-options'] ?? '') === 'nosniff' && ($headers['x-frame-options'] ?? '') === 'SAMEORIGIN', 'Sicherheits-Header');
+    $c->ok(!isset($headers['strict-transport-security']), 'Über HTTP kein HSTS');
+    $hsts = $d->send('GET', $base, ['X-Forwarded-Proto' => 'https'], null)[2]['strict-transport-security'] ?? '';
+    $c->ok($hsts === 'max-age=15552000', 'Über HTTPS (hinter einem Proxy) mit HSTS, ohne includeSubDomains');
+    // Nach der eingetragenen Adresse (base_url), ohne sie nach der Anfrage.
+    $hstsIn = static function (string $path, string $baseUrl) use ($app, $data): bool {
+        $cfg = Config::load($data)->toArray();
+        Config::write($data, ['base_url' => $baseUrl] + $cfg);
+        try {
+            return (fn (): bool => $this->hstsEnabled())->call(new Kernel($app, new HttpContext([], ['HTTP_HOST' => 'example.org', 'HTTPS' => 'on'], $path)));
+        } finally {
+            Config::write($data, $cfg);
+        }
+    };
+    $c->ok($hstsIn('/', '') && !$hstsIn('/verein/app/', ''), 'HSTS von sich aus nur im Hauptverzeichnis (gälte sonst für den ganzen Host)');
+    $c->ok(!$hstsIn('/', 'https://example.org/verein/app/'), 'HSTS: eingetragene Adresse im Unterordner gilt (Proxy schreibt den Pfad um)');
     $man = json_decode((string) file_get_contents($base . 'index.php?r=/manifest.webmanifest'), true);
     $c->ok(($man['start_url'] ?? '') === $base && str_starts_with($man['icons'][0]['src'] ?? '', $base . 'app/icons/icon-192.png'), 'Manifest mit Start-Adresse und Icons');
     // Drehbar (Querformat), nicht auf hochkant festgelegt
@@ -249,6 +272,9 @@ try {
     $c->ok($swAgain[0] === 304 && !isset($swAgain[2]['content-length']), 'sw.js über index.php: passender ETag → 304 ohne Inhalt');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron&key=falsch', [], null)[0] === 403, 'Cron mit falschem Schlüssel → 403');
     $c->ok($d->send('GET', $kernel->cronUrl(), [], null)[0] === 200, 'Cron mit Schlüssel → 200');
+    $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron-Key' => $kernel->cronKey()], null)[0] === 200, 'Cron mit Schlüssel im Header → 200');
+    $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron-Key' => 'falsch'], null)[0] === 403, 'Cron mit falschem Schlüssel im Header → 403');
+    $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron' => '', 'X-Kompanie-Cron-Key' => $kernel->cronKey()], null)[0] === 200, 'Leerer Header verdeckt den Schlüssel nicht');
     // Schwarzes Brett (Issue #5, #172): Der Cron führt das Aufräumen aus und löscht Nachrichten 30 Tage nach ihrem Ende.
     $kdb = $kernel->db();
     $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);
@@ -551,6 +577,12 @@ try {
         [$k] = $counted($unreachable);
         $cron = array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'cron'))[0] ?? [];
         $c->ok(($cron['level'] ?? '') === 'error' && str_contains($cron['text'] ?? '', 'Cronjob') && str_contains($cron['text'] ?? '', 'key='), 'Statusseite meldet den fehlschlagenden Selbstaufruf und empfiehlt einen Cronjob mit Adresse');
+        $https = static fn (Kernel $k): array => array_values(array_filter($k->app()->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'https'))[0] ?? [];
+        $c->ok($https($k) === [], 'Statusseite: localhost ohne Hinweis zu HTTPS');
+        [$k] = $counted(new Config($data, ['base_url' => 'http://example.org/app/'] + Config::load($data)->toArray()));
+        $c->ok(($https($k)['level'] ?? '') === 'warn', 'Statusseite: Adresse mit http:// → Warnung „Verschlüsselte Verbindung“');
+        [$k] = $counted(new Config($data, ['base_url' => 'https://example.org/app/'] + Config::load($data)->toArray()));
+        $c->ok(($https($k)['level'] ?? '') === 'ok', 'Statusseite: Adresse mit https:// → in Ordnung');
         $kernel->db()->execute("DELETE FROM {tasks} WHERE name = 'testaufgabe'");
         $kernel->scheduler()->refresh();
         $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
@@ -748,6 +780,58 @@ try {
     [$s, $r] = $d->request('POST', '/admin/backup', ['backup' => json_encode($dl), 'confirm' => true]);
     $c->ok($s === 200 && ($r['restored'] ?? false) === true, 'POST /admin/backup stellt wieder her');
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Gelöschter Termin ist nach dem Wiederherstellen über die API wieder da');
+    // Verschlüsselte Sicherung: Passwort einrichten, verschlüsselt herunterladen, nur mit dem Passwort wiederherstellen.
+    $d->forgetSessions();
+    $d->actAs($anna);
+    $pass = 'sehr-geheimes-sicherungs-passwort';
+    [$s, $enc] = $d->request('PUT', '/admin/backup/encryption', ['passphrase' => $pass, 'passphrase_confirm' => $pass]);
+    $c->ok($s === 200 && ($enc['configured'] ?? false) === true, 'Passwort für Sicherungen eingerichtet');
+    $encUrl = $base . 'index.php?r=/sicherung&verschluesselt=1';
+    $c->ok($d->send('GET', $encUrl, ['Cookie' => Sessions::COOKIE . '=' . $d->token($anna)], null)[0] === 409, 'Verschlüsselt herunterladen erst mit geprüftem Passwort');
+    $c->ok(($d->request('POST', '/admin/backup/encryption/verify', ['passphrase' => $pass])[1]['ok'] ?? false) === true, 'Passwort geprüft');
+    $raw = (string) file_get_contents($base . 'index.php?r=/sicherung&verschluesselt=1', false, stream_context_create(['http' => ['header' => 'Cookie: ' . Sessions::COOKIE . '=' . $d->token($anna), 'ignore_errors' => true]]));
+    $c->ok(str_starts_with($raw, \KompanieApp\Core\Storage\BackupCrypto::MAGIC) && !str_contains($raw, 'Sicherungstest'), 'Verschlüsselt heruntergeladen (Inhalt nicht lesbar)');
+    $d->request('DELETE', '/events/' . (int) $kernel->db()->scalar("SELECT id FROM {events} WHERE title = 'Sicherungstest'"));
+    [$s, $r] = $d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true]);
+    $c->ok($s === 400 && ($r['code'] ?? '') === 'passphrase_required', 'Verschlüsselte Sicherung ohne Passwort → 400 passphrase_required');
+    $c->ok($d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true, 'passphrase' => 'falsch'])[0] === 400, 'Falsches Passwort → 400');
+    [$s, $r] = $d->request('POST', '/admin/backup', ['backup_base64' => base64_encode($raw), 'confirm' => true, 'passphrase' => $pass]);
+    $c->ok($s === 200 && (int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Verschlüsselte Sicherung mit Passwort wiederhergestellt');
+    $c->ok(is_array($kernel->app()->settings->fresh(\KompanieApp\Core\Storage\BackupCrypto::SETTING)), 'Passwort für Sicherungen bleibt nach dem Wiederherstellen eingerichtet (gehört zur Installation)');
+    // Kommandozeile: verschlüsselt exportieren (keine Reste daneben), nur mit dem Passwort importieren.
+    $cli = static function (string ...$args) use ($app, $data): array {
+        $p = proc_open([PHP_BINARY, $app . '/bin/kompanie.php', ...$args], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $app, ['KOMPANIE_DATA_DIR' => $data] + getenv());
+        fclose($pipes[0]);
+        $out = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+        return [proc_close($p), $out];
+    };
+    $encFile = $data . '-cli' . \KompanieApp\Core\Storage\BackupCrypto::EXTENSION;
+    file_put_contents($data . '-pass', $pass . "\n");
+    file_put_contents($data . '-wrong', "falsch\n");
+    try {
+        [$code, $msg] = $cli('export', '--encrypt', '--out=' . $encFile);
+        $raw = (string) @file_get_contents($encFile);
+        $c->ok($code === 0 && str_starts_with($raw, \KompanieApp\Core\Storage\BackupCrypto::MAGIC) && !str_contains($raw, 'Sicherungstest'), 'CLI export --encrypt schreibt verschlüsselt' . ($code !== 0 ? ": $msg" : ''));
+        $c->ok((fileperms($encFile) & 0777) === 0600 && glob($encFile . '.*.part') === [], 'CLI-Export nur für den Besitzer lesbar, keine Reste');
+        $c->ok($cli('import', $encFile, '--passphrase-file=' . $data . '-wrong')[0] !== 0, 'CLI-Import mit falschem Passwort scheitert');
+        $setting = \KompanieApp\Core\Storage\BackupCrypto::SETTING;
+        $kernel->app()->settings->set($setting, ['verified' => false] + (array) $kernel->app()->settings->fresh($setting));
+        [$code, $msg] = $cli('import', $encFile, '--passphrase-file=' . $data . '-pass');
+        $c->ok($code === 0 && (int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'CLI-Import mit Passwort' . ($code !== 0 ? ": $msg" : ''));
+        $c->ok(($kernel->app()->settings->fresh($setting)['verified'] ?? null) === true, 'CLI-Import mit dem eingerichteten Passwort gilt als Prüfung');
+    } finally {
+        array_map('unlink', array_filter([$encFile, $data . '-pass', $data . '-wrong'], 'is_file'));
+    }
+    $d->forgetSessions();
+
+    // Auskunft nach Art. 15 DSGVO: eigene Daten als Datei, nicht ohne Anmeldung
+    $d->actAs($max);
+    [$s, $mine] = $d->request('GET', '/me/data');
+    $c->ok($s === 200 && ($mine['format'] ?? '') === 'kompanie-app-personal-data' && ($mine['person']['id'] ?? null) === $max, 'GET /me/data liefert die eigenen Daten');
+    $c->ok(is_array($mine['person']['account']['sessions'] ?? null) && $mine['person']['account']['sessions'] !== [] && !str_contains((string) json_encode($mine), 'token_hash'), 'Auskunft mit Kontodaten und Sitzungen (ohne Schlüssel)');
+    $c->ok($d->request('GET', "/members/$anna/data")[0] === 403, 'Mitglied darf die Daten anderer nicht exportieren');
+    $d->actAs(null);
+    $c->ok($d->request('GET', '/me/data')[0] === 401, 'Ohne Anmeldung → 401');
     $d->forgetSessions();
 
     $c->section('Schöne Adressen (URL-Umschreibung)');

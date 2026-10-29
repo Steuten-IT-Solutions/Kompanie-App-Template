@@ -2,6 +2,7 @@
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
 import type { Address } from './address';
+import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
@@ -551,6 +552,8 @@ export interface FormerInfo {
   left_on: string;
   /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
   previous_level: Level;
+  /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse) */
+  personal_deleted: boolean;
 }
 
 /** Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181). */
@@ -1127,14 +1130,7 @@ export type EncodedFile = { name: string; data: string };
 
 /** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
 export async function encodeFile(file: File): Promise<EncodedFile> {
-  const data = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
-    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
-    reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
-    reader.readAsDataURL(file);
-  });
-  return { name: file.name, data };
+  return { name: file.name, data: await readBase64(file) };
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
@@ -1489,6 +1485,8 @@ export interface AccountProfile extends PersonName {
   phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
+  /** Auskunft (Daten exportieren) erlaubt: der Server prüft die Rechte aller enthaltenen Bereiche */
+  can_export: boolean;
 }
 
 export class ApiError extends Error {
@@ -1608,8 +1606,10 @@ async function requestFull<T>(
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
-  // Ausnahme: die Abfrage des Push-Status beim Start, ein POST ohne Änderung an den angezeigten Daten.
-  if (method !== 'GET' && !path.endsWith('/push/status')) dataCache.clear();
+  // Ausnahmen ohne Änderung an den angezeigten Daten: die Abfrage des Push-Status beim Start und Vorschauen ({preview: true},
+  // z. B. die Frist für Ehemalige vor dem Speichern).
+  const readOnly = path.endsWith('/push/status') || (body as { preview?: unknown } | undefined)?.preview === true;
+  if (method !== 'GET' && !readOnly) dataCache.clear();
 
   const data = await res.json().catch(() => null);
 
@@ -1991,7 +1991,21 @@ export const api = {
   updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
-  restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  /** Auskunft nach Art. 15 DSGVO: alle eigenen Daten bzw. die einer Person (create_users), als JSON */
+  myData: () => request<unknown>('GET', '/me/data'),
+  memberData: (id: number) => request<unknown>('GET', `/members/${id}/data`),
+  /** Aufbewahrungsfrist für Ehemalige (nur Admins) */
+  formerRetention: () => request<FormerRetention>('GET', '/admin/former/retention'),
+  /** preview: nur zeigen, wen die Frist beim nächsten Lauf löscht, ohne zu speichern */
+  setFormerRetention: (data: { years: number; preview?: boolean }) => request<FormerRetention>('PUT', '/admin/former/retention', data),
+  /** Inhalt aus filePayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
+  restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>
+    request<{ restored: boolean }>('POST', '/admin/backup', { ...payload, ...(passphrase ? { passphrase } : {}), confirm: true }),
+  backupEncryption: () => request<BackupEncryptionStatus>('GET', '/admin/backup/encryption'),
+  setBackupEncryption: (passphrase: string, passphrase_confirm: string) =>
+    request<BackupEncryptionStatus>('PUT', '/admin/backup/encryption', { passphrase, passphrase_confirm }),
+  removeBackupEncryption: () => request<BackupEncryptionStatus>('DELETE', '/admin/backup/encryption'),
+  verifyBackupEncryption: (passphrase: string) => request<{ ok: boolean }>('POST', '/admin/backup/encryption/verify', { passphrase }),
   backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
   setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
   uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
@@ -2104,6 +2118,8 @@ export interface BackupDriveStatus {
   /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
   access: boolean;
   enabled: boolean;
+  /** mit Passwort für Sicherungen verschlüsselt */
+  encrypted: boolean;
   email: string;
   folder_url: string | null;
   last_ok: number | null;
@@ -2111,6 +2127,28 @@ export interface BackupDriveStatus {
   error: string | null;
   every_days: number;
   keep: number;
+}
+
+/** Aufbewahrungsfrist für Ehemalige: 0 = aus; due wird beim nächsten Lauf gelöscht, soon in den nächsten 30 Tagen fällig */
+export interface FormerRetention {
+  years: number;
+  due: { id: number; name: string; left_on: string }[];
+  soon: { id: number; name: string; left_on: string }[];
+}
+
+/** Passwort für Sicherungen (Einstellungen → Datensicherung) */
+export interface BackupEncryptionStatus {
+  /** PHP hat sodium */
+  available: boolean;
+  configured: boolean;
+  /** Eingerichtet, auch ohne sodium (dann nur entfernen) */
+  stored: boolean;
+  /** Seit dem Einrichten einmal richtig geprüft; erst dann löscht Drive alte unverschlüsselte Sicherungen */
+  verified: boolean;
+  /** Fingerabdruck des Schlüssels, z. B. „3f2a 9c41 07be d5e0“ */
+  fingerprint: string | null;
+  set_at: number | null;
+  min_length: number;
 }
 
 export interface UpdateStatus {

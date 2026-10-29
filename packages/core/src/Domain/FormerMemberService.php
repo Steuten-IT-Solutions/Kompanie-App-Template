@@ -10,6 +10,9 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\FormerMemberRepository;
+use KompanieApp\Core\Storage\UserData;
+use KompanieApp\Core\Telemetry\Code;
+use KompanieApp\Core\Telemetry\Detail;
 
 /**
  * Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden.
@@ -26,6 +29,11 @@ use KompanieApp\Core\Storage\FormerMemberRepository;
  * - Import (Ersterfassung, z. B. aus einer Chronik): CSV vorname;nachname;eintritt;ausgeschieden;grund. Für jede Person
  *   entsteht ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen wird. Wer schon
  *   ein Konto mit genau diesem Namen hat, wird übersprungen.
+ * - Aufbewahrungsfrist (DSGVO, Standard aus; gehört zur Installation, nicht in Sicherungen): Ist sie eingestellt, löscht die
+ *   tägliche Aufgabe RETENTION_TASK bei allen Ehemaligen, deren Ausscheiden länger als so viele Jahre zurückliegt, die
+ *   persönlichen Angaben (forgetPersonal); die Chronik bleibt (Name, Eintrag als ehemalig, Ämter, Punkte, Dienstgrad,
+ *   Titel, Foto, Eintrittsjahr: UserData::CHRONICLE). Stichtag ist das Datum des Ausscheidens (nur ein Jahr: der 31.12.),
+ *   ohne Datum der Tag des Eintragens.
  */
 final class FormerMemberService
 {
@@ -37,6 +45,11 @@ final class FormerMemberService
     public const YEAR_MIN = 1800;
     public const IMPORT_MAX_BYTES = 200000;
     public const IMPORT_MAX_ROWS = 500;
+    /** Einstellung (gehört zur Installation, Backup::LOCAL_SETTINGS): {years: int (0 = aus)} */
+    public const RETENTION_SETTING = 'former_retention';
+    public const RETENTION_TASK = 'former_retention';
+    public const RETENTION_MAX_YEARS = 50;
+    public const RETENTION_INTERVAL = 86400;
 
     /** @var array<int, array<string, mixed>>|null Einträge dieser Anfrage (eine Abfrage) */
     private ?array $all = null;
@@ -147,7 +160,7 @@ final class FormerMemberService
             return null;
         }
         $out = self::out($user, $row);
-        return ['reason' => $out['reason'], 'joined_on' => $out['joined_on'], 'founder' => $out['founder'], 'left_on' => $out['left_on'], 'previous_level' => $out['previous_level']];
+        return ['reason' => $out['reason'], 'joined_on' => $out['joined_on'], 'founder' => $out['founder'], 'left_on' => $out['left_on'], 'previous_level' => $out['previous_level'], 'personal_deleted' => $out['personal_deleted']];
     }
 
     /**
@@ -457,6 +470,192 @@ final class FormerMemberService
         return [$target, $row];
     }
 
+    /** @return array{years: int} */
+    public function retention(): array
+    {
+        $c = $this->app->settings->get(self::RETENTION_SETTING);
+        $c = is_array($c) ? $c : [];
+        // WordPress kann Zahlen als Zeichenkette zurückgeben.
+        return ['years' => is_numeric($c['years'] ?? null) ? max(0, min(self::RETENTION_MAX_YEARS, (int) $c['years'])) : 0];
+    }
+
+    /**
+     * Frist mit Vorschau: bei wem der nächste Lauf die persönlichen Angaben löscht (due) und wer in den nächsten 30 Tagen
+     * dazukommt (soon).
+     *
+     * @return array{years: int, due: list<array{id: int, name: string, left_on: string}>, soon: list<array{id: int, name: string, left_on: string}>}
+     */
+    public function retentionStatus(?array $config = null): array
+    {
+        $config ??= $this->retention();
+        if ($config['years'] === 0) {
+            return $config + ['due' => [], 'soon' => []];
+        }
+        $today = $this->app->time()->today();
+        $in30 = $today->modify('+30 days');
+        $due = $soon = [];
+        foreach ($this->candidates($config) as $p) {
+            if ($p['expires'] <= $today) {
+                $due[] = ['id' => $p['id'], 'name' => $p['name'], 'left_on' => $p['left_on']];
+            } elseif ($p['expires'] <= $in30) {
+                $soon[] = ['id' => $p['id'], 'name' => $p['name'], 'left_on' => $p['left_on']];
+            }
+        }
+        return $config + ['due' => $due, 'soon' => $soon];
+    }
+
+    /**
+     * Frist einstellen (nur manage_settings, s. Api). Mit $preview nur die Vorschau für diese Werte, ohne zu speichern:
+     * Die App zeigt vor dem Speichern, bei wem der nächste Lauf die persönlichen Angaben löscht.
+     *
+     * @param array<string, mixed> $in years
+     * @return array<string, mixed> retentionStatus()
+     */
+    public function setRetention(array $in, bool $preview = false): array
+    {
+        // Fehlt die Zahl oder ist sie ungültig: Fehler, nicht stillschweigend „aus“.
+        $years = Input::integer($in['years'] ?? null);
+        if ($years === null) {
+            throw ApiError::invalid('Bitte die Frist in ganzen Jahren angeben (0 = aus).');
+        }
+        if ($years < 0 || $years > self::RETENTION_MAX_YEARS) {
+            throw ApiError::invalid('Die Frist darf höchstens ' . self::RETENTION_MAX_YEARS . ' Jahre sein (0 = aus).');
+        }
+        $config = ['years' => $years];
+        if ($preview) {
+            return $this->retentionStatus($config);
+        }
+        $this->app->settings->set(self::RETENTION_SETTING, $config);
+        $this->app->scheduleTasks();
+        return $this->retentionStatus();
+    }
+
+    /**
+     * Tägliche Aufgabe: bei Ehemaligen nach Ablauf der Frist die persönlichen Angaben löschen. Ins Protokoll kommt nur die
+     * Anzahl.
+     *
+     * @return int Anzahl der Personen
+     */
+    public function purgeExpired(): int
+    {
+        $config = $this->retention();
+        if ($config['years'] === 0) {
+            return 0;
+        }
+        $done = 0;
+        $today = $this->app->time()->today();
+        $due = array_values(array_filter($this->candidates($config, true), static fn (array $p): bool => $p['expires'] <= $today));
+        // Schon Erledigte nur, wenn wieder etwas Persönliches da ist (eine Abfrage je Tabelle für alle).
+        $purged = array_column(array_filter($due, static fn (array $p): bool => $p['purged']), 'id');
+        $again = array_flip(UserData::withPersonalData($this->app->db, $purged, PollService::existingSecret($this->app->settings), ActivityService::existingSecret($this->app->settings)));
+        foreach ($due as $person) {
+            if ($person['purged'] && !isset($again[$person['id']])) {
+                continue;
+            }
+            // Unmittelbar vorher neu prüfen: Wer seit dem Einlesen wieder aufgenommen wurde oder ein anderes Datum bekam,
+            // ist nicht (mehr) dran.
+            $row = $this->repository()->find($person['id']);
+            $user = $this->app->users->find($person['id']);
+            if ($row === null || $user === null || $user->role !== Roles::GUEST || $row['left_on'] !== $person['left_on']) {
+                continue;
+            }
+            if ($person['purged']) {
+                // Schon erledigt: Was seither dazugekommen ist (z. B. neu eingetragene Kontaktdaten, unter WordPress nach
+                // einer neuen Anmeldung), löscht jeder Lauf wieder; die Anmeldung bleibt, wie sie nach dem ersten Lauf ist.
+                try {
+                    if (!$this->app->userDeleted($person['id'], keepChronicle: true)) {
+                        throw new \RuntimeException('nicht alles gelöscht (siehe Fehlerprotokoll); nächster Versuch beim nächsten Lauf');
+                    }
+                } catch (\Throwable $e) {
+                    $this->retentionFailed($person['id'], $e);
+                }
+                continue;
+            }
+            // Scheitert eine Person, geht es mit den anderen weiter: Scheitert schon die Anmeldung, kommt sie im nächsten Lauf
+            // ganz wieder, sonst räumt das Nachräumen oben den Rest (jeder Schritt lässt sich wiederholen).
+            try {
+                $this->forgetPersonal($person['id']);
+                $done++;
+            } catch (\Throwable $e) {
+                $this->retentionFailed($person['id'], $e);
+            }
+        }
+        $this->all = null;
+        if ($done > 0) {
+            error_log('Kompanie-App: Persönliche Angaben von ' . $done . ' ehemaligen Mitgliedern nach Ablauf der Aufbewahrungsfrist gelöscht.');
+        }
+        return $done;
+    }
+
+    /** Nicht still übergehen: Die Frist ist eine Zusage. Ins Fehlerprotokoll der App (Admins sehen es) und ins error_log. */
+    private function retentionFailed(int $userId, \Throwable $e): void
+    {
+        $message = 'Persönliche Angaben von Konto ' . $userId . ' nach Ablauf der Aufbewahrungsfrist nicht (ganz) gelöscht: ' . $e->getMessage();
+        error_log('Kompanie-App: ' . $message);
+        try {
+            $this->app->telemetry()->record(Code::TaskFailed, Detail::of(self::RETENTION_TASK), $message);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Persönliche Angaben einer oder eines Ehemaligen löschen, die Chronik behalten (UserData::CHRONICLE, Ämter, Listen):
+     * Kontaktdaten, Anmeldung, Geburtstag, Strafen, Anwesenheiten, Umfragen, Push, Signatur, Einstellungen, Entwürfe,
+     * Mail-Protokolle, Fehlermeldungen, Nutzungsauswertung und eigene Rechte.
+     */
+    private function forgetPersonal(int $userId): void
+    {
+        // Die Anmeldung zuerst (E-Mail-Adresse, Benutzername, Passwort): Sie fällt sicher zum Stichtag weg. Danach gilt die
+        // Person als erledigt (personal_deleted passt so immer zur Anmeldung); scheitert beim Rest etwas, findet das tägliche
+        // Nachräumen (UserData::withPersonalData) übrige Zeilen in den Tabellen und versucht es wieder. Was dort nicht steht
+        // (Pseudonym der Nutzungsauswertung, Dateien von Entwürfen), meldet nur das Fehlerprotokoll.
+        $this->app->users->forgetLogin($userId);
+        $complete = $this->app->userDeleted($userId, keepChronicle: true);
+        $this->repository()->markPurged($userId, $this->app->time()->nowUtc());
+        if (!$complete) {
+            throw new \RuntimeException('Nicht alle Angaben gelöscht (siehe Fehlerprotokoll); das tägliche Nachräumen versucht es wieder.');
+        }
+    }
+
+    /**
+     * Ehemalige, für die die Frist gilt, mit dem ersten Tag nach ihrem Ablauf (expires: ab dann fällig), nach Namen; mit $withPurged auch die
+     * schon erledigten (purged).
+     *
+     * @param array{years: int} $config
+     * @return list<array{id: int, name: string, left_on: string, expires: \DateTimeImmutable, purged: bool}>
+     */
+    private function candidates(array $config, bool $withPurged = false): array
+    {
+        $tz = $this->app->time()->today()->getTimezone();
+        $rows = $this->all();
+        $users = $this->app->users->findMany(array_keys($rows));
+        $out = [];
+        foreach ($rows as $id => $row) {
+            $user = $users[$id] ?? null;
+            if ($user === null || $user->role !== Roles::GUEST || (!$withPurged && $row['purged_at'] !== '')) {
+                continue;
+            }
+            $left = match (strlen($row['left_on'])) {
+                10 => $row['left_on'],
+                4 => $row['left_on'] . '-12-31',
+                // ohne Datum: Tag des Eintrags (created_at in UTC) in der Zeitzone der App
+                default => (new \DateTimeImmutable((string) $row['created_at'], new \DateTimeZone('UTC')))->setTimezone($tz)->format('Y-m-d'),
+            };
+            $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $left, $tz);
+            if ($until !== false) {
+                // Jahre dazu; vom 29. Februar in ein Nicht-Schaltjahr: der 28. (wie § 188 BGB), nicht der 1. März.
+                [$y, $m, $d] = array_map('intval', explode('-', $until->format('Y-n-j')));
+                $y += $config['years'];
+                $first = $until->setDate($y, $m, 1);
+                // Die Frist endet mit Ablauf dieses Tages (§ 188 BGB); gelöscht wird ab dem Tag danach.
+                $expires = $first->setDate($y, $m, min($d, (int) $first->format('t')))->modify('+1 day');
+                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $expires, 'purged' => $row['purged_at'] !== ''];
+            }
+        }
+        usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        return $out;
+    }
+
     /**
      * @param array<string, mixed> $row aus dem Repository
      * @return array{id: int, name: string, first_name: string, last_name: string, reason: string, joined_on: string, founder: bool, left_on: string, previous_level: string}
@@ -474,6 +673,8 @@ final class FormerMemberService
             'founder' => $row['founder'],
             'left_on' => $row['left_on'],
             'previous_level' => is_string($level) && $level !== '' ? $level : Roles::MEMBER,
+            // Die Aufbewahrungsfrist hat die persönlichen Angaben gelöscht (eigenständig auch die Anmeldung).
+            'personal_deleted' => $row['purged_at'] !== '',
         ];
     }
 

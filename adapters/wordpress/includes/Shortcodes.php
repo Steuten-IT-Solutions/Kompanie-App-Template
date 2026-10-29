@@ -392,7 +392,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         // ohne 1024er (Issue #109): Großansicht mit der 480er, dann ohne srcset (dieselbe Datei, keine falsche Breite).
         $medium = $app->memberPhotos()->urls(480);
         $large = $app->memberPhotos()->urls(1024);
-        $original = $app->memberPhotos()->urls(MemberPhotoService::MAX_EDGE); // nachgeladen; fehlt bei älteren Fotos (404)
+        // Originalauflösung nachgeladen; fehlt bei älteren Fotos (404) und gibt es nur nach der Anmeldung.
+        $original = is_user_logged_in() ? $app->memberPhotos()->urls(MemberPhotoService::MAX_EDGE) : [];
         $placeholder = self::membersPlaceholder($app);
         $html .= self::lightbox() . '<ul class="ka ka-mitglieder">';
         foreach ($members as $m) {

@@ -363,6 +363,28 @@ final class WpUsers implements UserDirectory, AuthContext
         clean_user_cache($id);
     }
 
+    /** Registriert am und die Sitzungen (Anmeldung, Ablauf, IP, Browser; ohne Schlüssel); den Benutzer verwaltet WordPress. */
+    public function accountData(int $id): array
+    {
+        $user = get_userdata($id);
+        if (!$user) {
+            return [];
+        }
+        $sessions = array_values(array_map(
+            static fn (array $s): array => array_intersect_key($s, ['login' => 1, 'expiration' => 1, 'ip' => 1, 'ua' => 1]),
+            \WP_Session_Tokens::get_instance($id)->get_all(),
+        ));
+        return ['registered' => (string) $user->user_registered, 'sessions' => $sessions];
+    }
+
+    /** Der Benutzer der Webseite gehört WordPress (Anmeldung, E-Mail-Adresse): nur die Sitzungen beenden. */
+    public function forgetLogin(int $id): void
+    {
+        if (get_userdata($id)) {
+            \WP_Session_Tokens::get_instance($id)->destroy_all();
+        }
+    }
+
     /** Wieder aufnehmen: Rolle in der App (und für Mitglieder die frühere WP-Rolle) setzen, geprüft wie deactivate(). */
     public function reactivate(int $id, string $role): void
     {
@@ -476,9 +498,15 @@ final class WpUsers implements UserDirectory, AuthContext
             $role = AppRoles::MEMBER;
         }
         $caps = $this->capabilities !== null ? ($this->capabilities)($role, (int) $u->ID) : AppRoles::templateCapabilities($role);
-        // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter.
+        // Rechte, die WordPress selbst vergibt (z. B. ein Redakteur mit „Benutzer anlegen“), gelten weiter. create_users
+        // öffnet in der App auch E-Mail und Telefon der Mitglieder: Wer das für Rollen der Webseite nicht will, kürzt die
+        // Liste mit dem Filter kompanie_app_wp_capability_map (z. B. return []).
         $wp = ['create_users' => Capability::CreateUsers, 'promote_users' => Capability::PromoteUsers, 'manage_options' => Capability::ManageSettings];
-        foreach ($wp as $wpCap => $cap) {
+        $wp = apply_filters('kompanie_app_wp_capability_map', $wp, $u);
+        foreach (is_array($wp) ? $wp : [] as $wpCap => $cap) {
+            if (!is_string($wpCap) || !$cap instanceof Capability) {
+                continue;
+            }
             if (!in_array($cap, $caps, true) && user_can($u, $wpCap)) {
                 $caps[] = $cap;
             }

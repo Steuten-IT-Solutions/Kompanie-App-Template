@@ -143,6 +143,27 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Error' }
 
+  /me/data:
+    get:
+      tags: [Eigene Daten]
+      summary: Alle eigenen Daten herunterladen (Auskunft nach Art. 15 DSGVO)
+      description: |
+        Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
+        `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag, Foto (Base64) und `account` (vom Adapter: angelegt am,
+        letzte Anmeldung, Sitzungen ohne Schlüssel); `data` je Tabelle die Zeilen der Person
+        (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
+        eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        Enthält auch die eigenen Antworten in anonymen Umfragen und die eigene Nutzungsauswertung.
+      responses:
+        '200':
+          description: Daten der Person
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /me/attendance:
     get:
       tags: [Eigene Daten]
@@ -3287,6 +3308,34 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/data:
+    get:
+      tags: [Verwaltung]
+      summary: Alle Daten einer Person herunterladen (Auskunft nach Art. 15 DSGVO)
+      description: |
+        Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
+        `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
+        (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
+        eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
+        Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
+        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `view_personal`,
+        `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
+        `send_mail`, `manage_lists`, `post_board`, `view_offices`.
+      x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Daten der Person
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/former:
     get:
       tags: [Verwaltung]
@@ -4913,6 +4962,8 @@ paths:
         alle Sitzungen enden. WordPress: nur Sicherungen derselben Website; fehlende Konten werden mit
         ihrer ID angelegt (nur mit den WP-Rechten create_users und promote_users), vorhandene behalten
         Anmeldedaten. Passt eine ID nicht zum Benutzernamen, wird nichts geändert (400).
+        Verschlüsselte Sicherungen (beginnen mit `KOMPANIE-BACKUP-ENC`) als `backup_base64` mit `passphrase`;
+        ohne Passwort 400 `passphrase_required`, mit falschem 400.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -4920,9 +4971,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [backup, confirm]
+              required: [confirm]
               properties:
-                backup: { type: string, description: Inhalt der Sicherungsdatei }
+                backup: { type: string, description: Inhalt der Sicherungsdatei (JSON) }
+                backup_base64: { type: string, description: Inhalt der Sicherungsdatei als Base64 (verschlüsselte Sicherung) }
+                passphrase: { type: string, description: Passwort für Sicherungen (nur für verschlüsselte) }
                 confirm: { type: boolean, enum: [true] }
       responses:
         '200':
@@ -4937,6 +4990,116 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/encryption:
+    get:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen – Stand
+      description: |
+        Mit Passwort sind heruntergeladene Sicherungen (`<App>/sicherung?verschluesselt=1`) und alle Sicherungen in
+        Google Drive verschlüsselt (Argon2id, X25519, XChaCha20-Poly1305). Gespeichert wird nur der öffentliche
+        Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen. Verschlüsselt
+        herunterladen geht erst, wenn das Passwort einmal geprüft ist (`verified`, sonst 409).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen einrichten oder ändern
+      description: Mindestens 12 Zeichen, beide gleich (sonst 400). Ältere Sicherungen brauchen weiter das bisherige Passwort.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passphrase, passphrase_confirm]
+              properties:
+                passphrase: { type: string, minLength: 12 }
+                passphrase_confirm: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen entfernen (neue Sicherungen unverschlüsselt, auch die in Google Drive)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/encryption/verify:
+    post:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen prüfen
+      description: Nach 10 Fehlversuchen in 15 Minuten 15 Minuten gesperrt (429); richtige Passwörter zählen nicht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passphrase]
+              properties:
+                passphrase: { type: string }
+      responses:
+        '200':
+          description: Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /admin/former/retention:
+    get:
+      tags: [Verwaltung]
+      summary: Aufbewahrungsfrist für Ehemalige – Stand mit Vorschau
+      description: |
+        Mit Frist (years > 0) löscht eine tägliche Aufgabe bei Ehemaligen so viele Jahre nach dem Ausscheiden die
+        persönlichen Angaben (Kontaktdaten, Anmeldung, Geburtstag, Strafen, Anwesenheiten, Umfragen, Push, Signatur,
+        Einstellungen, Nutzungsauswertung); Name, Eintrag als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und
+        Eintrittsjahr bleiben als Chronik. Stichtag: Datum des Ausscheidens (nur Jahr: 31.12.), ohne Datum der Tag des
+        Eintragens.
+        `due`: beim nächsten Lauf fällig, `soon`: in den nächsten 30 Tagen.
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/FormerRetention' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Verwaltung]
+      summary: Aufbewahrungsfrist für Ehemalige einstellen (0 = aus)
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [years]
+              properties:
+                years: { type: integer, minimum: 0, maximum: 50 }
+                preview: { type: boolean, description: 'Nur die Vorschau (due/soon) für diese Werte, ohne zu speichern' }
+      responses:
+        '200': { $ref: '#/components/responses/FormerRetention' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
 
   /admin/backup/drive:
     get:
@@ -4952,8 +5115,10 @@ paths:
       summary: Sicherungen in Google Drive ein- oder ausschalten
       description: |
         Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
-        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen
-        eigenen Ordner im verbundenen Google-Konto und behält die letzten acht.
+        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen eigenen Ordner
+        im verbundenen Google-Konto und behält die letzten acht: mit Passwort für Sicherungen verschlüsselt
+        (`.json.enc`), ohne unverschlüsselt (`.json`). Ist ein Passwort eingerichtet, fehlt aber die Erweiterung
+        sodium, scheitert das Hochladen (statt unverschlüsselt).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -5049,11 +5214,12 @@ components:
         application/json:
           schema:
             type: object
-            required: [available, access, enabled, email, folder_url, last_ok, last_try, error, every_days, keep]
+            required: [available, access, enabled, encrypted, email, folder_url, last_ok, last_try, error, every_days, keep]
             properties:
               available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
               access: { type: boolean, description: Google hat drive.file erlaubt }
               enabled: { type: boolean }
+              encrypted: { type: boolean, description: Mit Passwort für Sicherungen verschlüsselt (.json.enc), sonst unverschlüsselt (.json) }
               email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
               folder_url: { type: [string, 'null'] }
               last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
@@ -5061,6 +5227,36 @@ components:
               error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
               every_days: { type: integer }
               keep: { type: integer }
+    FormerRetention:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [years, due, soon]
+            properties:
+              years: { type: integer, description: 0 = aus }
+              due:
+                type: array
+                items: { $ref: '#/components/schemas/FormerRetentionPerson' }
+              soon:
+                type: array
+                items: { $ref: '#/components/schemas/FormerRetentionPerson' }
+    BackupEncryptionStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, configured, stored, verified, fingerprint, set_at, min_length]
+            properties:
+              available: { type: boolean, description: PHP hat die Erweiterung sodium }
+              configured: { type: boolean, description: Eingerichtet und nutzbar (mit sodium) }
+              stored: { type: boolean, description: 'Eingerichtet, auch wenn sodium fehlt (dann lässt es sich nur entfernen)' }
+              verified: { type: boolean, description: 'Seit dem Einrichten einmal richtig geprüft; erst dann löscht Google Drive alte unverschlüsselte Sicherungen' }
+              fingerprint: { type: [string, 'null'], description: 'Fingerabdruck des öffentlichen Schlüssels, z. B. „3f2a 9c41 07be d5e0“' }
+              set_at: { type: [integer, 'null'], description: Eingerichtet am (Unix-Zeit) }
+              min_length: { type: integer }
     PushStatus:
       description: OK
       content:
@@ -5147,6 +5343,7 @@ components:
               email: { type: string }
               phone: { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist oder der Betrachter view_personal nicht hat' }
               can_change_login: { type: boolean, description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)' }
+              can_export: { type: boolean, description: 'Ob der Betrachter die Auskunft (GET /members/{id}/data) bekommt' }
     OwnAccount:
       description: Eigene Kontaktangaben
       content:
@@ -6336,13 +6533,22 @@ components:
 
     FormerInfo:
       type: object
-      required: [reason, joined_on, founder, left_on, previous_level]
+      required: [reason, joined_on, founder, left_on, previous_level, personal_deleted]
       properties:
         reason: { $ref: '#/components/schemas/FormerReason' }
         joined_on: { $ref: '#/components/schemas/FormerDate' }
         founder: { type: boolean }
         left_on: { $ref: '#/components/schemas/FormerDate' }
         previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
+        personal_deleted: { type: boolean, description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse; WordPress: der Benutzer der Webseite bleibt)' }
+
+    FormerRetentionPerson:
+      type: object
+      required: [id, name, left_on]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        left_on: { $ref: '#/components/schemas/FormerDate' }
 
     FormerMember:
       allOf:

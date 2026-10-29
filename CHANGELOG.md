@@ -39,6 +39,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
   Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
   Tage vorher, anfangs wie bisher 7 Tage).
+- **Verschlüsselte Sicherungen**: Unter *Einstellungen → Datensicherung* lässt sich ein **Passwort für Sicherungen**
+  einrichten. Heruntergeladene Sicherungen und alle Sicherungen in Google Drive sind damit verschlüsselt; wer die Datei
+  findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
+  sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
+- **Meine Daten herunterladen (Auskunft nach DSGVO)**: Unter *Konto → Meine Daten* lädt jede Person alles herunter,
+  was die App über sie gespeichert hat. Wer jeden darin enthaltenen Bereich auch in der App sehen darf (in der Regel
+  Admins), kann das auch für eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne
+  Antworten in anonymen Umfragen.
+- **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
+  seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
+  Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.
+  Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
 
 ### Geändert
 
@@ -49,6 +61,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   dazu weiter bei Eintritt und Austritt), und **Persönliche Angaben** stehen unter den Ämtern, über *Konto und Rolle*.
   Antippen der Adresse zeigt den Ort in der Karten-App: auf Android mit Auswahl der App, auf iPhone und Mac in Apple
   Karten, am PC in Google Maps.
+- **Sicherungen in Google Drive verschlüsselt**, sobald unter *Einstellungen → Datensicherung* ein Passwort für
+  Sicherungen eingerichtet ist (ohne Passwort wie bisher unverschlüsselt). Ältere, unverschlüsselte Sicherungen im Ordner
+  löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal mit *Passwort prüfen* (oder einer
+  Wiederherstellung) bestätigt ist.
 
 ### Behoben
 
@@ -61,6 +77,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Liste aller Geburtstage**: Die Seite „Alle Geburtstage“ gibt es nicht mehr. Die Karte „Anstehende Geburtstage“ bei
   den Terminen bleibt; die Benachrichtigung am Geburtstag öffnet jetzt die Termine.
+
+### Sicherheit
+
+- **Mitgliederfotos folgen den Rechten von Gast**: Hat ein Admin unter *Einstellungen → Rollen* der Rolle **Gast** die
+  Mitgliederliste bzw. die Ehemaligen weggenommen, waren die Fotos darin trotzdem ohne Anmeldung abrufbar. Jetzt sind
+  sie nur noch öffentlich, wenn Gast die Liste sehen darf. Die Originalauflösung gibt es nur noch nach der Anmeldung.
+- **HTTPS (eigenständige Version)**: Über HTTPS schickt die App jetzt HSTS mit (der Browser öffnet sie danach nur noch
+  verschlüsselt), wenn sie im Hauptverzeichnis ihrer Adresse liegt; in einem Unterordner nur mit `'hsts' => true` in
+  `config.php`, weil es sonst auch für die übrigen Seiten unter derselben Adresse gälte. Läuft die App über `http://`, warnen der Installer und *Einstellungen → Zustand und Updates*.
+- **WordPress**: Die App-Seite lässt sich nicht mehr in fremde Seiten einbetten (Schutz vor Clickjacking).
+- **Keine E-Mail-Adressen im Fehlerprotokoll des Servers**, wenn eine Mail nicht zugestellt werden kann.
+- **Cronjob**: Der Schlüssel lässt sich jetzt auch im Header `X-Kompanie-Cron-Key` senden, dann steht er nicht im
+  Zugriffsprotokoll des Webservers. Die bisherige Adresse mit `key=` funktioniert weiter.
 
 ## [0.4.0] – 2026-10-27
 

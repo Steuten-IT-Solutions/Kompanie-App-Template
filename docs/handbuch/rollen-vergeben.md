@@ -18,7 +18,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 - **Als {rolle.member} aufnehmen**: nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat, z. B. Anwärter (wer Mitglieder anlegen darf).
 - **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf).
 - **Ehemalig** mit **Als ehemalig eintragen …** (wer Mitglieder anlegen darf).
-- **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern** und **Konto löschen** (wer Mitglieder anlegen darf). Auf deiner eigenen Seite fehlt **Konto löschen**.
+- **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern**, **Daten exportieren (Auskunft)** und **Konto löschen** (wer Mitglieder anlegen darf). Auf deiner eigenen Seite fehlt **Konto löschen**.
 
 ## So gehst du vor
 ### Die Rolle ändern
@@ -52,11 +52,12 @@ Du siehst nur die Teile, für die du das Recht hast:
 - Wer kein {rolle.admin} ist, vergibt und entfernt nur Rollen und Rechte, die er selbst hat – nie {rolle.admin} und nie „Mitglieder anlegen“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser beiden Rechte und keine weiteren Rechte als er selbst haben.
 - Ausnahmen bei den Rechten bleiben, wenn sich die Rollen ändern; was die Rollen dann ohnehin regeln, fällt weg. {rolle.admin}s haben immer alle Rechte, {rolle.guest}s die ihrer Rolle: Für sie gibt es keine Ausnahmen. Einstellungen, Updates und Datensicherung bleiben {rolle.admin}s vorbehalten.
 - Nach einem neuen Startpasswort gilt das alte nicht mehr, und die Person ist auf allen Geräten abgemeldet. Ein neuer Benutzername meldet sie ebenfalls überall ab.
+- **Daten exportieren (Auskunft)** (nur für alle, die jeden darin enthaltenen Bereich auch in der App sehen dürfen: persönliche Angaben, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.polls}, E-Mails, {bereich.lists}, {bereich.board} und {bereich.offices}; in der Regel {rolle.admin}s) lädt alle gespeicherten Daten der Person als Datei herunter, z. B. wenn jemand nach der DSGVO (Art. 15) Auskunft verlangt. Antworten in anonymen Umfragen sind nicht dabei (sie bleiben anonym); die bekommt die Person nur selbst unter **Konto → Meine Daten**.
 - **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank}, {bereich.titles}, Geburtstag, Eintritt, Foto, Antworten bei Umfragen und Benachrichtigungen. Was sie für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen. Wer nur ausgetreten oder verstorben ist, trägst du besser als ehemalig ein: Dann bleiben alle Daten erhalten.
 - Wer kein {rolle.admin} ist, setzt Passwörter nur bei Personen zurück (und ändert bzw. löscht nur deren Konten und Fotos), die keine weiteren Rechte als er selbst haben und weder Mitglieder anlegen noch Rollen vergeben dürfen.
 - Bei einer ehemaligen Person lassen sich Rolle, Rechte und Passwort erst nach **Wieder aufnehmen** ändern.
 
-> **Für Fortgeschrittene:** In der WordPress-Version wird die Rolle {rolle.admin} im WordPress-Backend vergeben und entzogen, nicht in der App. Der Knopf zum Löschen heißt dort **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Den Benutzernamen von Benutzern der Webseite (z. B. Redakteure) ändert nur, wer sie in WordPress bearbeiten darf.
+> **Für Fortgeschrittene:** In der WordPress-Version wird die Rolle {rolle.admin} im WordPress-Backend vergeben und entzogen, nicht in der App. Der Knopf zum Löschen heißt dort **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter **Benutzer** (Beiträge dabei einer anderen Person zuordnen). Den Benutzernamen von Benutzern der Webseite (z. B. Redakteure) ändert nur, wer sie in WordPress bearbeiten darf.
 
 ## Siehe auch
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)

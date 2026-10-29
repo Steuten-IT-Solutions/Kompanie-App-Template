@@ -12,6 +12,8 @@ import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { addressInput, EMPTY_ADDRESS, formatAddress } from '../address';
 import { MemberAvatar } from '../memberPhoto';
+import { downloadPersonalData } from '../personalData';
+import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 
 const MIN_LENGTH = 8;
@@ -248,6 +250,9 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       {signatureAllowed() && <SignatureCard onToast={onToast} />}
 
+      {/* In der Vorschau gibt es keinen Export (der Server lehnt ihn ab) */}
+      {!previewRole() && <MyDataCard />}
+
       <div className="card account-card">
         <h3>Darstellung</h3>
         <p className="muted small">
@@ -314,6 +319,38 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       <button className="btn btn-danger btn-block logout" onClick={onLogout}>
         Abmelden
       </button>
+    </div>
+  );
+}
+
+/** Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten der Person als JSON-Datei. */
+function MyDataCard() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="card account-card">
+      <h3>Meine Daten</h3>
+      <p className="muted small">
+        Alles, was die App über dich gespeichert hat, als Datei (JSON) zum Herunterladen, z. B. für eine Auskunft nach der DSGVO.
+      </p>
+      <button
+        className="btn btn-secondary btn-block"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setError(null);
+          downloadPersonalData()
+            .catch((err: Error) => setError(err.message))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy ? 'Wird zusammengestellt …' : 'Meine Daten herunterladen'}
+      </button>
+      {error && (
+        <p className="form-error small" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

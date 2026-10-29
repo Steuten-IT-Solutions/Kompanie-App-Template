@@ -104,7 +104,21 @@ final class Plugin
         add_action('rest_api_init', static fn () => RestBridge::register(self::app()));
         // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
         add_filter('cron_schedules', [WpScheduler::class, 'schedules']);
-        add_action(WpScheduler::HOOK, static fn (string $task) => WpUpdateTarget::$installed ? null : self::app()->runTask($task));
+        // Hintergrundaufgaben laufen als System, nicht als die Person, deren Seitenaufruf WP-Cron gerade auslöst
+        // (ALTERNATE_WP_CRON, wp cron event run --user=…): Sonst gälten ihre Rechte, z. B. beim Löschen nach Ablauf der
+        // Aufbewahrungsfrist (WpUsers::guardAccount).
+        add_action(WpScheduler::HOOK, static function (string $task): void {
+            if (WpUpdateTarget::$installed) {
+                return;
+            }
+            $user = get_current_user_id();
+            wp_set_current_user(0);
+            try {
+                self::app()->runTask($task);
+            } finally {
+                wp_set_current_user($user);
+            }
+        });
         // Multisite: aus einer Seite entfernt bzw. im Netzwerk gelöscht – die Daten jeder betroffenen Seite löschen
         // (die Tabellen der App gibt es je Seite).
         add_action('remove_user_from_blog', static fn (int $id, int $blogId) => self::purgeOnBlog($id, $blogId), 10, 2);
