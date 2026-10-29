@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\FormerMemberRepository;
+use KompanieApp\Core\Storage\UserData;
 
 /**
  * Ehemalige Mitglieder: ausgetreten, verstorben oder sonst ausgeschieden.
@@ -26,10 +27,11 @@ use KompanieApp\Core\Storage\FormerMemberRepository;
  * - Import (Ersterfassung, z. B. aus einer Chronik): CSV vorname;nachname;eintritt;ausgeschieden;grund. Für jede Person
  *   entsteht ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen wird. Wer schon
  *   ein Konto mit genau diesem Namen hat, wird übersprungen.
- * - Aufbewahrungsfrist (DSGVO, Standard aus; gehört zur Installation, nicht in Sicherungen): Ist sie eingestellt, löscht die tägliche Aufgabe RETENTION_TASK Konto und
- *   Daten aller Ehemaligen, deren Ausscheiden länger als so viele Jahre zurückliegt (wie „Konto löschen“: App::userDeleted;
- *   Amtszeiten bleiben als Chronik mit dem Namen). Gründungsmitglieder und Verstorbene nur, wenn eigens eingestellt.
- *   Stichtag ist das Datum des Ausscheidens (nur ein Jahr: der 31.12.), ohne Datum der Tag des Eintragens.
+ * - Aufbewahrungsfrist (DSGVO, Standard aus; gehört zur Installation, nicht in Sicherungen): Ist sie eingestellt, löscht die
+ *   tägliche Aufgabe RETENTION_TASK bei allen Ehemaligen, deren Ausscheiden länger als so viele Jahre zurückliegt, die
+ *   persönlichen Angaben (forgetPersonal); die Chronik bleibt (Name, Eintrag als ehemalig, Ämter, Punkte, Dienstgrad,
+ *   Titel, Foto, Eintrittsjahr: UserData::CHRONICLE). Stichtag ist das Datum des Ausscheidens (nur ein Jahr: der 31.12.),
+ *   ohne Datum der Tag des Eintragens.
  */
 final class FormerMemberService
 {
@@ -41,7 +43,7 @@ final class FormerMemberService
     public const YEAR_MIN = 1800;
     public const IMPORT_MAX_BYTES = 200000;
     public const IMPORT_MAX_ROWS = 500;
-    /** Einstellung (gehört zur Installation, Backup::LOCAL_SETTINGS): {years: int (0 = aus), include_founders: bool, include_deceased: bool} */
+    /** Einstellung (gehört zur Installation, Backup::LOCAL_SETTINGS): {years: int (0 = aus)} */
     public const RETENTION_SETTING = 'former_retention';
     public const RETENTION_TASK = 'former_retention';
     public const RETENTION_MAX_YEARS = 50;
@@ -465,20 +467,20 @@ final class FormerMemberService
         return [$target, $row];
     }
 
-    /** @return array{years: int, include_founders: bool, include_deceased: bool} */
+    /** @return array{years: int} */
     public function retention(): array
     {
         $c = $this->app->settings->get(self::RETENTION_SETTING);
         $c = is_array($c) ? $c : [];
-        $years = is_numeric($c['years'] ?? null) ? max(0, min(self::RETENTION_MAX_YEARS, (int) $c['years'])) : 0;
-        // Input::bool: WordPress kann Werte als Zeichenkette zurückgeben.
-        return ['years' => $years, 'include_founders' => Input::bool($c['include_founders'] ?? false), 'include_deceased' => Input::bool($c['include_deceased'] ?? false)];
+        // WordPress kann Zahlen als Zeichenkette zurückgeben.
+        return ['years' => is_numeric($c['years'] ?? null) ? max(0, min(self::RETENTION_MAX_YEARS, (int) $c['years'])) : 0];
     }
 
     /**
-     * Frist mit Vorschau: wer beim nächsten Lauf gelöscht würde (due) und wer in den nächsten 30 Tagen dazukommt (soon).
+     * Frist mit Vorschau: bei wem der nächste Lauf die persönlichen Angaben löscht (due) und wer in den nächsten 30 Tagen
+     * dazukommt (soon).
      *
-     * @return array{years: int, include_founders: bool, include_deceased: bool, due: list<array{id: int, name: string, left_on: string}>, soon: list<array{id: int, name: string, left_on: string}>}
+     * @return array{years: int, due: list<array{id: int, name: string, left_on: string}>, soon: list<array{id: int, name: string, left_on: string}>}
      */
     public function retentionStatus(?array $config = null): array
     {
@@ -501,9 +503,9 @@ final class FormerMemberService
 
     /**
      * Frist einstellen (nur manage_settings, s. Api). Mit $preview nur die Vorschau für diese Werte, ohne zu speichern:
-     * Die App zeigt vor dem Speichern, wen die Frist beim nächsten Lauf löscht (der erste Lauf kommt gleich danach).
+     * Die App zeigt vor dem Speichern, bei wem der nächste Lauf die persönlichen Angaben löscht.
      *
-     * @param array<string, mixed> $in years, include_founders, include_deceased
+     * @param array<string, mixed> $in years
      * @return array<string, mixed> retentionStatus()
      */
     public function setRetention(array $in, bool $preview = false): array
@@ -517,11 +519,7 @@ final class FormerMemberService
         if ($years < 0 || $years > self::RETENTION_MAX_YEARS) {
             throw ApiError::invalid('Die Frist darf höchstens ' . self::RETENTION_MAX_YEARS . ' Jahre sein (0 = aus).');
         }
-        $config = [
-            'years' => $years,
-            'include_founders' => Input::bool($in['include_founders'] ?? false),
-            'include_deceased' => Input::bool($in['include_deceased'] ?? false),
-        ];
+        $config = ['years' => $years];
         if ($preview) {
             return $this->retentionStatus($config);
         }
@@ -531,9 +529,10 @@ final class FormerMemberService
     }
 
     /**
-     * Tägliche Aufgabe: Ehemalige nach Ablauf der Frist endgültig löschen. Ins Protokoll kommt nur die Anzahl.
+     * Tägliche Aufgabe: bei Ehemaligen nach Ablauf der Frist die persönlichen Angaben löschen. Ins Protokoll kommt nur die
+     * Anzahl.
      *
-     * @return int Anzahl gelöschter Konten
+     * @return int Anzahl der Personen
      */
     public function purgeExpired(): int
     {
@@ -541,36 +540,48 @@ final class FormerMemberService
         if ($config['years'] === 0) {
             return 0;
         }
-        $deleted = 0;
+        $done = 0;
         $today = $this->app->time()->today();
         foreach ($this->candidates($config) as $person) {
             if ($person['expires'] > $today) {
                 continue;
             }
-            // Scheitert eine Person, geht es mit den anderen weiter. Lässt sich das Konto nicht löschen, kommt sie im nächsten
-            // Lauf wieder. Danach löscht UserData::purge Tabelle für Tabelle (wie „Konto löschen“) und protokolliert eine
-            // Tabelle, die scheitert; einen weiteren Lauf gibt es dann nicht, das Konto ist schon weg.
+            // Scheitert eine Person, geht es mit den anderen weiter; sie kommt im nächsten Lauf wieder (erledigt ist sie
+            // erst mit markPurged am Ende, und jeder Schritt lässt sich wiederholen).
             try {
-                $this->app->users->removeAccount($person['id']);
-                // Löscht auch den Eintrag als ehemalig (former_members steht in UserData::TABLES).
-                $this->app->userDeleted($person['id']);
-                $deleted++;
+                $this->forgetPersonal($person['id']);
+                $done++;
             } catch (\Throwable $e) {
-                // z. B. Administrator der Webseite: dort verwaltet. Nicht still übergehen: Die Frist ist eine Zusage.
-                error_log('Kompanie-App: Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
+                // Nicht still übergehen: Die Frist ist eine Zusage.
+                error_log('Kompanie-App: Persönliche Angaben von Konto ' . $person['id'] . ' nach Ablauf der Aufbewahrungsfrist nicht gelöscht: ' . $e->getMessage());
             }
         }
         $this->all = null;
-        if ($deleted > 0) {
-            error_log('Kompanie-App: ' . $deleted . ' ehemalige Mitglieder nach Ablauf der Aufbewahrungsfrist gelöscht.');
+        if ($done > 0) {
+            error_log('Kompanie-App: Persönliche Angaben von ' . $done . ' ehemaligen Mitgliedern nach Ablauf der Aufbewahrungsfrist gelöscht.');
         }
-        return $deleted;
+        return $done;
+    }
+
+    /**
+     * Persönliche Angaben einer oder eines Ehemaligen löschen, die Chronik behalten (UserData::CHRONICLE, Ämter, Listen):
+     * Kontaktdaten, Anmeldung, Geburtstag, Strafen, Anwesenheiten, Umfragen, Push, Signatur, Einstellungen, Entwürfe,
+     * Mail-Protokolle, Fehlermeldungen, Nutzungsauswertung und eigene Rechte.
+     */
+    private function forgetPersonal(int $userId): void
+    {
+        UserData::purge($this->app->db, $userId, PollService::existingSecret($this->app->settings), keepChronicle: true);
+        $this->app->attachments()->deleteDraftsOf($userId);
+        $this->app->roles()->forget($userId);
+        $this->app->activity()->forget($userId);
+        $this->app->users->forgetLogin($userId);
+        $this->repository()->markPurged($userId, $this->app->time()->nowUtc());
     }
 
     /**
      * Ehemalige, für die die Frist gilt, mit dem Tag, an dem sie abläuft (expires), nach Namen.
      *
-     * @param array{years: int, include_founders: bool, include_deceased: bool} $config
+     * @param array{years: int} $config
      * @return list<array{id: int, name: string, left_on: string, expires: \DateTimeImmutable}>
      */
     private function candidates(array $config): array
@@ -581,9 +592,7 @@ final class FormerMemberService
         $out = [];
         foreach ($rows as $id => $row) {
             $user = $users[$id] ?? null;
-            if ($user === null || $user->role !== Roles::GUEST
-                || ($row['founder'] && !$config['include_founders'])
-                || ($row['reason'] === self::REASON_DECEASED && !$config['include_deceased'])) {
+            if ($user === null || $user->role !== Roles::GUEST || $row['purged_at'] !== '') {
                 continue;
             }
             $left = match (strlen($row['left_on'])) {

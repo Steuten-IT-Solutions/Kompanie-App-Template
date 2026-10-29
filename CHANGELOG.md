@@ -47,8 +47,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   was die App über sie gespeichert hat. Wer Mitglieder anlegen und persönliche Angaben sehen darf, kann das auch für
   eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne Antworten in anonymen Umfragen.
 - **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
-  seit dem Ausscheiden die App Ehemalige mit allen Daten endgültig löscht (Gründungsmitglieder und Verstorbene nur auf
-  Wunsch). Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
+  seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
+  Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.
+  Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
 
 ### Geändert
 

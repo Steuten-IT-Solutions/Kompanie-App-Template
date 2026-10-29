@@ -93,6 +93,13 @@ try {
     $anna = $users->add('Anna Admin', 'anna', 'anna@example.org', 'anna-passwort', Roles::ADMIN);
     $max = $users->add('Max Mitglied', 'max', 'max@example.org', 'max-passwort', Roles::MEMBER);
     $json = ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
+    // Aufbewahrungsfrist: Anmeldedaten vergessen, Name bleibt
+    $gone = $users->add('Ehe Malig', 'ehemalig', 'ehemalig@example.org', 'ehemalig-passwort', Roles::MEMBER);
+    $users->deactivate($gone);
+    $users->forgetLogin($gone);
+    $row = $kernel->db()->selectOne('SELECT login, email, password_hash, name FROM {users} WHERE id = ?', [$gone]);
+    $c->ok($row !== null && $row['login'] === "ehemalig-$gone" && $row['email'] === '' && $row['password_hash'] === '' && $row['name'] === 'Ehe Malig', 'forgetLogin: Anmeldedaten weg, Name bleibt');
+    $c->ok($users->findForLogin('ehemalig@example.org') === null, 'forgetLogin: über die alte E-Mail-Adresse nicht mehr zu finden');
     $login = static fn (string $u, string $p, ?bool $remember = true, array $headers = []) => $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', $headers + $json, (string) json_encode(['username' => $u, 'password' => $p] + ($remember === null ? [] : ['remember' => $remember])));
     $cookieOf = static fn (array $res): ?string => preg_match('/' . Sessions::COOKIE . '=([a-f0-9]{64})/', $res[2]['set-cookie'], $m) ? $m[1] : null;
     // Das zuletzt gesetzte Sitzungs-Cookie (der Browser übernimmt das letzte).

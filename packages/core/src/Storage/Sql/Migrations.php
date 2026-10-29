@@ -1424,6 +1424,12 @@ WHERE title IS NULL",
                     "ALTER TABLE {member_contacts} ADD COLUMN country_name TEXT NOT NULL DEFAULT ''",
                 ],
             ],
+            // Aufbewahrungsfrist für Ehemalige: wann die persönlichen Angaben gelöscht wurden (die Chronik bleibt);
+            // danach kommt die Person nicht wieder dran.
+            36 => [
+                'mysql' => ['ALTER TABLE {former_members} ADD COLUMN purged_at datetime DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {former_members} ADD COLUMN purged_at TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

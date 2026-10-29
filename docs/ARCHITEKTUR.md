@@ -233,9 +233,12 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Import** (`POST /members/former/import`, Ersterfassung z. B. aus einer Chronik): CSV mit Semikolon oder Tabulator `vorname;nachname;eintritt;ausgeschieden;grund`, UTF-8 (mit oder ohne BOM) oder Windows-1252, höchstens 200 KB bzw. 500 Zeilen. Eintritt „Gründer“ setzt `founder`. Ohne `apply` Vorschau je Zeile (Fehler, `existing` bei gleichem Anzeigenamen eines vorhandenen Kontos, gleiche Namen in der Tabelle sind ein Fehler); mit `apply` nur ohne Fehler. Je Person `MemberService::prepare`/`insert` (Benutzername aus dem Namen, zufälliges Passwort, das niemand erfährt) und gleich `deactivate`. Keine Transaktion (WordPress-Benutzer): Bricht es ab, findet ein zweiter Lauf die schon angelegten als `existing`. Danach verknüpft `OfficeService::linkNames` freie Namen in Amtszeiten (ohne `user_id`) mit den neuen Konten und mit schon früher importierten Ehemaligen, wenn der Name nach `Text::line` ohne Unterschied in Groß- und Kleinschreibung gleich ist und die Person in der Amtszeit noch nicht steht; `name` bleibt. `offices_linked` zählt die Einträge (in der Vorschau die zu verknüpfenden).
 
 - **Aufbewahrungsfrist** (Einstellung `former_retention`, gehört zur Installation und kommt nicht mit einer Sicherung zurück, Standard aus; `GET`/`PUT /admin/former/retention`
-  mit `manage_settings`): Aufgabe `former_retention` (täglich, nur mit Frist) löscht Ehemalige nach `years` Jahren ab
-  `left_on` (nur Jahr: 31.12., leer: `created_at`) über `UserDirectory::removeAccount` und `App::userDeleted`; Gründer
-  und Verstorbene nur mit `include_founders` bzw. `include_deceased`. Ins Protokoll kommt nur die Anzahl.
+  mit `manage_settings`): Aufgabe `former_retention` (täglich, nur mit Frist) löscht bei Ehemaligen nach `years` Jahren ab
+  `left_on` (nur Jahr: 31.12., leer: `created_at` in Ortszeit) die persönlichen Angaben: `UserData::purge` mit
+  `keepChronicle` (es bleiben `UserData::CHRONICLE`, Ämter und Listen), Entwürfe, eigene Rechte, Pseudonym der
+  Nutzungsauswertung und `UserDirectory::forgetLogin` (Standalone: E-Mail, Benutzername, Passwort; WordPress: nur
+  Sitzungen). Zum Schluss `former_members.purged_at`: danach nicht wieder; bis dahin wiederholt der nächste Lauf alles.
+  Ins Protokoll kommt nur die Anzahl.
 
 #### Fotos der Mitglieder
 

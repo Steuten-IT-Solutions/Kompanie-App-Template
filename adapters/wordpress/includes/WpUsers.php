@@ -363,6 +363,14 @@ final class WpUsers implements UserDirectory, AuthContext
         clean_user_cache($id);
     }
 
+    /** Der Benutzer der Webseite gehört WordPress (Anmeldung, E-Mail-Adresse): nur die Sitzungen beenden. */
+    public function forgetLogin(int $id): void
+    {
+        if (get_userdata($id)) {
+            \WP_Session_Tokens::get_instance($id)->destroy_all();
+        }
+    }
+
     /** Wieder aufnehmen: Rolle in der App (und für Mitglieder die frühere WP-Rolle) setzen, geprüft wie deactivate(). */
     public function reactivate(int $id, string $role): void
     {

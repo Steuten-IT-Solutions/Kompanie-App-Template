@@ -193,6 +193,13 @@ final class PdoUsers implements UserDirectory
         $this->sessions?->destroyAllFor($id);
     }
 
+    public function forgetLogin(int $id): void
+    {
+        // Benutzername eindeutig und ohne Bezug zur Person; ein leerer Prüfwert passt zu keinem Passwort.
+        $this->db->update('users', ['login' => 'ehemalig-' . $id, 'email' => '', 'password_hash' => '', 'last_login_at' => null, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+        $this->sessions?->destroyAllFor($id);
+    }
+
     public function reactivate(int $id, string $role): void
     {
         $this->db->update('users', ['level' => $role, 'disabled_at' => null, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);

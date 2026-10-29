@@ -10,7 +10,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Ehemalige Mitglieder (Tabelle former_members): Grund, Eintritt, Ausscheiden und der Stand der Rollen von vorher. Das
  * Konto selbst steht beim Adapter (Port\UserDirectory) und hat die Rolle Gast.
  *
- * @phpstan-type Former array{user_id: int, reason: string, joined_on: string, founder: bool, left_on: string, restore: array<string, mixed>, created_by: int, created_at: string, updated_at: string}
+ * @phpstan-type Former array{user_id: int, reason: string, joined_on: string, founder: bool, left_on: string, restore: array<string, mixed>, created_by: int, created_at: string, updated_at: string, purged_at: string}
  */
 final class FormerMemberRepository
 {
@@ -75,6 +75,12 @@ final class FormerMemberRepository
         ], ['user_id' => $userId]);
     }
 
+    /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (FormerMemberService::purgeExpired). */
+    public function markPurged(int $userId, string $now): void
+    {
+        $this->db->update('former_members', ['purged_at' => $now], ['user_id' => $userId]);
+    }
+
     public function delete(int $userId): void
     {
         $this->db->execute('DELETE FROM {former_members} WHERE user_id = ?', [$userId]);
@@ -97,6 +103,8 @@ final class FormerMemberRepository
             'created_by' => (int) $r['created_by'],
             'created_at' => (string) $r['created_at'],
             'updated_at' => (string) $r['updated_at'],
+            // '' = nicht gelöscht (auch vor der Migration, ohne Spalte)
+            'purged_at' => (string) ($r['purged_at'] ?? ''),
         ];
     }
 }

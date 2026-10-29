@@ -201,22 +201,18 @@ export function FormerList() {
 }
 
 /**
- * Aufbewahrungsfrist (nur Admins, Standard aus): Nach so vielen Jahren seit dem Ausscheiden löscht die App Konto und
- * Daten endgültig, wie „Konto löschen“. Vorschau, wen es beim nächsten Lauf und in den nächsten 30 Tagen trifft.
+ * Aufbewahrungsfrist (nur Admins, Standard aus): Nach so vielen Jahren seit dem Ausscheiden löscht die App die
+ * persönlichen Angaben; die Chronik bleibt. Vorschau, wen es beim nächsten Lauf und in den nächsten 30 Tagen trifft.
  */
 function RetentionCard({ onChanged }: { onChanged: () => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.formerRetention(), [], 'admin/former/retention');
-  const [form, setForm] = useState<{ years: string; include_founders: boolean; include_deceased: boolean } | null>(null);
+  const [form, setForm] = useState<{ years: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const r = data!;
-  const f = form ?? {
-    years: r.years > 0 ? String(r.years) : '',
-    include_founders: r.include_founders,
-    include_deceased: r.include_deceased,
-  };
+  const f = form ?? { years: r.years > 0 ? String(r.years) : '' };
   const names = (list: FormerRetention['due']) =>
     list.map((p) => `${p.name}${p.left_on ? ` (${formatYearOrDate(p.left_on)})` : ''}`).join(', ');
 
@@ -227,7 +223,7 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
       setSaveError('Bitte die Frist in ganzen Jahren angeben (0 bis 50; leer oder 0 = aus).');
       return;
     }
-    const data = { years, include_founders: f.include_founders, include_deceased: f.include_deceased };
+    const data = { years };
     setBusy(true);
     setSaveError(null);
     try {
@@ -238,8 +234,8 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
         const due = preview.due.length;
         const question =
           due > 0
-            ? `Beim nächsten Lauf (spätestens in einem Tag) werden ${due} Ehemalige endgültig gelöscht, mit allen Daten: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
-            : `Ehemalige ${years} Jahre nach dem Ausscheiden endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
+            ? `Beim nächsten Lauf (spätestens in einem Tag) werden bei ${due} Ehemaligen die persönlichen Angaben endgültig gelöscht: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
+            : `Bei Ehemaligen ${years} Jahre nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
         if (!window.confirm(question)) return;
       }
       setData(await api.setFormerRetention(data)); // auch in den Zwischenspeicher, neu geladen wird wie sonst
@@ -256,11 +252,13 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
     <form className="form card settings-section" onSubmit={save} aria-labelledby="former-retention-title">
       <h3 id="former-retention-title">Aufbewahrungsfrist</h3>
       <p className="muted small">
-        Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App Ehemalige so
-        viele Jahre nach dem Ausscheiden endgültig, mit allen Daten (wie „Konto löschen“); Amtszeiten bleiben als Chronik mit dem Namen
-        stehen. Ohne Datum des Ausscheidens zählt der Tag des Eintragens. Leer oder 0: aus.
+        Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App bei Ehemaligen
+        so viele Jahre nach dem Ausscheiden endgültig die persönlichen Angaben: Adresse, Handynummer, E-Mail-Adresse, Anmeldung, Geburtstag,
+        Strafen, Anwesenheiten, Antworten in Umfragen, Benachrichtigungen, Signatur und Einstellungen. Für die Chronik bleiben Name, Eintrag
+        als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr. Ohne Datum des Ausscheidens zählt der Tag des Eintragens.
+        Leer oder 0: aus.
         {config?.variant === 'wordpress' &&
-          ' Der Benutzer der Webseite (Name, E-Mail-Adresse) bleibt in WordPress; ihn löscht ein Administrator der Webseite unter Benutzer.'}
+          ' Der Benutzer der Webseite (Anmeldung, E-Mail-Adresse) bleibt in WordPress; ihn löscht oder ändert ein Administrator der Webseite unter Benutzer.'}
       </p>
       <label className="field">
         <span>Jahre nach dem Ausscheiden</span>
@@ -273,17 +271,9 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
           onChange={(e) => setForm({ ...f, years: e.target.value })}
         />
       </label>
-      <label className="toggle">
-        <input type="checkbox" checked={f.include_founders} onChange={(e) => setForm({ ...f, include_founders: e.target.checked })} />
-        <span>Gründungsmitglieder auch löschen</span>
-      </label>
-      <label className="toggle">
-        <input type="checkbox" checked={f.include_deceased} onChange={(e) => setForm({ ...f, include_deceased: e.target.checked })} />
-        <span>Verstorbene auch löschen</span>
-      </label>
       {r.years > 0 && (
         <p className="small">
-          {r.due.length > 0 ? <>Beim nächsten Lauf (täglich) gelöscht: {names(r.due)}.</> : 'Zurzeit ist niemand fällig.'}
+          {r.due.length > 0 ? <>Beim nächsten Lauf (täglich) fällig: {names(r.due)}.</> : 'Zurzeit ist niemand fällig.'}
           {r.soon.length > 0 && <> In den nächsten 30 Tagen fällig: {names(r.soon)}.</>}
         </p>
       )}

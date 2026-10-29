@@ -1997,8 +1997,7 @@ export const api = {
   /** Aufbewahrungsfrist für Ehemalige (nur Admins) */
   formerRetention: () => request<FormerRetention>('GET', '/admin/former/retention'),
   /** preview: nur zeigen, wen die Frist beim nächsten Lauf löscht, ohne zu speichern */
-  setFormerRetention: (data: { years: number; include_founders: boolean; include_deceased: boolean; preview?: boolean }) =>
-    request<FormerRetention>('PUT', '/admin/former/retention', data),
+  setFormerRetention: (data: { years: number; preview?: boolean }) => request<FormerRetention>('PUT', '/admin/former/retention', data),
   /** Inhalt aus backupPayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
   restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>
     request<{ restored: boolean }>('POST', '/admin/backup', { ...payload, ...(passphrase ? { passphrase } : {}), confirm: true }),
@@ -2133,8 +2132,6 @@ export interface BackupDriveStatus {
 /** Aufbewahrungsfrist für Ehemalige: 0 = aus; due wird beim nächsten Lauf gelöscht, soon in den nächsten 30 Tagen fällig */
 export interface FormerRetention {
   years: number;
-  include_founders: boolean;
-  include_deceased: boolean;
   due: { id: number; name: string; left_on: string }[];
   soon: { id: number; name: string; left_on: string }[];
 }

@@ -51,6 +51,13 @@ final class UserData
     ];
 
     /**
+     * Was bei der Aufbewahrungsfrist für Ehemalige bleibt (Chronik, purge mit $keepChronicle): Punkte, Dienstgrad mit
+     * Verlauf, Titel, Foto, Eintrittsjahr und der Eintrag als ehemaliges Mitglied; dazu Ämter und Zeilen in Listen mit
+     * ihrer Verknüpfung.
+     */
+    public const CHRONICLE = ['points', 'rank_history', 'member_ranks', 'member_titles', 'member_photos', 'join_years', 'former_members'];
+
+    /**
      * Tabelle => Spalte mit der Person; auch für die Auskunft (Domain\PersonalDataExport), damit Löschen und Auskunft
      * dieselben Tabellen kennen.
      *
@@ -61,8 +68,11 @@ final class UserData
         return self::TABLES;
     }
 
-    /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */
-    public static function purge(Connection $db, int $userId, ?string $pollSecret = null): void
+    /**
+     * @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden
+     * @param bool $keepChronicle nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige): CHRONICLE bleibt
+     */
+    public static function purge(Connection $db, int $userId, ?string $pollSecret = null, bool $keepChronicle = false): void
     {
         $ok = true;
         if ($pollSecret !== null) {
@@ -79,8 +89,10 @@ final class UserData
             $ok = false; // Tabelle fehlt (ältere Version oder Seite ohne die App)
         }
         try {
-            $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
-            $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+            if (!$keepChronicle) {
+                $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
+                $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+            }
         } catch (\RuntimeException) {
             $ok = false;
         }
@@ -91,11 +103,16 @@ final class UserData
             $ok = false;
         }
         try {
-            $db->execute('UPDATE {list_rows} SET user_id = NULL WHERE user_id = ?', [$userId]);
+            if (!$keepChronicle) {
+                $db->execute('UPDATE {list_rows} SET user_id = NULL WHERE user_id = ?', [$userId]);
+            }
         } catch (\RuntimeException) {
             $ok = false;
         }
         foreach (self::TABLES as $table => $column) {
+            if ($keepChronicle && in_array($table, self::CHRONICLE, true)) {
+                continue;
+            }
             try {
                 $db->execute('DELETE FROM {' . $table . '} WHERE ' . $column . ' = ?', [$userId]);
             } catch (\RuntimeException) {

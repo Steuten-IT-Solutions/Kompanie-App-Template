@@ -5066,9 +5066,11 @@ paths:
       tags: [Verwaltung]
       summary: Aufbewahrungsfrist für Ehemalige – Stand mit Vorschau
       description: |
-        Mit Frist (years > 0) löscht eine tägliche Aufgabe Ehemalige so viele Jahre nach dem Ausscheiden endgültig
-        (wie `DELETE /members/{id}`); Gründungsmitglieder und Verstorbene nur mit `include_founders` bzw.
-        `include_deceased`. Stichtag: Datum des Ausscheidens (nur Jahr: 31.12.), ohne Datum der Tag des Eintragens.
+        Mit Frist (years > 0) löscht eine tägliche Aufgabe bei Ehemaligen so viele Jahre nach dem Ausscheiden die
+        persönlichen Angaben (Kontaktdaten, Anmeldung, Geburtstag, Strafen, Anwesenheiten, Umfragen, Push, Signatur,
+        Einstellungen, Nutzungsauswertung); Name, Eintrag als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und
+        Eintrittsjahr bleiben als Chronik. Stichtag: Datum des Ausscheidens (nur Jahr: 31.12.), ohne Datum der Tag des
+        Eintragens.
         `due`: beim nächsten Lauf fällig, `soon`: in den nächsten 30 Tagen.
       x-capability: manage_settings
       responses:
@@ -5088,8 +5090,6 @@ paths:
               required: [years]
               properties:
                 years: { type: integer, minimum: 0, maximum: 50 }
-                include_founders: { type: boolean }
-                include_deceased: { type: boolean }
                 preview: { type: boolean, description: 'Nur die Vorschau (due/soon) für diese Werte, ohne zu speichern' }
       responses:
         '200': { $ref: '#/components/responses/FormerRetention' }
@@ -5228,11 +5228,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [years, include_founders, include_deceased, due, soon]
+            required: [years, due, soon]
             properties:
               years: { type: integer, description: 0 = aus }
-              include_founders: { type: boolean }
-              include_deceased: { type: boolean }
               due:
                 type: array
                 items: { $ref: '#/components/schemas/FormerRetentionPerson' }
