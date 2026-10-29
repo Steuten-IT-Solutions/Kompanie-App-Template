@@ -34,7 +34,9 @@ final class BackupEncryptionService
 
     public function configured(): bool
     {
-        return $this->key() !== null;
+        // Ohne sodium (Erweiterung später abgeschaltet) lässt sich nichts verschlüsseln: nicht als eingerichtet zählen,
+        // sonst entstünden leere Downloads und Drive scheiterte bei jedem Lauf.
+        return BackupCrypto::available() && $this->key() !== null;
     }
 
     /**
@@ -141,12 +143,16 @@ final class BackupEncryptionService
             throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
         }
         try {
-            $filter = stream_filter_append($in, 'convert.base64-decode', STREAM_FILTER_WRITE);
+            // In Stücken von 1 MiB (durch 4 teilbar, Base64 ohne Zeilenumbrüche wie von der App): streng geprüft, damit
+            // eine abgeschnittene oder kaputte Übertragung nicht als „beschädigte Sicherung“ erscheint.
             for ($pos = 0, $len = strlen($base64); $pos < $len; $pos += 1048576) {
-                fwrite($in, substr($base64, $pos, 1048576));
-            }
-            if ($filter !== false) {
-                stream_filter_remove($filter); // schreibt den Rest
+                $chunk = base64_decode(substr($base64, $pos, 1048576), true);
+                if ($chunk === false) {
+                    throw ApiError::invalid('Die Datei ließ sich nicht lesen (Übertragung unvollständig?).');
+                }
+                if (fwrite($in, $chunk) !== strlen($chunk)) {
+                    throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht zwischenspeichern (Speicherplatz?).');
+                }
             }
             rewind($in);
             return BackupCrypto::decrypt($in, $passphrase);
@@ -271,8 +277,8 @@ final class BackupEncryptionService
         // WordPress kann Zahlen als Zeichenkette zurückgeben.
         return ['public_key' => $k['public_key'], 'salt' => $k['salt'], 'ops' => (int) $k['ops'], 'mem' => (int) $k['mem']]
             + (is_numeric($k['set_at'] ?? null) ? ['set_at' => (int) $k['set_at']] : [])
-            // Ältere Einstellungen ohne den Schalter gelten als geprüft (wie vor dieser Prüfung).
-            + ['verified' => !array_key_exists('verified', $k) || $k['verified'] === true || $k['verified'] === '1' || $k['verified'] === 1];
+            // Fehlt der Schalter, gilt das Passwort als ungeprüft: Drive löscht dann lieber nichts.
+            + ['verified' => in_array($k['verified'] ?? false, [true, '1', 1], true)];
     }
 
     private function throttle(string $kind): void

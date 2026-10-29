@@ -1155,8 +1155,9 @@ final class Api
                     // Als Text gelesen ist eine verschlüsselte Datei nicht mehr lesbar (Zeichensatz); die App sendet sie als Base64.
                     throw ApiError::invalid('Verschlüsselte Sicherungen bitte als Datei hochladen (backup_base64).');
                 }
-                // Hintergrundaufgaben (z. B. die Aufbewahrungsfrist aus der Sicherung) plant der nächste Aufruf neu: Der
-                // Import löscht tasks_planned (App::upgrade). Nicht hier: Die Einstellungen dieser Anfrage sind noch die alten.
+                // Hintergrundaufgaben (abhängig von den wiederhergestellten Einstellungen, z. B. Mail oder Updates) plant der
+                // nächste Aufruf neu: Der Import löscht tasks_planned (App::upgrade). Nicht hier: Die Einstellungen dieser
+                // Anfrage sind noch die alten. Die Aufbewahrungsfrist kommt nie aus einer Sicherung (Backup::LOCAL_SETTINGS).
                 try {
                     $backup->import($data);
                 } catch (\RuntimeException $e) {

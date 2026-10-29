@@ -49,17 +49,17 @@ final class BackupDownload
         }
         $now = $this->app->time()->timestamp();
         $name = 'sicherung-' . $this->app->time()->format($now, 'Y-m-d') . ($encrypted ? BackupCrypto::EXTENSION : '.json');
-        if ($encrypted) {
-            // Stück für Stück verschlüsselt an den Browser, wie die unverschlüsselte Sicherung (keine Zwischendatei, kein
-            // Warten vor dem ersten Byte, das ein Proxy als Zeitüberschreitung abbricht). Bricht es ab, fehlt der Abschluss
-            // der Datei: Beim Wiederherstellen gilt sie dann als unvollständig, nie als ganze Sicherung.
-            return ['status' => 200, 'headers' => [
-                'Content-Type' => 'application/octet-stream',
-                'Content-Disposition' => 'attachment; filename="' . $name . '"',
-                'Cache-Control' => 'no-store',
-                'X-Content-Type-Options' => 'nosniff',
-                'X-Robots-Tag' => 'noindex',
-            ], 'write' => function ($out) use ($backup, $now): void {
+        // Verschlüsselt ebenso Stück für Stück an den Browser (keine Zwischendatei, kein Warten vor dem ersten Byte, das ein
+        // Proxy als Zeitüberschreitung abbricht). Bricht es ab, fehlt der Abschluss der Datei: Beim Wiederherstellen gilt
+        // sie dann als unvollständig, nie als ganze Sicherung.
+        return ['status' => 200, 'headers' => [
+            'Content-Type' => $encrypted ? 'application/octet-stream' : 'application/json; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $name . '"',
+            'Cache-Control' => 'no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Robots-Tag' => 'noindex',
+        ], 'write' => function ($out) use ($backup, $now, $encrypted): void {
+            if ($encrypted) {
                 try {
                     $this->app->backupEncryption()->exportEncryptedTo($backup, $out);
                 } catch (\Throwable $e) {
@@ -67,17 +67,9 @@ final class BackupDownload
                     $this->app->telemetry()->record(Code::ServerError, 'backup_download', 'Verschlüsselte Sicherung nicht erstellt: ' . $e->getMessage());
                     throw $e;
                 }
-                $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
-            }];
-        }
-        return ['status' => 200, 'headers' => [
-            'Content-Type' => 'application/json; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="' . $name . '"',
-            'Cache-Control' => 'no-store',
-            'X-Content-Type-Options' => 'nosniff',
-            'X-Robots-Tag' => 'noindex',
-        ], 'write' => function ($out) use ($backup, $now): void {
-            $backup->exportTo($out);
+            } else {
+                $backup->exportTo($out);
+            }
             // Erst nach dem Schreiben: Die Ampel zählt nur eine vollständig erzeugte Sicherung.
             $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
         }];

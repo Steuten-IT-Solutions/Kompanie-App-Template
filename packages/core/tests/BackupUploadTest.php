@@ -73,9 +73,10 @@ final class BackupUploadTest extends TestCase
         $this->app = TestApp::create(TestApp::connection(), $users, ['name' => 'Testkompanie'], $this->http(), clock: $this->clock, scheduler: $this->scheduler, backup: $backup);
         $holder->app = $this->app;
         $users->current = $users->add('anna', 'admin');
-        // Nach Drive nur verschlüsselt: Passwort für Sicherungen ist eingerichtet (ohne: testNeedsPassphrase).
+        // Nach Drive nur verschlüsselt: Passwort für Sicherungen ist eingerichtet und geprüft (ohne: testNeedsPassphrase,
+        // ungeprüft: testPlainBackupsStayUntilPassphraseVerified).
         self::$key ??= BackupCrypto::newKey(self::PASS, 1, 8192);
-        $this->app->settings->set(BackupCrypto::SETTING, self::$key);
+        $this->app->settings->set(BackupCrypto::SETTING, self::$key + ['verified' => true]);
     }
 
     private static function decrypt(string $content): string
@@ -427,6 +428,13 @@ final class BackupUploadTest extends TestCase
                 $this->assertSame(400, $e->status, "Versuch $i");
             }
         }
+        // Kaputt übertragen (kein gültiges Base64): so gemeldet, nicht als beschädigte Sicherung.
+        try {
+            $this->app->backupEncryption()->readUpload(base64_encode($damaged) . '!', self::PASS);
+            $this->fail('kein Base64');
+        } catch (\KompanieApp\Core\Http\ApiError $e) {
+            $this->assertStringContainsString('Übertragung', $e->getMessage());
+        }
         $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
         $stored = (string) json_encode($this->app->settings->get(BackupCrypto::SETTING));
         $this->assertStringNotContainsString(self::PASS, $stored, 'Passwort nicht gespeichert');
@@ -438,6 +446,10 @@ final class BackupUploadTest extends TestCase
         $this->connect();
         $this->assertSame(200, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => self::PASS, 'passphrase_confirm' => self::PASS])[0]);
         $this->assertFalse($this->app->backupEncryption()->status()['verified']);
+        $setting = (array) $this->app->settings->get(BackupCrypto::SETTING);
+        $this->app->settings->set(BackupCrypto::SETTING, array_diff_key($setting, ['verified' => 1]));
+        $this->assertFalse($this->app->backupEncryption()->status()['verified'], 'ohne Schalter: ungeprüft');
+        $this->app->settings->set(BackupCrypto::SETTING, $setting);
         $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
         $this->app->backupUpload()->upload();
         $this->drive['alt'] = ['name' => 'sicherung-2026-01-01-120000.json', 'parent' => $this->folders[0], 'content' => '{}'];
