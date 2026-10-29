@@ -156,7 +156,8 @@ final class FormerMemberService
             return null;
         }
         $out = self::out($user, $row);
-        return ['reason' => $out['reason'], 'joined_on' => $out['joined_on'], 'founder' => $out['founder'], 'left_on' => $out['left_on'], 'previous_level' => $out['previous_level']];
+        // personal_deleted: Die Aufbewahrungsfrist hat die persönlichen Angaben gelöscht (auch die Anmeldung).
+        return ['reason' => $out['reason'], 'joined_on' => $out['joined_on'], 'founder' => $out['founder'], 'left_on' => $out['left_on'], 'previous_level' => $out['previous_level'], 'personal_deleted' => $row['purged_at'] !== ''];
     }
 
     /**

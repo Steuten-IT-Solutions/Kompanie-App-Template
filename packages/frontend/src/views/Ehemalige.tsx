@@ -521,11 +521,18 @@ export function FormerPanel({
   }
 
   async function reactivate() {
-    if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?`)) return;
+    const deleted = former?.personal_deleted
+      ? ' Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht, auch Benutzername und E-Mail-Adresse.'
+      : '';
+    if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`)) return;
     setBusy(true);
     try {
       await api.reactivate(id);
-      onToast(`${name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.`);
+      onToast(
+        former.personal_deleted
+          ? `${name} ist wieder aufgenommen. Bitte unter „Angaben ändern“ Benutzername und E-Mail-Adresse neu eintragen, dann ein neues Startpasswort erzeugen.`
+          : `${name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.`,
+      );
       onChanged();
     } catch (err) {
       onToast((err as Error).message);

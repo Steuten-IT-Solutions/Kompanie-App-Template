@@ -208,7 +208,7 @@ final class BackupEncryptionService
      */
     public function exportToTempFile(BackupProvider $backup): string
     {
-        return $this->writeEncrypted(static fn ($out) => $backup->exportTo($out));
+        return $this->writeBackupFile(static fn ($out) => $backup->exportTo($out));
     }
 
     /**
@@ -218,7 +218,7 @@ final class BackupEncryptionService
      */
     public function exportPlainToTempFile(BackupProvider $backup): string
     {
-        return $this->writeEncrypted(static fn ($out) => $backup->exportTo($out), null, false);
+        return $this->writeBackupFile(static fn ($out) => $backup->exportTo($out), null, false);
     }
 
     /**
@@ -227,7 +227,7 @@ final class BackupEncryptionService
      */
     public function exportToFile(BackupProvider $backup, string $path): void
     {
-        $this->writeEncrypted(static fn ($out) => $backup->exportTo($out), $path);
+        $this->writeBackupFile(static fn ($out) => $backup->exportTo($out), $path);
     }
 
     /**
@@ -265,7 +265,7 @@ final class BackupEncryptionService
             throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
         }
         try {
-            return $this->writeEncrypted(static function ($out) use ($in): void {
+            return $this->writeBackupFile(static function ($out) use ($in): void {
                 if (stream_copy_to_stream($in, $out) === false) {
                     throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
                 }
@@ -276,12 +276,12 @@ final class BackupEncryptionService
     }
 
     /**
-     * Datei (ohne $file: temporär), in die $write verschlüsselt schreibt; geprüft, ob alles angekommen ist
+     * Datei (ohne $file: temporär), in die $write schreibt (mit $encrypt verschlüsselt, sonst unverschlüsselt); geprüft, ob alles angekommen ist
      * (Speicherplatz). Bricht PHP ab (Zeitlimit, Abbruch eines Downloads), löscht das Ende der Anfrage die Datei.
      *
      * @param \Closure(resource): void $write
      */
-    private function writeEncrypted(\Closure $write, ?string $file = null, bool $encrypt = true): string
+    private function writeBackupFile(\Closure $write, ?string $file = null, bool $encrypt = true): string
     {
         $temp = $file === null;
         $file ??= $this->app->files->tempFile();

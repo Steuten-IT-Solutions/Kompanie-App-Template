@@ -551,6 +551,8 @@ export interface FormerInfo {
   left_on: string;
   /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
   previous_level: Level;
+  /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (auch Benutzername und E-Mail-Adresse) */
+  personal_deleted: boolean;
 }
 
 /** Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181). */

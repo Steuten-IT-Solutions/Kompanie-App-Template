@@ -121,8 +121,8 @@ final class BackupCrypto
     public static function encryptTo($out, array $key, array $meta, \Closure $write): int
     {
         $enc = BackupEncryptor::start($key, $meta);
-        $enc->attach($out);
         try {
+            $enc->attach($out);
             $write($out);
         } catch (\Throwable $e) {
             $enc->abort(); // ohne Abschluss: bleibt als abgeschnitten erkennbar

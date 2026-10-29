@@ -50,7 +50,7 @@ final class FormerMembersTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
         $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'joined_on' => '03.05.1993', 'left_on' => '2016-06-30']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['reason' => 'left', 'joined_on' => '1993-05-03', 'founder' => false, 'left_on' => '2016-06-30', 'previous_level' => Roles::MEMBER, 'offices_ended' => 0], $res->data);
+        $this->assertSame(['reason' => 'left', 'joined_on' => '1993-05-03', 'founder' => false, 'left_on' => '2016-06-30', 'previous_level' => Roles::MEMBER, 'personal_deleted' => false, 'offices_ended' => 0], $res->data);
 
         $this->assertSame(Roles::GUEST, $this->users->find($this->m)?->role, 'keine Rechte mehr');
         $this->assertNotContains($this->m, $this->memberIds());
@@ -509,6 +509,7 @@ final class FormerMembersTest extends TestCase
         $this->assertFalse($this->users->verifyPassword($old, 'passwort123'), 'Anmeldung nicht mehr möglich');
         // Chronik bleibt
         $this->assertNotNull($this->users->find($old), 'Konto mit Namen bleibt');
+        $this->assertTrue($this->app->formerMembers()->of($old)['personal_deleted'] ?? false, 'beim Wiederaufnehmen erkennbar');
         foreach (['points', 'join_years', 'former_members'] as $table) {
             $this->assertSame(1, $count($table), "$table bleibt");
         }

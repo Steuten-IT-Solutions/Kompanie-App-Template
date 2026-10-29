@@ -6530,13 +6530,14 @@ components:
 
     FormerInfo:
       type: object
-      required: [reason, joined_on, founder, left_on, previous_level]
+      required: [reason, joined_on, founder, left_on, previous_level, personal_deleted]
       properties:
         reason: { $ref: '#/components/schemas/FormerReason' }
         joined_on: { $ref: '#/components/schemas/FormerDate' }
         founder: { type: boolean }
         left_on: { $ref: '#/components/schemas/FormerDate' }
         previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
+        personal_deleted: { type: boolean, description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (auch Benutzername und E-Mail-Adresse)' }
 
     FormerRetentionPerson:
       type: object
