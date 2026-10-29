@@ -200,19 +200,34 @@ export function formatAddress(a: Address | null | undefined): string[] {
 export type MapPlatform = 'android' | 'apple' | 'other';
 
 /**
- * Adresse in der Karten-App zeigen (nur den Ort, keine Route): auf Android als geo:-Link, dann bietet Android alle
- * Karten-Apps zur Auswahl an (Google Maps, Waze, OsmAnd …); auf Apple-Geräten Apple Karten (maps.apple.com, q), sonst
- * Google Maps (Maps URLs, search/?api=1). Ohne Zusatz (c/o, Hinterhaus …), den die Suche nicht kennt, dafür immer mit
- * dem Land. null ohne Adresse.
+ * Ort in der Karten-App zeigen (nur den Ort, keine Route), gesucht als freier Text (z. B. Ort eines Termins): auf
+ * Android als geo:-Link, dann bietet Android alle Karten-Apps zur Auswahl an (Google Maps, Waze, OsmAnd …); auf
+ * Apple-Geräten Apple Karten (maps.apple.com, q), sonst Google Maps (Maps URLs, search/?api=1). null ohne Text.
+ */
+export function mapSearchUrl(query: string, platform: MapPlatform): string | null {
+  const q = line(query);
+  if (!q) return null;
+  const target = encodeURIComponent(q);
+  if (platform === 'android') return `geo:0,0?q=${target}`;
+  return platform === 'apple' ? `https://maps.apple.com/?q=${target}` : `https://www.google.com/maps/search/?api=1&query=${target}`;
+}
+
+/**
+ * Adresse in der Karten-App zeigen (mapSearchUrl): ohne Zusatz (c/o, Hinterhaus …), den die Suche nicht kennt, dafür
+ * immer mit dem Land. null ohne Adresse.
  */
 export function mapUrl(a: Address | null | undefined, platform: MapPlatform): string | null {
   if (!a || isEmptyAddress(a)) return null;
   const land = a.country === OTHER_COUNTRY ? a.country_name : (country(a.country)?.name ?? a.country);
-  const target = encodeURIComponent(
+  return mapSearchUrl(
     [line(`${a.street} ${a.house_number}`), line(`${a.postal_code} ${a.city}`), land].filter(Boolean).join(', '),
+    platform,
   );
-  if (platform === 'android') return `geo:0,0?q=${target}`;
-  return platform === 'apple' ? `https://maps.apple.com/?q=${target}` : `https://www.google.com/maps/search/?api=1&query=${target}`;
+}
+
+/** Link-Attribute zu mapUrl/mapSearchUrl: https in neuem Tab; geo: nicht, der neue Tab bliebe leer zurück. */
+export function mapLinkTarget(url: string): { target?: string; rel?: string } {
+  return url.startsWith('https:') ? { target: '_blank', rel: 'noreferrer' } : {};
 }
 
 /** Android; iPhone, iPad (gibt sich als Mac mit Touch aus) oder Mac; sonst (PC) */

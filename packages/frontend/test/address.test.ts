@@ -7,6 +7,8 @@ import {
   addressProblems,
   EMPTY_ADDRESS,
   formatAddress,
+  mapLinkTarget,
+  mapSearchUrl,
   mapUrl,
   normalizeAddress,
   normalizePostalCode,
@@ -111,4 +113,18 @@ test('Ort in der Karten-App: ohne Zusatz, mit Land', () => {
     mapUrl(a({ ...ok, country: OTHER_COUNTRY, country_name: 'Norwegen', postal_code: '0150', city: 'Oslo' }), 'apple'),
     `https://maps.apple.com/?q=${encodeURIComponent('Musterstraße 1, 0150 Oslo, Norwegen')}`,
   );
+});
+
+test('Ort eines Termins in der Karten-App: freier Text wie bei der Adresse', () => {
+  assert.equal(mapSearchUrl('', 'android'), null);
+  assert.equal(mapSearchUrl('  \n ', 'apple'), null);
+  const q = encodeURIComponent('Schützenhalle, Am Markt 3, Musterstadt');
+  assert.equal(mapSearchUrl(' Schützenhalle,\n Am Markt 3,  Musterstadt ', 'android'), `geo:0,0?q=${q}`);
+  assert.equal(mapSearchUrl('Schützenhalle, Am Markt 3, Musterstadt', 'apple'), `https://maps.apple.com/?q=${q}`);
+  assert.equal(mapSearchUrl('Schützenhalle, Am Markt 3, Musterstadt', 'other'), `https://www.google.com/maps/search/?api=1&query=${q}`);
+});
+
+test('Karten-Link: https in neuem Tab, geo: im selben', () => {
+  assert.deepEqual(mapLinkTarget('https://maps.apple.com/?q=x'), { target: '_blank', rel: 'noreferrer' });
+  assert.deepEqual(mapLinkTarget('geo:0,0?q=x'), {});
 });

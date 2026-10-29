@@ -29,7 +29,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 Die Knöpfe eines aufgeklappten Termins:
 - **In meinen Kalender**: Die App lädt eine Kalenderdatei herunter. Öffne sie, und dein Handy oder Computer bietet an, den Termin in deinen eigenen Kalender zu übernehmen.
 - **Mehr Infos**: öffnet eine Webseite zum Termin. Den Knopf gibt es nur, wenn beim Termin ein Link eingetragen ist.
-- **Karte**: zeigt den Ort in Google Maps. Den Knopf gibt es nur, wenn ein Ort angegeben ist.
+- **Karte**: zeigt den Ort in der Karten-App: Auf Android wählst du die App aus (z. B. Google Maps oder Waze), auf iPhone und Mac öffnet sich Apple Karten, am PC Google Maps. Den Knopf gibt es nur, wenn ein Ort angegeben ist.
 
 ### Über neue Termine benachrichtigt werden
 1. Tippe unter der Liste auf **Bei neuen Terminen benachrichtigen**.
