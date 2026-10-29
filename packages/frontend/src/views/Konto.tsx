@@ -13,6 +13,7 @@ import { normalizePhone } from '../phone';
 import { addressInput, EMPTY_ADDRESS, formatAddress } from '../address';
 import { MemberAvatar } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
+import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 
 const MIN_LENGTH = 8;
@@ -249,7 +250,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       {signatureAllowed() && <SignatureCard onToast={onToast} />}
 
-      <MyDataCard />
+      {/* In der Vorschau gibt es keinen Export (der Server lehnt ihn ab) */}
+      {!previewRole() && <MyDataCard />}
 
       <div className="card account-card">
         <h3>Darstellung</h3>

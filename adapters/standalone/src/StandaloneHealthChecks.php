@@ -33,19 +33,21 @@ final class StandaloneHealthChecks implements HealthChecks
 
     /**
      * Über HTTP gehen Passwörter, Sitzungen und alle Daten der Mitglieder unverschlüsselt durchs Netz. Geprüft wird die
-     * fest eingetragene Adresse (ohne sie gibt es nichts zu prüfen); localhost zählt nicht (Test auf dem eigenen Rechner).
+     * fest eingetragene Adresse (ohne sie die der Anfrage); localhost zählt nicht (Test auf dem eigenen Rechner).
      *
      * @return array{key: string, label: string, level: string, text: string}|null
      */
     public function https(): ?array
     {
+        // Ohne fest eingetragene Adresse die der Anfrage (über die die Statusseite gerade geöffnet ist).
         $base = $this->config->baseUrl();
-        $host = strtolower((string) parse_url($base, PHP_URL_HOST));
-        if ($base === '' || in_array($host, ['localhost', '127.0.0.1', '::1', '[::1]'], true)) {
+        $https = $base !== '' ? strtolower((string) parse_url($base, PHP_URL_SCHEME)) === 'https' : $this->kernel->http()->isHttps();
+        $host = strtolower((string) ($base !== '' ? parse_url($base, PHP_URL_HOST) : parse_url($this->kernel->http()->baseUrl(), PHP_URL_HOST)));
+        if (in_array($host, ['', 'localhost', '127.0.0.1', '::1', '[::1]'], true)) {
             return null;
         }
         $item = static fn (string $level, string $text): array => ['key' => 'https', 'label' => 'Verschlüsselte Verbindung', 'level' => $level, 'text' => $text];
-        if (str_starts_with($base, 'https://')) {
+        if ($https) {
             return $item('ok', 'Die App läuft über HTTPS; Passwörter und Daten gehen verschlüsselt durchs Netz.');
         }
         return $item('warn', 'Die App läuft über HTTP: Passwörter und Daten der Mitglieder gehen unverschlüsselt durchs Netz. '

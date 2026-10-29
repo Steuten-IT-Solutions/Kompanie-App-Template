@@ -64,6 +64,7 @@ final class PersonalDataExportTest extends TestCase
         foreach (['signature' => 'sig-bild', 'draft' => 'entwurf-bild'] as $owner => $uid) {
             $db->insert('rich_images', ['uid' => $uid, 'owner_type' => $owner, 'owner_id' => $this->m, 'user_id' => $this->m, 'mime' => 'image/png', 'width' => 1, 'height' => 1, 'bytes' => 1, 'data' => 'AA==', 'created_at' => $now]);
         }
+        $db->insert('bug_reports', ['uuid' => 'b1', 'user_id' => $this->m, 'report' => 'Fehlertext mit Daten anderer', 'screenshot' => 'BILD', 'created_at' => 1]);
         $db->insert('attachments', ['uid' => 'entwurf-anhang', 'owner_type' => 'draft', 'owner_id' => $this->m, 'user_id' => $this->m, 'name' => 'entwurf.txt', 'mime' => 'text/plain', 'bytes' => 1, 'file' => 'anh-x.bin', 'created_at' => $now]);
     }
 
@@ -92,6 +93,9 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame('https://push.example/abc', $d['data']['push_subscriptions'][0]['endpoint']);
         $this->assertEqualsCanonicalizing(['sig-bild', 'entwurf-bild'], array_column($d['data']['rich_images'], 'uid'));
         $this->assertSame(['entwurf-anhang'], array_column($d['data']['attachments'], 'uid'));
+        $this->assertArrayNotHasKey('file', $d['data']['attachments'][0], 'Ablageort auf dem Server nicht');
+        $this->assertSame(['Fehlertext mit Daten anderer'], array_column($d['data']['bug_reports'], 'report'));
+        $this->assertStringNotContainsString('BILD', $json);
     }
 
     public function testExportForAdministration(): void
@@ -105,6 +109,7 @@ final class PersonalDataExportTest extends TestCase
         $this->assertCount(1, $res->data['data']['poll_votes'], 'Teilnahme schon');
         $this->assertSame(['sig-bild'], array_column($res->data['data']['rich_images'], 'uid'), 'Entwürfe nur in der eigenen Auskunft');
         $this->assertArrayNotHasKey('attachments', $res->data['data']);
+        $this->assertSame([null], array_map(static fn (array $r) => $r['report'] ?? null, $res->data['data']['bug_reports']), 'Fehlermeldung nur, dass es sie gibt');
 
         // Wer Konten anlegt, aber kein Admin ist: keine Admins; ohne create_users gar nicht; ohne Anmeldung 401.
         $res = $this->call('POST', '/admin/roles', ['label' => 'Nur Konten', 'capabilities' => TestApp::caps(['member', 'create_users'])]);

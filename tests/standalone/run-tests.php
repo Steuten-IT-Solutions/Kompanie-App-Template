@@ -256,6 +256,7 @@ try {
     $c->ok($d->send('GET', $kernel->cronUrl(), [], null)[0] === 200, 'Cron mit Schlüssel → 200');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron-Key' => $kernel->cronKey()], null)[0] === 200, 'Cron mit Schlüssel im Header → 200');
     $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron-Key' => 'falsch'], null)[0] === 403, 'Cron mit falschem Schlüssel im Header → 403');
+    $c->ok($d->send('GET', $base . 'index.php?r=/cron', ['X-Kompanie-Cron' => '', 'X-Kompanie-Cron-Key' => $kernel->cronKey()], null)[0] === 200, 'Leerer Header verdeckt den Schlüssel nicht');
     // Schwarzes Brett (Issue #5, #172): Der Cron führt das Aufräumen aus und löscht Nachrichten 30 Tage nach ihrem Ende.
     $kdb = $kernel->db();
     $past = static fn (int $s): string => gmdate('Y-m-d H:i:s', time() - $s);

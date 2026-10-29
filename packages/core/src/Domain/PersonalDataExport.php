@@ -20,9 +20,9 @@ use KompanieApp\Core\Storage\UserData;
  * Die Tabellen kommen aus UserData::tables(), derselben Liste wie beim Löschen; dazu Push-Abos, Ämter, Zeilen in Listen,
  * eigene Änderungen am Schwarzen Brett, eigene Bilder (Signatur, Entwürfe) und Anhänge von Entwürfen (Angaben zur Datei).
  * Ausgelassen:
- * - Schlüssel (Push: p256dh, auth) und Pseudonyme (vote_ref); die Fassungen des Fotos (es steht einmal unter
- *   person.photo); Bildschirmfotos wartender Fehlermeldungen (können Daten anderer zeigen). Eigene Bilder (Signatur,
- *   Entwürfe) sind mit Inhalt dabei.
+ * - Schlüssel (Push: p256dh, auth), Pseudonyme (vote_ref) und Ablageorte (Anhänge: file); die Fassungen des Fotos (es
+ *   steht einmal unter person.photo); Bildschirmfotos wartender Fehlermeldungen (können Daten anderer zeigen), ihr Text
+ *   nur beim eigenen Export. Eigene Bilder (Signatur, Entwürfe) sind mit Inhalt dabei.
  * - Antworten in anonymen Umfragen und Entwürfe (Bilder, Anhänge) nur beim eigenen Export: Sonst sähe die Verwaltung,
  *   wer was geantwortet hat, und was in der App nur die Person selbst sieht.
  * - Nutzungsauswertung (activity*) nur beim eigenen Export und für Admins mit view_activity, die sie ohnehin sehen.
@@ -36,7 +36,7 @@ final class PersonalDataExport
      * Spalten je Tabelle, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Bildschirmfotos); je Tabelle, damit eine
      * gleich benannte Spalte anderswo nicht still fehlt. member_photos steht ganz unter person.photo.
      */
-    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot']];
+    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot'], 'attachments' => ['file']];
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
 
     public function __construct(private readonly App $app)
@@ -74,6 +74,11 @@ final class PersonalDataExport
                 // Eigene anonyme Antworten (über das Pseudonym; namentliche kamen schon über user_id); nur die Person selbst
                 // bekommt sie.
                 $rows = [...$rows, ...$this->rows('poll_answers', 'SELECT * FROM {poll_answers} WHERE vote_ref = ? AND user_id IS NULL', [PollService::pseudonym($secret, $userId)])];
+            }
+            if ($table === 'bug_reports' && !$self) {
+                // Wartende Fehlermeldungen sieht in der App niemand (sie gehen an die Betreuer); ihr Text kann Daten anderer
+                // enthalten: für andere nur, dass es sie gibt.
+                $rows = array_map(static fn (array $r): array => array_diff_key($r, ['report' => 1]), $rows);
             }
             if ($rows !== []) {
                 $data[$table] = $rows;

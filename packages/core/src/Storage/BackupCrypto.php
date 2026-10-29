@@ -75,6 +75,7 @@ final class BackupCrypto
     /** Passt das Passwort zum gespeicherten Schlüssel? */
     public static function matches(array $key, string $passphrase): bool
     {
+        self::requireAvailable();
         $salt = base64_decode((string) ($key['salt'] ?? ''), true);
         $public = base64_decode((string) ($key['public_key'] ?? ''), true);
         if ($salt === false || $public === false || strlen($salt) !== SODIUM_CRYPTO_PWHASH_SALTBYTES || strlen($public) !== SODIUM_CRYPTO_BOX_PUBLICKEYBYTES) {
@@ -87,6 +88,14 @@ final class BackupCrypto
     }
 
     /** Kurzer Fingerabdruck des öffentlichen Schlüssels (Base64), z. B. „3f2a 9c41 07be d5e0“: zeigt, welches Passwort gilt. */
+    /** @throws \RuntimeException ohne sodium (z. B. später abgeschaltet), statt eines Fehlers über fehlende Konstanten */
+    private static function requireAvailable(): void
+    {
+        if (!self::available()) {
+            throw new \RuntimeException('Dafür fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.');
+        }
+    }
+
     public static function fingerprint(string $publicKeyBase64): string
     {
         return implode(' ', str_split(substr(hash('sha256', (string) base64_decode($publicKeyBase64, true)), 0, 16), 4));
@@ -136,9 +145,7 @@ final class BackupCrypto
      */
     public static function decrypt($in, string $passphrase): string
     {
-        if (!self::available()) {
-            throw new \RuntimeException('Zum Entschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.');
-        }
+        self::requireAvailable();
         try {
             return self::readPlain($in, $passphrase);
         } catch (\SodiumException $e) {

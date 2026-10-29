@@ -21,6 +21,7 @@ import { addressInput, EMPTY_ADDRESS, isEmptyAddress, type Address } from '../ad
 import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
+import { previewRole } from '../preview';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
@@ -482,7 +483,7 @@ export function AccountPanel({
             >
               Angaben ändern
             </button>
-            {can('view_personal') && (
+            {can('view_personal') && !previewRole() && (
               <button
                 className="btn btn-link"
                 disabled={busy}
