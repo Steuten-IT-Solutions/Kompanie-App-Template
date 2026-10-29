@@ -73,9 +73,10 @@ final class UserData
      * die Aufbewahrungsfrist: nur bei ihnen erneut löschen. Eine Abfrage je Tabelle, nicht je Person.
      *
      * @param list<int> $userIds
+     * @param string|null $pollSecret wie bei purge(): auch anonyme Antworten in Umfragen (über das Pseudonym)
      * @return list<int>
      */
-    public static function withPersonalData(Connection $db, array $userIds): array
+    public static function withPersonalData(Connection $db, array $userIds, ?string $pollSecret = null): array
     {
         $queries = [];
         foreach (self::TABLES as $table => $column) {
@@ -97,6 +98,22 @@ final class UserData
                     }
                 } catch (\RuntimeException $e) {
                     // Tabelle fehlt oder kurz nicht erreichbar: der nächste Lauf prüft wieder
+                    error_log('Kompanie-App: Prüfung auf persönliche Angaben unvollständig: ' . $e->getMessage());
+                }
+            }
+        }
+        if ($pollSecret !== null && $userIds !== []) {
+            $refs = [];
+            foreach ($userIds as $id) {
+                $refs[PollService::pseudonym($pollSecret, $id)] = $id;
+            }
+            foreach (array_chunk(array_keys($refs), 500) as $chunk) {
+                try {
+                    $rows = $db->select('SELECT DISTINCT vote_ref FROM {poll_answers} WHERE user_id IS NULL AND vote_ref IN (' . implode(', ', array_fill(0, count($chunk), '?')) . ')', $chunk);
+                    foreach ($rows as $r) {
+                        $found[$refs[(string) $r['vote_ref']]] = true;
+                    }
+                } catch (\RuntimeException $e) {
                     error_log('Kompanie-App: Prüfung auf persönliche Angaben unvollständig: ' . $e->getMessage());
                 }
             }

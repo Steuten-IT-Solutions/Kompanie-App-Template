@@ -530,6 +530,11 @@ final class FormerMembersTest extends TestCase
         $this->assertSame(0, $this->app->formerMembers()->purgeExpired());
         $this->assertSame(0, $count('birthdays'), 'neu eingetragener Geburtstag wieder weg');
         $this->assertSame($login, $this->users->profile($old)['login'], 'Anmeldung nicht jedes Mal neu');
+        // Auch eine anonyme Antwort (nur über das Pseudonym zu finden)
+        $ref = \KompanieApp\Core\Domain\PollService::pseudonym($this->app->polls()->secret(), $old);
+        $db->insert('poll_answers', ['poll_id' => 1, 'vote_ref' => $ref, 'user_id' => null, 'option_id' => 0, 'answer_text' => 'anonym']);
+        $this->app->formerMembers()->purgeExpired();
+        $this->assertSame(0, (int) $db->scalar('SELECT COUNT(*) FROM {poll_answers} WHERE vote_ref = ?', [$ref]), 'anonyme Antwort wieder weg');
 
         // Die Frist gehört zur Installation: Eine Sicherung bringt sie nicht (ungesehen) zurück.
         $this->assertContains(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_SETTING, Backup::LOCAL_SETTINGS);

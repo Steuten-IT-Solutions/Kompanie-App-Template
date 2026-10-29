@@ -156,7 +156,7 @@ final class StatusService
             if ($drive['encrypted'] && !$this->app->backupEncryption()->verified()) {
                 // Kein eigener Abbruch: Die Erinnerung an eine zu alte Sicherung (unten) bleibt sichtbar. Bis dahin bleiben
                 // in Drive unverschlüsselte Sicherungen liegen (BackupUploadService::prune).
-                $hint = ' Das Passwort für Sicherungen ist noch nicht geprüft; bis dahin bleiben ältere, unverschlüsselte Sicherungen in Google Drive liegen. Bitte unter Einstellungen → Datensicherung „Passwort prüfen“ wählen.';
+                $hint = ' Das Passwort für Sicherungen ist noch nicht geprüft: Ist es vertippt, lassen sich die verschlüsselten Sicherungen nicht wiederherstellen. Bitte unter Einstellungen → Datensicherung „Passwort prüfen“ wählen; bis dahin löscht die App in Google Drive keine älteren unverschlüsselten Sicherungen.';
             }
         }
         $newest = max($last ?? 0, $drive['enabled'] ? (int) $drive['last_ok'] : 0);

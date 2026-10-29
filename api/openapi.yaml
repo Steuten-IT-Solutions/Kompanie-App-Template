@@ -6537,7 +6537,7 @@ components:
         founder: { type: boolean }
         left_on: { $ref: '#/components/schemas/FormerDate' }
         previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
-        personal_deleted: { type: boolean, description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (auch Benutzername und E-Mail-Adresse)' }
+        personal_deleted: { type: boolean, description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse; WordPress: der Benutzer der Webseite bleibt)' }
 
     FormerRetentionPerson:
       type: object

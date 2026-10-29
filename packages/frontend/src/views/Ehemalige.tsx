@@ -521,15 +521,17 @@ export function FormerPanel({
   }
 
   async function reactivate() {
+    // Benutzername und E-Mail-Adresse löscht die Frist nur in der eigenständigen Version (WordPress: Benutzer der Webseite).
+    const loginDeleted = former?.personal_deleted && config?.variant !== 'wordpress';
     const deleted = former?.personal_deleted
-      ? ' Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht, auch Benutzername und E-Mail-Adresse.'
+      ? ` Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht${loginDeleted ? ', auch Benutzername und E-Mail-Adresse' : ''}.`
       : '';
     if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`)) return;
     setBusy(true);
     try {
       await api.reactivate(id);
       onToast(
-        former.personal_deleted
+        loginDeleted
           ? `${name} ist wieder aufgenommen. Bitte unter „Angaben ändern“ Benutzername und E-Mail-Adresse neu eintragen, dann ein neues Startpasswort erzeugen.`
           : `${name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.`,
       );

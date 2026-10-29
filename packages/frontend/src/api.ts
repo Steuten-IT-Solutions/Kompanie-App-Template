@@ -552,7 +552,7 @@ export interface FormerInfo {
   left_on: string;
   /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
   previous_level: Level;
-  /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (auch Benutzername und E-Mail-Adresse) */
+  /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse) */
   personal_deleted: boolean;
 }
 

@@ -548,7 +548,8 @@ final class FormerMemberService
         $today = $this->app->time()->today();
         $due = array_values(array_filter($this->candidates($config, true), static fn (array $p): bool => $p['expires'] <= $today));
         // Schon Erledigte nur, wenn wieder etwas Persönliches da ist (eine Abfrage je Tabelle für alle).
-        $again = array_flip(UserData::withPersonalData($this->app->db, array_column(array_filter($due, static fn (array $p): bool => $p['purged']), 'id')));
+        $purged = array_column(array_filter($due, static fn (array $p): bool => $p['purged']), 'id');
+        $again = array_flip(UserData::withPersonalData($this->app->db, $purged, PollService::existingSecret($this->app->settings)));
         foreach ($due as $person) {
             if ($person['purged'] && !isset($again[$person['id']])) {
                 continue;
