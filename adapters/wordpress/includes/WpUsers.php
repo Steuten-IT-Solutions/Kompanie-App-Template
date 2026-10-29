@@ -363,6 +363,20 @@ final class WpUsers implements UserDirectory, AuthContext
         clean_user_cache($id);
     }
 
+    /** Registriert am und die Sitzungen (Anmeldung, Ablauf, IP, Browser; ohne Schlüssel); den Benutzer verwaltet WordPress. */
+    public function accountData(int $id): array
+    {
+        $user = get_userdata($id);
+        if (!$user) {
+            return [];
+        }
+        $sessions = array_values(array_map(
+            static fn (array $s): array => array_intersect_key($s, ['login' => 1, 'expiration' => 1, 'ip' => 1, 'ua' => 1]),
+            \WP_Session_Tokens::get_instance($id)->get_all(),
+        ));
+        return ['registered' => (string) $user->user_registered, 'sessions' => $sessions];
+    }
+
     /** Der Benutzer der Webseite gehört WordPress (Anmeldung, E-Mail-Adresse): nur die Sitzungen beenden. */
     public function forgetLogin(int $id): void
     {

@@ -825,6 +825,7 @@ try {
     $d->actAs($max);
     [$s, $mine] = $d->request('GET', '/me/data');
     $c->ok($s === 200 && ($mine['format'] ?? '') === 'kompanie-app-personal-data' && ($mine['person']['id'] ?? null) === $max, 'GET /me/data liefert die eigenen Daten');
+    $c->ok(is_array($mine['person']['account']['sessions'] ?? null) && $mine['person']['account']['sessions'] !== [] && !str_contains((string) json_encode($mine), 'token_hash'), 'Auskunft mit Kontodaten und Sitzungen (ohne Schlüssel)');
     $c->ok($d->request('GET', "/members/$anna/data")[0] === 403, 'Mitglied darf die Daten anderer nicht exportieren');
     $d->actAs(null);
     $c->ok($d->request('GET', '/me/data')[0] === 401, 'Ohne Anmeldung → 401');

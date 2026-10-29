@@ -24,7 +24,8 @@ final class BackupEncryptor
     /** @var resource|null */
     private $filter = null;
 
-    private function __construct(private string $state, private readonly string $head, string $header)
+    /** $state: Zustand des Streams; nach final()/abort() null (sodium_memzero setzt die Variable auf null). */
+    private function __construct(private ?string $state, private readonly string $head, string $header)
     {
         $this->ad = $header;
     }

@@ -105,6 +105,14 @@ interface UserDirectory
     public function deactivate(int $id): void;
 
     /**
+     * Was der Adapter sonst zum Konto speichert, für die Auskunft (Art. 15 DSGVO): z. B. angelegt am, letzte Anmeldung,
+     * Sitzungen (ohne Schlüssel). Name, Benutzername und E-Mail stehen schon in profile().
+     *
+     * @return array<string, mixed>
+     */
+    public function accountData(int $id): array;
+
+    /**
      * Anmeldedaten eines stillgelegten Kontos vergessen (Aufbewahrungsfrist für Ehemalige): Der Name bleibt (Chronik).
      * Standalone: E-Mail-Adresse leer, Benutzername ersetzt, kein Passwort mehr, letzte Anmeldung vergessen, Sitzungen
      * beendet. WordPress: Der Benutzer der Webseite gehört WordPress (Anmeldung, E-Mail-Adresse) und bleibt; nur die

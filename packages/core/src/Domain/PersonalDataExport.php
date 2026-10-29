@@ -135,6 +135,8 @@ final class PersonalDataExport
                 'birthday' => $this->app->birthdays()->of($userId),
                 'join_year' => $this->app->joinYears()->of($userId),
                 'former' => $this->app->formerMembers()->of($userId),
+                // vom Adapter: angelegt am, letzte Anmeldung, Sitzungen (ohne Schlüssel)
+                'account' => $this->app->users->accountData($userId),
                 'photo' => $jpeg !== null ? ['type' => 'image/jpeg', 'base64' => base64_encode($jpeg)] : null,
             ],
             'data' => $data,

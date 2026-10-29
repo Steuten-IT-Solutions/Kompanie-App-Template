@@ -51,7 +51,8 @@ final class BackupCrypto
     /** Ob PHP alles Nötige mitbringt (libsodium ab PHP 7.2 eingebaut, aber abschaltbar). */
     public static function available(): bool
     {
-        return function_exists('sodium_crypto_pwhash') && function_exists('sodium_crypto_box_seal')
+        // extension_loaded: WordPress bringt sodium_compat mit, das die Funktionen nachbildet, Argon2id aber nicht kann.
+        return extension_loaded('sodium') && function_exists('sodium_crypto_pwhash') && function_exists('sodium_crypto_box_seal')
             && function_exists('sodium_crypto_secretstream_xchacha20poly1305_init_push') && defined('SODIUM_CRYPTO_PWHASH_ALG_ARGON2ID13');
     }
 

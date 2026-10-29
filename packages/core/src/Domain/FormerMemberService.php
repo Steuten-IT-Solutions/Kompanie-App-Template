@@ -515,11 +515,10 @@ final class FormerMemberService
     public function setRetention(array $in, bool $preview = false): array
     {
         // Fehlt die Zahl oder ist sie ungültig: Fehler, nicht stillschweigend „aus“.
-        $years = $in['years'] ?? null;
-        if (!is_int($years) && !(is_string($years) && ctype_digit($years))) {
+        $years = Input::integer($in['years'] ?? null);
+        if ($years === null) {
             throw ApiError::invalid('Bitte die Frist in ganzen Jahren angeben (0 = aus).');
         }
-        $years = (int) $years;
         if ($years < 0 || $years > self::RETENTION_MAX_YEARS) {
             throw ApiError::invalid('Die Frist darf höchstens ' . self::RETENTION_MAX_YEARS . ' Jahre sein (0 = aus).');
         }

@@ -150,7 +150,8 @@ paths:
       description: |
         Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
         `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
-        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag, Foto (Base64) und `account` (vom Adapter: angelegt am,
+        letzte Anmeldung, Sitzungen ohne Schlüssel); `data` je Tabelle die Zeilen der Person
         (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
         eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
         Enthält auch die eigenen Antworten in anonymen Umfragen und die eigene Nutzungsauswertung.
