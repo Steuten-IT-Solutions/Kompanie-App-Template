@@ -420,23 +420,30 @@ final class FormerMembersTest extends TestCase
         $this->assertNull($this->app->formerMembers()->repository()->find($this->m), 'kein halber Zustand');
     }
 
-    /** Scheitert ein Teil, gilt die Person nicht als erledigt: Der nächste Lauf wiederholt alles. */
+    /**
+     * Scheitert ein Teil, ist die Anmeldung trotzdem weg; das Fehlerprotokoll nennt es, und das tägliche Nachräumen löscht
+     * den Rest, sobald es geht.
+     */
     public function testRetentionRetriesAfterAFailure(): void
     {
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'founder' => false, 'joined_on' => '', 'left_on' => '2000'])->status);
-        $this->app->db->insert('birthdays', ['user_id' => $this->m, 'month' => 3, 'day' => 4, 'updated_by' => $this->admin, 'updated_at' => '2020-01-01 00:00:00']);
+        $db = $this->app->db;
+        $db->insert('birthdays', ['user_id' => $this->m, 'month' => 3, 'day' => 4, 'updated_by' => $this->admin, 'updated_at' => '2020-01-01 00:00:00']);
+        $db->insert('penalties', ['user_id' => $this->m, 'amount_cents' => 500, 'reason' => 'Zu spät', 'entry_date' => '2019-05-01', 'created_by' => $this->admin, 'created_at' => '2019-05-01 00:00:00']);
         $this->assertSame(200, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status);
-        $this->app->db->execute('ALTER TABLE {penalties} RENAME TO {penalties_weg}');
+        $db->execute('ALTER TABLE {penalties} RENAME TO {penalties_weg}');
         try {
-            $this->assertSame(0, @$this->app->formerMembers()->purgeExpired(), 'nicht erledigt');
+            $this->assertSame(0, @$this->app->formerMembers()->purgeExpired(), 'nicht ganz erledigt');
         } finally {
-            $this->app->db->execute('ALTER TABLE {penalties_weg} RENAME TO {penalties}');
+            $db->execute('ALTER TABLE {penalties_weg} RENAME TO {penalties}');
         }
-        $this->assertSame([$this->m], array_column($this->call('GET', '/admin/former/retention')->data['due'], 'id'), 'weiter fällig');
         $this->assertStringContainsString('Aufbewahrungsfrist', implode(' ', array_column($this->app->telemetry()->log(), 'message')), 'im Fehlerprotokoll der App');
-        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {birthdays} WHERE user_id = ?', [$this->m]), 'was ging, ist schon weg');
-        $this->assertSame(1, $this->app->formerMembers()->purgeExpired(), 'nächster Lauf');
-        $this->assertSame([], $this->call('GET', '/admin/former/retention')->data['due']);
+        $this->assertSame(0, (int) $db->scalar('SELECT COUNT(*) FROM {birthdays} WHERE user_id = ?', [$this->m]), 'was ging, ist schon weg');
+        $this->assertMatchesRegularExpression('/^ehemalig-/', $this->users->profile($this->m)['login'], 'Anmeldung trotzdem weg');
+        $this->assertTrue($this->app->formerMembers()->of($this->m)['personal_deleted'] ?? false);
+        $this->assertSame(1, (int) $db->scalar('SELECT COUNT(*) FROM {penalties} WHERE user_id = ?', [$this->m]), 'Rest noch da');
+        $this->app->formerMembers()->purgeExpired();
+        $this->assertSame(0, (int) $db->scalar('SELECT COUNT(*) FROM {penalties} WHERE user_id = ?', [$this->m]), 'nächster Lauf räumt nach');
     }
 
     /**

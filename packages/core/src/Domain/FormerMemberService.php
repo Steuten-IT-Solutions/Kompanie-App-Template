@@ -565,8 +565,8 @@ final class FormerMemberService
                 }
                 continue;
             }
-            // Scheitert eine Person, geht es mit den anderen weiter; sie kommt im nächsten Lauf wieder (erledigt ist sie
-            // erst mit markPurged am Ende, und jeder Schritt lässt sich wiederholen).
+            // Scheitert eine Person, geht es mit den anderen weiter: Scheitert schon die Anmeldung, kommt sie im nächsten Lauf
+            // ganz wieder, sonst räumt das Nachräumen oben den Rest (jeder Schritt lässt sich wiederholen).
             try {
                 $this->forgetPersonal($person['id']);
                 $done++;
@@ -599,13 +599,15 @@ final class FormerMemberService
      */
     private function forgetPersonal(int $userId): void
     {
-        // Erledigt erst, wenn alles geklappt hat; sonst wiederholt der nächste Lauf alles (jeder Schritt lässt sich wiederholen).
-        // Die Anmeldung zum Schluss (gesperrt ist sie als ehemalig schon): So stimmt personal_deleted mit ihr überein.
-        if (!$this->app->userDeleted($userId, keepChronicle: true)) {
-            throw new \RuntimeException('Nicht alle Angaben gelöscht (siehe Fehlerprotokoll); nächster Versuch beim nächsten Lauf.');
-        }
+        // Die Anmeldung zuerst (E-Mail-Adresse, Benutzername, Passwort): Sie fällt sicher zum Stichtag weg. Danach gilt die
+        // Person als erledigt (personal_deleted passt so immer zur Anmeldung); scheitert beim Rest etwas, findet das tägliche
+        // Nachräumen (UserData::withPersonalData) die übrigen Zeilen und versucht es wieder.
         $this->app->users->forgetLogin($userId);
+        $complete = $this->app->userDeleted($userId, keepChronicle: true);
         $this->repository()->markPurged($userId, $this->app->time()->nowUtc());
+        if (!$complete) {
+            throw new \RuntimeException('Nicht alle Angaben gelöscht (siehe Fehlerprotokoll); das tägliche Nachräumen versucht es wieder.');
+        }
     }
 
     /**
