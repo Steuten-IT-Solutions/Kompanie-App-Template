@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, can, type PersonalInfo } from './api';
-import { addressInput, EMPTY_ADDRESS, formatAddress, mapPlatform, mapUrl } from './address';
+import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl } from './address';
 import { normalizeEmail } from './email';
 import { normalizePhone } from './phone';
 import { AddressFields, EmailField, PhoneField } from './ui';
@@ -128,10 +128,10 @@ export function PersonalPanel({
               )}
             </dd>
             <dt>Adresse</dt>
-            {/* Antippen: der Ort in der Karten-App; geo: nicht in einem neuen Tab, der bliebe leer zurück */}
+            {/* Antippen: der Ort in der Karten-App */}
             <dd className="address-lines">
               {map ? (
-                <a href={map} {...(map.startsWith('https:') ? { target: '_blank', rel: 'noreferrer' } : {})}>
+                <a href={map} {...mapLinkTarget(map)}>
                   {lines.join('\n')}
                 </a>
               ) : (

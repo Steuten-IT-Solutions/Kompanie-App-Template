@@ -21,7 +21,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 ### Einen Termin ansehen
 1. Tippe auf den Termin. Er klappt auf und zeigt die Beschreibung, falls es eine gibt.
 2. Tippe auf **In meinen Kalender**, um den Termin in deinen eigenen Kalender zu übernehmen: Die App lädt eine Kalenderdatei herunter. Öffne sie, und dein Handy oder Computer bietet die Übernahme an.
-3. Ist ein Ort angegeben, zeigt **Karte** ihn in Google Maps.
+3. Ist ein Ort angegeben, zeigt **Karte** ihn in der Karten-App: Auf Android wählst du die App aus (z. B. Google Maps oder Waze), auf iPhone und Mac öffnet sich Apple Karten, am PC Google Maps.
 4. Tippe noch einmal auf den Termin, um ihn wieder zuzuklappen.
 
 ![Aufgeklappter Termin mit Beschreibung und dem Knopf „In meinen Kalender“](bild:kalender-termin)
