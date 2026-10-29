@@ -124,6 +124,21 @@ final class BackupEncryptionService
     }
 
     /**
+     * Mit $passphrase wurde gerade eine Sicherung entschlüsselt (Web oder Kommandozeile): Ist es das eingerichtete
+     * Passwort, ist das so gut wie „Passwort prüfen“. Nur eine Zugabe: Fehler hier lassen das Wiederherstellen nicht scheitern.
+     */
+    public function restoredWith(string $passphrase): void
+    {
+        $key = $this->key();
+        try {
+            if ($key !== null && !$this->verified() && BackupCrypto::matches($key, $passphrase)) {
+                $this->markVerified($key);
+            }
+        } catch (\RuntimeException) {
+        }
+    }
+
+    /**
      * @param array{public_key: string, verified?: bool} $key
      */
     private function markVerified(array $key): void
@@ -184,15 +199,7 @@ final class BackupEncryptionService
             }
             rewind($in);
             $plain = BackupCrypto::decrypt($in, $passphrase);
-            // Wiederhergestellt mit dem eingerichteten Passwort: Das ist so gut wie „Passwort prüfen“.
-            $key = $this->key();
-            try {
-                if ($key !== null && !$this->verified() && BackupCrypto::matches($key, $passphrase)) {
-                    $this->markVerified($key);
-                }
-            } catch (\RuntimeException) {
-                // nur eine Zugabe: Das Wiederherstellen scheitert daran nicht
-            }
+            $this->restoredWith($passphrase);
             return $plain;
         } catch (\RuntimeException $e) {
             // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.

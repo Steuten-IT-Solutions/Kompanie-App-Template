@@ -173,6 +173,8 @@ try {
                 } finally {
                     fclose($in);
                 }
+                // Wie beim Wiederherstellen in der App: Mit dem eingerichteten Passwort gilt es als geprüft.
+                $kernel->app()->backupEncryption()->restoredWith($pass);
             } else {
                 $data = (string) file_get_contents($file);
             }

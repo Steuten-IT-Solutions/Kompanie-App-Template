@@ -811,8 +811,11 @@ try {
         $c->ok($code === 0 && str_starts_with($raw, \KompanieApp\Core\Storage\BackupCrypto::MAGIC) && !str_contains($raw, 'Sicherungstest'), 'CLI export --encrypt schreibt verschlüsselt' . ($code !== 0 ? ": $msg" : ''));
         $c->ok((fileperms($encFile) & 0777) === 0600 && glob($encFile . '.*.part') === [], 'CLI-Export nur für den Besitzer lesbar, keine Reste');
         $c->ok($cli('import', $encFile, '--passphrase-file=' . $data . '-wrong')[0] !== 0, 'CLI-Import mit falschem Passwort scheitert');
+        $setting = \KompanieApp\Core\Storage\BackupCrypto::SETTING;
+        $kernel->app()->settings->set($setting, ['verified' => false] + (array) $kernel->app()->settings->fresh($setting));
         [$code, $msg] = $cli('import', $encFile, '--passphrase-file=' . $data . '-pass');
         $c->ok($code === 0 && (int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'CLI-Import mit Passwort' . ($code !== 0 ? ": $msg" : ''));
+        $c->ok(($kernel->app()->settings->fresh($setting)['verified'] ?? null) === true, 'CLI-Import mit dem eingerichteten Passwort gilt als Prüfung');
     } finally {
         array_map('unlink', array_filter([$encFile, $data . '-pass', $data . '-wrong'], 'is_file'));
     }

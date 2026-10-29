@@ -83,6 +83,7 @@ final class UserData
                 $queries[] = 'SELECT DISTINCT ' . $column . ' AS id FROM {' . $table . '} WHERE ' . $column . ' IN (%s)';
             }
         }
+        // Dieselben Stellen außerhalb von TABLES wie in purge() (dort ändern, dann auch hier)
         $queries[] = 'SELECT DISTINCT user_id AS id FROM {push_subscriptions} WHERE user_id IN (%s)';
         $queries[] = "SELECT DISTINCT owner_id AS id FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id IN (%s)";
         $queries[] = "SELECT DISTINCT owner_id AS id FROM {attachments} WHERE owner_type = 'draft' AND owner_id IN (%s)";
