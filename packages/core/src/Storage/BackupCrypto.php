@@ -87,7 +87,6 @@ final class BackupCrypto
         return $ok;
     }
 
-    /** Kurzer Fingerabdruck des öffentlichen Schlüssels (Base64), z. B. „3f2a 9c41 07be d5e0“: zeigt, welches Passwort gilt. */
     /** @throws \RuntimeException ohne sodium (z. B. später abgeschaltet), statt eines Fehlers über fehlende Konstanten */
     private static function requireAvailable(): void
     {
@@ -96,6 +95,7 @@ final class BackupCrypto
         }
     }
 
+    /** Kurzer Fingerabdruck des öffentlichen Schlüssels (Base64), z. B. „3f2a 9c41 07be d5e0“: zeigt, welches Passwort gilt. */
     public static function fingerprint(string $publicKeyBase64): string
     {
         return implode(' ', str_split(substr(hash('sha256', (string) base64_decode($publicKeyBase64, true)), 0, 16), 4));

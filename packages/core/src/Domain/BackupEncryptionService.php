@@ -204,7 +204,8 @@ final class BackupEncryptionService
      */
     private function encryptInto($out, \Closure $write): int
     {
-        $key = $this->key() ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
+        // configured(): auch ohne sodium eine verständliche Meldung statt eines Fehlers über fehlende Funktionen
+        $key = ($this->configured() ? $this->key() : null) ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (oder PHP fehlt die Erweiterung sodium).');
         return BackupCrypto::encryptTo($out, $key, $this->meta(), $write);
     }
 
@@ -239,9 +240,6 @@ final class BackupEncryptionService
      */
     private function writeEncrypted(\Closure $write, ?string $file = null): string
     {
-        if (!$this->configured()) {
-            throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet.');
-        }
         $temp = $file === null;
         $file ??= $this->app->files->tempFile();
         // Eine vorgegebene Datei nur neu anlegen (x), nie eine fremde überschreiben oder löschen.

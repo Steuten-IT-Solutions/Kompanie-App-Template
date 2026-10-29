@@ -593,7 +593,12 @@ final class FormerMemberService
             };
             $until = \DateTimeImmutable::createFromFormat('!Y-m-d', $left, $tz);
             if ($until !== false) {
-                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $until->modify('+' . $config['years'] . ' years')];
+                // Jahre dazu; vom 29. Februar in ein Nicht-Schaltjahr: der 28. (wie § 188 BGB), nicht der 1. März.
+                [$y, $m, $d] = array_map('intval', explode('-', $until->format('Y-n-j')));
+                $y += $config['years'];
+                $first = $until->setDate($y, $m, 1);
+                $expires = $first->setDate($y, $m, min($d, (int) $first->format('t')));
+                $out[] = ['id' => $user->id, 'name' => $user->name, 'left_on' => $row['left_on'], 'expires' => $expires];
             }
         }
         usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));

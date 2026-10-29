@@ -456,6 +456,7 @@ final class BackupUploadTest extends TestCase
         $this->clock->at = new \DateTimeImmutable('2026-10-28 12:00:00 UTC');
         $this->app->backupUpload()->upload();
         $this->assertContains('sicherung-2026-01-01-120000.json', array_column($this->drive, 'name'), 'noch nicht geprüft: bleibt');
+        $this->assertStringContainsString('noch nicht geprüft', $this->backupItem()['text'], 'Statusübersicht sagt es');
         $this->assertSame([200, ['ok' => true]], $this->api('POST', '/admin/backup/encryption/verify', ['passphrase' => self::PASS]));
         $this->assertTrue($this->app->backupEncryption()->status()['verified']);
         $this->clock->at = new \DateTimeImmutable('2026-11-04 12:00:00 UTC');

@@ -151,6 +151,10 @@ final class StatusService
                 return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Sicherungen in Google Drive pausieren: Sie gehen nur noch verschlüsselt dorthin. '
                     . (BackupCrypto::available() ? 'Bitte unter Einstellungen → Datensicherung ein Passwort für Sicherungen einrichten.' : 'Dafür fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.'));
             }
+            if (!$this->app->backupEncryption()->verified()) {
+                // Bis dahin rotiert Drive nichts (BackupUploadService::prune): Der Ordner wächst.
+                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Das Passwort für Sicherungen ist noch nicht geprüft; bis dahin löscht die App in Google Drive keine älteren Sicherungen. Bitte unter Einstellungen → Datensicherung „Passwort prüfen“ wählen.');
+            }
             if (!$drive['access']) {
                 return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die Verbindung zu Google erlaubt das Hochladen nicht mehr; bitte unter Einstellungen → Google-Zugang neu verbinden.');
             }

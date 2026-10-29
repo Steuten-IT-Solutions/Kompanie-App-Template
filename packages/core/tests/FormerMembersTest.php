@@ -21,11 +21,13 @@ final class FormerMembersTest extends TestCase
     private App $app;
     private int $admin;
     private int $m;
+    private FixedClock $clock;
 
     protected function setUp(): void
     {
         $this->users = new FakeUsers();
-        $this->app = TestApp::create(TestApp::connection(), $this->users, clock: new FixedClock(new \DateTimeImmutable('2026-10-22 12:00:00')));
+        $this->clock = new FixedClock(new \DateTimeImmutable('2026-10-22 12:00:00'));
+        $this->app = TestApp::create(TestApp::connection(), $this->users, clock: $this->clock);
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER, 'passwort123');
         $this->users->current = $this->admin;
@@ -416,6 +418,16 @@ final class FormerMembersTest extends TestCase
             $this->app->db->execute('ALTER TABLE {office_terms_weg} RENAME TO {office_terms}');
         }
         $this->assertNull($this->app->formerMembers()->repository()->find($this->m), 'kein halber Zustand');
+    }
+
+    /** Ausgeschieden am 29. Februar: Die Frist endet in einem Nicht-Schaltjahr am 28. Februar, nicht am 1. März. */
+    public function testRetentionFromLeapDay(): void
+    {
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'founder' => false, 'joined_on' => '', 'left_on' => '2024-02-29'])->status);
+        $this->clock->at = new \DateTimeImmutable('2026-02-28 12:00:00');
+        $this->assertSame([$this->m], array_column($this->call('PUT', '/admin/former/retention', ['years' => 2, 'preview' => true])->data['due'], 'id'));
+        $this->clock->at = new \DateTimeImmutable('2026-02-27 12:00:00');
+        $this->assertSame([], $this->call('PUT', '/admin/former/retention', ['years' => 2, 'preview' => true])->data['due']);
     }
 
     /** Aufbewahrungsfrist: Standard aus; danach Konto und Daten weg, Gründungsmitglieder und Verstorbene nur auf Wunsch. */
