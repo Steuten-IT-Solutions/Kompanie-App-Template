@@ -71,6 +71,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Galerie**: Zurück aus einem Album (mit **‹ Alle Alben** oder der Zurück-Taste) führt wieder an die Stelle der
   Übersicht, an der man das Album geöffnet hat, statt an den Anfang. Nach dem Schließen der Großansicht steht das
   zuletzt gezeigte Bild im Album im Blick, auch wenn man weit geblättert hat.
+  Die Zurück-Taste (oder -Geste) bei offener Großansicht schließt nur das Bild, statt das Album zu verlassen.
 
 ### Behoben
 

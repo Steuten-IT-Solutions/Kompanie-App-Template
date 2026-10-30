@@ -2811,6 +2811,19 @@ test('Galerie: Zurück führt an die Stelle der Übersicht, Schließen der Groß
   await expect(page.locator('.lightbox')).toHaveCount(0);
   await expect(page.locator('.photo').nth(2)).toBeFocused();
   await expect(page.locator('.photo').nth(2)).toBeInViewport();
+
+  // Zurück bei offener Großansicht schließt nur sie, das Album bleibt.
+  const albumUrl = page.url();
+  await page.locator('.photo').nth(1).click();
+  await expect(page.locator('.lb-count')).toHaveText('2 / 3');
+  await page.goBack();
+  await expect(page.locator('.lightbox')).toHaveCount(0);
+  await expect(page.locator('.photo')).toHaveCount(3);
+  expect(page.url()).toBe(albumUrl);
+  await expect(page.locator('.photo').nth(1)).toBeFocused();
+  // Nach dem Schließen (oben mit Escape, hier mit Zurück) bleibt kein Eintrag übrig: Zurück führt zur Übersicht.
+  await page.goBack();
+  await expect(page.locator('.album-card', { hasText: 'Sommerfest' })).toBeVisible();
   await page.setViewportSize(devices['iPhone 13'].viewport);
 });
 

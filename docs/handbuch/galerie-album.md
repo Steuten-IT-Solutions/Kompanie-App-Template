@@ -23,7 +23,7 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 1. Tippe auf ein Vorschaubild. Es öffnet sich groß, auf dunklem Hintergrund, und nach einem Moment in voller Auflösung.
 2. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf **›** bzw. **‹**. Am Computer gehen auch die Pfeiltasten.
 3. Unten steht, das wievielte Bild es ist, z. B. „3 / 3“, bei internen Bildern mit „intern“.
-4. Tippe auf **✕** oben rechts, um das Bild zu schließen. Am Computer geht auch die Escape-Taste. Das Album zeigt dann die Stelle mit dem zuletzt angesehenen Bild.
+4. Tippe auf **✕** oben rechts, um das Bild zu schließen. Am Computer geht auch die Escape-Taste, auf dem Handy auch die Zurück-Taste oder -Geste. Das Album zeigt dann die Stelle mit dem zuletzt angesehenen Bild.
 
 ![Bild in der Großansicht mit Pfeilen zum Blättern und dem Knopf ✕](bild:galerie-album-bild)
 

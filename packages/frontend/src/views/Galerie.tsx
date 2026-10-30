@@ -171,6 +171,10 @@ function Album({ id }: { id: number }) {
   );
 }
 
+function isLightboxEntry(): boolean {
+  return !!(window.history.state as { lightbox?: boolean } | null)?.lightbox;
+}
+
 type Zoom = { scale: number; x: number; y: number };
 const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 const MAX_ZOOM = 4;
@@ -195,7 +199,23 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   const [i, setI] = useState(start);
   const current = useRef(i);
   current.current = i;
-  const close = useCallback(() => onClose(current.current), [onClose]);
+  // Zurück (Taste, Geste des Geräts) schließt die Großansicht statt das Album: Beim Öffnen kommt ein Eintrag mit derselben
+  // Adresse in den Verlauf (kein hashchange, der Router merkt nichts). Schließen mit ✕ oder Escape nimmt ihn wieder weg.
+  const closing = useRef(false);
+  const close = useCallback(() => {
+    if (closing.current) return;
+    closing.current = true;
+    if (isLightboxEntry()) window.history.back();
+    else onClose(current.current);
+  }, [onClose]);
+  useEffect(() => {
+    if (!isLightboxEntry()) window.history.pushState({ ...window.history.state, lightbox: true }, '');
+    const onPop = () => {
+      if (!isLightboxEntry()) onClose(current.current);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [onClose]);
   const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
   const gesture = useRef<{ kind: 'swipe' | 'pan' | 'pinch'; x: number; y: number; start: Zoom; dist?: number } | null>(null);
   const lastTap = useRef(0);
