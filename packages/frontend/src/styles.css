@@ -237,8 +237,11 @@ select {
   border-bottom: 1px solid var(--line-strong);
 }
 .install-hint-logo {
-  width: 38px;
+  /* Nur die Höhe festlegen, damit nicht-quadratische Logos (z. B. Wappen) nicht gestaucht werden */
   height: 38px;
+  width: auto;
+  max-width: 56px;
+  object-fit: contain;
   flex: none;
 }
 .install-hint-text {
@@ -5451,8 +5454,8 @@ button.spotlight-person:focus-visible {
     padding: 4px var(--content-pad-r) 4px 16px;
   }
   .install-hint-logo {
-    width: 28px;
     height: 28px;
+    max-width: 42px;
   }
   .install-hint-text span {
     display: none;
