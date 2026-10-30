@@ -75,6 +75,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
   Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
   die neue Version.
+- **Update mit Passwort für Sicherungen und Google Drive**: Ist ein Passwort für Sicherungen eingerichtet, scheiterte
+  das Update bei einer großen Sicherung mit einem kritischen Fehler (zu wenig Arbeitsspeicher beim Verschlüsseln der
+  Sicherung für Google Drive). Die Sicherung wird jetzt in kleinen Stücken verschlüsselt. Das wirkt bei Updates, die
+  von dieser Version aus eingespielt werden.
 
 ### Entfernt
 

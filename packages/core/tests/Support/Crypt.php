@@ -17,9 +17,7 @@ final class Crypt
      */
     public static function encrypt($in, $out, array $key, array $meta = []): void
     {
-        BackupCrypto::encryptTo($out, $key, $meta, static function ($out) use ($in): void {
-            stream_copy_to_stream($in, $out);
-        });
+        BackupCrypto::encryptTo($out, $key, $meta, static fn ($out) => BackupCrypto::copy($in, $out));
     }
 
     public static function string(string $data, string $passphrase): string

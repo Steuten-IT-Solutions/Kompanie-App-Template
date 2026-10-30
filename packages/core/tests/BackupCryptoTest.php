@@ -168,9 +168,54 @@ final class BackupCryptoTest extends TestCase
         }
     }
 
+    /**
+     * copy() schreibt in begrenzten Stücken, gleich wie PHP Dateien kopiert: Der Filter zum Verschlüsseln hält jedes
+     * Stück etwa dreifach im Speicher (ein Update mit großer Sicherung scheiterte an memory_limit).
+     */
+    public function testCopyWritesInLimitedPieces(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'kompanie-copy');
+        try {
+            file_put_contents($file, str_repeat(random_bytes(1024 * 1024), 5) . 'Rest');
+            $in = fopen($file, 'rb');
+            $out = fopen('php://memory', 'w+b');
+            stream_filter_register('kompanie-test.largest-write', LargestWrite::class);
+            LargestWrite::$largest = 0;
+            stream_filter_append($out, 'kompanie-test.largest-write', STREAM_FILTER_WRITE);
+            BackupCrypto::copy($in, $out);
+            fclose($in);
+            rewind($out);
+            $this->assertSame(hash_file('sha256', $file), hash('sha256', (string) stream_get_contents($out)));
+            $this->assertLessThanOrEqual(256 * 1024, LargestWrite::$largest, 'höchstens 256 KB je Schreibvorgang');
+        } finally {
+            @unlink($file);
+        }
+    }
+
     private static function flip(string $s, int $pos): string
     {
         $s[$pos] = chr(ord($s[$pos]) ^ 1);
         return $s;
+    }
+}
+
+/** Schreibfilter für testCopyWritesInLimitedPieces: merkt sich das größte Stück. */
+final class LargestWrite extends \php_user_filter
+{
+    public static int $largest = 0;
+
+    /**
+     * @param resource $in
+     * @param resource $out
+     * @param int $consumed
+     */
+    public function filter($in, $out, &$consumed, bool $closing): int
+    {
+        while ($bucket = stream_bucket_make_writeable($in)) {
+            self::$largest = max(self::$largest, $bucket->datalen);
+            $consumed += $bucket->datalen;
+            stream_bucket_append($out, $bucket);
+        }
+        return PSFS_PASS_ON;
     }
 }
