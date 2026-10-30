@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   api,
+  can,
+  config,
   levelLabel,
+  type FormerRetention,
   type CreatedFormer,
   type FormerImportResult,
   type FormerInfo,
@@ -9,7 +12,7 @@ import {
   type FormerOfficesPreview,
   type FormerReason,
 } from '../api';
-import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday } from '../birthdays';
+import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
@@ -192,7 +195,104 @@ export function FormerList() {
         ))}
         {list.length === 0 && (data ?? []).length > 0 && <Empty>Niemand gefunden.</Empty>}
       </ul>
+      {can('manage_settings') && <RetentionCard onChanged={reload} />}
     </div>
+  );
+}
+
+/**
+ * Aufbewahrungsfrist (nur Admins, Standard aus): Nach so vielen Jahren seit dem Ausscheiden löscht die App die
+ * persönlichen Angaben; die Chronik bleibt. Vorschau, wen es beim nächsten Lauf und in den nächsten 30 Tagen trifft.
+ */
+function RetentionCard({ onChanged }: { onChanged: () => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.formerRetention(), [], 'admin/former/retention');
+  const [form, setForm] = useState<{ years: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const r = data!;
+  const f = form ?? { years: r.years > 0 ? String(r.years) : '' };
+  const names = (list: FormerRetention['due']) =>
+    list.map((p) => `${p.name}${p.left_on ? ` (${formatYearOrDate(p.left_on)})` : ''}`).join(', ');
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const years = f.years.trim() === '' ? 0 : Number(f.years);
+    if (!Number.isInteger(years) || years < 0 || years > 50) {
+      setSaveError('Bitte die Frist in ganzen Jahren angeben (0 bis 50; leer oder 0 = aus).');
+      return;
+    }
+    const data = { years };
+    setBusy(true);
+    setSaveError(null);
+    try {
+      // Erst zeigen, wen es trifft: Beim Einschalten kommt der erste Lauf wenige Minuten nach dem Speichern, sonst gilt
+      // der tägliche Lauf.
+      if (years > 0) {
+        const preview = await api.setFormerRetention({ ...data, preview: true });
+        const due = preview.due.length;
+        const question =
+          due > 0
+            ? `Beim nächsten Lauf (spätestens in einem Tag) werden bei ${due} Ehemaligen die persönlichen Angaben endgültig gelöscht: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
+            : `Bei Ehemaligen ${years} Jahre nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
+        if (!window.confirm(question)) return;
+      }
+      setData(await api.setFormerRetention(data)); // auch in den Zwischenspeicher, neu geladen wird wie sonst
+      setForm(null);
+      onChanged();
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="form card settings-section" onSubmit={save} aria-labelledby="former-retention-title">
+      <h3 id="former-retention-title">Aufbewahrungsfrist</h3>
+      <p className="muted small">
+        Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App bei Ehemaligen
+        so viele Jahre nach dem Ausscheiden endgültig die persönlichen Angaben: Adresse, Handynummer, E-Mail-Adresse, Anmeldung, Geburtstag,
+        Strafen, Anwesenheiten, Antworten in Umfragen, Benachrichtigungen, Signatur und Einstellungen. Für die Chronik bleiben Name, Eintrag
+        als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr. Ohne Datum des Ausscheidens zählt der Tag des Eintragens.
+        Leer oder 0: aus.
+        {config?.variant === 'wordpress' &&
+          ' Der Benutzer der Webseite (Anmeldung, E-Mail-Adresse) bleibt in WordPress; ihn löscht oder ändert ein Administrator der Webseite unter Benutzer.'}
+      </p>
+      <label className="field">
+        <span>Jahre nach dem Ausscheiden</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={50}
+          value={f.years}
+          onChange={(e) => setForm({ ...f, years: e.target.value })}
+        />
+      </label>
+      {r.years > 0 && (
+        <p className="small">
+          {r.due.length > 0 ? <>Beim nächsten Lauf (täglich) fällig: {names(r.due)}.</> : 'Zurzeit ist niemand fällig.'}
+          {r.soon.length > 0 && <> In den nächsten 30 Tagen fällig: {names(r.soon)}.</>}
+        </p>
+      )}
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+      {form && (
+        <div className="button-row">
+          <button className="btn" type="submit" disabled={busy}>
+            {busy ? 'Speichert …' : 'Speichern'}
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={() => setForm(null)}>
+            Abbrechen
+          </button>
+        </div>
+      )}
+    </form>
   );
 }
 
@@ -261,7 +361,7 @@ export function NewFormer() {
     e.preventDefault();
     setFormError(null);
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
-    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
@@ -327,7 +427,7 @@ export function NewFormer() {
       </button>
       <NameFields value={name} onChange={setName} />
       <FormerFields value={former} onChange={setFormer} />
-      {canSetBirthdays() && (
+      {canEnterBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
           <legend>Geburtstag (optional)</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />
@@ -421,11 +521,20 @@ export function FormerPanel({
   }
 
   async function reactivate() {
-    if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?`)) return;
+    // Benutzername und E-Mail-Adresse löscht die Frist nur in der eigenständigen Version (WordPress: Benutzer der Webseite).
+    const loginDeleted = former?.personal_deleted && config?.variant !== 'wordpress';
+    const deleted = former?.personal_deleted
+      ? ` Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht${loginDeleted ? ', auch Benutzername und E-Mail-Adresse' : ''}.`
+      : '';
+    if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`)) return;
     setBusy(true);
     try {
       await api.reactivate(id);
-      onToast(`${name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.`);
+      onToast(
+        loginDeleted
+          ? `${name} ist wieder aufgenommen. Bitte unter „Angaben ändern“ Benutzername und E-Mail-Adresse neu eintragen, dann ein neues Startpasswort erzeugen.`
+          : `${name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.`,
+      );
       onChanged();
     } catch (err) {
       onToast((err as Error).message);

@@ -83,7 +83,14 @@ enum Capability: string
     case ManageLists = 'manage_lists';
     /** E-Mails aus der Verwaltung schreiben und versenden, Verlauf mit Versandprotokoll sehen (Bereich E-Mails). */
     case SendMail = 'send_mail';
-    /** Mitglieder anlegen, Startpasswörter erzeugen. */
+    /**
+     * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
+     * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.
+     */
+    case ViewPersonal = 'view_personal';
+    /** Persönliche Angaben anderer ändern (setzt view_personal voraus). */
+    case ManagePersonal = 'manage_personal';
+    /** Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
@@ -97,13 +104,17 @@ enum Capability: string
 
     /**
      * Recht, das dieses voraussetzt: Eigene Punkte, Strafen, Dienstgrad und Anwesenheit sowie alles zum Verwalten gibt es
-     * nur für Mitglieder (sonst sähe die Person ihre Mitglieder nicht bzw. hätte nichts Eigenes). Die einzige Stelle
-     * für diese Regel; die App hat sie in capabilities.ts (REQUIRES) noch einmal.
+     * nur für Mitglieder (sonst sähe die Person ihre Mitglieder nicht bzw. hätte nichts Eigenes). Persönliche Angaben
+     * pflegt nur, wer sie sieht (manage_personal → view_personal → member). Die einzige Stelle für diese Regel; die App
+     * hat sie in capabilityRules.ts (requires) noch einmal.
      */
     public function requires(): ?self
     {
         if (in_array($this, self::ownData(), true)) {
             return self::Member;
+        }
+        if ($this === self::ManagePersonal) {
+            return self::ViewPersonal;
         }
         return $this->isView() || $this === self::Member ? null : self::Member;
     }
@@ -134,13 +145,14 @@ enum Capability: string
 
     /**
      * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
-     * Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in adminNav.tsx). Punkte und
-     * Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht (MemberService::visibleParts).
+     * Anwesenheit pflegt, persönliche Angaben sieht, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in
+     * adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
+     * (MemberService::visibleParts).
      *
      * @return list<self>
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::CreateUsers, self::PromoteUsers];
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ViewPersonal, self::CreateUsers, self::PromoteUsers];
     }
 }

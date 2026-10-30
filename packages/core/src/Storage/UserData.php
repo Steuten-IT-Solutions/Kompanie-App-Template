@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Storage\Sql\Connection;
 
@@ -50,8 +51,91 @@ final class UserData
         'activity_last' => 'user_id',
     ];
 
-    /** @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden */
-    public static function purge(Connection $db, int $userId, ?string $pollSecret = null): void
+    /**
+     * Was bei der Aufbewahrungsfrist für Ehemalige bleibt (Chronik, purge mit $keepChronicle): Punkte, Dienstgrad mit
+     * Verlauf, Titel, Foto, Eintrittsjahr und der Eintrag als ehemaliges Mitglied; dazu Ämter und Zeilen in Listen mit
+     * ihrer Verknüpfung.
+     */
+    public const CHRONICLE = ['points', 'rank_history', 'member_ranks', 'member_titles', 'member_photos', 'join_years', 'former_members'];
+
+    /**
+     * Tabelle => Spalte mit der Person; auch für die Auskunft (Domain\PersonalDataExport), damit Löschen und Auskunft
+     * dieselben Tabellen kennen.
+     *
+     * @return array<string, string>
+     */
+    public static function tables(): array
+    {
+        return self::TABLES;
+    }
+
+    /**
+     * Wer von $userIds hat noch persönliche Angaben (Tabellen außer CHRONICLE, Push-Abos, eigene Bilder, Entwürfe)? Für
+     * die Aufbewahrungsfrist: nur bei ihnen erneut löschen. Eine Abfrage je Tabelle, nicht je Person.
+     *
+     * @param list<int> $userIds
+     * @param string|null $pollSecret wie bei purge(): auch anonyme Antworten in Umfragen (über das Pseudonym)
+     * @param string|null $activitySecret auch „zuletzt gesehen“ der Nutzungsauswertung (activity_seen, über das Pseudonym)
+     * @return list<int>
+     */
+    public static function withPersonalData(Connection $db, array $userIds, ?string $pollSecret = null, ?string $activitySecret = null): array
+    {
+        $queries = [];
+        foreach (self::TABLES as $table => $column) {
+            if (!in_array($table, self::CHRONICLE, true)) {
+                $queries[] = 'SELECT DISTINCT ' . $column . ' AS id FROM {' . $table . '} WHERE ' . $column . ' IN (%s)';
+            }
+        }
+        // Dieselben Stellen außerhalb von TABLES wie in purge() (dort ändern, dann auch hier)
+        $queries[] = 'SELECT DISTINCT user_id AS id FROM {push_subscriptions} WHERE user_id IN (%s)';
+        $queries[] = "SELECT DISTINCT owner_id AS id FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id IN (%s)";
+        $queries[] = "SELECT DISTINCT owner_id AS id FROM {attachments} WHERE owner_type = 'draft' AND owner_id IN (%s)";
+        $found = [];
+        foreach (array_chunk(array_values(array_unique($userIds)), 500) as $chunk) {
+            $in = implode(', ', array_fill(0, count($chunk), '?'));
+            foreach ($queries as $sql) {
+                try {
+                    foreach ($db->select(sprintf($sql, $in), $chunk) as $r) {
+                        $found[(int) $r['id']] = true;
+                    }
+                } catch (\RuntimeException $e) {
+                    // Tabelle fehlt oder kurz nicht erreichbar: der nächste Lauf prüft wieder
+                    error_log('Kompanie-App: Prüfung auf persönliche Angaben unvollständig: ' . $e->getMessage());
+                }
+            }
+        }
+        // Über Pseudonyme: anonyme Antworten in Umfragen, „zuletzt gesehen“ der Nutzungsauswertung
+        $pseudonymous = [];
+        if ($pollSecret !== null) {
+            $pseudonymous[] = ['SELECT DISTINCT vote_ref AS ref FROM {poll_answers} WHERE user_id IS NULL AND vote_ref IN (%s)', static fn (int $id): string => PollService::pseudonym($pollSecret, $id)];
+        }
+        if ($activitySecret !== null) {
+            $pseudonymous[] = ['SELECT DISTINCT token AS ref FROM {activity_seen} WHERE token IN (%s)', static fn (int $id): string => ActivityService::token($activitySecret, $id)];
+        }
+        foreach ($pseudonymous as [$sql, $ref]) {
+            $refs = [];
+            foreach ($userIds as $id) {
+                $refs[$ref($id)] = $id;
+            }
+            foreach (array_chunk(array_keys($refs), 500) as $chunk) {
+                try {
+                    foreach ($db->select(sprintf($sql, implode(', ', array_fill(0, count($chunk), '?'))), $chunk) as $r) {
+                        $found[$refs[(string) $r['ref']]] = true;
+                    }
+                } catch (\RuntimeException $e) {
+                    error_log('Kompanie-App: Prüfung auf persönliche Angaben unvollständig: ' . $e->getMessage());
+                }
+            }
+        }
+        return array_keys($found);
+    }
+
+    /**
+     * @param string|null $pollSecret Geheimnis der Umfragen (PollService::SECRET_SETTING) dieser Seite, falls vorhanden
+     * @param bool $keepChronicle nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige): CHRONICLE bleibt
+     * @return bool ob alles geklappt hat (sonst steht es im Fehlerprotokoll)
+     */
+    public static function purge(Connection $db, int $userId, ?string $pollSecret = null, bool $keepChronicle = false): bool
     {
         $ok = true;
         if ($pollSecret !== null) {
@@ -68,8 +152,10 @@ final class UserData
             $ok = false; // Tabelle fehlt (ältere Version oder Seite ohne die App)
         }
         try {
-            $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
-            $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+            if (!$keepChronicle) {
+                $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
+                $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);
+            }
         } catch (\RuntimeException) {
             $ok = false;
         }
@@ -80,11 +166,16 @@ final class UserData
             $ok = false;
         }
         try {
-            $db->execute('UPDATE {list_rows} SET user_id = NULL WHERE user_id = ?', [$userId]);
+            if (!$keepChronicle) {
+                $db->execute('UPDATE {list_rows} SET user_id = NULL WHERE user_id = ?', [$userId]);
+            }
         } catch (\RuntimeException) {
             $ok = false;
         }
         foreach (self::TABLES as $table => $column) {
+            if ($keepChronicle && in_array($table, self::CHRONICLE, true)) {
+                continue;
+            }
             try {
                 $db->execute('DELETE FROM {' . $table . '} WHERE ' . $column . ' = ?', [$userId]);
             } catch (\RuntimeException) {
@@ -94,5 +185,6 @@ final class UserData
         if (!$ok) {
             error_log('Kompanie-App: Nicht alle Tabellen gefunden beim Löschen der Daten von Benutzer ' . $userId . '.');
         }
+        return $ok;
     }
 }

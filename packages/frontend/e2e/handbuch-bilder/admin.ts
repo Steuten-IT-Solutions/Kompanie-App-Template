@@ -59,6 +59,10 @@ const gruppe: Gruppe = async (f) => {
   await f.oeffnen('einstellungen/benachrichtigungen');
   await f.foto('admin-benachrichtigungen');
 
+  // Geburtstage: Vorlauf der Karte „Anstehende Geburtstage“
+  await f.oeffnen('einstellungen/geburtstage');
+  await f.foto('admin-geburtstage');
+
   // E-Mail: Kompanieadresse und Mailserver (Beispielwerte, nicht gespeichert)
   await f.oeffnen('einstellungen/email');
   const email = page.locator('#einstellungen-email');

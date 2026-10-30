@@ -116,6 +116,8 @@ final class Roles
         Capability::ManageOffices,
         Capability::ManageInventory,
         // Mitglieder und Rollen
+        Capability::ViewPersonal,
+        Capability::ManagePersonal,
         Capability::CreateUsers,
         Capability::PromoteUsers,
     ];

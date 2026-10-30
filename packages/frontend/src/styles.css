@@ -544,10 +544,7 @@ select {
   background: #d8ead9;
   color: #1d5a31;
 }
-.badge-role,
-.badge-level-organizer,
-.badge-level-manager,
-.badge-level-admin {
+.badge-role {
   background: var(--accent);
   color: var(--on-accent);
   margin-left: 6px;
@@ -3823,13 +3820,12 @@ fieldset.rights-tree legend {
   }
 }
 
-/* Geburtstage (Issue #1): Karte „Anstehende Geburtstage“, Liste nach Monaten, Eingabe Tag/Monat/Jahr */
+/* Geburtstage (Issue #1): Karte „Anstehende Geburtstage“, Eingabe Tag/Monat/Jahr */
 .birthdays-upcoming {
-  padding: 14px 14px 6px;
+  padding: 14px 14px 10px;
   margin-bottom: 18px;
 }
-.birthdays-title,
-.birthdays-page-title {
+.birthdays-title {
   margin: 0 0 10px;
   font-family: var(--font-head);
   font-weight: 600;
@@ -3871,10 +3867,6 @@ fieldset.rights-tree legend {
 .birthday-badge {
   background: var(--accent);
   color: var(--on-accent);
-}
-.birthdays-all {
-  display: block;
-  margin: 2px 0 6px auto;
 }
 .birthday-fields .birthday-day {
   flex: 0 0 84px;
@@ -5565,4 +5557,38 @@ button.spotlight-person:focus-visible {
     max-width: 760px;
     margin-inline: auto;
   }
+}
+
+/* Postanschrift (AddressFields): Straße und Nr., PLZ und Ort nebeneinander; Nr. und PLZ schmal */
+.address-fields .field {
+  margin-bottom: 8px;
+}
+.address-row {
+  display: flex;
+  gap: 8px;
+}
+.address-row > .field {
+  flex: 1;
+  min-width: 0;
+}
+.address-row > .address-house-number {
+  flex: 0 0 5.5em;
+}
+.address-row > .address-postal-code {
+  flex: 0 0 7em;
+}
+.address-lines {
+  margin: 0;
+  white-space: pre-line;
+}
+.address-fields {
+  margin: 0 0 12px;
+  min-width: 0;
+}
+.bulk-address {
+  margin: 0 0 12px;
+}
+.bulk-address summary {
+  cursor: pointer;
+  padding: 4px 0;
 }

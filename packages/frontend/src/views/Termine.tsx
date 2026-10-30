@@ -3,8 +3,9 @@ import { can, config } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
-import { eventEnd, eventStart, formatEventWhen, formatMonth } from '../format';
+import { eventEnd, eventStart, formatEventWhen, formatMonth, shortMonth } from '../format';
 import { downloadIcs } from '../ics';
+import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { hasEvents, sources, type EventLike } from '../viewData';
@@ -73,6 +74,7 @@ function EventList({ focus }: { focus?: string }) {
       </>
     );
 
+  const platform = mapPlatform();
   return (
     <div className="events">
       {birthdays}
@@ -84,12 +86,13 @@ function EventList({ focus }: { focus?: string }) {
             {evs.map((ev) => {
               const s = eventStart(ev);
               const isOpen = open === ev.id;
+              const map = isOpen ? mapSearchUrl(ev.location, platform) : null;
               return (
                 <li key={ev.id} className={`card event ${isOpen ? 'open' : ''} ${flash === ev.id ? 'focused' : ''}`} data-focus-id={ev.id}>
                   <button className="event-head" onClick={() => setOpen(isOpen ? null : ev.id)} aria-expanded={isOpen}>
                     <div className="date-badge" aria-hidden="true">
                       <span className="day">{s.getDate()}</span>
-                      <span className="mon">{s.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')}</span>
+                      <span className="mon">{shortMonth(s)}</span>
                     </div>
                     <div className="event-main">
                       <div className="event-title">{ev.title}</div>
@@ -109,13 +112,8 @@ function EventList({ focus }: { focus?: string }) {
                             Mehr Infos
                           </a>
                         )}
-                        {ev.location && (
-                          <a
-                            className="btn btn-secondary"
-                            href={`https://maps.google.com/?q=${encodeURIComponent(ev.location)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
+                        {map && (
+                          <a className="btn btn-secondary" href={map} {...mapLinkTarget(map)}>
                             Karte
                           </a>
                         )}

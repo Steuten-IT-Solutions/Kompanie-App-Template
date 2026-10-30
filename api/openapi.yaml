@@ -143,6 +143,27 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Error' }
 
+  /me/data:
+    get:
+      tags: [Eigene Daten]
+      summary: Alle eigenen Daten herunterladen (Auskunft nach Art. 15 DSGVO)
+      description: |
+        Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
+        `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag, Foto (Base64) und `account` (vom Adapter: angelegt am,
+        letzte Anmeldung, Sitzungen ohne Schlüssel); `data` je Tabelle die Zeilen der Person
+        (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
+        eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        Enthält auch die eigenen Antworten in anonymen Umfragen und die eigene Nutzungsauswertung.
+      responses:
+        '200':
+          description: Daten der Person
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /me/attendance:
     get:
       tags: [Eigene Daten]
@@ -397,16 +418,17 @@ paths:
   /me/account:
     get:
       tags: [Eigene Daten]
-      summary: Eigene E-Mail-Adresse und Handynummer (Meins → Konto)
+      summary: Eigene E-Mail-Adresse, Handynummer und Adresse (Meins → Konto)
       responses:
         '200': { $ref: '#/components/responses/OwnAccount' }
         '401': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Eigene Daten]
-      summary: Eigene E-Mail-Adresse und Handynummer ändern
+      summary: Eigene E-Mail-Adresse, Handynummer und Adresse ändern
       description: |
         Eine neue E-Mail-Adresse nur mit dem aktuellen Passwort (wie beim Passwortwechsel höchstens 5 Versuche in
-        15 Minuten). Felder, die fehlen, bleiben; Name und Benutzername ändert hier niemand.
+        15 Minuten); die Adresse ohne. Felder, die fehlen, bleiben; Name und Benutzername ändert hier niemand. Erst wird
+        alles geprüft, bei einem Fehler ändert sich nichts.
       requestBody:
         required: true
         content:
@@ -416,6 +438,7 @@ paths:
               properties:
                 email: { type: string, description: 'Leer entfernt sie' }
                 phone: { type: string, maxLength: 30, description: 'Ziffern, Leerzeichen und + ( ) / -, 5 bis 20 Ziffern; leer entfernt sie' }
+                address: { $ref: '#/components/schemas/AddressInput' }
                 current_password: { type: string, description: 'Pflicht, wenn sich die E-Mail-Adresse ändert' }
       responses:
         '200': { $ref: '#/components/responses/OwnAccount' }
@@ -524,23 +547,6 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
-
-  /push/key:
-    get:
-      tags: [Benachrichtigungen]
-      summary: Öffentlicher VAPID-Schlüssel des Servers
-      security: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [supported, publicKey]
-                properties:
-                  supported: { type: boolean, description: Der Server kann Push-Nachrichten verschlüsseln und signieren }
-                  publicKey: { type: string, description: 'applicationServerKey (base64url, unkomprimierter P-256-Punkt); leer, wenn nicht unterstützt' }
 
   /me/push/status:
     post:
@@ -2011,7 +2017,7 @@ paths:
         - name: days
           in: query
           required: false
-          description: 'Nur die nächsten N Tage (0–366), heute eingeschlossen; die App fragt `days=7` (heute und die nächsten 7 Tage).'
+          description: 'Nur die nächsten N Tage (0–366), heute eingeschlossen; die App fragt `days` mit dem Vorlauf aus `/config` (`birthdays.upcomingDays`, Standard 7).'
           schema: { type: integer, minimum: 0, maximum: 366 }
       responses:
         '200':
@@ -3302,6 +3308,34 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/data:
+    get:
+      tags: [Verwaltung]
+      summary: Alle Daten einer Person herunterladen (Auskunft nach Art. 15 DSGVO)
+      description: |
+        Auskunft nach Art. 15 DSGVO als Datei (`Content-Disposition: attachment`, `Cache-Control: no-store`):
+        `{format: "kompanie-app-personal-data", formatVersion, created, kompanie, person, data}`. `person` mit Profil,
+        Rollen, Geburtstag, Eintrittsjahr, Ehemaligen-Eintrag und Foto (Base64); `data` je Tabelle die Zeilen der Person
+        (dieselben Tabellen wie beim Löschen, dazu Push-Abos ohne Schlüssel, Ämter, Listen, Änderungen am Schwarzen Brett,
+        eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
+        Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
+        Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
+        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `view_personal`,
+        `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
+        `send_mail`, `manage_lists`, `post_board`, `view_offices`.
+      x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Daten der Person
+          content:
+            application/json:
+              schema: { type: object }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/former:
     get:
       tags: [Verwaltung]
@@ -3405,7 +3439,9 @@ paths:
         CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
         Windows-1252, höchstens 200 KB und 500 Personen. Die erste Zeile enthält die Spaltennamen (Reihenfolge und Groß- und
         Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
-        geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden, grund. Unbekannte Spalten und
+        handynummer (auch handy, mobil), straße, hausnummer, adresszusatz, plz, ort, land (Name oder ISO-Code, leer = DE;
+        Prüfung wie `AddressInput`), geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden,
+        grund. Unbekannte Spalten und
         Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
         status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
         Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
@@ -3561,7 +3597,9 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Angaben eines Kontos zum Bearbeiten (Issue #24)
-      description: Mit denselben Grenzen wie beim Passwort-Zurücksetzen (Admins nur für Admins usw.).
+      description: |
+        Mit denselben Grenzen wie beim Passwort-Zurücksetzen (Admins nur für Admins usw.). `phone` nur für das eigene
+        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`.
       x-capability: create_users
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
@@ -3569,8 +3607,10 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Verwaltung]
-      summary: Vor- und Nachname, E-Mail, Handynummer und Benutzername ändern; ein neuer Benutzername meldet das Konto auf allen Geräten ab
-      description: Der Anzeigename wird „Vorname Nachname“. Felder, die fehlen, bleiben.
+      summary: Vor- und Nachname, E-Mail und Benutzername ändern; ein neuer Benutzername meldet das Konto auf allen Geräten ab
+      description: |
+        Der Anzeigename wird „Vorname Nachname“. Felder, die fehlen, bleiben. `phone` bei anderen nur mit
+        `manage_personal` (sonst 403); besser `PUT /members/{id}/personal`.
       x-capability: create_users
       requestBody:
         required: true
@@ -3588,6 +3628,39 @@ paths:
                 current_password: { type: string, description: 'Pflicht, wenn jemand die eigene E-Mail-Adresse ändert' }
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/personal:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: Persönliche Angaben einer Person ändern (E-Mail, Handynummer, Adresse)
+      description: |
+        Für alle Konten, auch Admins und Ehemalige. Eine andere E-Mail-Adresse nur mit den Grenzen der Kontoverwaltung
+        (`GET /members/{id}/account`), denn über sie lässt sich bei WordPress das Passwort zurücksetzen; die eigene nur
+        mit `current_password`. Felder, die fehlen, bleiben. Erst wird alles geprüft. Das Geburtsdatum über
+        `PUT /members/{id}/birthday`.
+      x-capability: manage_personal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+                phone: { type: string, maxLength: 30, description: 'Leer entfernt sie' }
+                address: { $ref: '#/components/schemas/AddressInput' }
+                current_password: { type: string, description: 'Pflicht, wenn jemand die eigene E-Mail-Adresse ändert' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PersonalInfo' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -3723,7 +3796,7 @@ paths:
         Nur das Datum (Prüfung wie bei `PUT /me/birthday`). `visible`, `show_age` und `profile` entscheidet allein die
         Person: Sie bleiben, wie sie sind (mitgeschickte Werte werden nicht übernommen); ein neuer Eintrag ist sichtbar,
         ohne Alter und nicht auf der Seite in der Mitgliederliste.
-      x-capability: create_users
+      x-capability: manage_personal
       requestBody:
         required: true
         content:
@@ -3747,7 +3820,7 @@ paths:
     delete:
       tags: [Geburtstage]
       summary: Geburtstag eines Mitglieds entfernen
-      x-capability: create_users
+      x-capability: manage_personal
       responses:
         '200':
           description: Entfernt (`birthday` ist null)
@@ -3779,6 +3852,8 @@ paths:
                 name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
+                phone: { type: string, maxLength: 30, description: 'Handynummer (optional), Prüfung wie bei `PATCH /me/account`' }
+                address: { $ref: '#/components/schemas/AddressInput' }
                 level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
                 initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
@@ -3803,7 +3878,7 @@ paths:
       summary: Mehrere Mitglieder (bzw. mit einer Rolle für neue Konten) auf einmal anlegen (Issue #24)
       description: |
         Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
-        Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
+        Handynummer, Adresse, Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
         Scheitert danach doch eines, steht es mit `error` im Ergebnis. Die Ergebnisse stehen in der Reihenfolge von
         `people`. Fotos lassen sich je Person mitschicken; die App lädt sie stattdessen danach einzeln mit `PUT
         /members/{id}/photo` hoch, damit die Anfrage nicht größer wird, als der Server annimmt (`post_max_size`).
@@ -3829,6 +3904,8 @@ paths:
                       name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet' }
                       username: { type: string }
                       email: { type: string, format: email }
+                      phone: { type: string, maxLength: 30 }
+                      address: { $ref: '#/components/schemas/AddressInput' }
                       initial_points: { type: integer, minimum: 0 }
                       initial_points_date: { type: string, format: date }
                       rank_id: { type: integer }
@@ -4611,6 +4688,34 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /admin/birthdays:
+    get:
+      tags: [Einstellungen]
+      summary: Einstellungen der Geburtstage (Vorlauf der Karte „Anstehende Geburtstage“)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BirthdaySettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Vorlauf der Karte „Anstehende Geburtstage“ ändern
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upcoming_days]
+              properties:
+                upcoming_days: { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (0 = nur heute, Standard 7)' }
+      responses:
+        '200': { $ref: '#/components/responses/BirthdaySettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/status:
     get:
       tags: [Wartung]
@@ -4792,6 +4897,18 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
 
   /admin/update:
+    get:
+      tags: [Wartung]
+      summary: Stand der Updates (ohne die übrige Statusseite), z. B. für die Fortschrittsanzeige während eines Updates
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdateStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Wartung]
       summary: Automatische Updates, Kanal und Statusmeldungen einstellen
@@ -4845,6 +4962,8 @@ paths:
         alle Sitzungen enden. WordPress: nur Sicherungen derselben Website; fehlende Konten werden mit
         ihrer ID angelegt (nur mit den WP-Rechten create_users und promote_users), vorhandene behalten
         Anmeldedaten. Passt eine ID nicht zum Benutzernamen, wird nichts geändert (400).
+        Verschlüsselte Sicherungen (beginnen mit `KOMPANIE-BACKUP-ENC`) als `backup_base64` mit `passphrase`;
+        ohne Passwort 400 `passphrase_required`, mit falschem 400.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -4852,9 +4971,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [backup, confirm]
+              required: [confirm]
               properties:
-                backup: { type: string, description: Inhalt der Sicherungsdatei }
+                backup: { type: string, description: Inhalt der Sicherungsdatei (JSON) }
+                backup_base64: { type: string, description: Inhalt der Sicherungsdatei als Base64 (verschlüsselte Sicherung) }
+                passphrase: { type: string, description: Passwort für Sicherungen (nur für verschlüsselte) }
                 confirm: { type: boolean, enum: [true] }
       responses:
         '200':
@@ -4869,6 +4990,116 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/encryption:
+    get:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen – Stand
+      description: |
+        Mit Passwort sind heruntergeladene Sicherungen (`<App>/sicherung?verschluesselt=1`) und alle Sicherungen in
+        Google Drive verschlüsselt (Argon2id, X25519, XChaCha20-Poly1305). Gespeichert wird nur der öffentliche
+        Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen. Verschlüsselt
+        herunterladen geht erst, wenn das Passwort einmal geprüft ist (`verified`, sonst 409).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen einrichten oder ändern
+      description: Mindestens 12 Zeichen, beide gleich (sonst 400). Ältere Sicherungen brauchen weiter das bisherige Passwort.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passphrase, passphrase_confirm]
+              properties:
+                passphrase: { type: string, minLength: 12 }
+                passphrase_confirm: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen entfernen (neue Sicherungen unverschlüsselt, auch die in Google Drive)
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupEncryptionStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/encryption/verify:
+    post:
+      tags: [Wartung]
+      summary: Passwort für Sicherungen prüfen
+      description: Nach 10 Fehlversuchen in 15 Minuten 15 Minuten gesperrt (429); richtige Passwörter zählen nicht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passphrase]
+              properties:
+                passphrase: { type: string }
+      responses:
+        '200':
+          description: Ergebnis
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /admin/former/retention:
+    get:
+      tags: [Verwaltung]
+      summary: Aufbewahrungsfrist für Ehemalige – Stand mit Vorschau
+      description: |
+        Mit Frist (years > 0) löscht eine tägliche Aufgabe bei Ehemaligen so viele Jahre nach dem Ausscheiden die
+        persönlichen Angaben (Kontaktdaten, Anmeldung, Geburtstag, Strafen, Anwesenheiten, Umfragen, Push, Signatur,
+        Einstellungen, Nutzungsauswertung); Name, Eintrag als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und
+        Eintrittsjahr bleiben als Chronik. Stichtag: Datum des Ausscheidens (nur Jahr: 31.12.), ohne Datum der Tag des
+        Eintragens.
+        `due`: beim nächsten Lauf fällig, `soon`: in den nächsten 30 Tagen.
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/FormerRetention' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Verwaltung]
+      summary: Aufbewahrungsfrist für Ehemalige einstellen (0 = aus)
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [years]
+              properties:
+                years: { type: integer, minimum: 0, maximum: 50 }
+                preview: { type: boolean, description: 'Nur die Vorschau (due/soon) für diese Werte, ohne zu speichern' }
+      responses:
+        '200': { $ref: '#/components/responses/FormerRetention' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
 
   /admin/backup/drive:
     get:
@@ -4884,8 +5115,10 @@ paths:
       summary: Sicherungen in Google Drive ein- oder ausschalten
       description: |
         Einschalten braucht eine Verbindung über „Mit Google verbinden“, bei der Google die Berechtigung
-        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen
-        eigenen Ordner im verbundenen Google-Konto und behält die letzten acht.
+        drive.file erlaubt hat (sonst 400). Die App lädt dann einmal pro Woche eine Sicherung in einen eigenen Ordner
+        im verbundenen Google-Konto und behält die letzten acht: mit Passwort für Sicherungen verschlüsselt
+        (`.json.enc`), ohne unverschlüsselt (`.json`). Ist ein Passwort eingerichtet, fehlt aber die Erweiterung
+        sodium, scheitert das Hochladen (statt unverschlüsselt).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -4981,11 +5214,12 @@ components:
         application/json:
           schema:
             type: object
-            required: [available, access, enabled, email, folder_url, last_ok, last_try, error, every_days, keep]
+            required: [available, access, enabled, encrypted, email, folder_url, last_ok, last_try, error, every_days, keep]
             properties:
               available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
               access: { type: boolean, description: Google hat drive.file erlaubt }
               enabled: { type: boolean }
+              encrypted: { type: boolean, description: Mit Passwort für Sicherungen verschlüsselt (.json.enc), sonst unverschlüsselt (.json) }
               email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
               folder_url: { type: [string, 'null'] }
               last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
@@ -4993,6 +5227,36 @@ components:
               error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
               every_days: { type: integer }
               keep: { type: integer }
+    FormerRetention:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [years, due, soon]
+            properties:
+              years: { type: integer, description: 0 = aus }
+              due:
+                type: array
+                items: { $ref: '#/components/schemas/FormerRetentionPerson' }
+              soon:
+                type: array
+                items: { $ref: '#/components/schemas/FormerRetentionPerson' }
+    BackupEncryptionStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, configured, stored, verified, fingerprint, set_at, min_length]
+            properties:
+              available: { type: boolean, description: PHP hat die Erweiterung sodium }
+              configured: { type: boolean, description: Eingerichtet und nutzbar (mit sodium) }
+              stored: { type: boolean, description: 'Eingerichtet, auch wenn sodium fehlt (dann lässt es sich nur entfernen)' }
+              verified: { type: boolean, description: 'Seit dem Einrichten einmal richtig geprüft; erst dann löscht Google Drive alte unverschlüsselte Sicherungen' }
+              fingerprint: { type: [string, 'null'], description: 'Fingerabdruck des öffentlichen Schlüssels, z. B. „3f2a 9c41 07be d5e0“' }
+              set_at: { type: [integer, 'null'], description: Eingerichtet am (Unix-Zeit) }
+              min_length: { type: integer }
     PushStatus:
       description: OK
       content:
@@ -5029,6 +5293,15 @@ components:
             type: object
             properties:
               sent: { type: boolean }
+    BirthdaySettings:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [upcoming_days]
+            properties:
+              upcoming_days: { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (Standard 7)' }
     PushAdmin:
       description: OK
       content:
@@ -5068,17 +5341,14 @@ components:
               last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
               login: { type: string }
               email: { type: string }
-              phone: { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist' }
+              phone: { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist oder der Betrachter view_personal nicht hat' }
               can_change_login: { type: boolean, description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)' }
+              can_export: { type: boolean, description: 'Ob der Betrachter die Auskunft (GET /members/{id}/data) bekommt' }
     OwnAccount:
       description: Eigene Kontaktangaben
       content:
         application/json:
-          schema:
-            type: object
-            properties:
-              email: { type: string }
-              phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
+          schema: { $ref: '#/components/schemas/PersonalInfo' }
     AttendanceGroups:
       description: Je Rolle (ohne Gast), als welche sie im Zähler zählt
       content:
@@ -5723,7 +5993,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -5736,7 +6006,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -5756,7 +6026,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -5819,6 +6089,18 @@ components:
             kind: { type: string, enum: [auto, withdrawn] }
             at: { type: integer }
             error: { type: string }
+        running: { type: boolean, description: 'Gerade läuft ein Update (auch eines, dessen Anfrage durch ein Zeitlimit abgebrochen ist)' }
+        progress:
+          type: [object, 'null']
+          description: 'Nur während running: Schritt des laufenden Updates für die Fortschrittsanzeige'
+          properties:
+            version: { type: string }
+            step: { type: string, enum: [download, backup, drive, install] }
+            steps: { type: array, items: { type: string, enum: [download, backup, drive, install] }, description: Schritte dieses Updates in ihrer Reihenfolge }
+            at: { type: integer, description: Beginn des Schritts }
+            done: { type: [integer, 'null'], description: 'Bytes: bei backup schon geschrieben, bei drive schon hochgeladen; sonst null' }
+            total: { type: [integer, 'null'], description: 'Größe in Bytes; null = unbekannt' }
+            estimate: { type: boolean, description: 'total ist geschätzt (bei backup: Größe der letzten Sicherung vor einem Update)' }
 
     AppConfig:
       type: object
@@ -5835,6 +6117,12 @@ components:
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
+        birthdays:
+          type: [object, 'null']
+          description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'
+          required: [upcomingDays]
+          properties:
+            upcomingDays: { type: integer, minimum: 0, maximum: 30 }
         preview:
           type: [object, 'null']
           description: 'Vorschau „App als Rolle ansehen“ (Issue #63), vom Server bestätigt; null ohne (gültige) Vorschau. user, capabilities und features sind dann die der Rolle.'
@@ -6197,10 +6485,14 @@ components:
               type: array
               items: { $ref: '#/components/schemas/TitleRef' }
             birthday:
-              description: Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag)
+              description: Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage und Recht view_personal; null ohne Eintrag)
               oneOf:
                 - $ref: '#/components/schemas/Birthday'
                 - type: 'null'
+            personal:
+              description: E-Mail-Adresse, Handynummer und Adresse (nur mit Recht view_personal)
+              allOf:
+                - $ref: '#/components/schemas/PersonalInfo'
             join_year:
               description: Eintrittsjahr mit Anzeige (nur mit Recht create_users; null ohne Eintrag)
               oneOf:
@@ -6241,13 +6533,22 @@ components:
 
     FormerInfo:
       type: object
-      required: [reason, joined_on, founder, left_on, previous_level]
+      required: [reason, joined_on, founder, left_on, previous_level, personal_deleted]
       properties:
         reason: { $ref: '#/components/schemas/FormerReason' }
         joined_on: { $ref: '#/components/schemas/FormerDate' }
         founder: { type: boolean }
         left_on: { $ref: '#/components/schemas/FormerDate' }
         previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
+        personal_deleted: { type: boolean, description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse; WordPress: der Benutzer der Webseite bleibt)' }
+
+    FormerRetentionPerson:
+      type: object
+      required: [id, name, left_on]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        left_on: { $ref: '#/components/schemas/FormerDate' }
 
     FormerMember:
       allOf:
@@ -6359,7 +6660,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, create_users, promote_users]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users]
 
     MemberRights:
       type: object
@@ -6401,6 +6702,50 @@ components:
         birthday:
           oneOf:
             - $ref: '#/components/schemas/Birthday'
+            - type: 'null'
+
+    Address:
+      type: object
+      description: |
+        Postanschrift (Domain\Address). Land als ISO 3166-1 alpha-2 aus der Auswahl (DE, AT, CH, NL, BE, LU, FR, DK, PL,
+        CZ, IT, ES, GB, TR); leer heißt anderes Land, dann `country_name`.
+      required: [street, house_number, extra, postal_code, city, country, country_name]
+      properties:
+        street: { type: string, maxLength: 100 }
+        house_number: { type: string, maxLength: 10 }
+        extra: { type: string, maxLength: 100, description: 'Adresszusatz, z. B. c/o' }
+        postal_code: { type: string, maxLength: 12, description: 'Wie im Land üblich geschrieben (12345, 1234 AB, 00-950, 110 00, SW1A 1AA)' }
+        city: { type: string, maxLength: 60 }
+        country: { type: string, description: 'ISO-Code oder leer (anderes Land)' }
+        country_name: { type: string, maxLength: 60, description: 'Nur bei anderem Land' }
+
+    AddressInput:
+      description: |
+        Adresse zum Speichern; null oder alle Felder leer entfernt sie. Pflicht sind dann Straße, PLZ und Ort; ohne
+        `country` gilt DE. Geglättet wird vorher: Leerzeichen, Hausnummer am Ende der Straße in ihr Feld, PLZ ohne
+        Länderkennung (D-, L-, CH-) und wie im Land üblich. Die PLZ wird je Land geprüft (z. B. DE fünfstellig ohne die
+        Leitregion 00, NL `1234 AB`, PL `00-950`); sonst 400 mit Grund.
+      oneOf:
+        - type: 'null'
+        - type: object
+          properties:
+            street: { type: string }
+            house_number: { type: string }
+            extra: { type: string }
+            postal_code: { type: string }
+            city: { type: string }
+            country: { type: string }
+            country_name: { type: string }
+
+    PersonalInfo:
+      type: object
+      required: [email, phone, address]
+      properties:
+        email: { type: string }
+        phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
+        address:
+          oneOf:
+            - $ref: '#/components/schemas/Address'
             - type: 'null'
 
     BirthdayString:
@@ -6483,7 +6828,7 @@ components:
         kind: { type: string, enum: [field, blank], description: 'field: Wert aus der App, blank: leer zum Ausfüllen auf Papier' }
         field:
           type: [string, 'null']
-          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, points, penalties, null]
+          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, address, street, postal_code, city, country, phone, email, points, penalties, null]
           description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
         label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
         width: { type: string, enum: [narrow, normal, wide], default: normal }
@@ -6504,7 +6849,7 @@ components:
             deleted: { type: boolean }
             values:
               type: object
-              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), points (Zahl), penalties (offene Cent)'
+              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), mit view_personal address (ganze Adresse in einer Zeile, das Land nur außerhalb Deutschlands), street (Straße und Nr.), postal_code, city, country (Name des Landes), phone, email (je null ohne Eintrag), points (Zahl), penalties (offene Cent)'
               additionalProperties: true
         - type: object
           description: Freie Zeile

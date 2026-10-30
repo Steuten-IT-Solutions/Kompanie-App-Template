@@ -539,7 +539,7 @@ function History({ items, keepDays }: { items: MailListItem[]; keepDays: number 
 
 /** Wer zu einer Standardgruppe gehört (die App bestimmt es beim Senden). */
 const STANDARD_HINTS: Record<string, string> = {
-  members: 'Alle, deren Rolle den Mitgliederbereich hat, auch Admins und eigene Rollen wie Spieß; ohne Anwärter.',
+  members: 'Alle, deren Rolle „Gehört zur Kompanie“ hat, auch Admins und eigene Rollen wie Spieß; ohne Anwärter.',
   all: 'Alle Konten außer Gästen, auch Anwärter.',
 };
 

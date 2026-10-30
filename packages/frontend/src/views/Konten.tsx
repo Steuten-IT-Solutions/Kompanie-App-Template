@@ -4,11 +4,13 @@ import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
-import { EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
+import { AddressFields, EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
-import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
+import { addressInput, EMPTY_ADDRESS, isEmptyAddress, type Address } from '../address';
+import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
+import { downloadPersonalData } from '../personalData';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password: string }): string {
@@ -111,7 +113,7 @@ export function Credentials({
   );
 }
 
-type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null };
+type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null; postal: Address };
 
 /**
  * Rolle neuer Konten: Mitglied oder eine eigene Rolle, die der Admin dafür freigegeben hat (Einstellungen → Rollen,
@@ -134,11 +136,21 @@ export function NewAccountRole({ label, value, onChange }: { label: string; valu
   );
 }
 
-const emptyRow = (): Row => ({ first_name: '', last_name: '', username: '', email: '', points: '', bday: emptyBirthday(), picture: null });
+const emptyRow = (): Row => ({
+  first_name: '',
+  last_name: '',
+  username: '',
+  email: '',
+  phone: '',
+  postal: EMPTY_ADDRESS,
+  points: '',
+  bday: emptyBirthday(),
+  picture: null,
+});
 
 /**
- * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, optional Benutzername, E-Mail, Anfangspunkte,
- * Geburtstag und Foto; Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt. Die Fotos (im
+ * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, optional Benutzername, E-Mail,
+ * Handynummer, Adresse (aufklappbar), Anfangspunkte, Geburtstag und Foto; Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt. Die Fotos (im
  * Browser schon gelesen und verkleinert) kommen danach einzeln: Alle in einer Anfrage würden zu groß für viele Server.
  */
 export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
@@ -152,7 +164,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
 
   // Mit dem aktuellen Stand: Ein Foto wird erst nach dem Lesen übernommen, inzwischen kann sich anderes geändert haben.
   const update = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const birthdays = canSetBirthdays();
+  const birthdays = canEnterBirthdays();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -168,6 +180,8 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
         ...name,
         ...(r.username?.trim() ? { username: r.username.trim() } : {}),
         ...(r.email && normalizeEmail(r.email) ? { email: normalizeEmail(r.email) } : {}),
+        ...(r.phone && normalizePhone(r.phone) ? { phone: normalizePhone(r.phone) } : {}),
+        ...(addressInput(r.postal) ? { address: addressInput(r.postal) } : {}),
         ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
         ...(bday ? { birthday: birthdayString(bday) } : {}),
       });
@@ -240,6 +254,12 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
             </label>
             <EmailField value={r.email ?? ''} onChange={(email) => update(i, { email })} />
           </div>
+          <PhoneField value={r.phone ?? ''} onChange={(phone) => update(i, { phone })} />
+          {/* Mit Eintrag offen: Sonst hielte ein Fehler im verborgenen Feld das Formular ohne sichtbaren Grund an. */}
+          <details className="bulk-address" open={!isEmptyAddress(r.postal) || undefined}>
+            <summary>Adresse (optional)</summary>
+            <AddressFields label="Adresse" value={r.postal} onChange={(postal) => update(i, { postal })} />
+          </details>
           {points && (
             <label className="field">
               <span>{brand.labels.sections.points} (Anfangsbestand, optional)</span>
@@ -298,8 +318,9 @@ function plainName(s: string): string {
 }
 
 /**
- * Mitgliedsdetails: Vor- und Nachname, Benutzername, E-Mail und Handynummer ändern, Konto löschen (Issue #24). Das
- * eigene Konto ohne Löschen; eine neue eigene E-Mail-Adresse nur mit dem aktuellen Passwort (wie unter Meins → Konto).
+ * Mitgliedsdetails: Vor- und Nachname, Benutzername und E-Mail ändern, Konto löschen (Issue #24). Das eigene Konto ohne
+ * Löschen; eine neue eigene E-Mail-Adresse nur mit dem aktuellen Passwort (wie unter Meins → Konto). Handynummer, Adresse
+ * und Geburtsdatum stehen bei den persönlichen Angaben (view_personal, PersonalPanel).
  */
 export function AccountPanel({
   id,
@@ -344,7 +365,6 @@ export function AccountPanel({
         await api.updateAccount(id, {
           ...trimName(editing),
           email: normalizeEmail(editing.email),
-          phone: normalizePhone(editing.phone),
           ...(p.can_change_login ? { username: editing.login.trim() } : {}),
           ...(ownEmailChanged ? { current_password: password } : {}),
         }),
@@ -403,7 +423,6 @@ export function AccountPanel({
             <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
           )}
           <EmailField value={editing.email} onChange={(email) => setEditing({ ...editing, email })} />
-          <PhoneField value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
           {ownEmailChanged && (
             <label className="field">
               <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
@@ -441,30 +460,55 @@ export function AccountPanel({
                 {' · '}E-Mail: {p.email}
               </>
             )}
-            {p.phone && (
-              <>
-                {' · '}Handy: <a href={`tel:${p.phone.replace(/[^\d+]/g, '')}`}>{p.phone}</a>
-              </>
-            )}
           </p>
           <div className="button-row">
-            <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(p)}>
+            <button
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => {
+                setFormError(null); // z. B. vom Export
+                setEditing(p);
+              }}
+            >
               Angaben ändern
             </button>
+            {p.can_export && (
+              <button
+                className="btn btn-link"
+                disabled={busy}
+                title="Alle gespeicherten Daten dieser Person als Datei, z. B. für eine Auskunft nach der DSGVO"
+                onClick={() => {
+                  setBusy(true);
+                  setFormError(null);
+                  downloadPersonalData(id)
+                    .catch((err: Error) => setFormError(err.message))
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Daten exportieren (Auskunft)
+              </button>
+            )}
             {level !== 'admin' && !self && (
               <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
                 {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
               </button>
             )}
           </div>
+          {formError && !editing && (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          )}
           {confirming && (
             <div className="card account-delete" role="alertdialog" aria-labelledby="account-delete-title">
               <p id="account-delete-title">
                 <strong>{wordpress ? `${plainName(p.name)} aus der App entfernen?` : `Konto von ${plainName(p.name)} löschen?`}</strong>{' '}
                 Alle {brand.labels.sections.points}, {brand.labels.sections.penalties}, Anwesenheiten, {brand.labels.rank} und Titel dieser
                 Person werden gelöscht
-                {wordpress ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App).' : ', das Konto auch.'} Das lässt sich nicht
-                rückgängig machen.
+                {wordpress
+                  ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App). Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter Benutzer.'
+                  : ', das Konto auch.'}{' '}
+                Das lässt sich nicht rückgängig machen.
                 {!former &&
                   ' Wer nur ausgetreten oder verstorben ist, lässt sich stattdessen als ehemalig eintragen; dann bleiben die Daten.'}
               </p>

@@ -76,7 +76,7 @@ final class OfficeService
         $users = $userIds === [] ? [] : $this->app->users->findMany(array_values($userIds));
         $directory = $this->app->features()->enabled('directory');
         $photos = $directory && $users !== [] ? $this->app->memberPhotos()->urls() : [];
-        $former = $this->app->formerMembers();
+        $guest = $this->app->anonymous(); // für die Sichtbarkeit der Fotos, einmal statt je Person
         // Titelnamen für die Pflege (Verknüpfung) und, mit Bereich Titel, als Bezeichnung für eine Person (holder_title)
         $titles = [];
         $titlesShown = $this->app->features()->enabled('titles');
@@ -101,17 +101,18 @@ final class OfficeService
                 // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“; die eigene Einzahl des
                 // Amts, sonst der verknüpfte Titel, null ohne beides (dann die Bezeichnung)
                 'holder_title' => $o['singular'] !== '' ? $o['singular'] : ($titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null),
-                'terms' => array_map(function (array $t) use ($holders, $users, $photos, $directory, $former, $manager, $viewer): array {
-                    return self::termOut($t) + ['holders' => array_map(function (array $h) use ($users, $photos, $directory, $former, $manager, $viewer): array {
+                'terms' => array_map(function (array $t) use ($holders, $users, $photos, $directory, $manager, $viewer, $guest): array {
+                    return self::termOut($t) + ['holders' => array_map(function (array $h) use ($users, $photos, $directory, $manager, $viewer, $guest): array {
                         $user = $h['user_id'] !== null ? ($users[$h['user_id']] ?? null) : null;
                         $out = ['name' => $user !== null ? $user->name : $h['name']];
-                        // Konto und Foto: öffentlich nur für Personen in der Mitgliederliste und Ehemalige (Tab daneben),
-                        // sonst nur für die Pflege (und das eigene Konto, für „Meine Ämter“).
-                        $public = $user !== null && $directory && (MemberService::inDirectory($user) || $former->previousRole($user) !== null);
-                        if ($user !== null && ($public || $manager || $viewer?->id === $user->id)) {
+                        // Konto und Foto: für Personen, deren Foto der Betrachter sehen darf (Mitgliederliste und Ehemalige,
+                        // dieselbe Regel wie beim Abrufen des Fotos: MemberPhotoService::visibility), sonst nur für die
+                        // Pflege (und das eigene Konto, für „Meine Ämter“).
+                        $visible = $user !== null && $directory && $this->app->memberPhotos()->visibility($viewer, $user, $guest)['visible'];
+                        if ($user !== null && ($visible || $manager || $viewer?->id === $user->id)) {
                             $out['user_id'] = $user->id;
                         }
-                        if ($public) {
+                        if ($visible) {
                             $out['photo_url'] = $photos[$user->id] ?? null;
                         }
                         return $out;

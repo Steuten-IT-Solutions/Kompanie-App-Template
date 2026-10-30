@@ -585,9 +585,10 @@ final class DriveClient
      * Stücken von $chunk Bytes (Vielfaches von 256 KB, wie Google es verlangt): Die Datei muss nie ganz in den
      * Arbeitsspeicher (große Sicherungen).
      *
+     * @param (callable(int, int): void)|null $onProgress nach jedem angenommenen Stück: übertragene Bytes, Größe
      * @throws \RuntimeException mit verständlicher Meldung
      */
-    public function uploadFile(string $folderId, string $name, string $path, string $mime, int $chunk = self::UPLOAD_CHUNK): string
+    public function uploadFile(string $folderId, string $name, string $path, string $mime, int $chunk = self::UPLOAD_CHUNK, ?callable $onProgress = null): string
     {
         $size = @filesize($path);
         $in = $size === false ? false : @fopen($path, 'rb');
@@ -596,6 +597,7 @@ final class DriveClient
         }
         try {
             $location = $this->startUpload($folderId, $name, $mime, $size);
+            $onProgress && $onProgress(0, $size);
             if ($size <= $chunk) {
                 return self::uploadedId($this->http->request('PUT', $location, ['Content-Type' => $mime], (string) stream_get_contents($in), 300));
             }
@@ -611,6 +613,7 @@ final class DriveClient
                     if ($res['status'] !== 308) {
                         throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
                     }
+                    $onProgress && $onProgress($end + 1, $size);
                     continue;
                 }
                 return self::uploadedId($res);

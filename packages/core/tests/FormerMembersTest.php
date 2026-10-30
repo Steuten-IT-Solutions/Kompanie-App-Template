@@ -21,11 +21,13 @@ final class FormerMembersTest extends TestCase
     private App $app;
     private int $admin;
     private int $m;
+    private FixedClock $clock;
 
     protected function setUp(): void
     {
         $this->users = new FakeUsers();
-        $this->app = TestApp::create(TestApp::connection(), $this->users, clock: new FixedClock(new \DateTimeImmutable('2026-10-22 12:00:00')));
+        $this->clock = new FixedClock(new \DateTimeImmutable('2026-10-22 12:00:00'));
+        $this->app = TestApp::create(TestApp::connection(), $this->users, clock: $this->clock);
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER, 'passwort123');
         $this->users->current = $this->admin;
@@ -48,7 +50,7 @@ final class FormerMembersTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
         $res = $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'joined_on' => '03.05.1993', 'left_on' => '2016-06-30']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(['reason' => 'left', 'joined_on' => '1993-05-03', 'founder' => false, 'left_on' => '2016-06-30', 'previous_level' => Roles::MEMBER, 'offices_ended' => 0], $res->data);
+        $this->assertSame(['reason' => 'left', 'joined_on' => '1993-05-03', 'founder' => false, 'left_on' => '2016-06-30', 'previous_level' => Roles::MEMBER, 'personal_deleted' => false, 'offices_ended' => 0], $res->data);
 
         $this->assertSame(Roles::GUEST, $this->users->find($this->m)?->role, 'keine Rechte mehr');
         $this->assertNotContains($this->m, $this->memberIds());
@@ -416,5 +418,138 @@ final class FormerMembersTest extends TestCase
             $this->app->db->execute('ALTER TABLE {office_terms_weg} RENAME TO {office_terms}');
         }
         $this->assertNull($this->app->formerMembers()->repository()->find($this->m), 'kein halber Zustand');
+    }
+
+    /**
+     * Scheitert ein Teil, ist die Anmeldung trotzdem weg; das Fehlerprotokoll nennt es, und das tägliche Nachräumen löscht
+     * den Rest, sobald es geht.
+     */
+    public function testRetentionRetriesAfterAFailure(): void
+    {
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'founder' => false, 'joined_on' => '', 'left_on' => '2000'])->status);
+        $db = $this->app->db;
+        $db->insert('birthdays', ['user_id' => $this->m, 'month' => 3, 'day' => 4, 'updated_by' => $this->admin, 'updated_at' => '2020-01-01 00:00:00']);
+        $db->insert('penalties', ['user_id' => $this->m, 'amount_cents' => 500, 'reason' => 'Zu spät', 'entry_date' => '2019-05-01', 'created_by' => $this->admin, 'created_at' => '2019-05-01 00:00:00']);
+        $this->assertSame(200, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status);
+        $db->execute('ALTER TABLE {penalties} RENAME TO {penalties_weg}');
+        try {
+            $this->assertSame(0, @$this->app->formerMembers()->purgeExpired(), 'nicht ganz erledigt');
+        } finally {
+            $db->execute('ALTER TABLE {penalties_weg} RENAME TO {penalties}');
+        }
+        $this->assertStringContainsString('Aufbewahrungsfrist', implode(' ', array_column($this->app->telemetry()->log(), 'message')), 'im Fehlerprotokoll der App');
+        $this->assertSame(0, (int) $db->scalar('SELECT COUNT(*) FROM {birthdays} WHERE user_id = ?', [$this->m]), 'was ging, ist schon weg');
+        $this->assertMatchesRegularExpression('/^ehemalig-/', $this->users->profile($this->m)['login'], 'Anmeldung trotzdem weg');
+        $this->assertTrue($this->app->formerMembers()->of($this->m)['personal_deleted'] ?? false);
+        $this->assertSame(1, (int) $db->scalar('SELECT COUNT(*) FROM {penalties} WHERE user_id = ?', [$this->m]), 'Rest noch da');
+        $this->app->formerMembers()->purgeExpired();
+        $this->assertSame(0, (int) $db->scalar('SELECT COUNT(*) FROM {penalties} WHERE user_id = ?', [$this->m]), 'nächster Lauf räumt nach');
+    }
+
+    /**
+     * Ausgeschieden am 29. Februar: Die Frist endet in einem Nicht-Schaltjahr mit Ablauf des 28. Februar (nicht des 1. März);
+     * gelöscht wird ab dem Tag danach.
+     */
+    public function testRetentionFromLeapDay(): void
+    {
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left', 'founder' => false, 'joined_on' => '', 'left_on' => '2024-02-29'])->status);
+        $this->clock->at = new \DateTimeImmutable('2026-03-01 12:00:00');
+        $this->assertSame([$this->m], array_column($this->call('PUT', '/admin/former/retention', ['years' => 2, 'preview' => true])->data['due'], 'id'));
+        $this->clock->at = new \DateTimeImmutable('2026-02-28 12:00:00');
+        $this->assertSame([], $this->call('PUT', '/admin/former/retention', ['years' => 2, 'preview' => true])->data['due']);
+    }
+
+    /**
+     * Aufbewahrungsfrist: Standard aus; danach persönliche Angaben weg, die Chronik bleibt (Name, Eintrag als ehemalig,
+     * Ämter, Punkte, Dienstgrad, Titel, Foto, Eintrittsjahr), für alle Ehemaligen gleich.
+     */
+    public function testRetentionForgetsPersonalDataAfterTheDeadline(): void
+    {
+        $old = $this->m;
+        $recent = $this->users->add('neulich', Roles::MEMBER);
+        $founder = $this->users->add('gruender', Roles::MEMBER);
+        $this->call('POST', '/points', ['user_ids' => [$old], 'points' => 5, 'reason' => 'Fest']);
+        $this->officeTerm('Fahne', 2006, [['user_id' => $old]]);
+        $db = $this->app->db;
+        $now = '2020-01-01 00:00:00';
+        $db->insert('penalties', ['user_id' => $old, 'amount_cents' => 500, 'reason' => 'Zu spät', 'entry_date' => '2019-05-01', 'created_by' => $this->admin, 'created_at' => $now]);
+        $db->insert('attendance_entries', ['list_id' => 1, 'user_id' => $old, 'status' => 'present', 'updated_by' => $this->admin, 'updated_at' => $now]);
+        $db->insert('birthdays', ['user_id' => $old, 'month' => 3, 'day' => 4, 'year' => 1960, 'updated_by' => $this->admin, 'updated_at' => $now]);
+        $db->insert('join_years', ['user_id' => $old, 'year' => 1980, 'updated_by' => $this->admin, 'updated_at' => $now]);
+        $db->insert('member_contacts', ['user_id' => $old, 'phone' => '+49 171 1234567', 'city' => 'Neuss', 'updated_at' => $now]);
+        $this->users->updateProfile($old, 'Mit', 'Glied', 'alt@example.org', null);
+        foreach ([[$old, 'left', false, '2020'], [$recent, 'left', false, '2024-06-30'], [$founder, 'deceased', true, '2010']] as [$id, $reason, $isFounder, $left]) {
+            $res = $this->call('PUT', "/members/$id/former", ['reason' => $reason, 'founder' => $isFounder, 'joined_on' => '', 'left_on' => $left]);
+            $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        }
+        $scheduler = $this->app->scheduler;
+        $this->assertInstanceOf(\KompanieApp\Core\Tests\Support\NullScheduler::class, $scheduler);
+
+        // Standard: aus, nichts geplant, nichts gelöscht.
+        $status = $this->call('GET', '/admin/former/retention')->data;
+        $this->assertSame(['years' => 0, 'due' => [], 'soon' => []], $status);
+        $this->assertSame(0, $this->app->formerMembers()->purgeExpired());
+
+        $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => 51])->status);
+        $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => 'fünf'])->status);
+        $this->assertSame(400, $this->call('PUT', '/admin/former/retention', ['years' => null])->status, 'fehlt: Fehler, nicht „aus“');
+        $this->users->current = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
+        $this->assertSame(403, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status, 'nur Admins (manage_settings)');
+        $this->users->current = $this->admin;
+
+        // Vorschau vor dem Speichern: zeigt, wen es trifft (auch Gründungsmitglieder und Verstorbene), speichert nichts.
+        $preview = $this->call('PUT', '/admin/former/retention', ['years' => 5, 'preview' => true]);
+        $this->assertSame([$founder, $old], array_column($preview->data['due'], 'id'), 'nach Namen: Gruender, Mitglied');
+        $this->assertSame(0, $this->app->formerMembers()->retention()['years'], 'nicht gespeichert');
+        $this->assertArrayNotHasKey(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK, $scheduler->scheduled);
+
+        // 5 Jahre: 2020 (31.12.2020 + 5 = 31.12.2025) und 2010 sind fällig, 2024 nicht.
+        $res = $this->call('PUT', '/admin/former/retention', ['years' => 5]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(86400, $scheduler->scheduled[\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK] ?? null, 'täglich eingeplant');
+        $this->app->runTask(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK);
+
+        // Persönliche Angaben weg
+        $count = static fn (string $table): int => (int) $db->scalar('SELECT COUNT(*) FROM {' . $table . '} WHERE user_id = ?', [$old]);
+        foreach (['penalties', 'attendance_entries', 'birthdays', 'member_contacts'] as $table) {
+            $this->assertSame(0, $count($table), "$table gelöscht");
+        }
+        $profile = $this->users->profile($old);
+        $this->assertSame('', $profile['email'], 'E-Mail weg');
+        $this->assertMatchesRegularExpression('/^ehemalig-[0-9a-f]{12}$/', $profile['login'], 'Benutzername ohne Bezug zur Person');
+        $this->assertFalse($this->users->verifyPassword($old, 'passwort123'), 'Anmeldung nicht mehr möglich');
+        // Chronik bleibt
+        $this->assertNotNull($this->users->find($old), 'Konto mit Namen bleibt');
+        $this->assertTrue($this->app->formerMembers()->of($old)['personal_deleted'] ?? false, 'beim Wiederaufnehmen erkennbar');
+        $listed = array_column($this->call('GET', '/members/former')->data, 'personal_deleted', 'id');
+        $this->assertSame([true, false], [$listed[$old] ?? null, $listed[$recent] ?? null], 'auch in der Liste');
+        $this->assertSame(['level' => Roles::MEMBER], $this->app->formerMembers()->repository()->find($old)['restore'] ?? null, 'von den Rollen nur die Grundrolle');
+        foreach (['points', 'join_years', 'former_members'] as $table) {
+            $this->assertSame(1, $count($table), "$table bleibt");
+        }
+        $this->assertSame(1, (int) $db->scalar('SELECT COUNT(*) FROM {office_holders} WHERE user_id = ?', [$old]), 'Amt bleibt verknüpft');
+        $formerIds = array_column($this->call('GET', '/members/former')->data, 'id');
+        sort($formerIds);
+        $this->assertSame([$old, $recent, $founder], $formerIds, 'alle bleiben in der Liste der Ehemaligen');
+
+        // Erledigt: kommt nicht wieder dran; die übrigen bis zu ihrer Frist. Was danach dazukommt, löscht jeder Lauf wieder.
+        $this->assertSame([], $this->call('GET', '/admin/former/retention')->data['due']);
+        $db->insert('birthdays', ['user_id' => $old, 'month' => 1, 'day' => 2, 'updated_by' => $this->admin, 'updated_at' => $now]);
+        $login = $this->users->profile($old)['login'];
+        $this->assertSame(0, $this->app->formerMembers()->purgeExpired());
+        $this->assertSame(0, $count('birthdays'), 'neu eingetragener Geburtstag wieder weg');
+        $this->assertSame($login, $this->users->profile($old)['login'], 'Anmeldung nicht jedes Mal neu');
+        // Auch eine anonyme Antwort (nur über das Pseudonym zu finden)
+        $ref = \KompanieApp\Core\Domain\PollService::pseudonym($this->app->polls()->secret(), $old);
+        $db->insert('poll_answers', ['poll_id' => 1, 'vote_ref' => $ref, 'user_id' => null, 'option_id' => 0, 'answer_text' => 'anonym']);
+        $this->app->formerMembers()->purgeExpired();
+        $this->assertSame(0, (int) $db->scalar('SELECT COUNT(*) FROM {poll_answers} WHERE vote_ref = ?', [$ref]), 'anonyme Antwort wieder weg');
+
+        // Die Frist gehört zur Installation: Eine Sicherung bringt sie nicht (ungesehen) zurück.
+        $this->assertContains(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_SETTING, Backup::LOCAL_SETTINGS);
+
+        // Aus: Aufgabe nicht mehr eingeplant.
+        $this->call('PUT', '/admin/former/retention', ['years' => 0]);
+        $this->assertArrayNotHasKey(\KompanieApp\Core\Domain\FormerMemberService::RETENTION_TASK, $scheduler->scheduled);
     }
 }

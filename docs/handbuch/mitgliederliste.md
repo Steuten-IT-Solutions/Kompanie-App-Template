@@ -2,7 +2,7 @@
 titel: Mitgliederliste
 reihenfolge: 51
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, promote_users]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, view_personal, manage_personal, create_users, promote_users]
 ---
 In der Mitgliederliste der Verwaltung findest du alle Personen der Kompanie und öffnest die Seite eines Mitglieds, um dort etwas zu ändern. Was in den Zeilen steht, hängt von deinen Aufgaben ab.
 

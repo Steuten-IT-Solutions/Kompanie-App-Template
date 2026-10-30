@@ -19,8 +19,9 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
  *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert) und, soweit
  *   möglich, in Originalauflösung (MAX_EDGE), in der Datenbank (MemberPhotoRepository).
  * - Sehen: die Person selbst (Konto), alle, die die Mitglieder in der Verwaltung sehen (Capability::memberList), und mit dem Bereich
- *   directory alle, auch ohne Anmeldung, die Fotos der Personen in der Mitgliederliste und der Ehemaligen (Issue #112,
- *   inDirectory).
+ *   directory alle, die die Mitgliederliste (view_directory) bzw. die Ehemaligen (view_former) sehen dürfen, die Fotos
+ *   der Personen darin (Issue #112, publicVia); ohne Anmeldung nur, wenn Gast das Recht hat, und nie in
+ *   Originalauflösung.
  *   Ausgeliefert über Environment::memberPhotoUrl() nach Prüfung der Anmeldung; die Header setzt der Kern, damit beide
  *   Adapter gleich antworten.
  */
@@ -233,16 +234,36 @@ final class MemberPhotoService
     }
 
     /**
-     * Mitgliederliste (Bereich directory, Issue #112: öffentlich): Die Fotos der Personen darin und der Ehemaligen (Tab
-     * daneben) sieht jeder, auch ohne Anmeldung; die anderer Gäste nicht.
+     * Mitgliederliste (Bereich directory, Issue #112): Über welches Recht das Foto zu sehen ist: view_directory für die
+     * Personen in der Mitgliederliste, view_former für die Ehemaligen (Tab daneben); null für andere Gäste.
      */
-    private function inDirectory(int $userId): bool
+    private function publicVia(?User $target): ?Capability
     {
-        if (!$this->app->features()->enabled('directory')) {
-            return false;
+        if ($target === null || !$this->app->features()->enabled('directory')) {
+            return null;
         }
-        $target = $this->app->users->find($userId);
-        return $target !== null && (MemberService::inDirectory($target) || $this->app->formerMembers()->previousRole($target) !== null);
+        if (MemberService::inDirectory($target)) {
+            return Capability::ViewDirectory;
+        }
+        return $this->app->formerMembers()->previousRole($target) !== null ? Capability::ViewFormer : null;
+    }
+
+    /**
+     * Ob $viewer (null: ohne Anmeldung) das Foto von $target sehen darf: dieselbe Regel wie forDelivery(), für Seiten,
+     * die Fotos anderer verlinken (z. B. Ämter), damit sie keine Adressen ausgeben, die dann 401/403 liefern.
+     * Öffentlich ist es nur, wenn Gast die Liste sehen darf; sonst braucht, wer angemeldet ist, das Recht selbst.
+     *
+     * $guest: App::anonymous(), wenn eine Seite viele Fotos prüft (einmal ermittelt statt je Foto).
+     *
+     * @return array{visible: bool, public: bool}
+     */
+    public function visibility(?User $viewer, ?User $target, ?User $guest = null): array
+    {
+        $via = $this->publicVia($target);
+        $public = $via !== null && ($guest ?? $this->app->anonymous())->can($via);
+        $visible = $public || ($viewer !== null && $target !== null
+            && ($viewer->id === $target->id || self::canSeeOthers($viewer) || ($via !== null && $viewer->can($via))));
+        return ['visible' => $visible, 'public' => $public];
     }
 
     /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */
@@ -274,14 +295,23 @@ final class MemberPhotoService
         if ($this->app->maintenance()->blocks($viewer)) {
             return $deny(503);
         }
-        $public = $this->inDirectory($userId);
-        if ($viewer === null && !$public) {
-            return $deny(401);
+        // Öffentlich nur, wenn Gast die Liste sehen darf (sonst ließen sich die Fotos über die fortlaufenden Nummern
+        // abrufen, obwohl die Liste verborgen ist); sonst brauchen Angemeldete das Recht selbst.
+        $target = $this->app->users->find($userId);
+        if ($target === null) {
+            // Konto gelöscht: 404 nur für die, die die Mitglieder sehen; sonst wie ein verborgenes Foto, damit sich über
+            // die fortlaufenden Nummern nicht herausfinden lässt, welche Konten es gibt.
+            return $deny($viewer === null ? 401 : (self::canSeeOthers($viewer) ? 404 : 403));
         }
-        if ($viewer !== null && $viewer->id !== $userId && !self::canSeeOthers($viewer) && !$public) {
-            return $deny(403);
+        ['visible' => $visible, 'public' => $public] = $this->visibility($viewer, $target);
+        if (!$visible) {
+            return $deny($viewer === null ? 401 : 403);
         }
         $size = Input::integer($size) ?? self::DEFAULT_SIZE;
+        // Originalauflösung nur für Angemeldete; die Großansicht bleibt dann bei der 1024er (wie bei älteren Fotos).
+        if ($viewer === null && $size === self::MAX_EDGE) {
+            return $deny(404);
+        }
         $photo = $this->repository()->find($userId);
         // Originalauflösung (MAX_EDGE) fehlt bei älteren Fotos: 404, die Großansicht zeigt dann die 1024er weiter.
         $body = $photo === null ? null : match (true) {
@@ -299,7 +329,8 @@ final class MemberPhotoService
             // Die Adresse wechselt mit jedem Foto. Höchstens einen Tag speichern, nur im Browser, solange das Foto nicht
             // öffentlich in der Mitgliederliste steht: Ein entferntes Foto oder entzogene Rechte gelten so bald auch auf
             // Geräten, die es schon geladen haben. In der Vorschau (Issue #63) nie speichern.
-            'Cache-Control' => $this->app->preview()->cacheControl(($public ? 'public' : 'private') . ($current ? ', max-age=86400' : ', no-cache')),
+            // Die Originalauflösung gibt es nur nach der Anmeldung: nie in gemeinsamen Zwischenspeichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(($public && $size !== self::MAX_EDGE ? 'public' : 'private') . ($current ? ', max-age=86400' : ', no-cache')),
             'X-Robots-Tag' => 'noindex',
             'ETag' => '"' . $photo['version'] . '-' . $size . '"',
         ], 'body' => $body];

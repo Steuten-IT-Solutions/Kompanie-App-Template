@@ -19,7 +19,6 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
   switch (view) {
     case 'termine':
       if (sub === 'verwalten') return 'termine-pflegen';
-      if (sub === 'geburtstage') return 'geburtstage';
       // Mit internem Kalender zeigt die Seite alle Termine (kalender), sonst nur die öffentlichen.
       return on('calendar') && ctx.can('calendar')
         ? 'kalender'
@@ -80,6 +79,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           bereiche: 'admin-bereiche',
           rollen: 'admin-rollen-und-mitglieder',
           benachrichtigungen: 'admin-benachrichtigungen',
+          geburtstage: 'admin-geburtstage',
           email: 'admin-email',
           google: 'admin-google',
           galerie: 'admin-galerie',
@@ -135,7 +135,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
       austritt: 'ehemalige-mitglieder',
     };
     if (page && memberPages[page]) return memberPages[page];
-    if (page === 'geburtstag' && ctx.can('create_users') && ctx.features.birthdays) return 'geburtstage-pflegen';
+    if (page === 'geburtstag' && ctx.can('manage_personal') && ctx.features.birthdays) return 'geburtstage-pflegen';
     return former ? 'ehemalige-mitglieder' : 'mitglied-uebersicht';
   }
   return null;

@@ -1,6 +1,6 @@
 <?php
 // Fotos fürs Handbuch, Teil „allgemein“: mehr öffentliche Termine (Termine, Öffentliche Termine pflegen) und
-// Geburtstage (Anstehende Geburtstage bei den Terminen, Alle Geburtstage, Mein Konto).
+// Geburtstage (Anstehende Geburtstage bei den Terminen, Mein Konto).
 declare(strict_types=1);
 
 use KompanieApp\Core\Domain\EventService;

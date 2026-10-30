@@ -268,6 +268,18 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         }
     }
 
+    public function accountData(int $id): array
+    {
+        return isset($this->users[$id]) ? ['sessions' => []] : [];
+    }
+
+    public function forgetLogin(int $id): void
+    {
+        $this->users[$id]['login'] = 'ehemalig-' . bin2hex(random_bytes(6));
+        $this->users[$id]['email'] = '';
+        $this->users[$id]['password'] = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+    }
+
     public function reactivate(int $id, string $role): void
     {
         $this->users[$id]['level'] = $role;

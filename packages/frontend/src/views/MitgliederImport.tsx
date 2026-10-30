@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, levelLabel, newAccountRoles, type MemberImportResult, type MemberImportRow } from '../api';
 import brand from '../generated/brand';
+import { formatAddress } from '../address';
 import { formatYearOrDate } from '../format';
 import { toCsv } from '../lists';
 import { readSheet } from '../sheet';
@@ -16,6 +17,12 @@ const TEMPLATE_HEADER = [
   'Status',
   'Benutzername',
   'E-Mail',
+  'Handynummer',
+  'Straße',
+  'Hausnummer',
+  'PLZ',
+  'Ort',
+  'Land',
   'Geburtstag',
   'Eintritt',
   'Punkte',
@@ -25,9 +32,28 @@ const TEMPLATE_HEADER = [
   'Grund',
 ];
 const TEMPLATE_ROWS = [
-  ['Erika', 'Muster', 'Mitglied', '', 'erika@example.org', '03.02.1980', '1999', '', '', '', '', ''],
-  ['Max', 'Beispiel', 'Mitglied', '', '', '24.12.', '2025', '', '', '', '', ''],
-  ['Otto', 'Früher', 'ehemalig', '', '', '', 'Gründer', '', '', '', '2001', 'verstorben'],
+  [
+    'Erika',
+    'Muster',
+    'Mitglied',
+    '',
+    'erika@example.org',
+    '+49 171 1234567',
+    'Musterstraße',
+    '1',
+    '12345',
+    'Musterstadt',
+    'Deutschland',
+    '03.02.1980',
+    '1999',
+    '',
+    '',
+    '',
+    '',
+    '',
+  ],
+  ['Max', 'Beispiel', 'Mitglied', '', '', '', '', '', '', '', '', '24.12.', '2025', '', '', '', '', ''],
+  ['Otto', 'Früher', 'ehemalig', '', '', '', '', '', '', '', '', '', 'Gründer', '', '', '', '2001', 'verstorben'],
 ];
 
 function downloadTemplate() {
@@ -49,6 +75,8 @@ function rowSummary(r: MemberImportRow): string {
   const parts: string[] = [];
   if (r.username) parts.push(`Benutzername ${r.username}`);
   if (r.email) parts.push(r.email);
+  if (r.phone) parts.push(r.phone);
+  if (r.address) parts.push(formatAddress(r.address).join(', '));
   if (r.birthday) {
     const [y, m, d] = r.birthday.length === 5 ? ['', ...r.birthday.split('-')] : r.birthday.split('-');
     parts.push(`Geburtstag ${d}.${m}.${y}`);
@@ -137,9 +165,10 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
     <div className="member-import office-import">
       <p className="muted small">
         Eine Zeile je Person, die erste Zeile enthält die Spaltennamen. Nötig ist nur <strong>Vorname</strong>; außerdem kennt die App
-        Nachname, Status ({roles} oder ehemalig; leer heißt {levelLabel('member')}), Benutzername, E-Mail, Geburtstag, Eintritt, Punkte,
-        Dienstgrad, Titel sowie bei Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Daten als TT.MM.JJJJ, den
-        Eintritt auch nur als Jahr. Die Reihenfolge der Spalten ist egal, andere Spalten werden übergangen.
+        Nachname, Status ({roles} oder ehemalig; leer heißt {levelLabel('member')}), Benutzername, E-Mail, Handynummer, Adresse (Straße,
+        Hausnummer, Adresszusatz, PLZ, Ort, Land; leer heißt Deutschland), Geburtstag, Eintritt, Punkte, Dienstgrad, Titel sowie bei
+        Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Daten als TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die
+        Reihenfolge der Spalten ist egal, andere Spalten werden übergangen.
       </p>
       <p className="muted small">
         Aktive bekommen ein Startpasswort, das nach dem Übernehmen einmal angezeigt wird. Ehemalige bekommen ein Konto ohne Anmeldung. Wer

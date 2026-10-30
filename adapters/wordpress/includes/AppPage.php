@@ -98,7 +98,7 @@ final class AppPage
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === 'sicherung') {
-            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
+            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
         } elseif (preg_match('#^anhang/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {
@@ -456,6 +456,26 @@ final class AppPage
         $pos = strpos($html, '<head>');
         $html = $pos === false ? $head . $html : substr_replace($html, $head, $pos + strlen('<head>'), 0);
         header('Content-Type: text/html; charset=utf-8');
+        self::securityHeaders();
         echo $html; // phpcs:ignore WordPress.Security.EscapeOutput
+    }
+
+    /**
+     * Wie die eigenständige Version: nicht in fremde Seiten einbetten (Klickbetrug, „Clickjacking“), Typ nicht raten,
+     * Adresse nur gekürzt weitergeben. HSTS bleibt Sache von WordPress bzw. des Hosters (gilt für die ganze Seite).
+     */
+    private static function securityHeaders(): void
+    {
+        header('X-Content-Type-Options: nosniff');
+        // Ein strengeres DENY der Webseite oder eines Plugins nicht überschreiben, und in der CSP ebenso streng bleiben:
+        // Browser richten sich nach frame-ancestors vor X-Frame-Options.
+        $frame = array_values(array_filter(headers_list(), static fn (string $h): bool => stripos($h, 'X-Frame-Options:') === 0));
+        $deny = $frame !== [] && stripos($frame[0], 'deny') !== false;
+        if ($frame === []) {
+            header('X-Frame-Options: SAMEORIGIN');
+        }
+        // Zusätzlich (false): Eine CSP der Webseite oder eines Sicherheits-Plugins bleibt; Browser beachten beide.
+        header('Content-Security-Policy: frame-ancestors ' . ($deny ? "'none'" : "'self'"), false);
+        header('Referrer-Policy: strict-origin-when-cross-origin');
     }
 }

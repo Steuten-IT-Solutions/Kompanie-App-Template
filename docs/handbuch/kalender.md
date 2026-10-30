@@ -12,7 +12,7 @@ Bist du angemeldet, siehst du unter **{bereich.events}** alle kommenden Termine 
 Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 
 ## Was du hier siehst
-- **Anstehende {bereich.birthdays}** (oben, nur für {rolle.member} und nur, wenn die {kompanie.name} {bereich.birthdays} nutzt): wer heute oder in den nächsten 7 Tagen Geburtstag hat. Mit **Alle {bereich.birthdays}** öffnest du die ganze Liste.
+- **Anstehende {bereich.birthdays}** (oben, nur für {rolle.member} und nur, wenn die {kompanie.name} {bereich.birthdays} nutzt): wer heute oder in den nächsten Tagen Geburtstag hat (wie viele Tage vorher, legt ein {rolle.admin} fest; anfangs 7).
 - **Öffentliche Termine verwalten**: nur, wenn du öffentliche Termine pflegen darfst.
 - **Monatsüberschrift**: z. B. „Oktober 2026“; darunter die Termine dieses Monats.
 - **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
@@ -21,7 +21,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 ### Einen Termin ansehen
 1. Tippe auf den Termin. Er klappt auf und zeigt die Beschreibung, falls es eine gibt.
 2. Tippe auf **In meinen Kalender**, um den Termin in deinen eigenen Kalender zu übernehmen: Die App lädt eine Kalenderdatei herunter. Öffne sie, und dein Handy oder Computer bietet die Übernahme an.
-3. Ist ein Ort angegeben, zeigt **Karte** ihn in Google Maps.
+3. Ist ein Ort angegeben, zeigt **Karte** ihn in der Karten-App: Auf Android wählst du die App aus (z. B. Google Maps oder Waze), auf iPhone und Mac öffnet sich Apple Karten, am PC Google Maps.
 4. Tippe noch einmal auf den Termin, um ihn wieder zuzuklappen.
 
 ![Aufgeklappter Termin mit Beschreibung und dem Knopf „In meinen Kalender“](bild:kalender-termin)

@@ -32,10 +32,11 @@ const OWN_DATA: Capability[] = ['view_own_points', 'view_own_penalties', 'view_o
 
 /**
  * Recht, das dieses voraussetzt (wie Capability::requires im Kern): eigene Daten und alles zum Verwalten nur mit
- * „Gehört zur Kompanie“ (member).
+ * „Gehört zur Kompanie“ (member); persönliche Angaben pflegt nur, wer sie sieht (manage_personal → view_personal).
  */
 export function requires(c: Capability): Capability | null {
   if (OWN_DATA.includes(c)) return 'member';
+  if (c === 'manage_personal') return 'view_personal';
   return isView(c) || c === 'member' ? null : 'member';
 }
 
@@ -53,12 +54,14 @@ export function allowedFor(role: string, c: Capability): boolean {
 export function toggleCap(set: ReadonlySet<Capability>, c: Capability, on: boolean): Set<Capability> {
   const next = new Set(set);
   if (on) {
-    next.add(c);
-    const needed = requires(c);
-    if (needed) next.add(needed);
+    // Mehrstufig: manage_personal → view_personal → member
+    for (let x: Capability | null = c; x; x = requires(x)) next.add(x);
   } else {
-    next.delete(c);
-    for (const other of [...next]) if (requires(other) === c) next.delete(other);
+    const drop = (x: Capability) => {
+      next.delete(x);
+      for (const other of [...next]) if (requires(other) === x) drop(other);
+    };
+    drop(c);
   }
   return next;
 }
@@ -132,6 +135,8 @@ const ORDER: Capability[] = [
   'manage_attendance',
   'manage_offices',
   'manage_inventory',
+  'view_personal',
+  'manage_personal',
   'create_users',
   'promote_users',
 ];

@@ -10,7 +10,9 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\AttendanceService;
+use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
+use KompanieApp\Core\Domain\PersonalDataExport;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardMailService;
 use KompanieApp\Core\Domain\BoardService;
@@ -107,6 +109,7 @@ final class App
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ActivityService::TASK => ActivityService::INTERVAL,
+        FormerMemberService::RETENTION_TASK => FormerMemberService::RETENTION_INTERVAL,
     ];
 
     /**
@@ -264,6 +267,8 @@ final class App
             BackupUploadService::TASK => $this->backupUpload()->active(),
             // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
             ActivityService::TASK => true,
+            // Ehemalige nach Ablauf der Aufbewahrungsfrist löschen: täglich, nur mit eingestellter Frist.
+            FormerMemberService::RETENTION_TASK => $this->formerMembers()->retention()['years'] > 0,
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -335,6 +340,8 @@ final class App
                 $this->backupUpload()->runTask();
             } elseif ($task === ActivityService::TASK) {
                 $this->activity()->prune();
+            } elseif ($task === FormerMemberService::RETENTION_TASK) {
+                $this->formerMembers()->purgeExpired();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -433,21 +440,25 @@ final class App
      * bleiben (dort steht nur, wer etwas geändert hat; angezeigt dann als „gelöschtes Konto“). Aus der Nutzungsauswertung
      * (Issue #175) verschwinden ihre Einträge, „zuletzt aktiv“ und ihr Pseudonym; die Tageszahlen ohne Personenbezug bleiben.
      */
-    public function userDeleted(int $userId): void
+    public function userDeleted(int $userId, bool $keepChronicle = false): bool
     {
-        UserData::purge($this->db, $userId, PollService::existingSecret($this->settings));
+        // $keepChronicle: nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige, UserData::CHRONICLE bleibt).
+        $ok = UserData::purge($this->db, $userId, PollService::existingSecret($this->settings), $keepChronicle);
         // Noch nicht gespeicherte Dateianhänge samt Dateien (Anhänge gespeicherter Nachrichten und Mails bleiben bei ihnen).
         try {
             $this->attachments()->deleteDraftsOf($userId);
         } catch (\Throwable $e) {
+            $ok = false;
             error_log('Kompanie-App: Entwürfe von Anhängen nicht gelöscht: ' . $e->getMessage());
         }
-        $this->roles()->forget($userId);
+        $this->roles()->forget($userId); // Fehler gehen nach oben (wie bisher: Löschen meldet 500)
         try {
             $this->activity()->forget($userId);
         } catch (\Throwable $e) {
+            $ok = false;
             error_log('Kompanie-App: Pseudonym der Nutzungsauswertung nicht gelöscht: ' . $e->getMessage());
         }
+        return $ok;
     }
 
     public function pushTriggers(): PushTriggers
@@ -633,9 +644,15 @@ final class App
             $this->cache,
             $this->roles(),
             fn (User $user): ?string => $this->formerMembers()->previousRole($user),
-            new MemberContactRepository($this->db),
+            $this->memberContacts(),
             $this->time(),
         ));
+    }
+
+    /** Handynummer und Adresse der Konten (MemberService, Listen) */
+    public function memberContacts(): MemberContactRepository
+    {
+        return $this->service(MemberContactRepository::class, fn () => new MemberContactRepository($this->db));
     }
 
     public function formerMembers(): FormerMemberService
@@ -693,6 +710,18 @@ final class App
             $this->telemetry(),
             $this->backupUpload(),
         ));
+    }
+
+    /** Passwort für Sicherungen, verschlüsselte Sicherungen */
+    public function backupEncryption(): BackupEncryptionService
+    {
+        return $this->service(BackupEncryptionService::class, fn () => new BackupEncryptionService($this));
+    }
+
+    /** Auskunft nach Art. 15 DSGVO: alle Daten einer Person */
+    public function personalData(): PersonalDataExport
+    {
+        return $this->service(PersonalDataExport::class, fn () => new PersonalDataExport($this));
     }
 
     /** Sicherungen automatisch in Google Drive */

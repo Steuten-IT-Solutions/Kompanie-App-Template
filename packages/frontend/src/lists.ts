@@ -10,6 +10,14 @@ export function csvField(value: string | number): string {
   return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/**
+ * Handynummer für die CSV: „+49 171 1234567“ als „0049 171 1234567“. Mit dem + davor bekäme sie (gegen CSV-Injection)
+ * ein ', das Excel mit anzeigt. Nur mit Leerzeichen: Ohne läse Excel die Ziffern als Zahl und strich die Nullen vorn.
+ */
+export function csvPhone(phone: string): string {
+  return /^\+\d/.test(phone) && phone.includes(' ') ? `00${phone.slice(1)}` : phone;
+}
+
 /** Byte Order Mark: Daran erkennt Excel UTF-8. */
 const BOM = String.fromCharCode(0xfeff);
 

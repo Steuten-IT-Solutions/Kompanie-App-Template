@@ -19,7 +19,7 @@ Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was l
 - **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen bzw. in Google Drive abgelegt wurde.
 - **Server**: welche PHP-Version und Datenbank laufen; gelb, wenn auf dem Webspace weniger als 200 MB frei sind.
 - **Push-Benachrichtigungen**: wie viele Geräte angemeldet sind, oder was dem Server fehlt, um Benachrichtigungen zu senden.
-- Nur ohne WordPress: **Schutz der Daten** (ob Datenbank und Zugangsdaten aus dem Internet abrufbar wären; ist die Zeile rot, lass das sofort beim Hoster beheben) und **Hintergrundaufgaben** (ob ein Cronjob beim Hoster die Aufgaben erledigt, mit der Adresse dafür).
+- Nur ohne WordPress: **Schutz der Daten** (ob Datenbank und Zugangsdaten aus dem Internet abrufbar wären; ist die Zeile rot, lass das sofort beim Hoster beheben), **Verschlüsselte Verbindung** (gelb, wenn die App über `http://` statt `https://` läuft; dann gehen Passwörter und Daten unverschlüsselt durchs Netz) und **Hintergrundaufgaben** (ob ein Cronjob beim Hoster die Aufgaben erledigt, mit der Adresse dafür).
 
 Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erledigt werden, z. B. eine neue Datensicherung. **Rot** heißt, etwas funktioniert nicht. **Grau** heißt ausgeschaltet, noch nicht eingerichtet oder in dieser Installation nicht verfügbar. Ist bei euch eine Kontaktadresse der Betreuer hinterlegt, steht sie darunter bei **Hilfe**.
 
@@ -43,8 +43,10 @@ Die Fehler der letzten 14 Tage (höchstens 50) mit Zeitpunkt, Art des Fehlers un
 
 ### Eine neue Version einspielen
 1. Tippe auf **Nach Updates suchen**. Die App sucht ohnehin einmal am Tag selbst.
-2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert einige Minuten, mit Sicherung in Google Drive auch länger.
+2. Gibt es eine neue Version, tippe auf **Jetzt auf … aktualisieren**. Das dauert einige Minuten, mit Sicherung in Google Drive auch länger. Ein Balken zeigt den Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen auch die MB; die Größe der Sicherung ist aus der letzten geschätzt („ca.“).
 3. Danach lädt die App neu.
+
+Lass die Seite offen, bis die App neu lädt. Bricht die Verbindung zwischendurch ab, läuft das Update auf dem Server weiter und die App wartet darauf. Läuft schon ein Update, wenn du die Seite öffnest (z. B. das automatische), zeigt sie dessen Fortschritt.
 
 Klappt die Sicherung in Google Drive vor dem Update nicht (z. B. weil der Speicher voll ist), fragt die App nach: Bestätigst du, spielt sie das Update trotzdem ein; die Sicherung auf dem Server ist dann da. Brichst du ab, bleibt die bisherige Version.
 

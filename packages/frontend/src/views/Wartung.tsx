@@ -1,5 +1,18 @@
-import { useRef, useState, type ChangeEvent } from 'react';
-import { api, ApiError, config, type AdminStatus, type BackupDriveStatus, type ErrorLogEntry, type UpdateStatus } from '../api';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import {
+  api,
+  ApiError,
+  config,
+  inBackground,
+  type AdminStatus,
+  type BackupDriveStatus,
+  type BackupEncryptionStatus,
+  type ErrorLogEntry,
+  type UpdateProgress,
+  type UpdateStatus,
+  type UpdateStep,
+} from '../api';
+import { filePayload, isEncryptedFile } from '../backupFile';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
@@ -10,13 +23,7 @@ import { ErrorBox, Loading, useAsync } from '../ui';
 /** Seiten „Zustand und Updates“ und „Datensicherung“ der Einstellungen. */
 export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => api.status(), [], 'admin/status');
-  if (part === 'datensicherung')
-    return (
-      <>
-        <Datensicherung onToast={onToast} onChanged={reload} />
-        <DriveSicherung onToast={onToast} />
-      </>
-    );
+  if (part === 'datensicherung') return <DatensicherungSeite onToast={onToast} onChanged={reload} />;
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
@@ -68,6 +75,62 @@ function date(ts: number | null | undefined): string {
   return ts ? new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) : '–';
 }
 
+const STEP_TEXT: Record<UpdateStep, string> = {
+  download: 'Paket wird geladen',
+  backup: 'Daten werden gesichert',
+  drive: 'Sicherung wird in Google Drive abgelegt',
+  install: 'Neue Version wird eingespielt',
+};
+
+/** Abfrage des laufenden Updates alle … ms; nach höchstens … ms aufgeben (das Zeitlimit von PHP sind 5 Minuten). */
+const POLL_MS = 3000;
+const WAIT_MAX_MS = 20 * 60 * 1000;
+
+/**
+ * Antwort auf das Einspielen ging verloren, das Update läuft aber auf dem Server weiter: keine Verbindung (Netzwechsel),
+ * Zeitlimit des Hosters vor PHP (Gateway-Fehler ohne Code der App) oder es läuft schon eines (z. B. nach erneutem Klick).
+ */
+function stillRunning(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    (err.code === 'update_running' || err.status === 0 || (!err.code && [502, 503, 504, 520, 522, 524].includes(err.status)))
+  );
+}
+
+function mb(bytes: number): string {
+  return (bytes / 1024 / 1024).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+/**
+ * Anzeige je Schritt, innerhalb von Sicherung und Hochladen nach Bytes. Die Größe der Sicherung steht erst am Ende fest
+ * (geschätzt aus der letzten): Der Balken bleibt dann vor dem Ende des Schritts stehen, bis der nächste beginnt.
+ */
+function UpdateProgressBar({ progress }: { progress: UpdateProgress | null }) {
+  const index = progress ? progress.steps.indexOf(progress.step) : -1;
+  const steps = progress?.steps.length ?? 0;
+  const { done = null, total = null, estimate = false } = progress ?? {};
+  const part = done !== null && total ? Math.min(done / total, estimate ? 0.95 : 1) : 0;
+  const bytes = done === null ? '' : total ? ` (${mb(done)} von ${estimate ? 'ca. ' : ''}${mb(total)} MB)` : ` (${mb(done)} MB)`;
+  return (
+    <div className="small" role="status" aria-live="polite">
+      {index >= 0 ? (
+        <>
+          <progress className="progress" value={index + part} max={steps} aria-label={`Update: Schritt ${index + 1} von ${steps}`} />
+          <p className="muted">
+            Schritt {index + 1} von {steps}: {STEP_TEXT[progress!.step]}
+            {bytes} … Bitte die Seite offen lassen; das kann einige Minuten dauern.
+          </p>
+        </>
+      ) : (
+        <>
+          <progress className="progress" aria-label="Update läuft" />
+          <p className="muted">Das Update läuft … Bitte die Seite offen lassen; das kann einige Minuten dauern.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChanged: () => void; onToast: (msg: string) => void }) {
   const [u, setU] = useState<UpdateStatus>(status.updates);
   const [reports, setReports] = useState(status.statusReports.enabled);
@@ -75,6 +138,15 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
   const [error, setError] = useState<string | null>(null);
   const [older, setOlder] = useState('');
   const [showPayload, setShowPayload] = useState(false);
+  /** Fortschritt des laufenden Updates; undefined: keins läuft */
+  const [progress, setProgress] = useState<UpdateProgress | null | undefined>(status.updates.running ? status.updates.progress : undefined);
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
 
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(label);
@@ -88,6 +160,69 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
     }
   }
 
+  /**
+   * Fragt den Stand ab, solange auf dem Server ein Update läuft, und zeigt den Fortschritt. Danach: eingespielt → App neu
+   * laden; gescheitert → der Stand zeigt „Letztes Update … hat nicht geklappt“.
+   *
+   * @param version Ziel des Updates; null: nur auf ein schon laufendes warten (z. B. nach dem Neuladen der Seite)
+   * @param done Promise der eigenen Anfrage; solange sie läuft, nur den Fortschritt zeigen
+   */
+  async function follow(version: string | null, done?: Promise<unknown>): Promise<void> {
+    let finished = !done;
+    let failure: unknown = null;
+    done?.then(
+      () => (finished = true),
+      (err) => {
+        finished = true;
+        failure = err;
+      },
+    );
+    const before = u.current;
+    const until = Date.now() + WAIT_MAX_MS;
+    setProgress((p) => p ?? null);
+    try {
+      for (;;) {
+        await new Promise((r) => setTimeout(r, done && finished ? 0 : POLL_MS));
+        if (!alive.current) return;
+        if (finished && done) {
+          // Antwort auf die eigene Anfrage: eingespielt, oder abgebrochen, während das Update weiterläuft.
+          if (!failure) return reloadApp(version!);
+          if (!stillRunning(failure)) throw failure;
+          done = undefined;
+          continue;
+        }
+        let next: UpdateStatus;
+        try {
+          next = await inBackground(() => api.updateStatus());
+        } catch {
+          if (Date.now() > until) throw new Error('Der Server antwortet nicht. Bitte in ein paar Minuten den Zustand neu laden.');
+          continue; // kurz nicht erreichbar (z. B. während die Dateien getauscht werden)
+        }
+        if (next.running) {
+          setProgress(next.progress);
+          if (Date.now() > until) throw new Error('Das Update läuft noch. Bitte in ein paar Minuten den Zustand neu laden.');
+          continue;
+        }
+        if (done) continue; // Anfrage läuft noch, Sperre noch nicht gesetzt oder schon frei: auf die Antwort warten
+        setU(next);
+        // Eingespielt (auch ein anderes, das schon lief, z. B. das automatische): die neue App laden.
+        if (next.current !== before) return reloadApp(next.current);
+        if (version && !(next.last && !next.last.ok && next.last.to === version)) {
+          throw new Error(`Version ${version} wurde nicht eingespielt. Bitte den Zustand neu laden und erneut versuchen.`);
+        }
+        return; // gescheitert: steht unter „Letztes Update … hat nicht geklappt“
+      }
+    } finally {
+      if (alive.current) setProgress(undefined);
+    }
+  }
+
+  /** Ein Update läuft schon (Seite neu geladen, automatisches Update, anderer Admin): warten und Fortschritt zeigen. */
+  useEffect(() => {
+    if (status.updates.running) void run('wait', () => follow(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Nach einem Update läuft im Browser noch die alte App: neu laden. */
   function reloadApp(version: string) {
     onToast(`Version ${version} ist eingespielt.`);
@@ -98,9 +233,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
    * Scheitert nur die Sicherung in Google Drive vor dem Update (die auf dem Server ist da), fragt die App nach:
    * trotzdem einspielen oder abbrechen.
    */
-  async function askWithoutDrive(fn: (withoutDrive: boolean) => Promise<unknown>) {
+  async function askWithoutDrive(version: string, fn: (withoutDrive: boolean) => Promise<unknown>) {
     try {
-      await fn(false);
+      await follow(version, fn(false));
     } catch (err) {
       if (
         !(err instanceof ApiError && err.code === 'drive_backup_failed') ||
@@ -108,14 +243,13 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
       ) {
         throw err;
       }
-      await fn(true);
+      await follow(version, fn(true));
     }
   }
 
   const install = (version: string, major = false) =>
     run('install', async () => {
-      await askWithoutDrive((withoutDrive) => api.installUpdate(version, major, withoutDrive));
-      reloadApp(version);
+      await askWithoutDrive(version, (withoutDrive) => api.installUpdate(version, major, withoutDrive));
     });
 
   const olderVersions = u.versions.filter((v) => compare(v.version, u.current) < 0);
@@ -170,8 +304,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                   disabled={!!busy}
                   onClick={() =>
                     run('held', async () => {
-                      await api.installHeldUpdate();
-                      reloadApp(u.held!.version);
+                      await follow(u.held!.version, api.installHeldUpdate());
                     })
                   }
                 >
@@ -188,6 +321,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               </div>
             </div>
           )}
+          {progress !== undefined && <UpdateProgressBar progress={progress} />}
           {u.error && <p className="form-error small">Letzte Prüfung: {u.error}</p>}
           {u.last && !u.last.ok && u.last.to !== u.held?.version && (
             <p className="form-error small">
@@ -303,8 +437,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 onClick={() =>
                   window.confirm(`Auf Version ${older} zurückgehen?`) &&
                   run('rollback', async () => {
-                    await askWithoutDrive((withoutDrive) => api.rollback(older, withoutDrive));
-                    reloadApp(older);
+                    await askWithoutDrive(older, (withoutDrive) => api.rollback(older, withoutDrive));
                   })
                 }
               >
@@ -476,18 +609,70 @@ export function compare(a: string, b: string): number {
   return 0;
 }
 
-function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
+/** Datensicherung mit Passwort für Sicherungen; das Passwort bestimmt Download und Google Drive. */
+function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
+  // Änderungen über setData: auch in den Zwischenspeicher, sonst zeigte ein erneutes Öffnen kurz den alten Stand.
+  const { data, error, loading, reload, setData } = useAsync(() => api.backupEncryption(), [], 'admin/backup/encryption');
+  if (loading && !data) return <Loading />;
+  const e = data;
+  // Ohne den Stand des Passworts bleiben Herunterladen (unverschlüsselt) und Wiederherstellen trotzdem möglich.
+  return (
+    <>
+      {/* Ohne Stand (Fehler): ausdrücklich „unverschlüsselt“, nicht stillschweigend */}
+      {/* Verschlüsselt erst mit geprüftem Passwort: Ein vertipptes machte die Sicherung unbrauchbar. */}
+      <Datensicherung
+        onToast={onToast}
+        onChanged={onChanged}
+        encrypted={e ? e.configured && e.verified : null}
+        unverified={!!e && e.configured && !e.verified}
+      />
+      {e ? (
+        <Verschluesselung
+          status={e}
+          onChange={(s) => {
+            setData(s);
+            onChanged(); // Ampel (z. B. „Passwort nicht geprüft“) neu laden
+          }}
+          onToast={onToast}
+        />
+      ) : (
+        <ErrorBox message={error ?? 'Nicht geladen'} onRetry={reload} />
+      )}
+      {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (verschlüsselt oder nicht) */}
+      <DriveSicherung key={String(e?.configured)} onToast={onToast} noSodium={e?.available === false} />
+    </>
+  );
+}
+
+function Datensicherung({
+  onToast,
+  onChanged,
+  encrypted,
+  unverified = false,
+}: {
+  onToast: (msg: string) => void;
+  onChanged: () => void;
+  /** null: Stand des Passworts unbekannt (nicht geladen) */
+  encrypted: boolean | null;
+  /** Passwort eingerichtet, aber noch nicht geprüft: noch nicht verschlüsselt herunterladen */
+  unverified?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Verschlüsselte Datei zum Wiederherstellen: wartet auf das Passwort für Sicherungen.
+  const [pending, setPending] = useState<File | null>(null);
+  const [passphrase, setPassphrase] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
-  async function download() {
+  async function download(plain = false) {
     setError(null);
     // Als Datei über die eigene Adresse: Der Server schreibt die Sicherung Stück für Stück, weder er noch der Browser
-    // braucht sie ganz im Arbeitsspeicher (Fotos und Dokumente machen sie schnell groß).
+    // braucht sie ganz im Arbeitsspeicher (Fotos und Dokumente machen sie schnell groß). Mit Passwort für Sicherungen
+    // verschlüsselt, außer auf ausdrücklichen Wunsch.
     if (config?.backupUrl) {
       const a = document.createElement('a');
-      a.href = config.backupUrl;
+      const url = config.backupUrl;
+      a.href = encrypted && !plain ? `${url}${url.includes('?') ? '&' : '?'}verschluesselt=1` : url;
       a.download = '';
       document.body.appendChild(a);
       a.click();
@@ -495,6 +680,10 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       onToast('Sicherung wird heruntergeladen');
       // Die Ampel zählt die Sicherung, sobald sie ganz geschrieben ist.
       setTimeout(onChanged, 5000);
+      return;
+    }
+    if (encrypted && !plain) {
+      setError('Verschlüsselt herunterladen geht nur über die Adresse der App; bitte die Seite neu laden.');
       return;
     }
     setBusy(true);
@@ -527,10 +716,22 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
       )
     )
       return;
+    setError(null);
+    if (await isEncryptedFile(file)) {
+      setPending(file);
+      setPassphrase('');
+      return;
+    }
+    setPending(null); // eine zuvor gewählte verschlüsselte Datei ist damit nicht mehr gemeint
+    await send(file, false);
+  }
+
+  async function send(file: File, encrypted: boolean, pass?: string) {
     setBusy(true);
     setError(null);
     try {
-      await api.restoreBackup(await file.text());
+      await api.restoreBackup(await filePayload(file, encrypted), pass);
+      setPending(null);
       onToast('Sicherung wiederhergestellt');
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
@@ -550,14 +751,260 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
         eingeschaltet sind, auch dort.
       </p>
       <div className="button-row">
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>
-          Sicherung herunterladen
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void download()}>
+          {encrypted
+            ? 'Sicherung verschlüsselt herunterladen'
+            : encrypted === null
+              ? 'Sicherung unverschlüsselt herunterladen'
+              : 'Sicherung herunterladen'}
         </button>
+        {encrypted && (
+          <button type="button" className="btn btn-link" disabled={busy} onClick={() => void download(true)}>
+            unverschlüsselt herunterladen
+          </button>
+        )}
         <button type="button" className="btn btn-link" disabled={busy} onClick={() => fileInput.current?.click()}>
           Sicherung wiederherstellen …
         </button>
       </div>
-      <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={restore} />
+      {unverified && (
+        <p className="small">
+          Verschlüsselt herunterladen geht, sobald das Passwort unten mit „Passwort prüfen“ bestätigt ist: Mit einem vertippten Passwort
+          ließe sich die Sicherung nicht wiederherstellen.
+        </p>
+      )}
+      {encrypted && (
+        <p className="muted small">
+          Bricht das Herunterladen ab, ist die Datei unvollständig (die App erkennt das beim Wiederherstellen); der Grund steht unter
+          Einstellungen → Zustand und Updates im Fehlerprotokoll.
+        </p>
+      )}
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/json,application/octet-stream,.json,.enc"
+        hidden
+        onChange={(e) => void restore(e)}
+      />
+      {pending && (
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(pending, true, passphrase);
+          }}
+        >
+          <p className="small">„{pending.name}“ ist verschlüsselt. Zum Wiederherstellen bitte das Passwort für Sicherungen eingeben.</p>
+          <label className="field">
+            <span>Passwort für Sicherungen</span>
+            <input type="password" autoComplete="off" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} required />
+          </label>
+          <div className="button-row">
+            <button type="submit" className="btn btn-primary" disabled={busy || passphrase === ''}>
+              {busy ? 'Stellt wieder her …' : 'Wiederherstellen'}
+            </button>
+            <button type="button" className="btn btn-link" disabled={busy} onClick={() => setPending(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Passwort für Sicherungen: Sicherungen außerhalb des Servers (Download, Google Drive) sind damit verschlüsselt. Die App
+ * speichert nur einen öffentlichen Schlüssel; ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht
+ * wiederherstellen, auch nicht von den Betreuern.
+ */
+function Verschluesselung({
+  status,
+  onChange,
+  onToast,
+}: {
+  status: BackupEncryptionStatus;
+  onChange: (s: BackupEncryptionStatus) => void;
+  onToast: (msg: string) => void;
+}) {
+  const [mode, setMode] = useState<'view' | 'set' | 'check'>('view');
+  const [pass, setPass] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [kept, setKept] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function open(next: 'view' | 'set' | 'check') {
+    setMode(next);
+    setPass('');
+    setRepeat('');
+    setKept(false);
+    setError(null);
+  }
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function remove() {
+    if (
+      window.confirm(
+        'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, auch die in Google Drive. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
+      )
+    )
+      void run(async () => {
+        onChange(await api.removeBackupEncryption());
+        onToast('Passwort für Sicherungen entfernt');
+      });
+  }
+
+  return (
+    <section className="card settings-section" aria-labelledby="backup-enc-title">
+      <h3 id="backup-enc-title">Passwort für Sicherungen</h3>
+      <p className="muted small">
+        Mit diesem Passwort sind heruntergeladene Sicherungen und die Sicherungen in Google Drive verschlüsselt: Wer die Datei findet, kann
+        sie ohne das Passwort nicht lesen. Die App speichert das Passwort nicht.{' '}
+        <strong>
+          Ohne das Passwort lässt sich eine verschlüsselte Sicherung nicht wiederherstellen, auch nicht von den Betreuern der App.
+        </strong>{' '}
+        Bitte an einem sicheren Ort aufbewahren (z. B. im Passwort-Manager oder ausgedruckt im Tresor). Die Sicherungen vor Updates auf dem
+        Server bleiben unverschlüsselt.
+      </p>
+      {!status.available ? (
+        <>
+          <p className="small">Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.</p>
+          {status.stored && (
+            <>
+              <p className="form-error" role="alert">
+                Ein Passwort ist eingerichtet, lässt sich ohne sodium aber nicht nutzen: Heruntergeladene Sicherungen sind unverschlüsselt,
+                und Sicherungen in Google Drive werden nicht hochgeladen. Entfernst du das Passwort, gehen sie unverschlüsselt dorthin.
+              </p>
+              <div className="button-row">
+                <button type="button" className="btn btn-link" disabled={busy} onClick={remove}>
+                  Passwort entfernen
+                </button>
+              </div>
+            </>
+          )}
+        </>
+      ) : status.configured && mode === 'view' ? (
+        <>
+          <p className="small">
+            Eingerichtet{status.set_at ? ` am ${date(status.set_at)}` : ''}. Fingerabdruck: <code>{status.fingerprint}</code>
+          </p>
+          {!status.verified && (
+            <p className="small">
+              Bitte das Passwort einmal mit „Passwort prüfen“ bestätigen. Erst danach löscht die App in Google Drive die unverschlüsselten
+              Sicherungen, und die mit einem früheren Passwort wechseln wie die übrigen durch (die letzten acht bleiben); bis dahin bleiben
+              sie.
+            </p>
+          )}
+          <div className="button-row">
+            <button type="button" className="btn btn-secondary" onClick={() => open('check')}>
+              Passwort prüfen
+            </button>
+            <button type="button" className="btn btn-link" onClick={() => open('set')}>
+              Ändern
+            </button>
+            <button type="button" className="btn btn-link" disabled={busy} onClick={remove}>
+              Entfernen
+            </button>
+          </div>
+        </>
+      ) : mode === 'check' ? (
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              const { ok } = await api.verifyBackupEncryption(pass);
+              if (ok) {
+                onToast('Das Passwort für Sicherungen stimmt');
+                onChange(await api.backupEncryption()); // jetzt geprüft: Hinweis weg
+                open('view');
+              } else setError('Das Passwort stimmt nicht.');
+            });
+          }}
+        >
+          <label className="field">
+            <span>Passwort für Sicherungen</span>
+            <input type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} required />
+          </label>
+          <div className="button-row">
+            <button type="submit" className="btn btn-primary" disabled={busy || pass === ''}>
+              Prüfen
+            </button>
+            <button type="button" className="btn btn-link" onClick={() => open('view')}>
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      ) : mode === 'set' || !status.configured ? (
+        <form
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(async () => {
+              onChange(await api.setBackupEncryption(pass, repeat));
+              onToast('Passwort für Sicherungen eingerichtet');
+              open('view');
+            });
+          }}
+        >
+          {status.configured && (
+            <p className="small">
+              Das neue Passwort gilt für neue Sicherungen. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.
+            </p>
+          )}
+          <label className="field">
+            <span>Neues Passwort für Sicherungen (mind. {status.min_length} Zeichen)</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              minLength={status.min_length}
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Passwort wiederholen</span>
+            <input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} required />
+          </label>
+          <label className="toggle">
+            <input type="checkbox" checked={kept} onChange={(e) => setKept(e.target.checked)} />
+            <span>Ich habe das Passwort sicher aufbewahrt. Ohne es lässt sich keine verschlüsselte Sicherung wiederherstellen.</span>
+          </label>
+          <div className="button-row">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              // Zeichen wie auf dem Server (mb_strlen), nicht UTF-16-Einheiten
+              disabled={busy || !kept || [...pass].length < status.min_length || pass !== repeat}
+            >
+              {busy ? 'Richtet ein …' : 'Passwort einrichten'}
+            </button>
+            {status.configured && (
+              <button type="button" className="btn btn-link" onClick={() => open('view')}>
+                Abbrechen
+              </button>
+            )}
+          </div>
+        </form>
+      ) : null}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -568,7 +1015,7 @@ function Datensicherung({ onToast, onChanged }: { onToast: (msg: string) => void
 }
 
 /** Sicherungen automatisch in Google Drive (wöchentlich, die letzten acht bleiben). */
-function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
+function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void; noSodium: boolean }) {
   const { data, error, loading, reload } = useAsync(() => api.backupDrive(), [], 'admin/backup/drive');
   const [state, setState] = useState<BackupDriveStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -598,8 +1045,16 @@ function DriveSicherung({ onToast }: { onToast: (msg: string) => void }) {
       <p className="muted small">
         Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt: Die App legt einmal pro{' '}
         {d.every_days === 7 ? 'Woche' : `${d.every_days} Tage`} eine Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und
-        behält die letzten {d.keep}. Die Sicherungen enthalten Zugangsschlüssel und Passwort-Prüfwerte; den Ordner bitte nicht freigeben.
+        behält die letzten {d.keep}. Ist oben ein Passwort für Sicherungen eingerichtet, gehen sie verschlüsselt dorthin; den Ordner
+        trotzdem bitte nicht freigeben.
       </p>
+      {!d.encrypted && (
+        <p className="small">
+          {noSodium
+            ? 'Zum Verschlüsseln fehlt PHP auf diesem Server die Erweiterung sodium: Ist oben ein Passwort eingerichtet, werden keine Sicherungen hochgeladen, sonst unverschlüsselt.'
+            : 'Unverschlüsselt: Wer den Ordner öffnen kann, kann die Sicherungen lesen. Mit einem Passwort für Sicherungen (oben) gehen sie verschlüsselt dorthin.'}
+        </p>
+      )}
       {!d.available ? (
         <p className="small">
           Dafür braucht die App eine Verbindung über „Mit Google verbinden“ (<a href="#/einstellungen/google">Google-Zugang</a>).

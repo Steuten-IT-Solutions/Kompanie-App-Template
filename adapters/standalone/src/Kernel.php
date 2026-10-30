@@ -352,7 +352,7 @@ final class Kernel
             $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === '/sicherung') {
             $app = $this->app();
-            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
+            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
         } elseif (preg_match('#^/anhang/([a-f0-9]{32})$#', $path, $m)) {
             $this->beginPreview();
             $app = $this->app();
@@ -664,9 +664,11 @@ final class Kernel
 
     private function sendCron(): void
     {
-        // Schlüssel im Header (Selbstaufruf) oder als Parameter (Cronjob des Hosters).
-        $header = $this->http->header('X-Kompanie-Cron');
-        $key = (string) ($header ?? (is_string($_GET['key'] ?? null) ? $_GET['key'] : ''));
+        // Schlüssel im Header (Selbstaufruf: X-Kompanie-Cron; Cronjob des Hosters: X-Kompanie-Cron-Key, landet nicht
+        // im Zugriffsprotokoll des Webservers) oder als Parameter (Cronjob des Hosters, wenn er nur eine Adresse nimmt).
+        // Der erste nicht leere: Ein leer mitgeschickter Header verdeckt den Schlüssel nicht.
+        $header = $this->http->header('X-Kompanie-Cron'); // gesetzt: Selbstaufruf (runDueTasks unten)
+        $key = ($header ?: $this->http->header('X-Kompanie-Cron-Key')) ?: (is_string($_GET['key'] ?? null) ? $_GET['key'] : '');
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
             $this->sendPlain(403, 'Falscher Schlüssel.');
@@ -682,7 +684,7 @@ final class Kernel
         if (!$this->finishResponse()) {
             $this->flushResponse();
         }
-        $this->runDueTasks($header !== null ? 'spawn' : 'cron');
+        $this->runDueTasks($header !== null && $header !== '' ? 'spawn' : 'cron');
     }
 
     private function sendApp(): void
@@ -793,6 +795,30 @@ final class Kernel
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('X-Frame-Options: SAMEORIGIN');
         header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+        // HSTS: der Browser ruft danach ein halbes Jahr alles unter diesem Host nur noch über HTTPS auf. Nur über HTTPS
+        // (über HTTP ignorieren Browser den Header ohnehin), ohne includeSubDomains (andere Subdomains des Vereins) und
+        // von sich aus nur, wenn die App den Host allein hat (liegt im Wurzelverzeichnis): In einem Unterordner gälte
+        // es auch für die anderen Seiten des Vereins unter demselben Host. 'hsts' => true/false in config.php
+        // schaltet es immer ein bzw. aus.
+        if ($this->http->isHttps() && $this->hstsEnabled()) {
+            header('Strict-Transport-Security: max-age=15552000');
+        }
+    }
+
+    private function hstsEnabled(): bool
+    {
+        try {
+            $set = $this->config()->hsts();
+        } catch (\Throwable) {
+            $set = null; // noch nicht eingerichtet
+        }
+        // Die eingetragene Adresse gilt vor der Anfrage (hinter einem Proxy, der den Pfad umschreibt, sieht PHP „/“).
+        try {
+            $base = $this->config()->baseUrl();
+        } catch (\Throwable) {
+            $base = '';
+        }
+        return $set ?? (parse_url($base !== '' ? $base : $this->http->baseUrl(), PHP_URL_PATH) ?: '/') === '/';
     }
 
     private function appDir(): string

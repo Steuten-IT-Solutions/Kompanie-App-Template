@@ -5,7 +5,7 @@ import { useDragSort } from '../dragSort';
 import { formatDate, formatEuro, todayYmd } from '../format';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo-small.webp';
-import { columnWidths, csvFileName, listFileBase, toCsv } from '../lists';
+import { columnWidths, csvFileName, csvPhone, listFileBase, toCsv } from '../lists';
 import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -27,8 +27,23 @@ const FIELD_LABELS: Record<ListField, string> = {
   rank: brand.labels.rank,
   titles: sec.titles,
   birthday: 'Geburtstag',
+  address: 'Adresse',
+  street: 'Straße und Nr.',
+  postal_code: 'PLZ',
+  city: 'Ort',
+  country: 'Land',
+  phone: 'Handynummer',
+  email: 'E-Mail',
   points: sec.points,
   penalties: `${sec.penalties} (offen)`,
+};
+
+/** Breite einer neuen Datenspalte (sonst normal) */
+const FIELD_WIDTHS: Partial<Record<ListField, ListColumn['width']>> = {
+  nr: 'narrow',
+  postal_code: 'narrow',
+  address: 'wide',
+  email: 'wide',
 };
 
 const WIDTH_LABELS: Record<ListColumn['width'], string> = { narrow: 'schmal', normal: 'normal', wide: 'breit' };
@@ -372,7 +387,12 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
 
 function downloadCsv(d: Draft) {
   const header = d.columns.map((c) => columnLabel(c));
-  const rows = d.rows.map((r, i) => d.columns.map((c) => cell(c, r, i)));
+  const rows = d.rows.map((r, i) =>
+    d.columns.map((c) => {
+      const v = cell(c, r, i);
+      return c.field === 'phone' && typeof v === 'string' ? csvPhone(v) : v;
+    }),
+  );
   const blob = new Blob([toCsv(header, rows)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -474,7 +494,7 @@ function ColumnEditor({
           onClick={() =>
             onChange([
               ...columns,
-              { kind: 'field', field, label: '', width: field === 'nr' ? 'narrow' : 'normal', checkbox: false, available: true },
+              { kind: 'field', field, label: '', width: FIELD_WIDTHS[field] ?? 'normal', checkbox: false, available: true },
             ])
           }
         >

@@ -7,8 +7,8 @@
  *   php bin/kompanie.php create-admin --name="Vorname Nachname" --login=name [--email=…] [--password=…]
  *   php bin/kompanie.php reset-password --login=name
  *   php bin/kompanie.php cron           fällige Aufgaben ausführen (z. B. stündlich als Cronjob)
- *   php bin/kompanie.php export [--out=datei.json]
- *   php bin/kompanie.php import datei.json
+ *   php bin/kompanie.php export [--out=datei.json] [--encrypt]   --encrypt: mit dem Passwort für Sicherungen verschlüsselt
+ *   php bin/kompanie.php import datei.json [--passphrase-file=…]   verschlüsselte Sicherungen fragen nach dem Passwort
  *   php bin/kompanie.php status
  *   php bin/kompanie.php update-check   Update-Liste prüfen und anzeigen
  *   php bin/kompanie.php update [--version=…] [--major] [--without-drive]   neueste (oder angegebene) Version einspielen
@@ -24,6 +24,7 @@
 declare(strict_types=1);
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Update\UpdateService;
 use KompanieApp\Standalone\HttpContext;
 use KompanieApp\Standalone\Kernel;
@@ -99,6 +100,29 @@ try {
 
         case 'export':
             $kernel->upgrade();
+            if (isset($opt['encrypt'])) {
+                $out = $str('out');
+                if ($out === '') {
+                    throw new RuntimeException('Verschlüsselt nur in eine Datei: bitte --out=datei' . BackupCrypto::EXTENSION . ' angeben.');
+                }
+                if (!$kernel->app()->backupEncryption()->configured()) {
+                    throw new RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (Einstellungen → Datensicherung).');
+                }
+                if (!$kernel->app()->backupEncryption()->verified()) {
+                    // Ein vertipptes Passwort machte die Sicherung unbrauchbar.
+                    throw new RuntimeException('Das Passwort für Sicherungen ist noch nicht geprüft: bitte erst unter Einstellungen → Datensicherung „Passwort prüfen“.');
+                }
+                // Verschlüsselt direkt in eine neue Datei daneben schreiben (nie Klartext auf der Platte), erst danach
+                // umbenennen: Scheitert etwas, bleibt eine vorhandene Datei unter --out unverändert, und es entsteht keine halbe.
+                $part = $out . '.' . bin2hex(random_bytes(4)) . '.part';
+                $kernel->app()->backupEncryption()->exportToFile(new StandaloneBackup($kernel), $part);
+                if (!@rename($part, $out)) {
+                    @unlink($part);
+                    throw new RuntimeException("$out lässt sich nicht schreiben (Ordner vorhanden, Schreibrechte?).");
+                }
+                fwrite(STDERR, "Verschlüsselt gesichert in $out (wiederherstellen nur mit dem Passwort für Sicherungen).\n");
+                break;
+            }
             $json = json_encode((new StandaloneBackup($kernel))->export(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $out = $str('out');
             if ($out === '') {
@@ -117,6 +141,47 @@ try {
             }
             $kernel->upgrade();
             $backup = new StandaloneBackup($kernel);
+            // Erst entschlüsseln: Ein falsches Passwort soll nichts anlegen.
+            $head = (string) file_get_contents($file, false, null, 0, strlen(BackupCrypto::MAGIC));
+            if (BackupCrypto::isEncrypted($head)) {
+                $passFile = $str('passphrase-file');
+                if ($passFile !== '') {
+                    $read = @file_get_contents($passFile);
+                    if ($read === false) {
+                        throw new RuntimeException("Die Datei mit dem Passwort ($passFile) lässt sich nicht lesen.");
+                    }
+                    $pass = rtrim($read, "\r\n");
+                } else {
+                    fwrite(STDERR, 'Passwort für Sicherungen: ');
+                    // shell_exec ist bei manchen Hostern gesperrt: dann ohne Verdecken lesen.
+                    if (function_exists('posix_isatty') && posix_isatty(STDIN) && function_exists('shell_exec')) {
+                        // Eingabe verdeckt; die Shell stellt die Anzeige auch bei Strg-C wieder her (trap), ohne pcntl.
+                        $line = shell_exec("sh -c 'trap \"stty echo; exit 130\" INT TERM; stty -echo; IFS= read -r p; stty echo; printf \"%s\" \"\$p\"'");
+                        $pass = is_string($line) ? $line : '';
+                    } else {
+                        $line = fgets(STDIN);
+                        $pass = $line === false ? '' : rtrim($line, "\r\n");
+                    }
+                    fwrite(STDERR, "\n");
+                }
+                if ($pass === '') {
+                    throw new RuntimeException('Kein Passwort für Sicherungen angegeben.');
+                }
+                // Direkt aus der Datei in den Arbeitsspeicher entschlüsseln: Der Klartext liegt nie als Datei vor.
+                $in = @fopen($file, 'rb');
+                if ($in === false) {
+                    throw new RuntimeException('Die Sicherung ließ sich nicht lesen.');
+                }
+                try {
+                    $data = BackupCrypto::decrypt($in, $pass);
+                } finally {
+                    fclose($in);
+                }
+                // Wie beim Wiederherstellen in der App: Mit dem eingerichteten Passwort gilt es als geprüft.
+                $kernel->app()->backupEncryption()->restoredWith($pass);
+            } else {
+                $data = (string) file_get_contents($file);
+            }
             // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
             $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.json';
             $out = fopen($before, 'wb');
@@ -127,7 +192,7 @@ try {
                 fclose($out);
             }
             echo "Bisheriger Stand gesichert: $before\n";
-            $backup->import((string) file_get_contents($file));
+            $backup->import($data);
             echo "Sicherung wiederhergestellt. Alle Geräte müssen sich neu anmelden; die Galeriebilder werden neu aufbereitet.\n";
             break;
 

@@ -1140,6 +1140,7 @@ final class Migrations
             // (board_message_revisions, ohne Fremdschlüssel: überdauert das Löschen der Nachricht), Mailversand je
             // Empfänger (board_mails: Warteschlange und Protokoll) und Einstellungen je Konto (user_settings, z. B.
             // board_mail = 0 für „keine Mails vom Brett“).
+            // Die erste Zeile über INSTR/LEFT statt SUBSTRING_INDEX: Das gibt es in der SQLite-Integration von WordPress nicht.
             29 => [
                 'mysql' => [
                     'ALTER TABLE {board_messages} ADD COLUMN title longtext DEFAULT NULL',
@@ -1147,9 +1148,9 @@ final class Migrations
                     'ALTER TABLE {board_messages} ADD COLUMN deleted_by bigint(20) unsigned DEFAULT NULL',
                     'ALTER TABLE {board_messages} MODIFY body longtext NOT NULL',
                     "UPDATE {board_messages} SET
-  title = COALESCE(NULLIF(CASE WHEN CHAR_LENGTH(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1))) > 80
-    THEN CONCAT(LEFT(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)), 79), '…')
-    ELSE TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)) END, ''), 'Nachricht'),
+  title = COALESCE(NULLIF(CASE WHEN CHAR_LENGTH(TRIM(LEFT(REPLACE(body, CHAR(13), ''), INSTR(CONCAT(REPLACE(body, CHAR(13), ''), CHAR(10)), CHAR(10)) - 1))) > 80
+    THEN CONCAT(LEFT(TRIM(LEFT(REPLACE(body, CHAR(13), ''), INSTR(CONCAT(REPLACE(body, CHAR(13), ''), CHAR(10)), CHAR(10)) - 1)), 79), '…')
+    ELSE TRIM(LEFT(REPLACE(body, CHAR(13), ''), INSTR(CONCAT(REPLACE(body, CHAR(13), ''), CHAR(10)), CHAR(10)) - 1)) END, ''), 'Nachricht'),
   body = CONCAT('<p>', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(body, CHAR(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), CHAR(10), '<br>'), '</p>')
 WHERE title IS NULL",
                     'CREATE TABLE IF NOT EXISTS {user_signatures} (
@@ -1402,6 +1403,34 @@ WHERE title IS NULL",
             // Handynummern einheitlich schreiben wie die App sie jetzt speichert (packages/frontend/src/phone.ts):
             // +491716438655 → +49 171 6438655. Nur Nummern aus + und Ziffern; was schon Leerzeichen hat, bleibt.
             34 => self::phoneFormat(),
+            // Postanschrift je Konto (Domain\Address) neben der Handynummer: Land als ISO-Code (DE), bei einem Land
+            // außerhalb der Auswahl der Name in country_name. Alle Felder leer heißt keine Adresse.
+            35 => [
+                'mysql' => [
+                    "ALTER TABLE {member_contacts} ADD COLUMN street varchar(100) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN house_number varchar(10) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN address_extra varchar(100) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN postal_code varchar(12) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN city varchar(60) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country varchar(2) NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country_name varchar(60) NOT NULL DEFAULT ''",
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {member_contacts} ADD COLUMN street TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN house_number TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN address_extra TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN postal_code TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN city TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country TEXT NOT NULL DEFAULT ''",
+                    "ALTER TABLE {member_contacts} ADD COLUMN country_name TEXT NOT NULL DEFAULT ''",
+                ],
+            ],
+            // Aufbewahrungsfrist für Ehemalige: wann die persönlichen Angaben gelöscht wurden (die Chronik bleibt);
+            // danach kommt die Person nicht wieder dran.
+            36 => [
+                'mysql' => ['ALTER TABLE {former_members} ADD COLUMN purged_at datetime DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {former_members} ADD COLUMN purged_at TEXT DEFAULT NULL'],
+            ],
         ];
     }
 
