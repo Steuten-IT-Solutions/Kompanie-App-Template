@@ -141,12 +141,14 @@ final class BoardRebuildTest extends TestCase
                 (new Migrator($db, $settings, array_filter($all, static fn (int $v): bool => $v <= 27, ARRAY_FILTER_USE_KEY)))->migrate();
                 $db->insert('board_messages', ['body' => "Halle gesperrt!\r\nBitte <b>nicht</b> kommen & weitersagen.", 'author_id' => 1, 'created_at' => '2026-10-20 10:00:00', 'updated_at' => '2026-10-20 10:00:00', 'expires_at' => '2026-10-21 10:00:00']);
                 $db->insert('board_messages', ['body' => str_repeat('Länger ', 30), 'author_id' => 1, 'created_at' => '2026-10-20 10:00:00', 'updated_at' => '2026-10-20 10:00:00', 'expires_at' => '2026-10-21 10:00:00']);
+                $db->insert('board_messages', ['body' => "Übung fällt aus\nGrüße", 'author_id' => 1, 'created_at' => '2026-10-20 10:00:00', 'updated_at' => '2026-10-20 10:00:00', 'expires_at' => '2026-10-21 10:00:00']);
                 (new Migrator($db, $settings))->migrate();
                 $rows = $db->select('SELECT title, body FROM {board_messages} ORDER BY id');
                 $this->assertSame('Halle gesperrt!', $rows[0]['title'], "$driver: erste Zeile als Titel");
                 $this->assertSame('<p>Halle gesperrt!<br>Bitte &lt;b&gt;nicht&lt;/b&gt; kommen &amp; weitersagen.</p>', $rows[0]['body'], "$driver: escaped, Zeilenumbruch als <br>");
                 $this->assertSame(80, mb_strlen($rows[1]['title']), "$driver: höchstens 80 Zeichen (Zeichen, nicht Bytes)");
                 $this->assertStringEndsWith('…', $rows[1]['title']);
+                $this->assertSame('Übung fällt aus', $rows[2]['title'], "$driver: erste Zeile mit Umlauten (Zeichen, nicht Bytes)");
                 // Wiederholt ausgeführt (Versionsstand verloren): nichts doppelt escaped
                 $settings->set(Migrator::SETTING, 27);
                 (new Migrator($db, $settings))->migrate();
