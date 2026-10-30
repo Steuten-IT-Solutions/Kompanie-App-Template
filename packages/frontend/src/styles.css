@@ -237,7 +237,7 @@ select {
   border-bottom: 1px solid var(--line-strong);
 }
 .install-hint-logo {
-  /* Nur die Höhe festlegen, damit nicht-quadratische Logos (z. B. Wappen) nicht gestaucht werden */
+  /* Nur die Höhe festlegen, damit nicht-quadratische Logos nicht gestaucht werden */
   height: 38px;
   width: auto;
   max-width: 56px;

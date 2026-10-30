@@ -71,6 +71,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der
+  Seite in die Breite gezogen. Es erscheint jetzt im richtigen Seitenverhältnis, wie in der Kopfzeile.
 - **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
   ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
   Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
