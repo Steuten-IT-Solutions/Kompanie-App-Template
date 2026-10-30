@@ -345,6 +345,50 @@ test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stel
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+test('Galerie: Zurück aus einem Album steht wieder an derselben Stelle, die Leiste unten beginnt oben', async ({ page }) => {
+  await login(page, 'mitglied1');
+  // Niedriges Fenster, damit die wenigen Testalben schon scrollen.
+  await page.setViewportSize({ width: 390, height: 300 });
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  const album = page.locator('.album-card', { hasText: 'Sommerfest' });
+  await expect(album).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const y = await page.evaluate(() => window.scrollY);
+  expect(y).toBeGreaterThan(0);
+
+  for (const back of [() => page.getByRole('button', { name: '‹ Alle Alben' }).click(), () => page.goBack()]) {
+    await album.click();
+    await expect(page.locator('.photo').first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await back();
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(y);
+  }
+  // „‹ Alle Alben“ ging im Verlauf zurück: Vor dem Album liegt wieder die Seite davor, nicht noch einmal die Galerie.
+  await album.click();
+  await page.getByRole('button', { name: '‹ Alle Alben' }).click();
+  await page.goBack();
+  await expect(page).not.toHaveURL(/#\/galerie/);
+
+  // Über die Leiste unten: immer die Startansicht, auch aus einem Album und auf der schon offenen Seite.
+  await page.goForward();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(y);
+  await album.click();
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  await expect(page).toHaveURL(/#\/galerie$/);
+  await expect(album).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+  // Neu geladen: wieder an der Stelle von vorher.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.reload();
+  await expect(album).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(y);
+});
+
 /** Waagerecht über den Namen auf der Seite eines Mitglieds wischen (Touch-Ereignisse über CDP, wie ein Finger). */
 async function swipe(page: Page, dx: number) {
   const box = (await page.locator('.member-name').boundingBox())!;
@@ -4838,9 +4882,9 @@ test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle S
   await expect(all).toHaveCount(5);
   await expect(all.filter({ hasText: 'Halle' }).first()).toContainText('Menge: 4 Stück → 5 Stück');
 
-  // Aufräumen
+  // Aufräumen. Zurück im Inventar ist die Gruppe noch aufgeklappt, wie beim Verlassen.
   await page.getByRole('button', { name: /Zurück zum Inventar/ }).click();
-  await group.locator('.inventory-group-head').click();
+  await expect(group.locator('.inventory-entry[data-location="Halle"]')).toBeVisible();
   for (const place of ['Halle', 'Lager']) {
     await group.locator(`.inventory-entry[data-location="${place}"]`).getByRole('button', { name: 'Löschen' }).click();
     await expect(page.locator('.toast')).toHaveText('Eintrag gelöscht');

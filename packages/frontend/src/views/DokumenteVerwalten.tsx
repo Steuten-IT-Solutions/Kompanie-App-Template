@@ -3,7 +3,7 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import { api, type DocCategory, type DocumentInfo, type DocumentMeta, type DocVisibility } from '../api';
 import brand from '../generated/brand';
 import { formatBytes, formatDate, todayYmd } from '../format';
-import { navigate } from '../router';
+import { goBack } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { docGroupKey, groupDocuments, groupKey } from '../documents';
 import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenGroups, VISIBILITY_LABELS } from './Dokumente';
@@ -196,7 +196,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('dokumente')}>
+      <button className="btn btn-link back" onClick={() => goBack('dokumente')}>
         ‹ Alle {sec.documents}
       </button>
 

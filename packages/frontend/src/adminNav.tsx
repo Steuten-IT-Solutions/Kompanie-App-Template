@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { can, config } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
-import { navigate } from './router';
+import { goBack, navigate } from './router';
 import { usePromotionsDue } from './promotionsDue';
 
 const sec = brand.labels.sections;
@@ -288,12 +288,12 @@ export function AdminBack({ from }: { from?: string } = {}) {
   if (adminTabs().length < 2) return null;
   if (from && setupTabs().some((t) => t.id === from) && startTabs().some((t) => t.id === SETUP))
     return (
-      <button type="button" className="btn btn-link back" onClick={() => navigate(`verwaltung/${SETUP}`)}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack(`verwaltung/${SETUP}`)}>
         ‹ Einrichtungen
       </button>
     );
   return (
-    <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung')}>
+    <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung')}>
       ‹ Verwaltung
     </button>
   );

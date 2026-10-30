@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { type NewsItem } from '../api';
 import { newsDate } from '../format';
 import GuestPushButton from '../GuestPushButton';
-import { navigate } from '../router';
+import { navigate, useEntryState } from '../router';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
@@ -14,13 +14,17 @@ export default function News({ id }: { id?: string }) {
 }
 
 function NewsList() {
-  const [page, setPage] = useState(1);
-  const [items, setItems] = useState<NewsItem[]>([]);
+  // Nachgeladene Seiten: beim Zurückkommen aus einem Beitrag wieder da, damit die Liste an derselben Stelle steht.
+  const [page, setPage] = useEntryState('news-page', 1);
+  const [items, setItems] = useEntryState<NewsItem[]>('news-items', []);
   const s = sources.news(page);
   const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
 
   useEffect(() => {
-    if (data) setItems((prev) => (page === 1 ? data.items : [...prev, ...data.items]));
+    if (!data) return;
+    // Zurückgekommen: Die Seite steht schon in der Liste (useEntryState) und wird nur aufgefrischt.
+    const ids = new Set(data.items.map((n) => n.id));
+    setItems((prev) => (page === 1 ? data.items : [...prev.filter((n) => !ids.has(n.id)), ...data.items]));
   }, [data, page]);
 
   if (loading && items.length === 0) return <Loading />;

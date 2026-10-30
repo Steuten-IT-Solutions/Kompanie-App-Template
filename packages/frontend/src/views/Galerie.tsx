@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent, type TouchList } from 'react';
 import { type GalleryPhoto } from '../api';
-import { navigate } from '../router';
+import { goBack, navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 
@@ -93,7 +93,7 @@ function Album({ id }: { id: number }) {
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('galerie')}>
+      <button className="btn btn-link back" onClick={() => goBack('galerie')}>
         ‹ Alle Alben
       </button>
       <h2 className="member-name">

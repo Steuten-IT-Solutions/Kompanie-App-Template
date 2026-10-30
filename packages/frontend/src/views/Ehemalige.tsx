@@ -15,7 +15,7 @@ import {
 import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
-import { navigate } from '../router';
+import { goBack, navigate, useEntryState } from '../router';
 import { readSheet } from '../sheet';
 import { Empty, emptyName, ErrorBox, Loading, NameFields, trimName, useAsync } from '../ui';
 import { MemberAvatar, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
@@ -59,10 +59,11 @@ export function formerSummary(f: Pick<FormerInfo, 'reason' | 'joined_on' | 'foun
  */
 export function FormerList() {
   const { data, error, loading, reload } = useAsync(() => api.formerMembers(), [], 'former-members');
-  const [query, setQuery] = useState('');
-  const [reason, setReason] = useState<FormerReason | ''>('');
+  // Suche und Filter: beim Zurückkommen aus einer Person wie verlassen, wie in der Mitgliederliste.
+  const [query, setQuery] = useEntryState('former-admin-query', '');
+  const [reason, setReason] = useEntryState<FormerReason | ''>('former-admin-reason', '');
   // Filter und Sortierung zunächst eingeklappt, wie in der Mitgliederliste.
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useEntryState('former-admin-filters', false);
   // Wie die Mitgliederliste (gemerkt je Gerät); gemerkt nach Punkten gilt hier der Nachname.
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   const order = orderFor(stored, FORMER_SORTS);
@@ -419,7 +420,7 @@ export function NewFormer() {
 
   return (
     <form className="form" onSubmit={submit}>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung/ehemalige')}>
         ‹ Ehemalige
       </button>
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/ehemalige/import')}>
@@ -678,7 +679,7 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
   return (
     <div className="office-import">
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige/neu')}>
+      <button className="btn btn-link back" onClick={() => goBack('verwaltung/ehemalige/neu')}>
         ‹ Einzeln anlegen
       </button>
       <h2 className="member-name">Ehemalige importieren</h2>

@@ -22,7 +22,7 @@ import Rollen from './Rollen';
 import Wartung from './Wartung';
 import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
-import { navigate } from '../router';
+import { goBack, navigate, redirect } from '../router';
 import { formatBytes } from '../format';
 
 const sec = brand.labels.sections;
@@ -54,14 +54,14 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
   // Rückkehr von Google landet auf #/einstellungen?google=1: gleich zur Seite Google-Zugang (sie liest ?google=1).
   const [fromGoogle] = useState(() => !path[0] && new URLSearchParams(window.location.search).has('google'));
   useEffect(() => {
-    if (fromGoogle) window.location.replace('#/einstellungen/google');
+    if (fromGoogle) redirect('einstellungen/google');
   }, [fromGoogle]);
   const page = PAGES.find((p) => p.id === path[0]);
   if (fromGoogle && !page) return <Loading />;
   if (!page) return <Overview />;
   return (
     <div className="settings">
-      <button type="button" className="btn btn-link back" onClick={() => navigate('einstellungen')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('einstellungen')}>
         ‹ Einstellungen
       </button>
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
@@ -652,7 +652,8 @@ function takeGoogleReturn(): boolean {
   if (!params.has('google')) return false;
   params.delete('google');
   const search = params.toString();
-  window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : '') + window.location.hash);
+  // Den Stand des Verlaufseintrags behalten (router.ts: Kennung für die Scrollposition).
+  window.history.replaceState(window.history.state, '', window.location.pathname + (search ? `?${search}` : '') + window.location.hash);
   return true;
 }
 

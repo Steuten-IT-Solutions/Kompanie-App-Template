@@ -71,6 +71,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Zurück an dieselbe Stelle**: Ging man in der App zurück, z. B. aus einem Album der Galerie, stand die Seite davor
+  wieder ganz oben. Jetzt steht sie an der Stelle, an der man sie verlassen hat, in allen Bereichen und egal, ob mit
+  einem Knopf wie „‹ Alle Alben“, der Zurück-Taste oder der Zurück-Geste des Handys. Nachgeladene Beiträge („Ältere
+  Beiträge“), Suchbegriffe und aufgeklappte Abschnitte bleiben dabei erhalten. Über die Leiste unten öffnet ein Bereich
+  dagegen immer mit seiner Startseite, oben; auch ein Tippen auf den schon offenen Bereich führt dorthin zurück.
 - **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
   ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
   Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach

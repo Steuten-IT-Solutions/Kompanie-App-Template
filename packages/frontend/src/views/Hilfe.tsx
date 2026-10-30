@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { can, config, levelLabel, type Capability, type Feature } from '../api';
 import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
-import { navigate } from '../router';
+import { goBack, navigate, useEntryState } from '../router';
 import { Empty, lazyView } from '../ui';
 import FehlerMelden, { ReportButton } from './FehlerMelden';
 
@@ -100,7 +100,7 @@ function visible(): Seite[] {
 export default function Hilfe({ slug }: { slug?: string }) {
   const map = useMemo(labels, []);
   const seiten = useMemo(visible, []);
-  const [suche, setSuche] = useState('');
+  const [suche, setSuche] = useEntryState('help-search', '');
   const seite = slug ? seiten.find((s) => s.slug === slug) : undefined;
   const text = useRef<HTMLDivElement>(null);
 
@@ -127,7 +127,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
   if (seite) {
     return (
       <article className="hilfe-seite">
-        <button className="btn btn-link back" onClick={() => navigate('hilfe')}>
+        <button className="btn btn-link back" onClick={() => goBack('hilfe')}>
           ‹ Alle Hilfeseiten
         </button>
         <h2 className="news-headline">{fill(seite.titel, map, false)}</h2>

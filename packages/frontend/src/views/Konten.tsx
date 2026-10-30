@@ -3,7 +3,7 @@ import { api, config, newAccountRoles, type AccountProfile, type BulkResult, typ
 import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
-import { navigate } from '../router';
+import { goBack, navigate } from '../router';
 import { AddressFields, EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
@@ -233,7 +233,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
 
   return (
     <form className="form bulk-new" onSubmit={submit}>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung/neu')}>
         ‹ Einzeln anlegen
       </button>
       <NewAccountRole label="Rolle für alle" value={level} onChange={setLevel} />

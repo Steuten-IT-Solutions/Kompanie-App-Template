@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElemen
 import { type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
-import { navigate } from '../router';
+import { navigate, useEntryState } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { lanes, yearRange } from '../yearGrid';
@@ -455,7 +455,7 @@ export function YearGrid({
 /** Alle Ämter nach Gruppen; je Amt eine aufklappbare Karte mit dem Zeitstrahl, umschaltbar auf die Übersicht nach Jahren. */
 export function OfficesView() {
   const { data, error, loading, reload } = useOffices();
-  const [open, setOpen] = useState<Set<number>>(new Set());
+  const [open, setOpen] = useEntryState<Set<number>>('offices-open', () => new Set());
   const [view, setView] = useState(loadView);
 
   if (loading && !data) return <Loading />;

@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify';
 import { api } from '../api';
 import { newsDate } from '../format';
-import { navigate } from '../router';
+import { goBack } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 /**
@@ -46,7 +46,7 @@ export default function NewsArtikel({ id }: { id: string }) {
 
   return (
     <article className="news-article">
-      <button className="btn btn-link back" onClick={() => navigate('news')}>
+      <button className="btn btn-link back" onClick={() => goBack('news')}>
         ‹ Alle Neuigkeiten
       </button>
       {n.image && <img className="news-hero" src={n.image} alt="" />}

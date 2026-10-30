@@ -1,6 +1,6 @@
 import lizenzen from 'virtual:kompanie-lizenzen';
 import { config } from '../api';
-import { navigate } from '../router';
+import { goBack } from '../router';
 
 /**
  * Lizenzen (Issue #173), unter Hilfe für alle: Lizenz der App, wo es den Quellcode gibt, und die Drittanbieter-Bausteine
@@ -13,7 +13,7 @@ export default function Lizenzen() {
   const version = config?.version;
   return (
     <article className="hilfe-seite lizenzen">
-      <button className="btn btn-link back" onClick={() => navigate('hilfe')}>
+      <button className="btn btn-link back" onClick={() => goBack('hilfe')}>
         ‹ Alle Hilfeseiten
       </button>
       <h2 className="news-headline">Lizenzen</h2>

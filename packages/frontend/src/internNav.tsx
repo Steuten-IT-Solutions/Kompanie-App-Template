@@ -1,5 +1,5 @@
 import { AdminIcon } from './adminNav';
-import { navigate } from './router';
+import { goBack, navigate } from './router';
 
 /** Bereich von „Intern“: eigene Ansicht (#/<id>); „Intern“ gibt es mit dem Recht view_intern (App.tsx). */
 export type InternTab = { id: string; label: string };
@@ -26,7 +26,7 @@ export function InternMenu({ tabs }: { tabs: InternTab[] }) {
 /** Zurück zur Startseite von „Intern“. */
 export function InternBack() {
   return (
-    <button type="button" className="btn btn-link back" onClick={() => navigate('intern')}>
+    <button type="button" className="btn btn-link back" onClick={() => goBack('intern')}>
       ‹ Intern
     </button>
   );

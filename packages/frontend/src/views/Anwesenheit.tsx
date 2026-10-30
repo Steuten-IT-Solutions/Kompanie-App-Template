@@ -13,7 +13,7 @@ import {
 } from '../api';
 import { caps, formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
-import { navigate } from '../router';
+import { goBack, navigate, useEntryState } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 
@@ -37,7 +37,7 @@ async function loadOverview(): Promise<[AttendanceEvent[] | string, AttendanceSu
 function Overview({ onToast }: { onToast: (msg: string) => void }) {
   // Mit Schlüssel: Beim Zurückkehren aus einer Liste steht die Übersicht sofort da (statt „Lädt …“).
   const { data, error, loading, reload } = useAsync(loadOverview, [], 'attendance-overview');
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useEntryState('attendance-all', false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
@@ -236,7 +236,7 @@ function Editor({
 
   return (
     <div className="attendance">
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/anwesenheit')}>
+      <button className="btn btn-link back" onClick={() => goBack('verwaltung/anwesenheit')}>
         ‹ {sec.attendance}
       </button>
       {free ? (

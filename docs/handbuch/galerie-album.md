@@ -13,7 +13,7 @@ In einem Album der {bereich.gallery} siehst du alle Bilder als kleine Vorschau. 
 Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 
 ## Was du hier siehst
-- **‹ Alle Alben**: zurück zur Übersicht.
+- **‹ Alle Alben**: zurück zur Übersicht, an die Stelle, an der du das Album geöffnet hast.
 - **Titel und Jahr** des Albums.
 - **Vorschaubilder**: alle Bilder und Videos des Albums, die du sehen darfst. Bilder und Videos nur für {rolle.member} tragen ein Schloss 🔒.
 - **Videos** erkennst du am ▶ in der Mitte, unten links steht ihre Länge, z. B. „1:02“.

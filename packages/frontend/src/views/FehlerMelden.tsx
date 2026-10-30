@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { api, config, encodeFile } from '../api';
 import { formatBytes } from '../format';
 import { lastError, reportOrigin } from '../lastError';
-import { navigate } from '../router';
+import { goBack, navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 const MAX_TEXT = 2000;
@@ -109,7 +109,7 @@ export default function FehlerMelden() {
 
   return (
     <form className="form card report-form" onSubmit={submit} noValidate>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('hilfe')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('hilfe')}>
         ‹ Alle Hilfeseiten
       </button>
       <h2 className="news-headline">Fehler melden</h2>

@@ -16,7 +16,7 @@ Hier lernst du den Aufbau der App kennen: die Kopfleiste oben, die Leiste mit de
 - **?**: öffnet die Hilfe passend zum aktuellen Bildschirm.
 - **Mond bzw. Sonne**: wechselt zwischen dunkler und heller Darstellung.
 - **Login** (oben rechts, nur ohne Anmeldung): führt zur Anmeldung, siehe [Anmelden](seite:anmelden).
-- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer, steht die Leiste links.
+- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer, steht die Leiste links. Ein Bereich öffnet über die Leiste immer mit seiner Startseite, oben; tippst du auf den Bereich, in dem du schon bist, beginnt er wieder vorn.
 
 Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt und ob du angemeldet bist:
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
@@ -69,6 +69,7 @@ Unter der Kopfleiste erscheinen manchmal Hinweise:
 ![Hinweis „Die App aufs Handy holen“ mit dem Knopf „So geht's“](bild:app-ueberblick-hinweis)
 
 ## Gut zu wissen
+- Gehst du zurück (mit einem Knopf wie **‹ Alle Alben**, der Zurück-Taste oder der Zurück-Geste deines Handys), steht die Seite wieder so da, wie du sie verlassen hast: an derselben Stelle, mit nachgeladenen Einträgen, Suchbegriff und aufgeklappten Abschnitten. Das gilt auch, wenn du die Seite neu lädst.
 - Wird die App gerade gewartet, siehst du statt der Inhalte nur einen Hinweis darauf. Mit **Erneut versuchen** prüfst du, ob sie wieder da ist.
 - Die Bezeichnungen der Bereiche (z. B. **{bereich.events}**) legt jede Kompanie selbst fest. Deshalb können sie bei dir anders heißen als in anderen Apps.
 

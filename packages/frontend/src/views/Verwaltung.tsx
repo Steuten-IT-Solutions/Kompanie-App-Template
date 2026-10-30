@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   api,
   can,
@@ -19,7 +19,7 @@ import {
 } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
-import { navigate, redirect as redirectTo } from '../router';
+import { goBack, navigate, redirect as redirectTo, useEntryState } from '../router';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
@@ -231,7 +231,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
 function ImportPage() {
   return (
     <div>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung/neu')}>
         ‹ Einzeln anlegen
       </button>
       <h2 className="member-name">Mitglieder importieren</h2>
@@ -239,17 +239,6 @@ function ImportPage() {
     </div>
   );
 }
-
-/** Stand der Mitgliederliste beim Öffnen eines Mitglieds: Beim Zurückkommen steht die Liste wieder an derselben Stelle. */
-type MembersState = {
-  query: string;
-  role: Level;
-  title: number | null;
-  showGuests: boolean;
-  filtersOpen: boolean;
-  scrollY: number;
-};
-let savedMembers: MembersState | null = null;
 
 /**
  * Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt
@@ -268,23 +257,19 @@ const admitRole = (level: Level) => {
 
 function Members() {
   const canPromote = can('promote_users');
-  // Nur einmal übernehmen: Wer die Liste danach neu öffnet, fängt wieder oben an.
-  const [restore] = useState(() => {
-    const s = savedMembers;
-    savedMembers = null;
-    return s;
-  });
-  const [showGuests, setShowGuests] = useState(restore?.showGuests ?? false);
-  // Filter und Sortierung zunächst eingeklappt; beim Zurückkommen wie verlassen.
-  const [filtersOpen, setFiltersOpen] = useState(restore?.filtersOpen ?? false);
+  // Suche und Filter: beim Zurückkommen aus einem Mitglied wie verlassen (die Stelle in der Liste merkt router.ts);
+  // wer die Liste neu öffnet, fängt wieder oben an.
+  const [showGuests, setShowGuests] = useEntryState('members-guests', false);
+  // Filter und Sortierung zunächst eingeklappt
+  const [filtersOpen, setFiltersOpen] = useEntryState('members-filters', false);
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
-  const [role, setRole] = useState<Level>(restore?.role ?? '');
+  const [role, setRole] = useEntryState<Level>('members-role', '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
   // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
   const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
   // Filter nach Titel (nur, wer Titel sieht)
-  const [title, setTitle] = useState<number | null>(restore?.title ?? null);
-  const [query, setQuery] = useState(restore?.query ?? '');
+  const [title, setTitle] = useEntryState<number | null>('members-title', null);
+  const [query, setQuery] = useEntryState('members-query', '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   const sortOptions = memberSorts();
   const order = orderFor(stored, sortOptions);
@@ -328,16 +313,7 @@ function Members() {
     a.title.localeCompare(b.title, 'de'),
   );
 
-  // Scrollen, sobald die Liste steht (aus dem Speicher sofort, sonst nach dem Laden).
-  const pendingScroll = useRef(restore?.scrollY ?? null);
-  useLayoutEffect(() => {
-    if (pendingScroll.current === null || !data) return;
-    window.scrollTo(0, pendingScroll.current);
-    pendingScroll.current = null;
-  }, [data]);
-
   function open(id: number) {
-    savedMembers = { query, role, title, showGuests, filtersOpen, scrollY: window.scrollY };
     setBrowseOrder('mitglied', list);
     navigate(`verwaltung/mitglied/${id}`);
   }
@@ -758,11 +734,11 @@ function MemberDetailView({
         )}
         <div className="member-nav">
           {former ? (
-            <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
+            <button className="btn btn-link back" onClick={() => goBack('verwaltung/ehemalige')}>
               ‹ Ehemalige
             </button>
           ) : (
-            <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+            <button className="btn btn-link back" onClick={() => goBack('verwaltung/mitglieder')}>
               ‹ Alle Mitglieder
             </button>
           )}
@@ -1367,7 +1343,7 @@ function NewMember() {
 
   return (
     <form className="form" onSubmit={submit}>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung/mitglieder')}>
         ‹ Alle Mitglieder
       </button>
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
@@ -1460,7 +1436,7 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
-  const back = () => navigate(`verwaltung/anwesenheit/${list.id}`);
+  const back = () => goBack(`verwaltung/anwesenheit/${list.id}`);
   const ids = list.people
     .filter((p) => p.member && (kind === 'punkte' ? p.status === 'present' && !p.booked : p.status === 'absent'))
     .map((p) => p.id);
@@ -1779,7 +1755,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/strafe')}>
+      <button className="btn btn-link back" onClick={() => goBack('verwaltung/strafe')}>
         ‹ {sec.penalties} eintragen
       </button>
       <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(total)} tone={total > 0 ? 'warn' : 'good'} />

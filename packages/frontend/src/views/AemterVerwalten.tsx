@@ -14,7 +14,7 @@ import {
 import { memberListAllowed } from '../adminNav';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
-import { navigate } from '../router';
+import { goBack, navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { termYears } from './Aemter';
 
@@ -346,7 +346,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
+      <button className="btn btn-link back" onClick={() => goBack('verwaltung/aemter')}>
         ‹ Alle {sec.offices}
       </button>
       <h2 className="member-name">{office.title}</h2>
@@ -751,7 +751,7 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
   return (
     <div className="office-import">
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
+      <button className="btn btn-link back" onClick={() => goBack('verwaltung/aemter')}>
         ‹ Alle {sec.offices}
       </button>
       <h2 className="member-name">Tabelle importieren</h2>

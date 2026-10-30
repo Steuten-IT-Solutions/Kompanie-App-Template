@@ -10,7 +10,7 @@ import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
-import { navigate, useRoute, viewKey } from './router';
+import { navigate, startOver, useRoute, viewKey } from './router';
 import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { InternBack, InternMenu, type InternTab } from './internNav';
@@ -388,6 +388,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
   const showToast = useCallback((msg: string) => setToast(msg), []);
+  // Leiste unten auf den schon offenen Tab getippt: Die Ansicht fängt neu an (wie beim Wechsel dorthin).
+  const [restart, setRestart] = useState(0);
   // Bereiche wurden ein- oder ausgeschaltet: Tabs und Ansichten neu bestimmen.
   const [, setConfigVersion] = useState(0);
   useEffect(() => {
@@ -534,7 +536,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
       <main className="content">
-        <ErrorBoundary key={viewKey(path)}>
+        <ErrorBoundary key={`${viewKey(path)}#${restart}`}>
           <Suspense fallback={<Loading />}>
             {config.setupPending && tab !== 'einrichtung' && (
               <div className="card setup-hint">
@@ -604,7 +606,13 @@ export default function App({ notice = null }: { notice?: string | null }) {
               key={t}
               className={activeTab === t ? 'active' : ''}
               aria-label={tabLabels()[t]}
-              onClick={() => navigate(t)}
+              onClick={() => {
+                // Über die Leiste immer die Startansicht des Tabs (oben, ohne gemerkten Stand), auch wenn sie schon offen ist.
+                if (rawPath.join('/') === t) {
+                  startOver();
+                  setRestart((n) => n + 1);
+                } else navigate(t);
+              }}
               onPointerDown={() => prefetchTab(t)}
               onFocus={() => prefetchTab(t)}
               aria-current={activeTab === t ? 'page' : undefined}

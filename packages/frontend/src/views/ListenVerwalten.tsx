@@ -7,7 +7,7 @@ import brand from '../generated/brand';
 import logoUrl from '../generated/logo-small.webp';
 import { columnWidths, csvFileName, csvPhone, listFileBase, toCsv } from '../lists';
 import { sortRowsByName, splitName } from '../memberSort';
-import { navigate } from '../router';
+import { goBack, navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 
 const sec = brand.labels.sections;
@@ -295,7 +295,7 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
   }
 
   function leave() {
-    if (!dirty || window.confirm('Änderungen verwerfen?')) navigate('verwaltung/listen');
+    if (!dirty || window.confirm('Änderungen verwerfen?')) goBack('verwaltung/listen');
   }
 
   const deleted = draft.rows.filter((r) => r.kind === 'member' && r.deleted).length;
