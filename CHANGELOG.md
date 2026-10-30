@@ -79,6 +79,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   das Update bei einer großen Sicherung mit einem kritischen Fehler (zu wenig Arbeitsspeicher beim Verschlüsseln der
   Sicherung für Google Drive). Die Sicherung wird jetzt in kleinen Stücken verschlüsselt. Das wirkt bei Updates, die
   von dieser Version aus eingespielt werden.
+- **WordPress mit SQLite**: Auf WordPress-Seiten, die statt MySQL die SQLite-Integration nutzen, brach das Aktivieren
+  oder Aktualisieren des Plugins seit Version 0.3.0 mit einem Datenbankfehler ab (`SUBSTRING_INDEX` beim Umbau des
+  Schwarzen Bretts). Der Umbau kommt jetzt ohne diese MySQL-Funktion aus; auf MySQL und MariaDB ändert sich nichts.
 
 ### Entfernt
 

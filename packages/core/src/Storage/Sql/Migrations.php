@@ -1140,6 +1140,7 @@ final class Migrations
             // (board_message_revisions, ohne Fremdschlüssel: überdauert das Löschen der Nachricht), Mailversand je
             // Empfänger (board_mails: Warteschlange und Protokoll) und Einstellungen je Konto (user_settings, z. B.
             // board_mail = 0 für „keine Mails vom Brett“).
+            // Die erste Zeile über INSTR/LEFT statt SUBSTRING_INDEX: Das gibt es in der SQLite-Integration von WordPress nicht.
             29 => [
                 'mysql' => [
                     'ALTER TABLE {board_messages} ADD COLUMN title longtext DEFAULT NULL',
@@ -1147,9 +1148,9 @@ final class Migrations
                     'ALTER TABLE {board_messages} ADD COLUMN deleted_by bigint(20) unsigned DEFAULT NULL',
                     'ALTER TABLE {board_messages} MODIFY body longtext NOT NULL',
                     "UPDATE {board_messages} SET
-  title = COALESCE(NULLIF(CASE WHEN CHAR_LENGTH(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1))) > 80
-    THEN CONCAT(LEFT(TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)), 79), '…')
-    ELSE TRIM(SUBSTRING_INDEX(REPLACE(body, CHAR(13), ''), CHAR(10), 1)) END, ''), 'Nachricht'),
+  title = COALESCE(NULLIF(CASE WHEN CHAR_LENGTH(TRIM(LEFT(REPLACE(body, CHAR(13), ''), INSTR(CONCAT(REPLACE(body, CHAR(13), ''), CHAR(10)), CHAR(10)) - 1))) > 80
+    THEN CONCAT(LEFT(TRIM(LEFT(REPLACE(body, CHAR(13), ''), INSTR(CONCAT(REPLACE(body, CHAR(13), ''), CHAR(10)), CHAR(10)) - 1)), 79), '…')
+    ELSE TRIM(LEFT(REPLACE(body, CHAR(13), ''), INSTR(CONCAT(REPLACE(body, CHAR(13), ''), CHAR(10)), CHAR(10)) - 1)) END, ''), 'Nachricht'),
   body = CONCAT('<p>', REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(body, CHAR(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), CHAR(10), '<br>'), '</p>')
 WHERE title IS NULL",
                     'CREATE TABLE IF NOT EXISTS {user_signatures} (
