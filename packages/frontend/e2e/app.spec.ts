@@ -2766,6 +2766,54 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   expect(asGuest.status()).toBe(401);
 });
 
+test('Galerie: Zurück führt an die Stelle der Übersicht, Schließen der Großansicht zum zuletzt gezeigten Bild', async ({ page }) => {
+  await login(page, 'mitglied1');
+  // Niedrig, damit die Übersicht mit drei Alben scrollt.
+  await page.setViewportSize({ width: 390, height: 260 });
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  const card = page.locator('.album-card', { hasText: 'Vereinsabend' });
+  await expect(card).toBeVisible();
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottom = await scrollY();
+  expect(bottom).toBeGreaterThan(50);
+  const near = (y: number) => async () => Math.abs((await scrollY()) - y) < 2;
+
+  // Zurück im Browser
+  await card.click();
+  await expect(page.locator('.photo')).toHaveCount(1);
+  await page.goBack();
+  await expect(card).toBeVisible();
+  await expect.poll(near(bottom)).toBe(true);
+
+  // „‹ Alle Alben“
+  await card.click();
+  await expect(page.locator('.photo')).toHaveCount(1);
+  expect(await scrollY()).toBe(0);
+  await page.getByRole('button', { name: '‹ Alle Alben' }).click();
+  await expect(card).toBeVisible();
+  await expect.poll(near(bottom)).toBe(true);
+
+  // Neu über die Tableiste geöffnet beginnt die Übersicht oben.
+  await page.locator('.tabbar').getByRole('button', { name: 'Termine' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  await expect(card).toBeVisible();
+  expect(await scrollY()).toBe(0);
+
+  // In der Großansicht weitergeblättert: Nach dem Schließen hat das zuletzt gezeigte Bild den Fokus.
+  await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
+  await expect(page.locator('.photo')).toHaveCount(3);
+  await page.locator('.photo').first().click();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-count')).toHaveText(/^3 \/ 3/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.lightbox')).toHaveCount(0);
+  await expect(page.locator('.photo').nth(2)).toBeFocused();
+  await expect(page.locator('.photo').nth(2)).toBeInViewport();
+  await page.setViewportSize(devices['iPhone 13'].viewport);
+});
+
 test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Range)', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/galerie');

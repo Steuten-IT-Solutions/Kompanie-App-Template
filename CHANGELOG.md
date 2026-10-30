@@ -68,6 +68,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Sicherungen eingerichtet ist (ohne Passwort wie bisher unverschlüsselt). Ältere, unverschlüsselte Sicherungen im Ordner
   löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal mit *Passwort prüfen* (oder einer
   Wiederherstellung) bestätigt ist.
+- **Galerie**: Zurück aus einem Album (mit **‹ Alle Alben** oder der Zurück-Taste) führt wieder an die Stelle der
+  Übersicht, an der man das Album geöffnet hat, statt an den Anfang. Nach dem Schließen der Großansicht steht das
+  zuletzt gezeigte Bild im Album im Blick, auch wenn man weit geblättert hat.
 
 ### Behoben
 
