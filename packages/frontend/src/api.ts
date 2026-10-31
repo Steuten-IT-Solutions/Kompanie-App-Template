@@ -1507,6 +1507,17 @@ export class ApiError extends Error {
 
 let csrfToken = config?.csrf.token ?? '';
 
+/**
+ * Tokens aus der aktuellen App-Seite übernehmen (pageUpdate.ts): Der Service Worker zeigt beim Start die gespeicherte
+ * Seite, deren CSRF-Token und Adresse zum Abmelden (WordPress: mit Token) veraltet sein können.
+ */
+export function takeTokens(csrf: AppConfig['csrf'], auth: AppConfig['auth']): void {
+  if (!config || !csrf?.token) return;
+  config.csrf = csrf;
+  config.auth = auth;
+  csrfToken = csrf.token;
+}
+
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
   // Nach der Anmeldung zurück auf diese Seite (z. B. aus einem geteilten Link), siehe main.tsx.

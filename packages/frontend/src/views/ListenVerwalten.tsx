@@ -10,6 +10,7 @@ import { columnWidths, csvFileName, csvPhone, listFileBase, longBirthday, sortRo
 import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -109,7 +110,7 @@ export function ListAdmin({ path, onToast }: { path: string[]; onToast: Toast })
 }
 
 function ListOverview({ onToast }: { onToast: Toast }) {
-  const { data, error, loading, reload } = useAsync(api.lists, [], 'lists');
+  const { data, error, loading, reload } = useAsync(sources.lists.load, sources.lists.deps, sources.lists.key);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);

@@ -7,6 +7,7 @@ import { isStandalone } from './install';
 import App from './App';
 import { config, preparePreview } from './api';
 import { dataUpdated } from './dataCache';
+import { handlePageMessage } from './pageUpdate';
 import { deviceStore } from './deviceStore';
 import { previewRole } from './preview';
 import { skeletons } from './skeleton';
@@ -71,6 +72,8 @@ if ('serviceWorker' in navigator && cfg) {
   // Neue Daten aus dem Hintergrund (public/sw.js, Issue #108): offene Ansichten neu laden.
   navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
     if (e.data?.type === 'kompanie-data') dataUpdated();
+    // Aktuelle App-Seite aus dem Hintergrund (Seite kam sofort aus dem Speicher)
+    else if (e.data?.type === 'kompanie-page') handlePageMessage(e.data);
   });
   window.addEventListener('load', () => {
     // Der Service Worker erfährt so, wo API und Programmdateien liegen.

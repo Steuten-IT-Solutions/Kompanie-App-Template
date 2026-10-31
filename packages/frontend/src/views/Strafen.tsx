@@ -1,8 +1,9 @@
-import { api, type Me, type Penalty } from '../api';
+import { type Me, type Penalty } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatEuro } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
 import { useFocusEntry } from '../focus';
+import { sources } from '../viewData';
 
 export function PenaltyRow({ p, actions, focused }: { p: Penalty; actions?: React.ReactNode; focused?: boolean }) {
   return (
@@ -23,7 +24,7 @@ export function PenaltyRow({ p, actions, focused }: { p: Penalty; actions?: Reac
 }
 
 export default function Strafen({ me, focus }: { me: Me; focus?: string }) {
-  const { data, error, loading, reload } = useAsync(api.myPenalties, [], 'me/penalties');
+  const { data, error, loading, reload } = useAsync(sources.myPenalties.load, sources.myPenalties.deps, sources.myPenalties.key);
   const flash = useFocusEntry(focus, !error && !!data?.some((p) => String(p.id) === focus));
 
   if (loading && !data) return <Loading />;

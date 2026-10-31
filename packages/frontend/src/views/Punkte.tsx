@@ -1,11 +1,12 @@
-import { api, type Me } from '../api';
+import { type Me } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatPoints } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
 import { useFocusEntry } from '../focus';
+import { sources } from '../viewData';
 
 export default function Punkte({ me, focus }: { me: Me; focus?: string }) {
-  const { data, error, loading, reload } = useAsync(api.myPoints, [], 'me/points');
+  const { data, error, loading, reload } = useAsync(sources.myPoints.load, sources.myPoints.deps, sources.myPoints.key);
   const flash = useFocusEntry(focus, !error && !!data?.some((p) => String(p.id) === focus));
 
   if (loading && !data) return <Loading />;

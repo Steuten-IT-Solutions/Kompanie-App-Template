@@ -4,6 +4,7 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -33,7 +34,7 @@ function OfficeHint({ office }: { office: { id: number; title: string } }) {
  * Zugewiesene Titel lassen sich nicht löschen, nur umbenennen oder deaktivieren.
  */
 export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.titles, [], 'titles');
+  const { data, error, loading, reload, setData } = useAsync(sources.titles.load, sources.titles.deps, sources.titles.key);
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -206,7 +207,7 @@ export function MemberTitles({
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
-  const all = useAsync(api.titles, [], 'titles');
+  const all = useAsync(sources.titles.load, sources.titles.deps, sources.titles.key);
   const current = titles.map((t) => t.id);
   const [selected, setSelected] = useState<number[]>(current);
   const [busy, setBusy] = useState(false);

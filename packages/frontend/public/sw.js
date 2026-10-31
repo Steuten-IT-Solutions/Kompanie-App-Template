@@ -5,9 +5,13 @@
  *   Speicher; unveränderte Dateien übernimmt er aus dem der vorigen Version, statt sie neu zu laden. Beim Aktivieren
  *   werden die Speicher der alten Versionen gelöscht.
  * - App-Seite → beim Installieren gespeichert (passt so nach einem Update zu den neuen Programmdateien und ist schon
- *   nach dem ersten Besuch offline da); beim Öffnen zuerst aus dem Netz, aber höchstens NAVIGATION_TIMEOUT_MS warten,
- *   wenn eine gespeicherte Fassung da ist (schlechtes Mobilnetz); ohne Netz die gespeicherte. Nur HTML gilt als
- *   App-Seite (nicht z. B. ein direkt geöffnetes Foto).
+ *   nach dem ersten Besuch offline da). Beim Öffnen sofort die gespeicherte Fassung, ohne auf den Server zu warten
+ *   (appPage); die aktuelle holt der Service Worker im Hintergrund und meldet dem neuen Fenster, was sich an der
+ *   Konfiguration geändert hat ({type: 'kompanie-page', ...}, siehe pageChange; die App übernimmt neue Tokens und lädt
+ *   neu, wenn sich mehr geändert hat). Aus dem Netz (höchstens NAVIGATION_TIMEOUT_MS warten, wenn eine gespeicherte
+ *   Fassung da ist, schlechtes Mobilnetz) kommt sie kurz nach einer eigenen Änderung (z. B. Anmeldung), mit Parametern
+ *   in der Adresse und wenn die Seite von außerhalb der App aufgerufen wird (z. B. Rückkehr von der Anmeldeseite von
+ *   WordPress); ohne Netz die gespeicherte. Nur HTML gilt als App-Seite (nicht z. B. ein direkt geöffnetes Foto).
  * - API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version (höchstens DATA_MAX Einträge, die ältesten
  *   fallen zuerst heraus; die App-Seite zählt nicht mit).
  *   Mit dem Header X-Kompanie-Stale-Ok (setzt die App bei GET, Issue #108): Ist eine Version für dieselbe Person
@@ -313,19 +317,24 @@ async function store(key, res) {
  * Zuerst aus dem Netz. Mit timeoutMs: Ist eine gespeicherte Fassung da und antwortet das Netz nicht
  * rechtzeitig, kommt die gespeicherte; die Antwort aus dem Netz aktualisiert den Speicher danach trotzdem.
  */
-/** Antwort mit der Person, für die sie gilt (Header der App), zum Speichern. */
-function tagged(res, request) {
+/**
+ * Antwort mit der Person, für die sie gilt (Header der App), zum Speichern. Als Zeitpunkt zählt der Beginn der Anfrage,
+ * nicht das Speichern: Eine Antwort auf eine Anfrage, die vor einer eigenen Änderung begann (z. B. Vorabladen im
+ * Hintergrund), zeigt den Stand davor und darf danach nicht sofort aus dem Speicher kommen.
+ */
+function tagged(res, request, startedAt) {
   const headers = new Headers(res.headers);
   headers.set(USER_HEADER, request.headers.get(USER_HEADER) || '');
-  headers.set(STORED_AT_HEADER, String(Date.now()));
+  headers.set(STORED_AT_HEADER, String(startedAt));
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 async function networkFirst(request, fallbackUrl, timeoutMs, event) {
   const key = fallbackUrl || request;
+  const startedAt = Date.now();
   const network = fetch(request).then((res) => {
     if (fallbackUrl ? isPage(res) : cacheable(res)) {
-      const saving = store(key, fallbackUrl ? res.clone() : tagged(res.clone(), request));
+      const saving = store(key, fallbackUrl ? res.clone() : tagged(res.clone(), request, startedAt));
       try {
         if (event) event.waitUntil(saving);
       } catch {
@@ -349,6 +358,98 @@ async function networkFirst(request, fallbackUrl, timeoutMs, event) {
     if (fallback) return fallback;
     throw err;
   }
+}
+
+/**
+ * App-Seite: sofort die gespeicherte, wenn sie sicher passt, sonst aus dem Netz (siehe oben). Kurz nach einer Änderung
+ * (z. B. Anmeldung) auf das Netz warten: Die gespeicherte Seite enthält evtl. die Konfiguration der Person davor, und mit
+ * ihr gäbe es deren gespeicherte Daten.
+ */
+async function appPage(request, url, event) {
+  const scope = self.registration.scope;
+  const changed = Date.now() - (await lastChange()) < CHANGE_WAIT_MS;
+  if (!changed && url.search === '' && !fromOutside(request)) {
+    const cached = await caches.match(scope, MATCH);
+    if (cached) {
+      const refresh = refreshPage(request, cached.clone(), event.resultingClientId).catch(() => undefined);
+      try {
+        event.waitUntil(refresh);
+      } catch {
+        // Ereignis schon beendet: Die Abfrage läuft trotzdem weiter.
+      }
+      return cached;
+    }
+  }
+  return networkFirst(request, scope, changed ? 0 : NAVIGATION_TIMEOUT_MS, event);
+}
+
+/**
+ * Aufruf von einer Seite außerhalb der App (z. B. Rückkehr von wp-login.php nach der Anmeldung oder ein Link auf der
+ * Webseite): Die Anmeldung kann sich dort geändert haben, ohne dass der Service Worker es sah.
+ */
+function fromOutside(request) {
+  const referrer = request.referrer || '';
+  return referrer !== '' && referrer !== 'about:client' && !referrer.startsWith(self.registration.scope);
+}
+
+/** Aktuelle App-Seite im Hintergrund holen, speichern und dem neuen Fenster melden, was sich geändert hat. */
+async function refreshPage(request, shown, clientId) {
+  const res = await fetch(request);
+  if (!isPage(res)) return;
+  const [before, after] = await Promise.all([shown.text(), res.clone().text()]);
+  await store(self.registration.scope, res);
+  const change = pageChange(before, after);
+  if (change) await tellClient(clientId, { type: 'kompanie-page', ...change });
+}
+
+const CONFIG_PATTERN = /window\.KOMPANIE_CONFIG=(\{.*?\});<\/script>/s;
+const ENTRY_PATTERN = /<script type="module"[^>]*\ssrc="([^"]+)"/;
+
+/**
+ * Unterschied zwischen gezeigter und aktueller App-Seite: null, wenn gleich. Sonst die Werte, die sich mit jeder Seite
+ * ändern und die die App ohne Neuladen übernimmt (CSRF-Token, Adresse zum Abmelden mit Token von WordPress), und
+ * reload: ob sich mehr geändert hat (Rechte, Bereiche, Version, Programmdateien …).
+ */
+function pageChange(before, after) {
+  const parse = (html) => {
+    const m = html.match(CONFIG_PATTERN);
+    let config = null;
+    try {
+      config = m ? JSON.parse(m[1]) : null;
+    } catch {
+      config = null;
+    }
+    const entry = (html.match(ENTRY_PATTERN) || [])[1] || '';
+    return { config, entry };
+  };
+  const a = parse(before);
+  const b = parse(after);
+  if (!b.config) return null;
+  const tokens = { csrf: b.config.csrf, auth: b.config.auth };
+  const rest = (c) => JSON.stringify({ ...c, csrf: { ...c.csrf, token: '' }, auth: { ...c.auth, logoutUrl: '' } });
+  const reload = !a.config || a.entry !== b.entry || rest(a.config) !== rest(b.config);
+  if (
+    !reload &&
+    JSON.stringify(a.config.csrf) === JSON.stringify(tokens.csrf) &&
+    JSON.stringify(a.config.auth) === JSON.stringify(tokens.auth)
+  ) {
+    return null;
+  }
+  return { reload, ...tokens };
+}
+
+/** Nachricht an das Fenster, das die Seite geöffnet hat (entsteht evtl. erst kurz danach); sonst an alle der App. */
+async function tellClient(clientId, message) {
+  for (let i = 0; clientId && i < 30; i++) {
+    const client = await self.clients.get(clientId);
+    if (client) {
+      client.postMessage(message);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const windows = await self.clients.matchAll({ type: 'window' });
+  for (const w of windows) w.postMessage(message);
 }
 
 /**
@@ -401,6 +502,7 @@ async function revalidateUntilCurrent(request, key, stored, running) {
 
 async function revalidate(request, key, before) {
   let res;
+  const startedAt = Date.now();
   try {
     res = await fetch(request);
   } catch {
@@ -409,7 +511,7 @@ async function revalidate(request, key, before) {
   const ok = cacheable(res);
   if (ok) {
     const text = await res.clone().text();
-    await store(key, tagged(res, request));
+    await store(key, tagged(res, request, startedAt));
     if (text === before) return;
   }
   announced.set(key, { at: Date.now(), ok });
@@ -448,10 +550,7 @@ self.addEventListener('fetch', (event) => {
   } else if (isStatic(url)) {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === 'navigate' && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {
-    // Kurz nach einer Änderung (z. B. Anmeldung) auf das Netz warten: Die gespeicherte Seite enthält evtl. die
-    // Konfiguration der Person davor, und mit ihr gäbe es deren gespeicherte Daten.
-    const wait = changedAt !== null && Date.now() - changedAt < CHANGE_WAIT_MS ? 0 : NAVIGATION_TIMEOUT_MS;
-    event.respondWith(networkFirst(request, self.registration.scope, wait, event));
+    event.respondWith(appPage(request, url, event));
   } else if (isApi(url) && !isAdmin(url)) {
     event.respondWith(
       request.headers.get('X-Kompanie-Stale-Ok') === '1'

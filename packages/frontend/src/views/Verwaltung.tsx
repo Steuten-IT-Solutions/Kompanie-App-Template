@@ -1450,7 +1450,7 @@ function NewMember() {
 /* ------------------------------------------------------------------ */
 
 function useMembersAndCatalog() {
-  return useAsync(() => Promise.all([api.members(), api.catalog()]), [], 'members-catalog');
+  return useAsync(sources.membersAndCatalog.load, sources.membersAndCatalog.deps, sources.membersAndCatalog.key);
 }
 
 /** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
@@ -1817,7 +1817,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
 /* ------------------------------------------------------------------ */
 
 function Catalog({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.catalog(true), [], 'catalog-all');
+  const { data, error, loading, reload, setData } = useAsync(sources.catalogAll.load, sources.catalogAll.deps, sources.catalogAll.key);
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('');
   const [busy, setBusy] = useState(false);

@@ -8,7 +8,7 @@ import { downloadIcs } from '../ics';
 import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-import { hasEvents, sources, type EventLike } from '../viewData';
+import { hasEvents, prefetcher, prefetchOnTap, sources, type EventLike } from '../viewData';
 
 /** `focus`: Kennung eines Termins aus der Adresse termine/termin/<id> (Ziel einer Benachrichtigung, Issue #190). */
 export default function Termine({ focus }: { focus?: string }) {
@@ -47,12 +47,20 @@ function EventList({ focus }: { focus?: string }) {
     if (flash) setOpen(flash);
   }, [flash]);
 
-  const manage =
-    can('manage_events') && config?.features.events ? (
-      <button className="btn btn-secondary btn-block manage-events" onClick={() => navigate('termine/verwalten')}>
-        Öffentliche Termine verwalten
-      </button>
-    ) : null;
+  const canManage = can('manage_events') && !!config?.features.events;
+  // Wer Termine pflegt, öffnet die Seite dahinter oft: im Leerlauf vorab laden, beim Antippen sofort.
+  useEffect(() => {
+    if (canManage) void prefetcher.idle([sources.events]);
+  }, [canManage]);
+  const manage = canManage ? (
+    <button
+      className="btn btn-secondary btn-block manage-events"
+      onClick={() => navigate('termine/verwalten')}
+      {...prefetchOnTap(sources.events)}
+    >
+      Öffentliche Termine verwalten
+    </button>
+  ) : null;
 
   const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
 

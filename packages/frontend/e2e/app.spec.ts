@@ -3184,7 +3184,7 @@ test('Service Worker: nach einem Update alte Speicher gelöscht, alle Programmte
     await page.context().setOffline(false);
   }
 
-  // Langsames Netz: Die gespeicherte App-Seite erscheint nach höchstens 3 Sekunden (der Service Worker wartet 2,5 s).
+  // Langsames Netz: Die gespeicherte App-Seite erscheint sofort (der Service Worker wartet nicht auf den Server).
   await page.goto('/app/');
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await page.context().route(/\/app\/?$/, async (route) => {

@@ -32,6 +32,7 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
+import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -58,7 +59,7 @@ export function formerSummary(f: Pick<FormerInfo, 'reason' | 'joined_on' | 'foun
  * Antippen öffnet die Seite der Person wie in der Mitgliederliste.
  */
 export function FormerList() {
-  const { data, error, loading, reload } = useAsync(() => api.formerMembers(), [], 'former-members');
+  const { data, error, loading, reload } = useAsync(sources.formerMembers.load, sources.formerMembers.deps, sources.formerMembers.key);
   const [query, setQuery] = useState('');
   const [reason, setReason] = useState<FormerReason | ''>('');
   // Filter und Sortierung zunächst eingeklappt, wie in der Mitgliederliste.
