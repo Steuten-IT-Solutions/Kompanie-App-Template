@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEv
 import { type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-import { prefetchOnTap, sources } from '../viewData';
+import { prefetchAlbumOnTap, sources } from '../viewData';
 
 export default function Galerie({ albumId }: { albumId?: number }) {
   return albumId ? <Album id={albumId} /> : <Overview />;
@@ -43,7 +43,7 @@ function Overview() {
                     overviewScroll = window.scrollY;
                     navigate(`galerie/${a.id}`);
                   }}
-                  {...prefetchOnTap(sources.album(a.id))}
+                  {...prefetchAlbumOnTap(a.id)}
                 >
                   {a.cover ? <img src={a.cover} alt="" loading="lazy" /> : <span className="album-placeholder" />}
                   <span className="album-title">{a.title}</span>

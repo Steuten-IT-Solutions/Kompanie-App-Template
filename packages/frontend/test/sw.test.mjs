@@ -575,3 +575,82 @@ test('Antwort auf eine Anfrage, die vor einer eigenen Änderung begann, kommt da
   t = 4000;
   assert.equal(await (await sw.request(url, 'cors', headers)).text(), '["nachher"]', 'aus dem Netz, nicht der alte Stand');
 });
+
+const image =
+  (body, status = 200) =>
+  () =>
+    response(body, 'image/jpeg', status);
+
+test('Bilder der Galerie über die App: zuerst aus dem Speicher, auch offline; ohne Fassung oder Original durchgereicht', async () => {
+  const thumb = `${SCOPE}foto/3/thumb?v=abc`;
+  const net = {
+    [thumb]: image('t1'),
+    [`${SCOPE}foto/3/thumb`]: image('ohne'),
+    [`${SCOPE}foto/3/original?v=abc`]: image('orig'),
+  };
+  const sw = load({ net });
+  assert.equal(await (await sw.request(thumb)).text(), 't1');
+  delete net[thumb]; // offline
+  assert.equal(await (await sw.request(thumb)).text(), 't1', 'aus dem Speicher');
+  assert.equal(sw.fetched.filter((u) => u === thumb).length, 1);
+  assert.equal(await sw.request(`${SCOPE}foto/3/thumb`), undefined, 'ohne Fassung: durchgereicht');
+  assert.equal(await sw.request(`${SCOPE}foto/3/original?v=abc`), undefined, 'Original: durchgereicht');
+  assert.equal(await sw.request(thumb, 'navigate'), undefined, 'direkt geöffnet: durchgereicht');
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url);
+  assert.deepEqual(keys, [thumb]);
+});
+
+test('Bilder der Galerie: auch als ?kompanie_app= und ?r= erkannt; Platzhalter (202) nie gespeichert', async () => {
+  const wp = `${ORIGIN}/?kompanie_app=foto/4/large&v=x1`;
+  const sa = `${ORIGIN}/index.php?r=/foto/5/thumb&v=y1`;
+  let ready = false;
+  const net = {
+    [wp]: () => (ready ? response('fertig', 'image/jpeg') : response('<svg/>', 'image/svg+xml', 202)),
+    [sa]: image('s'),
+  };
+  const sw = load({ net });
+  assert.equal((await sw.request(wp)).status, 202);
+  ready = true;
+  assert.equal(await (await sw.request(wp)).text(), 'fertig', 'nach dem Platzhalter aus dem Netz');
+  assert.equal(await (await sw.request(sa)).text(), 's');
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url).sort();
+  assert.deepEqual(keys, [wp, sa].sort());
+});
+
+test('Bilder der Galerie: neue Fassung ersetzt die alte; dasselbe Bild nur einmal gleichzeitig geladen', async () => {
+  const v1 = `${SCOPE}foto/3/thumb?v=a`;
+  const v2 = `${SCOPE}foto/3/thumb?v=b`;
+  const other = `${SCOPE}foto/3/large?v=a`;
+  const net = { [v1]: image('1'), [v2]: image('2'), [other]: image('L') };
+  const sw = load({ net });
+  await sw.request(v1);
+  await sw.request(other);
+  const a = sw.requestSplit(v2);
+  const b = sw.requestSplit(v2);
+  assert.equal(await (await a.answer).text(), '2');
+  assert.equal(await (await b.answer).text(), '2');
+  await Promise.all([a.done, b.done]);
+  assert.equal(sw.fetched.filter((u) => u === v2).length, 1, 'nur ein Abruf');
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url).sort();
+  assert.deepEqual(keys, [other, v2].sort(), 'alte Fassung entfernt, andere Größe bleibt');
+});
+
+test('Bilder der Galerie: Vorschau „App als Rolle ansehen“ weder gespeichert noch aus dem Speicher', async () => {
+  const thumb = `${SCOPE}foto/3/thumb?v=abc`;
+  const net = { [thumb]: image('admin'), [`${thumb}&vorschau=member`]: image('vorschau') };
+  const sw = load({ net });
+  await sw.request(thumb);
+  assert.equal(await sw.request(`${thumb}&vorschau=member`), undefined);
+  assert.equal(await sw.request(thumb, 'cors', { 'X-Kompanie-Preview': 'member' }), undefined);
+});
+
+test('Bilder der Galerie: höchstens PHOTOS_MAX Vorschaubilder, die ältesten fallen heraus', async () => {
+  const net = {};
+  const max = Number(SOURCE.match(/const PHOTOS_MAX = (\d+);/)[1]);
+  for (let i = 1; i <= max + 2; i++) net[`${SCOPE}foto/${i}/thumb?v=a`] = image(String(i));
+  const sw = load({ net });
+  for (let i = 1; i <= max + 2; i++) await sw.request(`${SCOPE}foto/${i}/thumb?v=a`);
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url);
+  assert.equal(keys.length, max);
+  assert.ok(!keys.includes(`${SCOPE}foto/1/thumb?v=a`) && !keys.includes(`${SCOPE}foto/2/thumb?v=a`));
+});

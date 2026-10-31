@@ -40,6 +40,63 @@ final class AppPage
             return $vars;
         });
         add_action('template_redirect', static fn () => self::dispatch(Plugin::app()), 0);
+        // Bilder der Galerie früher beantworten (nach dem Update der App auf init mit Priorität 1).
+        add_action('init', [self::class, 'earlyPhoto'], 2);
+    }
+
+    /**
+     * Bilder der Galerie, die über die App kommen (interne und noch nicht aufbereitete), schon auf init statt erst auf
+     * template_redirect: Ein Album zeigt viele davon, und jedes ist ein eigener Aufruf von WordPress. So entfallen je
+     * Bild die init-Aufgaben der anderen Plugins (Priorität 10), das Auswerten der Adresse und die Abfrage der Beiträge.
+     * Anmeldung und Recht prüft der Kern wie sonst (WordPress kennt die Person ab hier über das Anmelde-Cookie). Was
+     * hier nicht eindeutig ein Bild ist (andere Permalinks, z. B. mit index.php oder einer Sprache davor), läuft wie
+     * bisher über dispatch.
+     */
+    public static function earlyPhoto(): void
+    {
+        $method = isset($_SERVER['REQUEST_METHOD']) && is_string($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : '';
+        if ($method !== 'GET' && $method !== 'HEAD') {
+            return;
+        }
+        $path = self::earlyPath();
+        if ($path === null || !preg_match('#^foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
+            return;
+        }
+        $app = Plugin::app();
+        self::beginPreview($app);
+        self::sendPhoto($app, (int) $m[1], $m[2]);
+        exit;
+    }
+
+    /** Pfad in der App aus der Adresse (wie die Regeln in RULES bzw. ?kompanie_app=…), sonst null. */
+    public static function earlyPath(): ?string
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend
+        if (isset($_GET[self::QUERY_VAR]) && is_string($_GET[self::QUERY_VAR])) {
+            return sanitize_text_field(wp_unslash($_GET[self::QUERY_VAR]));
+        }
+        if (!WpEnvironment::prettyPermalinks() || !isset($_SERVER['REQUEST_URI']) || !is_string($_SERVER['REQUEST_URI'])) {
+            return null;
+        }
+        $path = (string) wp_parse_url(wp_unslash($_SERVER['REQUEST_URI']), PHP_URL_PATH);
+        $home = (string) wp_parse_url(home_url('/'), PHP_URL_PATH);
+        $home = $home === '' ? '/' : $home;
+        if (!str_starts_with($path, $home)) {
+            return null;
+        }
+        return preg_match('#^app/(.+)$#', substr($path, strlen($home)), $m) ? rawurldecode($m[1]) : null;
+    }
+
+    /**
+     * Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
+     * der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
+     */
+    private static function beginPreview(App $app): void
+    {
+        $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, schränkt Rechte nur ein
+        $query = isset($_GET[Preview::QUERY]) && is_string($_GET[Preview::QUERY]) ? sanitize_text_field(wp_unslash($_GET[Preview::QUERY])) : null;
+        $app->preview()->begin(Preview::valueFrom($header, $query));
     }
 
     public const RULES = ['^app/?$' => 'index', '^app/(.+)$' => '$matches[1]'];
@@ -72,12 +129,7 @@ final class AppPage
             return;
         }
         if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto|bild)/#', $path)) {
-            // Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
-            // der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
-            $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, schränkt Rechte nur ein
-            $query = isset($_GET[Preview::QUERY]) && is_string($_GET[Preview::QUERY]) ? sanitize_text_field(wp_unslash($_GET[Preview::QUERY])) : null;
-            $app->preview()->begin(Preview::valueFrom($header, $query));
+            self::beginPreview($app);
         }
         if ($path === 'manifest.webmanifest') {
             self::sendManifest($app);

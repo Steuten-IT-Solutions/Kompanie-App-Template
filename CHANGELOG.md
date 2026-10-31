@@ -62,6 +62,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Interne Bilder der Galerie schneller**: Interne Bilder bleiben geschützt (der Server prüft bei jedem Abruf, ob
+  jemand angemeldet ist und sie sehen darf), erscheinen aber nach dem ersten Laden sofort, auch offline: Die App
+  speichert sie auf dem Gerät und löscht sie beim Abmelden. Beim Antippen eines Albums lädt sie die ersten
+  Vorschaubilder schon vorab. Unter WordPress antwortet die App auf Bildabrufe, bevor Theme und andere Plugins starten.
 - **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
   ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
   Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso

@@ -28,6 +28,12 @@
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
  * - Abzeichen der Dienstgrade (<App>/abzeichen/<id>?v=<Fassung>&s=<Größe>, Issue #17) → zuerst aus dem Speicher,
  *   ebenso versioniert; je Dienstgrad und Größe nur die aktuelle Fassung. Einmal geladen, sind sie offline da.
+ * - Bilder der Galerie, die über die App kommen (<App>/foto/<id>/<thumb|large>?v=<Fassung>: interne und noch nicht
+ *   aufbereitete) → zuerst aus dem Speicher. Interne Bilder prüft der Server bei jedem Abruf (Anmeldung, Recht) und
+ *   startet dafür die ganze App, unter WordPress das ganze WordPress; gespeichert erscheinen sie sofort, auch offline.
+ *   Nur fertige Bilder (200, kein Platzhalter), nur mit Fassung in der Adresse; je Bild und Größe nur die aktuelle
+ *   Fassung, höchstens PHOTOS_MAX Vorschaubilder und PHOTOS_LARGE_MAX große, die ältesten fallen heraus. Wer gerade
+ *   dasselbe Bild lädt (Vorladen und Ansicht), wartet auf diese eine Anfrage. Beim Abmelden gelöscht wie alles.
  * - Bildschirmfotos des Handbuchs (<Programmdateien>/handbuch/bilder/<name>.jpg?v=<Version>) → zuerst aus dem Speicher;
  *   je Foto nur die Fassung der aktuellen Version. Vorab geladen wird nichts (die App bliebe sonst nicht klein); was
  *   einmal in der Hilfe angesehen wurde, ist offline da.
@@ -52,6 +58,9 @@ const DATA_CACHE = 'kompanie-data-v2';
 const DOCS_CACHE = 'kompanie-docs-v1';
 const BADGES_CACHE = 'kompanie-badges-v1';
 const HELP_IMAGES_CACHE = 'kompanie-hilfebilder-v1';
+const PHOTOS_CACHE = 'kompanie-fotos-v1';
+const PHOTOS_MAX = 600;
+const PHOTOS_LARGE_MAX = 80;
 // Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
 const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
@@ -134,7 +143,9 @@ self.addEventListener('activate', (event) => {
         Promise.all(
           keys
             .filter(
-              (k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE].includes(k) && !k.startsWith(VIEWS_CACHE),
+              (k) =>
+                ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE, PHOTOS_CACHE].includes(k) &&
+                !k.startsWith(VIEWS_CACHE),
             )
             .map((k) => caches.delete(k)),
         ),
@@ -261,6 +272,51 @@ async function badgeFirst(request, key) {
     await cache.put(request, res.clone());
   }
   return res;
+}
+
+/**
+ * Bild der Galerie über die App, mit Fassung: Kennung und Größe (<App>/foto/<id>/<größe>, ?kompanie_app=foto/<id>/<größe>
+ * oder ?r=/foto/<id>/<größe>), sonst null. Originalauflösung und Videos nicht (groß bzw. in Ausschnitten).
+ */
+function photoKey(url) {
+  if (!url.searchParams.get('v')) return null;
+  const scope = new URL(self.registration.scope);
+  const path = url.pathname.startsWith(scope.pathname) ? url.pathname.slice(scope.pathname.length) : '';
+  const param = (url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '').replace(/^\//, '');
+  const m = path.match(/^foto\/(\d+)\/(thumb|large)$/) || param.match(/^foto\/(\d+)\/(thumb|large)$/);
+  return m ? { id: m[1], size: m[2] } : null;
+}
+
+/** Laufende Abrufe von Bildern (Adresse → Antwort), damit Vorladen und Ansicht dasselbe Bild nur einmal holen. */
+const photoRequests = new Map();
+
+/** Bilder der Galerie über die App: gespeicherte Fassung, sonst laden, ältere Fassungen ersetzen, Anzahl begrenzen. */
+async function photoFirst(request, key) {
+  const cache = await caches.open(PHOTOS_CACHE);
+  const cached = await cache.match(request, MATCH);
+  if (cached) return cached;
+  let running = photoRequests.get(request.url);
+  if (!running) {
+    running = (async () => {
+      const res = await fetch(request.url, { credentials: 'same-origin' });
+      // Nur das fertige Bild: 202 ist ein Platzhalter, solange es noch aufbereitet wird.
+      if (cacheable(res) && res.status === 200) {
+        const keys = await cache.keys();
+        const same = (k) => {
+          const other = photoKey(new URL(k.url));
+          return other !== null && other.id === key.id && other.size === key.size;
+        };
+        await Promise.all(keys.filter(same).map((k) => cache.delete(k)));
+        await cache.put(request.url, res.clone());
+        const ofSize = (await cache.keys()).filter((k) => photoKey(new URL(k.url))?.size === key.size);
+        const max = key.size === 'large' ? PHOTOS_LARGE_MAX : PHOTOS_MAX;
+        await Promise.all(ofSize.slice(0, Math.max(0, ofSize.length - max)).map((k) => cache.delete(k)));
+      }
+      return res;
+    })().finally(() => photoRequests.delete(request.url));
+    photoRequests.set(request.url, running);
+  }
+  return (await running).clone();
 }
 
 function isHelpImage(url) {
@@ -540,7 +596,10 @@ self.addEventListener('fetch', (event) => {
 
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;
-  if (badge !== null) {
+  const photo = doc === null && badge === null ? photoKey(url) : null;
+  if (photo !== null) {
+    if (request.mode !== 'navigate') event.respondWith(photoFirst(request, photo));
+  } else if (badge !== null) {
     if (request.mode !== 'navigate') event.respondWith(badgeFirst(request, badge));
   } else if (doc !== null) {
     // Direkt aufgerufen (neuer Tab, Download-Link): durchreichen, nicht als App-Seite speichern.
