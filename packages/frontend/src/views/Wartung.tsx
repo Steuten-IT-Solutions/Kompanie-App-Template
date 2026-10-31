@@ -25,7 +25,7 @@ import { sources } from '../viewData';
 export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensicherung'; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(sources.status.load, sources.status.deps, sources.status.key);
   if (part === 'datensicherung') return <DatensicherungSeite onToast={onToast} onChanged={reload} />;
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
   return (
@@ -614,7 +614,7 @@ export function compare(a: string, b: string): number {
 function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
   // Änderungen über setData: auch in den Zwischenspeicher, sonst zeigte ein erneutes Öffnen kurz den alten Stand.
   const { data, error, loading, reload, setData } = useAsync(() => api.backupEncryption(), [], 'admin/backup/encryption');
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   const e = data;
   // Ohne den Stand des Passworts bleiben Herunterladen (unverschlüsselt) und Wiederherstellen trotzdem möglich.
   return (
@@ -1021,7 +1021,7 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
   const [state, setState] = useState<BackupDriveStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const d = state ?? data!;
 

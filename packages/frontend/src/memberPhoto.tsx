@@ -127,7 +127,7 @@ function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string;
   const closeRef = useRef<HTMLButtonElement>(null);
   // Vor Datenbankversion 18 hochgeladene Fotos gibt es nicht in 1024 Pixeln (404): dann die 480er.
   const [fallback, setFallback] = useState(false);
-  // Bis das Bild da ist, dreht sich die Ladeschnecke (die 1024er-Fassung braucht im Mobilnetz einen Moment).
+  // Bis das Bild da ist, steht eine Fläche in seiner Größe (die 1024er-Fassung braucht im Mobilnetz einen Moment).
   const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading');
   const [original, setOriginal] = useState<string | null>(null);
   const src = url.startsWith('data:') ? url : (original ?? badgeSrc(url, fallback ? PIXELS.large : ZOOM_PIXELS));
@@ -163,11 +163,7 @@ function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string;
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <figure onClick={(e) => e.target === e.currentTarget && onClose()}>
-        {state === 'loading' && (
-          <span className="member-photo-zoom-loading" role="status" aria-label="Foto lädt">
-            <span className="spinner" aria-hidden="true" />
-          </span>
-        )}
+        {state === 'loading' && <span className="member-photo-zoom-loading" role="status" aria-label="Foto lädt" />}
         {state === 'failed' ? (
           <p className="member-photo-zoom-error">Das Foto lässt sich gerade nicht laden.</p>
         ) : (

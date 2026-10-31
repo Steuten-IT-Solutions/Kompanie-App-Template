@@ -23,7 +23,7 @@ function NewsList() {
     if (data) setItems((prev) => (page === 1 ? data.items : [...prev, ...data.items]));
   }, [data, page]);
 
-  if (loading && items.length === 0) return <Loading />;
+  if (loading && items.length === 0) return <Loading shape="news" />;
   if (error && items.length === 0) return <ErrorBox message={error} onRetry={reload} />;
   const notify = <GuestPushButton label="Bei neuen Beiträgen benachrichtigen" />;
   if (items.length === 0)

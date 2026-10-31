@@ -120,10 +120,10 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
         Nachrichten nicht.
       </p>
       {saved === undefined && !error ? (
-        <Loading />
+        <Loading shape="text" />
       ) : draft !== null ? (
         <>
-          <Suspense fallback={<Loading />}>
+          <Suspense fallback={<Loading shape="text" chunk />}>
             <RichTextEditor value={draft} onChange={setDraft} label="Signatur" id="signature-text" />
           </Suspense>
           <div className="button-row">
@@ -367,7 +367,7 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const account = data!;
   const emailChanged = editing !== null && normalizeEmail(editing.email).toLowerCase() !== account.email.toLowerCase();

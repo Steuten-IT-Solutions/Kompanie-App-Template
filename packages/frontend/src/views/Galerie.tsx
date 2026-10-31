@@ -24,7 +24,7 @@ function Overview() {
     window.scrollTo(0, overviewScroll);
     overviewScroll = null;
   }, [ready]);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="grid" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
   if (years.length === 0) return <Empty>Noch keine Bilder in der Galerie.</Empty>;
@@ -121,7 +121,7 @@ function Album({ id }: { id: number }) {
     tile?.focus({ preventScroll: true });
   }, [open]);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="detail" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const album = data!;
   const photos = album.photos.map((p) =>

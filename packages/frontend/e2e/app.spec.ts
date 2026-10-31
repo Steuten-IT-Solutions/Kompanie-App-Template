@@ -2259,6 +2259,29 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Beim ersten Öffnen ohne gemerktes Gerüst steht ein allgemeines in der Form der Seite, keine Ladeschnecke', async ({ page }) => {
+  await page.goto('/app/#/news');
+  await expect(page.locator('.tabbar')).toBeVisible();
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
+  // Gemerkte Gerüste löschen, erst danach (ohne weiteres Laden) neu laden: wie das erste Öffnen auf einem Gerät
+  await page.context().route(/news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.evaluate(async () => {
+      await caches.delete('kompanie-ansicht-geruest-v1');
+      await caches.delete('kompanie-data-v2');
+    });
+    await page.reload();
+    await expect(page.locator('.skeleton[data-shape="news"] .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.getByRole('status').filter({ hasText: 'Lädt …' })).toHaveCount(1);
+    await expect(page.locator('.spinner')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
   await page.context().clearCookies();
   // Laufende Abrufe der News, auch die des Service Workers (die sieht nur der Kontext, nicht die Seite).
@@ -2305,8 +2328,9 @@ test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „L
       .toBe(false);
     await page.goto('/app/#/news');
     await page.reload();
-    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
-    await expect(page.locator('.loading')).toHaveCount(0);
+    // Das gemerkte Gerüst (ohne data-shape), nicht das allgemeine
+    await expect(page.locator('.skeleton:not([data-shape]) .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.skeleton[data-shape]')).toHaveCount(0);
     await shot(page, 'geruest-news');
     await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.skeleton')).toHaveCount(0);

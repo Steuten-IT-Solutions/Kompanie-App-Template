@@ -62,6 +62,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
+  ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
+  Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso
+  zeigt das vergrößerte Foto einer Person beim Laden eine Fläche in seiner Größe.
 - **Schnellerer Start**: Die App erscheint beim Öffnen sofort mit dem zuletzt geladenen Stand, statt zuerst auf den
   Webserver zu warten (bisher bis zu 2,5 Sekunden, je nach Hoster). Die aktuelle Fassung holt sie im Hintergrund; hat
   sich etwas Wichtiges geändert (z. B. Rechte, Bereiche oder eine neue Version), lädt sie sich kurz nach dem Start
@@ -93,6 +97,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Gerüst passt zur Seite**: Das graue Gerüst beim Laden ragte auf manchen Seiten über den Rand (z. B.
+  *Datensicherung*, *Benachrichtigungen*), zeigte unter *Einstellungen* die Zeile „‹ Verwaltung“ doppelt und stellte
+  manche Knöpfe und Schalter anders dar als die fertige Seite.
 - Direkt nach einer eigenen Änderung konnte eine Seite den Stand von vorher zeigen, wenn die App ihre Daten gerade im
   Hintergrund lud und die Antwort erst nach der Änderung ankam. Solche Antworten gelten jetzt als veraltet.
 - **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der

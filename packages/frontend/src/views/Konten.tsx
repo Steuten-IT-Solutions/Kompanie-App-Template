@@ -348,7 +348,7 @@ export function AccountPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const wordpress = config?.variant === 'wordpress';
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   // Keine Rechte für dieses Konto (z. B. ein Admin): kein Bereich „Konto“.
   if (error) return null;
   const p = data!;

@@ -90,7 +90,7 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
   const [reason, setReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const m = data!;
   const text = reason ?? m.reason;

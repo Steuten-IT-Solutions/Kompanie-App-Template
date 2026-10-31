@@ -232,7 +232,7 @@ function History({ id }: { id: number }) {
     api.boardHistory(id).then(setData, (err: Error) => setError(err.message));
   }, [id]);
   if (error) return <p className="form-error small">{error}</p>;
-  if (!data) return <Loading />;
+  if (!data) return <Loading shape="detail" />;
   const value = (r: BoardRevision, v: unknown) => {
     if (v === null || v === undefined) return null;
     if (r.action === 'expires') return <span>{formatUntil(String(v))}</span>;
@@ -431,7 +431,7 @@ function Ended() {
         (error ? (
           <p className="form-error small">{error}</p>
         ) : data === null ? (
-          <Loading />
+          <Loading shape="text" />
         ) : (
           <>
             <p className="muted small">

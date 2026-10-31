@@ -499,7 +499,7 @@ function PollAdmin({ onToast }: { onToast: (msg: string) => void }) {
         }}
       />
       {!data && loading ? (
-        <Loading />
+        <Loading shape="text" />
       ) : !data ? (
         <ErrorBox message={error ?? 'Fehler'} onRetry={reload} />
       ) : data.length === 0 ? (

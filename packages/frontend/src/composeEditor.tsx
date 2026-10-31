@@ -42,7 +42,7 @@ export function ComposeEditor(props: {
 }) {
   const signature = useSignature();
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<Loading shape="text" chunk />}>
       <RichTextEditor
         value={props.value}
         onChange={props.onChange}

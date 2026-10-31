@@ -27,7 +27,7 @@ export default function Strafen({ me, focus }: { me: Me; focus?: string }) {
   const { data, error, loading, reload } = useAsync(sources.myPenalties.load, sources.myPenalties.deps, sources.myPenalties.key);
   const flash = useFocusEntry(focus, !error && !!data?.some((p) => String(p.id) === focus));
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="stat" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const penalties = data!;
   const open = penalties.filter((p) => p.status === 'open');

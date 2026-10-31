@@ -30,7 +30,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
     if (index > 0) stepRef.current?.focus();
   }, [index]);
 
-  if ((settings.loading && !settings.data) || (features.loading && !features.data)) return <Loading />;
+  if ((settings.loading && !settings.data) || (features.loading && !features.data)) return <Loading shape="form" />;
   if (settings.error) return <ErrorBox message={settings.error} onRetry={settings.reload} />;
   if (features.error) return <ErrorBox message={features.error} onRetry={features.reload} />;
   const s = settings.data!;
