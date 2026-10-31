@@ -51,6 +51,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
   Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.
   Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
+- **Listen als PDF-Datei**: *Verwaltung → Listen → PDF herunterladen* speichert die Liste direkt als PDF, ohne
+  Druckdialog. *Drucken* gibt es weiterhin als eigenen Knopf.
+- **Listen: Breite „automatisch“**: Eine Spalte kann so breit sein wie ihr längster Inhalt bzw. ihre Überschrift; die
+  übrigen Spalten teilen sich den Rest.
+- **Listen: Sortieren nach jeder Spalte**: Unter *Zeilen* sortiert **Sortieren nach** die Liste nach dem Namen oder einer
+  beliebigen Datenspalte, auf- oder absteigend (Geburtstage nach Tag im Jahr). Zeilen ohne Wert kommen ans Ende.
+- **Listen: weitere Personen**: Unter *Zeilen → In die Liste kommen* wählst du neben den Mitgliedern auch Rollen ohne
+  Mitgliederbereich (z. B. Anwärter oder eine Jugendgruppe). „Mitglieder aktualisieren“ holt dann auch sie in die Liste.
 
 ### Geändert
 
@@ -72,6 +80,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Übersicht, an der man das Album geöffnet hat, statt an den Anfang. Nach dem Schließen der Großansicht steht das
   zuletzt gezeigte Bild im Album im Blick, auch wenn man weit geblättert hat.
   Die Zurück-Taste (oder -Geste) bei offener Großansicht schließt nur das Bild, statt das Album zu verlassen.
+- **Listen: Geburtstag in langer Form**: Die Spalte Geburtstag zeigt das Datum ausgeschrieben („9. März“), mit dem
+  Recht „Persönliche Angaben sehen“ samt Geburtsjahr („9. März 1990“), auch in CSV und PDF.
 
 ### Behoben
 

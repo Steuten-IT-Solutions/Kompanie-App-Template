@@ -1251,8 +1251,9 @@ paths:
       tags: [Listen]
       summary: „Mitglieder aktualisieren“
       description: |
-        Legt Zeilen für alle Mitglieder (Recht `member`, ohne Gäste und Anwärter) an, die noch keine haben, und löscht die
-        Zeilen von Konten, die es nicht mehr gibt oder die kein Mitglied mehr sind. Freie Zeilen bleiben. Neue Zeilen
+        Legt Zeilen für alle Personen der Liste (`groups`: Mitglieder mit Recht `member` und auf Wunsch Rollen ohne
+        Mitgliederbereich wie Anwärter; nie Gäste) an, die noch keine haben, und löscht die Zeilen von Konten, die es nicht
+        mehr gibt oder die nicht mehr dazugehören. Freie Zeilen bleiben. Neue Zeilen
         werden nach Nachname vor die erste Mitgliedszeile eingeordnet, die nach Namen später kommt (sonst hinter die
         letzte; ohne Mitgliedszeilen an den Anfang). Ohne `apply` nur die Übersicht, was sich ändern würde.
       x-capability: manage_lists
@@ -6831,7 +6832,7 @@ components:
           enum: [nr, name, first_name, last_name, role, rank, titles, birthday, address, street, postal_code, city, country, phone, email, points, penalties, null]
           description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
         label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
-        width: { type: string, enum: [narrow, normal, wide], default: normal }
+        width: { type: string, enum: [narrow, normal, wide, auto], default: normal, description: 'auto: so breit wie der längste Inhalt (misst die App)' }
         checkbox: { type: boolean, description: Kästchen zum Abhaken (nur bei blank) }
         available: { type: boolean, description: 'Nur in Antworten: ob die anfragende Person die Werte sieht (blank immer)' }
 
@@ -6849,7 +6850,7 @@ components:
             deleted: { type: boolean }
             values:
               type: object
-              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), mit view_personal address (ganze Adresse in einer Zeile, das Land nur außerhalb Deutschlands), street (Straße und Nr.), postal_code, city, country (Name des Landes), phone, email (je null ohne Eintrag), points (Zahl), penalties (offene Cent)'
+              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday (Objekt mit day, month und year – year nur mit view_personal, sonst null – oder null), mit view_personal address (ganze Adresse in einer Zeile, das Land nur außerhalb Deutschlands), street (Straße und Nr.), postal_code, city, country (Name des Landes), phone, email (je null ohne Eintrag), points (Zahl), penalties (offene Cent)'
               additionalProperties: true
         - type: object
           description: Freie Zeile
@@ -6860,13 +6861,25 @@ components:
 
     PrintList:
       type: object
-      required: [id, title, subtitle, date, orientation, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
+      required: [id, title, subtitle, date, orientation, groups, group_options, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 120 }
         subtitle: { type: [string, 'null'], maxLength: 200 }
         date: { type: [string, 'null'], format: date }
         orientation: { type: string, enum: [portrait, landscape] }
+        groups:
+          type: array
+          description: 'Wer mit „Mitglieder aktualisieren“ in die Liste kommt: members (alle mit Mitgliederbereich) und Schlüssel von Rollen ohne Mitgliederbereich'
+          items: { type: string }
+        group_options:
+          type: array
+          description: 'Zur Auswahl: members, dann die Rollen ohne Mitgliederbereich (ohne Gast) in der Reihenfolge der Rollen'
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              label: { type: string }
         created_by_name: { type: [string, 'null'] }
         created_at: { type: string, format: date-time }
         updated_by_name: { type: [string, 'null'] }
@@ -6894,6 +6907,12 @@ components:
         subtitle: { type: string, maxLength: 200 }
         date: { type: [string, 'null'], format: date }
         orientation: { type: string, enum: [portrait, landscape], default: portrait }
+        groups:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: 'Personen der Liste (siehe PrintList.groups); Vorgabe: [members]'
+          items: { type: string }
         columns:
           type: array
           minItems: 1

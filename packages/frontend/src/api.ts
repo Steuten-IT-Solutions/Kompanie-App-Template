@@ -1315,7 +1315,8 @@ export type ListField =
   | 'email'
   | 'points'
   | 'penalties';
-export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
+/** auto: so breit wie der längste Inhalt */
+export type ListColumnWidth = 'narrow' | 'normal' | 'wide' | 'auto';
 
 export interface ListColumn {
   /** field: Wert aus der App, blank: leer zum Ausfüllen auf Papier */
@@ -1338,8 +1339,8 @@ export interface ListValues {
   role?: string;
   rank?: string | null;
   titles?: string[];
-  /** „TT.MM.“ oder null (nicht freigegeben) */
-  birthday?: string | null;
+  /** Tag und Monat, das Jahr nur mit view_personal (sonst null); null: nicht freigegeben */
+  birthday?: { day: number; month: number; year: number | null } | null;
   /** Persönliche Angaben (nur mit view_personal); null ohne Eintrag. address: die ganze Adresse in einer Zeile */
   address?: string | null;
   /** Straße mit Hausnummer */
@@ -1375,6 +1376,10 @@ export interface PrintList {
   subtitle: string | null;
   date: string | null;
   orientation: 'portrait' | 'landscape';
+  /** Wer mit „Mitglieder aktualisieren“ in die Liste kommt: members (alle mit Mitgliederbereich) und Rollen ohne ihn */
+  groups: string[];
+  /** Zur Auswahl: members, dann die Rollen ohne Mitgliederbereich (ohne Gast) */
+  group_options: { key: string; label: string }[];
   created_by_name: string | null;
   created_at: string;
   updated_by_name: string | null;
@@ -1389,6 +1394,7 @@ export interface PrintListInput {
   subtitle?: string;
   date?: string | null;
   orientation?: 'portrait' | 'landscape';
+  groups?: string[];
   columns?: Omit<ListColumn, 'available'>[];
   rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
   /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */

@@ -1,7 +1,7 @@
 // Listen (src/lists.ts, Issue #121): CSV für ein deutsches Excel, Schutz vor CSV-Injection, Dateiname.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { columnWidths, csvField, csvFileName, csvPhone, toCsv } from '../src/lists.ts';
+import { columnWidths, csvField, csvFileName, csvPhone, longBirthday, sortRowsBy, toCsv } from '../src/lists.ts';
 
 const BOM = String.fromCharCode(0xfeff);
 
@@ -55,4 +55,44 @@ test('Handynummer in der CSV mit 00 statt +, damit Excel kein Apostroph zeigt', 
   assert.equal(csvPhone('+12125550100'), '+12125550100', 'ohne Leerzeichen läse Excel eine Zahl ohne führende Nullen');
   assert.equal(csvPhone('0171 1234567'), '0171 1234567');
   assert.equal(csvPhone('+=1'), '+=1');
+});
+
+test('Spaltenbreite automatisch: so breit wie der Inhalt, die anderen teilen sich den Rest', () => {
+  // Automatische Spalte (Mitte) mit 80: die beiden anderen 2 : 1 aus 320
+  assert.deepEqual(columnWidths([2, 2.5, 1], [0, 0, 0], 400, [null, 80, null]), [213, 80, 107]);
+  // Mindestbreiten der anderen gelten weiter
+  assert.deepEqual(columnWidths([1, 2.5, 1], [200, 0, 0], 400, [null, 80, null]), [200, 80, 120]);
+  // Nur automatische: füllen die Breite im Verhältnis
+  assert.deepEqual(columnWidths([2.5, 2.5], [0, 0], 400, [100, 300]), [100, 300]);
+  assert.deepEqual(columnWidths([2.5, 2.5], [0, 0], 400, [50, 150]), [100, 300]);
+  // Zu breit: Die anderen behalten je ein Fünfundzwanzigstel, die automatischen werden im Verhältnis schmaler
+  assert.deepEqual(columnWidths([2.5, 2.5, 1], [0, 0, 0], 500, [600, 400, null]), [288, 192, 20]);
+});
+
+test('Geburtstag in langer Form', () => {
+  assert.equal(longBirthday({ day: 9, month: 3, year: 1990 }), '9. März 1990');
+  assert.equal(longBirthday({ day: 24, month: 12, year: null }), '24. Dezember');
+  assert.equal(longBirthday({ day: 1, month: 1 }), '1. Januar');
+});
+
+test('Zeilen nach einer Spalte sortieren: Zahlen nach Wert, Text wie die Mitgliederliste, leere am Ende', () => {
+  const rows = ['Özdemir', '', 'Müller', 'Zander', 'Abel', 'Muster10', 'Muster2'];
+  assert.deepEqual(
+    sortRowsBy(rows, (r) => r, 'asc'),
+    ['Abel', 'Müller', 'Muster2', 'Muster10', 'Özdemir', 'Zander', ''],
+  );
+  assert.deepEqual(
+    sortRowsBy(rows, (r) => r, 'desc'),
+    ['Zander', 'Özdemir', 'Muster10', 'Muster2', 'Müller', 'Abel', ''],
+  );
+  const nums = [{ n: 10 }, { n: null }, { n: 2 }, { n: 2, x: 1 }];
+  assert.deepEqual(
+    sortRowsBy(nums, (r) => r.n, 'asc'),
+    [{ n: 2 }, { n: 2, x: 1 }, { n: 10 }, { n: null }],
+    'gleiche Werte in bisheriger Reihenfolge',
+  );
+  assert.deepEqual(
+    sortRowsBy(nums, (r) => r.n, 'desc'),
+    [{ n: 10 }, { n: 2 }, { n: 2, x: 1 }, { n: null }],
+  );
 });

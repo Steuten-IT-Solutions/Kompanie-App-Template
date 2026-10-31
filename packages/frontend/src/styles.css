@@ -4865,21 +4865,41 @@ button.spotlight-person:focus-visible {
   align-items: center;
   margin-top: 8px;
 }
-.list-columns .field.narrow {
-  flex-basis: 124px;
+.list-columns .field.narrow,
+.list-sort .field.narrow {
+  /* Platz für „automatisch“ bzw. „absteigend“ */
+  flex: 0 0 150px;
 }
 .list-columns .toggle {
   margin: 0 8px 0 2px;
 }
-.list-add-column {
+.list-add-column,
+.list-sort {
   align-items: flex-end;
 }
-.list-add-column .btn {
+.list-sort {
+  margin-top: 12px;
+}
+.list-add-column .btn,
+.list-sort .btn {
   flex: none;
   min-height: 46px;
 }
 .list-rows {
   gap: 6px;
+}
+.list-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.list-groups legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-weight: 600;
 }
 .list-row-nr {
   flex: none;
