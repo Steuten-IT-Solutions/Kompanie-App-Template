@@ -64,7 +64,7 @@ function EventList({ focus }: { focus?: string }) {
 
   const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
 
-  if ((loading && !data) || (showBirthdays && upcoming.loading && !upcoming.data)) return <Loading />;
+  if ((loading && !data) || (showBirthdays && upcoming.loading && !upcoming.data)) return <Loading shape="events" />;
   if (error)
     return (
       <>

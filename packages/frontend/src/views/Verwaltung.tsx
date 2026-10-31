@@ -342,7 +342,7 @@ function Members() {
     navigate(`verwaltung/mitglied/${id}`);
   }
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="people" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   return (
@@ -1363,7 +1363,7 @@ function NewMember() {
     );
   }
   // Erst mit den Dienstgraden zeigen: Sonst taucht das Feld dafür später auf und schiebt den Rest des Formulars nach unten.
-  if (canRanks() && ranks.loading && !ranks.data) return <Loading />;
+  if (canRanks() && ranks.loading && !ranks.data) return <Loading shape="form" />;
 
   return (
     <form className="form" onSubmit={submit}>
@@ -1457,7 +1457,7 @@ function useMembersAndCatalog() {
 function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
   const s = sources.attendance(listId);
   const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="detail" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
   const back = () => navigate(`verwaltung/anwesenheit/${list.id}`);
@@ -1507,7 +1507,7 @@ function GivePoints({
   const [formError, setFormError] = useState<string | null>(null);
   const [applyFactor, setApplyFactor] = useState(true);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [members, catalog] = data as [MemberSummary[], CatalogItem[]];
   // Punktefaktor der Rollen (z. B. 0,5 für junge Mitglieder; bei Zusatzrollen der kleinste): gilt beim Buchen, lässt
@@ -1666,7 +1666,7 @@ function GivePenalty({
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if ((loading && !data) || (total.loading && !total.data && !noTotal)) return <Loading />;
+  if ((loading && !data) || (total.loading && !total.data && !noTotal)) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const totalOpen = total.data?.filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
 
@@ -1752,7 +1752,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => Promise.all([api.openPenalties(), api.members(false, true)]));
   const [busy, setBusy] = useState(false);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="detail" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [penalties, members] = data!;
   const names = new Map(members.filter((m) => m.level !== 'guest').map((m) => [m.id, m.name]));
@@ -1866,7 +1866,7 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
     }
   }
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   return (

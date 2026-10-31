@@ -157,7 +157,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
   const s = sources.attendance(id);
   const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <Editor key={data!.updated_at} list={data!} onSaved={setData} onToast={onToast} />;
 }

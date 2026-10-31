@@ -552,7 +552,7 @@ export function personEntries(data: OfficesOverview | null | undefined, userId: 
  */
 export function PersonOffices({ userId, empty, to }: { userId: number; empty: string; to?: PersonPath }) {
   const { data, error, loading, reload } = useOffices();
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="text" />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const entries = personEntries(data, userId);
   if (entries.length === 0) return <Empty>{empty}</Empty>;

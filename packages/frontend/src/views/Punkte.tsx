@@ -9,7 +9,7 @@ export default function Punkte({ me, focus }: { me: Me; focus?: string }) {
   const { data, error, loading, reload } = useAsync(sources.myPoints.load, sources.myPoints.deps, sources.myPoints.key);
   const flash = useFocusEntry(focus, !error && !!data?.some((p) => String(p.id) === focus));
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="stat" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const points = data!;
 

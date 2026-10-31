@@ -70,7 +70,7 @@ export default function Meins({
       {active === 'konto' ? (
         <Konto onToast={onToast} onLogout={onLogout} />
       ) : me.loading && !me.data ? (
-        <Loading />
+        <Loading shape={active === 'uebersicht' ? 'overview' : active === 'anwesenheit' ? 'list' : 'stat'} />
       ) : me.error && !me.data ? (
         <ErrorBox message={me.error} onRetry={me.reload} />
       ) : active === 'uebersicht' ? (

@@ -217,7 +217,7 @@ function ListOverview({ onToast }: { onToast: Toast }) {
 
 function ListEditorLoader({ id, onToast }: { id: number; onToast: Toast }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.list(id), [id]);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   return <ListEditor list={data!} onSaved={setData} onToast={onToast} />;
 }
