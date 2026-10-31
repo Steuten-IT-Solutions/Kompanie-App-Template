@@ -519,7 +519,7 @@ function History({ itemId }: { itemId?: number }) {
         {itemId === undefined ? 'Gesamter Verlauf' : latest ? `Verlauf: ${latest.title} · ${latest.location}` : 'Verlauf'}
       </h2>
       {log.loading && !log.data ? (
-        <Loading />
+        <Loading shape="text" />
       ) : log.error ? (
         <ErrorBox message={log.error} onRetry={log.reload} />
       ) : entries.length === 0 ? (

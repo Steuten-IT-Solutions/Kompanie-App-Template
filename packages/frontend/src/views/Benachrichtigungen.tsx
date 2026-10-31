@@ -84,7 +84,7 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
     );
   }
   if (error) return <ErrorBox message={error} onRetry={() => setTick((n) => n + 1)} />;
-  if (!status || types === null) return <Loading />;
+  if (!status || types === null) return <Loading shape="form" />;
   if (!status.supported) {
     return (
       <div className="card push-card">

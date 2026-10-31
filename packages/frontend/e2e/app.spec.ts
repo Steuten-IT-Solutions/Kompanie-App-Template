@@ -274,12 +274,15 @@ test('Benachrichtigung führt zum Eintrag: Termin und Punkte (Issue #190)', asyn
 
   // Unbekannter Termin (gelöscht oder vorbei): einfach die Liste
   await page.goto('/app/#/termine/termin/gibtesnicht');
+  // Erst fertig geladen: Das Gerüst beim Laden hat dieselben Klassen (li.event, li.row), aber keine Kennung.
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   await expect(page.locator('li.event').first()).toBeVisible();
   await expect(page.locator('li.event.focused, li.event.open')).toHaveCount(0);
 
   // Punkte: meins/punkte/<id>
   await page.setViewportSize(devices['iPhone 13'].viewport);
   await page.goto('/app/#/meins/punkte');
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   const row = page.locator('.card-list > li.row').last();
   await expect(row).toBeVisible();
   const pointId = await row.getAttribute('data-focus-id');
@@ -2259,6 +2262,29 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Beim ersten Öffnen ohne gemerktes Gerüst steht ein allgemeines in der Form der Seite, keine Ladeschnecke', async ({ page }) => {
+  await page.goto('/app/#/news');
+  await expect(page.locator('.tabbar')).toBeVisible();
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
+  // Gemerkte Gerüste löschen, erst danach (ohne weiteres Laden) neu laden: wie das erste Öffnen auf einem Gerät
+  await page.context().route(/news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.evaluate(async () => {
+      await caches.delete('kompanie-ansicht-geruest-v1');
+      await caches.delete('kompanie-data-v2');
+    });
+    await page.reload();
+    await expect(page.locator('.skeleton[data-shape="news"] .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.getByRole('status').filter({ hasText: 'Lädt …' })).toHaveCount(1);
+    await expect(page.locator('.spinner')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
   await page.context().clearCookies();
   // Laufende Abrufe der News, auch die des Service Workers (die sieht nur der Kontext, nicht die Seite).
@@ -2305,8 +2331,9 @@ test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „L
       .toBe(false);
     await page.goto('/app/#/news');
     await page.reload();
-    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
-    await expect(page.locator('.loading')).toHaveCount(0);
+    // Das gemerkte Gerüst (ohne data-shape), nicht das allgemeine
+    await expect(page.locator('.skeleton:not([data-shape]) .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.skeleton[data-shape]')).toHaveCount(0);
     await shot(page, 'geruest-news');
     await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.skeleton')).toHaveCount(0);
@@ -4302,6 +4329,10 @@ test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), e
   // Ausgangslage: keine Signatur
   await openKonto(page);
   const signatureCard = page.locator('.signature-card');
+  // Erst wenn die Signatur geladen ist, steht fest, ob es eine gibt (sonst bliebe eine aus einem früheren Lauf stehen).
+  await expect(
+    signatureCard.getByRole('button', { name: 'Löschen' }).or(signatureCard.getByRole('button', { name: 'Signatur einrichten' })),
+  ).toBeVisible();
   if (await signatureCard.getByRole('button', { name: 'Löschen' }).count()) {
     await signatureCard.getByRole('button', { name: 'Löschen' }).click();
     await expect(signatureCard.getByRole('button', { name: 'Signatur einrichten' })).toBeVisible();

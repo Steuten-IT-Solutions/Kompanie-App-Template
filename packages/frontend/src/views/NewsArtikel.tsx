@@ -39,7 +39,7 @@ function cleanHtml(html: string): string {
 export default function NewsArtikel({ id }: { id: string }) {
   const { data, error, loading, reload } = useAsync(() => api.newsItem(id), [id], 'news-item');
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="detail" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const n = data!;
   const html = cleanHtml(n.content ?? '');

@@ -58,7 +58,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
     if (fromGoogle) window.location.replace('#/einstellungen/google');
   }, [fromGoogle]);
   const page = PAGES.find((p) => p.id === path[0]);
-  if (fromGoogle && !page) return <Loading />;
+  if (fromGoogle && !page) return <Loading shape="form" />;
   if (!page) return <Overview />;
   return (
     <div className="settings">
@@ -128,7 +128,7 @@ function Overview() {
 /** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
 function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData, revision } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
   // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
@@ -147,7 +147,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const p = data!;
 
@@ -231,7 +231,7 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (!config?.features.birthdays) return <p className="muted">Der Bereich {sec.birthdays} ist ausgeschaltet.</p>;
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   async function save(days: number) {
@@ -281,7 +281,7 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
  */
 function MailSection({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.mailSettings(), [], 'admin/mail');
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <MailForm key={JSON.stringify(data)} settings={data!} onSaved={setData} onToast={onToast} />;
 }
@@ -560,7 +560,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
   const value = Object.fromEntries(list.map((f) => [f.key, f.enabled])) as Record<Feature, boolean>;
@@ -1160,7 +1160,7 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
           {error}
         </p>
       )}
-      {open && !list && !error && <Loading />}
+      {open && !list && !error && <Loading shape="text" />}
       {list && (
         <>
           <ul className="gallery-failed-list">

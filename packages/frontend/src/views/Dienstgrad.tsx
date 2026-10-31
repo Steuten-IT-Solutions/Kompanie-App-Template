@@ -11,7 +11,7 @@ const sec = brand.labels.sections;
 /** „Meins“ → Dienstgrad: eigener Dienstgrad, mit Punkten der Weg zum nächsten, die Liste und der eigene Verlauf. */
 export default function Dienstgrad() {
   const { data, error, loading, reload } = useAsync(sources.myRank.load, sources.myRank.deps, sources.myRank.key);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="stat" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const d = data!;
   const withPoints = !!config?.features.points && d.points !== undefined;

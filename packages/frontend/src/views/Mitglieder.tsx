@@ -401,7 +401,7 @@ function MemberList({ former = false }: { former?: boolean }) {
     navigate(`mitglieder/${id}`);
   }
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="people" />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
 
   const total = data?.length ?? 0;

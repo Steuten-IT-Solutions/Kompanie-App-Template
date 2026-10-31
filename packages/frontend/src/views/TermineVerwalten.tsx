@@ -158,7 +158,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
 
       <h2 className="section-title">Kommende öffentliche Termine</h2>
       {loading && !data ? (
-        <Loading />
+        <Loading shape="text" />
       ) : error ? (
         <ErrorBox message={error} onRetry={reload} />
       ) : (data ?? []).length === 0 ? (

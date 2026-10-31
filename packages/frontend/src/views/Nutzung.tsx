@@ -38,7 +38,7 @@ export default function Nutzung({ onToast }: { onToast: (msg: string) => void })
     'admin/activity',
   );
   const [person, setPerson] = useState<{ id: number; name: string } | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const o = data!;
   return (
@@ -250,7 +250,7 @@ function History({ person, from, to, onClose }: { person: { id: number; name: st
         {formatDate(from)} bis {formatDate(to)}
       </p>
       {loading && !data ? (
-        <Loading />
+        <Loading shape="text" />
       ) : error ? (
         <ErrorBox message={error} onRetry={reload} />
       ) : data!.entries.length === 0 ? (

@@ -236,7 +236,7 @@ export function MemberTitles({
       {all.error ? (
         <ErrorBox message={all.error} onRetry={all.reload} />
       ) : !all.data ? (
-        <Loading />
+        <Loading shape="text" />
       ) : options.length === 0 ? (
         <p className="muted small">
           Noch keine {sec.titles} angelegt (Verwaltung → {sec.titles}).
