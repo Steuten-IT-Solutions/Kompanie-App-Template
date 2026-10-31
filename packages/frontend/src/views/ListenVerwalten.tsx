@@ -5,7 +5,8 @@ import { useDragSort } from '../dragSort';
 import { formatDate, formatEuro, todayYmd } from '../format';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo-small.webp';
-import { columnWidths, csvFileName, csvPhone, listFileBase, toCsv } from '../lists';
+import type { ListPdfInput } from '../listPdf';
+import { columnWidths, csvFileName, csvPhone, listFileBase, longBirthday, sortRowsBy, toCsv, type SortValue } from '../lists';
 import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -46,9 +47,9 @@ const FIELD_WIDTHS: Partial<Record<ListField, ListColumn['width']>> = {
   email: 'wide',
 };
 
-const WIDTH_LABELS: Record<ListColumn['width'], string> = { narrow: 'schmal', normal: 'normal', wide: 'breit' };
-/** Anteil an der Breite der Tabelle */
-const WIDTH_WEIGHT: Record<ListColumn['width'], number> = { narrow: 1, normal: 2.5, wide: 5 };
+const WIDTH_LABELS: Record<ListColumn['width'], string> = { narrow: 'schmal', normal: 'normal', wide: 'breit', auto: 'automatisch' };
+/** Anteil an der Breite der Tabelle (automatisch: nur, wenn der Platz für den Inhalt nicht reicht, siehe columnWidths) */
+const WIDTH_WEIGHT: Record<ListColumn['width'], number> = { narrow: 1, normal: 2.5, wide: 5, auto: 2.5 };
 
 export const columnLabel = (c: Pick<ListColumn, 'kind' | 'field' | 'label'>): string =>
   c.label.trim() !== '' ? c.label : c.kind === 'field' && c.field ? FIELD_LABELS[c.field] : '';
@@ -72,10 +73,24 @@ function cell(c: ListColumn, r: ListRow, index: number): string | number {
   }
   if (r.deleted) return '';
   const v: unknown = (r.values as Record<string, unknown>)[c.field];
+  if (c.field === 'birthday') return isBirthday(v) ? longBirthday(v) : '';
   if (Array.isArray(v)) return v.join(', ');
   // Offene Strafen in Euro (CSV: als Zahl)
   if (typeof v === 'number') return c.field === 'penalties' ? v / 100 : v;
   return typeof v === 'string' ? v : '';
+}
+
+type BirthdayValue = { day: number; month: number; year: number | null };
+const isBirthday = (v: unknown): v is BirthdayValue => typeof v === 'object' && v !== null && 'day' in v && 'month' in v;
+
+/** Wert zum Sortieren: Geburtstage nach Tag im Jahr (Monat, Tag), sonst wie in der Zelle. */
+function sortValue(c: ListColumn, r: ListRow, index: number): SortValue {
+  if (c.field === 'birthday' && r.kind === 'member' && !r.deleted) {
+    const v: unknown = (r.values as Record<string, unknown>).birthday;
+    return isBirthday(v) ? v.month * 100 + v.day : null;
+  }
+  const v = cell(c, r, index);
+  return v === '' ? null : v;
 }
 
 function cellText(c: ListColumn, r: ListRow, index: number): string {
@@ -211,6 +226,7 @@ interface Draft {
   subtitle: string;
   date: string;
   orientation: 'portrait' | 'landscape';
+  groups: string[];
   columns: ListColumn[];
   rows: DraftRow[];
 }
@@ -220,6 +236,7 @@ const toDraft = (l: PrintList): Draft => ({
   subtitle: l.subtitle ?? '',
   date: l.date ?? '',
   orientation: l.orientation,
+  groups: l.groups,
   columns: l.columns,
   rows: l.rows.map(withKey),
 });
@@ -229,6 +246,7 @@ const toInput = (d: Draft): PrintListInput => ({
   subtitle: d.subtitle.trim(),
   date: d.date || null,
   orientation: d.orientation,
+  groups: d.groups,
   columns: d.columns.map(({ kind, field, label, width, checkbox }) => ({ kind, field, label, width, checkbox })),
   rows: d.rows.map((r) => (r.kind === 'free' ? { kind: 'free', name: r.name } : { kind: 'member', user_id: r.user_id })),
 });
@@ -294,6 +312,21 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     }
   }
 
+  const [pdfBusy, setPdfBusy] = useState(false);
+  /** PDF als Datei, ohne Druckdialog (jsPDF wird erst jetzt geladen). */
+  async function downloadPdf() {
+    setPdfBusy(true);
+    setError(null);
+    try {
+      const { downloadListPdf } = await import('../listPdf');
+      await downloadListPdf(pdfInput(draft));
+    } catch (e) {
+      setError(`Das PDF ließ sich nicht erstellen: ${(e as Error).message}`);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   function leave() {
     if (!dirty || window.confirm('Änderungen verwerfen?')) navigate('verwaltung/listen');
   }
@@ -336,6 +369,10 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
 
       <RowEditor
         rows={draft.rows}
+        columns={draft.columns}
+        groups={draft.groups}
+        groupOptions={list.group_options}
+        onGroups={(groups) => update({ groups })}
         deleted={deleted}
         busy={busy}
         sync={sync}
@@ -364,17 +401,17 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
           <p className="muted small">Ohne die Rechte dazu bleiben diese Spalten leer: {hidden.map((c) => columnLabel(c)).join(', ')}.</p>
         )}
         <div className="button-row">
-          <button className="btn" onClick={() => window.print()}>
-            Drucken / PDF
+          <button className="btn" disabled={pdfBusy} onClick={downloadPdf}>
+            {pdfBusy ? 'PDF wird erstellt …' : 'PDF herunterladen'}
+          </button>
+          <button className="btn btn-secondary" onClick={() => window.print()}>
+            Drucken
           </button>
           <button className="btn btn-secondary" onClick={() => downloadCsv(draft)}>
             CSV herunterladen
           </button>
         </div>
-        <p className="muted small">
-          Die Liste enthält personenbezogene Daten. Bitte nach Gebrauch vernichten bzw. löschen. Als PDF speichern: im Druckdialog „Als PDF
-          speichern“ wählen.
-        </p>
+        <p className="muted small">Die Liste enthält personenbezogene Daten. Bitte nach Gebrauch vernichten bzw. löschen.</p>
         <div className="list-preview" aria-label="Vorschau">
           <PrintSheet draft={draft} />
         </div>
@@ -384,6 +421,37 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     </div>
   );
 }
+
+/** Liste für das PDF: dieselben Spalten und Texte wie im Ausdruck. */
+function pdfInput(d: Draft): ListPdfInput {
+  return {
+    title: d.title || 'Ohne Titel',
+    subtitle: d.subtitle,
+    metaLeft: brand.name,
+    metaRight: metaText(d),
+    orientation: d.orientation,
+    color: brand.themeColor,
+    logoUrl,
+    columns: d.columns.map((c) => ({
+      label: columnLabel(c),
+      weight: WIDTH_WEIGHT[c.width],
+      auto: c.width === 'auto',
+      name: c.kind === 'field' && c.field !== null && NAME_FIELDS.has(c.field),
+      rotated: rotated(c),
+      blank: c.kind === 'blank',
+      checkbox: c.kind === 'blank' && c.checkbox,
+    })),
+    rows: d.rows.map((r, i) =>
+      d.columns.map((c) => ({
+        text: c.kind === 'blank' ? '' : cellText(c, r, i),
+        num: c.field === 'nr' || typeof cell(c, r, i) === 'number',
+      })),
+    ),
+  };
+}
+
+/** Unter dem Balken rechts: Datum der Liste und Stand (heute) */
+const metaText = (d: Draft): string => [d.date ? formatDate(d.date) : null, `Stand: ${formatDate(todayYmd())}`].filter(Boolean).join(' · ');
 
 function downloadCsv(d: Draft) {
   const header = d.columns.map((c) => columnLabel(c));
@@ -518,8 +586,15 @@ function ColumnEditor({
   );
 }
 
+/** Sortieren nach: Name (Nachname, Vorname) oder eine Datenspalte (ihre Stelle in der Liste) */
+type RowSort = 'name' | number;
+
 function RowEditor({
   rows,
+  columns,
+  groups,
+  groupOptions,
+  onGroups,
   deleted,
   busy,
   sync,
@@ -529,6 +604,10 @@ function RowEditor({
   onCancelSync,
 }: {
   rows: DraftRow[];
+  columns: ListColumn[];
+  groups: string[];
+  groupOptions: PrintList['group_options'];
+  onGroups: (groups: string[]) => void;
   deleted: number;
   busy: boolean;
   sync: ListSyncResult | null;
@@ -541,15 +620,54 @@ function RowEditor({
   const members = rows.filter((r) => r.kind === 'member').length;
   const addFree = (n: number) =>
     onChange([...rows, ...Array.from({ length: Math.min(n, ROWS_MAX - rows.length) }, () => withKey({ kind: 'free', name: '' }))]);
+  // Sortieren nach jeder Datenspalte außer Nr. (zählt nur die Zeilen); Nach Namen wie bisher nach Nachname, Vorname
+  const sortable = columns.map((c, i) => ({ c, i })).filter(({ c }) => c.kind === 'field' && c.field !== null && c.field !== 'nr');
+  const [by, setBy] = useState<RowSort>('name');
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
+  const sortBy: RowSort = typeof by === 'number' && !sortable.some(({ i }) => i === by) ? 'name' : by;
+  function applySort() {
+    if (sortBy === 'name') {
+      const sorted = sortRowsByName(rows);
+      const named = sorted.filter((r) => !(r.kind === 'member' && r.deleted) && r.name.trim() !== '');
+      onChange(dir === 'asc' ? sorted : [...named.reverse(), ...sorted.slice(named.length)]);
+    } else {
+      const c = columns[sortBy];
+      onChange(sortRowsBy(rows, (r, i) => sortValue(c, r, i), dir));
+    }
+  }
+  const onlyMembers = groups.every((g) => g === 'members');
 
   return (
     <section className="card form">
       <h3>Zeilen</h3>
       <p className="muted small">
-        {rows.length} {rows.length === 1 ? 'Zeile' : 'Zeilen'}, davon {members} {members === 1 ? 'Mitglied' : 'Mitglieder'}. „Mitglieder
-        aktualisieren“ legt Zeilen für alle Mitglieder an und löscht die von Konten, die es nicht mehr gibt oder die kein Mitglied mehr
-        sind; eigene Zeilen bleiben.
+        {rows.length} {rows.length === 1 ? 'Zeile' : 'Zeilen'}, davon {members}{' '}
+        {onlyMembers ? (members === 1 ? 'Mitglied' : 'Mitglieder') : members === 1 ? 'Person aus der App' : 'Personen aus der App'}.
+        „Mitglieder aktualisieren“ legt Zeilen für alle an, die in die Liste gehören, und löscht die von Konten, die es nicht mehr gibt oder
+        die nicht mehr dazugehören; eigene Zeilen bleiben.
       </p>
+      {groupOptions.length > 1 && (
+        <fieldset className="list-groups">
+          <legend>In die Liste kommen</legend>
+          {groupOptions.map((o) => {
+            const checked = groups.includes(o.key);
+            return (
+              <label key={o.key} className="toggle">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  // Mindestens eine Gruppe bleibt gewählt
+                  disabled={checked && groups.length === 1}
+                  onChange={(e) =>
+                    onGroups(groupOptions.map((g) => g.key).filter((k) => (k === o.key ? e.target.checked : groups.includes(k))))
+                  }
+                />
+                <span>{o.label}</span>
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
       {deleted > 0 && (
         <p className="form-error">
           {deleted === 1 ? 'Eine Zeile gehört' : `${deleted} Zeilen gehören`} zu einem gelöschten Konto. „Mitglieder aktualisieren“ entfernt
@@ -566,8 +684,28 @@ function RowEditor({
         <button type="button" className="btn btn-secondary" disabled={rows.length >= ROWS_MAX} onClick={() => addFree(5)}>
           + 5 leere Zeilen
         </button>
-        <button type="button" className="btn btn-secondary" disabled={rows.length < 2} onClick={() => onChange(sortRowsByName(rows))}>
-          Nach Namen sortieren
+      </div>
+      <div className="field-row list-sort">
+        <label className="field">
+          <span>Sortieren nach</span>
+          <select value={String(sortBy)} onChange={(e) => setBy(e.target.value === 'name' ? 'name' : Number(e.target.value))}>
+            <option value="name">Name (Nachname, Vorname)</option>
+            {sortable.map(({ c, i }) => (
+              <option key={i} value={i}>
+                {columnLabel(c) || FIELD_LABELS[c.field as ListField]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field narrow">
+          <span>Richtung</span>
+          <select value={dir} onChange={(e) => setDir(e.target.value as 'asc' | 'desc')}>
+            <option value="asc">aufsteigend</option>
+            <option value="desc">absteigend</option>
+          </select>
+        </label>
+        <button type="button" className="btn btn-secondary" disabled={rows.length < 2} onClick={applySort}>
+          Sortieren
         </button>
       </div>
 
@@ -835,6 +973,21 @@ function PrintSheet({ draft }: { draft: Draft }) {
         ) + CELL_EXTRA_PX
       : 0,
   );
+  // Breite „automatisch“: so breit wie der längste Inhalt oder die Überschrift (Kästchen: wie ein Zeichen in 13 pt)
+  const natural = cols.map((c) =>
+    c.width === 'auto'
+      ? Math.ceil(
+          Math.max(
+            textWidth(
+              draft.rows.map((r, i) => (c.kind === 'blank' ? '' : cellText(c, r, i))),
+              fonts.cell,
+            ),
+            textWidth([columnLabel(c)], fonts.head),
+            c.kind === 'blank' && c.checkbox ? 18 : 0,
+          ),
+        ) + CELL_EXTRA_PX
+      : null,
+  );
   // Spaltenbreiten in ganzen Pixeln: Der Browser rastet die senkrechten Rahmen auf ganze Pixel ein, die gekippten Felder
   // nicht; nur so beginnen die schrägen Linien genau über den senkrechten. Der gekippte Kopf der letzten gedrehten
   // Spalte ragt oben um die Höhe des Kopfs nach rechts hinaus: Reichen die Spalten dahinter dafür nicht, kommt eine leere
@@ -846,6 +999,7 @@ function PrintSheet({ draft }: { draft: Draft }) {
       cols.map((c) => WIDTH_WEIGHT[c.width]),
       minimums,
       Math.floor(pageWidth * PX_PER_MM) - sparePx,
+      natural,
     );
     const tail = widths.slice(lastRotated + 1).reduce((a, b) => a + b, 0);
     const spare = lastRotated < 0 ? 0 : Math.max(0, headPx - tail);
@@ -863,7 +1017,7 @@ function PrintSheet({ draft }: { draft: Draft }) {
       </header>
       <div className="list-sheet-meta">
         <span>{brand.name}</span>
-        <span>{[draft.date ? formatDate(draft.date) : null, `Stand: ${formatDate(todayYmd())}`].filter(Boolean).join(' · ')}</span>
+        <span>{metaText(draft)}</span>
       </div>
       <table className="list-table">
         <colgroup>

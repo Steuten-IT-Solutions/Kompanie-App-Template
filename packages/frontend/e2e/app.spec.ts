@@ -1760,6 +1760,31 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   expect(csv).toContain(';Mitglied1;;;\r\n');
   expect(csv).toContain('\r\nNachbarverein;Gast vom;;;\r\n');
 
+  // PDF direkt als Datei, ohne Druckdialog
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PDF herunterladen' }).click()]);
+  expect(pdf.suggestedFilename()).toBe(`${title}.pdf`);
+  const pdfData = readFileSync((await pdf.path())!);
+  expect(pdfData.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  expect(pdfData.toString('latin1')).toContain(`/Title (${title})`);
+  await expect(page.locator('.list-editor .form-error')).toHaveCount(0);
+
+  // Sortieren: nach Namen, nach einer Spalte (Vorname absteigend, Zeilen ohne Wert am Ende) und wieder nach Namen
+  const sortBy = async (label: string, dir: 'asc' | 'desc') => {
+    await page.getByLabel('Sortieren nach').selectOption({ label });
+    await page.getByLabel('Richtung').selectOption(dir);
+    await page.getByRole('button', { name: 'Sortieren', exact: true }).click();
+  };
+  const rowTexts = () => page.locator('.list-row').allInnerTexts();
+  await sortBy('Name (Nachname, Vorname)', 'asc');
+  const byName = await rowTexts();
+  await sortBy('Vorname', 'desc');
+  const firstNames = await preview.locator('tbody tr td:nth-child(2)').allInnerTexts();
+  const filled = firstNames.filter((n) => n.trim() !== '');
+  expect(filled).toEqual([...filled].sort((a, b) => b.localeCompare(a, 'de', { sensitivity: 'base', numeric: true })));
+  expect(firstNames.slice(filled.length).every((n) => n.trim() === '')).toBe(true);
+  await sortBy('Name (Nachname, Vorname)', 'asc');
+  expect(await rowTexts()).toEqual(byName);
+
   // Druck: nur die Liste, ohne Kopf- und Tab-Leiste der App
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('.list-print-root .list-table')).toBeVisible();

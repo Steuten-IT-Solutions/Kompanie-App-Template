@@ -285,7 +285,7 @@ final class ListServiceTest extends TestCase
         $byId = array_column($list['rows'], null, 'user_id');
         $this->assertEquals((object) [
             'name' => 'Anna Müller', 'first_name' => 'Anna', 'last_name' => 'Müller', 'role' => 'Mitglied, Punkte verwalten', 'rank' => 'Gefreiter',
-            'titles' => ['Ehrenmitglied'], 'birthday' => '09.03.', 'points' => 5, 'penalties' => 250,
+            'titles' => ['Ehrenmitglied'], 'birthday' => ['day' => 9, 'month' => 3, 'year' => 1990], 'points' => 5, 'penalties' => 250,
         ], $byId[$this->anna]['values']);
         $this->assertNull($byId[$this->bernd]['values']->birthday, 'nicht freigegeben');
         $this->assertSame([], $byId[$this->bernd]['values']->titles);
@@ -303,7 +303,8 @@ final class ListServiceTest extends TestCase
         $fields = array_column($mine['fields'], 'available', 'key');
         $this->assertSame(array_intersect_key($fields, array_column($mine['columns'], 'available', 'field')), array_column($mine['columns'], 'available', 'field'));
         $values = array_column($mine['rows'], null, 'user_id')[$this->anna]['values'];
-        $this->assertEquals((object) ['name' => 'Anna Müller', 'first_name' => 'Anna', 'last_name' => 'Müller', 'rank' => 'Gefreiter', 'titles' => ['Ehrenmitglied'], 'birthday' => '09.03.'], $values);
+        // Ohne view_personal nur Tag und Monat (das ganze Geburtsdatum anderer nur mit view_personal).
+        $this->assertEquals((object) ['name' => 'Anna Müller', 'first_name' => 'Anna', 'last_name' => 'Müller', 'rank' => 'Gefreiter', 'titles' => ['Ehrenmitglied'], 'birthday' => ['day' => 9, 'month' => 3, 'year' => null]], $values);
 
         // Ohne öffentliche Mitgliederliste: Dienstgrad und Titel nur für die, die sie pflegen. Bereich aus: Spalte leer.
         $this->app->features()->update(['directory' => false, 'birthdays' => false]);
@@ -353,5 +354,46 @@ final class ListServiceTest extends TestCase
         $this->app->features()->update(['lists' => false]);
         $res = $this->call('GET', '/lists');
         $this->assertSame([403, 'feature_disabled'], [$res->status, $res->data['code'] ?? null]);
+    }
+
+    /** Personen der Liste: Mitglieder und auf Wunsch Rollen ohne Mitgliederbereich (z. B. Anwärter), nie Gäste. */
+    public function testGroups(): void
+    {
+        $this->setUpApp();
+        $roles = $this->ok('POST', '/admin/roles', ['label' => 'Jugend', 'capabilities' => ['calendar']]);
+        $young = (string) array_column($roles, 'key', 'label')['Jugend'];
+        $this->ok('POST', '/admin/roles', ['label' => 'Vorstand', 'capabilities' => ['member']]);
+        $jo = $this->users->create('Jo', 'Jung', 'jo', 'jo@example.org', 'geheim123', $young);
+        $list = $this->ok('POST', '/lists', ['title' => 'Alle']);
+        $this->assertSame(['members'], $list['groups'], 'Vorgabe: nur Mitglieder');
+        $this->assertSame([['key' => 'members', 'label' => 'Mitglieder'], ['key' => $young, 'label' => 'Jugend']], $list['group_options'], 'ohne Gast und ohne Rollen mit Mitgliederbereich');
+        $this->assertNotContains($jo, array_column($this->ok('POST', "/lists/{$list['id']}/sync-members")['added'], 'user_id'));
+        $this->assertSame(400, $this->call('PUT', "/lists/{$list['id']}", ['title' => 'x', 'columns' => $list['columns'], 'rows' => [['kind' => 'member', 'user_id' => $jo]]])->status, 'nicht in der Liste vorgesehen');
+
+        $list = $this->save($list, ['groups' => [$young, 'members']]);
+        $this->assertSame(['members', $young], $list['groups'], 'in der Reihenfolge der Auswahl');
+        $done = $this->ok('POST', "/lists/{$list['id']}/sync-members", ['apply' => true]);
+        $this->assertSame(['Jo Jung', 'Lena Listig', 'Anna Müller', 'Bernd Özdemir', 'Ada Zander'], self::rows($done['list']));
+        $this->assertSame(['members', $young], $this->ok('POST', "/lists/{$list['id']}/copy")['groups'], 'Kopie mit denselben Personen');
+
+        // Nur die Jugend: Die Mitglieder fallen beim Aktualisieren heraus.
+        $list = $this->save($done['list'], ['groups' => [$young]]);
+        $done = $this->ok('POST', "/lists/{$list['id']}/sync-members", ['apply' => true]);
+        $this->assertSame(['Jo Jung'], self::rows($done['list']));
+
+        foreach ([[], ['guest'], [Roles::MEMBER], [Roles::ADMIN], ['unbekannt'], 'members'] as $i => $bad) {
+            $this->assertSame(400, $this->call('PUT', "/lists/{$list['id']}", ['title' => 'x', 'columns' => $list['columns'], 'rows' => [], 'groups' => $bad])->status, 'Fall ' . $i);
+        }
+        // Gespeicherte Gruppe, die es nicht mehr gibt: fällt weg; bleibt keine, gilt wie früher „Mitglieder“.
+        $this->app->db->execute("UPDATE {lists} SET people = 'weg' WHERE id = ?", [$list['id']]);
+        $this->assertSame(['members'], $this->ok('GET', "/lists/{$list['id']}")['groups']);
+    }
+
+    public function testAutoWidth(): void
+    {
+        $this->setUpApp();
+        $list = $this->ok('POST', '/lists', ['title' => 'Breiten']);
+        $list = $this->save($list, ['columns' => [['kind' => 'field', 'field' => 'name', 'width' => 'auto'], ['kind' => 'blank', 'width' => 'auto']]]);
+        $this->assertSame(['auto', 'auto'], array_column($list['columns'], 'width'));
     }
 }

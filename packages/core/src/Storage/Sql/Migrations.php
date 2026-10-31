@@ -1431,6 +1431,12 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {former_members} ADD COLUMN purged_at datetime DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {former_members} ADD COLUMN purged_at TEXT DEFAULT NULL'],
             ],
+            // Listen: wer mit „Mitglieder aktualisieren“ in die Liste kommt, durch Komma getrennt: members (alle mit
+            // Mitgliederbereich) und Schlüssel von Rollen ohne Mitgliederbereich (z. B. Anwärter). Leer: nur members.
+            37 => [
+                'mysql' => ["ALTER TABLE {lists} ADD COLUMN people varchar(255) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {lists} ADD COLUMN people TEXT NOT NULL DEFAULT ''"],
+            ],
         ];
     }
 
