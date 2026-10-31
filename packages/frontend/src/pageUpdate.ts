@@ -1,12 +1,12 @@
 import { config, takeTokens, type AppConfig } from './api';
 import { previewRole } from './preview';
-import { shouldReload } from './pageReload';
+import { recentReloads, shouldReload } from './pageReload';
 
 /**
  * Aktuelle App-Seite aus dem Hintergrund (public/sw.js, appPage): Der Service Worker zeigt beim Start sofort die
  * gespeicherte Seite und meldet danach, was an der aktuellen anders ist. Neue Tokens übernimmt die App still; hat sich
  * mehr geändert (Rechte, Bereiche, Version …), lädt sie einmal neu – nur kurz nach dem Start, damit niemand beim
- * Arbeiten unterbrochen wird (sonst gilt die neue Seite beim nächsten Öffnen), und höchstens einmal je Minute.
+ * Arbeiten unterbrochen wird (sonst gilt die neue Seite beim nächsten Öffnen), und höchstens dreimal je Minute.
  */
 export interface PageMessage {
   type: 'kompanie-page';
@@ -17,12 +17,12 @@ export interface PageMessage {
 
 const KEY = 'kompanie-seite-neu-geladen';
 
-function lastReload(): number | null {
+function reloadTimes(): number[] {
   try {
-    const v = Number(sessionStorage.getItem(KEY));
-    return v > 0 ? v : null;
+    const list: unknown = JSON.parse(sessionStorage.getItem(KEY) ?? '[]');
+    return Array.isArray(list) ? list.filter((t): t is number => typeof t === 'number') : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -31,9 +31,10 @@ export function handlePageMessage(data: unknown): void {
   if (!config || msg?.type !== 'kompanie-page') return;
   takeTokens(msg.csrf, msg.auth);
   const now = Date.now();
-  if (!shouldReload(msg, performance.now(), lastReload(), now, !!previewRole())) return;
+  const times = reloadTimes();
+  if (!shouldReload(msg, performance.now(), times, now, !!previewRole())) return;
   try {
-    sessionStorage.setItem(KEY, String(now));
+    sessionStorage.setItem(KEY, JSON.stringify([...recentReloads(times, now), now]));
   } catch {
     // Ohne sessionStorage nicht neu laden: sonst könnte es eine Schleife geben.
     return;
