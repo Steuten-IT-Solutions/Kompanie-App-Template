@@ -1562,7 +1562,8 @@ test('Querformat: Navigation links, Listen und Formulare zweispaltig, nichts scr
       return !!bar && bar.x === 0 && bar.width < 120 && bar.height > 300;
     })
     .toBe(true);
-  // Mitgliederliste in zwei Spalten
+  // Mitgliederliste in zwei Spalten (erst nach dem Gerüst: Es trägt dieselben Klassen und wird gleich ersetzt)
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   const rows = page.locator('.card-list .member-row');
   await expect(rows.nth(1)).toBeVisible();
   const [a, b] = [await rows.nth(0).boundingBox(), await rows.nth(1).boundingBox()];
