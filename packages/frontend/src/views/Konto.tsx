@@ -15,6 +15,7 @@ import { MemberAvatar } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
+import { sources } from '../viewData';
 
 const MIN_LENGTH = 8;
 
@@ -360,7 +361,7 @@ function MyDataCard() {
  * Passwort. Andere sehen sie nur mit dem Recht „Persönliche Angaben sehen“.
  */
 function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.ownAccount, [], 'me/account');
+  const { data, error, loading, reload, setData } = useAsync(sources.ownAccount.load, sources.ownAccount.deps, sources.ownAccount.key);
   const [editing, setEditing] = useState<OwnAccount | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);

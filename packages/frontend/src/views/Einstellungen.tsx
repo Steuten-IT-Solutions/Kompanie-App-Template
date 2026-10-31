@@ -24,6 +24,7 @@ import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
 import { formatBytes } from '../format';
+import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -88,19 +89,28 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
   // ein und schiebt die Zeilen darunter weg.
-  const { data, loading } = useAsync(() => api.settings(), [], 'settings');
-  if (loading && !data) return <Loading />;
+  const { data, loading } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
   const pages = PAGES.filter(
     (p) =>
       (p.id !== 'news' || !!data?.news) &&
       (p.id !== 'nutzung' || can('view_activity')) &&
       (p.id !== 'geburtstage' || !!config?.features.birthdays),
   );
+  usePrefetchMenu(
+    'einstellungen',
+    pages.map((p) => p.id),
+  );
+  if (loading && !data) return <Loading />;
   return (
     <ul className="card-list settings-overview">
       {pages.map((p) => (
         <li key={p.id}>
-          <button type="button" className="card row clickable settings-link" onClick={() => navigate(`einstellungen/${p.id}`)}>
+          <button
+            type="button"
+            className="card row clickable settings-link"
+            onClick={() => navigate(`einstellungen/${p.id}`)}
+            {...prefetchOnTap(...menuSources('einstellungen', p.id))}
+          >
             <span className="row-main">
               <span className="row-title">{p.title}</span>
               <span className="row-sub">{p.text}</span>
@@ -117,7 +127,7 @@ function Overview() {
 
 /** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
 function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData, revision } = useAsync(() => api.settings(), [], 'settings');
+  const { data, error, loading, reload, setData, revision } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;

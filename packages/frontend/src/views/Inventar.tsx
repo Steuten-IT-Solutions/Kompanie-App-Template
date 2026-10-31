@@ -4,6 +4,7 @@ import brand from '../generated/brand';
 import { formatShortTime } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 // Inventar (Issue #6): Liste nach Material gruppiert (Summe über alle Orte, je Einheit), aufklappbar zu den Einträgen je
 // Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Nur mit manage_inventory.
@@ -72,8 +73,8 @@ export default function Inventar({ path, onToast }: { path: string[]; onToast: (
 }
 
 function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
-  const list = useAsync(api.inventory, [], 'inventory');
-  const locations = useAsync(api.inventoryLocations, [], 'inventory-locations');
+  const list = useAsync(sources.inventory.load, sources.inventory.deps, sources.inventory.key);
+  const locations = useAsync(sources.inventoryLocations.load, sources.inventoryLocations.deps, sources.inventoryLocations.key);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());

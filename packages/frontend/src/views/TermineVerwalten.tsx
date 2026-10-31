@@ -3,6 +3,7 @@ import { api, config, type EventInput, type PublicEvent } from '../api';
 import { formatEventWhen } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 const EMPTY: EventInput = {
   title: '',
@@ -30,7 +31,7 @@ function toInput(ev: PublicEvent): EventInput {
 
 /** Admins pflegen hier die öffentliche Terminliste (App für Gäste und ggf. die Webseite). */
 export default function TermineVerwalten({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(api.events, [], 'events');
+  const { data, error, loading, reload } = useAsync(sources.events.load, sources.events.deps, sources.events.key);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const [form, setForm] = useState<EventInput>(EMPTY);
   const [busy, setBusy] = useState(false);

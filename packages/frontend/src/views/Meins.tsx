@@ -14,7 +14,7 @@ import { RankBadge } from '../RankBadge';
 import { formatBirthday, ownBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
-import { sources } from '../viewData';
+import { sources, usePrefetchMenu } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -52,6 +52,11 @@ export default function Meins({
     .map(([id, label]) => [id, label] as const);
   const parts = [...dataParts, ['konto', 'Konto'] as const];
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
+  // Die anderen Seiten von „Meins“ im Leerlauf vorab laden: Sie erscheinen dann schon beim ersten Öffnen ohne Warten.
+  usePrefetchMenu(
+    'meins',
+    parts.map(([id]) => id).filter((id) => id !== active),
+  );
   return (
     <div>
       {parts.length > 1 && (
