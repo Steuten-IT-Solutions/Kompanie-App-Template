@@ -274,12 +274,15 @@ test('Benachrichtigung führt zum Eintrag: Termin und Punkte (Issue #190)', asyn
 
   // Unbekannter Termin (gelöscht oder vorbei): einfach die Liste
   await page.goto('/app/#/termine/termin/gibtesnicht');
+  // Erst fertig geladen: Das Gerüst beim Laden hat dieselben Klassen (li.event, li.row), aber keine Kennung.
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   await expect(page.locator('li.event').first()).toBeVisible();
   await expect(page.locator('li.event.focused, li.event.open')).toHaveCount(0);
 
   // Punkte: meins/punkte/<id>
   await page.setViewportSize(devices['iPhone 13'].viewport);
   await page.goto('/app/#/meins/punkte');
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   const row = page.locator('.card-list > li.row').last();
   await expect(row).toBeVisible();
   const pointId = await row.getAttribute('data-focus-id');
@@ -4326,6 +4329,10 @@ test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), e
   // Ausgangslage: keine Signatur
   await openKonto(page);
   const signatureCard = page.locator('.signature-card');
+  // Erst wenn die Signatur geladen ist, steht fest, ob es eine gibt (sonst bliebe eine aus einem früheren Lauf stehen).
+  await expect(
+    signatureCard.getByRole('button', { name: 'Löschen' }).or(signatureCard.getByRole('button', { name: 'Signatur einrichten' })),
+  ).toBeVisible();
   if (await signatureCard.getByRole('button', { name: 'Löschen' }).count()) {
     await signatureCard.getByRole('button', { name: 'Löschen' }).click();
     await expect(signatureCard.getByRole('button', { name: 'Signatur einrichten' })).toBeVisible();
