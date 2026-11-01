@@ -18,7 +18,8 @@
  *   gespeichert (X-Kompanie-User, beim Speichern an der Antwort vermerkt), kommt sie sofort; die Antwort aus dem Netz
  *   holt der Service Worker im Hintergrund. So sieht nach einem Wechsel des Kontos niemand die Daten der Person davor.
  *   Ist die Antwort anders (oder ein Fehler), meldet er das den Fenstern der App ({type: 'kompanie-data', url}), die
- *   die Ansicht dann neu lädt: Dieses Neuladen (bis FRESH_MS danach) kommt aus dem Speicher, ohne zweite Anfrage; nach
+ *   die Ansicht dann neu lädt: Dieses Neuladen (bis FRESH_MS danach, nur in den gemeldeten Fenstern) kommt aus dem
+ *   Speicher, ohne zweite Anfrage; nach
  *   einem Fehler geht es direkt ans Netz, damit die App ihn sieht. Jede eigene Änderung (API-Anfrage außer GET; nicht
  *   die Abfrage des Push-Status beim Start) beendet das sofort, und was vor ihr gespeichert wurde, kommt erst wieder
  *   sofort, wenn es danach einmal aus dem Netz kam (Zeitpunkt der Änderung bleibt gespeichert, auch über ein Neuladen
@@ -69,7 +70,8 @@ const ASSETS = params.get('assets') || '';
 const NAVIGATION_TIMEOUT_MS = 2500;
 const DATA_MAX = 100;
 const FRESH_MS = 10000;
-/** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok }, für das Neuladen danach. */
+/** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok, clients }, für das Neuladen danach
+ * in den gemeldeten Fenstern. */
 const announced = new Map();
 /**
  * Laufende Abfragen im Hintergrund je Adresse: keine zweite gleichzeitig; wer währenddessen fragt, bekommt danach eine
@@ -521,9 +523,16 @@ async function staleWhileRevalidate(request, event) {
     found && user !== '' && found.headers.get(USER_HEADER) === user && Number(found.headers.get(STORED_AT_HEADER)) > (await lastChange())
       ? found
       : undefined;
+  // Nur das Fenster, das die Meldung bekommen hat, lädt danach aus dem Speicher, und nur einmal. Eine neu geladene Seite
+  // (anderes Fenster) fragt wie sonst im Hintergrund: Sonst bekäme sie bis FRESH_MS den Stand von vor einer Änderung,
+  // die erst nach der Meldung kam, falls die alte Seite die Meldung nicht mehr verarbeitet hat.
   const last = announced.get(key);
-  const recent = last && Date.now() - last.at < FRESH_MS;
-  if (recent) announced.delete(key); // nur für das eine Neuladen nach der Meldung
+  const client = event.clientId || '';
+  const recent = last && Date.now() - last.at < FRESH_MS && last.clients.has(client);
+  if (recent) {
+    last.clients.delete(client);
+    if (last.clients.size === 0) announced.delete(key);
+  }
   if (!stored || (recent && !last.ok)) return networkFirst(request, undefined, 0, event);
   if (recent) return stored;
   let running = revalidating.get(key);
@@ -570,8 +579,8 @@ async function revalidate(request, key, before) {
     await store(key, tagged(res, request, startedAt));
     if (text === before) return;
   }
-  announced.set(key, { at: Date.now(), ok });
   const windows = await self.clients.matchAll({ type: 'window' });
+  announced.set(key, { at: Date.now(), ok, clients: new Set(windows.map((w) => w.id || '')) });
   for (const w of windows) w.postMessage({ type: 'kompanie-data', url: key });
 }
 

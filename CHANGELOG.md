@@ -106,6 +106,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   manche Knöpfe und Schalter anders dar als die fertige Seite.
 - Direkt nach einer eigenen Änderung konnte eine Seite den Stand von vorher zeigen, wenn die App ihre Daten gerade im
   Hintergrund lud und die Antwort erst nach der Änderung ankam. Solche Antworten gelten jetzt als veraltet.
+- **Neu laden zeigt Änderungen anderer**: Hatte jemand anderes gerade etwas geändert (z. B. eine Nachricht am Brett)
+  und lud man die Seite kurz nach einer vorigen Aktualisierung neu, blieb bis zu zehn Sekunden der alte Stand stehen.
+  Die App fragt jetzt auch dann im Hintergrund nach und zeigt die Änderung.
 - **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der
   Seite in die Breite gezogen. Es erscheint jetzt im richtigen Seitenverhältnis, wie in der Kopfzeile.
 - **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch

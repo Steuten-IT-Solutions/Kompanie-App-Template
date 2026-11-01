@@ -67,7 +67,15 @@ function response(body, type = 'application/javascript', status = 200) {
  * Lädt sw.js mit eingesetzter Liste (wie der Build) und gibt Hilfen zum Auslösen der Ereignisse zurück.
  * `net` beantwortet fetch(): Adresse → Antwort; fehlt sie, gibt es einen Netzfehler.
  */
-function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheStorage(), now = () => 0, clientIds = [] } = {}) {
+function load({
+  build = 'b2',
+  precache = [],
+  net = {},
+  storage = new FakeCacheStorage(),
+  now = () => 0,
+  clientIds = [],
+  windowId = '',
+} = {}) {
   const listeners = {};
   const fetched = [];
   /** Optionen des letzten fetch() je Adresse (z. B. cache). */
@@ -83,7 +91,7 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
     registration: { scope: SCOPE },
     clients: {
       claim: async () => undefined,
-      matchAll: async () => [{ postMessage: (m) => messages.push(m) }],
+      matchAll: async () => [{ id: windowId, postMessage: (m) => messages.push(m) }],
       // Fenster mit Kennung (neu geöffnete App-Seite): Nachrichten mit Empfänger
       get: async (id) => (clientIds.includes(id) ? { postMessage: (m) => messages.push({ to: id, ...m }) } : undefined),
     },
@@ -126,11 +134,18 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   }
 
   /** fetch-Ereignis; gibt die Antwort des Service Workers zurück (undefined: durchgereicht). */
-  async function request(u, mode = 'cors', headers = {}, method = 'GET', { referrer = '', resultingClientId = '' } = {}) {
+  async function request(
+    u,
+    mode = 'cors',
+    headers = {},
+    method = 'GET',
+    { referrer = '', resultingClientId = '', clientId = windowId } = {},
+  ) {
     let answer;
     const waits = [];
     listeners.fetch({
       request: { url: u, method, mode, headers: new Headers(headers), referrer },
+      clientId,
       resultingClientId,
       respondWith: (p) => (answer = p),
       waitUntil: (p) => waits.push(p),
@@ -141,11 +156,18 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   }
 
   /** Wie request, aber die Antwort für sich: { answer, done } (done: auch alles im Hintergrund erledigt). */
-  function requestSplit(u, mode = 'cors', headers = {}, method = 'GET', { referrer = '', resultingClientId = '' } = {}) {
+  function requestSplit(
+    u,
+    mode = 'cors',
+    headers = {},
+    method = 'GET',
+    { referrer = '', resultingClientId = '', clientId = windowId } = {},
+  ) {
     let answer;
     const waits = [];
     listeners.fetch({
       request: { url: u, method, mode, headers: new Headers(headers), referrer },
+      clientId,
       resultingClientId,
       respondWith: (p) => (answer = p),
       waitUntil: (p) => waits.push(p),
@@ -372,6 +394,27 @@ test('Mit X-Kompanie-Stale-Ok: Läuft die Abfrage im Hintergrund schon, fragt er
   assert.equal(sw.fetched.length, 3, 'danach noch einmal aus dem Netz');
   assert.equal(JSON.stringify(sw.messages), JSON.stringify([{ type: 'kompanie-data', url: `${API}board` }]));
   assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK)).text(), '["neu"]');
+});
+
+test('Mit X-Kompanie-Stale-Ok: Nach der Meldung fragt eine neu geladene Seite wieder im Hintergrund', async () => {
+  let t = 0;
+  const net = { [`${API}board`]: json('["a"]') };
+  const sw = load({ net, now: () => t, windowId: 'alt' });
+  await sw.request(`${API}board`, 'cors', STALE_OK);
+  // Geändert, die alte Seite bekommt die Meldung …
+  net[`${API}board`] = json('["b"]');
+  t = 20_000;
+  await sw.request(`${API}board`, 'cors', STALE_OK);
+  assert.equal(sw.messages.length, 1);
+  assert.equal(sw.fetched.length, 2);
+  // … wird aber neu geladen, bevor sie neu fragt; inzwischen wurde wieder geändert. Die neue Seite bekommt den
+  // gespeicherten Stand und fragt im Hintergrund, statt bis FRESH_MS beim Stand der Meldung zu bleiben.
+  net[`${API}board`] = json('["c"]');
+  t = 21_000;
+  assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK, 'GET', { clientId: 'neu' })).text(), '["b"]');
+  assert.equal(sw.fetched.length, 3, 'im Hintergrund aus dem Netz');
+  assert.equal(sw.messages.length, 2);
+  assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK, 'GET', { clientId: 'neu' })).text(), '["c"]');
 });
 
 test('Mit X-Kompanie-Stale-Ok: Fehler im Hintergrund wird gemeldet, dann aus dem Netz; ohne Netz bleibt der Stand', async () => {
