@@ -39,6 +39,7 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 
 ## Gut zu wissen
 - Neue Bilder bereitet die App beim ersten Öffnen auf. Bis dahin erscheint manchmal kurz ein grauer Platzhalter; die App lädt das Bild dann von selbst nach.
+- Solange ein Bild noch lädt oder aufbereitet wird, dreht sich darin ein Ring.
 - Bilder mit Schloss 🔒, die du einmal angesehen hast, speichert die App auf deinem Gerät: Beim nächsten Mal erscheinen sie sofort, auch ohne Internet. Beim Abmelden löscht die App sie wieder.
 - Videos kommen beim Abspielen direkt aus Google Drive. Mit langsamer Verbindung dauert der Start einen Moment.
 - Steht dort „Dieses Video kann dein Browser nicht abspielen.“, ist das Video in einem Format gespeichert, das dein Gerät nicht kennt. Auf einem anderen Gerät oder Browser klappt es oft.
