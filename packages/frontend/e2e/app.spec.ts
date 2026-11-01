@@ -3097,7 +3097,10 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await expect.poll(async () => (await cachedUrls()).some((u) => u.startsWith(decodeURIComponent(apiBase)))).toBe(true);
   expect((await cachedUrls()).filter((u) => u.includes('/admin/') || /[/=]sicherung\/?$/.test(u))).toEqual([]);
   // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
+  // Neu geladen: Die Seite fragt den Server (Verwaltung kommt nie aus dem Speicher des Service Workers), nicht den
+  // Stand im Speicher der App von vor dem Herunterladen.
   await page.goto('/app/#/einstellungen/zustand');
+  await page.reload();
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
 });
@@ -4255,7 +4258,8 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');
   await page.reload();
-  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible();
+  // Unter WordPress in der CI dauert die Antwort aus dem Netz im Hintergrund teils länger als 5 s.
+  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible({ timeout: 15_000 });
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await banner.getByRole('button', { name: '+1 weitere' }).click();
   await expect(banner).toContainText(`${first} – fällt aus`);
