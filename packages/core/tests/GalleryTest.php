@@ -727,7 +727,7 @@ final class GalleryTest extends TestCase
         });
         $this->assertSame([true, [0, 2499, 5000], 2500, 3], [$complete, $start, strlen($out), $http->chunks], 'nach dem dritten Stück Schluss');
         $this->expectException(\RuntimeException::class);
-        $app->drive()->streamRange('F', 10, 20, static fn (): null => null, static fn (): bool => true); // 200 mitten in der Datei
+        $app->drive()->streamRange('F', 10, 20, static function (): void {}, static fn (): bool => true); // 200 mitten in der Datei
     }
 
     /** Update einer bestehenden Datenbank (SQLite und MySQL): vorhandene Bilder bleiben Bilder, Videos kommen dazu. */
