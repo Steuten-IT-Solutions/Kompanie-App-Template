@@ -2747,14 +2747,14 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
 });
 
 /**
- * In der Großansicht der Galerie waagerecht über die Mitte wischen (Touch über CDP, wie ein Finger). hold: Finger liegen
- * lassen; release() hebt ihn ab.
+ * In der Großansicht der Galerie waagerecht wischen (Touch über CDP, wie ein Finger), um die Mitte des Bildschirms oder
+ * um die Stelle at. hold: Finger liegen lassen; release() hebt ihn ab.
  */
-async function lightboxSwipe(page: Page, dx: number, hold = false) {
+async function lightboxSwipe(page: Page, dx: number, hold = false, at?: { x: number; y: number }) {
   const cdp = await page.context().newCDPSession(page);
   const { width, height } = page.viewportSize()!;
-  const x = width / 2 - dx / 2;
-  const y = height / 2;
+  const x = (at?.x ?? width / 2) - dx / 2;
+  const y = at?.y ?? height / 2;
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
   for (const f of [0.25, 0.5, 0.75, 1]) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * f, y }] });
@@ -2947,7 +2947,27 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   expect(res.headers()['content-range']).toMatch(/^bytes 0-\d+\/\d+$/);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(1);
   expect(await video.evaluate((v: HTMLVideoElement) => Math.round(v.duration))).toBe(2);
-  // Blättern zum Bild: das Video verschwindet.
+  // Tippen auf das Bild des Videos spielt ab und hält an.
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  // In der Leiste unten bedient Wischen den Player, auf dem Video blättert es (wie bei Bildern, mit dem Bild daneben).
+  // Das Testvideo ist klein (160 × 90): kurze Wege, die auf dem Video bleiben.
+  const box = (await video.boundingBox())!;
+  const mid = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await lightboxSwipe(page, -120, false, { x: mid.x, y: box.y + box.height - 8 });
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
+  await expect(video).toHaveCount(1);
+  const drag = await lightboxSwipe(page, -30, true, mid);
+  await expect(page.locator('.lb-peek-next img')).toBeVisible();
+  await drag.release();
+  await lightboxSwipe(page, -120, false, mid);
+  await expect(page.locator('.lightbox video')).toHaveCount(0);
+  await expect(page.locator('.lb-track > img')).toBeVisible();
+  // Zurück zum Video und mit der Pfeiltaste wieder zum Bild
+  await lightboxSwipe(page, 200);
+  await expect(page.locator('.lightbox video')).toHaveCount(1);
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lightbox video')).toHaveCount(0);
   await expect(page.locator('.lb-track > img')).toBeVisible();
