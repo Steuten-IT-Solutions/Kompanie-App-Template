@@ -70,7 +70,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   kleiner Ring (in der Übersicht, im Album und in der Großansicht). Ist das Bild schon auf dem Gerät, erscheint er nicht.
 - **Wischen in der Großansicht der Galerie**: Beim Wischen folgt das Bild dem Finger, daneben steht schon das nächste
   bzw. vorherige, und beim Loslassen gleitet es weiter, wie auf den Seiten der Mitglieder. Zu kurz gezogen schnappt es
-  zurück. Auch **‹**, **›** und die Pfeiltasten blättern mit dieser Bewegung.
+  zurück. Auch **‹**, **›** und die Pfeiltasten blättern mit dieser Bewegung. Das gilt auch auf Videos; nur in den
+  Leisten des Players (Zeitleiste, Ton, Vollbild) bedient Wischen weiter das Video. Tippen auf das Video spielt es ab
+  bzw. hält es an.
 - **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
   ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
   Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso

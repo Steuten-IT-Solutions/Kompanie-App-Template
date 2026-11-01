@@ -30,7 +30,7 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 ### Ein Video abspielen
 1. Tippe auf ein Vorschaubild mit ▶. Das Video öffnet sich groß.
 2. Tippe auf ▶ im Video, um es abzuspielen. Mit der Leiste darunter spulst du vor und zurück, schaltest den Ton ein oder aus und wechselst ins Vollbild.
-3. Zum nächsten oder vorherigen Bild tippst du auf **›** bzw. **‹** (Wischen auf dem Video bedient das Video). **✕** schließt es.
+3. Zum nächsten oder vorherigen Bild wischst du über das Video zur Seite oder tippst auf **›** bzw. **‹**. In den Leisten des Videos (oben und unten) bedient Wischen das Video, z. B. zum Spulen. **✕** schließt es.
 
 ### Ein Bild vergrößern
 1. Zieh das Bild mit zwei Fingern auseinander (bis zu vierfach) oder tippe doppelt darauf (zweifach).

@@ -1816,7 +1816,16 @@ code {
 .lightbox img.zoomed {
   transition: none;
 }
-/* Videos (Issue #182): Player des Browsers; Wischen darauf bedient den Player, nicht das Blättern (Galerie.tsx) */
+/* Videos (Issue #182): Player des Browsers; Wischen auf dem Bild des Videos blättert (.lb-video-hit), in den Leisten
+   bedient es den Player */
+.lb-video {
+  position: relative;
+  display: flex;
+}
+.lb-video-hit {
+  position: absolute;
+  inset: min(48px, 25%) 0 min(64px, 33%) 0;
+}
 .lightbox video {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
   max-height: calc(80vh / var(--kompanie-zoom, 1));

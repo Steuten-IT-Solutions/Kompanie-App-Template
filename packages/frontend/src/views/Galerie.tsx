@@ -247,7 +247,7 @@ function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
  * vorherige und nächste, beim Loslassen gleitet es weiter oder zurück (wie in der Mitgliederansicht, swipe.ts). Zoomen mit zwei Fingern (bis 4-fach) oder doppeltem Tippen;
  * vergrößert verschiebt ein Finger das Bild statt zu blättern. Zuerst erscheint die 1600er-Fassung, die
  * Originalauflösung wird nachgeladen und ersetzt sie, sobald sie ganz da ist. Videos spielt der Player des Browsers ab
- * (ohne Zoom; Wischen auf dem Video bedient den Player, daneben und mit den Pfeilen wird geblättert).
+ * (ohne Zoom; auf dem Bild des Videos wird geblättert, in den Leisten des Players bedient der Finger das Video).
  */
 function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: number; onClose: (last: number) => void }) {
   const [i, setI] = useState(start);
@@ -377,6 +377,13 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   }, [i, photos, originals]);
 
   const p = photos[i];
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => {});
+    else v.pause();
+  };
   // Nachbarn neben dem Bild, solange gewischt wird oder es weitergleitet; Videos mit ihrem Vorschaubild.
   const peek = (n: number, side: 'prev' | 'next') => {
     if (!swipe.peeking || !many) return null;
@@ -407,15 +414,20 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
             <p className="lb-error">Dieses Video kann dein Browser nicht abspielen.</p>
           ) : (
             // key: Beim Blättern hält das alte Video an, das neue lädt von vorn.
-            <video
-              key={p.id}
-              src={p.video}
-              poster={p.large || undefined}
-              controls
-              playsInline
-              preload="metadata"
-              onError={() => setUnplayable(p.id)}
-            />
+            <div className="lb-video" key={p.id}>
+              <video
+                ref={videoRef}
+                src={p.video}
+                poster={p.large || undefined}
+                controls
+                playsInline
+                preload="metadata"
+                onError={() => setUnplayable(p.id)}
+              />
+              {/* Fläche über dem Bild des Videos (nicht über den Leisten oben und unten): Der Player des Browsers gibt
+                  das Aufsetzen des Fingers nicht an die Seite weiter (so in Chromium), hier kommt es zum Wischen an. Tippen spielt ab bzw. hält an. */}
+              <div className="lb-video-hit" aria-hidden="true" onClick={togglePlay} />
+            </div>
           )
         ) : (
           <LoadingImage
