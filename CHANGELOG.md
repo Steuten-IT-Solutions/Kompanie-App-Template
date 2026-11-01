@@ -68,6 +68,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Vorschaubilder schon vorab. Unter WordPress antwortet die App auf Bildabrufe, bevor Theme und andere Plugins starten.
 - **Ladeanzeige in Galeriebildern**: Solange ein Bild der Galerie noch lädt oder aufbereitet wird, dreht sich darin ein
   kleiner Ring (in der Übersicht, im Album und in der Großansicht). Ist das Bild schon auf dem Gerät, erscheint er nicht.
+- **Wischen in der Großansicht der Galerie**: Beim Wischen folgt das Bild dem Finger, daneben steht schon das nächste
+  bzw. vorherige, und beim Loslassen gleitet es weiter, wie auf den Seiten der Mitglieder. Zu kurz gezogen schnappt es
+  zurück. Auch **‹**, **›** und die Pfeiltasten blättern mit dieser Bewegung.
 - **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
   ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
   Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso

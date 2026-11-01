@@ -2,6 +2,7 @@ import { useCallback, type CSSProperties, useEffect, useLayoutEffect, useRef, us
 import { type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
 
 export default function Galerie({ albumId }: { albumId?: number }) {
@@ -242,7 +243,8 @@ function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
 }
 
 /**
- * Vollbild-Ansicht mit Wischen, Pfeiltasten und Escape. Zoomen mit zwei Fingern (bis 4-fach) oder doppeltem Tippen;
+ * Vollbild-Ansicht mit Wischen, Pfeiltasten und Escape. Beim Wischen folgt das Bild dem Finger, daneben stehen das
+ * vorherige und nächste, beim Loslassen gleitet es weiter oder zurück (wie in der Mitgliederansicht, swipe.ts). Zoomen mit zwei Fingern (bis 4-fach) oder doppeltem Tippen;
  * vergrößert verschiebt ein Finger das Bild statt zu blättern. Zuerst erscheint die 1600er-Fassung, die
  * Originalauflösung wird nachgeladen und ersetzt sie, sobald sie ganz da ist. Videos spielt der Player des Browsers ab
  * (ohne Zoom; Wischen auf dem Video bedient den Player, daneben und mit den Pfeilen wird geblättert).
@@ -269,7 +271,7 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     return () => window.removeEventListener('popstate', onPop);
   }, [onClose]);
   const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
-  const gesture = useRef<{ kind: 'swipe' | 'pan' | 'pinch'; x: number; y: number; start: Zoom; dist?: number } | null>(null);
+  const gesture = useRef<{ kind: 'tap' | 'pan' | 'pinch'; x: number; y: number; start: Zoom; dist?: number } | null>(null);
   const lastTap = useRef(0);
   const closeRef = useRef<HTMLButtonElement>(null);
   // IDs der Bilder, deren Originalauflösung schon geladen ist (dann aus dem Speicher des Browsers).
@@ -283,6 +285,13 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     },
     [photos.length],
   );
+  const root = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const many = photos.length > 1;
+  // Vergrößert verschiebt ein Finger das Bild, statt zu blättern.
+  const swipe = useSwipeDrag(root, track, { canPrev: many, canNext: many, onCommit: go, enabled: zoom.scale === 1, inPlace: true });
+  const slide = useRef(swipe.slide);
+  slide.current = swipe.slide;
 
   function onTouchStart(e: TouchEvent) {
     if (e.target instanceof HTMLVideoElement) {
@@ -294,7 +303,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       gesture.current = { kind: 'pinch', x: p.cx, y: p.cy, start: zoom, dist: p.dist };
     } else if (e.touches.length === 1) {
       const t = e.touches[0];
-      gesture.current = { kind: zoom.scale > 1 ? 'pan' : 'swipe', x: t.clientX, y: t.clientY, start: zoom };
+      // Unvergrößert blättert useSwipeDrag; hier zählt nur noch das Tippen.
+      gesture.current = { kind: zoom.scale > 1 ? 'pan' : 'tap', x: t.clientX, y: t.clientY, start: zoom };
     }
   }
 
@@ -317,7 +327,6 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     gesture.current = null;
     const t = e.changedTouches[0];
     const moved = Math.hypot(t.clientX - g.x, t.clientY - g.y);
-    if (g.kind === 'swipe' && Math.abs(t.clientX - g.x) > 40) return go(t.clientX < g.x ? 1 : -1);
     // Doppeltes Tippen: zweifach vergrößern bzw. zurück (nicht bei Videos)
     if (g.kind !== 'pinch' && moved < 10 && !isVideo(photos[i])) {
       const now = Date.now();
@@ -334,8 +343,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       if (e.key === 'Escape') close();
       // Im Video (Fokus auf dem Player) spulen die Pfeile, statt zu blättern.
       if (e.target instanceof HTMLVideoElement) return;
-      if (e.key === 'ArrowLeft') go(-1);
-      if (e.key === 'ArrowRight') go(1);
+      if (e.key === 'ArrowLeft') slide.current(-1);
+      if (e.key === 'ArrowRight') slide.current(1);
     };
     document.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
@@ -344,7 +353,7 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
     };
-  }, [go, close]);
+  }, [close]);
 
   // Vorheriges und nächstes Bild schon laden, damit das Wischen ohne Wartezeit klappt.
   useEffect(() => {
@@ -368,49 +377,64 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   }, [i, photos, originals]);
 
   const p = photos[i];
+  // Nachbarn neben dem Bild, solange gewischt wird oder es weitergleitet; Videos mit ihrem Vorschaubild.
+  const peek = (n: number, side: 'prev' | 'next') => {
+    if (!swipe.peeking || !many) return null;
+    const q = photos[(n + photos.length) % photos.length];
+    return (
+      <div className={`lb-peek lb-peek-${side}`} aria-hidden="true">
+        {q.large && <LoadingImage key={q.id} src={q.large} />}
+      </div>
+    );
+  };
   return (
     <div
       className="lightbox"
       role="dialog"
       aria-modal="true"
       aria-label={`Bild ${i + 1} von ${photos.length}`}
-      onClick={(e) => e.target === e.currentTarget && zoom.scale === 1 && close()}
+      ref={root}
+      onClick={(e) => (e.target === e.currentTarget || e.target === track.current) && zoom.scale === 1 && close()}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {isVideo(p) ? (
-        unplayable === p.id ? (
-          <p className="lb-error">Dieses Video kann dein Browser nicht abspielen.</p>
+      <div className={`lb-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
+        {peek(i - 1, 'prev')}
+        {peek(i + 1, 'next')}
+        {isVideo(p) ? (
+          unplayable === p.id ? (
+            <p className="lb-error">Dieses Video kann dein Browser nicht abspielen.</p>
+          ) : (
+            // key: Beim Blättern hält das alte Video an, das neue lädt von vorn.
+            <video
+              key={p.id}
+              src={p.video}
+              poster={p.large || undefined}
+              controls
+              playsInline
+              preload="metadata"
+              onError={() => setUnplayable(p.id)}
+            />
+          )
         ) : (
-          // key: Beim Blättern hält das alte Video an, das neue lädt von vorn.
-          <video
+          <LoadingImage
             key={p.id}
-            src={p.video}
-            poster={p.large || undefined}
-            controls
-            playsInline
-            preload="metadata"
-            onError={() => setUnplayable(p.id)}
+            src={p.original && originals.has(p.id) ? p.original : p.large}
+            className={zoom.scale > 1 ? 'zoomed' : undefined}
+            style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
           />
-        )
-      ) : (
-        <LoadingImage
-          key={p.id}
-          src={p.original && originals.has(p.id) ? p.original : p.large}
-          className={zoom.scale > 1 ? 'zoomed' : undefined}
-          style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
-        />
-      )}
+        )}
+      </div>
       <button ref={closeRef} className="lb-btn lb-close" onClick={close} aria-label="Schließen">
         ✕
       </button>
-      {photos.length > 1 && (
+      {many && (
         <>
-          <button className="lb-btn lb-prev" onClick={() => go(-1)} aria-label="Vorheriges">
+          <button className="lb-btn lb-prev" onClick={() => swipe.slide(-1)} aria-label="Vorheriges">
             ‹
           </button>
-          <button className="lb-btn lb-next" onClick={() => go(1)} aria-label="Nächstes">
+          <button className="lb-btn lb-next" onClick={() => swipe.slide(1)} aria-label="Nächstes">
             ›
           </button>
         </>

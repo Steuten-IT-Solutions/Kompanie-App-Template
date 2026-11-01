@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { flushSync } from 'react-dom';
 
 /** Mindestweg in Pixeln, ab dem eine Wischbewegung blättert. */
 const MIN_DISTANCE = 60;
@@ -119,15 +120,20 @@ function ownsGesture(target: EventTarget | null, root: Element): boolean {
   if (target !== root && target.contains(root)) return false;
   if (!root.contains(target)) return true;
   for (let el = target instanceof Element ? target : null; el && el !== root; el = el.parentElement) {
-    if (el.matches('input, textarea, select, [contenteditable], .drag-handle')) return true;
+    // Videos bedienen mit dem Finger ihren Player (Großansicht der Galerie).
+    if (el.matches('input, textarea, select, [contenteditable], .drag-handle, video')) return true;
     const overflow = getComputedStyle(el).overflowX;
     if ((overflow === 'auto' || overflow === 'scroll') && el.scrollWidth > el.clientWidth) return true;
   }
   return false;
 }
 
-/** Längste Dauer der Animation (CSS .member-track), falls transitionend ausbleibt. */
+/** Längste Dauer der Animation (CSS .member-track, .lb-track), falls transitionend ausbleibt. */
 const SLIDE_TIMEOUT = 400;
+
+function reducedMotion(): boolean {
+  return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
 
 /** Ansicht, auf der gerade gewischt werden kann (es gibt höchstens eine). */
 let activeRoot: HTMLElement | null = null;
@@ -176,21 +182,33 @@ function trackFingers(): void {
  * Beim Loslassen gleitet die Spur zum Nachbarn und ruft dann onCommit auf (die Ansicht wechselt zum Nachbarn, der
  * genau an dieser Stelle erscheint), oder schnappt zurück. slide() macht dasselbe für die Pfeile. Der Versatz wird
  * direkt am Element gesetzt, nicht über React, damit das Ziehen nicht bei jeder Bewegung neu rendert.
+ * enabled: false nimmt keine neuen Gesten an (z. B. vergrößertes Bild, dort verschiebt der Finger das Bild).
+ * inPlace: Die Ansicht bleibt stehen und zeigt nach onCommit selbst den Nachbarn (Großansicht der Galerie). Dann
+ * rendert sie gleich mit dem neuen Eintrag, und die Spur steht ohne Animation wieder in der Mitte, bevor der Browser
+ * zeichnet; sonst (Mitglieder) ersetzt die Ansicht des Nachbarn diese.
  */
 export function useSwipeDrag(
   root: RefObject<HTMLElement>,
   track: RefObject<HTMLElement>,
-  { canPrev, canNext, onCommit }: { canPrev: boolean; canNext: boolean; onCommit: (step: -1 | 1) => void },
+  {
+    canPrev,
+    canNext,
+    onCommit,
+    enabled = true,
+    inPlace = false,
+  }: { canPrev: boolean; canNext: boolean; onCommit: (step: -1 | 1) => void; enabled?: boolean; inPlace?: boolean },
 ) {
   const [peeking, setPeeking] = useState(false);
   const gesture = useRef<{ x: number; y: number; lock: 'x' | null; dx: number; lastX: number; lastT: number; v: number } | null>(null);
   // Während die Spur gleitet, zählen weder Gesten noch Pfeile (sonst doppelte Sprünge).
   const busy = useRef(false);
   const pendingSlide = useRef<-1 | 1 | null>(null);
+  // inPlace: Pfeil, während die Spur noch gleitet (z. B. zweimal schnell gedrückt); er blättert gleich danach weiter.
+  const queuedSlide = useRef<-1 | 1 | null>(null);
   // Zählt Bewegungen der Spur: Endet ein Zurückschnappen erst, wenn schon wieder gezogen wird, bleiben die Nachbarn.
   const moves = useRef(0);
-  const latest = useRef({ canPrev, canNext, onCommit });
-  latest.current = { canPrev, canNext, onCommit };
+  const latest = useRef({ canPrev, canNext, onCommit, enabled, inPlace });
+  latest.current = { canPrev, canNext, onCommit, enabled, inPlace };
 
   function setOffset(px: number, animate: boolean) {
     const el = track.current;
@@ -225,7 +243,7 @@ export function useSwipeDrag(
   function settle(step: -1 | 0 | 1) {
     const el = track.current;
     if (!el) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const reduced = reducedMotion();
     if (step === 0) {
       // Zurückschnappen hält nichts auf: Ein neuer Finger darf die Karte gleich wieder greifen.
       setOffset(0, true);
@@ -236,6 +254,22 @@ export function useSwipeDrag(
     busy.current = true;
     moves.current++;
     const commit = () => {
+      if (latest.current.inPlace) {
+        flushSync(() => {
+          latest.current.onCommit(step);
+          setPeeking(false);
+        });
+        busy.current = false;
+        setOffset(0, false);
+        const queued = queuedSlide.current;
+        queuedSlide.current = null;
+        if (queued !== null && (queued === 1 ? latest.current.canNext : latest.current.canPrev)) {
+          busy.current = true;
+          pendingSlide.current = queued;
+          showPeeks();
+        }
+        return;
+      }
       latest.current.onCommit(step);
       // Die Ansicht des Nachbarn ersetzt diese gleich; bleibt sie doch stehen, die Karte wieder zeigen.
       setTimeout(() => {
@@ -260,7 +294,13 @@ export function useSwipeDrag(
   }, [peeking]);
 
   function slide(step: -1 | 1) {
-    if (busy.current || (step === 1 ? !canNext : !canPrev)) return;
+    if (step === 1 ? !canNext : !canPrev) return;
+    if (busy.current) {
+      if (inPlace) queuedSlide.current = step;
+      return;
+    }
+    // Ohne Animation wechselt die Ansicht an Ort und Stelle gleich (nicht erst im Effekt, dort ginge flushSync nicht).
+    if (inPlace && reducedMotion()) return onCommit(step);
     busy.current = true;
     pendingSlide.current = step;
     if (peeking) settle(step);
@@ -271,7 +311,7 @@ export function useSwipeDrag(
   // Ansicht, die ihn dann übernimmt).
   function grab(e: PointerEvent) {
     gesture.current =
-      finger?.id === e.pointerId && finger.eligible && !busy.current && root.current
+      finger?.id === e.pointerId && finger.eligible && !busy.current && latest.current.enabled && root.current
         ? { x: e.clientX, y: e.clientY, lock: null, dx: 0, lastX: e.clientX, lastT: e.timeStamp, v: 0 }
         : null;
   }

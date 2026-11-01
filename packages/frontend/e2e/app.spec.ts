@@ -2746,6 +2746,27 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
   await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 });
 
+/**
+ * In der Großansicht der Galerie waagerecht über die Mitte wischen (Touch über CDP, wie ein Finger). hold: Finger liegen
+ * lassen; release() hebt ihn ab.
+ */
+async function lightboxSwipe(page: Page, dx: number, hold = false) {
+  const cdp = await page.context().newCDPSession(page);
+  const { width, height } = page.viewportSize()!;
+  const x = width / 2 - dx / 2;
+  const y = height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * f, y }] });
+  }
+  const release = async () => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+  };
+  if (!hold) await release();
+  return { release };
+}
+
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/galerie');
@@ -2755,6 +2776,19 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await expect(page.locator('.photo')).toHaveCount(2);
   await expect(page.locator('.photo[data-intern]')).toHaveCount(0);
   await page.locator('.photo').first().click();
+  await expect(page.locator('.lb-count')).toHaveText('1 / 2');
+  // Wischen: Das Bild folgt dem Finger, daneben steht schon das nächste; zu kurz gezogen schnappt es zurück.
+  const lb = await lightboxSwipe(page, -30, true);
+  await expect(page.locator('.lb-peek-next img')).toBeVisible();
+  expect(await page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('translateX(-30px)');
+  await lb.release();
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
+  await expect(page.locator('.lb-count')).toHaveText('1 / 2');
+  await lightboxSwipe(page, -200);
+  await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
+  expect(await page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('');
+  await lightboxSwipe(page, 200);
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lb-count')).toHaveText('2 / 2');
@@ -2787,13 +2821,17 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
     [100, 300],
     [250, 300],
   ]);
-  await expect(page.locator('.lightbox img')).toHaveClass(/zoomed/);
+  await expect(page.locator('.lb-track > img')).toHaveClass(/zoomed/);
   await touch('touchstart', [[200, 300]]);
   await touch('touchmove', [[100, 300]]);
   await touch('touchend', [[100, 300]]);
   await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  // Auch ein echter Finger (mit Pointer-Ereignissen) blättert vergrößert nicht.
+  await lightboxSwipe(page, -200);
+  await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('.lightbox img')).not.toHaveClass(/zoomed/);
+  await expect(page.locator('.lb-track > img')).not.toHaveClass(/zoomed/);
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
   await page.keyboard.press('ArrowRight');
   await shot(page, '15-galerie-lightbox');
@@ -2811,7 +2849,7 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   // Geladen: keine Ladeschnecke mehr, weder im Raster noch in der Übersicht oder der Großansicht.
   await expect(page.locator('.photo .img-loading')).toHaveCount(0);
   await page.locator('.photo[data-intern]').click();
-  await expect(page.locator('.lightbox img')).toBeVisible();
+  await expect(page.locator('.lb-track > img')).toBeVisible();
   await expect(page.locator('.lightbox .img-loading')).toHaveCount(0);
   await page.keyboard.press('Escape');
   const internSrc = await page.locator('.photo[data-intern] img').getAttribute('src');
@@ -2912,7 +2950,7 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   // Blättern zum Bild: das Video verschwindet.
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lightbox video')).toHaveCount(0);
-  await expect(page.locator('.lightbox img')).toBeVisible();
+  await expect(page.locator('.lb-track > img')).toBeVisible();
   await page.keyboard.press('Escape');
 });
 
