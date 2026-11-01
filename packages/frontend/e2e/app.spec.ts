@@ -4258,8 +4258,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');
   await page.reload();
-  // Unter WordPress in der CI dauert die Antwort aus dem Netz im Hintergrund teils länger als 5 s.
-  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible({ timeout: 15_000 });
+  await expect(banner.getByRole('button', { name: '+1 weitere' })).toBeVisible();
   await expect(banner.locator('.board-entry')).toHaveCount(1);
   await banner.getByRole('button', { name: '+1 weitere' }).click();
   await expect(banner).toContainText(`${first} – fällt aus`);
