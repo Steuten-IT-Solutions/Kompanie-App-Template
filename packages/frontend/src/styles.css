@@ -1133,7 +1133,8 @@ button.member-date {
   left: calc(100% + 32px);
 }
 @media (prefers-reduced-motion: reduce) {
-  .member-track {
+  .member-track,
+  .lb-track {
     transition: none;
   }
 }
@@ -1775,6 +1776,36 @@ code {
   justify-content: center;
   /* Wischen und Zoomen mit zwei Fingern übernimmt die App (nicht der Browser für die ganze Seite) */
   touch-action: none;
+  overflow: hidden;
+}
+/* Spur mit dem Bild; beim Wischen setzt swipe.ts den Versatz, beim Loslassen gleitet sie (wie .member-track). */
+.lb-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.22s ease-out;
+}
+.lb-track.peeking {
+  will-change: transform;
+}
+/* Vorheriges und nächstes Bild neben dem Bild, Abstand wie PEEK_GAP in swipe.ts */
+.lb-peek {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.lb-peek-prev {
+  right: calc(100% + 32px);
+}
+.lb-peek-next {
+  left: calc(100% + 32px);
 }
 .lightbox img {
   max-width: calc(100vw / var(--kompanie-zoom, 1));

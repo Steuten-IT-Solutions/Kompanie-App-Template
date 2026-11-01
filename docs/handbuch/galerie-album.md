@@ -21,7 +21,7 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 ## So gehst du vor
 ### Ein Bild groß ansehen
 1. Tippe auf ein Vorschaubild. Es öffnet sich groß, auf dunklem Hintergrund, und nach einem Moment in voller Auflösung.
-2. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf **›** bzw. **‹**. Am Computer gehen auch die Pfeiltasten.
+2. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf **›** bzw. **‹**. Am Computer gehen auch die Pfeiltasten. Beim Wischen folgt das Bild deinem Finger, daneben siehst du schon das nächste. Ziehst du nur ein kleines Stück, bleibt das Bild stehen. Ist ein Bild vergrößert, verschiebt Wischen das Bild, statt zu blättern.
 3. Unten steht, das wievielte Bild es ist, z. B. „3 / 3“, bei internen Bildern mit „intern“.
 4. Tippe auf **✕** oben rechts, um das Bild zu schließen. Am Computer geht auch die Escape-Taste, auf dem Handy auch die Zurück-Taste oder -Geste. Das Album zeigt dann die Stelle mit dem zuletzt angesehenen Bild.
 
