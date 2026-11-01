@@ -526,27 +526,47 @@ final class Kernel
             header('Cache-Control: no-store');
             return;
         }
-        $res = $app->gallery()->deliverVideo($id, $this->http->header('Range'), static function () use ($app): array {
-            $user = $app->authContext->currentUser();
-            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
-        });
+        // Die Daten aus Drive gleich weitergeben (nicht puffern oder komprimieren, sonst wartet der Browser).
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        @ini_set('zlib.output_compression', '0');
+        $res = $app->gallery()->deliverVideo(
+            $id,
+            $this->http->header('Range'),
+            static function () use ($app): array {
+                $user = $app->authContext->currentUser();
+                return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
+            },
+            static function (array $head) use ($app): void {
+                http_response_code(206);
+                header('Accept-Ranges: bytes');
+                header('Content-Range: ' . $head['contentRange']);
+                header('Cache-Control: ' . $app->preview()->cacheControl($head['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
+                header('ETag: ' . $head['etag']);
+                header('Content-Type: ' . $head['mime']);
+                header('Content-Length: ' . $head['length']);
+                header('X-Accel-Buffering: no');
+                flush();
+            },
+            static function (string $chunk): bool {
+                echo $chunk;
+                flush();
+                return connection_aborted() === 0;
+            },
+        );
+        if (!empty($res['sent'])) {
+            return;
+        }
         http_response_code($res['status']);
         header('Accept-Ranges: bytes');
         if (isset($res['contentRange'])) {
             header('Content-Range: ' . $res['contentRange']);
         }
-        if ($res['status'] !== 206 || !isset($res['body'])) {
-            header('Cache-Control: no-store');
-            if (isset($res['retryAfter'])) {
-                header('Retry-After: ' . (int) $res['retryAfter']);
-            }
-            return;
+        header('Cache-Control: no-store');
+        if (isset($res['retryAfter'])) {
+            header('Retry-After: ' . (int) $res['retryAfter']);
         }
-        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
-        header('ETag: ' . $res['etag']);
-        header('Content-Type: ' . $res['mime']);
-        header('Content-Length: ' . strlen($res['body']));
-        echo $res['body'];
     }
 
     /**

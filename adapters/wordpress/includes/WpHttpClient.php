@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\Infra\BufferedStream;
+use KompanieApp\Core\Infra\CurlHttpClient;
 use KompanieApp\Core\Port\ExtendedHttpClient;
+use KompanieApp\Core\Port\StreamingHttpClient;
 
 /**
  * Ausgehende Anfragen über die WordPress-HTTP-API.
@@ -15,8 +18,13 @@ use KompanieApp\Core\Port\ExtendedHttpClient;
  * selbst (pre_http_request), gilt seine Antwort. Ohne Requests oder bei nur einer Anfrage nacheinander.
  *
  * Downloads (download) schreibt WordPress direkt in die Datei (stream), nicht in den Arbeitsspeicher.
+ *
+ * Weitergeben während des Ladens (stream, z. B. Videos aus Drive): Die HTTP-API von WordPress gibt die Antwort erst
+ * ganz zurück. Deshalb hier über cURL, mit den Zertifikaten von WordPress und nach denselben Filtern wie oben
+ * (http_request_args, pre_http_request, WP_HTTP_BLOCK_EXTERNAL). Mit Proxy, ohne cURL oder wenn ein Filter antwortet,
+ * über wp_remote_request in einem Stück.
  */
-final class WpHttpClient implements ExtendedHttpClient
+final class WpHttpClient implements ExtendedHttpClient, StreamingHttpClient
 {
     public function request(string $method, string $url, array $headers = [], ?string $body = null, int $timeoutSeconds = 15): array
     {
@@ -80,6 +88,30 @@ final class WpHttpClient implements ExtendedHttpClient
             throw new \RuntimeException('Die Datei ließ sich nicht speichern.');
         }
         return ['status' => $out['status'], 'headers' => $out['headers']];
+    }
+
+    public function stream(string $url, array $headers, \Closure $onHead, \Closure $onData, int $timeoutSeconds = 120): bool
+    {
+        $args = apply_filters('http_request_args', wp_parse_args(self::args('GET', $headers, null, $timeoutSeconds), self::defaults($url)), $url);
+        $pre = apply_filters('pre_http_request', false, $args, $url);
+        if ($pre !== false) {
+            if (!is_array($pre)) {
+                throw new \RuntimeException(is_wp_error($pre) ? $pre->get_error_message() : 'Keine Verbindung.');
+            }
+            return BufferedStream::emit(self::result($pre), $onHead, $onData);
+        }
+        $proxy = new \WP_HTTP_Proxy();
+        $direct = function_exists('curl_init') && !($proxy->is_enabled() && $proxy->send_through_proxy($url))
+            && !(new \WP_Http())->block_request($url) && !empty($args['sslverify']);
+        if ($direct) {
+            $curl = new CurlHttpClient((string) $args['user-agent'], 64 * 1024 * 1024, (string) $args['sslcertificates']);
+            try {
+                return $curl->stream($url, (array) $args['headers'], $onHead, $onData, (int) $args['timeout']);
+            } catch (\RuntimeException) {
+                // Vor der Antwort gescheitert (z. B. Zertifikate): wie sonst über WordPress versuchen.
+            }
+        }
+        return BufferedStream::emit($this->request('GET', $url, $headers, null, $timeoutSeconds), $onHead, $onData);
     }
 
     /**

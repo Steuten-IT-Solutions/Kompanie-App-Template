@@ -73,6 +73,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   zurück. Auch **‹**, **›** und die Pfeiltasten blättern mit dieser Bewegung. Das gilt auch auf Videos; nur in den
   Leisten des Players (Zeitleiste, Ton, Vollbild) bedient Wischen weiter das Video. Tippen auf das Video spielt es ab
   bzw. hält es an.
+- **Videos der Galerie starten schneller**: Der Server reicht ein Video jetzt weiter, während es aus Google Drive kommt,
+  statt jedes Stück erst ganz zu laden. Unter WordPress antwortet die App auf Videoabrufe wie bei Bildern, bevor Theme
+  und andere Plugins starten. In der Großansicht lädt ein Video schon beim Öffnen, nicht erst beim Tippen auf ▶.
+  Anmeldung und Rechte prüft der Server wie bisher vor jedem Abruf. Tipp für Admins: „Fürs Web optimiert“
+  gespeicherte Videos starten noch schneller (siehe Handbuch, Galerie einrichten).
 - **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
   ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
   Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso

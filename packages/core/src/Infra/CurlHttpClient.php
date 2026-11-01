@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Infra;
 
 use KompanieApp\Core\Port\ExtendedHttpClient;
+use KompanieApp\Core\Port\StreamingHttpClient;
 
 /**
  * Ausgehende Anfragen über cURL oder, falls nicht vorhanden, über PHP-Streams.
- * Mit cURL: komprimierte Antworten (gzip), mehrere Anfragen gleichzeitig, Downloads in eine Datei.
+ * Mit cURL: komprimierte Antworten (gzip), mehrere Anfragen gleichzeitig, Downloads in eine Datei, Weitergeben der
+ * Antwort, während sie ankommt (stream).
  */
-final class CurlHttpClient implements ExtendedHttpClient
+final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
 {
-    /** @param int $maxBytes größte angenommene Antwort (Schutz des Arbeitsspeichers), Standard 64 MB */
-    public function __construct(private readonly string $userAgent = 'Kompanie-App', private readonly int $maxBytes = 64 * 1024 * 1024)
-    {
+    /**
+     * @param int $maxBytes größte angenommene Antwort (Schutz des Arbeitsspeichers), Standard 64 MB
+     * @param string|null $caFile Zertifikate zum Prüfen der Gegenstelle (z. B. die von WordPress); null: die des Systems
+     */
+    public function __construct(
+        private readonly string $userAgent = 'Kompanie-App',
+        private readonly int $maxBytes = 64 * 1024 * 1024,
+        private readonly ?string $caFile = null,
+    ) {
     }
 
     public function request(string $method, string $url, array $headers = [], ?string $body = null, int $timeoutSeconds = 15): array
@@ -23,7 +31,7 @@ final class CurlHttpClient implements ExtendedHttpClient
         $lines = self::lines($headers);
         return function_exists('curl_init')
             ? $this->curl($method, $url, $lines, $body, $timeoutSeconds)
-            : $this->stream($method, $url, $lines, $body, $timeoutSeconds);
+            : $this->phpStream($method, $url, $lines, $body, $timeoutSeconds);
     }
 
     public function requestAll(array $requests, int $timeoutSeconds = 15): array
@@ -89,7 +97,7 @@ final class CurlHttpClient implements ExtendedHttpClient
     {
         self::checkUrl($url);
         if (!function_exists('curl_init')) {
-            $res = $this->stream('GET', $url, self::lines($headers), null, $timeoutSeconds);
+            $res = $this->phpStream('GET', $url, self::lines($headers), null, $timeoutSeconds);
             if (file_put_contents($file, $res['body']) === false) {
                 throw new \RuntimeException('Die Datei ließ sich nicht speichern.');
             }
@@ -109,6 +117,74 @@ final class CurlHttpClient implements ExtendedHttpClient
             curl_close($ch);
         }
         return ['status' => $res['status'], 'headers' => $res['headers']];
+    }
+
+    public function stream(string $url, array $headers, \Closure $onHead, \Closure $onData, int $timeoutSeconds = 120): bool
+    {
+        self::checkUrl($url);
+        if (!function_exists('curl_init')) {
+            return BufferedStream::emit($this->phpStream('GET', $url, self::lines($headers), null, $timeoutSeconds), $onHead, $onData);
+        }
+        $state = new \stdClass();
+        $state->head = null; // Ergebnis von $onHead, sobald gefragt
+        $state->stopped = false; // abgebrochen (von $onHead oder $onData)
+        $state->headers = [];
+        $state->size = 0;
+        $max = $this->maxBytes;
+        $head = static function ($ch) use ($state, $onHead): bool {
+            if ($state->head === null) {
+                $state->head = $onHead((int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), $state->headers);
+            }
+            return $state->head;
+        };
+        $ch = curl_init($url);
+        $options = [
+            CURLOPT_HTTPGET => true,
+            // Daten gleich weitergeben; nur so viel annehmen wie bei request().
+            CURLOPT_WRITEFUNCTION => static function ($ch, string $chunk) use ($state, $max, $head, $onData): int {
+                $state->size += strlen($chunk);
+                if (!$head($ch) || $state->size > $max || !$onData($chunk)) {
+                    $state->stopped = true;
+                    return 0;
+                }
+                return strlen($chunk);
+            },
+            CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use ($state): int {
+                if (preg_match('#^HTTP/\S+\s+\d{3}#', $line)) {
+                    $state->headers = []; // nächste Antwort (Weiterleitung)
+                }
+                $parts = explode(':', $line, 2);
+                if (count($parts) === 2) {
+                    $state->headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return strlen($line);
+            },
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_CONNECTTIMEOUT => min(10, $timeoutSeconds),
+            CURLOPT_TIMEOUT => $timeoutSeconds,
+            CURLOPT_USERAGENT => $this->userAgent,
+            // Ohne Accept-Encoding: Die Bytes gehen unverändert weiter (Länge und Bereich wie angefragt).
+            CURLOPT_HTTPHEADER => self::lines($headers),
+        ];
+        if ($this->caFile !== null && is_file($this->caFile)) {
+            $options[CURLOPT_CAINFO] = $this->caFile;
+        }
+        curl_setopt_array($ch, $options);
+        $ok = curl_exec($ch);
+        try {
+            if ($state->head === null) {
+                if ($ok === false) {
+                    throw new \RuntimeException(curl_error($ch) ?: 'Keine Verbindung.');
+                }
+                return $head($ch); // Antwort ohne Inhalt
+            }
+            return $ok !== false && !$state->stopped && $state->head;
+        } finally {
+            curl_close($ch);
+        }
     }
 
     private static function checkUrl(string $url): void
@@ -208,7 +284,7 @@ final class CurlHttpClient implements ExtendedHttpClient
         return ['status' => (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), 'headers' => $state->headers, 'body' => $state->data];
     }
 
-    private function stream(string $method, string $url, array $lines, ?string $body, int $timeout): array
+    private function phpStream(string $method, string $url, array $lines, ?string $body, int $timeout): array
     {
         $context = stream_context_create(['http' => [
             'method' => strtoupper($method),
