@@ -1,6 +1,16 @@
 import { useEffect } from 'react';
-import { api, can, config, inBackground, isMember, type AttendanceEvent, type AttendanceSummary, type CalendarEvent } from './api';
-import { prefetch } from './dataCache';
+import {
+  api,
+  can,
+  config,
+  inBackground,
+  isMember,
+  type AttendanceEvent,
+  type AttendanceSummary,
+  type CalendarEvent,
+  type GalleryAlbum,
+} from './api';
+import { cacheKey, dataCache, prefetch } from './dataCache';
 import { createPrefetcher, idleNetworkOk, type NetworkInfo } from './prefetch';
 import { previewRole } from './preview';
 
@@ -244,6 +254,52 @@ export const prefetcher = createPrefetcher({
   prefetch,
   inBackground,
 });
+
+/** Beim Antippen eines Albums so viele Vorschaubilder vorladen (die erste Bildschirmseite und etwas mehr). */
+export const ALBUM_PRELOAD = 12;
+const ALBUM_PRELOAD_PARALLEL = 3;
+
+/** Bild laden; fertig, wenn es da ist oder nicht lädt. */
+function loadImage(src: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
+/**
+ * Album beim Antippen: seine Daten (wie prefetchOnTap) und danach die ersten ALBUM_PRELOAD Vorschaubilder, je
+ * ALBUM_PRELOAD_PARALLEL gleichzeitig. Interne Bilder kommen über die App (Anmeldung und Recht werden je Bild geprüft)
+ * und brauchen dafür jeweils einen Aufruf des Servers. Nur mit Service Worker: Er speichert sie und holt ein Bild, das
+ * die Ansicht gleichzeitig anfragt, nur einmal (ohne ihn luden beide). Nicht offline, nicht im Datensparmodus.
+ */
+export function prefetchAlbumOnTap(id: number) {
+  const s = sources.album(id);
+  const start = () => {
+    if (prefetcher.blocked()) return;
+    // Wie prefetcher.tap, aber ohne Warteschlange: Das Versprechen gilt erst, wenn die Daten da sind (tap kehrt sofort
+    // zurück, solange eine Anfrage im Leerlauf läuft).
+    void prefetch(s.key, s.deps, () => inBackground(s.load), true).then(async () => {
+      if (!navigator.serviceWorker?.controller || prefetcher.blocked() || !idleNetworkOk(navigator as NetworkInfo)) return;
+      const k = cacheKey(s.key, s.deps);
+      if (!dataCache.has(k)) return;
+      const thumbs = dataCache
+        .get<GalleryAlbum>(k)
+        .photos.map((p) => p.thumb)
+        .filter((t): t is string => !!t)
+        .slice(0, ALBUM_PRELOAD);
+      const next = async (): Promise<void> => {
+        const src = thumbs.shift();
+        if (src === undefined) return;
+        await loadImage(src);
+        return next();
+      };
+      await Promise.all(Array.from({ length: ALBUM_PRELOAD_PARALLEL }, next));
+    });
+  };
+  return { onPointerDown: start, onFocus: start };
+}
 
 /** Handler für einen Eintrag, der eine Ansicht öffnet: beim Antippen (bzw. Fokus per Tastatur) ihre Daten laden. */
 export function prefetchOnTap(...list: Source[]) {

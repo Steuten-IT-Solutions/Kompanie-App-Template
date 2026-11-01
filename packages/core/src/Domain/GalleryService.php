@@ -649,14 +649,28 @@ final class GalleryService
         return '.original-' . $photo['file_key'] . '.merker';
     }
 
-    /** Öffentliche fertige Bilder direkt als Datei, sonst über die App (das Original erst, wenn es erzeugt ist). */
+    /**
+     * Öffentliche fertige Bilder direkt als Datei, sonst über die App (das Original erst, wenn es erzeugt ist). Über die
+     * App mit Fassung (?v=, aus der Prüfsumme in Drive): Ein geändertes Bild hat so eine neue Adresse, und der Service
+     * Worker kann interne Bilder auf dem Gerät behalten, ohne je eine alte Fassung zu zeigen.
+     */
     public function url(array $photo, string $size): string
     {
         if (!(int) $photo['is_intern'] && $photo['status'] === GalleryRepository::READY
             && ($size !== self::ORIGINAL || is_file($this->path($photo, $size)))) {
             return $this->files->publicUrl(self::relativePath($photo, $size));
         }
-        return $this->env->photoUrl((int) $photo['id'], $size);
+        return self::withVersion($this->env->photoUrl((int) $photo['id'], $size), $photo);
+    }
+
+    /** Fassung eines Bilds an seiner Adresse (ohne bekannte Prüfsumme unverändert). */
+    private static function withVersion(string $url, array $photo): string
+    {
+        $md5 = (string) ($photo['md5'] ?? '');
+        if ($md5 === '') {
+            return $url;
+        }
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode(substr($md5, 0, 12));
     }
 
     /**
@@ -1015,7 +1029,7 @@ final class GalleryService
         // Eine Abfrage für alle Alben samt Titelbild (keine je Album).
         foreach ($this->repo->albumSummaries($member) as $r) {
             $cover = $r['cover_id'] !== null
-                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media']]
+                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media'], 'md5' => (string) ($r['cover_md5'] ?? '')]
                 : null;
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],

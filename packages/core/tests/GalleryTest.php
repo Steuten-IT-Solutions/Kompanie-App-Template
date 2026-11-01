@@ -328,9 +328,9 @@ final class GalleryTest extends TestCase
         $this->assertCount(1, $pdo->log);
 
         // Noch nichts fertig: öffentliches Bild vor internem, sonst nach Aufnahmezeit (a.jpg vor b.jpg).
-        $this->assertSame('https://example.org/app/foto/' . $id('IMG1') . '/thumb', $cover($member, 'Sommerfest'));
-        $this->assertSame('https://example.org/app/foto/' . $id('IMG1') . '/thumb', $cover($guest, 'Sommerfest'));
-        $this->assertSame('https://example.org/app/foto/' . $id('IMG4') . '/thumb', $cover($member, 'Vereinsabend'), 'rein internes Album: internes Titelbild');
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG1') . '/thumb?v=m1', $cover($member, 'Sommerfest'));
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG1') . '/thumb?v=m1', $cover($guest, 'Sommerfest'));
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG4') . '/thumb?v=m4', $cover($member, 'Vereinsabend'), 'rein internes Album: internes Titelbild');
         $this->assertNull($cover($guest, 'Vereinsabend'));
 
         // Fertige Bilder gehen vor; öffentliche fertige als statische Datei.
@@ -340,7 +340,7 @@ final class GalleryTest extends TestCase
         $this->assertStringStartsWith('https://example.org/media/' . $photo['album_id'] . '/' . $photo['file_key'] . '-thumb.jpg', $url);
         // Fehlgeschlagene Bilder sind kein Titelbild.
         $app->db->execute("UPDATE {photos} SET status = 'error' WHERE drive_file_id IN ('IMG1', 'IMG2')");
-        $this->assertSame('https://example.org/app/foto/' . $id('IMG3') . '/thumb', $cover($gallery->overview(true), 'Sommerfest'));
+        $this->assertSame('https://example.org/app/foto/' . $id('IMG3') . '/thumb?v=m3', $cover($gallery->overview(true), 'Sommerfest'));
         $this->assertNull($cover($gallery->overview(false), 'Sommerfest'), 'Gäste: Album ohne sichtbare Bilder fehlt');
     }
 
@@ -439,7 +439,7 @@ final class GalleryTest extends TestCase
         $photo = fn (): array => array_values(array_filter($gallery->album($album, false)['photos'], static fn (array $p): bool => $p['id'] === $id))[0];
 
         // Noch nicht erzeugt: Adresse über die App, die Großansicht zeigt bis dahin large.
-        $this->assertSame('https://example.org/app/foto/' . $id . '/original', $photo()['original']);
+        $this->assertSame('https://example.org/app/foto/' . $id . '/original?v=m1', $photo()['original'], 'mit Fassung (md5): neue Fassung, neue Adresse');
         $res = $gallery->photoForDelivery($id, 'original', false, false);
         $this->assertSame(200, $res['status']);
         $this->assertSame([3000, 2000], array_slice((array) getimagesize((string) $res['file']), 0, 2), 'volle Auflösung, nicht 1600');

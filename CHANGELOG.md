@@ -62,6 +62,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Interne Bilder der Galerie schneller**: Interne Bilder bleiben geschützt (der Server prüft bei jedem Abruf, ob
+  jemand angemeldet ist und sie sehen darf), erscheinen aber nach dem ersten Laden sofort, auch offline: Die App
+  speichert sie auf dem Gerät und löscht sie beim Abmelden. Beim Antippen eines Albums lädt sie die ersten
+  Vorschaubilder schon vorab. Unter WordPress antwortet die App auf Bildabrufe, bevor Theme und andere Plugins starten.
 - **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
   ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
   Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso
@@ -102,6 +106,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   manche Knöpfe und Schalter anders dar als die fertige Seite.
 - Direkt nach einer eigenen Änderung konnte eine Seite den Stand von vorher zeigen, wenn die App ihre Daten gerade im
   Hintergrund lud und die Antwort erst nach der Änderung ankam. Solche Antworten gelten jetzt als veraltet.
+- **Neu laden zeigt Änderungen anderer**: Hatte jemand anderes gerade etwas geändert (z. B. eine Nachricht am Brett)
+  und lud man die Seite kurz nach einer vorigen Aktualisierung neu, blieb bis zu zehn Sekunden der alte Stand stehen.
+  Die App fragt jetzt auch dann im Hintergrund nach und zeigt die Änderung.
 - **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der
   Seite in die Breite gezogen. Es erscheint jetzt im richtigen Seitenverhältnis, wie in der Kopfzeile.
 - **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
